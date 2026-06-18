@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-bg: #EDF2F7;
+  --brand-surface: #FFFFFF;
+  --brand-card: #DDEEFF;
+  --brand-primary: #0F4C81;
+  --brand-accent: #0EA5E9;
+  --brand-text: #0D1B2E;
+  --brand-text-secondary: #4E6080;
+  --brand-border: #C8D8EC;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  max-width: 100vw;
+  background-color: var(--brand-bg);
+  color: var(--brand-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Remove tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--brand-border);
+  border-radius: 2px;
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-xl border border-brand-border p-4 mb-3;
+    border-color: var(--brand-border);
+  }
+  .card-blue {
+    @apply rounded-xl p-4 mb-3;
+    background: var(--brand-card);
+    border: 0.5px solid #B8CFEA;
+  }
+  .btn-primary {
+    @apply w-full rounded-lg py-3 px-4 text-sm font-medium text-white;
+    background: var(--brand-primary);
+  }
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
+  .btn-accent {
+    @apply w-full rounded-lg py-3 px-4 text-sm font-medium text-white;
+    background: var(--brand-accent);
+  }
+  .btn-outline {
+    @apply w-full rounded-lg py-3 px-4 text-sm font-medium border;
+    color: var(--brand-primary);
+    border-color: var(--brand-primary);
+    background: white;
+  }
+  .label {
+    @apply text-xs font-medium uppercase tracking-wide mb-2;
+    color: var(--brand-text-secondary);
+    letter-spacing: 0.5px;
+  }
+  .tag {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium;
+    background: var(--brand-card);
+    color: var(--brand-primary);
+  }
+  .tag-green {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium;
+    background: #D1FAE5;
+    color: #065F46;
+  }
+  .tag-sky {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium;
+    background: #E0F2FE;
+    color: #0369A1;
+  }
+  .tag-gray {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium;
+    background: #F1F5F9;
+    color: var(--brand-text-secondary);
+  }
+  .set-input {
+    @apply rounded-lg text-center text-sm;
+    background: #F0F4F8;
+    border: 0.5px solid var(--brand-border);
+    padding: 8px;
+    color: var(--brand-text);
+    width: 100%;
+  }
+  .set-input:focus {
+    outline: none;
+    border-color: var(--brand-accent);
+    background: var(--brand-card);
+  }
+  .set-input.done {
+    background: var(--brand-card);
+    border-color: var(--brand-accent);
+    font-weight: 500;
+  }
+}
