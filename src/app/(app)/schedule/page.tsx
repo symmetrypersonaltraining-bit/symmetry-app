@@ -73,7 +73,7 @@ export default async function SchedulePage() {
     if (assignment) {
       const prog = (assignment as any).programs;
       const allDays = (prog?.phases || []).flatMap((ph: any) => ph.days || []);
-      scheduledDows = [...new Set(allDays.map((d: any) => d.day_of_week).filter((d: any) => d !== null))];
+      scheduledDows = [...new Set(allDays.map((d: any) => d.day_of_week).filter((d: any) => d !== null))] as number[];
 
       // Build upcoming week
       for (let i = 0; i < 7; i++) {
