@@ -30,6 +30,29 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
+      // Check if this is a client with a temporary password
+      try {
+        const { data: { user: loggedInUser } } = await supabase.auth.getUser();
+        if (loggedInUser && loggedInUser.email !== "symmetrypersonaltraining@gmail.com") {
+          // Look up client_id from clients table
+          const { data: clientRec } = await supabase
+            .from("clients")
+            .select("id")
+            .eq("auth_user_id", loggedInUser.id)
+            .maybeSingle();
+          if (clientRec) {
+            const { data: settings } = await supabase
+              .from("client_app_settings")
+              .select("password_is_temporary")
+              .eq("client_id", clientRec.id)
+              .maybeSingle();
+            if (settings?.password_is_temporary) {
+              router.push("/set-password");
+              return;
+            }
+          }
+        }
+      } catch (_) { /* ignore — just go to home */ }
       router.push("/home");
       router.refresh();
     }

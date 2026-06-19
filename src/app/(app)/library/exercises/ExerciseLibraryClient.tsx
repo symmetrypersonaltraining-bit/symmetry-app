@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Logo from "@/components/Logo";
 
 interface Exercise {
   id: string;
@@ -39,9 +40,19 @@ const MODALITY_COLOR: Record<string, string> = {
   corrective: "#ef4444",
 };
 
+/** Extract YouTube video ID from common URL formats */
+function getYouTubeThumbnail(url: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^&\n?#]+)/
+  );
+  return match ? `https://img.youtube.com/vi/${match[1]}/mqdefault.jpg` : null;
+}
+
 function ExerciseDrawer({ ex, onClose }: { ex: Exercise; onClose: () => void }) {
   const icon = MODALITY_ICON[ex.modality?.toLowerCase() || ""] || "ti-barbell";
   const color = MODALITY_COLOR[ex.modality?.toLowerCase() || ""] || "var(--brand-primary)";
+  const ytThumb = getYouTubeThumbnail(ex.video_url);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
@@ -51,16 +62,32 @@ function ExerciseDrawer({ ex, onClose }: { ex: Exercise; onClose: () => void }) 
         style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}
         onClick={e => e.stopPropagation()}>
 
-        {/* Header */}
-        <div className="flex items-start gap-4 px-5 pt-5 pb-4 border-b"
+        {/* ── Drag handle (mobile) ── */}
+        <div className="flex justify-center pt-3 pb-0 lg:hidden">
+          <div className="w-10 h-1 rounded-full" style={{ background: "var(--brand-border)" }} />
+        </div>
+
+        {/* ── Header ── */}
+        <div className="flex items-start gap-4 px-5 pt-4 pb-4 border-b"
           style={{ borderColor: "var(--brand-border)" }}>
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: color + "20" }}>
-            <i className={`ti ${icon} text-2xl`} style={{ color }} />
-          </div>
+
+          {/* Exercise visual — YouTube thumbnail or Symmetry logo placeholder */}
+          {ytThumb ? (
+            <div className="w-16 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-black">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={ytThumb} alt={ex.name}
+                className="w-full h-full object-cover" />
+            </div>
+          ) : (
+            <div className="w-16 h-16 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: color + "18", border: `1.5px solid ${color}30` }}>
+              <Logo size={36} color={color} />
+            </div>
+          )}
+
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-bold" style={{ color: "var(--brand-text)" }}>{ex.name}</h2>
-            <div className="flex flex-wrap gap-2 mt-1">
+            <h2 className="text-base font-bold leading-snug" style={{ color: "var(--brand-text)" }}>{ex.name}</h2>
+            <div className="flex flex-wrap gap-2 mt-1.5">
               {ex.modality && (
                 <span className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
                   style={{ background: color + "20", color }}>
@@ -75,18 +102,21 @@ function ExerciseDrawer({ ex, onClose }: { ex: Exercise; onClose: () => void }) 
               )}
             </div>
           </div>
+
+          {/* Close button — prominent, always visible */}
           <button onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}>
-            <i className="ti ti-x text-sm" />
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
+            style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}
+            aria-label="Close">
+            <i className="ti ti-x text-base" />
           </button>
         </div>
 
-        {/* Details */}
+        {/* ── Details ── */}
         <div className="p-5 space-y-4">
           {ex.equipment && (
             <div className="flex items-center gap-3">
-              <i className="ti ti-tools text-base w-5" style={{ color: "var(--brand-text-secondary)" }} />
+              <i className="ti ti-tools text-base w-5 flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }} />
               <div>
                 <p className="text-[10px] uppercase tracking-wide font-semibold mb-0.5"
                   style={{ color: "var(--brand-text-secondary)" }}>Equipment</p>
@@ -95,17 +125,33 @@ function ExerciseDrawer({ ex, onClose }: { ex: Exercise; onClose: () => void }) 
             </div>
           )}
 
-          {/* Video */}
+          {/* Video section */}
           {ex.video_url ? (
             <div>
               <p className="text-[10px] uppercase tracking-wide font-semibold mb-2"
                 style={{ color: "var(--brand-text-secondary)" }}>Video</p>
-              <a href={ex.video_url} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm"
-                style={{ background: "var(--brand-primary)", color: "white" }}>
-                <i className="ti ti-player-play text-base" />
-                Watch Exercise Demo
-              </a>
+              {ytThumb ? (
+                <a href={ex.video_url} target="_blank" rel="noopener noreferrer"
+                  className="relative block rounded-xl overflow-hidden"
+                  style={{ aspectRatio: "16/9" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={ytThumb} alt={ex.name} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 flex items-center justify-center"
+                    style={{ background: "rgba(0,0,0,0.35)" }}>
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center"
+                      style={{ background: "rgba(255,255,255,0.92)" }}>
+                      <i className="ti ti-player-play text-xl" style={{ color: "#E53935" }} />
+                    </div>
+                  </div>
+                </a>
+              ) : (
+                <a href={ex.video_url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm"
+                  style={{ background: "var(--brand-primary)", color: "white" }}>
+                  <i className="ti ti-player-play text-base" />
+                  Watch Exercise Demo
+                </a>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
@@ -113,7 +159,9 @@ function ExerciseDrawer({ ex, onClose }: { ex: Exercise; onClose: () => void }) 
               <i className="ti ti-video-off text-base" style={{ color: "var(--brand-text-secondary)" }} />
               <div>
                 <p className="text-sm font-medium" style={{ color: "var(--brand-text-secondary)" }}>No video attached</p>
-                <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Video links can be added from Everfit export</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
+                  Video links can be added from Everfit export
+                </p>
               </div>
             </div>
           )}

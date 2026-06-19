@@ -197,8 +197,8 @@ export default function TrainerSidebar({
   return (
     <div>
       {/* Mobile top bar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center px-4 py-3 gap-3"
-        style={{ background: "linear-gradient(135deg, #0D3F6E, #0F4C81)" }}>
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center px-4 gap-3"
+        style={{ paddingTop: "calc(12px + env(safe-area-inset-top))", paddingBottom: "12px", background: "linear-gradient(135deg, #0D3F6E, #0F4C81)" }}>
         <button onClick={() => setMobileOpen(true)}
           className="w-9 h-9 rounded-lg flex items-center justify-center"
           style={{ background: "rgba(255,255,255,0.15)" }}>

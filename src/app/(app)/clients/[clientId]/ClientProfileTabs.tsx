@@ -1,7 +1,8 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import AssignProgramModal from "./AssignProgramModal";
 
@@ -28,10 +29,18 @@ interface Client {
   phone: string | null;
   injuries_limitations: string | null;
   primary_goal: string | null;
+  secondary_goals: string | null;
   experience_level: string | null;
   training_frequency: number | null;
   current_weight: number | null;
   current_body_fat_pct: number | null;
+  date_of_birth: string | null;
+  start_date: string | null;
+  notes: string | null;
+  current_fees: number | null;
+  is_self_coached: boolean | null;
+  payment_reminders_enabled: boolean | null;
+  created_at: string | null;
 }
 
 interface Props {
@@ -144,11 +153,13 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
                   ` • ${new Date(recentCompleted.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
               </p>
             </div>
-            <Link href={`/clients/${clientId}/day/${recentCompleted.days?.id || recentCompleted.day_id}`}
-              className="text-[10px] font-semibold px-2 py-1 rounded-lg"
-              style={{ background: "var(--brand-primary)15", color: "var(--brand-primary)" }}>
-              View
-            </Link>
+            {(recentCompleted.days?.id || recentCompleted.day_id) ? (
+              <Link href={`/clients/${clientId}/day/${recentCompleted.days?.id || recentCompleted.day_id}`}
+                className="text-[10px] font-semibold px-2 py-1 rounded-lg"
+                style={{ background: "var(--brand-primary)15", color: "var(--brand-primary)" }}>
+                View
+              </Link>
+            ) : null}
           </div>
         )}
       </div>
@@ -157,34 +168,35 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
       {todayWorkout && (() => {
         const done = todayWorkout.status === "completed";
         const dayId = todayWorkout.days?.id || todayWorkout.day_id;
+        const sessionCard = (
+          <div className="rounded-xl p-4 relative overflow-hidden"
+            style={{ background: done ? "var(--brand-surface)" : "var(--brand-primary)", border: done ? "1px solid var(--brand-border)" : "none" }}>
+            {!done && (
+              <div className="absolute top-0 right-0 w-28 h-28 rounded-full opacity-10"
+                style={{ background: "white", transform: "translate(30%,-30%)" }} />
+            )}
+            <div className="relative flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold" style={{ color: done ? "var(--brand-text)" : "white" }}>
+                  {todayWorkout.days?.label || "Workout"}
+                </h3>
+                <p className="text-xs mt-0.5" style={{ color: done ? "var(--brand-text-secondary)" : "rgba(255,255,255,0.7)" }}>
+                  {done ? "Completed" : "Not started"}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: done ? "#22c55e20" : "rgba(255,255,255,0.2)" }}>
+                <i className={`ti ${done ? "ti-check" : "ti-player-play"} text-lg`}
+                  style={{ color: done ? "#22c55e" : "white" }} />
+              </div>
+            </div>
+          </div>
+        );
         return (
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest mb-2"
               style={{ color: "var(--brand-text-secondary)" }}>Today&apos;s Session</p>
-            <Link href={`/clients/${clientId}/day/${dayId}`}>
-              <div className="rounded-xl p-4 relative overflow-hidden"
-                style={{ background: done ? "var(--brand-surface)" : "var(--brand-primary)", border: done ? "1px solid var(--brand-border)" : "none" }}>
-                {!done && (
-                  <div className="absolute top-0 right-0 w-28 h-28 rounded-full opacity-10"
-                    style={{ background: "white", transform: "translate(30%,-30%)" }} />
-                )}
-                <div className="relative flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-bold" style={{ color: done ? "var(--brand-text)" : "white" }}>
-                      {todayWorkout.days?.label || "Workout"}
-                    </h3>
-                    <p className="text-xs mt-0.5" style={{ color: done ? "var(--brand-text-secondary)" : "rgba(255,255,255,0.7)" }}>
-                      {done ? "Completed" : "Not started"}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{ background: done ? "#22c55e20" : "rgba(255,255,255,0.2)" }}>
-                    <i className={`ti ${done ? "ti-check" : "ti-player-play"} text-lg`}
-                      style={{ color: done ? "#22c55e" : "white" }} />
-                  </div>
-                </div>
-              </div>
-            </Link>
+            {dayId ? <Link href={`/clients/${clientId}/day/${dayId}`}>{sessionCard}</Link> : sessionCard}
           </div>
         );
       })()}
@@ -599,8 +611,169 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
   client: Client; programs: { id: string; name: string; description: string | null }[];
   currentProgramId?: string; clientId: string; onAssignProgram: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<"" | "saved" | "error">("");
+  const [form, setForm] = useState({
+    phone: client.phone || "",
+    primary_goal: client.primary_goal || "",
+    secondary_goals: client.secondary_goals || "",
+    experience_level: client.experience_level || "",
+    training_frequency: client.training_frequency != null ? String(client.training_frequency) : "",
+    current_weight: client.current_weight != null ? String(client.current_weight) : "",
+    current_body_fat_pct: client.current_body_fat_pct != null ? String(client.current_body_fat_pct) : "",
+    injuries_limitations: client.injuries_limitations || "",
+    notes: client.notes || "",
+    current_fees: client.current_fees != null ? String(client.current_fees) : "",
+    is_self_coached: client.is_self_coached ?? false,
+  });
+
+  const set = (k: keyof typeof form, v: string | boolean) =>
+    setForm(f => ({ ...f, [k]: v }));
+
+  const save = useCallback(async () => {
+    setSaving(true);
+    setSaveMsg("");
+    const supabase = createBrowserClient();
+    const payload: Record<string, string | number | boolean | null> = {
+      phone: form.phone || null,
+      primary_goal: form.primary_goal || null,
+      secondary_goals: form.secondary_goals || null,
+      experience_level: form.experience_level || null,
+      training_frequency: form.training_frequency ? Number(form.training_frequency) : null,
+      current_weight: form.current_weight ? Number(form.current_weight) : null,
+      current_body_fat_pct: form.current_body_fat_pct ? Number(form.current_body_fat_pct) : null,
+      injuries_limitations: form.injuries_limitations || null,
+      notes: form.notes || null,
+      current_fees: form.current_fees ? Number(form.current_fees) : null,
+      is_self_coached: form.is_self_coached,
+    };
+    const { error } = await supabase.from("clients").update(payload).eq("id", clientId);
+    setSaving(false);
+    if (error) { setSaveMsg("error"); } else { setSaveMsg("saved"); setEditing(false); }
+    setTimeout(() => setSaveMsg(""), 3000);
+  }, [form, clientId]);
+
+  function Row({ label, field, type = "text", placeholder = "" }: {
+    label: string; field: keyof typeof form; type?: string; placeholder?: string;
+  }) {
+    const val = form[field] as string;
+    return (
+      <div className="flex items-start gap-3 px-4 py-3 border-b last:border-b-0"
+        style={{ borderColor: "var(--brand-border)" }}>
+        <span className="text-xs font-medium w-28 flex-shrink-0 pt-2"
+          style={{ color: "var(--brand-text-secondary)" }}>{label}</span>
+        {editing ? (
+          <input
+            type={type}
+            value={val}
+            onChange={e => set(field, e.target.value)}
+            placeholder={placeholder || label}
+            className="flex-1 text-sm rounded-lg px-2.5 py-1.5 outline-none"
+            style={{
+              background: "var(--brand-bg)",
+              border: "1px solid var(--brand-primary)",
+              color: "var(--brand-text)",
+            }}
+          />
+        ) : (
+          <span className="text-sm flex-1 pt-1.5"
+            style={{ color: val ? "var(--brand-text)" : "var(--brand-text-secondary)" }}>
+            {val || "—"}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  function TextAreaRow({ label, field, placeholder = "" }: {
+    label: string; field: keyof typeof form; placeholder?: string;
+  }) {
+    const val = form[field] as string;
+    return (
+      <div className="flex items-start gap-3 px-4 py-3 border-b last:border-b-0"
+        style={{ borderColor: "var(--brand-border)" }}>
+        <span className="text-xs font-medium w-28 flex-shrink-0 pt-1.5"
+          style={{ color: "var(--brand-text-secondary)" }}>{label}</span>
+        {editing ? (
+          <textarea
+            rows={3}
+            value={val}
+            onChange={e => set(field, e.target.value)}
+            placeholder={placeholder || label}
+            className="flex-1 text-sm rounded-lg px-2.5 py-1.5 outline-none resize-none"
+            style={{
+              background: "var(--brand-bg)",
+              border: "1px solid var(--brand-primary)",
+              color: "var(--brand-text)",
+            }}
+          />
+        ) : (
+          <span className="text-sm flex-1 pt-0.5"
+            style={{ color: val ? "var(--brand-text)" : "var(--brand-text-secondary)", whiteSpace: "pre-wrap" }}>
+            {val || "—"}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  function SelectRow({ label, field, options }: {
+    label: string; field: keyof typeof form; options: string[];
+  }) {
+    const val = form[field] as string;
+    return (
+      <div className="flex items-start gap-3 px-4 py-3 border-b last:border-b-0"
+        style={{ borderColor: "var(--brand-border)" }}>
+        <span className="text-xs font-medium w-28 flex-shrink-0 pt-2"
+          style={{ color: "var(--brand-text-secondary)" }}>{label}</span>
+        {editing ? (
+          <select
+            value={val}
+            onChange={e => set(field, e.target.value)}
+            className="flex-1 text-sm rounded-lg px-2.5 py-1.5 outline-none"
+            style={{
+              background: "var(--brand-bg)",
+              border: "1px solid var(--brand-primary)",
+              color: "var(--brand-text)",
+            }}
+          >
+            <option value="">—</option>
+            {options.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        ) : (
+          <span className="text-sm flex-1 pt-1.5"
+            style={{ color: val ? "var(--brand-text)" : "var(--brand-text-secondary)" }}>
+            {val || "—"}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  const currentProgram = programs.find(p => p.id === currentProgramId);
+
+  function fmtDate(d: string | null) {
+    if (!d) return "—";
+    return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+
+      {/* Save message */}
+      {saveMsg && (
+        <div className="rounded-xl px-4 py-2.5 text-sm font-medium"
+          style={{
+            background: saveMsg === "saved" ? "#22c55e20" : "#ef444420",
+            color: saveMsg === "saved" ? "#16a34a" : "#dc2626",
+            border: `1px solid ${saveMsg === "saved" ? "#22c55e40" : "#ef444440"}`,
+          }}>
+          {saveMsg === "saved" ? "✓ Changes saved" : "✗ Save failed — try again"}
+        </div>
+      )}
+
+      {/* Program */}
       <div className="flex items-center justify-between px-4 py-3 rounded-xl"
         style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
         <div className="flex items-center gap-3">
@@ -609,9 +782,10 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
             <i className="ti ti-trophy text-base" style={{ color: "var(--brand-primary)" }} />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--brand-text-secondary)" }}>Program</p>
+            <p className="text-xs font-semibold uppercase tracking-wide"
+              style={{ color: "var(--brand-text-secondary)" }}>Program</p>
             <p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>
-              {programs.find(p => p.id === currentProgramId)?.name || "None assigned"}
+              {currentProgram?.name || "None assigned"}
             </p>
           </div>
         </div>
@@ -621,30 +795,165 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
           {currentProgramId ? "Change" : "Assign"}
         </button>
       </div>
+
+      {/* Edit toggle */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-widest"
+          style={{ color: "var(--brand-text-secondary)" }}>Client Details</h3>
+        {editing ? (
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setEditing(false); setForm({
+                phone: client.phone || "",
+                primary_goal: client.primary_goal || "",
+                secondary_goals: client.secondary_goals || "",
+                experience_level: client.experience_level || "",
+                training_frequency: client.training_frequency != null ? String(client.training_frequency) : "",
+                current_weight: client.current_weight != null ? String(client.current_weight) : "",
+                current_body_fat_pct: client.current_body_fat_pct != null ? String(client.current_body_fat_pct) : "",
+                injuries_limitations: client.injuries_limitations || "",
+                notes: client.notes || "",
+                current_fees: client.current_fees != null ? String(client.current_fees) : "",
+                is_self_coached: client.is_self_coached ?? false,
+              }); }}
+              className="px-3 py-1 rounded-lg text-xs font-medium"
+              style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}>
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="px-3 py-1 rounded-lg text-xs font-semibold"
+              style={{ background: "var(--brand-primary)", color: "white", opacity: saving ? 0.7 : 1 }}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium"
+            style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}>
+            <i className="ti ti-pencil text-xs" />
+            Edit
+          </button>
+        )}
+      </div>
+
+      {/* Contact */}
       <div className="rounded-xl overflow-hidden"
         style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-        {[
-          { label: "Email", value: client.email },
-          { label: "Phone", value: client.phone || "—" },
-          { label: "Goal", value: client.primary_goal || "—" },
-          { label: "Experience", value: client.experience_level || "—" },
-          { label: "Frequency", value: client.training_frequency ? `${client.training_frequency}x / week` : "—" },
-        ].map((row, i, arr) => (
-          <div key={row.label} className={`flex items-start gap-4 px-4 py-3 ${i < arr.length - 1 ? "border-b" : ""}`}
-            style={{ borderColor: "var(--brand-border)" }}>
-            <span className="text-xs font-medium w-24 flex-shrink-0 pt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{row.label}</span>
-            <span className="text-sm flex-1" style={{ color: "var(--brand-text)" }}>{row.value}</span>
-          </div>
-        ))}
-      </div>
-      {client.injuries_limitations && (
-        <div className="rounded-xl p-4" style={{ background: "#fef3c720", border: "1px solid #f59e0b40" }}>
-          <p className="text-xs font-semibold mb-1" style={{ color: "#f59e0b" }}>
-            <i className="ti ti-alert-triangle mr-1" />Injuries / Limitations
-          </p>
-          <p className="text-sm" style={{ color: "var(--brand-text)" }}>{client.injuries_limitations}</p>
+        <div className="px-4 py-2 border-b"
+          style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)" }}>
+          <p className="text-[10px] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--brand-text-secondary)" }}>Contact</p>
         </div>
-      )}
+        <div className="flex items-center gap-3 px-4 py-3 border-b"
+          style={{ borderColor: "var(--brand-border)" }}>
+          <span className="text-xs font-medium w-28 flex-shrink-0"
+            style={{ color: "var(--brand-text-secondary)" }}>Email</span>
+          <span className="text-sm" style={{ color: "var(--brand-text)" }}>{client.email}</span>
+        </div>
+        <Row label="Phone" field="phone" type="tel" placeholder="+1 (555) 000-0000" />
+      </div>
+
+      {/* Training */}
+      <div className="rounded-xl overflow-hidden"
+        style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+        <div className="px-4 py-2 border-b"
+          style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)" }}>
+          <p className="text-[10px] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--brand-text-secondary)" }}>Training</p>
+        </div>
+        <Row label="Primary Goal" field="primary_goal" placeholder="e.g. Fat loss, muscle gain" />
+        <Row label="Secondary Goals" field="secondary_goals" placeholder="e.g. Improve endurance" />
+        <SelectRow label="Experience" field="experience_level"
+          options={["Beginner", "Intermediate", "Advanced", "Elite"]} />
+        <Row label="Frequency" field="training_frequency" type="number" placeholder="3" />
+        <div className="flex items-center gap-3 px-4 py-3 border-b last:border-b-0"
+          style={{ borderColor: "var(--brand-border)" }}>
+          <span className="text-xs font-medium w-28 flex-shrink-0"
+            style={{ color: "var(--brand-text-secondary)" }}>Start Date</span>
+          <span className="text-sm" style={{ color: "var(--brand-text)" }}>{fmtDate(client.start_date)}</span>
+        </div>
+        <div className="flex items-center gap-3 px-4 py-3"
+          style={{ borderColor: "var(--brand-border)" }}>
+          <span className="text-xs font-medium w-28 flex-shrink-0"
+            style={{ color: "var(--brand-text-secondary)" }}>Date of Birth</span>
+          <span className="text-sm" style={{ color: "var(--brand-text)" }}>{fmtDate(client.date_of_birth)}</span>
+        </div>
+      </div>
+
+      {/* Body Metrics */}
+      <div className="rounded-xl overflow-hidden"
+        style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+        <div className="px-4 py-2 border-b"
+          style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)" }}>
+          <p className="text-[10px] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--brand-text-secondary)" }}>Body Metrics</p>
+        </div>
+        <Row label="Weight (lbs)" field="current_weight" type="number" placeholder="0.0" />
+        <Row label="Body Fat %" field="current_body_fat_pct" type="number" placeholder="0.0" />
+      </div>
+
+      {/* Injuries / Notes */}
+      <div className="rounded-xl overflow-hidden"
+        style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+        <div className="px-4 py-2 border-b"
+          style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)" }}>
+          <p className="text-[10px] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--brand-text-secondary)" }}>Notes & Limitations</p>
+        </div>
+        {(form.injuries_limitations || editing) && (
+          <TextAreaRow label="Injuries / Limits" field="injuries_limitations" placeholder="Any injuries or movement restrictions" />
+        )}
+        <TextAreaRow label="Trainer Notes" field="notes" placeholder="Internal notes (not visible to client)" />
+      </div>
+
+      {/* Admin */}
+      <div className="rounded-xl overflow-hidden"
+        style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+        <div className="px-4 py-2 border-b"
+          style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)" }}>
+          <p className="text-[10px] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--brand-text-secondary)" }}>Admin</p>
+        </div>
+        <Row label="Monthly Fee" field="current_fees" type="number" placeholder="0" />
+        <div className="flex items-center gap-3 px-4 py-3 border-b"
+          style={{ borderColor: "var(--brand-border)" }}>
+          <span className="text-xs font-medium w-28 flex-shrink-0"
+            style={{ color: "var(--brand-text-secondary)" }}>Self-Coached</span>
+          {editing ? (
+            <button
+              onClick={() => set("is_self_coached", !form.is_self_coached)}
+              className="w-10 h-6 rounded-full relative transition-colors"
+              style={{ background: form.is_self_coached ? "var(--brand-primary)" : "var(--brand-border)" }}>
+              <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform shadow"
+                style={{ left: form.is_self_coached ? "calc(100% - 22px)" : "2px", transform: "none" }} />
+            </button>
+          ) : (
+            <span className="text-sm" style={{ color: "var(--brand-text)" }}>
+              {form.is_self_coached ? "Yes" : "No"}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 px-4 py-3 border-b"
+          style={{ borderColor: "var(--brand-border)" }}>
+          <span className="text-xs font-medium w-28 flex-shrink-0"
+            style={{ color: "var(--brand-text-secondary)" }}>Payment SMS</span>
+          <span className="text-sm" style={{ color: "var(--brand-text)" }}>
+            {client.payment_reminders_enabled ? "Enabled" : "Disabled"}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 px-4 py-3"
+          style={{ borderColor: "var(--brand-border)" }}>
+          <span className="text-xs font-medium w-28 flex-shrink-0"
+            style={{ color: "var(--brand-text-secondary)" }}>Client Since</span>
+          <span className="text-sm" style={{ color: "var(--brand-text)" }}>
+            {client.created_at ? new Date(client.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "—"}
+          </span>
+        </div>
+      </div>
+
     </div>
   );
 }

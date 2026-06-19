@@ -1,4 +1,4 @@
-import { redirect, notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import WorkoutDayEditor from "./WorkoutDayEditor";
@@ -19,7 +19,8 @@ export default async function WorkoutDayEditPage({
     .select("id, name")
     .eq("id", clientId)
     .maybeSingle();
-  if (!client) notFound();
+
+  if (!client) redirect(`/clients`);
 
   const { data: day } = await supabase
     .from("days")
@@ -37,7 +38,43 @@ export default async function WorkoutDayEditPage({
     `)
     .eq("id", dayId)
     .maybeSingle();
-  if (!day) notFound();
+
+  // Day not found — program not yet migrated
+  if (!day) {
+    return (
+      <div style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
+        <div className="px-4 pt-4 pb-4" style={{ background: "var(--brand-primary)" }}>
+          <div className="flex items-center gap-2 mb-3">
+            <Link href={`/clients/${clientId}?tab=training`}
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(255,255,255,0.15)" }}>
+              <i className="ti ti-arrow-left text-white text-base" />
+            </Link>
+            <span className="text-white/70 text-sm">{(client as any).name}</span>
+          </div>
+          <h1 className="text-white text-xl font-bold">Workout Day</h1>
+          <p className="text-white/60 text-xs mt-0.5">Program not yet migrated</p>
+        </div>
+        <div className="p-6 text-center space-y-4 mt-8">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto"
+            style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+            <i className="ti ti-database-off text-3xl" style={{ color: "var(--brand-text-secondary)" }} />
+          </div>
+          <h2 className="text-lg font-bold" style={{ color: "var(--brand-text)" }}>
+            Program Not in App Yet
+          </h2>
+          <p className="text-sm max-w-xs mx-auto" style={{ color: "var(--brand-text-secondary)" }}>
+            This workout day hasn&apos;t been migrated from Everfit yet. Programs are being imported — check back soon.
+          </p>
+          <Link href={`/clients/${clientId}?tab=training`}
+            className="inline-block mt-2 px-5 py-2.5 rounded-xl text-sm font-semibold"
+            style={{ background: "var(--brand-primary)", color: "white" }}>
+            Back to Training Tab
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const { data: exercisesRaw } = await supabase
     .from("exercises")
@@ -54,7 +91,6 @@ export default async function WorkoutDayEditPage({
 
   return (
     <div style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
-      {/* Header */}
       <div className="px-4 pt-4 pb-4" style={{ background: "var(--brand-primary)" }}>
         <div className="flex items-center gap-2 mb-3">
           <Link href={`/clients/${clientId}?tab=training`}
@@ -67,7 +103,6 @@ export default async function WorkoutDayEditPage({
         <h1 className="text-white text-xl font-bold">{d.label || "Workout Day"}</h1>
         <p className="text-white/60 text-xs mt-0.5">{d.phases?.programs?.name} · {d.phases?.label}</p>
       </div>
-
       <div className="p-4">
         <WorkoutDayEditor
           dayId={dayId}

@@ -43,8 +43,8 @@ export default function TrainerLayoutWrapper({ children }: Props) {
       <div className="flex flex-col min-h-screen" style={{ background: "var(--brand-bg)" }}>
 
         {/* Top bar — mirrors what a client would see on mobile */}
-        <div className="flex items-center gap-3 px-4 py-3 sticky top-0 z-40 shadow-sm"
-          style={{ background: "var(--brand-primary)" }}>
+        <div className="flex items-center gap-3 px-4 pb-3 sticky top-0 z-40 shadow-sm"
+          style={{ background: "var(--brand-primary)", paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
           <Logo size={28} color="white" className="flex-shrink-0" />
           <div className="flex-1">
             <span className="text-white font-semibold text-sm">Symmetry</span>
@@ -66,7 +66,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
 
         {/* Client bottom nav */}
         <div className="fixed bottom-0 left-0 right-0 z-40 flex items-end"
-          style={{ background: "var(--brand-surface)", borderTop: "1px solid var(--brand-border)" }}>
+          style={{ background: "var(--brand-surface)", borderTop: "1px solid var(--brand-border)", paddingBottom: "env(safe-area-inset-bottom)" }}>
           {CLIENT_NAV.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
