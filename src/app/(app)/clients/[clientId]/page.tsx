@@ -16,7 +16,7 @@ export default async function ClientProfilePage({
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, name, email, phone, auth_user_id, created_at, payment_reminders_enabled, injuries_limitations, primary_goal, current_weight, current_body_fat_pct, experience_level, training_frequency")
+    .select("id, name, email, phone, auth_user_id, created_at, payment_reminders_enabled, injuries_limitations, primary_goal, secondary_goals, experience_level, training_frequency, current_weight, current_body_fat_pct, date_of_birth, start_date, notes, current_fees, is_self_coached")
     .eq("id", clientId)
     .maybeSingle();
   if (!client) notFound();
@@ -44,7 +44,7 @@ export default async function ClientProfilePage({
 
   const { data: assignment } = await supabase
     .from("program_assignments")
-    .select("id, start_date, active, programs(id, name)")
+    .select("id, program_id, start_date, active")
     .eq("client_id", clientId)
     .eq("active", true)
     .maybeSingle();
@@ -61,7 +61,7 @@ export default async function ClientProfilePage({
     .eq("client_id", clientId)
     .eq("status", "completed");
 
-  const prog = (assignment as any)?.programs;
+  const prog = programs.find(p => p.id === (assignment as any)?.program_id);
   const initials = client.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
   const avatarBgs = ["#DDEEFF","#FEF3C7","#F3E8FF","#FEE2E2","#D1FAE5","#FCE7F3"];
   const avatarTexts = ["#0F4C81","#92400E","#6B21A8","#991B1B","#065F46","#9D174D"];
@@ -130,7 +130,7 @@ export default async function ClientProfilePage({
         allWorkouts={allWorkouts}
         clientId={clientId}
         programs={programs}
-        currentProgramId={(assignment as any)?.programs?.id}
+        currentProgramId={(assignment as any)?.program_id}
       />
     </div>
   );

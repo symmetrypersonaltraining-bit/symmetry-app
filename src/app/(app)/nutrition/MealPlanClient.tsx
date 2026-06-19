@@ -61,9 +61,10 @@ interface Props {
   macroTarget: MacroTarget | null;
   weekLogs: { log_date: string; adherence: string }[];
   today: string;
+  isTrainer?: boolean;
 }
 
-export default function MealPlanClient({ clientId, mealPlan, todayLogs, macroTarget, weekLogs, today }: Props) {
+export default function MealPlanClient({ clientId, clientName, mealPlan, todayLogs, macroTarget, weekLogs, today, isTrainer }: Props) {
   const supabase = createClient();
   const [logs, setLogs] = useState<AdherenceLog[]>(todayLogs);
   const [saving, setSaving] = useState<string | null>(null);
@@ -205,13 +206,23 @@ export default function MealPlanClient({ clientId, mealPlan, todayLogs, macroTar
         </div>
       )}
 
-      {/* Header */}
-      <div className="px-4 pt-6 pb-4" style={{ background: "var(--brand-surface)", borderBottom: "1px solid var(--brand-border)" }}>
-        <h1 className="text-xl font-bold mb-0.5" style={{ color: "var(--brand-text)" }}>Nutrition</h1>
-        <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-          {new Date(today + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
-        </p>
-      </div>
+      {/* Header — hidden for trainer (trainer has its own header with selector) */}
+      {!isTrainer && (
+        <div className="px-4 pt-6 pb-4" style={{ background: "var(--brand-surface)", borderBottom: "1px solid var(--brand-border)" }}>
+          <h1 className="text-xl font-bold mb-0.5" style={{ color: "var(--brand-text)" }}>Nutrition</h1>
+          <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+            {new Date(today + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+          </p>
+        </div>
+      )}
+      {isTrainer && (
+        <div className="px-4 pt-4 pb-2">
+          <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>{clientName}</p>
+          <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+            {new Date(today + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+          </p>
+        </div>
+      )}
 
       {/* Macro rings */}
       <div className="mx-4 mt-4 rounded-2xl p-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>

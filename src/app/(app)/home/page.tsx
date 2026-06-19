@@ -36,7 +36,7 @@ export default async function HomePage() {
       .lte("scheduled_at", endStr + "T23:59:59")
       .order("scheduled_at");
 
-    type AE = { id: string; clientId: string; clientName: string; title: string; startTime: string; endTime: string; status: string };
+    type AE = { id: string; clientId: string; clientName: string; title: string; startTime: string; endTime: string; status: string; scheduledAt: string; endsAt: string | null };
     const appointmentMap: Record<string, AE[]> = {};
     for (const a of apptRows || []) {
       const row = a as any;
@@ -53,6 +53,8 @@ export default async function HomePage() {
         startTime,
         endTime,
         status: row.status || "scheduled",
+        scheduledAt: row.scheduled_at,
+        endsAt: row.ends_at || null,
       });
     }
 

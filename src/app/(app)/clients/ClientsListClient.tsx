@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import NewClientModal from "./NewClientModal";
 
 const AVATAR_COLORS = [
   { bg: "#DDEEFF", text: "#0F4C81" },
@@ -29,6 +30,7 @@ interface Props {
 
 export default function ClientsListClient({ clients }: Props) {
   const [search, setSearch] = useState("");
+  const [showNewClient, setShowNewClient] = useState(false);
 
   const filtered = clients.filter(
     (c) =>
@@ -38,6 +40,18 @@ export default function ClientsListClient({ clients }: Props) {
 
   return (
     <>
+      {showNewClient && <NewClientModal onClose={() => setShowNewClient(false)} />}
+
+      {/* New client button */}
+      <button
+        onClick={() => setShowNewClient(true)}
+        className="flex items-center gap-2 w-full mb-4 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        style={{ background: "var(--brand-primary)" }}
+      >
+        <i className="ti ti-user-plus text-base" />
+        Add New Client
+      </button>
+
       {/* Search bar */}
       <div className="relative mb-4">
         <i

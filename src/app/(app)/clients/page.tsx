@@ -53,13 +53,7 @@ export default async function ClientsPage() {
             {clientList.length} clients
           </p>
         </div>
-        <button
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
-          style={{ background: "var(--brand-primary)" }}
-        >
-          <i className="ti ti-user-plus text-base" />
-          Invite Client
-        </button>
+
       </div>
       <ClientsListClient clients={clientList} />
     </div>
