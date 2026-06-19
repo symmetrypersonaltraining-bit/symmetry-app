@@ -40,13 +40,10 @@ export default async function HomePage() {
     const appointmentMap: Record<string, AE[]> = {};
     for (const a of apptRows || []) {
       const row = a as any;
-      const dateKey = row.scheduled_at.split("T")[0];
-      const startTime = row.scheduled_at.includes("T")
-        ? row.scheduled_at.split("T")[1].slice(0, 5)
-        : "00:00";
-      const endTime = row.ends_at?.includes("T")
-        ? row.ends_at.split("T")[1].slice(0, 5)
-        : "01:00";
+      // Supabase returns "2026-06-22 10:30:00+00" (space) not ISO "T" format
+      const dateKey = row.scheduled_at.substring(0, 10);
+      const startTime = row.scheduled_at.length > 10 ? row.scheduled_at.substring(11, 16) : "00:00";
+      const endTime = row.ends_at ? row.ends_at.substring(11, 16) : "01:00";
       if (!appointmentMap[dateKey]) appointmentMap[dateKey] = [];
       appointmentMap[dateKey].push({
         id: row.id,
