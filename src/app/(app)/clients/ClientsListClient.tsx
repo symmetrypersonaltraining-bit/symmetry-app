@@ -101,9 +101,11 @@ export default function ClientsListClient({ clients }: Props) {
               <Link
                 key={client.id}
                 href={`/clients/${client.id}`}
-                className="flex items-center gap-4 px-4 py-3.5 border-b last:border-b-0 transition-colors"
+                className="flex items-center gap-4 px-4 py-3.5 border-b last:border-b-0 transition-all"
                 style={{
                   borderColor: "var(--brand-border)",
+                  borderLeft: `3px solid ${color.text}`,
+                  paddingLeft: "14px",
                 }}
               >
                 {/* Avatar */}

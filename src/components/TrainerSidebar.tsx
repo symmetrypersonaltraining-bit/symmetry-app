@@ -76,9 +76,9 @@ export default function TrainerSidebar({
   }
 
   const sidebarContent = (
-    <div className="flex flex-col h-full" style={{ background: "#0F4C81", color: "white" }}>
+    <div className="flex flex-col h-full" style={{ background: "linear-gradient(180deg, #0D3F6E 0%, #0F4C81 40%, #0A3A6B 100%)", color: "white" }}>
       {/* Logo */}
-      <div className="flex items-center gap-3 px-3 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.12)" }}>
+      <div className="flex items-center gap-3 px-3 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.15)", background: "rgba(0,0,0,0.15)" }}>
         <Link href="/home" className="flex items-center gap-2 flex-1 min-w-0">
           <Logo size={collapsed ? 36 : 40} color="white" className="flex-shrink-0" />
           {!collapsed && (
@@ -142,12 +142,16 @@ export default function TrainerSidebar({
           return (
             <Link key={item.href} href={item.href!}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 transition-all"
-              style={{ background: isActive(item.href) ? "rgba(255,255,255,0.18)" : "transparent" }}>
+              style={{
+                background: isActive(item.href) ? "rgba(255,255,255,0.18)" : "transparent",
+                borderLeft: isActive(item.href) ? "3px solid white" : "3px solid transparent",
+                boxShadow: isActive(item.href) ? "inset 0 0 20px rgba(255,255,255,0.05)" : "none",
+              }}>
               <i className={`ti ${item.icon} text-lg flex-shrink-0`}
-                style={{ color: isActive(item.href) ? "white" : "rgba(255,255,255,0.7)" }} />
+                style={{ color: isActive(item.href) ? "white" : "rgba(255,255,255,0.65)", filter: isActive(item.href) ? "drop-shadow(0 0 6px rgba(255,255,255,0.4))" : "none" }} />
               {!collapsed && (
-                <span className="text-sm font-medium"
-                  style={{ color: isActive(item.href) ? "white" : "rgba(255,255,255,0.85)" }}>
+                <span className="text-sm font-semibold"
+                  style={{ color: isActive(item.href) ? "white" : "rgba(255,255,255,0.82)" }}>
                   {item.label}
                 </span>
               )}
@@ -194,7 +198,7 @@ export default function TrainerSidebar({
     <div>
       {/* Mobile top bar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center px-4 py-3 gap-3"
-        style={{ background: "#0F4C81" }}>
+        style={{ background: "linear-gradient(135deg, #0D3F6E, #0F4C81)" }}>
         <button onClick={() => setMobileOpen(true)}
           className="w-9 h-9 rounded-lg flex items-center justify-center"
           style={{ background: "rgba(255,255,255,0.15)" }}>

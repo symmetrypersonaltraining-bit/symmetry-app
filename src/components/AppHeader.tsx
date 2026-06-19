@@ -21,7 +21,7 @@ export default function AppHeader({
   const initials = clientInitials || (clientName ? clientName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() : "?");
 
   return (
-    <div style={{ background: "#0F4C81" }}>
+    <div style={{ background: "linear-gradient(135deg, #0D3F6E 0%, #0F4C81 60%, #1565C0 100%)" }}>
       {/* Top bar */}
       <div className="flex items-center gap-3 px-4 py-3">
         <Logo size={38} color="white" />

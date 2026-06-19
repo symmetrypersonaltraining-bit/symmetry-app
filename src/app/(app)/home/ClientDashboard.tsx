@@ -75,7 +75,7 @@ function MetricCard({
   values: number[]; color: string; icon: string;
 }) {
   return (
-    <div className="rounded-2xl p-3.5" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+    <div className="metric-card">
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>{label}</span>
         <i className={`ti ${icon} text-sm`} style={{ color }} />
@@ -174,7 +174,7 @@ export default function ClientDashboard({
       </div>
 
       {/* Week overview */}
-      <div className="rounded-2xl p-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+      <div className="metric-card">
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>This Week</p>
           <p className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>{adherence}% adherence</p>

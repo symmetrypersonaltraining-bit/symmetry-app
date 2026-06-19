@@ -83,7 +83,7 @@ export default async function HomePage() {
     return (
       <div className="p-4 lg:p-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>Schedule</h1>
+          <h1 className="text-2xl font-bold gradient-text">Schedule</h1>
           <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
             {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </p>
