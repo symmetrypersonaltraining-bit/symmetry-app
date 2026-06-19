@@ -15,7 +15,6 @@ export default async function ClientProfilePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Only trainer can access client profiles
   const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
   if (!isTrainer) redirect("/home");
 
@@ -27,7 +26,6 @@ export default async function ClientProfilePage({
 
   if (!client) notFound();
 
-  // Get active program + all phases/days
   const { data: assignment } = await supabase
     .from("program_assignments")
     .select(`
@@ -42,7 +40,6 @@ export default async function ClientProfilePage({
     .eq("active", true)
     .maybeSingle();
 
-  // Workout history
   const { data: recentLogs } = await supabase
     .from("workout_logs")
     .select("id, log_date, completed, day_id, days(label)")
@@ -50,14 +47,12 @@ export default async function ClientProfilePage({
     .order("log_date", { ascending: false })
     .limit(10);
 
-  // Workout count
   const { count: totalWorkouts } = await supabase
     .from("workout_logs")
     .select("id", { count: "exact", head: true })
     .eq("client_id", clientId)
     .eq("completed", true);
 
-  // Upcoming payment reminders for this client
   const today = new Date().toISOString().split("T")[0];
   const in60 = new Date();
   in60.setDate(in60.getDate() + 60);
@@ -70,7 +65,6 @@ export default async function ClientProfilePage({
     .order("due_date")
     .limit(6);
 
-  // Body weight
   const { data: latestWeight } = await supabase
     .from("body_weight_logs")
     .select("weight_lbs, logged_at")
@@ -129,7 +123,7 @@ export default async function ClientProfilePage({
                 className="text-xs px-2.5 py-1 rounded-full"
                 style={{ background: "rgba(255,255,255,0.2)", color: "white" }}
               >
-                {client.auth_user_id ? "âœ“ App access" : "Invite pending"}
+                {client.auth_user_id ? "App access" : "Invite pending"}
               </span>
             </div>
           </div>
@@ -153,7 +147,7 @@ export default async function ClientProfilePage({
             style={{ background: "white", border: "0.5px solid #C8D8EC" }}
           >
             <div className="text-xl font-medium" style={{ color: "#0F4C81" }}>
-              {latestWeight?.weight_lbs ? `${latestWeight.weight_lbs} lb` : "â€”"}
+              {latestWeight?.weight_lbs ? latestWeight.weight_lbs + " lb" : "-"}
             </div>
             <div className="text-xs mt-0.5" style={{ color: "#4E6080" }}>Current wt.</div>
           </div>
@@ -171,7 +165,7 @@ export default async function ClientProfilePage({
         {/* Program */}
         {prog && (
           <>
-            <p className="label">program Â· {prog.name}</p>
+            <p className="label">program - {prog.name}</p>
             {phases.map((phase: any) => (
               <div key={phase.id} className="mb-3">
                 <div className="card" style={{ padding: "0.5rem 1rem" }}>
@@ -183,7 +177,7 @@ export default async function ClientProfilePage({
                     .map((day: any) => (
                       <Link
                         key={day.id}
-                        href={`/workout/${day.id}`}
+                        href={"/workout/" + day.id}
                         className="flex items-center gap-3 py-2.5 border-b last:border-b-0 -mx-4 px-4"
                         style={{ borderColor: "#EDF2F7" }}
                       >
@@ -220,4 +214,31 @@ export default async function ClientProfilePage({
                 <div
                   key={log.id}
                   className="flex items-center gap-3 py-2.5 border-b last:border-b-0"
-                  style={{ borderColor: "#ED
+                  style={{ borderColor: "#EDF2F7" }}
+                >
+                  <i
+                    className={"ti ti-calendar-check text-sm"}
+                    style={{ color: log.completed ? "#10B981" : "#C8D8EC" }}
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm">{log.days?.label ?? "Workout"}</div>
+                    <div className="text-xs mt-0.5" style={{ color: "#4E6080" }}>
+                      {new Date(log.log_date + "T00:00:00").toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </div>
+                  </div>
+                  {log.completed && (
+                    <i className="ti ti-check text-sm" style={{ color: "#10B981" }} />
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+}

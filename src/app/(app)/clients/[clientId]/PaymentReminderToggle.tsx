@@ -51,17 +51,17 @@ export default function PaymentReminderToggle({
       });
       const json = await res.json();
       if (!res.ok) {
-        setSendResult(`Error: ${json.error}`);
+        setSendResult("Error: " + json.error);
         return;
       }
       const sent = json.results?.filter((r: any) => r.status === "sent").length ?? 0;
       const skipped = json.results?.filter((r: any) => r.status?.startsWith("skipped")).length ?? 0;
-      if (sent > 0) setSendResult(`✓ Sent ${sent} reminder${sent > 1 ? "s" : ""}`);
+      if (sent > 0) setSendResult("Sent " + sent + " reminder" + (sent > 1 ? "s" : ""));
       else if (skipped > 0) setSendResult("Nothing to send right now (no due reminders or phone missing)");
       else if (json.count === 0) setSendResult("No pending reminders due in the next 3 days");
       else setSendResult("Done");
     } catch {
-      setSendResult("Network error — try again");
+      setSendResult("Network error - try again");
     } finally {
       setSending(false);
     }
@@ -89,8 +89,8 @@ export default function PaymentReminderToggle({
             <div className="text-xs mt-0.5" style={{ color: "#4E6080" }}>
               {enabled
                 ? clientPhone
-                  ? `SMS to ${clientPhone}`
-                  : "Enabled — add phone number to send SMS"
+                  ? "SMS to " + clientPhone
+                  : "Enabled - add phone number to send SMS"
                 : "Reminders disabled for this client"}
             </div>
           </div>
@@ -110,7 +110,7 @@ export default function PaymentReminderToggle({
           </button>
         </div>
 
-        {/* Send now button — only if enabled, has phone, has pending reminders */}
+        {/* Send now button */}
         {enabled && clientPhone && pendingReminders.length > 0 && (
           <div className="mt-3 pt-3" style={{ borderTop: "0.5px solid #EDF2F7" }}>
             <div className="flex items-center gap-3">
@@ -124,5 +124,61 @@ export default function PaymentReminderToggle({
                   opacity: sending ? 0.6 : 1,
                 }}
               >
-                <i className={`ti ${sending ? "ti-loader animate-spin" : "ti-send"} text-sm`} />
-                {sending ? "Sending
+                <i className={"ti " + (sending ? "ti-loader animate-spin" : "ti-send") + " text-sm"} />
+                {sending ? "Sending..." : "Send reminder now"}
+              </button>
+              {sendResult && (
+                <span
+                  className="text-xs"
+                  style={{
+                    color: sendResult.startsWith("Sent") ? "#065F46"
+                      : sendResult.startsWith("Error") ? "#991B1B"
+                      : "#4E6080",
+                  }}
+                >
+                  {sendResult}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* No phone warning */}
+        {enabled && !clientPhone && (
+          <div className="mt-3 pt-3" style={{ borderTop: "0.5px solid #EDF2F7" }}>
+            <p className="text-xs" style={{ color: "#92400E" }}>
+              Add a phone number to this client to enable SMS reminders.
+            </p>
+          </div>
+        )}
+
+        {/* Upcoming reminders list */}
+        {upcomingReminders.length > 0 && (
+          <div className="mt-3 pt-3" style={{ borderTop: "0.5px solid #EDF2F7" }}>
+            {upcomingReminders.map((r, i) => {
+              const { label, bg, color: c } = statusLabel(r.status);
+              return (
+                <div key={i} className="flex items-center justify-between py-1.5">
+                  <span className="text-xs" style={{ color: "#4E6080" }}>
+                    {new Date(r.date + "T00:00:00").toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                    {" - $"}
+                    {r.amount.toLocaleString()}
+                  </span>
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full"
+                    style={{ background: bg, color: c }}
+                  >
+                    {label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}

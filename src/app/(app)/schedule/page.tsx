@@ -71,7 +71,7 @@ export default async function SchedulePage() {
     if (assignment) {
       const prog = (assignment as any).programs;
       const allDays = (prog?.phases || []).flatMap((ph: any) => ph.days || []);
-      scheduledDows = [...new Set(allDays.map((d: any) => d.day_of_week).filter((d: any) => d !== null))];
+      scheduledDows = Array.from(new Set(allDays.map((d: any) => d.day_of_week).filter((d: any) => d !== null)));
 
       for (let i = 0; i < 7; i++) {
         const d = new Date(today);
