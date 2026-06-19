@@ -1,4 +1,4 @@
-﻿import { redirect, notFound } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import PaymentReminderToggle from "./PaymentReminderToggle";
@@ -21,7 +21,7 @@ export default async function ClientProfilePage({
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, name, email, auth_user_id, created_at, payment_reminders_enabled")
+    .select("id, name, email, phone, auth_user_id, created_at, payment_reminders_enabled")
     .eq("id", clientId)
     .maybeSingle();
 
@@ -203,6 +203,7 @@ export default async function ClientProfilePage({
           clientId={client.id}
           clientName={client.name}
           enabled={(client as any).payment_reminders_enabled ?? true}
+          clientPhone={(client as any).phone ?? null}
           upcomingReminders={(upcomingReminders || []).map((r: any) => ({
             date: r.due_date,
             amount: Number(r.amount_due),
@@ -219,7 +220,4 @@ export default async function ClientProfilePage({
                 <div
                   key={log.id}
                   className="flex items-center gap-3 py-2.5 border-b last:border-b-0"
-                  style={{ borderColor: "#EDF2F7" }}
-                >
-                  <div
-         
+                  style={{ borderColor: "#ED

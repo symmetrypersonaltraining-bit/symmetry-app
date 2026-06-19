@@ -1,0 +1,4 @@
+# Normalize all text files to LF on commit, no BOM
+* text=auto eol=lf
+*.ts linguist-language=TypeScript
+*.tsx linguist-language=TypeScript
