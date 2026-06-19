@@ -6,9 +6,9 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/home", label: "Home", icon: "ti-home" },
   { href: "/workout", label: "Workout", icon: "ti-barbell" },
-  { href: "/schedule", label: "Schedule", icon: "ti-calendar" },
+  { href: "/nutrition", label: "Nutrition", icon: "ti-salad" },
+  { href: "/log", label: "Log", icon: "ti-plus-circle" },
   { href: "/progress", label: "Progress", icon: "ti-chart-line" },
-  { href: "/profile", label: "Profile", icon: "ti-user" },
 ];
 
 export default function BottomNav() {
@@ -23,8 +23,8 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 flex border-t z-50"
       style={{
-        background: "white",
-        borderColor: "#C8D8EC",
+        background: "var(--brand-surface)",
+        borderColor: "var(--brand-border)",
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
@@ -38,11 +38,11 @@ export default function BottomNav() {
           >
             <i
               className={`ti ${item.icon} text-xl`}
-              style={{ color: active ? "#0F4C81" : "#4E6080" }}
+              style={{ color: active ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}
             />
             <span
               className="text-[10px] font-medium"
-              style={{ color: active ? "#0F4C81" : "#4E6080" }}
+              style={{ color: active ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}
             >
               {item.label}
             </span>

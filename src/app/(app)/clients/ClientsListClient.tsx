@@ -1,0 +1,142 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+
+const AVATAR_COLORS = [
+  { bg: "#DDEEFF", text: "#0F4C81" },
+  { bg: "#FEF3C7", text: "#92400E" },
+  { bg: "#F3E8FF", text: "#6B21A8" },
+  { bg: "#FEE2E2", text: "#991B1B" },
+  { bg: "#D1FAE5", text: "#065F46" },
+  { bg: "#E0F2FE", text: "#0369A1" },
+  { bg: "#FDF4FF", text: "#701A75" },
+  { bg: "#FFF7ED", text: "#9A3412" },
+];
+
+interface Client {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  hasAppAccess: boolean;
+  activeProgram: string | null;
+}
+
+interface Props {
+  clients: Client[];
+}
+
+export default function ClientsListClient({ clients }: Props) {
+  const [search, setSearch] = useState("");
+
+  const filtered = clients.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.email.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <>
+      {/* Search bar */}
+      <div className="relative mb-4">
+        <i
+          className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-base"
+          style={{ color: "var(--brand-text-secondary)" }}
+        />
+        <input
+          type="text"
+          placeholder="Search clients..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-9 pr-4 py-3 rounded-xl text-sm border"
+          style={{
+            background: "var(--brand-surface)",
+            borderColor: "var(--brand-border)",
+            color: "var(--brand-text)",
+          }}
+        />
+        {search && (
+          <button
+            onClick={() => setSearch("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2"
+          >
+            <i className="ti ti-x text-sm" style={{ color: "var(--brand-text-secondary)" }} />
+          </button>
+        )}
+      </div>
+
+      {/* Client list */}
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        {filtered.length === 0 ? (
+          <div className="py-12 text-center" style={{ color: "var(--brand-text-secondary)" }}>
+            <i className="ti ti-users text-3xl mb-2 block" />
+            <p className="text-sm">No clients found</p>
+          </div>
+        ) : (
+          filtered.map((client, i) => {
+            const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
+            const initials = client.name
+              .split(" ")
+              .map((n) => n[0] || "")
+              .join("")
+              .slice(0, 2)
+              .toUpperCase();
+
+            return (
+              <Link
+                key={client.id}
+                href={`/clients/${client.id}`}
+                className="flex items-center gap-4 px-4 py-3.5 border-b last:border-b-0 transition-colors"
+                style={{
+                  borderColor: "var(--brand-border)",
+                }}
+              >
+                {/* Avatar */}
+                <div
+                  className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
+                  style={{ background: color.bg, color: color.text }}
+                >
+                  {initials}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>
+                      {client.name}
+                    </span>
+                    {client.hasAppAccess ? (
+                      <span className="tag-green text-[10px] px-1.5 py-0.5 rounded-full font-medium">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="tag-gray text-[10px] px-1.5 py-0.5 rounded-full font-medium">
+                        Pending
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs mt-0.5 truncate" style={{ color: "var(--brand-text-secondary)" }}>
+                    {client.activeProgram || "No active program"}
+                  </div>
+                </div>
+
+                {/* Chevron */}
+                <i
+                  className="ti ti-chevron-right text-lg flex-shrink-0"
+                  style={{ color: "var(--brand-border)" }}
+                />
+              </Link>
+            );
+          })
+        )}
+      </div>
+
+      {search && filtered.length > 0 && (
+        <p className="text-xs text-center mt-2" style={{ color: "var(--brand-text-secondary)" }}>
+          {filtered.length} of {clients.length} clients
+        </p>
+      )}
+    </>
+  );
+}

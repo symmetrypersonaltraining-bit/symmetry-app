@@ -4,15 +4,18 @@ import WorkoutLogger from "./WorkoutLogger";
 
 export default async function WorkoutDayPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ dayId: string }>;
+  searchParams: Promise<{ forClient?: string }>;
 }) {
   const { dayId } = await params;
+  const { forClient } = await searchParams;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
 
   const { data: day } = await supabase
     .from("days")
@@ -28,7 +31,7 @@ export default async function WorkoutDayPage({
           unilateral, tempo, load_descriptor, cue, rest,
           superset_group, intensity_type, use_drop_sets,
           use_rest_pause, use_partials,
-          exercises(id, name, category, muscle_group, equipment)
+          exercises(id, name, modality, muscle_group, equipment_required)
         )
       )
     `)
@@ -47,22 +50,34 @@ export default async function WorkoutDayPage({
   }
 
   let clientId: string | null = null;
-  const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
+  let clientName: string | null = null;
 
-  if (isTrainer) {
+  if (isTrainer && forClient) {
+    // Trainer running a specific client's session
     const { data } = await supabase
       .from("clients")
-      .select("id")
+      .select("id, name")
+      .eq("id", forClient)
+      .maybeSingle();
+    clientId = data?.id || null;
+    clientName = data?.name || null;
+  } else if (isTrainer) {
+    // Trainer viewing their own workout (Dustin as client)
+    const { data } = await supabase
+      .from("clients")
+      .select("id, name")
       .ilike("name", "%Dustin%")
       .maybeSingle();
     clientId = data?.id || null;
+    clientName = data?.name || null;
   } else {
     const { data } = await supabase
       .from("clients")
-      .select("id")
+      .select("id, name")
       .eq("auth_user_id", user.id)
       .maybeSingle();
     clientId = data?.id || null;
+    clientName = data?.name || null;
   }
 
   const today = new Date().toISOString().split("T")[0];
@@ -84,6 +99,8 @@ export default async function WorkoutDayPage({
       program={{ id: program?.id, name: program?.name }}
       sections={sortedSections}
       clientId={clientId}
+      clientName={clientName}
+      isTrainerSession={isTrainer && !!forClient}
       existingLogId={existingLog?.id || null}
       existingSetLogs={existingLog?.set_logs || []}
     />

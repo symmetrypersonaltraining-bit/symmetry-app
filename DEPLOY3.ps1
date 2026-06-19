@@ -43,6 +43,7 @@ if ($LASTEXITCODE -eq 0) {
     if ($LASTEXITCODE -eq 0) {
         Write-Host "Force pushed. Vercel redeploys in ~60 seconds." -ForegroundColor Green
     } else {
-        Write-Host "Push failed. Check GitHub credentials." -ForegroundColor Red
+        Write-Host "Push failed. Check git remote / auth." -ForegroundColor Red
+        exit 1
     }
 }
