@@ -1,278 +1,511 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
-interface WorkoutEntry {
+interface AppointmentEntry {
+  id: string;
   clientId: string;
   clientName: string;
-  label: string;
-  completed: boolean;
-  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  status: string;
 }
 
 interface Props {
   clients: { id: string; name: string }[];
-  workoutMap: Record<string, WorkoutEntry[]>;
+  appointmentMap: Record<string, AppointmentEntry[]>;
   startDate: string;
 }
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const WEEK_OPTIONS = [1, 2, 4] as const;
-const AVATAR_COLORS = [
-  "#0F4C81", "#1B5E20", "#4A148C", "#BF360C", "#880E4F",
-  "#37474F", "#2D2D2D", "#006064", "#4E342E", "#558B2F",
+// ─── Color palette (vibrant, per client) ────────────────────────────────────
+const CLIENT_COLORS = [
+  "#1E88E5", "#43A047", "#8E24AA", "#FB8C00",
+  "#00ACC1", "#E91E63", "#7CB342", "#3949AB",
+  "#00897B", "#F4511E", "#6D4C41", "#039BE5",
 ];
 
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
+function clientColor(clients: { id: string }[], clientId: string) {
+  const idx = clients.findIndex((c) => c.id === clientId);
+  return CLIENT_COLORS[idx % CLIENT_COLORS.length];
 }
 
-function formatDate(dateStr: string): { day: number; month: string } {
-  const d = new Date(dateStr + "T00:00:00");
-  return { day: d.getDate(), month: d.toLocaleDateString("en-US", { month: "short" }) };
+function getInitials(name: string) {
+  return name.split(" ").map((n) => n[0] || "").join("").slice(0, 2).toUpperCase();
 }
 
-function isToday(dateStr: string): boolean {
-  return dateStr === new Date().toISOString().split("T")[0];
+function fmt12(t: string) {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
-function isPast(dateStr: string): boolean {
-  return dateStr < new Date().toISOString().split("T")[0];
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** SVG ring that wraps around the date number */
-function StatusRing({ total, done, isPastDay, isCurrentDay }: { total: number; done: number; isPastDay: boolean; isCurrentDay: boolean }) {
-  if (total === 0) return null;
-  const r = 13;
-  const circ = 2 * Math.PI * r;
-  const pct = total > 0 ? done / total : 0;
-  const color = pct === 1 ? "#22c55e" : pct > 0 ? "#f59e0b" : isPastDay ? "#ef4444" : "#94a3b8";
-  const dashOffset = circ * (1 - pct);
+// ─── Status styles ───────────────────────────────────────────────────────────
+const STATUS_STYLE: Record<string, { bg: string; color: string; border: string; label: string }> = {
+  scheduled: { bg: "rgba(14,165,233,0.12)", color: "#0EA5E9", border: "rgba(14,165,233,0.3)", label: "Scheduled" },
+  completed: { bg: "#D1FAE5", color: "#065F46", border: "#A7F3D0", label: "Done" },
+  cancelled: { bg: "rgba(239,68,68,0.1)", color: "#ef4444", border: "rgba(239,68,68,0.3)", label: "Cancelled" },
+  no_show:   { bg: "rgba(245,158,11,0.1)", color: "#f59e0b", border: "rgba(245,158,11,0.3)", label: "No-show" },
+};
+
+// ─── Day Detail Drawer ───────────────────────────────────────────────────────
+function DayDrawer({
+  date, entries, clients, onClose, onStatusChange,
+}: {
+  date: string;
+  entries: AppointmentEntry[];
+  clients: { id: string; name: string }[];
+  onClose: () => void;
+  onStatusChange: (id: string, status: string) => void;
+}) {
+  const supabase = createClient();
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  const d = new Date(date + "T00:00:00");
+  const dayNum = d.getDate();
+  const dow = d.toLocaleDateString("en-US", { weekday: "long" });
+  const monthLabel = d.toLocaleDateString("en-US", { month: "long" });
+  const isToday = date === todayStr();
+  const sorted = [...entries].sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  async function updateStatus(id: string, status: string) {
+    setUpdating(id);
+    await supabase.from("appointments").update({ status }).eq("id", id);
+    onStatusChange(id, status);
+    setUpdating(null);
+  }
 
   return (
-    <svg width="30" height="30" viewBox="0 0 30 30" className="absolute inset-0" style={{ pointerEvents: "none" }}>
-      <circle cx="15" cy="15" r={r} fill="none"
-        stroke={isCurrentDay ? "rgba(14,165,233,0.3)" : "rgba(150,150,150,0.15)"}
-        strokeWidth="2.5"/>
-      {pct > 0 && (
-        <circle cx="15" cy="15" r={r} fill="none" stroke={color} strokeWidth="2.5"
-          strokeDasharray={`${circ}`} strokeDashoffset={`${dashOffset}`}
-          strokeLinecap="round" transform="rotate(-90 15 15)"
-          style={{ transition: "stroke-dashoffset 0.5s ease" }}/>
-      )}
-      {pct === 0 && isPastDay && (
-        <circle cx="15" cy="15" r={r} fill="none" stroke={color} strokeWidth="2.5"
-          strokeDasharray="3 4" transform="rotate(-90 15 15)" opacity="0.5"/>
-      )}
-    </svg>
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+      <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.45)" }} />
+      <div
+        className="relative w-full max-w-lg max-h-[80vh] flex flex-col rounded-t-2xl overflow-hidden"
+        style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}
+        onClick={(e) => e.stopPropagation()}>
+
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full" style={{ background: "var(--brand-border)" }} />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b"
+          style={{ borderColor: "var(--brand-border)" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold"
+              style={{ background: isToday ? "#E53935" : "var(--brand-card)", color: isToday ? "white" : "var(--brand-text)" }}>
+              {dayNum}
+            </div>
+            <div>
+              <p className="text-base font-bold" style={{ color: "var(--brand-text)" }}>{dow}</p>
+              <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{monthLabel} {dayNum}</p>
+            </div>
+          </div>
+          <button onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center"
+            style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}>
+            <i className="ti ti-x text-sm" />
+          </button>
+        </div>
+
+        {/* Sessions list */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {sorted.length === 0 && (
+            <div className="text-center py-10">
+              <i className="ti ti-calendar-off text-3xl block mb-2" style={{ color: "var(--brand-border)" }} />
+              <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>No sessions scheduled</p>
+            </div>
+          )}
+          {sorted.map((entry) => {
+            const color = clientColor(clients, entry.clientId);
+            const s = STATUS_STYLE[entry.status] || STATUS_STYLE.scheduled;
+            const busy = updating === entry.id;
+            return (
+              <div key={entry.id} className="rounded-xl overflow-hidden"
+                style={{ border: "1px solid var(--brand-border)" }}>
+                {/* Color bar + content */}
+                <div className="flex">
+                  <div className="w-1 flex-shrink-0" style={{ background: color }} />
+                  <div className="flex-1 p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="text-right w-16 flex-shrink-0 pt-0.5">
+                        <p className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>{fmt12(entry.startTime)}</p>
+                        <p className="text-[10px]" style={{ color: "var(--brand-text-secondary)" }}>{fmt12(entry.endTime)}</p>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
+                            style={{ background: color }}>
+                            {getInitials(entry.clientName)}
+                          </span>
+                          <Link href={`/clients/${entry.clientId}`}
+                            className="text-sm font-semibold hover:underline truncate"
+                            style={{ color: "var(--brand-text)" }} onClick={onClose}>
+                            {entry.clientName}
+                          </Link>
+                        </div>
+                        <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+                          {entry.title || "Training Session"}
+                        </p>
+                        <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                          style={{ background: s.bg, color: s.color }}>
+                          {s.label}
+                        </span>
+                      </div>
+                    </div>
+                    {/* Action buttons */}
+                    {entry.status !== "completed" && entry.status !== "cancelled" && (
+                      <div className="flex gap-2 mt-2 pt-2 border-t" style={{ borderColor: "var(--brand-border)" }}>
+                        <button onClick={() => updateStatus(entry.id, "completed")} disabled={busy}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold"
+                          style={{ background: "#22c55e20", color: "#22c55e", opacity: busy ? 0.5 : 1 }}>
+                          {busy ? "…" : "✓ Done"}
+                        </button>
+                        <button onClick={() => updateStatus(entry.id, "no_show")} disabled={busy}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold"
+                          style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", opacity: busy ? 0.5 : 1 }}>
+                          No-show
+                        </button>
+                        <button onClick={() => updateStatus(entry.id, "cancelled")} disabled={busy}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold"
+                          style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", opacity: busy ? 0.5 : 1 }}>
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                    {(entry.status === "completed" || entry.status === "cancelled" || entry.status === "no_show") && (
+                      <div className="mt-2 pt-2 border-t" style={{ borderColor: "var(--brand-border)" }}>
+                        <button onClick={() => updateStatus(entry.id, "scheduled")} disabled={busy}
+                          className="text-xs px-3 py-1 rounded-lg font-medium"
+                          style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)", opacity: busy ? 0.5 : 1 }}>
+                          ↩ Undo
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer CTA */}
+        <div className="px-4 pb-5 pt-2 border-t" style={{ borderColor: "var(--brand-border)" }}>
+          <button className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+            style={{ background: "#E53935", color: "white" }}>
+            <i className="ti ti-plus text-base" />
+            Add on {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
-export default function TrainerCalendar({ clients, workoutMap, startDate }: Props) {
-  const [weeks, setWeeks] = useState<1 | 2 | 4>(4);
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [filterClient, setFilterClient] = useState<string | null>(null);
+// ─── Main Calendar ───────────────────────────────────────────────────────────
+const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  const displayStart = addDays(startDate, weekOffset * 7);
-  const totalDays = weeks * 7;
-  const dates: string[] = [];
-  for (let i = 0; i < totalDays; i++) dates.push(addDays(displayStart, i));
-  const weekRows: string[][] = [];
-  for (let w = 0; w < weeks; w++) weekRows.push(dates.slice(w * 7, (w + 1) * 7));
+export default function TrainerCalendar({ clients, appointmentMap }: Props) {
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth()); // 0-indexed
+  const [filterClient, setFilterClient] = useState<string | null>(null); // null = all
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [localMap, setLocalMap] = useState(appointmentMap);
 
-  const rangeStart = new Date(displayStart + "T00:00:00");
-  const rangeEnd = new Date(addDays(displayStart, totalDays - 1) + "T00:00:00");
-  const rangeLabel = `${rangeStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${rangeEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+  const today = todayStr();
 
-  function getClientColor(clientId: string) {
-    const idx = clients.findIndex((c) => c.id === clientId);
-    return AVATAR_COLORS[idx % AVATAR_COLORS.length];
+  // Build month grid
+  const cells = useMemo(() => {
+    const firstDay = new Date(viewYear, viewMonth, 1);
+    const lastDay = new Date(viewYear, viewMonth + 1, 0);
+    const startDow = firstDay.getDay(); // 0=Sun
+    const grid: (string | null)[] = [];
+    for (let i = 0; i < startDow; i++) grid.push(null);
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      const mm = String(viewMonth + 1).padStart(2, "0");
+      const dd = String(d).padStart(2, "0");
+      grid.push(`${viewYear}-${mm}-${dd}`);
+    }
+    while (grid.length % 7 !== 0) grid.push(null);
+    return grid;
+  }, [viewYear, viewMonth]);
+
+  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  }
+  function goToday() {
+    setViewYear(now.getFullYear());
+    setViewMonth(now.getMonth());
   }
 
-  function getClientInitials(name: string) {
-    return name.split(" ").map((n) => n[0] || "").join("").slice(0, 2).toUpperCase();
+  function handleStatusChange(id: string, status: string) {
+    setLocalMap(prev => {
+      const next = { ...prev };
+      for (const date of Object.keys(next)) {
+        next[date] = next[date].map(e => e.id === id ? { ...e, status } : e);
+      }
+      return next;
+    });
   }
 
-  const cellHeight = weeks === 1 ? "min-h-32" : weeks === 2 ? "min-h-24" : "min-h-20";
-  const maxCards = weeks === 4 ? 3 : 5;
+  // Unique clients that have at least one appointment
+  const activeClientIds = useMemo(() => {
+    const ids = new Set<string>();
+    Object.values(localMap).flat().forEach(e => ids.add(e.clientId));
+    return Array.from(ids);
+  }, [localMap]);
 
-  // Summary stats
-  const todayStr = new Date().toISOString().split("T")[0];
-  const allEntries = Object.entries(workoutMap);
-  const pastEntries = allEntries.filter(([d]) => d <= todayStr);
-  const totalScheduledPast = pastEntries.reduce((a, [, e]) => a + e.length, 0);
-  const totalCompletedPast = pastEntries.reduce((a, [, e]) => a + e.filter(x => x.completed).length, 0);
-  const overallPct = totalScheduledPast > 0 ? Math.round(totalCompletedPast / totalScheduledPast * 100) : null;
+  const activeClients = clients.filter(c => activeClientIds.includes(c.id));
+
+  // Stats
+  const pastDates = Object.keys(localMap).filter(d => d <= today);
+  const totalPast = pastDates.reduce((a, d) => a + localMap[d].length, 0);
+  const completedPast = pastDates.reduce((a, d) => a + localMap[d].filter(e => e.status === "completed").length, 0);
+  const pctOverall = totalPast > 0 ? Math.round(completedPast / totalPast * 100) : null;
 
   return (
     <div>
-      {/* Stats bar */}
-      {overallPct !== null && (
-        <div className="flex gap-3 mb-4 flex-wrap">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
-            style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-            <div className="w-2 h-2 rounded-full bg-green-500" />
-            <span style={{ color: "var(--brand-text-secondary)" }}>All-client adherence:</span>
-            <span className="font-bold" style={{ color: overallPct >= 80 ? "#22c55e" : overallPct >= 60 ? "#f59e0b" : "#ef4444" }}>
-              {overallPct}%
-            </span>
+      {/* ── Client Avatar Strip ─────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 no-scrollbar">
+        {/* All button */}
+        <button
+          onClick={() => setFilterClient(null)}
+          className="flex flex-col items-center gap-1 flex-shrink-0"
+          title="All clients">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold transition-all"
+            style={{
+              background: filterClient === null ? "#E53935" : "var(--brand-surface)",
+              color: filterClient === null ? "white" : "var(--brand-text-secondary)",
+              border: filterClient === null ? "2.5px solid #E53935" : "2px solid var(--brand-border)",
+              boxShadow: filterClient === null ? "0 0 0 3px rgba(229,57,53,0.2)" : "none",
+            }}>
+            <i className="ti ti-users text-base" />
           </div>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
+          <span className="text-[9px] font-medium" style={{ color: filterClient === null ? "#E53935" : "var(--brand-text-secondary)" }}>
+            All
+          </span>
+        </button>
+
+        {/* Per-client avatars */}
+        {activeClients.map((c) => {
+          const color = clientColor(clients, c.id);
+          const initials = getInitials(c.name);
+          const isSelected = filterClient === c.id;
+          const firstName = c.name.split(" ")[0];
+          return (
+            <div key={c.id} className="flex flex-col items-center gap-1 flex-shrink-0">
+              {/* Avatar — clicking filters calendar; long-press / right-click goes to profile */}
+              <button
+                onClick={() => setFilterClient(isSelected ? null : c.id)}
+                title={`Filter: ${c.name}`}
+                className="relative transition-all"
+                style={{ outline: "none" }}>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
+                  style={{
+                    background: color,
+                    border: isSelected ? `2.5px solid ${color}` : "2px solid transparent",
+                    boxShadow: isSelected ? `0 0 0 3px ${color}33` : "none",
+                    opacity: filterClient && !isSelected ? 0.45 : 1,
+                    transition: "all 0.15s ease",
+                  }}>
+                  {initials}
+                </div>
+                {isSelected && (
+                  <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full"
+                    style={{ background: color }} />
+                )}
+              </button>
+              {/* Name label — clicking goes to their profile Training tab */}
+              <Link href={`/clients/${c.id}?tab=training`}
+                className="text-[9px] font-medium text-center w-12 truncate"
+                style={{ color: isSelected ? color : "var(--brand-text-secondary)" }}
+                title={`Open ${c.name}'s Training Calendar`}>
+                {firstName}
+              </Link>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Stats bar ────────────────────────────────────────────────────────── */}
+      {pctOverall !== null && (
+        <div className="flex items-center gap-3 mb-3 flex-wrap">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs"
             style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-            <i className="ti ti-calendar-check" style={{ color: "#22c55e" }} />
-            <span style={{ color: "var(--brand-text-secondary)" }}>{totalCompletedPast} / {totalScheduledPast} sessions</span>
+            <span style={{ color: "var(--brand-text-secondary)" }}>Completion:</span>
+            <span className="font-bold" style={{ color: pctOverall >= 80 ? "#22c55e" : pctOverall >= 60 ? "#f59e0b" : "#ef4444" }}>
+              {pctOverall}%
+            </span>
+            <span style={{ color: "var(--brand-text-secondary)" }}>· {completedPast}/{totalPast} sessions</span>
           </div>
-          {/* Legend */}
-          <div className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs ml-auto"
+          <div className="flex items-center gap-3 px-3 py-1.5 rounded-xl text-xs ml-auto"
             style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-            <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: "#22c55e" }} />
-              <span style={{ color: "var(--brand-text-secondary)" }}>Done</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: "#f59e0b" }} />
-              <span style={{ color: "var(--brand-text-secondary)" }}>Partial</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: "#ef4444" }} />
-              <span style={{ color: "var(--brand-text-secondary)" }}>Missed</span>
-            </span>
+            {(["scheduled", "completed", "cancelled"] as const).map(s => {
+              const st = STATUS_STYLE[s];
+              return (
+                <span key={s} className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full" style={{ background: st.color }} />
+                  <span style={{ color: "var(--brand-text-secondary)" }}>{st.label}</span>
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Controls */}
-      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <button onClick={() => setWeekOffset((o) => o - 1)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center border"
-            style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)" }}>
-            <i className="ti ti-chevron-left text-sm" style={{ color: "var(--brand-text-secondary)" }} />
-          </button>
-          <button onClick={() => setWeekOffset(0)}
-            className="px-3 h-8 rounded-lg text-xs font-medium border"
-            style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)", color: "var(--brand-primary)" }}>
-            Today
-          </button>
-          <button onClick={() => setWeekOffset((o) => o + 1)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center border"
-            style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)" }}>
-            <i className="ti ti-chevron-right text-sm" style={{ color: "var(--brand-text-secondary)" }} />
-          </button>
-          <span className="text-sm font-medium ml-1" style={{ color: "var(--brand-text)" }}>{rangeLabel}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <select value={filterClient || ""} onChange={(e) => setFilterClient(e.target.value || null)}
-            className="px-3 py-1.5 rounded-lg text-sm border"
-            style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)", color: "var(--brand-text)" }}>
-            <option value="">All Clients</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name.split(" ")[0]} {c.name.split(" ").slice(-1)[0]?.[0]}.
-              </option>
-            ))}
-          </select>
-          <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "var(--brand-border)" }}>
-            {WEEK_OPTIONS.map((w) => (
-              <button key={w} onClick={() => setWeeks(w)}
-                className="px-3 py-1.5 text-xs font-medium transition-colors"
-                style={{
-                  background: weeks === w ? "var(--brand-primary)" : "var(--brand-surface)",
-                  color: weeks === w ? "white" : "var(--brand-text-secondary)",
-                }}>
-                {w}W
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* ── Calendar nav ─────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 mb-3">
+        <button onClick={prevMonth}
+          className="w-8 h-8 rounded-lg flex items-center justify-center border"
+          style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)" }}>
+          <i className="ti ti-chevron-left text-sm" style={{ color: "var(--brand-text-secondary)" }} />
+        </button>
+        <button onClick={goToday}
+          className="px-3 h-8 rounded-lg text-xs font-medium border"
+          style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)", color: "#E53935" }}>
+          Today
+        </button>
+        <button onClick={nextMonth}
+          className="w-8 h-8 rounded-lg flex items-center justify-center border"
+          style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)" }}>
+          <i className="ti ti-chevron-right text-sm" style={{ color: "var(--brand-text-secondary)" }} />
+        </button>
+        <span className="text-sm font-bold ml-1 flex-1" style={{ color: "var(--brand-text)" }}>{monthLabel}</span>
+        {filterClient && (
+          <span className="text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium"
+            style={{ background: clientColor(clients, filterClient) + "20", color: clientColor(clients, filterClient) }}>
+            {clients.find(c => c.id === filterClient)?.name.split(" ")[0]}
+            <button onClick={() => setFilterClient(null)} className="text-[10px]">✕</button>
+          </span>
+        )}
       </div>
 
-      {/* Grid */}
-      <div className="rounded-xl overflow-hidden border" style={{ borderColor: "var(--brand-border)", background: "var(--brand-surface)" }}>
-        {/* Headers */}
-        <div className="grid grid-cols-7 border-b" style={{ borderColor: "var(--brand-border)" }}>
-          {DAYS.map((d) => (
-            <div key={d} className="py-2 text-center text-xs font-semibold uppercase tracking-wide"
-              style={{ color: "var(--brand-text-secondary)", background: "var(--brand-bg)" }}>
+      {/* ── Month Grid ───────────────────────────────────────────────────────── */}
+      <div className="rounded-xl overflow-hidden border" style={{ borderColor: "var(--brand-border)" }}>
+        {/* DOW header */}
+        <div className="grid grid-cols-7 border-b" style={{ borderColor: "var(--brand-border)", background: "var(--brand-bg)" }}>
+          {DOW_LABELS.map((d) => (
+            <div key={d} className="py-2 text-center text-[10px] font-semibold uppercase tracking-wide"
+              style={{ color: "var(--brand-text-secondary)" }}>
               {d}
             </div>
           ))}
         </div>
 
-        {weekRows.map((weekDates, wi) => (
-          <div key={wi} className="grid grid-cols-7 border-b last:border-b-0"
-            style={{ borderColor: "var(--brand-border)" }}>
-            {weekDates.map((date) => {
-              const { day, month } = formatDate(date);
-              const todayCell = isToday(date);
-              const pastCell = isPast(date);
-              const allEntries = (workoutMap[date] || []).filter(
-                (e) => !filterClient || e.clientId === filterClient
-              );
-              const doneCount = allEntries.filter(e => e.completed).length;
-              const totalCount = allEntries.length;
+        {/* Day cells */}
+        <div className="grid grid-cols-7" style={{ background: "var(--brand-border)", gap: "1px" }}>
+          {cells.map((dateStr, i) => {
+            if (!dateStr) {
+              return <div key={`empty-${i}`} style={{ background: "var(--brand-bg)", minHeight: 88 }} />;
+            }
 
-              return (
-                <div key={date}
-                  className={`${cellHeight} border-r last:border-r-0 p-1.5`}
-                  style={{
-                    borderColor: "var(--brand-border)",
-                    background: todayCell ? "rgba(14,165,233,0.05)" : "transparent",
-                  }}>
-                  {/* Date with ring */}
-                  <div className="flex items-center gap-1 mb-1">
-                    <div className="relative w-[30px] h-[30px] flex-shrink-0 flex items-center justify-center">
-                      <StatusRing total={totalCount} done={doneCount} isPastDay={pastCell} isCurrentDay={todayCell} />
-                      <span className="relative z-10 text-xs font-semibold"
-                        style={{ color: todayCell ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>
-                        {day}
-                      </span>
-                    </div>
-                    {day === 1 && (
-                      <span className="text-[10px]" style={{ color: "var(--brand-text-secondary)" }}>{month}</span>
-                    )}
-                  </div>
+            const d = new Date(dateStr + "T00:00:00");
+            const dayNum = d.getDate();
+            const isToday = dateStr === today;
+            const isPast = dateStr < today;
 
-                  {/* Workout cards */}
-                  <div className="space-y-0.5">
-                    {allEntries.slice(0, maxCards).map((entry) => {
-                      const color = getClientColor(entry.clientId);
-                      const initials = getClientInitials(entry.clientName);
-                      return (
-                        <Link key={entry.id} href={`/clients/${entry.clientId}`}
-                          className="flex items-center gap-1 px-1.5 py-1 rounded text-[10px] font-medium truncate"
-                          style={{
-                            background: entry.completed ? "#D1FAE5" : color + "18",
-                            color: entry.completed ? "#065F46" : color,
-                            border: `1px solid ${entry.completed ? "#A7F3D0" : color + "40"}`,
-                          }}
-                          title={`${entry.clientName} — ${entry.label}`}>
-                          <span className="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-[8px] font-bold text-white"
-                            style={{ background: color }}>
-                            {initials}
-                          </span>
-                          <span className="truncate">{entry.label}</span>
-                          {entry.completed && <i className="ti ti-check text-[10px] flex-shrink-0" />}
-                        </Link>
-                      );
-                    })}
-                    {allEntries.length > maxCards && (
-                      <div className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                        style={{ color: "var(--brand-text-secondary)", background: "var(--brand-bg)" }}>
-                        +{allEntries.length - maxCards} more
-                      </div>
-                    )}
-                  </div>
+            const dayEntries = (localMap[dateStr] || [])
+              .filter(e => !filterClient || e.clientId === filterClient)
+              .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+            const doneCount = dayEntries.filter(e => e.status === "completed").length;
+
+            return (
+              <div key={dateStr}
+                className="cursor-pointer transition-colors"
+                style={{
+                  background: isToday ? "rgba(229,57,53,0.04)" : "var(--brand-surface)",
+                  minHeight: 88,
+                  padding: "6px 4px 4px",
+                }}
+                onClick={() => setSelectedDate(dateStr)}>
+
+                {/* Date number */}
+                <div className="flex items-center justify-center mb-1">
+                  <span
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold"
+                    style={{
+                      background: isToday ? "#E53935" : "transparent",
+                      color: isToday ? "white" : isPast ? "var(--brand-text-secondary)" : "var(--brand-text)",
+                    }}>
+                    {dayNum === 1
+                      ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                      : dayNum}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        ))}
+
+                {/* Event chips */}
+                <div className="space-y-0.5 px-0.5">
+                  {dayEntries.slice(0, 3).map((entry) => {
+                    const color = clientColor(clients, entry.clientId);
+                    const done = entry.status === "completed";
+                    const cancelled = entry.status === "cancelled";
+                    return (
+                      <div key={entry.id}
+                        className="flex items-center gap-1 px-1.5 py-1 rounded text-[10px] font-medium overflow-hidden"
+                        style={{
+                          background: cancelled ? "transparent" : color + "18",
+                          color: cancelled ? "var(--brand-text-secondary)" : color,
+                          border: `1px solid ${cancelled ? "var(--brand-border)" : color + "40"}`,
+                          textDecoration: cancelled ? "line-through" : "none",
+                          opacity: cancelled ? 0.6 : 1,
+                        }}>
+                        <span className="w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center text-[8px] font-bold text-white"
+                          style={{ background: color }}>
+                          {getInitials(entry.clientName)}
+                        </span>
+                        <span className="truncate leading-none">
+                          {fmt12(entry.startTime)} {entry.clientName.split(" ")[0]}
+                        </span>
+                        {done && <i className="ti ti-check text-[9px] flex-shrink-0" />}
+                      </div>
+                    );
+                  })}
+                  {dayEntries.length > 3 && (
+                    <div className="text-[10px] px-1.5 font-medium" style={{ color: "var(--brand-text-secondary)" }}>
+                      +{dayEntries.length - 3} more
+                    </div>
+                  )}
+                </div>
+
+                {/* Bottom completion dot */}
+                {dayEntries.length > 0 && doneCount === dayEntries.length && (
+                  <div className="mt-1 flex justify-center">
+                    <div className="w-1 h-1 rounded-full" style={{ background: "#22c55e" }} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
+
+      {/* ── Day Drawer ───────────────────────────────────────────────────────── */}
+      {selectedDate && (
+        <DayDrawer
+          date={selectedDate}
+          entries={(localMap[selectedDate] || []).filter(e => !filterClient || e.clientId === filterClient)}
+          clients={clients}
+          onClose={() => setSelectedDate(null)}
+          onStatusChange={handleStatusChange}
+        />
+      )}
     </div>
   );
 }

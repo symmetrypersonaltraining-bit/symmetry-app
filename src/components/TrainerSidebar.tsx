@@ -24,7 +24,6 @@ const TRAINER_NAV: SidebarItem[] = [
       { href: "/library/programs", label: "Programs", icon: "ti-trophy" },
     ],
   },
-  { href: "/schedule", label: "Schedule", icon: "ti-calendar" },
   { href: "/nutrition", label: "Nutrition", icon: "ti-salad" },
   { href: "/progress", label: "Progress", icon: "ti-chart-line" },
   { href: "/payments", label: "Payments", icon: "ti-credit-card" },

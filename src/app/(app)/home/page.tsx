@@ -19,39 +19,47 @@ export default async function HomePage() {
       .select("id, name")
       .order("name");
 
+    // Calendar range: 3 months back to 3 months forward (month view needs full month data)
     const today = new Date();
-    const dow = today.getDay();
-    const daysToMon = dow === 0 ? -6 : 1 - dow;
-    const mondayDate = new Date(today);
-    mondayDate.setDate(today.getDate() + daysToMon);
-    const endDate = new Date(mondayDate);
-    endDate.setDate(mondayDate.getDate() + 27);
-    const startStr = mondayDate.toISOString().split("T")[0];
-    const endStr = endDate.toISOString().split("T")[0];
+    const rangeStart = new Date(today);
+    rangeStart.setMonth(rangeStart.getMonth() - 3);
+    const rangeEnd = new Date(today);
+    rangeEnd.setMonth(rangeEnd.getMonth() + 3);
+    const startStr = rangeStart.toISOString().split("T")[0];
+    const endStr = rangeEnd.toISOString().split("T")[0];
 
-    const { data: swRows } = await supabase
-      .from("scheduled_workouts")
-      .select("id, client_id, scheduled_date, status, day_id, days(label), clients(name)")
-      .gte("scheduled_date", startStr)
-      .lte("scheduled_date", endStr)
-      .order("scheduled_date");
+    // Load appointments (trainer client sessions only)
+    const { data: apptRows } = await supabase
+      .from("appointments")
+      .select("id, client_id, scheduled_at, ends_at, status, title, clients(id, name)")
+      .gte("scheduled_at", startStr + "T00:00:00")
+      .lte("scheduled_at", endStr + "T23:59:59")
+      .order("scheduled_at");
 
-    type WE = { clientId: string; clientName: string; label: string; completed: boolean; id: string };
-    const workoutMap: Record<string, WE[]> = {};
-    for (const w of swRows || []) {
-      const row = w as any;
-      const dk: string = row.scheduled_date;
-      if (!workoutMap[dk]) workoutMap[dk] = [];
-      workoutMap[dk].push({
-        clientId: row.client_id,
-        clientName: row.clients?.name || "Unknown",
-        label: row.days?.label || "Workout",
-        completed: row.status === "completed",
+    type AE = { id: string; clientId: string; clientName: string; title: string; startTime: string; endTime: string; status: string };
+    const appointmentMap: Record<string, AE[]> = {};
+    for (const a of apptRows || []) {
+      const row = a as any;
+      const dateKey = row.scheduled_at.split("T")[0];
+      const startTime = row.scheduled_at.includes("T")
+        ? row.scheduled_at.split("T")[1].slice(0, 5)
+        : "00:00";
+      const endTime = row.ends_at?.includes("T")
+        ? row.ends_at.split("T")[1].slice(0, 5)
+        : "01:00";
+      if (!appointmentMap[dateKey]) appointmentMap[dateKey] = [];
+      appointmentMap[dateKey].push({
         id: row.id,
+        clientId: row.clients?.id || row.client_id,
+        clientName: row.clients?.name || "Unknown",
+        title: row.title || "Training Session",
+        startTime,
+        endTime,
+        status: row.status || "scheduled",
       });
     }
 
-    // Upcoming payment reminders (next 30 days, pending status)
+    // Upcoming payment reminders (next 30 days)
     const thirtyDays = new Date();
     thirtyDays.setDate(thirtyDays.getDate() + 30);
     const { data: remindersRaw } = await supabase
@@ -82,12 +90,12 @@ export default async function HomePage() {
           </p>
         </div>
         <PendingRemindersPanel reminders={reminders} />
-        <TrainerCalendar clients={clients || []} workoutMap={workoutMap} startDate={startStr} />
+        <TrainerCalendar clients={clients || []} appointmentMap={appointmentMap} startDate="" />
       </div>
     );
   }
 
-  // --- CLIENT DASHBOARD ---
+  // CLIENT DASHBOARD
   const { data: clientRecord } = await supabase
     .from("clients")
     .select("id, name")
@@ -128,7 +136,6 @@ export default async function HomePage() {
   const totalScheduled = recent30.length;
   const completedCount = recent30.filter((w: any) => w.status === "completed").length;
 
-  // Streak
   const sorted = [...(recentScheduled || [])].sort((a: any, b: any) =>
     b.scheduled_date.localeCompare(a.scheduled_date)
   );
@@ -157,7 +164,6 @@ export default async function HomePage() {
     }
   }
 
-  // Week workouts
   const todayDow = new Date().getDay();
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - todayDow);
