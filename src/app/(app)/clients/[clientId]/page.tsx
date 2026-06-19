@@ -1,6 +1,7 @@
-import { redirect, notFound } from "next/navigation";
+﻿import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import PaymentReminderToggle from "./PaymentReminderToggle";
 
 export default async function ClientProfilePage({
   params,
@@ -20,7 +21,7 @@ export default async function ClientProfilePage({
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, name, email, auth_user_id, created_at")
+    .select("id, name, email, auth_user_id, created_at, payment_reminders_enabled")
     .eq("id", clientId)
     .maybeSingle();
 
@@ -55,6 +56,19 @@ export default async function ClientProfilePage({
     .select("id", { count: "exact", head: true })
     .eq("client_id", clientId)
     .eq("completed", true);
+
+  // Upcoming payment reminders for this client
+  const today = new Date().toISOString().split("T")[0];
+  const in60 = new Date();
+  in60.setDate(in60.getDate() + 60);
+  const { data: upcomingReminders } = await supabase
+    .from("payment_reminders")
+    .select("due_date, amount_due, notification_status")
+    .eq("client_id", clientId)
+    .gte("due_date", today)
+    .lte("due_date", in60.toISOString().split("T")[0])
+    .order("due_date")
+    .limit(6);
 
   // Body weight
   const { data: latestWeight } = await supabase
@@ -115,7 +129,7 @@ export default async function ClientProfilePage({
                 className="text-xs px-2.5 py-1 rounded-full"
                 style={{ background: "rgba(255,255,255,0.2)", color: "white" }}
               >
-                {client.auth_user_id ? "✓ App access" : "Invite pending"}
+                {client.auth_user_id ? "âœ“ App access" : "Invite pending"}
               </span>
             </div>
           </div>
@@ -139,7 +153,7 @@ export default async function ClientProfilePage({
             style={{ background: "white", border: "0.5px solid #C8D8EC" }}
           >
             <div className="text-xl font-medium" style={{ color: "#0F4C81" }}>
-              {latestWeight?.weight_lbs ? `${latestWeight.weight_lbs} lb` : "—"}
+              {latestWeight?.weight_lbs ? `${latestWeight.weight_lbs} lb` : "â€”"}
             </div>
             <div className="text-xs mt-0.5" style={{ color: "#4E6080" }}>Current wt.</div>
           </div>
@@ -157,7 +171,7 @@ export default async function ClientProfilePage({
         {/* Program */}
         {prog && (
           <>
-            <p className="label">program · {prog.name}</p>
+            <p className="label">program Â· {prog.name}</p>
             {phases.map((phase: any) => (
               <div key={phase.id} className="mb-3">
                 <div className="card" style={{ padding: "0.5rem 1rem" }}>
@@ -184,6 +198,18 @@ export default async function ClientProfilePage({
           </>
         )}
 
+        {/* Payment reminder toggle */}
+        <PaymentReminderToggle
+          clientId={client.id}
+          clientName={client.name}
+          enabled={(client as any).payment_reminders_enabled ?? true}
+          upcomingReminders={(upcomingReminders || []).map((r: any) => ({
+            date: r.due_date,
+            amount: Number(r.amount_due),
+            status: r.notification_status,
+          }))}
+        />
+
         {/* Recent workout history */}
         {recentLogs && recentLogs.length > 0 && (
           <>
@@ -196,30 +222,4 @@ export default async function ClientProfilePage({
                   style={{ borderColor: "#EDF2F7" }}
                 >
                   <div
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ background: log.completed ? "#059669" : "#0EA5E9" }}
-                  />
-                  <div className="flex-1">
-                    <div className="text-sm">{log.days?.label || "Workout"}</div>
-                    <div className="text-xs" style={{ color: "#4E6080" }}>
-                      {new Date(log.log_date).toLocaleDateString("en-US", {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </div>
-                  </div>
-                  {log.completed ? (
-                    <span className="tag-green text-xs">Done</span>
-                  ) : (
-                    <span className="tag-sky text-xs">In progress</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-    </>
-  );
-}
+         
