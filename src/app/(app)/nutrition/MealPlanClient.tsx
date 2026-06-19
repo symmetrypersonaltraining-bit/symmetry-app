@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
 interface MealPlan { id: string; version_number: number; meals: Meal[]; }
-interface AdherenceLog { id: string; meal_id: string; meal_position: number; adherence: string; off_plan_details: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null; }
+interface AdherenceLog { id: string; meal_id: string | null; meal_position: number; adherence: string; off_plan_details: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null; }
 interface MacroTarget { calories: number; protein: number; carbs: number; fats: number; }
 
 const ADHERENCE_OPTIONS = [
@@ -22,6 +22,15 @@ const ADHERENCE_COLORS: Record<string, string> = {
   full: "#22c55e", three_quarters: "#84cc16", half: "#f59e0b",
   quarter: "#ef4444", skipped: "#6b7280", off_plan: "#8b5cf6",
 };
+
+const FREE_SLOTS = [
+  { position: 1, label: "Meal 1", timing: "Morning" },
+  { position: 2, label: "Meal 2", timing: "Mid-Morning" },
+  { position: 3, label: "Meal 3", timing: "Lunch" },
+  { position: 4, label: "Meal 4", timing: "Afternoon" },
+  { position: 5, label: "Meal 5", timing: "Dinner" },
+  { position: 6, label: "Meal 6", timing: "Evening Snack" },
+];
 
 function MacroRing({ value, target, color, label, unit = "g" }: {
   value: number; target: number; color: string; label: string; unit?: string;
@@ -68,7 +77,9 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const supabase = createClient();
   const [logs, setLogs] = useState<AdherenceLog[]>(todayLogs);
   const [saving, setSaving] = useState<string | null>(null);
-  const [offPlanModal, setOffPlanModal] = useState<{ meal: Meal } | null>(null);
+
+  // Off-plan modal (used for both plan "off_plan" and no-plan free-form)
+  const [offPlanModal, setOffPlanModal] = useState<{ mealId: string | null; position: number; mealName: string } | null>(null);
   const [offPlanDetails, setOffPlanDetails] = useState("");
   const [offPlanKcal, setOffPlanKcal] = useState("");
   const [offPlanP, setOffPlanP] = useState("");
@@ -94,8 +105,6 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const currentMacros = useMemo(() => {
     let kcal = 0, protein = 0, carbs = 0, fats = 0;
     for (const log of logs) {
-      const meal = sortedMeals.find(m => m.id === log.meal_id);
-      if (!meal) continue;
       const opt = ADHERENCE_OPTIONS.find(o => o.key === log.adherence);
       if (!opt) continue;
       if (log.adherence === "off_plan") {
@@ -103,12 +112,15 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         protein += log.est_protein || 0;
         carbs += log.est_carbs || 0;
         fats += log.est_fats || 0;
-      } else if (opt.pct !== null) {
-        const m = getMealMacros(meal);
-        kcal += m.kcal * opt.pct;
-        protein += m.protein * opt.pct;
-        carbs += m.carbs * opt.pct;
-        fats += m.fats * opt.pct;
+      } else if (opt.pct !== null && log.meal_id) {
+        const meal = sortedMeals.find(m => m.id === log.meal_id);
+        if (meal) {
+          const m = getMealMacros(meal);
+          kcal += m.kcal * opt.pct;
+          protein += m.protein * opt.pct;
+          carbs += m.carbs * opt.pct;
+          fats += m.fats * opt.pct;
+        }
       }
     }
     return { kcal, protein, carbs, fats };
@@ -117,7 +129,8 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
   async function logAdherence(meal: Meal, adherenceKey: string) {
     if (adherenceKey === "off_plan") {
-      setOffPlanModal({ meal });
+      setOffPlanDetails(""); setOffPlanKcal(""); setOffPlanP(""); setOffPlanC(""); setOffPlanF("");
+      setOffPlanModal({ mealId: meal.id, position: meal.position, mealName: meal.name });
       return;
     }
     setSaving(meal.id);
@@ -127,57 +140,76 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         meal_position: meal.position, adherence: adherenceKey,
         off_plan_details: null, est_kcal: null, est_protein: null,
         est_carbs: null, est_fats: null, source: "client_app",
-      }, { onConflict: "client_id,log_date,meal_id" }).select().single();
-      if (data) setLogs(prev => [...prev.filter(l => l.meal_id !== meal.id), data as AdherenceLog]);
+      }, { onConflict: "client_id,log_date,meal_position" }).select().single();
+      if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== meal.position), data as AdherenceLog]);
     } finally { setSaving(null); }
   }
 
   async function saveOffPlan() {
     if (!offPlanModal) return;
-    setSaving(offPlanModal.meal.id);
+    setSaving(offPlanModal.mealId || `pos-${offPlanModal.position}`);
     try {
       const { data } = await supabase.from("meal_adherence_logs").upsert({
-        client_id: clientId, log_date: today, meal_id: offPlanModal.meal.id,
-        meal_position: offPlanModal.meal.position, adherence: "off_plan",
+        client_id: clientId, log_date: today, meal_id: offPlanModal.mealId,
+        meal_position: offPlanModal.position, adherence: "off_plan",
         off_plan_details: offPlanDetails || null,
         est_kcal: offPlanKcal ? parseFloat(offPlanKcal) : null,
         est_protein: offPlanP ? parseFloat(offPlanP) : null,
         est_carbs: offPlanC ? parseFloat(offPlanC) : null,
         est_fats: offPlanF ? parseFloat(offPlanF) : null,
         source: "client_app",
-      }, { onConflict: "client_id,log_date,meal_id" }).select().single();
-      if (data) setLogs(prev => [...prev.filter(l => l.meal_id !== offPlanModal.meal.id), data as AdherenceLog]);
+      }, { onConflict: "client_id,log_date,meal_position" }).select().single();
+      if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== offPlanModal.position), data as AdherenceLog]);
       setOffPlanModal(null);
       setOffPlanDetails(""); setOffPlanKcal(""); setOffPlanP(""); setOffPlanC(""); setOffPlanF("");
     } finally { setSaving(null); }
   }
 
+  function openFreeSlot(slot: typeof FREE_SLOTS[0]) {
+    const existing = logs.find(l => l.meal_position === slot.position);
+    setOffPlanDetails(existing?.off_plan_details || "");
+    setOffPlanKcal(existing?.est_kcal?.toString() || "");
+    setOffPlanP(existing?.est_protein?.toString() || "");
+    setOffPlanC(existing?.est_carbs?.toString() || "");
+    setOffPlanF(existing?.est_fats?.toString() || "");
+    setOffPlanModal({ mealId: null, position: slot.position, mealName: slot.label });
+  }
+
+  async function deleteLog(position: number) {
+    const existing = logs.find(l => l.meal_position === position);
+    if (!existing) return;
+    setSaving(`del-${position}`);
+    try {
+      await supabase.from("meal_adherence_logs").delete().eq("id", existing.id);
+      setLogs(prev => prev.filter(l => l.meal_position !== position));
+    } finally { setSaving(null); }
+  }
+
   const loggedCount = logs.length;
-  const totalMeals = sortedMeals.length;
+  const totalMeals = mealPlan ? sortedMeals.length : 0;
   const todayPct = totalMeals > 0 ? loggedCount / totalMeals : 0;
 
-  if (!mealPlan) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center pb-24"
-        style={{ background: "var(--brand-bg)" }}>
-        <i className="ti ti-salad text-5xl mb-4" style={{ color: "var(--brand-text-secondary)" }} />
-        <h2 className="font-bold text-lg mb-2" style={{ color: "var(--brand-text)" }}>No Meal Plan Yet</h2>
-        <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>Your trainer will assign your meal plan soon.</p>
-      </div>
-    );
-  }
+  const noPlanHasLogs = !mealPlan && logs.length > 0;
+  const noPlanMacros = noPlanHasLogs ? currentMacros : null;
+
+  const offPlanSavingKey = offPlanModal ? (offPlanModal.mealId || `pos-${offPlanModal.position}`) : null;
 
   return (
     <div className="pb-24" style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
-      {/* Off Plan Modal */}
+
+      {/* Off-Plan Modal (shared for plan + no-plan) */}
       {offPlanModal && (
         <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
           onClick={() => setOffPlanModal(null)}>
-          <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)" }}
+          <div className="w-full rounded-t-3xl p-5 pb-8" style={{ background: "var(--brand-surface)" }}
             onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
-            <h3 className="font-bold text-base mb-1" style={{ color: "var(--brand-text)" }}>Off-Plan: {offPlanModal.meal.name}</h3>
-            <p className="text-xs mb-4" style={{ color: "var(--brand-text-secondary)" }}>What did you have instead? (optional)</p>
+            <h3 className="font-bold text-base mb-1" style={{ color: "var(--brand-text)" }}>
+              {mealPlan ? `Off-Plan: ${offPlanModal.mealName}` : `Log ${offPlanModal.mealName}`}
+            </h3>
+            <p className="text-xs mb-4" style={{ color: "var(--brand-text-secondary)" }}>
+              {mealPlan ? "What did you have instead? (optional)" : "What did you eat? (optional details)"}
+            </p>
             <textarea value={offPlanDetails} onChange={e => setOffPlanDetails(e.target.value)}
               placeholder="Describe what you ate…" className="w-full rounded-xl p-3 text-sm outline-none resize-none mb-3" rows={2}
               style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
@@ -197,16 +229,16 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                 </div>
               ))}
             </div>
-            <button onClick={saveOffPlan} disabled={saving === offPlanModal.meal.id}
+            <button onClick={saveOffPlan} disabled={saving === offPlanSavingKey}
               className="w-full py-3.5 rounded-2xl text-sm font-bold text-white"
               style={{ background: "#8b5cf6" }}>
-              {saving === offPlanModal.meal.id ? "Saving…" : "Log Off-Plan"}
+              {saving === offPlanSavingKey ? "Saving…" : mealPlan ? "Log Off-Plan" : "Save Meal"}
             </button>
           </div>
         </div>
       )}
 
-      {/* Header — hidden for trainer (trainer has its own header with selector) */}
+      {/* Header */}
       {!isTrainer && (
         <div className="px-4 pt-6 pb-4" style={{ background: "var(--brand-surface)", borderBottom: "1px solid var(--brand-border)" }}>
           <h1 className="text-xl font-bold mb-0.5" style={{ color: "var(--brand-text)" }}>Nutrition</h1>
@@ -224,159 +256,272 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         </div>
       )}
 
-      {/* Macro rings */}
-      <div className="mx-4 mt-4 rounded-2xl p-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>Today&apos;s Macros</p>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full" style={{ background: todayPct === 1 ? "#22c55e" : "var(--brand-primary)" }} />
-            <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{loggedCount}/{totalMeals} logged</span>
-          </div>
-        </div>
-        <div className="flex justify-around">
-          <MacroRing value={currentMacros.kcal} target={macroTarget?.calories || 0} color="#0EA5E9" label="kcal" unit="cal" />
-          <MacroRing value={currentMacros.protein} target={macroTarget?.protein || 0} color="#22c55e" label="Protein" />
-          <MacroRing value={currentMacros.carbs} target={macroTarget?.carbs || 0} color="#f59e0b" label="Carbs" />
-          <MacroRing value={currentMacros.fats} target={macroTarget?.fats || 0} color="#ef4444" label="Fats" />
-        </div>
-        <div className="mt-4 h-1.5 rounded-full" style={{ background: "var(--brand-border)" }}>
-          <div className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${todayPct * 100}%`, background: "var(--brand-primary)" }} />
-        </div>
-      </div>
-
-      {/* Meal cards */}
-      <div className="px-4 mt-4 space-y-3">
-        {sortedMeals.map(meal => {
-          const mealLog = logs.find(l => l.meal_id === meal.id);
-          const macros = getMealMacros(meal);
-          const isLogged = !!mealLog;
-          const logColor = mealLog ? ADHERENCE_COLORS[mealLog.adherence] : null;
-          const isSaving = saving === meal.id;
-          const currentOpt = mealLog ? ADHERENCE_OPTIONS.find(o => o.key === mealLog.adherence) : null;
-
-          return (
-            <div key={meal.id} className="rounded-2xl overflow-hidden"
-              style={{
-                background: "var(--brand-surface)",
-                border: isLogged ? `1.5px solid ${logColor}40` : "1px solid var(--brand-border)",
-              }}>
-              <div className="flex items-start justify-between p-4 pb-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: isLogged && logColor ? `${logColor}20` : "var(--brand-card)" }}>
-                    {isLogged
-                      ? <span className="text-base">{currentOpt?.emoji}</span>
-                      : <span className="text-sm font-bold" style={{ color: "var(--brand-text-secondary)" }}>M{meal.position}</span>
-                    }
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm" style={{ color: "var(--brand-text)" }}>{meal.name}</p>
-                    {meal.timing && (
-                      <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{meal.timing}</p>
-                    )}
-                    {macros.kcal > 0 && (
-                      <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                        {Math.round(macros.kcal)} cal · {Math.round(macros.protein)}P · {Math.round(macros.carbs)}C · {Math.round(macros.fats)}F
-                      </p>
-                    )}
-                  </div>
-                </div>
-                {isLogged && logColor && (
-                  <span className="text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0"
-                    style={{ background: `${logColor}20`, color: logColor }}>
-                    {currentOpt?.label}
-                  </span>
-                )}
-              </div>
-
-              {/* Food items */}
-              {(meal.meal_items || []).sort((a, b) => a.position - b.position).map(item => (
-                <div key={item.id} className="px-4 py-1.5 flex items-start gap-2"
-                  style={{ borderTop: "1px solid var(--brand-border)" }}>
-                  <i className="ti ti-point-filled text-xs mt-0.5 flex-shrink-0" style={{ color: "var(--brand-primary)" }} />
-                  <span className="text-sm" style={{ color: "var(--brand-text)" }}>
-                    {item.food}
-                    {!item.is_unlimited && item.amount && (
-                      <span className="ml-1 text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                        {item.amount}{item.unit ? ` ${item.unit}` : ""}
-                      </span>
-                    )}
-                    {item.is_unlimited && (
-                      <span className="ml-1 text-xs" style={{ color: "var(--brand-text-secondary)" }}>(unlimited)</span>
-                    )}
-                  </span>
-                </div>
-              ))}
-
-              {/* Swaps */}
-              {meal.swaps && (
-                <div className="mx-4 my-2 px-3 py-2 rounded-xl text-xs"
-                  style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}>
-                  <span className="font-medium">Swap: </span>{meal.swaps}
-                </div>
-              )}
-
-              {/* Adherence buttons */}
-              <div className="p-3 pt-2">
-                <div className="grid grid-cols-6 gap-1.5">
-                  {ADHERENCE_OPTIONS.map(opt => {
-                    const isActive = mealLog?.adherence === opt.key;
-                    const btnColor = ADHERENCE_COLORS[opt.key];
-                    return (
-                      <button key={opt.key} onClick={() => logAdherence(meal, opt.key)}
-                        disabled={isSaving}
-                        className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl transition-all"
-                        style={{
-                          background: isActive ? `${btnColor}20` : "var(--brand-card)",
-                          border: `1px solid ${isActive ? btnColor : "transparent"}`,
-                          opacity: isSaving ? 0.5 : 1,
-                        }}>
-                        <span className="text-base leading-none">{opt.emoji}</span>
-                        <span className="text-xs font-medium leading-none"
-                          style={{ color: isActive ? btnColor : "var(--brand-text-secondary)" }}>
-                          {opt.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+      {/* === NO MEAL PLAN — Free-Form Daily Log === */}
+      {!mealPlan && (
+        <div className="px-4 mt-4">
+          {/* Macro summary (only if anything logged) */}
+          {noPlanMacros && (
+            <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--brand-text-secondary)" }}>Today&apos;s Macros</p>
+              <div className="flex justify-around">
+                <MacroRing value={noPlanMacros.kcal} target={macroTarget?.calories || 0} color="#0EA5E9" label="kcal" unit="cal" />
+                <MacroRing value={noPlanMacros.protein} target={macroTarget?.protein || 0} color="#22c55e" label="Protein" />
+                <MacroRing value={noPlanMacros.carbs} target={macroTarget?.carbs || 0} color="#f59e0b" label="Carbs" />
+                <MacroRing value={noPlanMacros.fats} target={macroTarget?.fats || 0} color="#ef4444" label="Fats" />
               </div>
             </div>
-          );
-        })}
-      </div>
+          )}
 
-      {/* 7-day summary */}
-      {weekLogs.length > 0 && (
-        <div className="mx-4 mt-4 rounded-2xl p-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--brand-text-secondary)" }}>This Week</p>
-          <div className="flex gap-2 flex-wrap">
-            {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day, i) => {
-              const d = new Date();
-              const dayOfWeek = d.getDay();
-              const diff = i + 1 - (dayOfWeek === 0 ? 7 : dayOfWeek);
-              const dateClone = new Date(d);
-              dateClone.setDate(d.getDate() + diff);
-              const dateStr = dateClone.toISOString().split("T")[0];
-              const dayLogs = weekLogs.filter(l => l.log_date === dateStr);
-              const hasLog = dayLogs.length > 0;
-              const allFull = hasLog && dayLogs.every(l => l.adherence === "full");
+          {/* No plan info */}
+          {!noPlanHasLogs && (
+            <div className="rounded-2xl p-5 mb-4 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+              <i className="ti ti-salad text-3xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
+              <p className="font-semibold text-sm mb-1" style={{ color: "var(--brand-text)" }}>No Meal Plan Yet</p>
+              <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Your trainer will assign your meal plan soon. You can still log your meals below.</p>
+            </div>
+          )}
+
+          {/* Free-form meal slots */}
+          <p className="text-xs font-semibold uppercase tracking-widest mb-3 px-1" style={{ color: "var(--brand-text-secondary)" }}>
+            Log Today&apos;s Meals
+          </p>
+          <div className="space-y-2">
+            {FREE_SLOTS.map(slot => {
+              const logged = logs.find(l => l.meal_position === slot.position);
+              const isSaving = saving === `del-${slot.position}`;
               return (
-                <div key={day} className="flex flex-col items-center gap-1">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center"
-                    style={{
-                      background: !hasLog ? "var(--brand-card)" : allFull ? "#22c55e20" : "#f59e0b20",
-                      border: `1px solid ${!hasLog ? "var(--brand-border)" : allFull ? "#22c55e" : "#f59e0b"}`,
-                    }}>
-                    <span className="text-xs">{!hasLog ? "–" : allFull ? "✓" : "~"}</span>
+                <div key={slot.position} className="rounded-2xl overflow-hidden"
+                  style={{
+                    background: "var(--brand-surface)",
+                    border: logged ? "1.5px solid #8b5cf640" : "1px solid var(--brand-border)",
+                  }}>
+                  <div className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: logged ? "#8b5cf620" : "var(--brand-card)" }}>
+                        {logged
+                          ? <span className="text-base">✅</span>
+                          : <span className="text-sm font-bold" style={{ color: "var(--brand-text-secondary)" }}>M{slot.position}</span>
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm" style={{ color: "var(--brand-text)" }}>{slot.label}</p>
+                        {logged?.off_plan_details ? (
+                          <p className="text-xs mt-0.5 truncate" style={{ color: "var(--brand-text-secondary)" }}>
+                            {logged.off_plan_details}
+                          </p>
+                        ) : (
+                          <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{slot.timing}</p>
+                        )}
+                        {logged && (logged.est_protein || logged.est_carbs || logged.est_fats) && (
+                          <p className="text-xs mt-0.5" style={{ color: "#8b5cf6" }}>
+                            {logged.est_kcal ? `${Math.round(logged.est_kcal)} cal · ` : ""}
+                            {logged.est_protein ? `${Math.round(logged.est_protein)}P` : ""}
+                            {logged.est_carbs ? ` · ${Math.round(logged.est_carbs)}C` : ""}
+                            {logged.est_fats ? ` · ${Math.round(logged.est_fats)}F` : ""}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-2">
+                      {logged && (
+                        <button onClick={() => deleteLog(slot.position)} disabled={isSaving}
+                          className="w-7 h-7 rounded-full flex items-center justify-center"
+                          style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}>
+                          <i className="ti ti-trash text-xs" />
+                        </button>
+                      )}
+                      <button onClick={() => openFreeSlot(slot)}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold"
+                        style={{
+                          background: logged ? "#8b5cf620" : "var(--brand-primary)",
+                          color: logged ? "#8b5cf6" : "white",
+                        }}>
+                        {logged ? "Edit" : "+ Log"}
+                      </button>
+                    </div>
                   </div>
-                  <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{day}</span>
                 </div>
               );
             })}
           </div>
         </div>
+      )}
+
+      {/* === WITH MEAL PLAN === */}
+      {mealPlan && (
+        <>
+          {/* Macro rings */}
+          <div className="mx-4 mt-4 rounded-2xl p-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>Today&apos;s Macros</p>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full" style={{ background: todayPct === 1 ? "#22c55e" : "var(--brand-primary)" }} />
+                <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{loggedCount}/{totalMeals} logged</span>
+              </div>
+            </div>
+            <div className="flex justify-around">
+              <MacroRing value={currentMacros.kcal} target={macroTarget?.calories || 0} color="#0EA5E9" label="kcal" unit="cal" />
+              <MacroRing value={currentMacros.protein} target={macroTarget?.protein || 0} color="#22c55e" label="Protein" />
+              <MacroRing value={currentMacros.carbs} target={macroTarget?.carbs || 0} color="#f59e0b" label="Carbs" />
+              <MacroRing value={currentMacros.fats} target={macroTarget?.fats || 0} color="#ef4444" label="Fats" />
+            </div>
+            <div className="mt-4 h-1.5 rounded-full" style={{ background: "var(--brand-border)" }}>
+              <div className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${todayPct * 100}%`, background: "var(--brand-primary)" }} />
+            </div>
+          </div>
+
+          {/* Meal cards */}
+          <div className="px-4 mt-4 space-y-3">
+            {sortedMeals.map(meal => {
+              const mealLog = logs.find(l => l.meal_position === meal.position);
+              const macros = getMealMacros(meal);
+              const isLogged = !!mealLog;
+              const logColor = mealLog ? ADHERENCE_COLORS[mealLog.adherence] : null;
+              const isSaving = saving === meal.id;
+              const currentOpt = mealLog ? ADHERENCE_OPTIONS.find(o => o.key === mealLog.adherence) : null;
+
+              return (
+                <div key={meal.id} className="rounded-2xl overflow-hidden"
+                  style={{
+                    background: "var(--brand-surface)",
+                    border: isLogged ? `1.5px solid ${logColor}40` : "1px solid var(--brand-border)",
+                  }}>
+                  <div className="flex items-start justify-between p-4 pb-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: isLogged && logColor ? `${logColor}20` : "var(--brand-card)" }}>
+                        {isLogged
+                          ? <span className="text-base">{currentOpt?.emoji}</span>
+                          : <span className="text-sm font-bold" style={{ color: "var(--brand-text-secondary)" }}>M{meal.position}</span>
+                        }
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm" style={{ color: "var(--brand-text)" }}>{meal.name}</p>
+                        {meal.timing && (
+                          <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{meal.timing}</p>
+                        )}
+                        {macros.kcal > 0 && (
+                          <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
+                            {Math.round(macros.kcal)} cal · {Math.round(macros.protein)}P · {Math.round(macros.carbs)}C · {Math.round(macros.fats)}F
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {isLogged && logColor && (
+                      <span className="text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0"
+                        style={{ background: `${logColor}20`, color: logColor }}>
+                        {currentOpt?.label}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Food items */}
+                  {(meal.meal_items || []).sort((a, b) => a.position - b.position).map(item => (
+                    <div key={item.id} className="px-4 py-1.5 flex items-start gap-2"
+                      style={{ borderTop: "1px solid var(--brand-border)" }}>
+                      <i className="ti ti-point-filled text-xs mt-0.5 flex-shrink-0" style={{ color: "var(--brand-primary)" }} />
+                      <span className="text-sm" style={{ color: "var(--brand-text)" }}>
+                        {item.food}
+                        {!item.is_unlimited && item.amount && (
+                          <span className="ml-1 text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+                            {item.amount}{item.unit ? ` ${item.unit}` : ""}
+                          </span>
+                        )}
+                        {item.is_unlimited && (
+                          <span className="ml-1 text-xs" style={{ color: "var(--brand-text-secondary)" }}>(unlimited)</span>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+
+                  {/* Swaps */}
+                  {meal.swaps && (
+                    <div className="mx-4 my-2 px-3 py-2 rounded-xl text-xs"
+                      style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}>
+                      <span className="font-medium">Swap: </span>{meal.swaps}
+                    </div>
+                  )}
+
+                  {/* Off-plan details if logged off-plan */}
+                  {mealLog?.adherence === "off_plan" && mealLog.off_plan_details && (
+                    <div className="mx-4 my-2 px-3 py-2 rounded-xl text-xs"
+                      style={{ background: "#8b5cf610", color: "#8b5cf6", border: "1px solid #8b5cf630" }}>
+                      <span className="font-medium">Had: </span>{mealLog.off_plan_details}
+                      {(mealLog.est_protein || mealLog.est_carbs || mealLog.est_fats) && (
+                        <span className="ml-2">
+                          {mealLog.est_kcal ? `${Math.round(mealLog.est_kcal)} cal · ` : ""}
+                          {mealLog.est_protein ? `${Math.round(mealLog.est_protein)}P` : ""}
+                          {mealLog.est_carbs ? ` ${Math.round(mealLog.est_carbs)}C` : ""}
+                          {mealLog.est_fats ? ` ${Math.round(mealLog.est_fats)}F` : ""}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Adherence buttons */}
+                  <div className="p-3 pt-2">
+                    <div className="grid grid-cols-6 gap-1.5">
+                      {ADHERENCE_OPTIONS.map(opt => {
+                        const isActive = mealLog?.adherence === opt.key;
+                        const btnColor = ADHERENCE_COLORS[opt.key];
+                        return (
+                          <button key={opt.key} onClick={() => logAdherence(meal, opt.key)}
+                            disabled={isSaving}
+                            className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl transition-all"
+                            style={{
+                              background: isActive ? `${btnColor}20` : "var(--brand-card)",
+                              border: `1px solid ${isActive ? btnColor : "transparent"}`,
+                              opacity: isSaving ? 0.5 : 1,
+                            }}>
+                            <span className="text-base leading-none">{opt.emoji}</span>
+                            <span className="text-xs font-medium leading-none"
+                              style={{ color: isActive ? btnColor : "var(--brand-text-secondary)" }}>
+                              {opt.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 7-day summary */}
+          {weekLogs.length > 0 && (
+            <div className="mx-4 mt-4 rounded-2xl p-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--brand-text-secondary)" }}>This Week</p>
+              <div className="flex gap-2 flex-wrap">
+                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day, i) => {
+                  const d = new Date();
+                  const dayOfWeek = d.getDay();
+                  const diff = i + 1 - (dayOfWeek === 0 ? 7 : dayOfWeek);
+                  const dateClone = new Date(d);
+                  dateClone.setDate(d.getDate() + diff);
+                  const dateStr = dateClone.toISOString().split("T")[0];
+                  const dayLogs = weekLogs.filter(l => l.log_date === dateStr);
+                  const hasLog = dayLogs.length > 0;
+                  const allFull = hasLog && dayLogs.every(l => l.adherence === "full");
+                  return (
+                    <div key={day} className="flex flex-col items-center gap-1">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center"
+                        style={{
+                          background: !hasLog ? "var(--brand-card)" : allFull ? "#22c55e20" : "#f59e0b20",
+                          border: `1px solid ${!hasLog ? "var(--brand-border)" : allFull ? "#22c55e" : "#f59e0b"}`,
+                        }}>
+                        <span className="text-xs">{!hasLog ? "–" : allFull ? "✓" : "~"}</span>
+                      </div>
+                      <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{day}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
