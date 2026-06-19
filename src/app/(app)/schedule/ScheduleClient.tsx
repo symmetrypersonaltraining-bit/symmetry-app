@@ -51,14 +51,12 @@ export default function ScheduleClient({
 
   const dowNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-  // Map payment reminder dates for quick lookup
   const paymentDateMap: Record<string, PaymentReminder[]> = {};
   for (const pr of paymentReminders) {
     if (!paymentDateMap[pr.date]) paymentDateMap[pr.date] = [];
     paymentDateMap[pr.date].push(pr);
   }
 
-  // Upcoming payment reminders (next 30 days)
   const upcomingPayments = paymentReminders
     .filter((pr) => {
       const d = new Date(pr.date + "T00:00:00");
@@ -77,9 +75,7 @@ export default function ScheduleClient({
       </div>
 
       <div className="px-4 py-4">
-        {/* Calendar */}
         <div className="card">
-          {/* Toggle row */}
           {isTrainer && (
             <div className="flex items-center justify-between mb-3 pb-3" style={{ borderBottom: "0.5px solid #EDF2F7" }}>
               <span className="text-xs font-medium" style={{ color: "#4E6080" }}>
@@ -103,7 +99,6 @@ export default function ScheduleClient({
             </div>
           )}
 
-          {/* Day headers */}
           <div className="grid grid-cols-7 mb-2">
             {dowNames.map((d) => (
               <div key={d} className="text-center text-xs font-medium py-1" style={{ color: "#4E6080" }}>
@@ -112,7 +107,6 @@ export default function ScheduleClient({
             ))}
           </div>
 
-          {/* Calendar days */}
           <div className="grid grid-cols-7 gap-y-1">
             {Array.from({ length: firstDay }, (_, i) => (
               <div key={`empty-${i}`} />
@@ -140,7 +134,6 @@ export default function ScheduleClient({
                   >
                     {day}
                   </div>
-                  {/* Dot row â€” up to 3 dots */}
                   <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
                     {hasLog && (
                       <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#059669" }} />
@@ -160,7 +153,6 @@ export default function ScheduleClient({
             })}
           </div>
 
-          {/* Legend */}
           <div className="flex flex-wrap gap-4 mt-3 pt-3" style={{ borderTop: "0.5px solid #EDF2F7" }}>
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full" style={{ background: "#059669" }} />
@@ -179,7 +171,6 @@ export default function ScheduleClient({
           </div>
         </div>
 
-        {/* Upcoming payments (trainer only, when showing) */}
         {isTrainer && showPayments && upcomingPayments.length > 0 && (
           <>
             <p className="label mt-4">upcoming payments</p>
@@ -215,7 +206,6 @@ export default function ScheduleClient({
           </>
         )}
 
-        {/* Upcoming workouts */}
         {upcomingDays.length > 0 && (
           <>
             <p className="label mt-4">upcoming</p>
@@ -244,13 +234,12 @@ export default function ScheduleClient({
           </>
         )}
 
-        {/* Trainer: google calendar placeholder */}
         {isTrainer && (
           <>
             <p className="label mt-4">all clients</p>
             <div className="card text-sm" style={{ color: "#4E6080", padding: "1rem" }}>
               <i className="ti ti-brand-google text-lg mr-2" style={{ color: "#0F4C81" }} />
-              Google Calendar sync â€” connect in Settings to push sessions both ways.
+              Google Calendar sync — connect in Settings to push sessions both ways.
             </div>
           </>
         )}
