@@ -14,9 +14,10 @@ interface Props {
 // Client-mode bottom nav tabs
 const CLIENT_NAV = [
   { href: "/client-preview", label: "Home",      icon: "ti-home" },
-  { href: "/nutrition",      label: "Nutrition",  icon: "ti-salad" },
-  { href: "/progress",       label: "Progress",   icon: "ti-chart-line" },
-  { href: "/settings",       label: "Settings",   icon: "ti-settings" },
+  { href: "/client-preview/nutrition",  label: "Nutrition", icon: "ti-salad" },
+  { href: "/client-preview/progress",   label: "Progress",  icon: "ti-chart-line" },
+  { href: "/workout",                   label: "Workout",   icon: "ti-barbell" },
+  { href: "/log",                       label: "Log",       icon: "ti-plus-circle" },
 ];
 
 export default function TrainerLayoutWrapper({ children }: Props) {

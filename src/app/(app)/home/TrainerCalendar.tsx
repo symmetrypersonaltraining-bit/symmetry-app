@@ -21,9 +21,19 @@ interface AE {
 
 interface Client { id: string; name: string; }
 
+interface WorkoutEv {
+  id: string;
+  clientId: string;
+  clientName: string;
+  date: string;
+  dayLabel: string;
+  status: string;
+}
+
 interface Props {
   clients: Client[];
   appointmentMap: Record<string, AE[]>;
+  workoutMap: Record<string, WorkoutEv[]>;
   startDate: string;
 }
 
@@ -347,7 +357,7 @@ function EventPopup({ ev, clients, onClose }: { ev: AE; clients: Client[]; onClo
   );
 }
 
-export default function TrainerCalendar({ clients, appointmentMap }: Props) {
+export default function TrainerCalendar({ clients, appointmentMap, workoutMap }: Props) {
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
 
@@ -392,6 +402,11 @@ export default function TrainerCalendar({ clients, appointmentMap }: Props) {
 
   function getDayEvents(d: Date): AE[] {
     const all = appointmentMap[dayStr(d)] || [];
+    return selectedClientId ? all.filter(e => e.clientId === selectedClientId) : all;
+  }
+
+  function getDayWorkouts(d: Date): WorkoutEv[] {
+    const all = workoutMap[dayStr(d)] || [];
     return selectedClientId ? all.filter(e => e.clientId === selectedClientId) : all;
   }
 
@@ -470,6 +485,37 @@ export default function TrainerCalendar({ clients, appointmentMap }: Props) {
             );
           })}
         </div>
+
+        {/* All-day workout chips row */}
+        {weekDays.some(d => getDayWorkouts(d).length > 0) && (
+          <div className="flex flex-shrink-0 border-b" style={{ borderColor: "var(--brand-border)", background: "var(--brand-bg)", minHeight: 32 }}>
+            <div style={{ width: TIME_COL_W, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 6 }}>
+              <span className="text-[9px] font-semibold uppercase" style={{ color: "var(--brand-text-secondary)" }}>Schedule</span>
+            </div>
+            {weekDays.map(day => {
+              const ws = getDayWorkouts(day);
+              return (
+                <div key={dayStr(day)} className="flex-1 flex flex-wrap gap-0.5 p-1 border-l overflow-hidden"
+                  style={{ borderColor: "var(--brand-border)" }}>
+                  {ws.map(w => {
+                    const color = clientColor(clients, w.clientId);
+                    const isDone = w.status === "completed";
+                    return (
+                      <a key={w.id} href={`/clients/${w.clientId}?tab=training`}
+                        onClick={e => e.stopPropagation()}
+                        className="flex items-center gap-1 px-1.5 rounded text-[9px] font-semibold truncate max-w-full"
+                        style={{ background: isDone ? `${color}30` : `${color}18`, color, border: `1px solid ${color}40`,
+                          textDecoration: isDone ? "line-through" : "none", opacity: isDone ? 0.7 : 1 }}>
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                        {w.clientName.split(" ")[0]}
+                      </a>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Scrollable time grid */}
         <div ref={scrollRef} className="overflow-y-auto" style={{ flex: 1 }}>
@@ -574,17 +620,33 @@ export default function TrainerCalendar({ clients, appointmentMap }: Props) {
                   </span>
                 </div>
                 <div className="space-y-0.5">
-                  {evs.slice(0, 3).map(ev => {
+                  {/* Scheduled workout chips */}
+                  {(getDayWorkouts(day)).slice(0, 2).map(w => {
+                    const color = clientColor(clients, w.clientId);
+                    const isDone = w.status === "completed";
+                    return (
+                      <a key={w.id} href={`/clients/${w.clientId}?tab=training`}
+                        onClick={e => e.stopPropagation()}
+                        className="flex items-center gap-1 px-1.5 rounded text-[9px] font-medium truncate"
+                        style={{ background: isDone ? `${color}20` : `${color}15`, color, border: `1px solid ${color}35`,
+                          textDecoration: isDone ? "line-through" : "none" }}>
+                        <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: color }} />
+                        {w.clientName.split(" ")[0]}
+                      </a>
+                    );
+                  })}
+                  {/* Appointment chips */}
+                  {evs.slice(0, 2).map(ev => {
                     const color = clientColor(clients, ev.clientId);
                     return (
                       <div key={ev.id} onClick={e => { e.stopPropagation(); setPopupEv(ev); }}
                         className="px-1.5 rounded text-[9px] font-medium truncate"
                         style={{ background: `${color}25`, color, border: `1px solid ${color}50` }}>
-                        {ev.startTime} {ev.clientName}
+                        ⏰ {ev.startTime}
                       </div>
                     );
                   })}
-                  {evs.length > 3 && <p className="text-[9px] text-center" style={{ color: "var(--brand-text-secondary)" }}>+{evs.length - 3} more</p>}
+                  {(getDayWorkouts(day).length + evs.length) > 4 && <p className="text-[9px] text-center" style={{ color: "var(--brand-text-secondary)" }}>+{getDayWorkouts(day).length + evs.length - 4} more</p>}
                 </div>
               </div>
             );
@@ -619,12 +681,21 @@ export default function TrainerCalendar({ clients, appointmentMap }: Props) {
             const color = CLIENT_COLORS[idx % CLIENT_COLORS.length];
             const isActive = selectedClientId === c.id;
             return (
-              <button key={c.id} onClick={() => setSelectedClientId(isActive ? null : c.id)}
-                className="flex items-center gap-2 w-full px-2 py-1 rounded-lg text-xs truncate"
-                style={{ background: isActive ? `${color}20` : "transparent", color: isActive ? color : "var(--brand-text)", fontWeight: isActive ? 600 : 400 }}>
-                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
-                {c.name.split(" ")[0]}
-              </button>
+              <div key={c.id} className="flex items-center gap-1 w-full rounded-lg"
+                style={{ background: isActive ? `${color}20` : "transparent" }}>
+                <button onClick={() => setSelectedClientId(isActive ? null : c.id)}
+                  className="flex items-center gap-2 flex-1 px-2 py-1 text-xs truncate"
+                  style={{ color: isActive ? color : "var(--brand-text)", fontWeight: isActive ? 600 : 400 }}>
+                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
+                  {c.name.split(" ")[0]}
+                </button>
+                <a href={`/clients/${c.id}?tab=training`}
+                  className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 flex-shrink-0 mr-1"
+                  title="View schedule"
+                  style={{ color: "var(--brand-text-secondary)" }}>
+                  <i className="ti ti-arrow-right text-[10px]" />
+                </a>
+              </div>
             );
           })}
         </div>
