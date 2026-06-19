@@ -125,4 +125,4 @@ export default function PaymentReminderToggle({
                 }}
               >
                 <i className={`ti ${sending ? "ti-loader animate-spin" : "ti-send"} text-sm`} />
-                {sending ? "Sendingâ€
+                {sending ? "Sending
