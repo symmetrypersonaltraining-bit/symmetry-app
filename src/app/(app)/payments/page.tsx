@@ -12,7 +12,7 @@ export default async function PaymentsPage() {
 
   const { data: reminders } = await supabase
     .from("payment_reminders")
-    .select("id, client_id, due_date, amount_due, billing_credits, notification_status, sms_sent_at, sms_message, notes, clients(id, name, email)")
+    .select("id, client_id, due_date, amount_due, billing_credits, notification_status, email_sent_at, notes, clients(id, name, email)")
     .order("due_date", { ascending: true });
 
   const mapped = (reminders || []).map((r: any) => ({
@@ -24,8 +24,7 @@ export default async function PaymentsPage() {
     amountDue: Number(r.amount_due),
     billingCredits: Number(r.billing_credits || 0),
     notificationStatus: r.notification_status || "pending",
-    smsSentAt: r.sms_sent_at,
-    smsMessage: r.sms_message,
+    emailSentAt: r.email_sent_at,
     notes: r.notes,
   }));
 
