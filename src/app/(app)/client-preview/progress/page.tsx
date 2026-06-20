@@ -65,7 +65,8 @@ export default async function ClientPreviewProgressPage() {
   if (setRes.data) {
     const prMap = new Map();
     for (const sl of setRes.data) {
-      const name = sl.prescribed_exercises?.exercises?.name;
+      const pe = sl.prescribed_exercises as any;
+      const name = pe?.exercises?.name ?? (Array.isArray(pe) ? pe[0]?.exercises?.name : undefined);
       if (!name) continue;
       const w = sl.weight_lbs ?? sl.weight ?? 0;
       if (!prMap.has(name) || w > prMap.get(name).weight) {
