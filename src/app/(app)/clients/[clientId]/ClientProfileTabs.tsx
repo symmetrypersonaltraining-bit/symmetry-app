@@ -388,6 +388,13 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
 
     return (
       <div>
+        <div className="flex justify-end mb-2">
+          <a href={`/clients/${clientId}/program`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+            style={{ background: "var(--brand-primary)" }}>
+            <i className="ti ti-calendar-bolt text-xs" /> Open Programming Engine
+          </a>
+        </div>
         <CalendarHeader label={headerLabel} onPrev={prev} onNext={next} onToday={goToday}
           viewMode={viewMode} onViewMode={setViewMode} />
         <div className="grid grid-cols-7 mb-1">
@@ -438,6 +445,13 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
 
   return (
     <div>
+      <div className="flex justify-end mb-2">
+        <a href={`/clients/${clientId}/program`}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+          style={{ background: "var(--brand-primary)" }}>
+          <i className="ti ti-calendar-bolt text-xs" /> Open Programming Engine
+        </a>
+      </div>
       <CalendarHeader label={headerLabel} onPrev={prev} onNext={next} onToday={goToday}
         viewMode={viewMode} onViewMode={setViewMode} />
 
@@ -1068,7 +1082,17 @@ export default function ClientProfileTabs({ client, metrics, allWorkouts, appoin
             onAssignProgram={() => setShowAssignModal(true)}
           />
         )}
-        {tab === "training" && <TrainingCalendar workouts={allWorkouts} clientId={clientId} />}
+        {tab === "training" && (
+          <div>
+            <a href={`/clients/${clientId}/program`}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium mb-4 text-sm text-white"
+              style={{ background: "var(--brand-primary)" }}>
+              <i className="ti ti-calendar-bolt text-base" />
+              Open Programming Engine →
+            </a>
+            <TrainingCalendar workouts={allWorkouts} clientId={clientId} />
+          </div>
+        )}
         {tab === "metrics" && <MetricsTab metrics={metrics} />}
         {tab === "info" && (
           <InfoTab client={client} programs={programs} currentProgramId={currentProgramId}

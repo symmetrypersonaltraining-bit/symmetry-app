@@ -868,11 +868,18 @@ function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, cl
         <span className="text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>
           {clientName} · Programmed workouts
         </span>
-        <a href={`/clients/${clientId}?tab=training`}
-          className="text-xs font-semibold flex items-center gap-1"
-          style={{ color: "var(--brand-primary)" }}>
-          Full calendar <i className="ti ti-arrow-right text-[10px]" />
-        </a>
+        <div className="flex items-center gap-2">
+          <a href={`/clients/${clientId}/program`}
+            className="text-xs font-semibold flex items-center gap-1 px-2.5 py-1 rounded-lg text-white"
+            style={{ background: "var(--brand-primary)" }}>
+            Program <i className="ti ti-arrow-right text-[10px]" />
+          </a>
+          <a href={`/clients/${clientId}?tab=training`}
+            className="text-xs font-semibold flex items-center gap-1"
+            style={{ color: "var(--brand-primary)" }}>
+            Calendar <i className="ti ti-arrow-right text-[10px]" />
+          </a>
+        </div>
       </div>
     </div>
   );
