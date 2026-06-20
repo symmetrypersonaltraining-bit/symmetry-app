@@ -204,7 +204,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
                   Automatic Payment Reminders
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                  Send email reminders automatically on due date
+                  Send email reminders automatically 1 week before due date
                 </p>
               </div>
               <div

@@ -503,7 +503,7 @@ export default function ClientDashboard({
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold uppercase tracking-widest"
               style={{ color: "var(--brand-text-secondary)" }}>This Week</span>
-            <Link href={`${basePath}/workout`} className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
+            <Link href={`${basePath}/schedule`} className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
               View Schedule →
             </Link>
           </div>
@@ -518,7 +518,7 @@ export default function ClientDashboard({
 
         {/* Today's Workout */}
         {todayWorkout ? (
-          <Link href={`${basePath}/workout/${todayWorkout.id}`}>
+          <Link href={`${basePath}/workout/${(todayWorkout as any).day_id || todayWorkout.id}`}>
             <div className="rounded-2xl p-5 relative overflow-hidden cursor-pointer"
               style={{ background: "var(--brand-primary)" }}>
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10"
@@ -628,7 +628,7 @@ export default function ClientDashboard({
             <div className="rounded-2xl overflow-hidden"
               style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               {recentWorkouts.map((w, i) => (
-                <Link key={w.id} href={`${basePath}/workout/${w.id}`}>
+                <Link key={w.id} href={`${basePath}/workout/${(w as any).day_id || (w.days as any)?.id || w.id}`}>
                   <div
                     className={`flex items-center gap-3 px-4 py-3.5 ${i < recentWorkouts.length - 1 ? "border-b" : ""}`}
                     style={{ borderColor: "var(--brand-border)" }}

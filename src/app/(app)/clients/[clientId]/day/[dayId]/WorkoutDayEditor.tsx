@@ -27,9 +27,9 @@ interface PrescribedExercise {
 
 interface Section {
   id: string;
-  label: string;
+  internal_name: string;
+  client_facing_name: string;
   position: number;
-  notes: string | null;
   prescribed_exercises: PrescribedExercise[];
 }
 
@@ -371,10 +371,8 @@ export default function WorkoutDayEditor({ dayId, clientId, sections: initialSec
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="text-xs font-bold uppercase tracking-widest"
-                style={{ color: "var(--brand-text-secondary)" }}>{section.label}</h3>
-              {section.notes && (
-                <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{section.notes}</p>
-              )}
+                style={{ color: "var(--brand-text-secondary)" }}>{section.client_facing_name || section.internal_name}</h3>
+
             </div>
             <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
               {section.prescribed_exercises.length} exercises
@@ -403,7 +401,7 @@ export default function WorkoutDayEditor({ dayId, clientId, sections: initialSec
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border-2 border-dashed transition-colors"
             style={{ borderColor: "var(--brand-primary)40", color: "var(--brand-primary)" }}>
             <i className="ti ti-plus text-base" />
-            Add Exercise to {section.label}
+            Add Exercise to {section.client_facing_name || section.internal_name}
           </button>
         </div>
       ))}

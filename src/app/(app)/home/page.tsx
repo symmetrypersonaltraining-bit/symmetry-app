@@ -111,7 +111,7 @@ export default async function HomePage() {
 
   const { data: todayWorkout } = await supabase
     .from("scheduled_workouts")
-    .select("id, status, days(label, phase_id, phases(label, programs(name)))")
+    .select("id, day_id, status, days(id, label, phase_id, phases(label, programs(name)))")
     .eq("client_id", clientRecord.id)
     .eq("scheduled_date", today)
     .maybeSingle();
@@ -121,7 +121,7 @@ export default async function HomePage() {
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
   const { data: recentScheduled } = await supabase
     .from("scheduled_workouts")
-    .select("id, scheduled_date, status")
+    .select("id, day_id, scheduled_date, status")
     .eq("client_id", clientRecord.id)
     .gte("scheduled_date", sixtyDaysAgo.toISOString().split("T")[0])
     .lte("scheduled_date", today)
@@ -170,7 +170,7 @@ export default async function HomePage() {
 
   // Full history for week ring navigation (includes workout id for linking)
   const allScheduled = (recentScheduled || []).map((w: any) => ({
-    id: w.id as string,
+    id: (w.day_id || w.id) as string,
     date: w.scheduled_date as string,
     completed: w.status === "completed",
   }));
@@ -186,7 +186,7 @@ export default async function HomePage() {
 
   const { data: recentWorkouts } = await supabase
     .from("scheduled_workouts")
-    .select("id, scheduled_date, status, days(label)")
+    .select("id, day_id, scheduled_date, status, days(id, label)")
     .eq("client_id", clientRecord.id)
     .eq("status", "completed")
     .order("scheduled_date", { ascending: false })

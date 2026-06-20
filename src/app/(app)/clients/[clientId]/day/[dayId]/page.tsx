@@ -28,7 +28,7 @@ export default async function WorkoutDayEditPage({
       id, label, notes,
       phases(id, label, programs(id, name)),
       sections(
-        id, label, position, notes,
+        id, internal_name, client_facing_name, position,
         prescribed_exercises(
           id, position, sets, volume_type, volume_value,
           unilateral, tempo, load_descriptor, cue, rest,

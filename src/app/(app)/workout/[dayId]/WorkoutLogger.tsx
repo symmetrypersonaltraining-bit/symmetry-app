@@ -29,9 +29,9 @@ interface PrescribedExercise {
 
 interface Section {
   id: string;
-  label: string;
+  internal_name: string;
+  client_facing_name: string;
   position: number;
-  notes: string | null;
   prescribed_exercises: PrescribedExercise[];
 }
 
@@ -599,7 +599,7 @@ export default function WorkoutLogger({
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "var(--brand-primary)" }}>
-                {currentSection.label}
+                {currentSection.client_facing_name || currentSection.internal_name}
               </p>
               <h2 className="text-2xl font-bold text-white leading-tight">{currentExercise.exercises?.name}</h2>
               {currentExercise.load_descriptor && (
@@ -809,7 +809,7 @@ export default function WorkoutLogger({
               style={i === activeSectionIdx
                 ? { background: "var(--brand-primary)", color: "white", borderColor: "var(--brand-primary)" }
                 : { background: "var(--brand-surface)", color: "var(--brand-text-secondary)", borderColor: "var(--brand-border)" }}>
-              {sec.label}
+              {sec.client_facing_name || sec.internal_name}
             </button>
           ))}
         </div>

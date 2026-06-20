@@ -29,19 +29,19 @@ export default async function ClientPreviewWorkoutPage() {
   // Try today's workout first, then most recent scheduled
   const { data: todayWorkout } = await supabase
     .from("scheduled_workouts")
-    .select("id")
+    .select("id, day_id")
     .eq("client_id", clientRecord.id)
     .eq("scheduled_date", today)
     .maybeSingle();
 
   if (todayWorkout) {
-    redirect(`/workout/${todayWorkout.id}`);
+    redirect(`/workout/${todayWorkout.day_id || todayWorkout.id}`);
   }
 
   // Fall back to most recent workout
   const { data: recentWorkout } = await supabase
     .from("scheduled_workouts")
-    .select("id, scheduled_date")
+    .select("id, day_id, scheduled_date")
     .eq("client_id", clientRecord.id)
     .lte("scheduled_date", today)
     .order("scheduled_date", { ascending: false })
@@ -49,7 +49,7 @@ export default async function ClientPreviewWorkoutPage() {
     .maybeSingle();
 
   if (recentWorkout) {
-    redirect(`/workout/${recentWorkout.id}`);
+    redirect(`/workout/${recentWorkout.day_id || recentWorkout.id}`);
   }
 
   return (
