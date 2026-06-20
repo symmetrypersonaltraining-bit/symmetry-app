@@ -6,8 +6,8 @@ import toast from 'react-hot-toast';
 interface Appointment {
   id: string;
   client_id: string;
-  start_time: string;
-  end_time: string;
+  scheduled_at: string;
+  ends_at: string;
   status: 'scheduled' | 'completed' | 'cancelled';
   title?: string;
   color?: string;
@@ -73,7 +73,7 @@ export default function HomePage() {
 
   const fetchAppointments = async () => {
     const [{ data: apts }, { data: cls }] = await Promise.all([
-      supabase.from('appointments').select('*').gte('start_time', weekStart + 'T00:00:00').lte('start_time', weekEnd + 'T23:59:59').order('start_time'),
+      supabase.from('appointments').select('*').gte('scheduled_at', weekStart + 'T00:00:00').lte('scheduled_at', weekEnd + 'T23:59:59').order('scheduled_at'),
       supabase.from('clients').select('id, full_name').order('full_name'),
     ]);
     setAppointments(apts || []);
@@ -86,7 +86,7 @@ export default function HomePage() {
 
   const getApptForSlot = (dayStr: string, hour: number) =>
     appointments.filter(a => {
-      const d = new Date(a.start_time);
+      const d = new Date(a.scheduled_at);
       return fmtDate(d) === dayStr && d.getHours() === hour;
     });
 
@@ -96,7 +96,7 @@ export default function HomePage() {
     const startDt = `${newDate}T${newStart}:00`;
     const endDt = `${newDate}T${newEnd}:00`;
     const client = clients.find(c => c.id === newClientId);
-    await supabase.from('appointments').insert({ client_id: newClientId, start_time: startDt, end_time: endDt, status: 'scheduled' });
+    await supabase.from('appointments').insert({ client_id: newClientId, scheduled_at: startDt, ends_at: endDt, status: 'scheduled' });
     // Push to Google Calendar
     try {
       await fetch('/api/gcal-event', {
@@ -142,7 +142,7 @@ export default function HomePage() {
     } else if (mode === 'all' && appt.recurrence_group) {
       await supabase.from('appointments').update({ status: 'cancelled' }).eq('recurrence_group', appt.recurrence_group);
     } else if (mode === 'following' && appt.recurrence_group) {
-      await supabase.from('appointments').update({ status: 'cancelled' }).eq('recurrence_group', appt.recurrence_group).gte('start_time', appt.start_time);
+      await supabase.from('appointments').update({ status: 'cancelled' }).eq('recurrence_group', appt.recurrence_group).gte('scheduled_at', appt.scheduled_at);
     } else {
       await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', id);
       if (appt.gcal_event_id) {
@@ -249,7 +249,7 @@ export default function HomePage() {
                       {slotApts.map(apt => (
                         <div key={apt.id} onClick={e => { e.stopPropagation(); setActionAppt(apt); }}
                           style={{ background: STATUS_COLORS[apt.status] || '#2563eb', borderRadius: 5, padding: '2px 5px', fontSize: 10, color: 'white', fontWeight: 600, cursor: 'pointer', marginBottom: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                          {apt.title || fmtTime(apt.start_time)} {clients.find(c => c.id === apt.client_id)?.full_name?.split(' ')[0] || ''}
+                          {apt.title || fmtTime(apt.scheduled_at)} {clients.find(c => c.id === apt.client_id)?.full_name?.split(' ')[0] || ''}
                         </div>
                       ))}
                     </div>
@@ -267,7 +267,7 @@ export default function HomePage() {
           <div style={{ background: 'var(--brand-surface)', borderRadius: '18px 18px 0 0', width: '100%', padding: 16 }} onClick={e => e.stopPropagation()}>
             <div style={{ width: 36, height: 4, background: 'var(--brand-border)', borderRadius: 2, margin: '0 auto 14px' }} />
             <div style={{ fontWeight: 700, color: 'var(--brand-text)', marginBottom: 12 }}>
-              {fmtTime(actionAppt.start_time)} &#8212; {clients.find(c => c.id === actionAppt.client_id)?.full_name || 'Session'}
+              {fmtTime(actionAppt.scheduled_at)} &#8212; {clients.find(c => c.id === actionAppt.client_id)?.full_name || 'Session'}
             </div>
             {['scheduled', 'completed', 'cancelled'].map(s => (
               <button key={s} onClick={() => updateStatus(actionAppt.id, s)}
