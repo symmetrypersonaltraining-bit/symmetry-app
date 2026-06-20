@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import ClientsListClient from "./ClientsListClient";
 
@@ -46,12 +47,19 @@ export default async function ClientsPage() {
     <div className="px-4 py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold gradient-text">Clients</h1>
+          <h1 className="text-2xl font-bold gradient-text"Clients</h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
             {clientList.length} clients
           </p>
         </div>
-
+        <Link
+          href="/assessment"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm text-white transition-all"
+          style={{ background: "linear-gradient(135deg, #7c3aed, #a855f7)" }}
+        >
+          <i className="ti ti-clipboard-list text-base" />
+          Add Client
+        </Link>
       </div>
       <ClientsListClient clients={clientList} />
     </div>
