@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import TrainerLayoutWrapper from "@/components/TrainerLayoutWrapper";
 import BottomNav from "@/components/BottomNav";
 import AIAssistant from "@/components/AIAssistant";
+import FeedbackButton from "@/components/FeedbackButton";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -28,6 +29,7 @@ export default async function AppLayout({
       <div className="pb-20">{children}</div>
       <BottomNav />
       <AIAssistant isTrainer={false} />
+      <FeedbackButton />
     </div>
   );
 }
