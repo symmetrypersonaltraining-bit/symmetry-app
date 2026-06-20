@@ -76,7 +76,7 @@ export default async function WorkoutPage() {
   return (
     <>
       {/* Header */}
-      <div style={{ background: "#0F4C81" }} className="px-4 py-4">
+      <div style={{ background: "var(--brand-primary)" }} className="px-4 py-4">
         <h1 className="text-white font-medium text-lg">Workout</h1>
         <p className="text-white/60 text-sm">
           {today.toLocaleDateString("en-US", {
@@ -91,24 +91,24 @@ export default async function WorkoutPage() {
         {todayDay ? (
           <>
             {/* Today's workout card */}
-            <div className="card-blue">
-              <p className="text-xs mb-1" style={{ color: "#4E6080" }}>
-                Today · {todayDay.phase_label}
+            <div className="card card-glow">
+              <p className="text-xs mb-1" style={{ color: "var(--brand-text-secondary)" }}>
+                Today Â· {todayDay.phase_label}
               </p>
               <h2
                 className="text-lg font-medium mb-3"
-                style={{ color: "#0D1B2E" }}
+                style={{ color: "var(--brand-text)" }}
               >
                 {todayDay.label}
               </h2>
-              <p className="text-sm mb-4" style={{ color: "#4E6080" }}>
+              <p className="text-sm mb-4" style={{ color: "var(--brand-text-secondary)" }}>
                 {todayDay.program_name}
               </p>
               <Link
                 href={`/workout/${todayDay.id}`}
-                className="btn-primary block text-center"
+                className="btn btn-primary block text-center"
               >
-                Start workout →
+                Start workout â
               </Link>
             </div>
 
@@ -116,27 +116,27 @@ export default async function WorkoutPage() {
             {allPhases.map((phase) => (
               <div key={phase.id}>
                 <p className="label mt-4">{phase.label}</p>
-                <div className="card" style={{ padding: "0.5rem 1rem" }}>
+                <div className="card card-hover animate-slide-up" style={{ padding: "0.5rem 1rem" }}>
                   {phase.days.map((day) => (
                     <Link
                       key={day.id}
                       href={`/workout/${day.id}`}
                       className="flex items-center gap-3 py-3 border-b last:border-b-0 -mx-4 px-4"
-                      style={{ borderColor: "#EDF2F7" }}
+                      style={{ borderColor: "var(--brand-border)" }}
                     >
                       <div
                         className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ background: "#DDEEFF" }}
+                        style={{ background: "var(--brand-card)" }}
                       >
                         <i
                           className="ti ti-calendar text-sm"
-                          style={{ color: "#0F4C81" }}
+                          style={{ color: "var(--brand-primary)" }}
                         />
                       </div>
                       <span className="text-sm flex-1">{day.label}</span>
                       <i
                         className="ti ti-chevron-right"
-                        style={{ color: "#C8D8EC" }}
+                        style={{ color: "var(--brand-border)" }}
                       />
                     </Link>
                   ))}
@@ -148,10 +148,10 @@ export default async function WorkoutPage() {
           <div className="card text-center py-10">
             <i
               className="ti ti-barbell text-4xl block mb-3"
-              style={{ color: "#C8D8EC" }}
+              style={{ color: "var(--brand-border)" }}
             />
             <p className="font-medium mb-1">No program assigned</p>
-            <p className="text-sm" style={{ color: "#4E6080" }}>
+            <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
               Contact your trainer to get started.
             </p>
           </div>
