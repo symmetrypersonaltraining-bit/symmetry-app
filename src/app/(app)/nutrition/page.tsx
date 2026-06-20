@@ -105,8 +105,12 @@ export default async function NutritionPage({
             <ClientSelector clients={allClients} selectedId={null} label="Client" />
           </div>
         </div>
-        <div className="p-8 text-center" style={{ color: "var(--brand-text-secondary)" }}>
-          Select a client above to view their meal plan.
+        <div className="card text-center py-16 mt-4">
+          <i className="ti ti-salad" style={{ fontSize: 56, color: "var(--brand-border)", display: "block", marginBottom: 16 }} />
+          <p className="font-semibold text-lg mb-2" style={{ color: "var(--brand-text)" }}>No client selected</p>
+          <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
+            Choose a client from the dropdown above to view their meal plan, macros, and adherence log.
+          </p>
         </div>
       </>
     );
