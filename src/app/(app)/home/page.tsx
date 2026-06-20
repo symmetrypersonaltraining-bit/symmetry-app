@@ -30,12 +30,12 @@ export default async function HomePage() {
 
     const { data: apptRows } = await supabase
       .from("appointments")
-      .select("id, client_id, scheduled_at, ends_at, status, title, clients(id, name)")
+      .select("id, client_id, scheduled_at, ends_at, status, title, assessment_name, clients(id, name)")
       .gte("scheduled_at", startStr + "T00:00:00")
       .lte("scheduled_at", endStr + "T23:59:59")
       .order("scheduled_at");
 
-    type AE = { id: string; clientId: string; clientName: string; title: string; startTime: string; endTime: string; status: string; scheduledAt: string; endsAt: string | null };
+    type AE = { id: string; clientId: string; clientName: string; title: string; assessmentName?: string; startTime: string; endTime: string; status: string; scheduledAt: string; endsAt: string | null };
     // Build flat list — TrainerCalendar will key by LOCAL date client-side to avoid UTC offset mismatch
     const allAppointments: AE[] = (apptRows || []).map((a: any) => {
       const row = a as any;
@@ -43,9 +43,10 @@ export default async function HomePage() {
       const endTime = row.ends_at ? row.ends_at.substring(11, 16) : "01:00";
       return {
         id: row.id,
-        clientId: row.clients?.id || row.client_id,
-        clientName: row.clients?.name || "Unknown",
-        title: row.title || row.clients?.name || "Training Session",
+        clientId: row.clients?.id || row.client_id || null,
+        clientName: row.clients?.name || null,
+        title: row.title || row.clients?.name || row.assessment_name || "Training Session",
+        assessmentName: row.assessment_name || null,
         startTime,
         endTime,
         status: row.status || "scheduled",

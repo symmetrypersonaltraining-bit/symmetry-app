@@ -12,6 +12,7 @@ interface AE {
   clientId: string;
   clientName: string;
   title: string;
+  assessmentName?: string;
   startTime: string;
   endTime: string;
   status: string;
@@ -39,11 +40,10 @@ interface Props {
 }
 
 // ---- Constants ----
-const CLIENT_COLORS = [
-  "#1E88E5","#43A047","#8E24AA","#FB8C00","#00ACC1",
-  "#E91E63","#7CB342","#3949AB","#00897B","#F4511E",
-  "#6D4C41","#039BE5",
-];
+// Status-based chip colors — blue for scheduled/completed, orange for cancelled
+const CHIP_BLUE = "#1A73E8";
+const CHIP_ORANGE = "#F97316";
+const CHIP_TEXT = "#ffffff";
 const HOUR_PX = 64;
 const DAY_START = 5;
 const DAY_END = 22;
@@ -52,9 +52,17 @@ const TIME_COL_W = 52;
 const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const DOW_FULL = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-function clientColor(clients: Client[], clientId: string) {
-  const idx = clients.findIndex(c => c.id === clientId);
-  return CLIENT_COLORS[idx >= 0 ? idx % CLIENT_COLORS.length : 0];
+function chipColor(status: string) {
+  return (status === "cancelled_client" || status === "cancelled_trainer" || status === "cancelled")
+    ? CHIP_ORANGE
+    : CHIP_BLUE;
+}
+
+function displayName(ev: AE): string {
+  if (ev.clientName && ev.clientName !== "Unknown") {
+    return ev.clientName.split(" ")[0];
+  }
+  return ev.title || ev.assessmentName || "Assessment";
 }
 
 function parseAppt(str: string): Date {
@@ -105,10 +113,10 @@ function EventBlock({ ev, clients, onClick }: {
   const dayStartMin = DAY_START * 60;
   const top = Math.max((startMin - dayStartMin) / 60 * HOUR_PX, 0);
   const height = Math.max((endMin - startMin) / 60 * HOUR_PX, 22);
-  const color = clientColor(clients, ev.clientId);
+  const color = chipColor(ev.status);
   const pct = 100 / ev.laneCount;
   const left = ev.lane * pct;
-  const isCancelled = ev.status === "cancelled";
+  const isCancelled = ev.status === "cancelled" || ev.status === "cancelled_client" || ev.status === "cancelled_trainer";
 
   return (
     <div
@@ -117,21 +125,21 @@ function EventBlock({ ev, clients, onClick }: {
         position: "absolute",
         top, left: `${left}%`, width: `calc(${pct}% - 2px)`,
         height: Math.max(height, 22),
-        background: isCancelled ? "var(--brand-surface)" : `${color}e0`,
+        background: isCancelled ? `${CHIP_ORANGE}90` : `${CHIP_BLUE}e0`,
         border: `1px solid ${color}`,
         borderRadius: 6,
         padding: "2px 5px",
         cursor: "pointer",
         overflow: "hidden",
         zIndex: 2,
-        opacity: isCancelled ? 0.5 : 1,
+        opacity: isCancelled ? 0.6 : 1,
       }}>
       <p className="text-xs font-semibold leading-tight truncate"
-        style={{ color: isCancelled ? "var(--brand-text)" : "white", textDecoration: isCancelled ? "line-through" : "none" }}>
-        {ev.clientName}
+        style={{ color: CHIP_TEXT, textDecoration: isCancelled ? "line-through" : "none" }}>
+        {displayName(ev)}
       </p>
       {height > 32 && (
-        <p className="text-[10px] leading-tight" style={{ color: isCancelled ? "var(--brand-text-secondary)" : "rgba(255,255,255,0.85)" }}>
+        <p className="text-[10px] leading-tight" style={{ color: "rgba(255,255,255,0.85)" }}>
           {fmtTime(start)}–{fmtTime(end)}
         </p>
       )}
@@ -326,7 +334,7 @@ function AddSessionModal({ date, timeStr, clients, onClose, onSaved }: {
 function SessionDetailPopup({ ev, clients, onClose, onSaved }: {
   ev: AE; clients: Client[]; onClose: () => void; onSaved: () => void;
 }) {
-  const color = clientColor(clients, ev.clientId);
+  const color = chipColor(ev.status);
   const start = parseAppt(ev.scheduledAt);
   const end = ev.endsAt ? parseAppt(ev.endsAt) : new Date(start.getTime() + 3600000);
   const todayStr = dayStr(new Date());
@@ -362,10 +370,10 @@ function SessionDetailPopup({ ev, clients, onClose, onSaved }: {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
                 style={{ background: color }}>
-                {ev.clientName.charAt(0)}
+                {displayName(ev).charAt(0)}
               </div>
               <div>
-                <h3 className="text-base font-bold leading-tight" style={{ color: "var(--brand-text)" }}>{ev.clientName}</h3>
+                <h3 className="text-base font-bold leading-tight" style={{ color: "var(--brand-text)" }}>{ev.clientName && ev.clientName !== "Unknown" ? ev.clientName : (ev.title || ev.assessmentName || "Assessment")}</h3>
                 <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
                   {start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                 </p>
@@ -410,7 +418,7 @@ function SessionDetailPopup({ ev, clients, onClose, onSaved }: {
 
         {/* Action buttons */}
         <div className="px-5 pb-5 space-y-2">
-          {isToday && ev.status === "scheduled" && (
+          {isToday && ev.status === "scheduled" && ev.clientId && (
             <Link href={`/clients/${ev.clientId}?tab=training`}
               className="w-full py-2.5 rounded-xl font-bold text-sm text-center flex items-center justify-center gap-2"
               style={{ background: "#E53935", color: "white" }}>
@@ -433,16 +441,20 @@ function SessionDetailPopup({ ev, clients, onClose, onSaved }: {
                 <i className="ti ti-x text-xs" /> Cancel
               </button>
             )}
-            <Link href={`/clients/${ev.clientId}`}
-              className="py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
-              style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}>
-              <i className="ti ti-user text-xs" /> Profile
-            </Link>
-            <Link href={`/clients/${ev.clientId}?tab=training`}
-              className="py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
-              style={{ background: `${color}20`, color, border: `1px solid ${color}40` }}>
-              <i className="ti ti-calendar text-xs" /> Training
-            </Link>
+            {ev.clientId && (
+              <Link href={`/clients/${ev.clientId}`}
+                className="py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+                style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}>
+                <i className="ti ti-user text-xs" /> Profile
+              </Link>
+            )}
+            {ev.clientId && (
+              <Link href={`/clients/${ev.clientId}?tab=training`}
+                className="py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+                style={{ background: `${color}20`, color, border: `1px solid ${color}40` }}>
+                <i className="ti ti-calendar text-xs" /> Training
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -560,7 +572,7 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
               </p>
               <div className="space-y-1.5">
                 {workouts.map(w => {
-                  const color = clientColor(clients, w.clientId);
+                  const color = CHIP_BLUE;
                   const isDone = w.status === "completed";
                   return (
                     <a key={w.id} href={`/clients/${w.clientId}?tab=training`}
@@ -594,21 +606,21 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
               )}
               <div className="space-y-1.5">
                 {sorted.map(ev => {
-                  const color = clientColor(clients, ev.clientId);
+                  const color = chipColor(ev.status);
                   const start = parseAppt(ev.scheduledAt);
                   const end = ev.endsAt ? parseAppt(ev.endsAt) : new Date(start.getTime() + 3600000);
-                  const isCancelled = ev.status === "cancelled";
+                  const isCancelled = ev.status === "cancelled" || ev.status === "cancelled_client" || ev.status === "cancelled_trainer";
                   return (
                     <button key={ev.id}
                       onClick={() => { close(); setTimeout(() => onEventClick(ev), 100); }}
                       className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left"
                       style={{ background: "var(--brand-bg)", border: `1px solid ${color}30` }}>
-                      <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ background: isCancelled ? "#9E9E9E" : color }} />
+                      <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ background: color }} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate"
                           style={{ color: isCancelled ? "var(--brand-text-secondary)" : "var(--brand-text)",
                             textDecoration: isCancelled ? "line-through" : "none" }}>
-                          {ev.clientName}
+                          {displayName(ev)}
                         </p>
                         <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
                           {fmtTime(start)} – {fmtTime(end)}
@@ -618,8 +630,8 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize"
                           style={{
-                            background: ev.status === "completed" ? "#43A04720" : ev.status === "cancelled" ? "#9E9E9E20" : "#FB8C0020",
-                            color: ev.status === "completed" ? "#43A047" : ev.status === "cancelled" ? "#9E9E9E" : "#FB8C00"
+                            background: isCancelled ? "#F9731620" : ev.status === "completed" ? "#43A04720" : "#1A73E820",
+                            color: isCancelled ? "#F97316" : ev.status === "completed" ? "#43A047" : "#1A73E8"
                           }}>
                           {ev.status}
                         </span>
@@ -1120,7 +1132,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
                 <div className="space-y-0.5">
                   {/* Workout chips */}
                   {wks.slice(0, Math.min(wks.length, maxShow)).map(w => {
-                    const color = clientColor(clients, w.clientId);
+                    const color = CHIP_BLUE;
                     const isDone = w.status === "completed";
                     return (
                       <div key={w.id}
@@ -1134,13 +1146,15 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
                   })}
                   {/* Session chips */}
                   {evs.slice(0, Math.max(0, maxShow - wks.length)).map(ev => {
-                    const color = clientColor(clients, ev.clientId);
+                    const isCancelled = ev.status === "cancelled" || ev.status === "cancelled_client" || ev.status === "cancelled_trainer";
+                    const color = isCancelled ? CHIP_ORANGE : CHIP_BLUE;
                     return (
                       <div key={ev.id}
                         className="px-1.5 rounded text-[9px] font-medium truncate flex items-center gap-1"
-                        style={{ background: `${color}25`, color, border: `1px solid ${color}50` }}>
-                        <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: color }} />
-                        {ev.clientName.split(" ")[0]} {ev.startTime}
+                        style={{ background: color, color: CHIP_TEXT, border: `1px solid ${color}80`,
+                          textDecoration: isCancelled ? "line-through" : "none" }}>
+                        <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: CHIP_TEXT }} />
+                        {displayName(ev)} {ev.startTime}
                       </div>
                     );
                   })}
@@ -1211,7 +1225,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
               {/* Events */}
               <div className="px-4 py-2 space-y-2">
                 {wks.map(w => {
-                  const color = clientColor(clients, w.clientId);
+                  const color = CHIP_BLUE;
                   const isDone = w.status === "completed";
                   return (
                     <a key={w.id} href={`/clients/${w.clientId}?tab=training`}
@@ -1230,15 +1244,15 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
                   );
                 })}
                 {evs.map(ev => {
-                  const color = clientColor(clients, ev.clientId);
+                  const color = chipColor(ev.status);
                   const start = parseAppt(ev.scheduledAt);
                   const end = ev.endsAt ? parseAppt(ev.endsAt) : new Date(start.getTime() + 3600000);
-                  const isCancelled = ev.status === "cancelled";
+                  const isCancelled = ev.status === "cancelled" || ev.status === "cancelled_client" || ev.status === "cancelled_trainer";
                   return (
                     <button key={ev.id}
                       onClick={() => setPopupEv(ev)}
                       className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-left"
-                      style={{ background: "var(--brand-bg)", borderLeft: `3px solid ${isCancelled ? "#9E9E9E" : color}` }}>
+                      style={{ background: "var(--brand-bg)", borderLeft: `3px solid ${color}` }}>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>
                           {fmtTime(start)} – {fmtTime(end)}
@@ -1246,14 +1260,14 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
                         <p className="text-sm font-medium truncate"
                           style={{ color: isCancelled ? "var(--brand-text-secondary)" : "var(--brand-text)",
                             textDecoration: isCancelled ? "line-through" : "none" }}>
-                          {ev.clientName}
-                          {ev.title && ev.title !== "Training Session" ? ` · ${ev.title}` : ""}
+                          {ev.clientName && ev.clientName !== "Unknown" ? ev.clientName : (ev.title || ev.assessmentName || "Assessment")}
+                          {ev.clientName && ev.title && ev.title !== "Training Session" ? ` · ${ev.title}` : ""}
                         </p>
                       </div>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize flex-shrink-0"
                         style={{
-                          background: ev.status === "completed" ? "#43A04720" : ev.status === "cancelled" ? "#9E9E9E20" : "#FB8C0020",
-                          color: ev.status === "completed" ? "#43A047" : ev.status === "cancelled" ? "#9E9E9E" : "#FB8C00"
+                          background: isCancelled ? "#F9731620" : ev.status === "completed" ? "#43A04720" : "#1A73E820",
+                          color: isCancelled ? "#F97316" : ev.status === "completed" ? "#43A047" : "#1A73E8"
                         }}>
                         {ev.status}
                       </span>
@@ -1293,7 +1307,9 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
             <div className="w-3 h-3 rounded-full" style={{ background: "var(--brand-primary)" }} /> All clients
           </button>
           {clients.map((c, idx) => {
-            const color = CLIENT_COLORS[idx % CLIENT_COLORS.length];
+            // Sidebar filter dots: use a fixed palette just for visual distinction
+            const SIDEBAR_COLORS = ["#1A73E8","#43A047","#8E24AA","#FB8C00","#00ACC1","#E91E63","#7CB342","#3949AB","#00897B","#F4511E","#6D4C41","#039BE5"];
+            const color = SIDEBAR_COLORS[idx % SIDEBAR_COLORS.length];
             const isActive = selectedClientId === c.id;
             return (
               <div key={c.id} className="flex items-center gap-1 w-full rounded-lg"

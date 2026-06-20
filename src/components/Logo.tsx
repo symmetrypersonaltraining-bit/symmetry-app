@@ -12,7 +12,7 @@ interface LogoProps {
 // Falls back to /logo.png if not yet uploaded to storage
 const LOGO_URL =
   process.env.NEXT_PUBLIC_LOGO_URL ||
-  'https://mkfiginpiesospsnktea.supabase.co/storage/v1/object/public/assets/logo.png';
+  'https://mkfiginpiesospsnktea.supabase.co/storage/v1/object/public/assets/Transparent%20White.png';
 
 export default function Logo({
   size = 40,
