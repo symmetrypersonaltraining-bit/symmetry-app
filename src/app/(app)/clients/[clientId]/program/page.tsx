@@ -326,7 +326,7 @@ function WorkoutEditor({
         const sec = newSections[si];
         const { data: newSec } = await supabase
           .from("sections")
-          .insert({ day_id: (newDay as any).id, label: sec.label, position: si, section_type: sec.type })
+          .insert({ day_id: (newDay as any).id, internal_name: sec.label, client_facing_name: sec.label, position: si })
           .select("id")
           .single();
         if (!newSec) continue;
