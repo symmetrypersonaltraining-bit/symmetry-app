@@ -54,6 +54,11 @@ export default function AIAssistant({ isTrainer }: { isTrainer: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: updated, context: getContext() }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || "AI assistant unavailable. Please try again later.");
+        return;
+      }
       const data = await res.json();
       if (data.error) {
         setError(data.error);
@@ -277,7 +282,7 @@ export default function AIAssistant({ isTrainer }: { isTrainer: boolean }) {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-                placeholder="Ask anything about training…"
+                placeholder="Ask anything about trainingâ¦"
                 className="flex-1 text-sm px-3.5 py-2.5 rounded-xl outline-none"
                 style={{
                   background: "var(--brand-bg)",
