@@ -67,7 +67,7 @@ function MacroSection({ clientId }: { clientId: string }) {
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--brand-text)' }}>
               {item.value}{item.unit && <span style={{ fontSize: 10, fontWeight: 500 }}> {item.unit}</span>}
             </div>
-            {item.target && <div style={{ fontSize: 10, color: 'var(--brand-text-secondary' }}>of {item.target}{item.unit}</div>}
+            {item.target && <div style={{ fontSize: 10, color: 'var(--brand-text-secondary)' }}>of {item.target}{item.unit}</div>}
           </div>
         ))}
       </div>
@@ -91,45 +91,27 @@ export default function ClientPreviewPage() {
   useEffect(() => {
     const load = async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser || authUser.email !== TRAINER_EMAIL {
+      if (!authUser || authUser.email !== TRAINER_EMAIL) {
         window.location.href = '/home';
         return;
       }
       setUser(authUser);
-
-      const { data: cr } = await supabase
-        .from('clients')
-        .select('id, name')
-        .ilike('name', '%Dustin%')
-        .maybeSingle();
+      const { data: cr } = await supabase.from('clients').select('id, name').ilike('name', '%Dustin%').maybeSingle();
       setClientRecord(cr);
       if (!cr) { setLoading(false); return; }
-
       const today = new Date().toISOString().split('T')[0];
-
-      const [
-        { data: tw },
-        { data: rs },
-        { data: mh },
-        { data: rw },
-      ] = await Promise.all([
+      const [{ data: tw }, { data: rs }, { data: mh }, { data: rw }] = await Promise.all([
         supabase.from('scheduled_workouts').select('id, status, days(label, phase_id, phases(label, programs(name)))').eq('client_id', cr.id).eq('scheduled_date', today).maybeSingle(),
         supabase.from('scheduled_workouts').select('id, scheduled_date, status').eq('client_id', cr.id).gte('scheduled_date', (() => { const d = new Date(); d.setDate(d.getDate() - 60); return d.toISOString().split('T')[0]; })()).lte('scheduled_date', today).order('scheduled_date', { ascending: false }),
         supabase.from('metrics').select('metric_date, weight, body_fat_pct, lean_mass, fat_mass').eq('client_id', cr.id).order('metric_date', { ascending: false }).limit(10),
         supabase.from('scheduled_workouts').select('id, scheduled_date, status, days(label)').eq('client_id', cr.id).eq('status', 'completed').order('scheduled_date', { ascending: false }).limit(5),
       ]);
-
-      setTodayWorkout(tw);
-      setMetrics((mh || []).reverse());
-      setRecentWorkouts(rw || []);
-
-      const thirtyAgo = new Date();
-      thirtyAgo.setDate(thirtyAgo.getDate() - 30);
+      setTodayWorkout(tw); setMetrics((mh || []).reverse()); setRecentWorkouts(rw || []);
+      const thirtyAgo = new Date(); thirtyAgo.setDate(thirtyAgo.getDate() - 30);
       const thirtyStr = thirtyAgo.toISOString().split('T')[0];
       const recent30 = (rs || []).filter((w: any) => w.scheduled_date >= thirtyStr);
       setTotalScheduled(recent30.length);
       setCompletedCount(recent30.filter((w: any) => w.status === 'completed').length);
-
       const sorted = [...(rs || [])].sort((a: any, b: any) => b.scheduled_date.localeCompare(a.scheduled_date));
       const seenDates = new Set<string>();
       for (const w of sorted) { if (w.status === 'completed') seenDates.add(w.scheduled_date); }
@@ -139,54 +121,28 @@ export default function ClientPreviewPage() {
         const daysDiff = Math.floor((new Date(today).getTime() - new Date(completedDates[0]).getTime()) / 86400000);
         if (daysDiff <= 1) {
           for (const d of completedDates) {
-            const expected = new Date(completedDates[0]);
-            expected.setDate(expected.getDate() - streak);
-            if (streak === 0) { streak++; }
-            else if (d === expected.toISOString().split('T')[0]) { streak++; }
-            else break;
+            const expected = new Date(completedDates[0]); expected.setDate(expected.getDate() - streak);
+            if (streak === 0) { streak++; } else if (d === expected.toISOString().split('T')[0]) { streak++; } else break;
           }
         }
       }
       setStreakDays(streak);
-
-      const todayDow = new Date().getDay();
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - todayDow);
+      const todayDow = new Date().getDay(); const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - todayDow);
       const weekStartStr = weekStart.toISOString().split('T')[0];
       const weekEndStr = new Date(weekStart.getTime() + 6 * 86400000).toISOString().split('T')[0];
       setWeekWorkouts((rs || []).filter((w: any) => w.scheduled_date >= weekStartStr && w.scheduled_date <= weekEndStr).map((w: any) => ({ date: w.scheduled_date, completed: w.status === 'completed' })));
-
       setLoading(false);
     };
     load();
   }, []);
 
   if (loading) return <div style={{ padding: 32, textAlign: 'center', color: 'var(--brand-text-secondary)' }}>Loading preview...</div>;
-
-  if (!clientRecord) {
-    return (
-      <div className="p-6 text-center">
-        <p style={{ color: 'var(--brand-text-secondary' }}>
-          No client record found for your account. Ask Claude to create one.
-        </p>
-      </div>
-    );
-  }
+  if (!clientRecord) return <div className="p-6 text-center"><p style={{ color: 'var(--brand-text-secondary)' }}>No client record found for your account. Ask Claude to create one.</p></div>;
 
   const firstName = (clientRecord.name || '').split(' ')[0];
-
   return (
     <div>
-      <ClientDashboard
-        firstName={firstName}
-        todayWorkout={todayWorkout}
-        metrics={metrics}
-        completedCount={completedCount}
-        totalScheduled={totalScheduled}
-        recentWorkouts={recentWorkouts}
-        streakDays={streakDays}
-        weekWorkouts={weekWorkouts}
-      />
+      <ClientDashboard firstName={firstName} todayWorkout={todayWorkout} metrics={metrics} completedCount={completedCount} totalScheduled={totalScheduled} recentWorkouts={recentWorkouts} streakDays={streakDays} weekWorkouts={weekWorkouts} />
       <MacroSection clientId={user?.id || ''} />
     </div>
   );
