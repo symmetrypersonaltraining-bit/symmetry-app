@@ -15,7 +15,7 @@ export default async function ClientPreviewPage() {
   const { data: clientRecord } = await supabase
     .from("clients")
     .select("id, name")
-    .eq("email", TRAINER_EMAIL)
+    .ilike("name", "%Dustin%")
     .maybeSingle();
 
   if (!clientRecord) {
@@ -50,15 +50,15 @@ export default async function ClientPreviewPage() {
   const thirtyAgo = new Date();
   thirtyAgo.setDate(thirtyAgo.getDate() - 30);
   const thirtyStr = thirtyAgo.toISOString().split("T")[0];
-  const recent30 = (recentScheduled || []).filter((w: any) => w.scheduled_date >= thirtyStr);
+  const recent30 = (recentScheduled || []).filter((w) => w.scheduled_date >= thirtyStr);
   const totalScheduled = recent30.length;
-  const completedCount = recent30.filter((w: any) => w.status === "completed").length;
+  const completedCount = recent30.filter((w) => w.status === "completed").length;
 
-  const sorted = [...(recentScheduled || [])].sort((a: any, b: any) =>
+  const sorted = [...(recentScheduled || [])].sort((a, b) =>
     b.scheduled_date.localeCompare(a.scheduled_date)
   );
-  const seenDates = new Set<string>();
-  for (const w of sorted as any[]) {
+  const seenDates = new Set();
+  for (const w of sorted) {
     if (w.status === "completed") seenDates.add(w.scheduled_date);
   }
   const completedDates = Array.from(seenDates).sort().reverse();
@@ -85,8 +85,8 @@ export default async function ClientPreviewPage() {
   const weekStartStr = weekStart.toISOString().split("T")[0];
   const weekEndStr = new Date(weekStart.getTime() + 6 * 86400000).toISOString().split("T")[0];
   const weekWorkouts = (recentScheduled || [])
-    .filter((w: any) => w.scheduled_date >= weekStartStr && w.scheduled_date <= weekEndStr)
-    .map((w: any) => ({ date: w.scheduled_date, completed: w.status === "completed" }));
+    .filter((w) => w.scheduled_date >= weekStartStr && w.scheduled_date <= weekEndStr)
+    .map((w) => ({ date: w.scheduled_date, completed: w.status === "completed" }));
 
   const { data: metricsHistory } = await supabase
     .from("metrics")
