@@ -513,7 +513,7 @@ function WorkoutEditor({
                 <div className="flex items-center gap-2 px-3 py-2 border-b"
                   style={{ borderColor: "var(--brand-border)", background: "var(--brand-bg)" }}>
                   <input
-                    value={sec.client_facing_name}
+                    value={sec.label}
                     onChange={e => setNewSections(s => s.map((x, i) => i === si ? { ...x, label: e.target.value } : x))}
                     className="flex-1 text-xs font-semibold bg-transparent outline-none"
                     style={{ color: "var(--brand-text)" }}
