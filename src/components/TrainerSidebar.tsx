@@ -83,7 +83,7 @@ export default function TrainerSidebar({
           <Logo size={collapsed ? 36 : 40} color="white" className="flex-shrink-0" />
           {!collapsed && (
             <div className="min-w-0">
-              <div className="text-white font-semibold text-sm leading-tight">Symmetry</div>
+              <div className="text-white font-semibold text-sm leading-tight symmetry-title-dark">Symmetry</div>
               <div className="text-white/60 text-[10px] tracking-widest uppercase">Personal Training</div>
             </div>
           )}
@@ -206,7 +206,7 @@ export default function TrainerSidebar({
         </button>
         <Logo size={32} color="white" className="flex-shrink-0" />
         <div className="flex-1">
-          <div className="text-white font-semibold text-sm">Symmetry</div>
+          <div className="text-white font-semibold text-sm symmetry-title-dark">Symmetry</div>
         </div>
       </div>
 
