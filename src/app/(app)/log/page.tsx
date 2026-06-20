@@ -7,11 +7,24 @@ export default async function LogPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: clientRecord } = await supabase
-    .from("clients")
-    .select("id, name")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
+  const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
+  let clientRecord: { id: string; name: string } | null = null;
+
+  if (isTrainer) {
+    const { data } = await supabase
+      .from("clients")
+      .select("id, name")
+      .ilike("name", "%Dustin%")
+      .maybeSingle();
+    clientRecord = data;
+  } else {
+    const { data } = await supabase
+      .from("clients")
+      .select("id, name")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+    clientRecord = data;
+  }
 
   if (!clientRecord) return (
     <div className="p-6 text-center" style={{ color: "var(--brand-text-secondary)" }}>No client record found.</div>
