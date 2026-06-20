@@ -63,17 +63,6 @@ export default async function ClientProfilePage({
     .eq("client_id", clientId)
     .eq("status", "completed");
 
-  // Appointments for the Schedule tab (6 months back, 18 months forward)
-  const apptStart = new Date(); apptStart.setMonth(apptStart.getMonth() - 6);
-  const apptEnd = new Date(); apptEnd.setMonth(apptEnd.getMonth() + 18);
-  const { data: appointmentsRaw } = await supabase
-    .from("appointments")
-    .select("id, scheduled_at, ends_at, status, title")
-    .eq("client_id", clientId)
-    .gte("scheduled_at", apptStart.toISOString().split("T")[0] + "T00:00:00")
-    .lte("scheduled_at", apptEnd.toISOString().split("T")[0] + "T23:59:59")
-    .order("scheduled_at", { ascending: false });
-
   const prog = programs.find(p => p.id === (assignment as any)?.program_id);
   const initials = client.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
   const avatarBgs = ["#DDEEFF","#FEF3C7","#F3E8FF","#FEE2E2","#D1FAE5","#FCE7F3"];
@@ -82,7 +71,6 @@ export default async function ClientProfilePage({
   const lm = latestMetrics?.[0] as any;
   const metrics = (latestMetrics || []).reverse() as any[];
   const allWorkouts = (allWorkoutsRaw || []) as any[];
-  const appointments = (appointmentsRaw || []) as any[];
 
   return (
     <div style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
@@ -129,9 +117,9 @@ export default async function ClientProfilePage({
         {/* QUICK STATS inline */}
         <div className="flex gap-4 pb-1">
           {[
-            { label: "Weight", value: lm?.weight ? `${lm.weight} lb` : (client.current_weight ? `${client.current_weight} lb` : "â") },
-            { label: "Body Fat", value: lm?.body_fat_pct ? `${lm.body_fat_pct}%` : (client.current_body_fat_pct ? `${client.current_body_fat_pct}%` : "â") },
-            { label: "Lean Mass", value: lm?.lean_mass ? `${lm.lean_mass} lb` : "â" },
+            { label: "Weight", value: lm?.weight ? `${lm.weight} lb` : (client.current_weight ? `${client.current_weight} lb` : "—") },
+            { label: "Body Fat", value: lm?.body_fat_pct ? `${lm.body_fat_pct}%` : (client.current_body_fat_pct ? `${client.current_body_fat_pct}%` : "—") },
+            { label: "Lean Mass", value: lm?.lean_mass ? `${lm.lean_mass} lb` : "—" },
           ].map((s) => (
             <div key={s.label} className="text-center">
               <div className="text-white text-sm font-bold">{s.value}</div>
@@ -145,7 +133,6 @@ export default async function ClientProfilePage({
         client={client as any}
         metrics={metrics}
         allWorkouts={allWorkouts}
-        appointments={appointments}
         clientId={clientId}
         programs={programs}
         currentProgramId={(assignment as any)?.program_id}

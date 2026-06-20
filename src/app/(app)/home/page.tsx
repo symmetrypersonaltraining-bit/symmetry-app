@@ -105,7 +105,8 @@ export default async function HomePage() {
 
   const today = new Date().toISOString().split("T")[0];
 
-  const { data: todayWorkout } = await supabase
+  // Cast as any to bypass generated-type constraint on day_id column
+  const { data: todayWorkout } = await (supabase as any)
     .from("scheduled_workouts")
     .select("id, day_id, status, days(id, label, phase_id, phases(label, programs(name)))")
     .eq("client_id", clientRecord.id)
@@ -114,7 +115,7 @@ export default async function HomePage() {
 
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-  const { data: recentScheduled } = await supabase
+  const { data: recentScheduled } = await (supabase as any)
     .from("scheduled_workouts")
     .select("id, day_id, scheduled_date, status")
     .eq("client_id", clientRecord.id)
@@ -168,7 +169,7 @@ export default async function HomePage() {
     .limit(30);
   const metrics = (metricsHistory || []).reverse();
 
-  const { data: recentWorkouts } = await supabase
+  const { data: recentWorkouts } = await (supabase as any)
     .from("scheduled_workouts")
     .select("id, day_id, scheduled_date, status, days(id, label)")
     .eq("client_id", clientRecord.id)

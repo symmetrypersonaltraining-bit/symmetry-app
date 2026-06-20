@@ -143,17 +143,25 @@ function MetricModal({ metricKey, label, unit, color, icon, metrics, onClose }: 
 
 // ─── Metric Card ──────────────────────────────────────────────────────────────
 function MetricCard({ label, value, unit, values, color, icon, onClick }: { label: string; value: string | number | null; unit: string; values: number[]; color: string; icon: string; onClick: () => void }) {
+  const hasData = value != null;
   return (
     <button onClick={onClick} className="metric-card text-left w-full" style={{ cursor: "pointer" }}>
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>{label}</span>
-        <i className={`ti ${icon} text-sm`} style={{ color }} />
+        <i
+          className={`ti ${hasData ? icon : "ti-clock-hour-3"} text-sm`}
+          style={{ color: hasData ? color : "var(--brand-text-secondary)", opacity: hasData ? 1 : 0.45 }}
+        />
       </div>
       <div className="text-lg font-bold mb-2" style={{ color: "var(--brand-text)" }}>
-        {value != null ? <span>{value}<span className="text-xs font-normal ml-0.5" style={{ color: "var(--brand-text-secondary)" }}>{unit}</span></span> : <span style={{ color: "var(--brand-text-secondary)", fontSize: "13px" }}>No data</span>}
+        {hasData
+          ? <span>{value}<span className="text-xs font-normal ml-0.5" style={{ color: "var(--brand-text-secondary)" }}>{unit}</span></span>
+          : <span className="text-xs font-normal" style={{ color: "var(--brand-text-secondary)" }}>Nothing logged yet</span>}
       </div>
       <Sparkline values={values} color={color} />
-      <p className="text-xs mt-1.5" style={{ color: "var(--brand-text-secondary)" }}>Tap to expand ↗</p>
+      <p className="text-xs mt-1.5" style={{ color: "var(--brand-text-secondary)" }}>
+        {hasData ? "Tap to expand ↗" : "Logged after assessment"}
+      </p>
     </button>
   );
 }
