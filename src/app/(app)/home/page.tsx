@@ -85,7 +85,7 @@ export default async function HomePage() {
     thirtyDays.setDate(thirtyDays.getDate() + 30);
     const { data: remindersRaw } = await supabase
       .from("payment_reminders")
-      .select("id, client_id, due_date, amount_due, billing_credits, notification_status, sms_sent_at, clients(id, name)")
+      .select("id, client_id, due_date, amount_due, billing_credits, notification_status, email_sent_at, clients(id, name)")
       .gte("due_date", today.toISOString().split("T")[0])
       .lte("due_date", thirtyDays.toISOString().split("T")[0])
       .in("notification_status", ["pending", "paused"])
@@ -99,7 +99,7 @@ export default async function HomePage() {
       amountDue: Number(r.amount_due),
       billingCredits: Number(r.billing_credits),
       notificationStatus: r.notification_status,
-      smsSentAt: r.sms_sent_at,
+      emailSentAt: r.email_sent_at,
     }));
 
     return (
@@ -116,7 +116,7 @@ export default async function HomePage() {
     );
   }
 
-  // ── CLIENT DASHBOARD ──────────────────────────────────────────────────────
+  // ââ CLIENT DASHBOARD ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   const { data: clientRecord } = await supabase
     .from("clients")
     .select("id, name")
