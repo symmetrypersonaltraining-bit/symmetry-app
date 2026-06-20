@@ -1,4 +1,6 @@
-// Symmetry Personal Training — inline SVG seal (no external asset dependency)
+'use client';
+
+import Image from 'next/image';
 
 interface LogoProps {
   size?: number;
@@ -6,50 +8,37 @@ interface LogoProps {
   className?: string;
 }
 
+// Supabase storage public URL for the Vitruvian Man logo
+// Falls back to /logo.png if not yet uploaded to storage
+const LOGO_URL =
+  process.env.NEXT_PUBLIC_LOGO_URL ||
+  'https://mkfiginpiesospsnktea.supabase.co/storage/v1/object/public/assets/logo.png';
+
 export default function Logo({
   size = 40,
-  color = "white",
-  className = "",
+  className = '',
 }: LogoProps) {
-  const s = size;
-  const cx = s / 2;
-  const cy = s / 2;
-  const outerR = s / 2 - 1;
-  const innerR = outerR * 0.74;
-  // Unique id per size to avoid SVG defs collision when multiple instances render
-  const uid = `sym-${s}`;
-
   return (
-    <svg
-      width={s}
-      height={s}
-      viewBox={`0 0 ${s} ${s}`}
-      className={className}
-      aria-label="Symmetry Personal Training"
-      style={{ flexShrink: 0 }}
+    <div
+      className={`relative flex-shrink-0 rounded-full overflow-hidden ring-2 ring-white/30 ${className}`}
+      style={{ width: size, height: size, background: 'rgba(255,255,255,0.08)' }}
     >
-      <circle cx={cx} cy={cy} r={outerR} fill="none" stroke={color} strokeWidth={s * 0.04} />
-      <circle cx={cx} cy={cy} r={innerR} fill="none" stroke={color} strokeWidth={s * 0.018} />
-      <defs>
-        <path id={`top-arc-${uid}`}
-          d={`M ${cx - outerR * 0.82},${cy} A ${outerR * 0.82},${outerR * 0.82} 0 1,1 ${cx + outerR * 0.82},${cy}`} />
-        <path id={`bot-arc-${uid}`}
-          d={`M ${cx + outerR * 0.78},${cy} A ${outerR * 0.78},${outerR * 0.78} 0 0,1 ${cx - outerR * 0.78},${cy}`} />
-      </defs>
-      <text fill={color} fontSize={s * 0.12} fontWeight="500" letterSpacing={s * 0.045} className="symmetry-title-dark">
-        <textPath href={`#top-arc-${uid}`} startOffset="18%">SYMMETRY</textPath>
-      </text>
-      <text fill={color} fontSize={s * 0.092} letterSpacing={s * 0.025} opacity="0.85">
-        <textPath href={`#bot-arc-${uid}`} startOffset="5%">PERSONAL TRAINING</textPath>
-      </text>
-      {/* Figure icon */}
-      <circle cx={cx} cy={cy * 1.1} r={s * 0.175} fill="none" stroke={color} strokeWidth={s * 0.012} />
-      <rect x={cx - s * 0.145} y={cy * 0.67} width={s * 0.29} height={s * 0.28} fill="none" stroke={color} strokeWidth={s * 0.012} />
-      <circle cx={cx} cy={cy * 0.75} r={s * 0.055} fill={color} />
-      <line x1={cx} y1={cy * 0.8} x2={cx} y2={cy * 1.24} stroke={color} strokeWidth={s * 0.022} strokeLinecap="round" />
-      <line x1={cx - s * 0.2} y1={cy * 1.0} x2={cx + s * 0.2} y2={cy * 1.0} stroke={color} strokeWidth={s * 0.022} strokeLinecap="round" />
-      <line x1={cx} y1={cy * 1.24} x2={cx - s * 0.115} y2={cy * 1.46} stroke={color} strokeWidth={s * 0.022} strokeLinecap="round" />
-      <line x1={cx} y1={cy * 1.24} x2={cx + s * 0.115} y2={cy * 1.46} stroke={color} strokeWidth={s * 0.022} strokeLinecap="round" />
-    </svg>
+      <Image
+        src={LOGO_URL}
+        alt="Symmetry Personal Training"
+        width={size}
+        height={size}
+        className="w-full h-full object-cover"
+        unoptimized
+        priority
+        onError={(e) => {
+          // Fallback to local public/logo.png if Supabase URL fails
+          const img = e.currentTarget as HTMLImageElement;
+          if (!img.src.includes('/logo.png')) {
+            img.src = '/logo.png';
+          }
+        }}
+      />
+    </div>
   );
 }
