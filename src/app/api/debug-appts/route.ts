@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -11,45 +10,23 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  // Use admin client to bypass RLS
-  let adminData: any = { error: "admin not available" };
-  try {
-    const admin = createAdminClient();
-    const { data, count, error } = await admin
-      .from("appointments")
-      .select("id, scheduled_at, ends_at, status, client_id, gcal_event_id", { count: "exact" })
-      .order("scheduled_at", { ascending: false })
-      .limit(10);
-    
-    const { data: oldest } = await admin
-      .from("appointments")
-      .select("id, scheduled_at")
-      .order("scheduled_at", { ascending: true })
-      .limit(3);
-
-    // Check columns
-    const { data: cols } = await admin.rpc("exec_sql", { 
-      query: "SELECT column_name FROM information_schema.columns WHERE table_name='appointments' ORDER BY ordinal_position" 
-    }).select();
-
-    adminData = { 
-      total: count, 
-      recent: data?.slice(0,3),
-      oldest: oldest?.slice(0,3),
-      error: error?.message,
-    };
-  } catch (e: any) {
-    adminData = { adminError: e.message };
-  }
-
-  // Also test regular client
-  const { data: regularData, error: regularError } = await supabase
+  // Test appointments query with the fixed RLS (should now work for trainer)
+  const today = new Date();
+  const rangeStart = new Date(today); rangeStart.setMonth(rangeStart.getMonth() - 1);
+  const rangeEnd = new Date(today); rangeEnd.setMonth(rangeEnd.getMonth() + 18);
+  
+  const { data: appts, count, error } = await supabase
     .from("appointments")
-    .select("id, scheduled_at")
-    .limit(3);
+    .select("id, scheduled_at, ends_at, status, client_id, title", { count: "exact" })
+    .gte("scheduled_at", rangeStart.toISOString().split("T")[0] + "T00:00:00")
+    .lte("scheduled_at", rangeEnd.toISOString().split("T")[0] + "T23:59:59")
+    .order("scheduled_at")
+    .limit(5);
 
   return NextResponse.json({
-    admin: adminData,
-    regular: { data: regularData, error: regularError?.message },
+    error: error?.message,
+    total_in_range: count,
+    range: { start: rangeStart.toISOString().split("T")[0], end: rangeEnd.toISOString().split("T")[0] },
+    sample: appts?.slice(0, 3),
   });
 }

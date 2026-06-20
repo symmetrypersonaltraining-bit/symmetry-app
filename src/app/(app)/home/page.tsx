@@ -24,7 +24,7 @@ export default async function HomePage() {
     const rangeStart = new Date(today);
     rangeStart.setMonth(rangeStart.getMonth() - 1);
     const rangeEnd = new Date(today);
-    rangeEnd.setMonth(rangeEnd.getMonth() + 12);
+    rangeEnd.setMonth(rangeEnd.getMonth() + 18);
     const startStr = rangeStart.toISOString().split("T")[0];
     const endStr = rangeEnd.toISOString().split("T")[0];
 
