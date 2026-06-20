@@ -200,7 +200,7 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
         <p className="text-[10px] font-semibold uppercase tracking-widest mb-2"
           style={{ color: "var(--brand-text-secondary)" }}>Body Metrics Overview</p>
         <div className="space-y-2">
-          {[
+          {latestMetric ? [
             { label: "Weight", latest: latestMetric?.weight, unit: "lb", delta: weightDelta, values: weights, color: "var(--brand-primary)", icon: "ti-scale" },
             { label: "Body Fat", latest: latestMetric?.body_fat_pct, unit: "%", delta: bfDelta, values: bodyFats, color: "#f59e0b", icon: "ti-percentage" },
           ].map(m => (
@@ -223,11 +223,11 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
               </div>
               <MiniSparkline values={m.values} color={m.color} />
             </div>
-          ))}
-          {!latestMetric && (
+          )) : (
             <div className="rounded-xl py-6 text-center"
               style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-              <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>No metrics logged yet</p>
+              <i className="ti ti-chart-bar text-2xl block mb-1.5" style={{ color: "var(--brand-text-secondary)" }} />
+              <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>No metrics on file</p>
             </div>
           )}
         </div>
