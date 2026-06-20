@@ -7,7 +7,7 @@ import Link from "next/link";
 
 // ---- Types ----
 interface ClientRow {
-  id: string;h
+  id: string;
   name: string;
 }
 
