@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import ClientProfileTabs from "./ClientProfileTabs";
 import InviteClientButton from "./InviteClientButton";
-import PaymentReminderToggle from "./PaymentReminderToggle";
 
 export default async function ClientProfilePage({
   params,
@@ -29,7 +28,8 @@ export default async function ClientProfilePage({
   const rangeEnd = new Date();
   rangeEnd.setMonth(rangeEnd.getMonth() + 3);
 
-  const { data: allWorkoutsRaw } = await supabase
+  // Cast as any to bypass generated-type constraint on day_id column
+  const { data: allWorkoutsRaw } = await (supabase as any)
     .from("scheduled_workouts")
     .select("id, scheduled_date, status, day_id, days(id, label, position)")
     .eq("client_id", clientId)
