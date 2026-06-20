@@ -49,6 +49,25 @@ interface DayDetail {
   sections: Section[];
 }
 
+// Library panel types
+interface LibraryDay {
+  day_id: string;
+  day_label: string;
+  position: number;
+  phase_label: string;
+  phase_position: number;
+  program_id: string;
+  program_name: string;
+  exercises: string[];
+}
+
+// Copied week type
+interface CopiedWeekWorkout {
+  day_id: string | null;
+  dayOfWeek: number; // 0=Mon ... 6=Sun
+  label: string;
+}
+
 // ---- Exercise list ----
 const EXERCISE_LIST = [
   "Squat","Deadlift","Bench Press","Overhead Press","Pull-Up","Row","Lunge","Hip Thrust",
@@ -82,6 +101,18 @@ function todayStr() {
 
 function nameInitials(name: string) {
   return name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+}
+
+function addWeeks(base: Date, n: number): Date {
+  const d = new Date(base);
+  d.setDate(d.getDate() + n * 7);
+  return d;
+}
+
+function addDays(base: Date, n: number): Date {
+  const d = new Date(base);
+  d.setDate(d.getDate() + n);
+  return d;
 }
 
 const DOW_SHORT = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -143,7 +174,6 @@ function WorkoutEditor({
   const [loadingDays, setLoadingDays] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Create New state
   const [workoutName, setWorkoutName] = useState("");
   const [micActive, setMicActive] = useState(false);
   const [newSections, setNewSections] = useState<Array<{
@@ -156,7 +186,6 @@ function WorkoutEditor({
 
   const micRef = useRef<any>(null);
 
-  // Load program days
   useEffect(() => {
     if (tab !== "program") return;
     setLoadingDays(true);
@@ -192,7 +221,6 @@ function WorkoutEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, clientId]);
 
-  // Load edit detail
   useEffect(() => {
     if (tab !== "edit" || !editingWorkout?.day_id) return;
     supabase
@@ -424,8 +452,6 @@ function WorkoutEditor({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4" style={{ background: "var(--brand-bg)" }}>
-
-        {/* Program Days */}
         {tab === "program" && (
           <div className="space-y-2">
             {loadingDays ? (
@@ -454,7 +480,6 @@ function WorkoutEditor({
           </div>
         )}
 
-        {/* Create New */}
         {tab === "create" && (
           <div className="space-y-4">
             <div>
@@ -560,7 +585,6 @@ function WorkoutEditor({
           </div>
         )}
 
-        {/* Edit */}
         {tab === "edit" && (
           <div className="space-y-3">
             {!dayDetail ? (
@@ -601,6 +625,228 @@ function WorkoutEditor({
   );
 }
 
+// ---- Library Panel ----
+function LibraryPanel({
+  clientId,
+  onClose,
+}: {
+  clientId: string;
+  onClose: () => void;
+}) {
+  const supabase = createClient();
+  const [libraryDays, setLibraryDays] = useState<LibraryDay[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "client">("all");
+  const [clientProgramIds, setClientProgramIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("program_assignments")
+      .select("program_id")
+      .eq("client_id", clientId)
+      .then(({ data }) => {
+        setClientProgramIds((data || []).map((r: any) => r.program_id));
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
+
+  useEffect(() => {
+    setLoading(true);
+    supabase
+      .from("days")
+      .select(`
+        id, label, order_index,
+        phases(
+          id, label, order_index,
+          programs(
+            id, name, status,
+            program_assignments(client_id)
+          )
+        ),
+        sections(
+          prescribed_exercises(
+            order_index,
+            exercises(name)
+          )
+        )
+      `)
+      .then(({ data }) => {
+        const rows: LibraryDay[] = [];
+        for (const d of (data || []) as any[]) {
+          const ph = d.phases;
+          if (!ph) continue;
+          const prog = ph.programs;
+          if (!prog) continue;
+
+          const exNames: string[] = [];
+          for (const sec of d.sections || []) {
+            const sorted = [...(sec.prescribed_exercises || [])].sort(
+              (a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0)
+            );
+            for (const pe of sorted) {
+              const name = pe.exercises?.name;
+              if (name && !exNames.includes(name)) exNames.push(name);
+            }
+          }
+
+          rows.push({
+            day_id: d.id,
+            day_label: d.label || "Unnamed Day",
+            position: d.order_index ?? 0,
+            phase_label: ph.label || "",
+            phase_position: ph.order_index ?? 0,
+            program_id: prog.id,
+            program_name: prog.name || "Unnamed Program",
+            exercises: exNames,
+          });
+        }
+        rows.sort((a, b) => {
+          if (a.program_name < b.program_name) return -1;
+          if (a.program_name > b.program_name) return 1;
+          if (a.phase_position !== b.phase_position) return a.phase_position - b.phase_position;
+          return a.position - b.position;
+        });
+        setLibraryDays(rows);
+        setLoading(false);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const filtered = libraryDays.filter(d => {
+    if (filter === "client" && !clientProgramIds.includes(d.program_id)) return false;
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      d.day_label.toLowerCase().includes(q) ||
+      d.program_name.toLowerCase().includes(q) ||
+      d.exercises.some(e => e.toLowerCase().includes(q))
+    );
+  });
+
+  const grouped: Record<string, LibraryDay[]> = {};
+  for (const d of filtered) {
+    if (!grouped[d.program_name]) grouped[d.program_name] = [];
+    grouped[d.program_name].push(d);
+  }
+
+  return (
+    <div
+      className="absolute top-0 right-0 h-full flex flex-col shadow-2xl border-l"
+      style={{
+        width: "clamp(260px, 280px, 100vw)",
+        background: "var(--brand-surface)",
+        borderColor: "var(--brand-border)",
+        zIndex: 40,
+      }}>
+      <div className="flex items-center justify-between px-3 py-3 border-b flex-shrink-0"
+        style={{ borderColor: "var(--brand-border)", background: "var(--brand-primary)" }}>
+        <div className="flex items-center gap-2">
+          <i className="ti ti-books text-white text-base" />
+          <span className="text-white font-bold text-sm">Workout Library</span>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 rounded-full flex items-center justify-center"
+          style={{ background: "rgba(255,255,255,0.2)" }}>
+          <i className="ti ti-x text-white text-xs" />
+        </button>
+      </div>
+
+      <div className="px-3 pt-3 pb-2 flex-shrink-0" style={{ borderBottom: "1px solid var(--brand-border)" }}>
+        <div className="relative">
+          <i className="ti ti-search absolute left-2.5 top-1/2 -translate-y-1/2 text-xs"
+            style={{ color: "var(--brand-text-secondary)" }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search days or exercises..."
+            className="w-full pl-7 pr-3 py-2 rounded-lg text-xs border outline-none"
+            style={{
+              background: "var(--brand-bg)",
+              borderColor: "var(--brand-border)",
+              color: "var(--brand-text)",
+            }}
+          />
+        </div>
+        <div className="flex rounded-lg overflow-hidden border mt-2" style={{ borderColor: "var(--brand-border)" }}>
+          {(["all","client"] as const).map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className="flex-1 py-1.5 text-[11px] font-semibold transition-colors"
+              style={{
+                background: filter === f ? "var(--brand-primary)" : "var(--brand-surface)",
+                color: filter === f ? "white" : "var(--brand-text-secondary)",
+              }}>
+              {f === "all" ? "All Programs" : "This Client"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="px-3 py-1.5 flex-shrink-0 border-b" style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)" }}>
+        <p className="text-[10px]" style={{ color: "var(--brand-text-secondary)" }}>
+          Drag a card onto any calendar day to schedule it
+        </p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3 py-2">
+        {loading ? (
+          <div className="text-center py-8" style={{ color: "var(--brand-text-secondary)" }}>
+            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+            <p className="text-xs">Loading library...</p>
+          </div>
+        ) : Object.keys(grouped).length === 0 ? (
+          <div className="text-center py-8" style={{ color: "var(--brand-text-secondary)" }}>
+            <i className="ti ti-mood-empty text-3xl block mb-2" />
+            <p className="text-xs">No days found.</p>
+          </div>
+        ) : (
+          Object.entries(grouped).map(([programName, days]) => (
+            <div key={programName} className="mb-4">
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1"
+                style={{ color: "var(--brand-primary)" }}>
+                {programName}
+              </div>
+              <div className="space-y-1.5">
+                {days.map(d => (
+                  <div
+                    key={d.day_id}
+                    draggable
+                    onDragStart={e => {
+                      e.dataTransfer.setData("type", "library");
+                      e.dataTransfer.setData("dayId", d.day_id);
+                      e.dataTransfer.setData("dayLabel", d.day_label);
+                      e.dataTransfer.effectAllowed = "copy";
+                    }}
+                    className="rounded-lg p-2.5 border cursor-grab active:cursor-grabbing select-none"
+                    style={{
+                      background: "var(--brand-bg)",
+                      borderColor: "var(--brand-border)",
+                    }}>
+                    <div className="font-semibold text-xs mb-0.5" style={{ color: "var(--brand-text)" }}>
+                      {d.day_label}
+                    </div>
+                    <div className="text-[10px] mb-1" style={{ color: "var(--brand-text-secondary)" }}>
+                      {d.phase_label} · {d.exercises.length} exercise{d.exercises.length !== 1 ? "s" : ""}
+                    </div>
+                    {d.exercises.length > 0 && (
+                      <div className="text-[10px] truncate" style={{ color: "var(--brand-text-secondary)" }}>
+                        {d.exercises.slice(0, 3).join(", ")}{d.exercises.length > 3 ? "..." : ""}
+                      </div>
+                    )}
+                    <div className="mt-1.5 flex items-center gap-1">
+                      <i className="ti ti-drag-drop text-[10px]" style={{ color: "var(--brand-primary)" }} />
+                      <span className="text-[10px]" style={{ color: "var(--brand-primary)" }}>Drag to schedule</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ---- Workout Chip ----
 function WorkoutChip({
   workout,
@@ -609,6 +855,7 @@ function WorkoutChip({
   onCopy,
   onDragStart,
   onDragEnd,
+  isDragging,
 }: {
   workout: ScheduledWorkout;
   onEdit: () => void;
@@ -616,6 +863,7 @@ function WorkoutChip({
   onCopy: () => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: (e: React.DragEvent) => void;
+  isDragging?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -625,10 +873,11 @@ function WorkoutChip({
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className="rounded-lg px-2 py-1.5 mb-1 border cursor-grab active:cursor-grabbing relative group select-none"
+      className="rounded-lg px-2 py-1.5 mb-1 border cursor-grab active:cursor-grabbing relative group select-none transition-opacity"
       style={{
         background: "var(--brand-primary)18",
         borderColor: "var(--brand-primary)40",
+        opacity: isDragging ? 0.4 : 1,
       }}>
       <div className="flex items-start justify-between gap-1">
         <div className="flex-1 min-w-0">
@@ -700,31 +949,40 @@ export default function ProgramPage() {
   const [loading, setLoading] = useState(true);
 
   const [editorOpen, setEditorOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [editingWorkout, setEditingWorkout] = useState<ScheduledWorkout | null>(null);
 
   const [copiedWorkout, setCopiedWorkout] = useState<ScheduledWorkout | null>(null);
+  const [draggingWorkoutId, setDraggingWorkoutId] = useState<string | null>(null);
   const [draggingWorkout, setDraggingWorkout] = useState<ScheduledWorkout | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  const [dragType, setDragType] = useState<"chip" | "library" | null>(null);
+
+  const [copiedWeek, setCopiedWeek] = useState<CopiedWeekWorkout[] | null>(null);
+  const [bulkPasteCount, setBulkPasteCount] = useState(1);
+  const [bulkPasting, setBulkPasting] = useState(false);
 
   const today = todayStr();
 
+  const baseMonday = (() => {
+    const t = new Date();
+    const dow = t.getDay();
+    const m = new Date(t);
+    m.setDate(t.getDate() - (dow === 0 ? 6 : dow - 1));
+    m.setHours(0, 0, 0, 0);
+    return m;
+  })();
+
   useEffect(() => {
-    supabase
-      .from("clients")
-      .select("id, name")
-      .order("name")
+    supabase.from("clients").select("id, name").order("name")
       .then(({ data }) => setClients((data || []) as ClientRow[]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!clientId) return;
-    supabase
-      .from("clients")
-      .select("name")
-      .eq("id", clientId)
-      .maybeSingle()
+    supabase.from("clients").select("name").eq("id", clientId).maybeSingle()
       .then(({ data }) => { if (data) setClientName((data as any).name); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
@@ -736,17 +994,13 @@ export default function ProgramPage() {
     for (let w = 0; w < weeks; w++) {
       getWeekDates(weekOffset + w).forEach(d => allDatesArr.push(dateStr(d)));
     }
-    const start = allDatesArr[0];
-    const end = allDatesArr[allDatesArr.length - 1];
-
     const { data } = await supabase
       .from("scheduled_workouts")
       .select("id, scheduled_date, status, day_id, client_id, days(id, label)")
       .eq("client_id", clientId)
-      .gte("scheduled_date", start)
-      .lte("scheduled_date", end)
+      .gte("scheduled_date", allDatesArr[0])
+      .lte("scheduled_date", allDatesArr[allDatesArr.length - 1])
       .order("scheduled_date");
-
     setWorkouts((data || []) as unknown as ScheduledWorkout[]);
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -755,7 +1009,9 @@ export default function ProgramPage() {
   useEffect(() => { loadWorkouts(); }, [loadWorkouts]);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setCopiedWorkout(null); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setCopiedWorkout(null); setCopiedWeek(null); }
+    };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
@@ -768,10 +1024,8 @@ export default function ProgramPage() {
   async function pasteWorkout(date: string) {
     if (!copiedWorkout) return;
     await supabase.from("scheduled_workouts").insert({
-      client_id: clientId,
-      day_id: copiedWorkout.day_id,
-      scheduled_date: date,
-      status: "scheduled",
+      client_id: clientId, day_id: copiedWorkout.day_id,
+      scheduled_date: date, status: "scheduled",
     });
     setCopiedWorkout(null);
     loadWorkouts();
@@ -782,14 +1036,55 @@ export default function ProgramPage() {
     loadWorkouts();
   }
 
+  async function scheduleLibraryDay(dayId: string, targetDate: string) {
+    await supabase.from("scheduled_workouts").insert({
+      client_id: clientId, day_id: dayId,
+      scheduled_date: targetDate, status: "scheduled", source: "trainer", position: 1,
+    });
+    loadWorkouts();
+  }
+
+  function copyCurrentWeek() {
+    const weekDates = getWeekDates(weekOffset);
+    const weekWorkouts: CopiedWeekWorkout[] = [];
+    for (let i = 0; i < weekDates.length; i++) {
+      const ds = dateStr(weekDates[i]);
+      workouts.filter(w => w.scheduled_date === ds).forEach(w => {
+        weekWorkouts.push({ day_id: w.day_id, dayOfWeek: i, label: w.days?.label || "Workout" });
+      });
+    }
+    setCopiedWeek(weekWorkouts);
+    setCopiedWorkout(null);
+  }
+
+  async function pasteWeekBulk(startWeekOffset: number, count: number) {
+    if (!copiedWeek || copiedWeek.length === 0) return;
+    setBulkPasting(true);
+    const insertRows: any[] = [];
+    for (let w = 0; w < count; w++) {
+      const weekStart = addWeeks(baseMonday, startWeekOffset + w);
+      for (const workout of copiedWeek) {
+        if (!workout.day_id) continue;
+        insertRows.push({
+          client_id: clientId, day_id: workout.day_id,
+          scheduled_date: dateStr(addDays(weekStart, workout.dayOfWeek)),
+          status: "scheduled", source: "trainer", position: 1,
+        });
+      }
+    }
+    if (insertRows.length > 0) await supabase.from("scheduled_workouts").insert(insertRows);
+    setBulkPasting(false);
+    setCopiedWeek(null);
+    loadWorkouts();
+  }
+
   const weeks = density === "1w" ? 1 : density === "2w" ? 2 : 4;
   const allDays: Date[] = [];
   for (let w = 0; w < weeks; w++) getWeekDates(weekOffset + w).forEach(d => allDays.push(d));
 
   const rangeLabel = (() => {
-    const first = allDays[0], last = allDays[allDays.length - 1];
     const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    return `${fmt(first)} – ${fmt(last)}`;
+    return `${fmt(allDays[0])} – ${fmt(allDays[allDays.length - 1])}`;
   })();
 
   const workoutByDate: Record<string, ScheduledWorkout[]> = {};
@@ -803,7 +1098,6 @@ export default function ProgramPage() {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--brand-bg)" }}>
 
-      {/* Client Sidebar */}
       {sidebarOpen && (
         <div className="w-48 flex-shrink-0 flex flex-col border-r overflow-hidden"
           style={{ borderColor: "var(--brand-border)", background: "var(--brand-surface)" }}>
@@ -821,8 +1115,7 @@ export default function ProgramPage() {
               const ci = c.name.charCodeAt(0) % AVATAR_BG.length;
               const isSelected = c.id === clientId;
               return (
-                <button key={c.id}
-                  onClick={() => router.push(`/clients/${c.id}/program`)}
+                <button key={c.id} onClick={() => router.push(`/clients/${c.id}/program`)}
                   className="w-full flex items-center gap-2 px-2 py-2 transition-all text-left"
                   style={{
                     background: isSelected ? "var(--brand-primary)15" : "transparent",
@@ -843,10 +1136,7 @@ export default function ProgramPage() {
         </div>
       )}
 
-      {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-
-        {/* Top bar */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b flex-shrink-0"
           style={{ borderColor: "var(--brand-border)", background: "var(--brand-surface)" }}>
           {!sidebarOpen && (
@@ -864,15 +1154,13 @@ export default function ProgramPage() {
             {clientName || "Programming Engine"}
           </span>
 
-          {/* Week nav */}
           <div className="flex items-center gap-1">
             <button onClick={() => setWeekOffset(w => w - 1)}
               className="w-7 h-7 rounded flex items-center justify-center hover:opacity-70"
               style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
               <i className="ti ti-chevron-left text-xs" style={{ color: "var(--brand-text-secondary)" }} />
             </button>
-            <span className="text-xs font-medium px-2 min-w-[130px] text-center"
-              style={{ color: "var(--brand-text)" }}>
+            <span className="text-xs font-medium px-2 min-w-[130px] text-center" style={{ color: "var(--brand-text)" }}>
               {rangeLabel}
             </span>
             <button onClick={() => setWeekOffset(w => w + 1)}
@@ -882,7 +1170,6 @@ export default function ProgramPage() {
             </button>
           </div>
 
-          {/* Density */}
           <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "var(--brand-border)" }}>
             {(["1w","2w","4w"] as const).map(d => (
               <button key={d} onClick={() => setDensity(d)}
@@ -895,14 +1182,34 @@ export default function ProgramPage() {
               </button>
             ))}
           </div>
+
+          <button onClick={copyCurrentWeek} title="Copy this week"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-semibold hover:opacity-80 transition-colors"
+            style={{
+              background: copiedWeek ? "var(--brand-primary)15" : "var(--brand-bg)",
+              border: `1px solid ${copiedWeek ? "var(--brand-primary)" : "var(--brand-border)"}`,
+              color: copiedWeek ? "var(--brand-primary)" : "var(--brand-text-secondary)",
+            }}>
+            <i className="ti ti-calendar-copy text-sm" />
+            <span className="hidden sm:inline">Copy Week</span>
+          </button>
+
+          <button
+            onClick={() => { setLibraryOpen(v => !v); if (!libraryOpen && editorOpen) setEditorOpen(false); }}
+            title="Workout Library"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-semibold hover:opacity-80 transition-colors"
+            style={{
+              background: libraryOpen ? "var(--brand-primary)" : "var(--brand-bg)",
+              border: `1px solid ${libraryOpen ? "var(--brand-primary)" : "var(--brand-border)"}`,
+              color: libraryOpen ? "white" : "var(--brand-text-secondary)",
+            }}>
+            <i className="ti ti-books text-sm" />
+            <span className="hidden sm:inline">Library</span>
+          </button>
         </div>
 
-        {/* Grid + Editor */}
         <div className="flex flex-1 overflow-hidden">
-
-          {/* Calendar grid */}
-          <div className="flex-1 overflow-auto">
-            {/* Headers */}
+          <div className="flex-1 overflow-auto relative">
             <div className="grid sticky top-0 z-10 border-b"
               style={{
                 gridTemplateColumns: `repeat(${allDays.length}, minmax(${compact ? 80 : 120}px, 1fr))`,
@@ -921,14 +1228,13 @@ export default function ProgramPage() {
                         {DOW_SHORT[i % 7]}
                       </span>
                       <button
-                        onClick={() => { setSelectedDate(ds); setEditingWorkout(null); setEditorOpen(true); }}
+                        onClick={() => { setSelectedDate(ds); setEditingWorkout(null); setEditorOpen(true); setLibraryOpen(false); }}
                         className="w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         style={{ background: "var(--brand-primary)20", color: "var(--brand-primary)" }}>
                         <i className="ti ti-plus text-[10px]" />
                       </button>
                     </div>
-                    <div
-                      className={`font-bold ${compact ? "text-xs" : "text-sm"} w-6 h-6 flex items-center justify-center rounded-full`}
+                    <div className={`font-bold ${compact ? "text-xs" : "text-sm"} w-6 h-6 flex items-center justify-center rounded-full`}
                       style={{
                         background: isToday ? "var(--brand-primary)" : "transparent",
                         color: isToday ? "white" : "var(--brand-text)",
@@ -940,7 +1246,6 @@ export default function ProgramPage() {
               })}
             </div>
 
-            {/* Day cells */}
             <div className="grid"
               style={{ gridTemplateColumns: `repeat(${allDays.length}, minmax(${compact ? 80 : 120}px, 1fr))` }}>
               {allDays.map((d, i) => {
@@ -954,22 +1259,26 @@ export default function ProgramPage() {
                     className="border-r border-b min-h-[100px] p-1.5 relative transition-colors"
                     style={{
                       borderColor: "var(--brand-border)",
-                      background: isOver
-                        ? "var(--brand-primary)12"
-                        : isPasteMode
-                          ? "#7c3aed08"
-                          : "transparent",
+                      background: isOver ? "var(--brand-primary)12" : isPasteMode ? "#7c3aed08" : "transparent",
                       cursor: isPasteMode ? "copy" : "default",
                     }}
                     onClick={() => { if (copiedWorkout) pasteWorkout(ds); }}
                     onDragOver={e => { e.preventDefault(); setDragOverDate(ds); }}
-                    onDragLeave={() => setDragOverDate(null)}
+                    onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverDate(null); }}
                     onDrop={e => {
                       e.preventDefault();
                       setDragOverDate(null);
-                      if (draggingWorkout && draggingWorkout.scheduled_date !== ds) {
-                        moveWorkout(draggingWorkout, ds);
+                      const type = e.dataTransfer.getData("type");
+                      if (type === "library") {
+                        const dayId = e.dataTransfer.getData("dayId");
+                        if (dayId) scheduleLibraryDay(dayId, ds);
+                        setDragType(null);
+                        return;
                       }
+                      if (draggingWorkout && draggingWorkout.scheduled_date !== ds) moveWorkout(draggingWorkout, ds);
+                      setDraggingWorkoutId(null);
+                      setDraggingWorkout(null);
+                      setDragType(null);
                     }}>
 
                     {loading && dayWorkouts.length === 0 && i < 7 && (
@@ -980,15 +1289,36 @@ export default function ProgramPage() {
                       <WorkoutChip
                         key={w.id}
                         workout={w}
-                        onEdit={() => { setEditingWorkout(w); setSelectedDate(ds); setEditorOpen(true); }}
+                        isDragging={draggingWorkoutId === w.id}
+                        onEdit={() => { setEditingWorkout(w); setSelectedDate(ds); setEditorOpen(true); setLibraryOpen(false); }}
                         onDelete={() => deleteWorkout(w.id)}
                         onCopy={() => setCopiedWorkout(w)}
-                        onDragStart={() => setDraggingWorkout(w)}
-                        onDragEnd={() => setDraggingWorkout(null)}
+                        onDragStart={e => {
+                          e.dataTransfer.setData("type", "chip");
+                          e.dataTransfer.setData("scheduledWorkoutId", w.id);
+                          e.dataTransfer.setData("fromDate", ds);
+                          e.dataTransfer.effectAllowed = "move";
+                          setDraggingWorkout(w);
+                          setDraggingWorkoutId(w.id);
+                          setDragType("chip");
+                        }}
+                        onDragEnd={() => { setDraggingWorkout(null); setDraggingWorkoutId(null); setDragType(null); }}
                       />
                     ))}
 
-                    {isPasteMode && (
+                    {isOver && (
+                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center rounded"
+                        style={{ border: "2px dashed var(--brand-primary)", background: "var(--brand-primary)08" }}>
+                        {dragType === "library" && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded"
+                            style={{ background: "var(--brand-primary)", color: "white" }}>
+                            Drop here
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {isPasteMode && !isOver && (
                       <div className="absolute inset-0 rounded pointer-events-none"
                         style={{ border: "2px dashed #7c3aed40" }} />
                     )}
@@ -996,9 +1326,12 @@ export default function ProgramPage() {
                 );
               })}
             </div>
+
+            {libraryOpen && (
+              <LibraryPanel clientId={clientId} onClose={() => setLibraryOpen(false)} />
+            )}
           </div>
 
-          {/* Editor panel */}
           {editorOpen && (
             <div className="flex-shrink-0 border-l flex flex-col overflow-hidden"
               style={{ width: 460, borderColor: "var(--brand-border)", background: "var(--brand-surface)" }}>
@@ -1014,8 +1347,7 @@ export default function ProgramPage() {
         </div>
       </div>
 
-      {/* Copy mode bottom bar */}
-      {copiedWorkout && (
+      {copiedWorkout && !copiedWeek && (
         <div className="fixed bottom-0 left-0 right-0 z-50 px-6 py-3 flex items-center justify-between shadow-2xl"
           style={{ background: "#7c3aed", color: "white" }}>
           <div className="flex items-center gap-3">
@@ -1029,6 +1361,41 @@ export default function ProgramPage() {
             style={{ background: "rgba(255,255,255,0.2)" }}>
             Esc / Cancel
           </button>
+        </div>
+      )}
+
+      {copiedWeek && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 px-4 py-3 flex flex-wrap items-center gap-3 shadow-2xl"
+          style={{ background: "#0f4c81", color: "white" }}>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <i className="ti ti-calendar-copy text-lg" />
+            <span className="text-sm font-semibold">
+              Week copied ({copiedWeek.length} workout{copiedWeek.length !== 1 ? "s" : ""})
+            </span>
+          </div>
+          <span className="text-xs opacity-70 hidden sm:inline">Navigate to any week, then paste below.</span>
+          <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+            <span className="text-xs opacity-90">Paste for</span>
+            <input
+              type="number" min={1} max={52} value={bulkPasteCount}
+              onChange={e => setBulkPasteCount(Math.max(1, Math.min(52, parseInt(e.target.value) || 1)))}
+              className="w-14 px-2 py-1 rounded text-xs text-center font-semibold outline-none"
+              style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "1px solid rgba(255,255,255,0.3)" }}
+            />
+            <span className="text-xs opacity-90">week{bulkPasteCount !== 1 ? "s" : ""}</span>
+            <button
+              onClick={() => pasteWeekBulk(weekOffset, bulkPasteCount)}
+              disabled={bulkPasting}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold transition-opacity disabled:opacity-50"
+              style={{ background: "rgba(255,255,255,0.25)", color: "white" }}>
+              {bulkPasting ? "Pasting..." : "Paste"}
+            </button>
+            <button onClick={() => setCopiedWeek(null)}
+              className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(255,255,255,0.15)" }}>
+              <i className="ti ti-x text-xs" />
+            </button>
+          </div>
         </div>
       )}
     </div>
