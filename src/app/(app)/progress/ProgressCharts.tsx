@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-type WeightLog = { logged_at: string; weight_lbs: number };
+type WeightLog = { metric_date: string; weight: number; body_fat_pct: number | null; lean_mass: number | null; fat_mass: number | null };
 type PR = { exercise_name: string; weight: number; reps: number | null; date: string };
 
 interface Props {
@@ -27,7 +27,7 @@ function filterByRange(logs: WeightLog[], range: string): WeightLog[] {
     case "1yr": cutoff.setFullYear(now.getFullYear() - 1); break;
     default: return logs;
   }
-  return logs.filter((l) => new Date(l.logged_at) >= cutoff);
+  return logs.filter((l) => new Date(l.metric_date) >= cutoff);
 }
 
 function WeightChart({ logs }: { logs: WeightLog[] }) {
@@ -36,12 +36,12 @@ function WeightChart({ logs }: { logs: WeightLog[] }) {
       <div className="py-10 text-center" style={{ color: "#4E6080" }}>
         <i className="ti ti-scale text-4xl block mb-2" style={{ color: "#C8D8EC" }} />
         <p className="text-sm">No weight data yet</p>
-        <p className="text-xs mt-1">Log your weight to see your progress chart</p>
+<p className="text-xs mt-1">Metrics logged in-app will appear here</p>
       </div>
     );
   }
 
-  const weights = logs.map((l) => l.weight_lbs);
+  const weights = logs.map((l) => l.weight);
   const minW = Math.min(...weights) - 2;
   const maxW = Math.max(...weights) + 2;
   const range = maxW - minW || 1;
@@ -55,9 +55,9 @@ function WeightChart({ logs }: { logs: WeightLog[] }) {
   const xStep = logs.length > 1 ? chartW / (logs.length - 1) : chartW;
   const points = logs.map((l, i) => ({
     x: PAD.left + (logs.length > 1 ? i * xStep : chartW / 2),
-    y: PAD.top + chartH - ((l.weight_lbs - minW) / range) * chartH,
-    w: l.weight_lbs,
-    date: new Date(l.logged_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    y: PAD.top + chartH - ((l.weight - minW) / range) * chartH,
+    w: l.weight,
+    date: new Date(l.metric_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
   }));
 
   const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x},${p.y}`).join(" ");
@@ -191,9 +191,9 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2 mb-3">
         {[
-          { label: "Workouts", value: totalWorkouts || "—" },
-          { label: "Streak", value: "—" },
-          { label: "Avg mins", value: "—" },
+          { label: "Workouts", value: totalWorkouts || "â" },
+          { label: "Streak", value: "â" },
+          { label: "Avg mins", value: "â" },
         ].map((s) => (
           <div
             key={s.label}
@@ -222,7 +222,7 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
                   <div className="text-xs" style={{ color: "#4E6080" }}>{pr.date}</div>
                 </div>
                 <div className="text-sm font-medium" style={{ color: "#0F4C81" }}>
-                  {pr.weight} lb{pr.reps ? ` × ${pr.reps}` : ""}
+                  {pr.weight} lb{pr.reps ? ` Ã ${pr.reps}` : ""}
                 </div>
               </div>
             ))}
@@ -265,7 +265,7 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
             disabled={saving || !logWeight}
             className="btn-primary disabled:opacity-50"
           >
-            {saving ? "Saving…" : saved ? "✓ Saved!" : "Log weight"}
+            {saving ? "Savingâ¦" : saved ? "â Saved!" : "Log weight"}
           </button>
         </form>
       </div>
