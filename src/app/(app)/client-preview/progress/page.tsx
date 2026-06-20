@@ -32,11 +32,11 @@ export default async function ClientPreviewProgressPage() {
 
   const [weightRes, countRes, setRes] = await Promise.all([
     supabase
-      .from("body_weight_logs")
-      .select("logged_at, weight_lbs")
+      .from("metrics")
+      .select("metric_date, weight, body_fat_pct, lean_mass, fat_mass")
       .eq("client_id", clientId)
-      .gte("logged_at", ninetyDaysAgo.toISOString().split("T")[0])
-      .order("logged_at", { ascending: true }),
+      .gte("metric_date", ninetyDaysAgo.toISOString().split("T")[0])
+      .order("metric_date", { ascending: true }),
     supabase
       .from("workout_logs")
       .select("id", { count: "exact", head: true })
@@ -51,7 +51,14 @@ export default async function ClientPreviewProgressPage() {
       .limit(100),
   ]);
 
-  const weightLogs = weightRes.data || [];
+  const weightLogs: { metric_date: string; weight: number; body_fat_pct: number | null; lean_mass: number | null; fat_mass: number | null }[] =
+    (weightRes.data || []).map((r: any) => ({
+      metric_date: r.metric_date,
+      weight: parseFloat(r.weight) || 0,
+      body_fat_pct: r.body_fat_pct ? parseFloat(r.body_fat_pct) : null,
+      lean_mass: r.lean_mass ? parseFloat(r.lean_mass) : null,
+      fat_mass: r.fat_mass ? parseFloat(r.fat_mass) : null,
+    }));
   const totalWorkouts = countRes.count || 0;
 
   let recentPRs: { exercise_name: string; weight: number; reps: number | null; date: string }[] = [];
