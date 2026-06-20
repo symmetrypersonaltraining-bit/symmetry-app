@@ -11,7 +11,7 @@ interface Reminder {
   amountDue: number;
   billingCredits: number;
   notificationStatus: string;
-  smsSentAt: string | null;
+  emailSentAt: string | null;
 }
 
 interface Props {
@@ -109,10 +109,10 @@ export default function PendingRemindersPanel({ reminders }: Props) {
                     {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? "Due today" : `${days}d`}
                   </span>
                   <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>· {fmtDate(r.dueDate)}</span>
-                  {r.smsSentAt && (
+                  {r.emailSentAt && (
                     <span className="text-xs px-1.5 py-0.5 rounded"
                       style={{ background: "#22c55e20", color: "#22c55e" }}>
-                      SMS sent
+                      Email sent
                     </span>
                   )}
                   {isPaused && (

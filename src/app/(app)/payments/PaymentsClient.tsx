@@ -13,8 +13,7 @@ interface Reminder {
   amountDue: number;
   billingCredits: number;
   notificationStatus: string;
-  smsSentAt: string | null;
-  smsMessage: string | null;
+  emailSentAt: string | null;
   notes: string | null;
 }
 
@@ -66,17 +65,17 @@ export default function PaymentsClient({ reminders }: { reminders: Reminder[] })
     setUpdating(null);
   }
 
-  async function sendSMS(r: Reminder) {
+  async function sendReminder(r: Reminder) {
     setUpdating(r.id);
     try {
-      const res = await fetch("/api/send-reminder", {
+      const res = await fetch("/api/reminders/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reminderId: r.id }),
       });
       if (res.ok) {
         setLocalReminders(prev => prev.map(p =>
-          p.id === r.id ? { ...p, smsSentAt: new Date().toISOString(), notificationStatus: "sent" } : p
+          p.id === r.id ? { ...p, emailSentAt: new Date().toISOString(), notificationStatus: "sent" } : p
         ));
       }
     } finally { setUpdating(null); }
@@ -118,7 +117,7 @@ export default function PaymentsClient({ reminders }: { reminders: Reminder[] })
         <div className="px-4 lg:px-6 py-3 grid grid-cols-3 gap-3">
           {[
             { label: "Due This Week", value: filtered.filter(r => daysUntil(r.dueDate) <= 7 && daysUntil(r.dueDate) >= 0 && r.notificationStatus !== "paid").length, color: "#f59e0b" },
-            { label: "SMS Sent", value: filtered.filter(r => r.smsSentAt).length, color: "#22c55e" },
+            { label: "Email Sent", value: filtered.filter(r => r.emailSentAt).length, color: "#22c55e" },
             { label: "Total $", value: `$${filtered.filter(r => r.notificationStatus === "pending").reduce((a,r) => a + r.amountDue - r.billingCredits, 0).toLocaleString()}`, color: "var(--brand-primary)" },
           ].map(s => (
             <div key={s.label} className="rounded-xl p-3 text-center"
@@ -185,21 +184,21 @@ export default function PaymentsClient({ reminders }: { reminders: Reminder[] })
                       style={{ background: s.bg, color: s.color }}>
                       {s.label}
                     </span>
-                    {r.smsSentAt && (
+                    {r.emailSentAt && (
                       <span className="text-xs px-2 py-0.5 rounded-full"
                         style={{ background: "#22c55e20", color: "#22c55e" }}>
-                        <i className="ti ti-message-circle text-[10px] mr-0.5" />SMS sent
+                        <i className="ti ti-mail text-[10px] mr-0.5" />Email sent
                       </span>
                     )}
 
                     {/* Action buttons */}
                     {r.notificationStatus !== "paid" && r.notificationStatus !== "cancelled" && (
                       <>
-                        {!r.smsSentAt && r.notificationStatus !== "paused" && (
-                          <button onClick={() => sendSMS(r)} disabled={isUpdating}
+                        {!r.emailSentAt && r.notificationStatus !== "paused" && (
+                          <button onClick={() => sendReminder(r)} disabled={isUpdating}
                             className="text-xs px-2.5 py-1 rounded-lg font-medium transition-all"
                             style={{ background: "var(--brand-primary)", color: "white", opacity: isUpdating ? 0.5 : 1 }}>
-                            {isUpdating ? "…" : "Send SMS"}
+                            {isUpdating ? "…" : "Send Email"}
                           </button>
                         )}
                         <button onClick={() => updateStatus(r.id, "paid")} disabled={isUpdating}
