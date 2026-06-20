@@ -36,7 +36,7 @@ function WeightChart({ logs }: { logs: WeightLog[] }) {
       <div className="py-10 text-center" style={{ color: "#4E6080" }}>
         <i className="ti ti-scale text-4xl block mb-2" style={{ color: "#C8D8EC" }} />
         <p className="text-sm">No weight data yet</p>
-<p className="text-xs mt-1">Metrics logged in-app will appear here</p>
+        <p className="text-xs mt-1">Metrics logged in-app will appear here</p>
       </div>
     );
   }
@@ -191,17 +191,18 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2 mb-3">
         {[
-          { label: "Workouts", value: totalWorkouts || "â" },
-          { label: "Streak", value: "â" },
-          { label: "Avg mins", value: "â" },
+          { label: "Workouts", value: totalWorkouts || "—", icon: "ti-barbell" },
+          { label: "Streak", value: "—", icon: "ti-flame" },
+          { label: "Avg mins", value: "—", icon: "ti-clock" },
         ].map((s) => (
           <div
             key={s.label}
-            className="rounded-xl p-3 text-center"
+            className="stat-card rounded-xl p-3 text-center"
             style={{ background: "#EDF2F7", border: "0.5px solid #C8D8EC" }}
           >
-            <div className="text-xl font-medium" style={{ color: "#0F4C81" }}>{s.value}</div>
-            <div className="text-xs mt-0.5" style={{ color: "#4E6080" }}>{s.label}</div>
+            <i className={`ti ${s.icon} text-base mb-1 block`} style={{ color: "#0F4C81" }} />
+            <div className="stat-value text-xl font-medium" style={{ color: "#0F4C81" }}>{s.value}</div>
+            <div className="stat-label text-xs mt-0.5" style={{ color: "#4E6080" }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -222,7 +223,7 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
                   <div className="text-xs" style={{ color: "#4E6080" }}>{pr.date}</div>
                 </div>
                 <div className="text-sm font-medium" style={{ color: "#0F4C81" }}>
-                  {pr.weight} lb{pr.reps ? ` Ã ${pr.reps}` : ""}
+                  {pr.weight} lb{pr.reps ? ` × ${pr.reps}` : ""}
                 </div>
               </div>
             ))}
@@ -265,7 +266,7 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
             disabled={saving || !logWeight}
             className="btn-primary disabled:opacity-50"
           >
-            {saving ? "Savingâ¦" : saved ? "â Saved!" : "Log weight"}
+            {saving ? "Saving…" : saved ? "✓ Saved!" : "Log weight"}
           </button>
         </form>
       </div>
