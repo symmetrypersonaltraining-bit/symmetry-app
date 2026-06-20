@@ -7,7 +7,7 @@ import Link from "next/link";
 
 // ---- Types ----
 interface ClientRow {
-  id: string;
+  id: string;h
   name: string;
 }
 
@@ -38,7 +38,8 @@ interface PrescribedExercise {
 
 interface Section {
   id: string;
-  label: string;
+  internal_name: string;
+  client_facing_name: string;
   position: number;
   prescribed_exercises: PrescribedExercise[];
 }
@@ -192,8 +193,8 @@ function WorkoutEditor({
     supabase
       .from("days")
       .select(`
-        id, label, order_index,
-        phases(label, order_index,
+        id, label, position,
+        phases(label, position,
           programs(name,
             program_assignments(client_id)
           )
@@ -225,7 +226,7 @@ function WorkoutEditor({
     if (tab !== "edit" || !editingWorkout?.day_id) return;
     supabase
       .from("days")
-      .select(`id, label, sections(id, label, position, prescribed_exercises(id, position, sets, volume_value, load_descriptor, exercises(name)))`)
+      .select(`id, label, sections(id, internal_name, client_facing_name, position, prescribed_exercises(id, position, sets, volume_value, load_descriptor, exercises(name)))`)
       .eq("id", editingWorkout.day_id)
       .maybeSingle()
       .then(({ data }) => {
@@ -296,7 +297,7 @@ function WorkoutEditor({
           .from("phases")
           .select("id")
           .eq("program_id", programId)
-          .order("order_index")
+          .order("position")
           .limit(1)
           .maybeSingle();
         if (existPhase) {
@@ -304,7 +305,7 @@ function WorkoutEditor({
         } else {
           const { data: newPhase } = await supabase
             .from("phases")
-            .insert({ program_id: programId, label: "Phase 1", order_index: 0 })
+            .insert({ program_id: programId, label: "Phase 1", position: 0 })
             .select("id")
             .single();
           phaseId = (newPhase as any)?.id;
@@ -315,7 +316,7 @@ function WorkoutEditor({
 
       const { data: newDay } = await supabase
         .from("days")
-        .insert({ phase_id: phaseId, label: workoutName, order_index: Date.now() })
+        .insert({ phase_id: phaseId, label: workoutName, position: Date.now() })
         .select("id")
         .single();
 
@@ -512,7 +513,7 @@ function WorkoutEditor({
                 <div className="flex items-center gap-2 px-3 py-2 border-b"
                   style={{ borderColor: "var(--brand-border)", background: "var(--brand-bg)" }}>
                   <input
-                    value={sec.label}
+                    value={sec.client_facing_name}
                     onChange={e => setNewSections(s => s.map((x, i) => i === si ? { ...x, label: e.target.value } : x))}
                     className="flex-1 text-xs font-semibold bg-transparent outline-none"
                     style={{ color: "var(--brand-text)" }}
@@ -600,7 +601,7 @@ function WorkoutEditor({
                     style={{ borderColor: "var(--brand-border)", background: "var(--brand-surface)" }}>
                     <div className="px-3 py-2 border-b text-xs font-semibold"
                       style={{ borderColor: "var(--brand-border)", background: "var(--brand-bg)", color: "var(--brand-text)" }}>
-                      {sec.label}
+                      {sec.client_facing_name}
                     </div>
                     {sec.prescribed_exercises.length === 0 ? (
                       <div className="px-3 py-3 text-xs text-center" style={{ color: "var(--brand-text-secondary)" }}>No exercises</div>
@@ -656,9 +657,9 @@ function LibraryPanel({
     supabase
       .from("days")
       .select(`
-        id, label, order_index,
+        id, label, position,
         phases(
-          id, label, order_index,
+          id, label, position,
           programs(
             id, name, status,
             program_assignments(client_id)
@@ -666,7 +667,7 @@ function LibraryPanel({
         ),
         sections(
           prescribed_exercises(
-            order_index,
+            position,
             exercises(name)
           )
         )
@@ -682,7 +683,7 @@ function LibraryPanel({
           const exNames: string[] = [];
           for (const sec of d.sections || []) {
             const sorted = [...(sec.prescribed_exercises || [])].sort(
-              (a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0)
+              (a: any, b: any) => (a.position ?? 0) - (b.position ?? 0)
             );
             for (const pe of sorted) {
               const name = pe.exercises?.name;
@@ -693,9 +694,9 @@ function LibraryPanel({
           rows.push({
             day_id: d.id,
             day_label: d.label || "Unnamed Day",
-            position: d.order_index ?? 0,
+            position: d.position ?? 0,
             phase_label: ph.label || "",
-            phase_position: ph.order_index ?? 0,
+            phase_position: ph.position ?? 0,
             program_id: prog.id,
             program_name: prog.name || "Unnamed Program",
             exercises: exNames,
@@ -876,6 +877,7 @@ function WorkoutChip({
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onClick={onEdit}
       className="rounded-lg px-2 py-1.5 mb-1 border cursor-grab active:cursor-grabbing relative group select-none transition-opacity"
       style={{
         background: "var(--brand-primary)18",
