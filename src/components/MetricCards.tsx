@@ -1,0 +1,527 @@
+'use client';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface MetricCardsProps {
+  clientId: string;
+  isTrainer?: boolean;
+}
+
+interface MetricRow {
+  id: string;
+  client_id: string;
+  metric_date: string;
+  weight: number | null;
+  body_fat_pct: number | null;
+  lean_mass: number | null;
+  fat_mass: number | null;
+}
+
+interface DataPoint {
+  date: string;
+  value: number;
+}
+
+interface MetricConfig {
+  key: string;
+  label: string;
+  unit: string;
+  color: string;
+  lowerIsBetter: boolean;
+  canLog: boolean;
+}
+
+const METRIC_CONFIGS: MetricConfig[] = [
+  { key: 'weight',       label: 'Weight',    unit: 'lbs', color: '#0F4C81', lowerIsBetter: true,  canLog: true  },
+  { key: 'body_fat_pct', label: 'Body Fat',  unit: '%',   color: '#e87c3e', lowerIsBetter: true,  canLog: true  },
+  { key: 'lean_mass',    label: 'Lean Mass', unit: 'lbs', color: '#22c55e', lowerIsBetter: false, canLog: false },
+  { key: 'fat_mass',     label: 'Fat Mass',  unit: 'lbs', color: '#e84e4e', lowerIsBetter: true,  canLog: false },
+  { key: 'workouts',     label: 'Workouts',  unit: '',    color: '#8b5cf6', lowerIsBetter: false, canLog: false },
+  { key: 'streak',       label: 'Streak',    unit: 'days',color: '#f59e0b', lowerIsBetter: false, canLog: false },
+];
+
+const RANGES = [
+  { label: '1w',  days: 7  },
+  { label: '2w',  days: 14 },
+  { label: '4w',  days: 28 },
+  { label: '8w',  days: 56 },
+];
+
+// ─── Animated SVG Sparkline ───────────────────────────────────────────────────
+
+function Sparkline({ data, color }: { data: number[]; color: string }) {
+  const pathRef = useRef<SVGPathElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 50);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (!pathRef.current || !mounted || data.length < 2) return;
+    const len = pathRef.current.getTotalLength();
+    pathRef.current.style.strokeDasharray = String(len);
+    pathRef.current.style.strokeDashoffset = String(len);
+    requestAnimationFrame(() => {
+      if (pathRef.current) {
+        pathRef.current.style.transition = 'stroke-dashoffset 0.9s ease';
+        pathRef.current.style.strokeDashoffset = '0';
+      }
+    });
+  }, [mounted, data.length]);
+
+  if (data.length < 2) {
+    return (
+      <svg width="120" height="40" viewBox="0 0 120 40">
+        <line x1="0" y1="20" x2="120" y2="20" stroke={color} strokeWidth="1.5" strokeDasharray="4,4" opacity="0.3" />
+      </svg>
+    );
+  }
+
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const W = 120, H = 40, PAD = 4;
+
+  const points = data.map((v, i) => ({
+    x: PAD + (i / (data.length - 1)) * (W - PAD * 2),
+    y: H - PAD - ((v - min) / range) * (H - PAD * 2),
+  }));
+
+  // Smooth quadratic bezier path
+  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const cpx = (prev.x + curr.x) / 2;
+    d += ` Q ${cpx.toFixed(1)} ${prev.y.toFixed(1)} ${cpx.toFixed(1)} ${((prev.y + curr.y) / 2).toFixed(1)}`;
+    d += ` Q ${cpx.toFixed(1)} ${curr.y.toFixed(1)} ${curr.x.toFixed(1)} ${curr.y.toFixed(1)}`;
+  }
+
+  const gradId = `g${color.replace('#', '')}`;
+
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible' }}>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.15" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path
+        d={`${d} L ${points[points.length - 1].x} ${H} L ${points[0].x} ${H} Z`}
+        fill={`url(#${gradId})`}
+      />
+      <path
+        ref={pathRef}
+        d={d}
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx={points[points.length - 1].x}
+        cy={points[points.length - 1].y}
+        r="3"
+        fill={color}
+      />
+    </svg>
+  );
+}
+
+// ─── Expanded Panel with Chart.js ─────────────────────────────────────────────
+
+function ExpandedPanel({
+  cfg,
+  allData,
+  clientId,
+  onClose,
+  onLogged,
+}: {
+  cfg: MetricConfig;
+  allData: DataPoint[];
+  clientId: string;
+  onClose: () => void;
+  onLogged: () => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<any>(null);
+  const [rangeIdx, setRangeIdx] = useState(2);
+  const [showLog, setShowLog] = useState(false);
+  const [logValue, setLogValue] = useState('');
+  const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const supabase = createClient();
+
+  const filteredData = (() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - RANGES[rangeIdx].days);
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+    return allData.filter(d => d.date >= cutoffStr);
+  })();
+
+  const current = filteredData.length > 0 ? filteredData[filteredData.length - 1].value : null;
+  const startVal = filteredData.length > 1 ? filteredData[0].value : null;
+  const delta = current != null && startVal != null ? current - startVal : null;
+  const deltaSign = delta != null ? (delta >= 0 ? '+' : '') : '';
+  const deltaGood = delta != null ? (cfg.lowerIsBetter ? delta < 0 : delta > 0) : null;
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    const load = async () => {
+      const { Chart, registerables } = await import('chart.js');
+      Chart.register(...registerables);
+
+      if (chartRef.current) {
+        chartRef.current.destroy();
+        chartRef.current = null;
+      }
+
+      if (filteredData.length === 0) return;
+
+      const labels = filteredData.map(d => {
+        const dt = new Date(d.date + 'T00:00:00');
+        return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      });
+
+      chartRef.current = new Chart(canvasRef.current!, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: filteredData.map(d => d.value),
+            borderColor: cfg.color,
+            backgroundColor: cfg.color + '18',
+            borderWidth: 2.5,
+            pointRadius: 4,
+            pointBackgroundColor: cfg.color,
+            pointBorderColor: '#fff',
+            pointBorderWidth: 1.5,
+            tension: 0.4,
+            fill: true,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 600 },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx: any) => ` ${ctx.parsed.y.toFixed(1)}${cfg.unit}`,
+              },
+            },
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(128,128,128,0.1)' },
+              ticks: { color: '#888', font: { size: 10 } },
+            },
+            y: {
+              grid: { color: 'rgba(128,128,128,0.1)' },
+              ticks: {
+                color: '#888',
+                font: { size: 10 },
+                callback: (v: any) => `${v}${cfg.unit}`,
+              },
+            },
+          },
+        },
+      });
+    };
+
+    load();
+
+    return () => {
+      if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangeIdx, cfg.color, cfg.unit]);
+
+  const handleLog = async () => {
+    if (!logValue || !logDate) return;
+    setSaving(true);
+    const val = parseFloat(logValue);
+    await supabase.from('metrics').upsert(
+      { client_id: clientId, metric_date: logDate, [cfg.key]: val },
+      { onConflict: 'client_id,metric_date' }
+    );
+    setSaving(false);
+    setSaveSuccess(true);
+    setTimeout(() => { setSaveSuccess(false); setShowLog(false); setLogValue(''); onLogged(); }, 800);
+  };
+
+  return (
+    <div style={{
+      background: 'var(--brand-surface)',
+      border: `1.5px solid ${cfg.color}`,
+      borderRadius: 16,
+      marginBottom: 10,
+      padding: 16,
+      overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--brand-text)' }}>{cfg.label}</span>
+          {current != null && (
+            <span style={{ fontSize: 22, fontWeight: 800, color: cfg.color }}>
+              {current.toFixed(1)}<span style={{ fontSize: 11, fontWeight: 500, marginLeft: 2, color: 'var(--brand-text-secondary)' }}>{cfg.unit}</span>
+            </span>
+          )}
+          {delta != null && (
+            <span style={{ fontSize: 12, fontWeight: 600, color: deltaGood ? '#22c55e' : '#ef4444' }}>
+              {deltaSign}{delta.toFixed(1)}{cfg.unit}
+            </span>
+          )}
+        </div>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--brand-text-secondary)', lineHeight: 1, padding: 4 }}>
+          ✕
+        </button>
+      </div>
+
+      {/* Range buttons */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        {RANGES.map((r, i) => (
+          <button key={r.label} onClick={() => setRangeIdx(i)} style={{
+            padding: '5px 12px', borderRadius: 8, border: 'none', fontWeight: 600, fontSize: 12, cursor: 'pointer',
+            background: rangeIdx === i ? cfg.color : 'var(--brand-bg)',
+            color: rangeIdx === i ? 'white' : 'var(--brand-text-secondary)',
+            transition: 'all 0.15s',
+          }}>
+            {r.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Chart */}
+      <div style={{ height: 200, position: 'relative', marginBottom: 14 }}>
+        {filteredData.length >= 2
+          ? <canvas ref={canvasRef} />
+          : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--brand-text-secondary)', fontSize: 13 }}>
+              Not enough data for this range
+            </div>
+        }
+      </div>
+
+      {/* Log entry */}
+      {cfg.canLog && (
+        !showLog
+          ? <button onClick={() => setShowLog(true)} style={{
+              width: '100%', padding: '10px', borderRadius: 10,
+              border: `1.5px dashed ${cfg.color}`, background: cfg.color + '10',
+              color: cfg.color, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+            }}>
+              + Log {cfg.label}
+            </button>
+          : <div style={{ background: 'var(--brand-bg)', borderRadius: 12, padding: 14, border: '1px solid var(--brand-border)' }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <div style={{ flex: 2 }}>
+                  <label style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                    {cfg.label} ({cfg.unit || 'value'})
+                  </label>
+                  <input type="number" step="0.1"
+                    placeholder={cfg.key === 'body_fat_pct' ? 'e.g. 18.5' : 'e.g. 185.0'}
+                    value={logValue} onChange={e => setLogValue(e.target.value)}
+                    style={{ width: '100%', padding: '9px 11px', borderRadius: 8, border: '1px solid var(--brand-border)', background: 'var(--brand-surface)', color: 'var(--brand-text)', fontSize: 14 }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Date</label>
+                  <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)}
+                    style={{ width: '100%', padding: '9px 8px', borderRadius: 8, border: '1px solid var(--brand-border)', background: 'var(--brand-surface)', color: 'var(--brand-text)', fontSize: 13 }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setShowLog(false); setLogValue(''); }} style={{
+                  flex: 1, padding: 9, borderRadius: 9, border: '1px solid var(--brand-border)',
+                  background: 'transparent', color: 'var(--brand-text-secondary)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                }}>Cancel</button>
+                <button onClick={handleLog} disabled={saving || saveSuccess || !logValue} style={{
+                  flex: 2, padding: 9, borderRadius: 9, border: 'none',
+                  background: saveSuccess ? '#22c55e' : cfg.color,
+                  color: 'white', fontWeight: 700, fontSize: 13, cursor: !logValue ? 'default' : 'pointer',
+                  opacity: !logValue ? 0.5 : 1, transition: 'background 0.2s',
+                }}>
+                  {saveSuccess ? '✓ Saved!' : saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function MetricCards({ clientId }: MetricCardsProps) {
+  const [allMetrics, setAllMetrics] = useState<MetricRow[]>([]);
+  const [workoutCount, setWorkoutCount] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const supabase = createClient();
+
+  const load = useCallback(async () => {
+    if (!clientId) return;
+    setLoading(true);
+
+    const since = new Date();
+    since.setDate(since.getDate() - 56);
+    const sinceStr = since.toISOString().split('T')[0];
+
+    const [{ data: mData }, { count: wCount }, { data: wDates }] = await Promise.all([
+      supabase.from('metrics')
+        .select('id, client_id, metric_date, weight, body_fat_pct, lean_mass, fat_mass')
+        .eq('client_id', clientId)
+        .gte('metric_date', sinceStr)
+        .order('metric_date', { ascending: true }),
+      supabase.from('workout_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .gte('logged_at', sinceStr + 'T00:00:00'),
+      supabase.from('workout_logs')
+        .select('logged_at')
+        .eq('client_id', clientId)
+        .order('logged_at', { ascending: false }),
+    ]);
+
+    setAllMetrics(mData || []);
+    setWorkoutCount(wCount || 0);
+
+    if (wDates && wDates.length > 0) {
+      const uniqueDates = [
+        ...new Set((wDates as any[]).map(w => w.logged_at?.split('T')[0]).filter(Boolean)),
+      ].sort().reverse() as string[];
+      let streak = 0;
+      for (let i = 0; i < uniqueDates.length; i++) {
+        const expected = new Date();
+        expected.setDate(expected.getDate() - i);
+        if (uniqueDates[i] === expected.toISOString().split('T')[0]) streak++;
+        else break;
+      }
+      setStreakDays(streak);
+    }
+
+    setLoading(false);
+  }, [clientId]);
+
+  useEffect(() => { load(); }, [load, refreshKey]);
+
+  const getDataPoints = (key: string): DataPoint[] => {
+    if (key === 'workouts' || key === 'streak') return [];
+    return allMetrics
+      .filter(m => m[key as keyof MetricRow] != null)
+      .map(m => ({ date: m.metric_date, value: Number(m[key as keyof MetricRow]) }));
+  };
+
+  const getSummary = (key: string) => {
+    if (key === 'workouts') return { current: String(workoutCount), change: null as string | null, changeNum: null as number | null };
+    if (key === 'streak') return { current: streakDays > 0 ? String(streakDays) : '—', change: null as string | null, changeNum: null as number | null };
+    const pts = getDataPoints(key);
+    if (pts.length === 0) return { current: '—', change: null as string | null, changeNum: null as number | null };
+    const cur = pts[pts.length - 1].value;
+    const start = pts[0].value;
+    const diff = cur - start;
+    return { current: cur.toFixed(1), change: `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}`, changeNum: diff };
+  };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+        {METRIC_CONFIGS.map((_, i) => (
+          <div key={i} style={{ background: 'var(--brand-surface)', borderRadius: 12, height: 110, border: '1px solid var(--brand-border)', opacity: 0.4 }} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <style>{`
+        @keyframes mcFadeUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
+      {/* Expanded panel */}
+      {expandedKey && (() => {
+        const cfg = METRIC_CONFIGS.find(c => c.key === expandedKey);
+        if (!cfg) return null;
+        return (
+          <ExpandedPanel
+            cfg={cfg}
+            allData={getDataPoints(expandedKey)}
+            clientId={clientId}
+            onClose={() => setExpandedKey(null)}
+            onLogged={() => setRefreshKey(k => k + 1)}
+          />
+        );
+      })()}
+
+      {/* Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+        {METRIC_CONFIGS.map((cfg, idx) => {
+          const { current, change, changeNum } = getSummary(cfg.key);
+          const sparkData = getDataPoints(cfg.key).map(d => d.value);
+          const isActive = expandedKey === cfg.key;
+          const deltaGood = changeNum != null ? (cfg.lowerIsBetter ? changeNum < 0 : changeNum > 0) : null;
+
+          return (
+            <div
+              key={cfg.key}
+              onClick={() => setExpandedKey(isActive ? null : cfg.key)}
+              style={{
+                background: 'var(--brand-surface)',
+                borderRadius: 12,
+                padding: '12px 14px',
+                borderTop: `3px solid ${cfg.color}`,
+                border: isActive ? `1.5px solid ${cfg.color}` : '1px solid var(--brand-border)',
+                borderTopWidth: 3,
+                cursor: 'pointer',
+                transform: isActive ? 'scale(1.01)' : undefined,
+                transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.15s',
+                boxShadow: isActive ? `0 4px 20px ${cfg.color}25` : undefined,
+                animationName: 'mcFadeUp',
+                animationDuration: '0.4s',
+                animationTimingFunction: 'ease',
+                animationFillMode: 'both',
+                animationDelay: `${idx * 0.05}s`,
+              }}
+            >
+              <div style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600, marginBottom: 4 }}>
+                {cfg.label}
+              </div>
+              <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--brand-text)', lineHeight: 1.1 }}>
+                {current}
+                {cfg.unit && (
+                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--brand-text-secondary)', marginLeft: 2 }}>{cfg.unit}</span>
+                )}
+              </div>
+              {change && changeNum != null && (
+                <div style={{ fontSize: 11, fontWeight: 600, marginTop: 3, color: deltaGood ? '#22c55e' : '#ef4444' }}>
+                  {change}{cfg.unit ? ' ' + cfg.unit : ''}
+                </div>
+              )}
+              <div style={{ marginTop: 8 }}>
+                <Sparkline data={sparkData} color={cfg.color} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}

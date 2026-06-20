@@ -5,6 +5,7 @@ import { useState, useMemo, useCallback } from "react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import AssignProgramModal from "./AssignProgramModal";
+import MetricCards from "@/components/MetricCards";
 
 interface MetricPoint {
   metric_date: string;
@@ -210,42 +211,11 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
         );
       })()}
 
-      {/* Body Metrics */}
+      {/* Body Metrics — MetricCards */}
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-widest mb-2"
-          style={{ color: "var(--brand-text-secondary)" }}>Body Metrics Overview</p>
-        <div className="space-y-2">
-          {[
-            { label: "Weight", latest: latestMetric?.weight, unit: "lb", delta: weightDelta, values: weights, color: "var(--brand-primary)", icon: "ti-scale" },
-            { label: "Body Fat", latest: latestMetric?.body_fat_pct, unit: "%", delta: bfDelta, values: bodyFats, color: "#f59e0b", icon: "ti-percentage" },
-          ].map(m => (
-            <div key={m.label} className="rounded-xl p-3 flex items-center gap-3"
-              style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: `${m.color}15` }}>
-                <i className={`ti ${m.icon} text-sm`} style={{ color: m.color }} />
-              </div>
-              <div className="flex-1">
-                <p className="text-[10px]" style={{ color: "var(--brand-text-secondary)" }}>{m.label}</p>
-                <p className="text-base font-bold leading-tight" style={{ color: "var(--brand-text)" }}>
-                  {m.latest != null ? `${m.latest}${m.unit}` : "—"}
-                  {m.delta != null && (
-                    <span className="text-[10px] font-normal ml-1.5" style={{ color: m.delta <= 0 ? "#22c55e" : "#ef4444" }}>
-                      {m.delta > 0 ? "+" : ""}{m.delta.toFixed(1)}{m.unit}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <MiniSparkline values={m.values} color={m.color} />
-            </div>
-          ))}
-          {!latestMetric && (
-            <div className="rounded-xl py-6 text-center"
-              style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-              <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>No metrics logged yet</p>
-            </div>
-          )}
-        </div>
+          style={{ color: "var(--brand-text-secondary)" }}>Body Metrics</p>
+        <MetricCards clientId={clientId} isTrainer={true} />
       </div>
 
       {/* Program + Contact */}
