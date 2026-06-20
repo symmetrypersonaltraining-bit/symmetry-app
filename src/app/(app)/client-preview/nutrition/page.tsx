@@ -10,11 +10,10 @@ export default async function ClientPreviewNutritionPage() {
   if (!user) redirect("/login");
   if (user.email !== TRAINER_EMAIL) redirect("/nutrition");
 
-  // Fetch Dustin's own client record
   const { data: clientRecord } = await supabase
     .from("clients")
     .select("id, name")
-    .eq("email", TRAINER_EMAIL)
+    .ilike("name", "%Dustin%")
     .maybeSingle();
 
   if (!clientRecord) {
@@ -59,15 +58,21 @@ export default async function ClientPreviewNutritionPage() {
   ]);
 
   return (
-    <MealPlanClient
-      clientId={clientId}
-      clientName={clientName}
-      mealPlan={mpRes.data as any}
-      todayLogs={tlRes.data || []}
-      macroTarget={mtRes.data as any}
-      weekLogs={wlRes.data || []}
-      today={today}
-      isTrainer={false}
-    />
+    <>
+      <div style={{ background: "var(--brand-primary)" }} className="px-4 py-4">
+        <h1 className="text-white font-semibold text-lg">Nutrition</h1>
+        <p className="text-white/60 text-sm">{clientName}</p>
+      </div>
+      <MealPlanClient
+        clientId={clientId}
+        clientName={clientName}
+        mealPlan={mpRes.data as any}
+        todayLogs={tlRes.data || []}
+        macroTarget={mtRes.data as any}
+        weekLogs={wlRes.data || []}
+        today={today}
+        isTrainer={false}
+      />
+    </>
   );
 }
