@@ -13,7 +13,7 @@ export default async function ClientPreviewProgressPage() {
   const { data: clientRecord } = await supabase
     .from("clients")
     .select("id, name")
-    .eq("email", TRAINER_EMAIL)
+    .ilike("name", "%Dustin%")
     .maybeSingle();
 
   if (!clientRecord) {
@@ -51,8 +51,8 @@ export default async function ClientPreviewProgressPage() {
       .limit(100),
   ]);
 
-  const weightLogs: { metric_date: string; weight: number; body_fat_pct: number | null; lean_mass: number | null; fat_mass: number | null }[] =
-    (weightRes.data || []).map((r: any) => ({
+  const weightLogs =
+    (weightRes.data || []).map((r) => ({
       metric_date: r.metric_date,
       weight: parseFloat(r.weight) || 0,
       body_fat_pct: r.body_fat_pct ? parseFloat(r.body_fat_pct) : null,
@@ -61,14 +61,14 @@ export default async function ClientPreviewProgressPage() {
     }));
   const totalWorkouts = countRes.count || 0;
 
-  let recentPRs: { exercise_name: string; weight: number; reps: number | null; date: string }[] = [];
+  let recentPRs = [];
   if (setRes.data) {
-    const prMap = new Map<string, { weight: number; reps: number | null; date: string }>();
-    for (const sl of setRes.data as any[]) {
+    const prMap = new Map();
+    for (const sl of setRes.data) {
       const name = sl.prescribed_exercises?.exercises?.name;
       if (!name) continue;
       const w = sl.weight_lbs ?? sl.weight ?? 0;
-      if (!prMap.has(name) || w > prMap.get(name)!.weight) {
+      if (!prMap.has(name) || w > prMap.get(name).weight) {
         prMap.set(name, { weight: w, reps: sl.reps, date: sl.logged_at?.split("T")[0] || "" });
       }
     }
