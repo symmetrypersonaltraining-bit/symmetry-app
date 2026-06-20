@@ -732,9 +732,12 @@ function LibraryPanel({
 
   return (
     <div
-      className="absolute top-0 right-0 h-full flex flex-col shadow-2xl border-l"
+      className="fixed bottom-0 left-0 right-0 sm:absolute sm:top-0 sm:right-0 sm:bottom-auto sm:left-auto sm:h-full flex flex-col shadow-2xl border-t sm:border-t-0 sm:border-l rounded-t-2xl sm:rounded-none"
       style={{
-        width: "clamp(260px, 280px, 100vw)",
+        width: "100%",
+        maxHeight: "70vh",
+        overflowY: "auto",
+        ...(typeof window !== "undefined" && window.innerWidth >= 640 ? { width: "clamp(260px, 280px, 100vw)", maxHeight: "none", overflowY: "visible" } : {}),
         background: "var(--brand-surface)",
         borderColor: "var(--brand-border)",
         zIndex: 40,
@@ -887,7 +890,7 @@ function WorkoutChip({
         </div>
         <button
           onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); setConfirmDelete(false); }}
-          className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center"
           style={{ background: "var(--brand-primary)20" }}>
           <i className="ti ti-dots text-[10px]" style={{ color: "var(--brand-primary)" }} />
         </button>
@@ -942,7 +945,19 @@ export default function ProgramPage() {
 
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [clientName, setClientName] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      setSidebarOpen(!mobile);
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const [weekOffset, setWeekOffset] = useState(0);
   const [density, setDensity] = useState<"1w" | "2w" | "4w">("1w");
   const [workouts, setWorkouts] = useState<ScheduledWorkout[]>([]);
@@ -1210,6 +1225,7 @@ export default function ProgramPage() {
 
         <div className="flex flex-1 overflow-hidden">
           <div className="flex-1 overflow-auto relative">
+            <div className="min-w-[700px]">
             <div className="grid sticky top-0 z-10 border-b"
               style={{
                 gridTemplateColumns: `repeat(${allDays.length}, minmax(${compact ? 80 : 120}px, 1fr))`,
@@ -1229,7 +1245,7 @@ export default function ProgramPage() {
                       </span>
                       <button
                         onClick={() => { setSelectedDate(ds); setEditingWorkout(null); setEditorOpen(true); setLibraryOpen(false); }}
-                        className="w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        className={`w-5 h-5 rounded flex items-center justify-center transition-opacity ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                         style={{ background: "var(--brand-primary)20", color: "var(--brand-primary)" }}>
                         <i className="ti ti-plus text-[10px]" />
                       </button>
@@ -1330,11 +1346,18 @@ export default function ProgramPage() {
             {libraryOpen && (
               <LibraryPanel clientId={clientId} onClose={() => setLibraryOpen(false)} />
             )}
+            </div>{/* end min-w-[700px] wrapper */}
           </div>
 
           {editorOpen && (
-            <div className="flex-shrink-0 border-l flex flex-col overflow-hidden"
-              style={{ width: 460, borderColor: "var(--brand-border)", background: "var(--brand-surface)" }}>
+            <div className={isMobile
+                ? "fixed bottom-0 left-0 right-0 z-50 flex flex-col overflow-hidden rounded-t-2xl border-t shadow-2xl"
+                : "flex-shrink-0 border-l flex flex-col overflow-hidden"
+              }
+              style={isMobile
+                ? { height: "70vh", background: "var(--brand-surface)", borderColor: "var(--brand-border)" }
+                : { width: 460, borderColor: "var(--brand-border)", background: "var(--brand-surface)" }
+              }>
               <WorkoutEditor
                 clientId={clientId}
                 selectedDate={selectedDate}
