@@ -4,23 +4,34 @@ import { createClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  // Use service role key if available, fall back to anon key
+  // Service role bypasses RLS; anon key relies on table grants + RLS policies
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    supabaseKey,
+    { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
   try {
     // 1. Get all client names for matching
-    const { data: clients } = await supabase.from('clients').select('id, name');
-    if (!clients) return NextResponse.json({ error: 'No clients' }, { status: 500 });
+    const { data: clients, error: clientError } = await supabase.from('clients').select('id, name');
+    if (!clients || clients.length === 0) {
+      return NextResponse.json({ error: 'No clients', detail: clientError?.message }, { status: 500 });
+    }
 
     // 2. Fetch GCal events
+    const gcalToken = process.env.GOOGLE_OAUTH_TOKEN;
+    if (!gcalToken) {
+      return NextResponse.json({ error: 'GOOGLE_OAUTH_TOKEN not set' }, { status: 500 });
+    }
+
     const now = new Date().toISOString();
     const future = new Date(Date.now() + 84 * 24 * 60 * 60 * 1000).toISOString();
 
     const gcalRes = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${now}&timeMax=${future}&singleEvents=true&maxResults=500&orderBy=startTime`,
-      { headers: { Authorization: `Bearer ${process.env.GOOGLE_OAUTH_TOKEN}` } }
+      { headers: { Authorization: `Bearer ${gcalToken}` } }
     );
 
     if (!gcalRes.ok) {
@@ -68,7 +79,7 @@ export async function POST(req: NextRequest) {
       else synced++;
     }
 
-    return NextResponse.json({ synced, errors });
+    return NextResponse.json({ synced, errors, totalEvents: events.length });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

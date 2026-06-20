@@ -43,10 +43,19 @@ interface Client {
   created_at: string | null;
 }
 
+interface AppointmentEntry {
+  id: string;
+  scheduled_at: string;
+  ends_at: string | null;
+  status: string;
+  title: string | null;
+}
+
 interface Props {
   client: Client;
   metrics: MetricPoint[];
   allWorkouts: WorkoutEntry[];
+  appointments?: AppointmentEntry[];
   clientId: string;
   programs: { id: string; name: string; description: string | null }[];
   currentProgramId?: string;
@@ -558,6 +567,93 @@ function CalendarLegend() {
   );
 }
 
+
+// ---- Schedule Tab ----
+function ScheduleTab({ appointments }: { appointments: AppointmentEntry[] }) {
+  const now = new Date();
+  const upcoming = appointments
+    .filter(a => new Date(a.scheduled_at) >= now && a.status !== "cancelled")
+    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+  const past = appointments
+    .filter(a => new Date(a.scheduled_at) < now || a.status === "cancelled")
+    .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
+
+  const STATUS_COLORS: Record<string, {bg: string; text: string}> = {
+    scheduled: { bg: "#FB8C0020", text: "#FB8C00" },
+    completed: { bg: "#43A04720", text: "#43A047" },
+    cancelled: { bg: "#9E9E9E20", text: "#9E9E9E" },
+    cancelled_client: { bg: "#E5393520", text: "#E53935" },
+  };
+
+  function fmtAppt(isoStr: string) {
+    const d = new Date(isoStr);
+    return {
+      date: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+      time: d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+    };
+  }
+
+  function ApptRow({ a }: { a: AppointmentEntry }) {
+    const { date, time } = fmtAppt(a.scheduled_at);
+    const endTime = a.ends_at ? new Date(a.ends_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null;
+    const sc = STATUS_COLORS[a.status] || STATUS_COLORS.scheduled;
+    return (
+      <div className="flex items-center gap-3 py-2.5 border-b last:border-b-0"
+        style={{ borderColor: "var(--brand-border)" }}>
+        <div className="text-center w-12 flex-shrink-0">
+          <div className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>{date.split(",")[0]}</div>
+          <div className="text-[10px]" style={{ color: "var(--brand-text-secondary)" }}>{date.split(" ").slice(1).join(" ")}</div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>
+            {time}{endTime ? ` – ${endTime}` : ""}
+          </div>
+          {a.title && a.title !== "Training Session" && (
+            <div className="text-xs truncate" style={{ color: "var(--brand-text-secondary)" }}>{a.title}</div>
+          )}
+        </div>
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize flex-shrink-0"
+          style={{ background: sc.bg, color: sc.text }}>
+          {a.status.replace("_", " ")}
+        </span>
+      </div>
+    );
+  }
+
+  if (appointments.length === 0) {
+    return (
+      <div className="py-12 text-center">
+        <i className="ti ti-calendar-off text-3xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
+        <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>No appointments found</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {upcoming.length > 0 && (
+        <div className="card" style={{ padding: "12px 16px" }}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide mb-2"
+            style={{ color: "var(--brand-text-secondary)" }}>Upcoming ({upcoming.length})</p>
+          {upcoming.map(a => <ApptRow key={a.id} a={a} />)}
+        </div>
+      )}
+      {past.length > 0 && (
+        <div className="card" style={{ padding: "12px 16px" }}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide mb-2"
+            style={{ color: "var(--brand-text-secondary)" }}>Past ({past.length})</p>
+          {past.slice(0, 20).map(a => <ApptRow key={a.id} a={a} />)}
+          {past.length > 20 && (
+            <p className="text-xs text-center pt-2" style={{ color: "var(--brand-text-secondary)" }}>
+              + {past.length - 20} more
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---- Metrics tab ----
 function MetricsTab({ metrics }: { metrics: MetricPoint[] }) {
   const weights = metrics.map(m => m.weight).filter((v): v is number => v != null);
@@ -959,15 +1055,16 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
 }
 
 // ---- Main component ----
-export default function ClientProfileTabs({ client, metrics, allWorkouts, clientId, programs, currentProgramId }: Props) {
+export default function ClientProfileTabs({ client, metrics, allWorkouts, appointments = [], clientId, programs, currentProgramId }: Props) {
   const searchParams = useSearchParams();
-  const initialTab = (searchParams.get("tab") as "overview" | "training" | "metrics" | "info") ?? "overview";
-  const [tab, setTab] = useState<"overview" | "training" | "metrics" | "info">(initialTab);
+  const initialTab = (searchParams.get("tab") as "overview" | "training" | "schedule" | "metrics" | "info") ?? "overview";
+  const [tab, setTab] = useState<"overview" | "training" | "schedule" | "metrics" | "info">(initialTab);
   const [showAssignModal, setShowAssignModal] = useState(false);
 
   const TABS = [
     { id: "overview" as const, label: "Overview", icon: "ti-layout-dashboard" },
     { id: "training" as const, label: "Training", icon: "ti-calendar" },
+    { id: "schedule" as const, label: "Schedule", icon: "ti-clock" },
     { id: "metrics" as const, label: "Metrics", icon: "ti-chart-line" },
     { id: "info" as const, label: "Info", icon: "ti-user" },
   ];
@@ -1003,6 +1100,7 @@ export default function ClientProfileTabs({ client, metrics, allWorkouts, client
           />
         )}
         {tab === "training" && <TrainingCalendar workouts={allWorkouts} clientId={clientId} />}
+        {tab === "schedule" && <ScheduleTab appointments={appointments} />}
         {tab === "metrics" && <MetricsTab metrics={metrics} />}
         {tab === "info" && (
           <InfoTab client={client} programs={programs} currentProgramId={currentProgramId}
