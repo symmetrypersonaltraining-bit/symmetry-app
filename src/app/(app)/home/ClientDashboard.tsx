@@ -34,6 +34,7 @@ interface Props {
   streakDays: number;
   weekWorkouts: { date: string; completed: boolean }[];
   allScheduled?: ScheduledDay[];
+  basePath?: string;
 }
 
 // ─── Sparkline (mini, for metric cards) ──────────────────────────────────────
@@ -203,12 +204,13 @@ function FullChart({
 
 // ─── Metric Modal ─────────────────────────────────────────────────────────────
 function MetricModal({
-  metricKey, label, unit, color, icon, metrics, onClose,
+  metricKey, label, unit, color, icon, metrics, onClose, basePath = "",
 }: {
   metricKey: "weight" | "body_fat_pct" | "lean_mass" | "fat_mass";
   label: string; unit: string; color: string; icon: string;
   metrics: MetricPoint[];
   onClose: () => void;
+  basePath?: string;
 }) {
   const values = metrics.map(m => m[metricKey]).filter((v): v is number => v != null);
   const dates = metrics.filter(m => m[metricKey] != null).map(m => m.metric_date);
@@ -251,7 +253,7 @@ function MetricModal({
         <FullChart values={values} dates={dates} color={color} label={label} unit={unit} />
 
         <Link
-          href="/progress"
+          href={`${basePath}/progress`}
           onClick={onClose}
           className="flex items-center justify-center gap-2 mt-5 py-3 rounded-2xl text-sm font-semibold"
           style={{ background: "var(--brand-primary)", color: "white" }}
@@ -301,11 +303,13 @@ function WeekRing({
   weekOffset,
   onPrev,
   onNext,
+  basePath = "",
 }: {
   allScheduled: ScheduledDay[];
   weekOffset: number;
   onPrev: () => void;
   onNext: () => void;
+  basePath?: string;
 }) {
   const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const today = new Date();
@@ -397,7 +401,7 @@ function WeekRing({
           return (
             <div key={dow} className="flex flex-col items-center gap-1">
               {workout?.id ? (
-                <Link href={`/workout/${workout.id}`}>{circle}</Link>
+                <Link href={`${basePath}/workout/${workout.id}`}>{circle}</Link>
               ) : circle}
               <span className="text-xs" style={{ color: isToday ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>
                 {DAYS[dow]}
@@ -422,7 +426,7 @@ const METRIC_CONFIG: { key: MetricKey; label: string; unit: string; color: strin
 
 export default function ClientDashboard({
   firstName, todayWorkout, metrics, completedCount, totalScheduled,
-  recentWorkouts, streakDays, weekWorkouts, allScheduled = [],
+  recentWorkouts, streakDays, weekWorkouts, allScheduled = [], basePath = "",
 }: Props) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
@@ -471,6 +475,7 @@ export default function ClientDashboard({
           icon={activeMetricConfig.icon}
           metrics={metrics}
           onClose={() => setActiveMetric(null)}
+          basePath={basePath}
         />
       )}
 
@@ -498,7 +503,7 @@ export default function ClientDashboard({
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold uppercase tracking-widest"
               style={{ color: "var(--brand-text-secondary)" }}>This Week</span>
-            <Link href="/workout" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
+            <Link href={`${basePath}/workout`} className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
               View Schedule →
             </Link>
           </div>
@@ -507,12 +512,13 @@ export default function ClientDashboard({
             weekOffset={weekOffset}
             onPrev={() => setWeekOffset(o => o - 1)}
             onNext={() => setWeekOffset(o => Math.min(0, o + 1))}
+            basePath={basePath}
           />
         </div>
 
         {/* Today's Workout */}
         {todayWorkout ? (
-          <Link href={`/workout/${todayWorkout.id}`}>
+          <Link href={`${basePath}/workout/${todayWorkout.id}`}>
             <div className="rounded-2xl p-5 relative overflow-hidden cursor-pointer"
               style={{ background: "var(--brand-primary)" }}>
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10"
@@ -548,7 +554,7 @@ export default function ClientDashboard({
 
         {/* Quick links */}
         <div className="grid grid-cols-2 gap-3">
-          <Link href="/nutrition">
+          <Link href={`${basePath}/nutrition`}>
             <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer"
               style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#22c55e20" }}>
@@ -578,7 +584,7 @@ export default function ClientDashboard({
         <div>
           <div className="flex items-center justify-between mb-2.5">
             <h2 className="text-base font-bold" style={{ color: "var(--brand-text)" }}>Progress</h2>
-            <Link href="/progress" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
+            <Link href={`${basePath}/progress`} className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
               View all →
             </Link>
           </div>
@@ -622,7 +628,7 @@ export default function ClientDashboard({
             <div className="rounded-2xl overflow-hidden"
               style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               {recentWorkouts.map((w, i) => (
-                <Link key={w.id} href={`/workout/${w.id}`}>
+                <Link key={w.id} href={`${basePath}/workout/${w.id}`}>
                   <div
                     className={`flex items-center gap-3 px-4 py-3.5 ${i < recentWorkouts.length - 1 ? "border-b" : ""}`}
                     style={{ borderColor: "var(--brand-border)" }}

@@ -142,7 +142,7 @@ export default function ClientPreviewPage() {
   const firstName = (clientRecord.name || '').split(' ')[0];
   return (
     <div>
-      <ClientDashboard firstName={firstName} todayWorkout={todayWorkout} metrics={metrics} completedCount={completedCount} totalScheduled={totalScheduled} recentWorkouts={recentWorkouts} streakDays={streakDays} weekWorkouts={weekWorkouts} />
+      <ClientDashboard firstName={firstName} todayWorkout={todayWorkout} metrics={metrics} completedCount={completedCount} totalScheduled={totalScheduled} recentWorkouts={recentWorkouts} streakDays={streakDays} weekWorkouts={weekWorkouts} basePath="/client-preview" />
       <MacroSection clientId={user?.id || ''} />
     </div>
   );
