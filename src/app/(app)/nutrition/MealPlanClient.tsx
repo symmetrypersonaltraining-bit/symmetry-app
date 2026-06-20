@@ -1,27 +1,21 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
 interface MealPlan { id: string; version_number: number; meals: Meal[]; }
-interface AdherenceLog { id: string; meal_id: string | null; meal_position: number; adherence: string; off_plan_details: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null; }
+interface AdherenceLog { id: string; meal_id: string | null; meal_position: number; adherence: string; off_plan_details: string | null; notes: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null; }
 interface MacroTarget { calories: number; protein: number; carbs: number; fats: number; }
 
 const ADHERENCE_OPTIONS = [
-  { key: "full", label: "Full", emoji: "✅", pct: 1.0 },
-  { key: "three_quarters", label: "¾", emoji: "🟡", pct: 0.75 },
-  { key: "half", label: "½", emoji: "🟠", pct: 0.5 },
-  { key: "quarter", label: "¼", emoji: "🔴", pct: 0.25 },
-  { key: "skipped", label: "Skip", emoji: "⛔", pct: 0 },
-  { key: "off_plan", label: "Off Plan", emoji: "🚫", pct: null },
+  { key: "quarter",        label: "¼",        color: "#ef4444", pct: 0.25 },
+  { key: "half",           label: "½",        color: "#f59e0b", pct: 0.5  },
+  { key: "three_quarters", label: "¾",        color: "#84cc16", pct: 0.75 },
+  { key: "full",           label: "Full",     color: "#22c55e", pct: 1.0  },
+  { key: "off_plan",       label: "Off Plan", color: "#8b5cf6", pct: null },
 ];
-
-const ADHERENCE_COLORS: Record<string, string> = {
-  full: "#22c55e", three_quarters: "#84cc16", half: "#f59e0b",
-  quarter: "#ef4444", skipped: "#6b7280", off_plan: "#8b5cf6",
-};
 
 const FREE_SLOTS = [
   { position: 1, label: "Meal 1", timing: "Morning" },
@@ -31,36 +25,6 @@ const FREE_SLOTS = [
   { position: 5, label: "Meal 5", timing: "Dinner" },
   { position: 6, label: "Meal 6", timing: "Evening Snack" },
 ];
-
-function MacroRing({ value, target, color, label, unit = "g" }: {
-  value: number; target: number; color: string; label: string; unit?: string;
-}) {
-  const r = 38;
-  const circ = 2 * Math.PI * r;
-  const pct = target > 0 ? Math.min(value / target, 1) : 0;
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="relative w-20 h-20">
-        <svg width="80" height="80" viewBox="0 0 80 80">
-          <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7"/>
-          <circle cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="7"
-            strokeDasharray={`${circ}`}
-            strokeDashoffset={`${circ * (1 - pct)}`}
-            strokeLinecap="round" transform="rotate(-90 40 40)"
-            style={{ transition: "stroke-dashoffset 0.6s ease" }}/>
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xs font-bold leading-none" style={{ color: "var(--brand-text)" }}>{Math.round(value)}</span>
-          <span className="text-xs leading-none" style={{ color: "var(--brand-text-secondary)" }}>{unit}</span>
-        </div>
-      </div>
-      <p className="text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>{label}</p>
-      {target > 0 && (
-        <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>/ {Math.round(target)}</p>
-      )}
-    </div>
-  );
-}
 
 interface Props {
   clientId: string;
@@ -78,13 +42,21 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const [logs, setLogs] = useState<AdherenceLog[]>(todayLogs);
   const [saving, setSaving] = useState<string | null>(null);
 
-  // Off-plan modal (used for both plan "off_plan" and no-plan free-form)
+  const [notesMap, setNotesMap] = useState<Record<number, string>>(() => {
+    const m: Record<number, string> = {};
+    for (const l of todayLogs) if (l.notes) m[l.meal_position] = l.notes;
+    return m;
+  });
+
   const [offPlanModal, setOffPlanModal] = useState<{ mealId: string | null; position: number; mealName: string } | null>(null);
   const [offPlanDetails, setOffPlanDetails] = useState("");
   const [offPlanKcal, setOffPlanKcal] = useState("");
-  const [offPlanP, setOffPlanP] = useState("");
-  const [offPlanC, setOffPlanC] = useState("");
-  const [offPlanF, setOffPlanF] = useState("");
+  const [offPlanP,    setOffPlanP]    = useState("");
+  const [offPlanC,    setOffPlanC]    = useState("");
+  const [offPlanF,    setOffPlanF]    = useState("");
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoResult,  setPhotoResult]  = useState<string | null>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   const sortedMeals = useMemo(() => {
     if (!mealPlan?.meals) return [];
@@ -95,8 +67,8 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     let protein = 0, carbs = 0, fats = 0;
     for (const item of meal.meal_items || []) {
       protein += item.protein || 0;
-      carbs += item.carbs || 0;
-      fats += item.fats || 0;
+      carbs   += item.carbs   || 0;
+      fats    += item.fats    || 0;
     }
     const kcal = protein * 4 + carbs * 4 + fats * 9;
     return { kcal, protein, carbs, fats };
@@ -108,18 +80,18 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       const opt = ADHERENCE_OPTIONS.find(o => o.key === log.adherence);
       if (!opt) continue;
       if (log.adherence === "off_plan") {
-        kcal += log.est_kcal || 0;
+        kcal    += log.est_kcal    || 0;
         protein += log.est_protein || 0;
-        carbs += log.est_carbs || 0;
-        fats += log.est_fats || 0;
+        carbs   += log.est_carbs   || 0;
+        fats    += log.est_fats    || 0;
       } else if (opt.pct !== null && log.meal_id) {
         const meal = sortedMeals.find(m => m.id === log.meal_id);
         if (meal) {
           const m = getMealMacros(meal);
-          kcal += m.kcal * opt.pct;
+          kcal    += m.kcal    * opt.pct;
           protein += m.protein * opt.pct;
-          carbs += m.carbs * opt.pct;
-          fats += m.fats * opt.pct;
+          carbs   += m.carbs   * opt.pct;
+          fats    += m.fats    * opt.pct;
         }
       }
     }
@@ -127,9 +99,22 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logs, sortedMeals]);
 
+  const kcalTarget = macroTarget?.calories || 0;
+  const kcalPct    = kcalTarget > 0 ? Math.min(currentMacros.kcal / kcalTarget, 1) : 0;
+  const ringR      = 56;
+  const ringCirc   = 2 * Math.PI * ringR;
+  const loggedCount = logs.length;
+  const totalMeals  = mealPlan ? sortedMeals.length : 0;
+
   async function logAdherence(meal: Meal, adherenceKey: string) {
     if (adherenceKey === "off_plan") {
-      setOffPlanDetails(""); setOffPlanKcal(""); setOffPlanP(""); setOffPlanC(""); setOffPlanF("");
+      const existing = logs.find(l => l.meal_position === meal.position);
+      setOffPlanDetails(existing?.off_plan_details || "");
+      setOffPlanKcal(existing?.est_kcal?.toString() || "");
+      setOffPlanP(existing?.est_protein?.toString() || "");
+      setOffPlanC(existing?.est_carbs?.toString() || "");
+      setOffPlanF(existing?.est_fats?.toString() || "");
+      setPhotoResult(null);
       setOffPlanModal({ mealId: meal.id, position: meal.position, mealName: meal.name });
       return;
     }
@@ -140,28 +125,72 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         meal_position: meal.position, adherence: adherenceKey,
         off_plan_details: null, est_kcal: null, est_protein: null,
         est_carbs: null, est_fats: null, source: "client_app",
+        notes: notesMap[meal.position] || null,
       }, { onConflict: "client_id,log_date,meal_position" }).select().single();
       if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== meal.position), data as AdherenceLog]);
     } finally { setSaving(null); }
   }
 
+  async function saveNotes(position: number) {
+    const note = notesMap[position] || null;
+    const existing = logs.find(l => l.meal_position === position);
+    if (!existing) return;
+    await supabase.from("meal_adherence_logs").update({ notes: note }).eq("id", existing.id);
+  }
+
+  async function handlePhotoCapture(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoLoading(true);
+    setPhotoResult(null);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl.split(",")[1];
+        const res = await fetch("/api/analyze-meal-photo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: base64, mimeType: file.type || "image/jpeg" }),
+        });
+        const json = await res.json();
+        if (json.error) {
+          setPhotoResult("Could not analyze photo.");
+        } else {
+          setOffPlanKcal(json.calories?.toString() || "");
+          setOffPlanP(json.protein_g?.toString() || "");
+          setOffPlanC(json.carbs_g?.toString() || "");
+          setOffPlanF(json.fat_g?.toString() || "");
+          setOffPlanDetails(json.description || "");
+          setPhotoResult(`AI detected: ${json.description}`);
+        }
+      } catch {
+        setPhotoResult("Error analyzing photo.");
+      } finally {
+        setPhotoLoading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function saveOffPlan() {
     if (!offPlanModal) return;
-    setSaving(offPlanModal.mealId || `pos-${offPlanModal.position}`);
+    const key = offPlanModal.mealId || `pos-${offPlanModal.position}`;
+    setSaving(key);
     try {
       const { data } = await supabase.from("meal_adherence_logs").upsert({
         client_id: clientId, log_date: today, meal_id: offPlanModal.mealId,
         meal_position: offPlanModal.position, adherence: "off_plan",
         off_plan_details: offPlanDetails || null,
-        est_kcal: offPlanKcal ? parseFloat(offPlanKcal) : null,
-        est_protein: offPlanP ? parseFloat(offPlanP) : null,
-        est_carbs: offPlanC ? parseFloat(offPlanC) : null,
-        est_fats: offPlanF ? parseFloat(offPlanF) : null,
+        est_kcal:    offPlanKcal ? parseFloat(offPlanKcal) : null,
+        est_protein: offPlanP    ? parseFloat(offPlanP)    : null,
+        est_carbs:   offPlanC    ? parseFloat(offPlanC)    : null,
+        est_fats:    offPlanF    ? parseFloat(offPlanF)    : null,
+        notes: notesMap[offPlanModal.position] || null,
         source: "client_app",
       }, { onConflict: "client_id,log_date,meal_position" }).select().single();
       if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== offPlanModal.position), data as AdherenceLog]);
       setOffPlanModal(null);
-      setOffPlanDetails(""); setOffPlanKcal(""); setOffPlanP(""); setOffPlanC(""); setOffPlanF("");
     } finally { setSaving(null); }
   }
 
@@ -172,6 +201,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     setOffPlanP(existing?.est_protein?.toString() || "");
     setOffPlanC(existing?.est_carbs?.toString() || "");
     setOffPlanF(existing?.est_fats?.toString() || "");
+    setPhotoResult(null);
     setOffPlanModal({ mealId: null, position: slot.position, mealName: slot.label });
   }
 
@@ -185,45 +215,60 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     } finally { setSaving(null); }
   }
 
-  const loggedCount = logs.length;
-  const totalMeals = mealPlan ? sortedMeals.length : 0;
-  const todayPct = totalMeals > 0 ? loggedCount / totalMeals : 0;
-
-  const noPlanHasLogs = !mealPlan && logs.length > 0;
-  const noPlanMacros = noPlanHasLogs ? currentMacros : null;
-
   const offPlanSavingKey = offPlanModal ? (offPlanModal.mealId || `pos-${offPlanModal.position}`) : null;
 
   return (
     <div className="pb-24" style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
 
-      {/* Off-Plan Modal (shared for plan + no-plan) */}
+      {/* Hidden camera input */}
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment"
+        className="hidden" onChange={handlePhotoCapture} />
+
+      {/* Off-Plan Modal */}
       {offPlanModal && (
         <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
           onClick={() => setOffPlanModal(null)}>
-          <div className="w-full rounded-t-3xl p-5 pb-8" style={{ background: "var(--brand-surface)" }}
+          <div className="w-full rounded-t-3xl p-5 pb-10" style={{ background: "var(--brand-surface)" }}
             onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
-            <h3 className="font-bold text-base mb-1" style={{ color: "var(--brand-text)" }}>
-              {mealPlan ? `Off-Plan: ${offPlanModal.mealName}` : `Log ${offPlanModal.mealName}`}
-            </h3>
-            <p className="text-xs mb-4" style={{ color: "var(--brand-text-secondary)" }}>
-              {mealPlan ? "What did you have instead? (optional)" : "What did you eat? (optional details)"}
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>
+                {mealPlan ? `Off-Plan: ${offPlanModal.mealName}` : `Log ${offPlanModal.mealName}`}
+              </h3>
+              <button
+                onClick={() => cameraRef.current?.click()}
+                disabled={photoLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                style={{ background: "#0EA5E920", color: "#0EA5E9", border: "1px solid #0EA5E940" }}>
+                {photoLoading
+                  ? <><i className="ti ti-loader-2 animate-spin" /> Analyzing...</>
+                  : <><i className="ti ti-camera" /> Snap Photo</>
+                }
+              </button>
+            </div>
+            <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
+              {mealPlan ? "What did you have instead?" : "What did you eat?"} Snap a photo for AI macro analysis.
             </p>
+            {photoResult && (
+              <div className="mb-3 px-3 py-2 rounded-xl text-xs"
+                style={{ background: "#0EA5E910", color: "#0EA5E9", border: "1px solid #0EA5E930" }}>
+                {photoResult}
+              </div>
+            )}
             <textarea value={offPlanDetails} onChange={e => setOffPlanDetails(e.target.value)}
-              placeholder="Describe what you ate…" className="w-full rounded-xl p-3 text-sm outline-none resize-none mb-3" rows={2}
+              placeholder="Describe what you ate..." className="w-full rounded-xl p-3 text-sm outline-none resize-none mb-3" rows={2}
               style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
             <div className="grid grid-cols-4 gap-2 mb-4">
               {[
-                { label: "kcal", value: offPlanKcal, set: setOffPlanKcal },
-                { label: "Protein g", value: offPlanP, set: setOffPlanP },
-                { label: "Carbs g", value: offPlanC, set: setOffPlanC },
-                { label: "Fats g", value: offPlanF, set: setOffPlanF },
+                { label: "kcal",      value: offPlanKcal, set: setOffPlanKcal },
+                { label: "Protein g", value: offPlanP,    set: setOffPlanP    },
+                { label: "Carbs g",   value: offPlanC,    set: setOffPlanC    },
+                { label: "Fats g",    value: offPlanF,    set: setOffPlanF    },
               ].map(f => (
                 <div key={f.label}>
                   <p className="text-xs mb-1 text-center" style={{ color: "var(--brand-text-secondary)" }}>{f.label}</p>
                   <input type="number" value={f.value} onChange={e => f.set(e.target.value)}
-                    placeholder="—" inputMode="decimal"
+                    placeholder="0" inputMode="decimal"
                     className="w-full text-center text-sm py-2 rounded-xl outline-none"
                     style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
                 </div>
@@ -232,7 +277,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
             <button onClick={saveOffPlan} disabled={saving === offPlanSavingKey}
               className="w-full py-3.5 rounded-2xl text-sm font-bold text-white"
               style={{ background: "#8b5cf6" }}>
-              {saving === offPlanSavingKey ? "Saving…" : mealPlan ? "Log Off-Plan" : "Save Meal"}
+              {saving === offPlanSavingKey ? "Saving..." : mealPlan ? "Log Off-Plan" : "Save Meal"}
             </button>
           </div>
         </div>
@@ -256,76 +301,66 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         </div>
       )}
 
-      {/* === NO MEAL PLAN — Free-Form Daily Log === */}
+      {/* === NO MEAL PLAN === */}
       {!mealPlan && (
         <div className="px-4 mt-4">
-          {/* Macro summary (only if anything logged) */}
-          {noPlanMacros && (
+          {logs.length > 0 && (
             <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--brand-text-secondary)" }}>Today&apos;s Macros</p>
-              <div className="flex justify-around">
-                <MacroRing value={noPlanMacros.kcal} target={macroTarget?.calories || 0} color="#0EA5E9" label="kcal" unit="cal" />
-                <MacroRing value={noPlanMacros.protein} target={macroTarget?.protein || 0} color="#22c55e" label="Protein" />
-                <MacroRing value={noPlanMacros.carbs} target={macroTarget?.carbs || 0} color="#f59e0b" label="Carbs" />
-                <MacroRing value={noPlanMacros.fats} target={macroTarget?.fats || 0} color="#ef4444" label="Fats" />
+              <div className="grid grid-cols-4 gap-3">
+                {[
+                  { label: "Calories", value: Math.round(currentMacros.kcal),    target: macroTarget?.calories || 0, color: "#0EA5E9", unit: "cal" },
+                  { label: "Protein",  value: Math.round(currentMacros.protein), target: macroTarget?.protein  || 0, color: "#22c55e", unit: "g"   },
+                  { label: "Carbs",    value: Math.round(currentMacros.carbs),   target: macroTarget?.carbs    || 0, color: "#f59e0b", unit: "g"   },
+                  { label: "Fats",     value: Math.round(currentMacros.fats),    target: macroTarget?.fats     || 0, color: "#ef4444", unit: "g"   },
+                ].map(m => (
+                  <div key={m.label} className="rounded-xl p-3 flex flex-col items-center gap-1"
+                    style={{ background: `${m.color}10`, border: `1px solid ${m.color}30` }}>
+                    <span className="text-base font-bold" style={{ color: m.color }}>{m.value}</span>
+                    <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{m.unit}</span>
+                    <span className="text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>{m.label}</span>
+                    {m.target > 0 && <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>/ {m.target}</span>}
+                  </div>
+                ))}
               </div>
             </div>
           )}
-
-          {/* No plan info */}
-          {!noPlanHasLogs && (
+          {logs.length === 0 && (
             <div className="rounded-2xl p-5 mb-4 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               <i className="ti ti-salad text-3xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
               <p className="font-semibold text-sm mb-1" style={{ color: "var(--brand-text)" }}>No Meal Plan Yet</p>
               <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Your trainer will assign your meal plan soon. You can still log your meals below.</p>
             </div>
           )}
-
-          {/* Free-form meal slots */}
           <p className="text-xs font-semibold uppercase tracking-widest mb-3 px-1" style={{ color: "var(--brand-text-secondary)" }}>
             Log Today&apos;s Meals
           </p>
           <div className="space-y-2">
             {FREE_SLOTS.map(slot => {
               const logged = logs.find(l => l.meal_position === slot.position);
-              const isSaving = saving === `del-${slot.position}`;
               return (
                 <div key={slot.position} className="rounded-2xl overflow-hidden"
-                  style={{
-                    background: "var(--brand-surface)",
-                    border: logged ? "1.5px solid #8b5cf640" : "1px solid var(--brand-border)",
-                  }}>
+                  style={{ background: "var(--brand-surface)", border: logged ? "1.5px solid #8b5cf640" : "1px solid var(--brand-border)" }}>
                   <div className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ background: logged ? "#8b5cf620" : "var(--brand-card)" }}>
                         {logged
-                          ? <span className="text-base">✅</span>
+                          ? <i className="ti ti-check text-base" style={{ color: "#8b5cf6" }} />
                           : <span className="text-sm font-bold" style={{ color: "var(--brand-text-secondary)" }}>M{slot.position}</span>
                         }
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm" style={{ color: "var(--brand-text)" }}>{slot.label}</p>
-                        {logged?.off_plan_details ? (
-                          <p className="text-xs mt-0.5 truncate" style={{ color: "var(--brand-text-secondary)" }}>
-                            {logged.off_plan_details}
-                          </p>
-                        ) : (
-                          <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{slot.timing}</p>
-                        )}
-                        {logged && (logged.est_protein || logged.est_carbs || logged.est_fats) && (
-                          <p className="text-xs mt-0.5" style={{ color: "#8b5cf6" }}>
-                            {logged.est_kcal ? `${Math.round(logged.est_kcal)} cal · ` : ""}
-                            {logged.est_protein ? `${Math.round(logged.est_protein)}P` : ""}
-                            {logged.est_carbs ? ` · ${Math.round(logged.est_carbs)}C` : ""}
-                            {logged.est_fats ? ` · ${Math.round(logged.est_fats)}F` : ""}
-                          </p>
-                        )}
+                        {logged?.off_plan_details
+                          ? <p className="text-xs mt-0.5 truncate" style={{ color: "var(--brand-text-secondary)" }}>{logged.off_plan_details}</p>
+                          : <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{slot.timing}</p>
+                        }
                       </div>
                     </div>
                     <div className="flex items-center gap-2 ml-2">
                       {logged && (
-                        <button onClick={() => deleteLog(slot.position)} disabled={isSaving}
+                        <button onClick={() => deleteLog(slot.position)}
                           className="w-7 h-7 rounded-full flex items-center justify-center"
                           style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}>
                           <i className="ti ti-trash text-xs" />
@@ -333,10 +368,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                       )}
                       <button onClick={() => openFreeSlot(slot)}
                         className="px-3 py-2 rounded-xl text-xs font-semibold"
-                        style={{
-                          background: logged ? "#8b5cf620" : "var(--brand-primary)",
-                          color: logged ? "#8b5cf6" : "white",
-                        }}>
+                        style={{ background: logged ? "#8b5cf620" : "var(--brand-primary)", color: logged ? "#8b5cf6" : "white" }}>
                         {logged ? "Edit" : "+ Log"}
                       </button>
                     </div>
@@ -351,49 +383,79 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       {/* === WITH MEAL PLAN === */}
       {mealPlan && (
         <>
-          {/* Macro rings */}
+          {/* Calorie donut ring + macro stat cards */}
           <div className="mx-4 mt-4 rounded-2xl p-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>Today&apos;s Macros</p>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full" style={{ background: todayPct === 1 ? "#22c55e" : "var(--brand-primary)" }} />
-                <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{loggedCount}/{totalMeals} logged</span>
+            <div className="flex items-center gap-4">
+              {/* Big calorie donut */}
+              <div className="relative flex-shrink-0" style={{ width: 128, height: 128 }}>
+                <svg width="128" height="128" viewBox="0 0 128 128">
+                  <circle cx="64" cy="64" r={ringR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10"/>
+                  <circle cx="64" cy="64" r={ringR} fill="none" stroke="#0EA5E9" strokeWidth="10"
+                    strokeDasharray={`${ringCirc}`}
+                    strokeDashoffset={`${ringCirc * (1 - kcalPct)}`}
+                    strokeLinecap="round" transform="rotate(-90 64 64)"
+                    style={{ transition: "stroke-dashoffset 0.7s ease" }}/>
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-lg font-bold leading-tight" style={{ color: "var(--brand-text)" }}>
+                    {Math.round(currentMacros.kcal)}
+                  </span>
+                  <span className="text-xs leading-none" style={{ color: "var(--brand-text-secondary)" }}>
+                    {kcalTarget > 0 ? `/ ${kcalTarget}` : "cal"}
+                  </span>
+                  <span className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>kcal</span>
+                </div>
               </div>
-            </div>
-            <div className="flex justify-around">
-              <MacroRing value={currentMacros.kcal} target={macroTarget?.calories || 0} color="#0EA5E9" label="kcal" unit="cal" />
-              <MacroRing value={currentMacros.protein} target={macroTarget?.protein || 0} color="#22c55e" label="Protein" />
-              <MacroRing value={currentMacros.carbs} target={macroTarget?.carbs || 0} color="#f59e0b" label="Carbs" />
-              <MacroRing value={currentMacros.fats} target={macroTarget?.fats || 0} color="#ef4444" label="Fats" />
-            </div>
-            <div className="mt-4 h-1.5 rounded-full" style={{ background: "var(--brand-border)" }}>
-              <div className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${todayPct * 100}%`, background: "var(--brand-primary)" }} />
+
+              {/* 4 macro stat cards */}
+              <div className="flex-1 grid grid-cols-2 gap-2">
+                {[
+                  { label: "Protein",      value: Math.round(currentMacros.protein), target: macroTarget?.protein || 0, color: "#22c55e", unit: "g"     },
+                  { label: "Carbs",        value: Math.round(currentMacros.carbs),   target: macroTarget?.carbs   || 0, color: "#f59e0b", unit: "g"     },
+                  { label: "Fats",         value: Math.round(currentMacros.fats),    target: macroTarget?.fats    || 0, color: "#ef4444", unit: "g"     },
+                  { label: "Meals Logged", value: loggedCount,                       target: totalMeals,               color: "#0EA5E9", unit: "meals"  },
+                ].map(m => (
+                  <div key={m.label} className="rounded-xl p-2.5 flex flex-col"
+                    style={{ background: `${m.color}10`, border: `1px solid ${m.color}25` }}>
+                    <span className="text-sm font-bold leading-none" style={{ color: m.color }}>
+                      {m.value}
+                      {m.target > 0 && <span className="text-xs font-normal opacity-60">/{m.target}</span>}
+                      {m.label !== "Meals Logged" && (
+                        <span className="text-xs font-normal ml-0.5" style={{ color: "var(--brand-text-secondary)" }}>{m.unit}</span>
+                      )}
+                    </span>
+                    <span className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>{m.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Meal cards */}
           <div className="px-4 mt-4 space-y-3">
             {sortedMeals.map(meal => {
-              const mealLog = logs.find(l => l.meal_position === meal.position);
-              const macros = getMealMacros(meal);
+              const mealLog  = logs.find(l => l.meal_position === meal.position);
+              const macros   = getMealMacros(meal);
               const isLogged = !!mealLog;
-              const logColor = mealLog ? ADHERENCE_COLORS[mealLog.adherence] : null;
+              const logOpt   = mealLog ? ADHERENCE_OPTIONS.find(o => o.key === mealLog.adherence) : null;
+              const logColor = logOpt?.color || null;
               const isSaving = saving === meal.id;
-              const currentOpt = mealLog ? ADHERENCE_OPTIONS.find(o => o.key === mealLog.adherence) : null;
+              const noteVal  = notesMap[meal.position] || "";
 
               return (
                 <div key={meal.id} className="rounded-2xl overflow-hidden"
                   style={{
                     background: "var(--brand-surface)",
-                    border: isLogged ? `1.5px solid ${logColor}40` : "1px solid var(--brand-border)",
+                    border: isLogged && logColor ? `1.5px solid ${logColor}40` : "1px solid var(--brand-border)",
                   }}>
+
+                  {/* Card header */}
                   <div className="flex items-start justify-between p-4 pb-3">
                     <div className="flex items-start gap-3">
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ background: isLogged && logColor ? `${logColor}20` : "var(--brand-card)" }}>
-                        {isLogged
-                          ? <span className="text-base">{currentOpt?.emoji}</span>
+                        {isLogged && logColor
+                          ? <div className="w-3 h-3 rounded-full" style={{ background: logColor }} />
                           : <span className="text-sm font-bold" style={{ color: "var(--brand-text-secondary)" }}>M{meal.position}</span>
                         }
                       </div>
@@ -404,15 +466,15 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                         )}
                         {macros.kcal > 0 && (
                           <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                            {Math.round(macros.kcal)} cal · {Math.round(macros.protein)}P · {Math.round(macros.carbs)}C · {Math.round(macros.fats)}F
+                            {Math.round(macros.kcal)} cal &middot; {Math.round(macros.protein)}P &middot; {Math.round(macros.carbs)}C &middot; {Math.round(macros.fats)}F
                           </p>
                         )}
                       </div>
                     </div>
-                    {isLogged && logColor && (
-                      <span className="text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0"
+                    {isLogged && logColor && logOpt && (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0"
                         style={{ background: `${logColor}20`, color: logColor }}>
-                        {currentOpt?.label}
+                        {logOpt.label}
                       </span>
                     )}
                   </div>
@@ -444,46 +506,78 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                     </div>
                   )}
 
-                  {/* Off-plan details if logged off-plan */}
+                  {/* Off-plan details */}
                   {mealLog?.adherence === "off_plan" && mealLog.off_plan_details && (
                     <div className="mx-4 my-2 px-3 py-2 rounded-xl text-xs"
                       style={{ background: "#8b5cf610", color: "#8b5cf6", border: "1px solid #8b5cf630" }}>
                       <span className="font-medium">Had: </span>{mealLog.off_plan_details}
                       {(mealLog.est_protein || mealLog.est_carbs || mealLog.est_fats) && (
-                        <span className="ml-2">
+                        <span className="ml-2 opacity-80">
                           {mealLog.est_kcal ? `${Math.round(mealLog.est_kcal)} cal · ` : ""}
                           {mealLog.est_protein ? `${Math.round(mealLog.est_protein)}P` : ""}
-                          {mealLog.est_carbs ? ` ${Math.round(mealLog.est_carbs)}C` : ""}
-                          {mealLog.est_fats ? ` ${Math.round(mealLog.est_fats)}F` : ""}
+                          {mealLog.est_carbs   ? ` ${Math.round(mealLog.est_carbs)}C`  : ""}
+                          {mealLog.est_fats    ? ` ${Math.round(mealLog.est_fats)}F`   : ""}
                         </span>
                       )}
                     </div>
                   )}
 
-                  {/* Adherence buttons */}
-                  <div className="p-3 pt-2">
-                    <div className="grid grid-cols-6 gap-1.5">
+                  {/* Adherence pill chips: ¼ · ½ · ¾ · Full · Off Plan + Camera */}
+                  <div className="px-3 pt-2 pb-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {ADHERENCE_OPTIONS.map(opt => {
                         const isActive = mealLog?.adherence === opt.key;
-                        const btnColor = ADHERENCE_COLORS[opt.key];
                         return (
-                          <button key={opt.key} onClick={() => logAdherence(meal, opt.key)}
+                          <button key={opt.key}
+                            onClick={() => logAdherence(meal, opt.key)}
                             disabled={isSaving}
-                            className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl transition-all"
+                            className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
                             style={{
-                              background: isActive ? `${btnColor}20` : "var(--brand-card)",
-                              border: `1px solid ${isActive ? btnColor : "transparent"}`,
+                              background: isActive ? `${opt.color}25` : "var(--brand-card)",
+                              color: isActive ? opt.color : "var(--brand-text-secondary)",
+                              border: `1.5px solid ${isActive ? opt.color : "transparent"}`,
                               opacity: isSaving ? 0.5 : 1,
                             }}>
-                            <span className="text-base leading-none">{opt.emoji}</span>
-                            <span className="text-xs font-medium leading-none"
-                              style={{ color: isActive ? btnColor : "var(--brand-text-secondary)" }}>
-                              {opt.label}
-                            </span>
+                            {opt.label}
                           </button>
                         );
                       })}
+                      {/* Camera button — beside Off Plan */}
+                      <button
+                        onClick={() => {
+                          const existing = logs.find(l => l.meal_position === meal.position);
+                          setOffPlanDetails(existing?.off_plan_details || "");
+                          setOffPlanKcal(existing?.est_kcal?.toString() || "");
+                          setOffPlanP(existing?.est_protein?.toString() || "");
+                          setOffPlanC(existing?.est_carbs?.toString() || "");
+                          setOffPlanF(existing?.est_fats?.toString() || "");
+                          setPhotoResult(null);
+                          setOffPlanModal({ mealId: meal.id, position: meal.position, mealName: meal.name });
+                          setTimeout(() => cameraRef.current?.click(), 120);
+                        }}
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}
+                        title="Snap photo for AI macro analysis">
+                        <i className="ti ti-camera text-sm" />
+                      </button>
                     </div>
+                  </div>
+
+                  {/* Notes field */}
+                  <div className="px-3 pb-3">
+                    <input
+                      type="text"
+                      value={noteVal}
+                      placeholder="Add a note..."
+                      onChange={e => setNotesMap(prev => ({ ...prev, [meal.position]: e.target.value }))}
+                      onBlur={() => saveNotes(meal.position)}
+                      className="w-full text-xs px-3 py-2 rounded-xl outline-none"
+                      style={{
+                        background: "var(--brand-bg)",
+                        color: "var(--brand-text)",
+                        border: "1px solid var(--brand-border)",
+                      }}
+                    />
                   </div>
                 </div>
               );
@@ -497,13 +591,13 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
               <div className="flex gap-2 flex-wrap">
                 {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day, i) => {
                   const d = new Date();
-                  const dayOfWeek = d.getDay();
-                  const diff = i + 1 - (dayOfWeek === 0 ? 7 : dayOfWeek);
-                  const dateClone = new Date(d);
-                  dateClone.setDate(d.getDate() + diff);
-                  const dateStr = dateClone.toISOString().split("T")[0];
+                  const dow = d.getDay();
+                  const diff = i + 1 - (dow === 0 ? 7 : dow);
+                  const clone = new Date(d);
+                  clone.setDate(d.getDate() + diff);
+                  const dateStr = clone.toISOString().split("T")[0];
                   const dayLogs = weekLogs.filter(l => l.log_date === dateStr);
-                  const hasLog = dayLogs.length > 0;
+                  const hasLog  = dayLogs.length > 0;
                   const allFull = hasLog && dayLogs.every(l => l.adherence === "full");
                   return (
                     <div key={day} className="flex flex-col items-center gap-1">
@@ -512,7 +606,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                           background: !hasLog ? "var(--brand-card)" : allFull ? "#22c55e20" : "#f59e0b20",
                           border: `1px solid ${!hasLog ? "var(--brand-border)" : allFull ? "#22c55e" : "#f59e0b"}`,
                         }}>
-                        <span className="text-xs">{!hasLog ? "–" : allFull ? "✓" : "~"}</span>
+                        <span className="text-xs">{!hasLog ? "-" : allFull ? "check" : "~"}</span>
                       </div>
                       <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{day}</span>
                     </div>
