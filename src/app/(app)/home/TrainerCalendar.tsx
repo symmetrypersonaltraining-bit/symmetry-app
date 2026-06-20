@@ -57,7 +57,7 @@ function clientColor(clients: Client[], clientId: string) {
 }
 
 function parseAppt(str: string): Date {
-  return new Date(str.replace(" ", "T").replace("+00", "Z"));
+  return new Date(str.replace(" ", "T").replace(/\+00:00$/, "Z").replace(/\+00$/, "Z"));
 }
 
 function fmtTime(d: Date) {
