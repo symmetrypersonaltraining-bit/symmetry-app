@@ -95,6 +95,7 @@ export default async function SchedulePage() {
       upcomingDays={upcomingDays}
       isTrainer={isTrainer}
       paymentReminders={[]}
+      defaultView={isTrainer ? "month" : "week"}
     />
   );
 }

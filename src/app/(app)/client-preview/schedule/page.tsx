@@ -78,6 +78,7 @@ export default async function ClientPreviewSchedulePage() {
       upcomingDays={upcomingDays}
       isTrainer={false}
       paymentReminders={[]}
+      defaultView="week"
     />
   );
 }
