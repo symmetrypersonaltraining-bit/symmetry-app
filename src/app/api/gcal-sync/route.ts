@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // 1. Get all client names for matching
-    const { data: clients } = await supabase.from('clients').select('id, name, full_name');
+    const { data: clients } = await supabase.from('clients').select('id, name');
     if (!clients) return NextResponse.json({ error: 'No clients' }, { status: 500 });
 
     // 2. Fetch GCal events
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
       const summary = (event.summary || '').toLowerCase();
       const matchedClient = clients.find((c: any) => {
-        const clientName = (c.full_name || c.name || '').toLowerCase();
+        const clientName = (c.name || '').toLowerCase();
         const firstName = clientName.split(' ')[0];
         return summary.includes(firstName) || summary.includes(clientName);
       });
