@@ -27,6 +27,11 @@ const STATUS_COLORS: Record<string, { bg: string; color: string; label: string }
   cancelled:{ bg: "#ef444420", color: "#ef4444", label: "Cancelled" },
 };
 
+// Use local date string (YYYY-MM-DD) to avoid UTC-offset mismatches on client
+function localDateStr(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function PaymentsClient({ reminders }: { reminders: Reminder[] }) {
   const supabase = createClient();
   const [tab, setTab] = useState<Tab>("upcoming");
@@ -34,24 +39,27 @@ export default function PaymentsClient({ reminders }: { reminders: Reminder[] })
   const [search, setSearch] = useState("");
   const [localReminders, setLocalReminders] = useState(reminders);
 
-  const today = new Date().toISOString().split("T")[0];
-  const thirtyDays = new Date();
-  thirtyDays.setDate(thirtyDays.getDate() + 30);
-  const thirtyStr = thirtyDays.toISOString().split("T")[0];
+  const today = localDateStr();
+  const thirtyDaysDate = new Date();
+  thirtyDaysDate.setDate(thirtyDaysDate.getDate() + 30);
+  const thirtyStr = localDateStr(thirtyDaysDate);
 
   const filtered = localReminders.filter(r => {
     if (search) {
       const q = search.toLowerCase();
       if (!r.clientName.toLowerCase().includes(q)) return false;
     }
-    if (tab === "upcoming") return r.dueDate >= today && r.dueDate <= thirtyStr && r.notificationStatus !== "paid";
+    if (tab === "upcoming") return r.dueDate >= today && r.dueDate <= thirtyStr && r.notificationStatus !== "paid" && r.notificationStatus !== "cancelled";
     return true;
   });
 
+  const pendingCount = filtered.filter(r => r.notificationStatus === "pending").length;
   const totalPending = filtered.filter(r => r.notificationStatus === "pending").reduce((a, r) => a + r.amountDue - r.billingCredits, 0);
 
   function daysUntil(d: string) {
-    return Math.round((new Date(d + "T00:00:00").getTime() - new Date(today + "T00:00:00").getTime()) / 86400000);
+    const todayMidnight = new Date(today + "T00:00:00");
+    const dueMidnight = new Date(d + "T00:00:00");
+    return Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / 86400000);
   }
 
   function fmtDate(d: string) {
@@ -88,7 +96,9 @@ export default function PaymentsClient({ reminders }: { reminders: Reminder[] })
         style={{ background: "var(--brand-surface)", borderBottom: "1px solid var(--brand-border)" }}>
         <h1 className="text-xl font-bold mb-1" style={{ color: "var(--brand-text)" }}>Payments</h1>
         <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-          {tab === "upcoming" ? `${filtered.length} due in next 30 days · $${totalPending.toLocaleString()} pending` : `${localReminders.length} total reminders`}
+          {tab === "upcoming"
+            ? `${filtered.length} due in next 30 days · ${pendingCount} pending · $${totalPending.toLocaleString()} owed`
+            : `${localReminders.length} total reminders`}
         </p>
       </div>
 
@@ -117,8 +127,8 @@ export default function PaymentsClient({ reminders }: { reminders: Reminder[] })
         <div className="px-4 lg:px-6 py-3 grid grid-cols-3 gap-3">
           {[
             { label: "Due This Week", value: filtered.filter(r => daysUntil(r.dueDate) <= 7 && daysUntil(r.dueDate) >= 0 && r.notificationStatus !== "paid").length, color: "#f59e0b" },
-            { label: "Email Sent", value: filtered.filter(r => r.emailSentAt).length, color: "#22c55e" },
-            { label: "Total $", value: `$${filtered.filter(r => r.notificationStatus === "pending").reduce((a,r) => a + r.amountDue - r.billingCredits, 0).toLocaleString()}`, color: "var(--brand-primary)" },
+            { label: "Pending", value: pendingCount, color: "#f59e0b" },
+            { label: "Total Owed", value: `$${filtered.filter(r => r.notificationStatus !== "paid" && r.notificationStatus !== "cancelled").reduce((a,r) => a + r.amountDue - r.billingCredits, 0).toLocaleString()}`, color: "var(--brand-primary)" },
           ].map(s => (
             <div key={s.label} className="rounded-xl p-3 text-center"
               style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
@@ -135,7 +145,7 @@ export default function PaymentsClient({ reminders }: { reminders: Reminder[] })
           <div className="py-12 text-center rounded-2xl"
             style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
             <i className="ti ti-check-circle text-4xl block mb-2" style={{ color: "#22c55e" }} />
-            <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>All clear! No pending payments.</p>
+            <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>All clear! No upcoming payments.</p>
           </div>
         )}
         {filtered.map(r => {
