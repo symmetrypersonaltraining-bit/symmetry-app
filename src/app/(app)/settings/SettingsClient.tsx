@@ -17,12 +17,44 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
   const [signingOut, setSigningOut] = useState(false);
   const [gcalSync] = useState(false); // OFF by default — activate manually when ready
   const [autoReminders] = useState(false); // OFF by default
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
 
   async function handleSignOut() {
     setSigningOut(true);
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordError("");
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords do not match");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters");
+      return;
+    }
+    setUpdatingPassword(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setUpdatingPassword(false);
+    if (error) {
+      setPasswordError(error.message);
+    } else {
+      setPasswordSuccess(true);
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowChangePassword(false);
+      setTimeout(() => setPasswordSuccess(false), 3000);
+    }
   }
 
   return (
@@ -32,9 +64,9 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
       <section>
         <p className="section-header">Profile</p>
         <div className="card p-4 space-y-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <div
-              className="client-avatar"
+              className="client-avatar flex-shrink-0"
               style={{
                 width: 48,
                 height: 48,
@@ -45,14 +77,66 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
             >
               {userName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
             </div>
-            <div>
-              <p className="font-semibold" style={{ color: "var(--brand-text)" }}>{userName || "—"}</p>
-              <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{userEmail}</p>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold truncate" style={{ color: "var(--brand-text)" }}>{userName || "—"}</p>
+              <p className="text-sm truncate" style={{ color: "var(--brand-text-secondary)" }}>{userEmail}</p>
             </div>
             {isTrainer && (
-              <span className="badge badge-primary ml-auto">Trainer</span>
+              <span className="badge badge-primary ml-auto flex-shrink-0">Trainer</span>
             )}
           </div>
+        </div>
+      </section>
+
+      {/* ── Change Password ── */}
+      <section>
+        <p className="section-header">Security</p>
+        <div className="card p-4">
+          <button
+            onClick={() => { setShowChangePassword(!showChangePassword); setPasswordError(""); }}
+            className="flex items-center gap-2 text-sm font-semibold w-full text-left"
+            style={{ color: "var(--brand-text)" }}
+          >
+            <i className="ti ti-lock" style={{ color: "var(--brand-primary)" }} />
+            Change Password
+            <i className={`ti ti-chevron-${showChangePassword ? "up" : "down"} ml-auto text-xs`} style={{ color: "var(--brand-text-secondary)" }} />
+          </button>
+          {showChangePassword && (
+            <form onSubmit={handleChangePassword} className="mt-4 space-y-3">
+              <input
+                type="password"
+                placeholder="New password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-sm"
+                style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}
+                required
+              />
+              <input
+                type="password"
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-sm"
+                style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}
+                required
+              />
+              {passwordError && (
+                <p className="text-xs font-medium" style={{ color: "#ef4444" }}>{passwordError}</p>
+              )}
+              <button
+                type="submit"
+                disabled={updatingPassword}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold text-white"
+                style={{ background: "linear-gradient(135deg, var(--brand-primary), var(--brand-accent))" }}
+              >
+                {updatingPassword ? "Updating..." : "Update Password"}
+              </button>
+            </form>
+          )}
+          {passwordSuccess && (
+            <p className="mt-3 text-xs font-semibold" style={{ color: "#22c55e" }}>Password updated successfully!</p>
+          )}
         </div>
       </section>
 

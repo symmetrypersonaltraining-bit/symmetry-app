@@ -552,7 +552,7 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
               {dateLabel}
             </h2>
             <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-              {sorted.length} session{sorted.length !== 1 ? "s" : ""}{workouts.length > 0 ? ` · ${workouts.length} scheduled workout${workouts.length !== 1 ? "s" : ""}` : ""}
+              {sorted.length} session{sorted.length !== 1 ? "s" : ""}
             </p>
           </div>
           <button onClick={close}
@@ -564,46 +564,12 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
 
         {/* Content */}
         <div className="overflow-y-auto flex-1 px-5 py-3 space-y-2">
-          {/* Scheduled workouts */}
-          {workouts.length > 0 && (
-            <div className="mb-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>
-                Scheduled Workouts
-              </p>
-              <div className="space-y-1.5">
-                {workouts.map(w => {
-                  const color = CHIP_BLUE;
-                  const isDone = w.status === "completed";
-                  return (
-                    <a key={w.id} href={`/clients/${w.clientId}?tab=training`}
-                      className="flex items-center gap-3 rounded-xl px-3 py-2.5"
-                      style={{ background: "var(--brand-bg)", border: `1px solid ${color}30` }}>
-                      <div className="w-1 h-8 rounded-full flex-shrink-0" style={{ background: color }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate"
-                          style={{ color, textDecoration: isDone ? "line-through" : "none", opacity: isDone ? 0.7 : 1 }}>
-                          {w.clientName}
-                        </p>
-                        <p className="text-xs truncate" style={{ color: "var(--brand-text-secondary)" }}>
-                          {w.dayLabel} · {isDone ? "Completed" : "Pending"}
-                        </p>
-                      </div>
-                      {isDone && <i className="ti ti-check text-sm flex-shrink-0" style={{ color: "#43A047" }} />}
-                    </a>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+
 
           {/* Sessions */}
           {sorted.length > 0 ? (
             <div>
-              {workouts.length > 0 && (
-                <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>
-                  Training Sessions
-                </p>
-              )}
+  
               <div className="space-y-1.5">
                 {sorted.map(ev => {
                   const color = chipColor(ev.status);

@@ -57,31 +57,6 @@ export default async function HomePage() {
     // Keep appointmentMap as empty record — TrainerCalendar builds it client-side from allAppointments
     const appointmentMap: Record<string, AE[]> = {};
 
-    type WE = { id: string; clientId: string; clientName: string; date: string; dayLabel: string; status: string };
-    const workoutMapRange = new Date(today);
-    workoutMapRange.setMonth(workoutMapRange.getMonth() + 3);
-    const { data: workoutRows } = await supabase
-      .from("scheduled_workouts")
-      .select("id, client_id, scheduled_date, status, days(label), clients(id, name)")
-      .gte("scheduled_date", new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().split("T")[0])
-      .lte("scheduled_date", workoutMapRange.toISOString().split("T")[0])
-      .order("scheduled_date");
-
-    const workoutMap: Record<string, WE[]> = {};
-    for (const w of workoutRows || []) {
-      const row = w as any;
-      const dateKey = row.scheduled_date;
-      if (!workoutMap[dateKey]) workoutMap[dateKey] = [];
-      workoutMap[dateKey].push({
-        id: row.id,
-        clientId: row.clients?.id || row.client_id,
-        clientName: row.clients?.name || "Unknown",
-        date: dateKey,
-        dayLabel: row.days?.label || "Workout",
-        status: row.status || "scheduled",
-      });
-    }
-
     const thirtyDays = new Date();
     thirtyDays.setDate(thirtyDays.getDate() + 30);
     const { data: remindersRaw } = await supabase
@@ -112,7 +87,7 @@ export default async function HomePage() {
           </p>
         </div>
         <PendingRemindersPanel reminders={reminders} />
-        <TrainerCalendar clients={clients || []} appointmentMap={appointmentMap} allAppointments={allAppointments} workoutMap={workoutMap} startDate="" />
+        <TrainerCalendar clients={clients || []} appointmentMap={appointmentMap} allAppointments={allAppointments} workoutMap={{}} startDate="" />
       </div>
     );
   }

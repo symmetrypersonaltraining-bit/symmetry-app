@@ -965,7 +965,7 @@ export default function AssessmentPage() {
                 className="flex-1 py-3 rounded-xl font-semibold border transition-all"
                 style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)' }}
               >
-                {saving ? 'Saving...' : 'Save for Later'}
+                {saving ? 'Saving...' : 'Archive Records'}
               </button>
               <button
                 type="button"
@@ -974,7 +974,7 @@ export default function AssessmentPage() {
                 className="flex-1 py-3 rounded-xl font-semibold text-white transition-all"
                 style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)' }}
               >
-                {saving ? 'Creating...' : 'Create Account'}
+                {saving ? 'Creating...' : 'Create Client'}
               </button>
             </div>
           )}

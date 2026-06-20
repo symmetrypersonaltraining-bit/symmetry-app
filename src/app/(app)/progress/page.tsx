@@ -10,6 +10,11 @@ interface MetricRow {
   fat_mass: number | null;
 }
 
+interface ClientRow {
+  id: string;
+  name: string;
+}
+
 const RANGES = [
   { label: '1wk', days: 7 },
   { label: '2wk', days: 14 },
@@ -110,9 +115,24 @@ export default function ProgressPage() {
   const [workoutCounts, setWorkoutCounts] = useState<number>(0);
   const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [clients, setClients] = useState<ClientRow[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const supabase = createClient();
 
+  // Load clients list on mount
   useEffect(() => {
+    const loadClients = async () => {
+      const { data } = await supabase.from('clients').select('id, name').order('name');
+      if (data && data.length > 0) {
+        setClients(data);
+        setSelectedClientId(data[0].id);
+      }
+    };
+    loadClients();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedClientId) return;
     const load = async () => {
       setLoading(true);
       const days = RANGES[rangeIdx].days;
@@ -120,14 +140,11 @@ export default function ProgressPage() {
       since.setDate(since.getDate() - days);
       const sinceStr = since.toISOString().split('T')[0];
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
-
       const [{ data: mData }, { count: wCount }] = await Promise.all([
         supabase.from('metrics').select('metric_date,weight,body_fat_pct,lean_mass,fat_mass')
-          .eq('client_id', user.id).gte('metric_date', sinceStr).order('metric_date'),
+          .eq('client_id', selectedClientId).gte('metric_date', sinceStr).order('metric_date'),
         supabase.from('workout_logs').select('id', { count: 'exact', head: true })
-          .eq('client_id', user.id).gte('logged_at', sinceStr),
+          .eq('client_id', selectedClientId).gte('logged_at', sinceStr),
       ]);
 
       setMetrics(mData || []);
@@ -135,7 +152,7 @@ export default function ProgressPage() {
       setLoading(false);
     };
     load();
-  }, [rangeIdx]);
+  }, [rangeIdx, selectedClientId]);
 
   const getMetricData = (key: string): { date: string; value: number }[] => {
     if (key === 'workouts' || key === 'streak' || key === 'avg_cardio') return [];
@@ -165,6 +182,31 @@ export default function ProgressPage() {
         <span style={{ fontSize: 20 }}>📈</span>
         <span style={{ fontWeight: 700, fontSize: 17 }}>Progress</span>
       </div>
+
+      {/* Client selector */}
+      {clients.length > 0 && (
+        <div style={{ padding: '8px 16px 0' }}>
+          <select
+            value={selectedClientId}
+            onChange={e => setSelectedClientId(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: 10,
+              border: '1px solid var(--brand-border)',
+              background: 'var(--brand-surface)',
+              color: 'var(--brand-text)',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {clients.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, padding: '12px 16px' }}>
         {RANGES.map((r, i) => (

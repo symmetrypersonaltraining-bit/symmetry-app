@@ -1057,14 +1057,13 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
 // ---- Main component ----
 export default function ClientProfileTabs({ client, metrics, allWorkouts, appointments = [], clientId, programs, currentProgramId }: Props) {
   const searchParams = useSearchParams();
-  const initialTab = (searchParams.get("tab") as "overview" | "training" | "schedule" | "metrics" | "info") ?? "overview";
-  const [tab, setTab] = useState<"overview" | "training" | "schedule" | "metrics" | "info">(initialTab);
+  const initialTab = (searchParams.get("tab") as "overview" | "training" | "metrics" | "info") ?? "overview";
+  const [tab, setTab] = useState<"overview" | "training" | "metrics" | "info">(initialTab);
   const [showAssignModal, setShowAssignModal] = useState(false);
 
   const TABS = [
     { id: "overview" as const, label: "Overview", icon: "ti-layout-dashboard" },
     { id: "training" as const, label: "Training", icon: "ti-calendar" },
-    { id: "schedule" as const, label: "Schedule", icon: "ti-clock" },
     { id: "metrics" as const, label: "Metrics", icon: "ti-chart-line" },
     { id: "info" as const, label: "Info", icon: "ti-user" },
   ];
@@ -1100,7 +1099,6 @@ export default function ClientProfileTabs({ client, metrics, allWorkouts, appoin
           />
         )}
         {tab === "training" && <TrainingCalendar workouts={allWorkouts} clientId={clientId} />}
-        {tab === "schedule" && <ScheduleTab appointments={appointments} />}
         {tab === "metrics" && <MetricsTab metrics={metrics} />}
         {tab === "info" && (
           <InfoTab client={client} programs={programs} currentProgramId={currentProgramId}
