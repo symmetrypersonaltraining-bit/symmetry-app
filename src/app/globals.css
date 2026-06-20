@@ -794,3 +794,53 @@ nav.bottom-nav-bar {
   border: 2px solid var(--brand-surface);
   animation: badgePop 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
 }
+/* Shimmer animation for SYMMETRY title */
+@keyframes symmetry-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.symmetry-title {
+  background: linear-gradient(90deg, currentColor 0%, #93c5fd 30%, currentColor 50%, #93c5fd 70%, currentColor 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: symmetry-shimmer 3s linear infinite;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+.symmetry-title-dark {
+  background: linear-gradient(90deg, #fff 0%, #93c5fd 30%, #fff 50%, #93c5fd 70%, #fff 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: symmetry-shimmer 3s linear infinite;
+  font-weight: 900;
+}
+.page-header { padding: 14px 16px; color: white; display: flex; align-items: center; gap: 10px; }
+.page-header-home { background: linear-gradient(135deg, #0D3F6E, #0F4C81); }
+.page-header-workout { background: linear-gradient(135deg, #14532d, #16a34a); }
+.page-header-progress { background: linear-gradient(135deg, #92400e, #d97706); }
+.page-header-nutrition { background: linear-gradient(135deg, #1e3a5f, #2563eb); }
+.page-header-payments { background: linear-gradient(135deg, #7f1d1d, #dc2626); }
+.page-header-clients { background: linear-gradient(135deg, #4c1d95, #7c3aed); }
+.page-header-settings { background: linear-gradient(135deg, #374151, #6b7280); }
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-primary), color-mix(in srgb, var(--brand-primary) 70%, white));
+  color: white; border: none; border-radius: 10px; padding: 9px 18px;
+  font-weight: 600; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px color-mix(in srgb, var(--brand-primary) 40%, transparent); }
+.card-hover { transition: transform 0.15s, box-shadow 0.15s; }
+.card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+@keyframes card-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.card-animate { animation: card-in 0.3s ease both; }
+.fab-feedback {
+  position: fixed; bottom: 80px; right: 16px; width: 44px; height: 44px;
+  border-radius: 50%; background: var(--brand-primary); color: white;
+  border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); z-index: 100;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.fab-feedback:hover { transform: scale(1.1); box-shadow: 0 6px 24px rgba(0,0,0,0.25); }
