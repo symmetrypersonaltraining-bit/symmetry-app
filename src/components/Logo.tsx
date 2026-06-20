@@ -36,7 +36,7 @@ export default function Logo({
         <path id={`bot-arc-${uid}`}
           d={`M ${cx + outerR * 0.78},${cy} A ${outerR * 0.78},${outerR * 0.78} 0 0,1 ${cx - outerR * 0.78},${cy}`} />
       </defs>
-      <text fill={color} fontSize={s * 0.12} fontWeight="500" letterSpacing={s * 0.045}>
+      <text fill={color} fontSize={s * 0.12} fontWeight="500" letterSpacing={s * 0.045} className="symmetry-title-dark">
         <textPath href={`#top-arc-${uid}`} startOffset="18%">SYMMETRY</textPath>
       </text>
       <text fill={color} fontSize={s * 0.092} letterSpacing={s * 0.025} opacity="0.85">
