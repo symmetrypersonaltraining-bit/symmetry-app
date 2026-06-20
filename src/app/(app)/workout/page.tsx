@@ -35,7 +35,6 @@ export default async function WorkoutPage() {
 
   // Get today's day of week (0=Sun, 1=Mon, ..., 6=Sat)
   const today = new Date();
-  const todayDow = today.getDay();
 
   // Get active program assignment and find today's day
   let todayDay: { id: string; label: string; phase_label: string; program_name: string } | null = null;
@@ -44,7 +43,7 @@ export default async function WorkoutPage() {
   if (clientId) {
     const { data: assignment } = await supabase
       .from("program_assignments")
-      .select("program_id, programs(name, phases(id, label, position, days(id, label, position, day_of_week)))")
+      .select("program_id, programs(name, phases(id, label, position, days(id, label, position)))")
       .eq("client_id", clientId)
       .eq("active", true)
       .maybeSingle();
@@ -59,22 +58,6 @@ export default async function WorkoutPage() {
           label: ph.label,
           days: (ph.days || []).sort((a: any, b: any) => a.position - b.position),
         }));
-
-      // Find a day matching today's day_of_week in the first available phase
-      for (const phase of allPhases) {
-        const match = phase.days.find(
-          (d: any) => d.day_of_week === todayDow
-        );
-        if (match) {
-          todayDay = {
-            id: match.id,
-            label: match.label,
-            phase_label: phase.label,
-            program_name: prog.name,
-          };
-          break;
-        }
-      }
 
       // Fallback: just show first day of first phase
       if (!todayDay && allPhases.length > 0 && allPhases[0].days.length > 0) {
