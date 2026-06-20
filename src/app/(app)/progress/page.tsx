@@ -50,17 +50,23 @@ export default async function ProgressPage({
   }
 
   // Body weight history (last 90 days)
-  let weightLogs: { logged_at: string; weight_lbs: number }[] = [];
+  let weightLogs: { metric_date: string; weight: number; body_fat_pct: number | null; lean_mass: number | null; fat_mass: number | null }[] = [];
   if (clientId) {
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
     const { data } = await supabase
-      .from("body_weight_logs")
-      .select("logged_at, weight_lbs")
+      .from("metrics")
+      .select("metric_date, weight, body_fat_pct, lean_mass, fat_mass")
       .eq("client_id", clientId)
-      .gte("logged_at", ninetyDaysAgo.toISOString().split("T")[0])
-      .order("logged_at", { ascending: true });
-    weightLogs = data || [];
+      .gte("metric_date", ninetyDaysAgo.toISOString().split("T")[0])
+      .order("metric_date", { ascending: true });
+    weightLogs = (data || []).map((r: any) => ({
+      metric_date: r.metric_date,
+      weight: parseFloat(r.weight) || 0,
+      body_fat_pct: r.body_fat_pct ? parseFloat(r.body_fat_pct) : null,
+      lean_mass: r.lean_mass ? parseFloat(r.lean_mass) : null,
+      fat_mass: r.fat_mass ? parseFloat(r.fat_mass) : null,
+    }));
   }
 
   // Workout log counts
