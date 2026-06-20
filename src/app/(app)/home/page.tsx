@@ -22,9 +22,9 @@ export default async function HomePage() {
 
     const today = new Date();
     const rangeStart = new Date(today);
-    rangeStart.setMonth(rangeStart.getMonth() - 3);
+    rangeStart.setMonth(rangeStart.getMonth() - 1);
     const rangeEnd = new Date(today);
-    rangeEnd.setMonth(rangeEnd.getMonth() + 3);
+    rangeEnd.setMonth(rangeEnd.getMonth() + 12);
     const startStr = rangeStart.toISOString().split("T")[0];
     const endStr = rangeEnd.toISOString().split("T")[0];
 
@@ -47,7 +47,7 @@ export default async function HomePage() {
         id: row.id,
         clientId: row.clients?.id || row.client_id,
         clientName: row.clients?.name || "Unknown",
-        title: row.title || "Training Session",
+        title: row.title || row.clients?.name || "Training Session",
         startTime,
         endTime,
         status: row.status || "scheduled",
