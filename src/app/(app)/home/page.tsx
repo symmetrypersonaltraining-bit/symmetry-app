@@ -88,7 +88,7 @@ export default async function HomePage() {
       .select("id, client_id, due_date, amount_due, billing_credits, notification_status, email_sent_at, clients(id, name)")
       .gte("due_date", today.toISOString().split("T")[0])
       .lte("due_date", thirtyDays.toISOString().split("T")[0])
-      .in("notification_status", ["pending", "paused"])
+      .in("notification_status", ["pending", "paused", "sent"])
       .order("due_date");
 
     const reminders = (remindersRaw || []).map((r: any) => ({
