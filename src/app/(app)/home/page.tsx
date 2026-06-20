@@ -36,14 +36,12 @@ export default async function HomePage() {
       .order("scheduled_at");
 
     type AE = { id: string; clientId: string; clientName: string; title: string; startTime: string; endTime: string; status: string; scheduledAt: string; endsAt: string | null };
-    const appointmentMap: Record<string, AE[]> = {};
-    for (const a of apptRows || []) {
+    // Build flat list — TrainerCalendar will key by LOCAL date client-side to avoid UTC offset mismatch
+    const allAppointments: AE[] = (apptRows || []).map((a: any) => {
       const row = a as any;
-      const dateKey = row.scheduled_at.substring(0, 10);
       const startTime = row.scheduled_at.length > 10 ? row.scheduled_at.substring(11, 16) : "00:00";
       const endTime = row.ends_at ? row.ends_at.substring(11, 16) : "01:00";
-      if (!appointmentMap[dateKey]) appointmentMap[dateKey] = [];
-      appointmentMap[dateKey].push({
+      return {
         id: row.id,
         clientId: row.clients?.id || row.client_id,
         clientName: row.clients?.name || "Unknown",
@@ -53,8 +51,10 @@ export default async function HomePage() {
         status: row.status || "scheduled",
         scheduledAt: row.scheduled_at,
         endsAt: row.ends_at || null,
-      });
-    }
+      };
+    });
+    // Keep appointmentMap as empty record — TrainerCalendar builds it client-side from allAppointments
+    const appointmentMap: Record<string, AE[]> = {};
 
     type WE = { id: string; clientId: string; clientName: string; date: string; dayLabel: string; status: string };
     const workoutMapRange = new Date(today);
@@ -111,7 +111,7 @@ export default async function HomePage() {
           </p>
         </div>
         <PendingRemindersPanel reminders={reminders} />
-        <TrainerCalendar clients={clients || []} appointmentMap={appointmentMap} workoutMap={workoutMap} startDate="" />
+        <TrainerCalendar clients={clients || []} appointmentMap={appointmentMap} allAppointments={allAppointments} workoutMap={workoutMap} startDate="" />
       </div>
     );
   }

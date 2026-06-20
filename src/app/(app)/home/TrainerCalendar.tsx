@@ -33,6 +33,7 @@ interface WorkoutEv {
 interface Props {
   clients: Client[];
   appointmentMap: Record<string, AE[]>;
+  allAppointments?: AE[];
   workoutMap: Record<string, WorkoutEv[]>;
   startDate: string;
 }
@@ -64,7 +65,13 @@ function fmtTime(d: Date) {
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
-function dayStr(d: Date) { return d.toISOString().split("T")[0]; }
+function dayStr(d: Date) {
+  // Use LOCAL date parts to avoid UTC-offset shifting the day key
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function layoutEvents(events: AE[]): Array<AE & { lane: number; laneCount: number }> {
   if (events.length === 0) return [];
@@ -137,8 +144,8 @@ function MiniMonthCal({ year, month, selectedDate, onDateClick }: {
   year: number; month: number; selectedDate: Date; onDateClick: (d: Date) => void;
 }) {
   const [m, setM] = useState({ year, month });
-  const todayStr = new Date().toISOString().split("T")[0];
-  const selStr = selectedDate.toISOString().split("T")[0];
+  const todayStr = dayStr(new Date());
+  const selStr = dayStr(selectedDate);
 
   const firstDay = new Date(m.year, m.month, 1);
   const lastDay = new Date(m.year, m.month + 1, 0);
@@ -212,7 +219,7 @@ function AddSessionModal({ date, timeStr, clients, onClose, onSaved }: {
   async function save() {
     setSaving(true);
     const supabase = createClient();
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = dayStr(date);
 
     const buildRow = (ds: string) => ({
       client_id: clientId,
@@ -229,7 +236,7 @@ function AddSessionModal({ date, timeStr, clients, onClose, onSaved }: {
       for (let w = 1; w < weeks; w++) {
         const d = new Date(date);
         d.setDate(d.getDate() + w * 7);
-        rows.push(buildRow(d.toISOString().split("T")[0]));
+        rows.push(buildRow(dayStr(d)));
       }
     }
 
@@ -322,8 +329,8 @@ function SessionDetailPopup({ ev, clients, onClose, onSaved }: {
   const color = clientColor(clients, ev.clientId);
   const start = parseAppt(ev.scheduledAt);
   const end = ev.endsAt ? parseAppt(ev.endsAt) : new Date(start.getTime() + 3600000);
-  const todayStr = new Date().toISOString().split("T")[0];
-  const evDateStr = start.toISOString().split("T")[0];
+  const todayStr = dayStr(new Date());
+  const evDateStr = dayStr(start);
   const isToday = evDateStr === todayStr;
   const [updating, setUpdating] = useState(false);
 
@@ -894,9 +901,25 @@ function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, cl
 }
 
 // ---- Main Component ----
-export default function TrainerCalendar({ clients, appointmentMap, workoutMap }: Props) {
+export default function TrainerCalendar({ clients, appointmentMap: appointmentMapProp, allAppointments, workoutMap }: Props) {
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+  const todayStr = dayStr(today);
+
+  // Build appointmentMap keyed by LOCAL date so timezone offsets don't shift chips to wrong column
+  const appointmentMap = useMemo<Record<string, AE[]>>(() => {
+    if (allAppointments && allAppointments.length > 0) {
+      const map: Record<string, AE[]> = {};
+      for (const apt of allAppointments) {
+        // parseAppt converts UTC string to local Date; dayStr extracts local YYYY-MM-DD
+        const localKey = dayStr(parseAppt(apt.scheduledAt));
+        if (!map[localKey]) map[localKey] = [];
+        map[localKey].push(apt);
+      }
+      return map;
+    }
+    // Fallback: re-key the server-provided map (already UTC-keyed, best effort)
+    return appointmentMapProp;
+  }, [allAppointments, appointmentMapProp]);
 
   function getMonday(d: Date) {
     const copy = new Date(d);
