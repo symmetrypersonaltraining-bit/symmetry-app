@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import toast from 'react-hot-toast';
 
 interface Appointment {
   id: string;
@@ -11,6 +12,7 @@ interface Appointment {
   title?: string;
   color?: string;
   recurrence_group?: string;
+  gcal_event_id?: string;
 }
 
 interface Client {
@@ -62,22 +64,24 @@ export default function HomePage() {
   const [newRepeat, setNewRepeat] = useState('none');
   const [newUntil, setNewUntil] = useState('4wk');
   const [saving, setSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const supabase = createClient();
   const weekDays = getWeekDays(weekBase);
   const weekStart = fmtDate(weekDays[0]);
   const weekEnd = fmtDate(weekDays[6]);
 
+  const fetchAppointments = async () => {
+    const [{ data: apts }, { data: cls }] = await Promise.all([
+      supabase.from('appointments').select('*').gte('start_time', weekStart + 'T00:00:00').lte('start_time', weekEnd + 'T23:59:59').order('start_time'),
+      supabase.from('clients').select('id, full_name').order('full_name'),
+    ]);
+    setAppointments(apts || []);
+    setClients(cls || []);
+  };
+
   useEffect(() => {
-    const load = async () => {
-      const [{ data: apts }, { data: cls }] = await Promise.all([
-        supabase.from('appointments').select('*').gte('start_time', weekStart + 'T00:00:00').lte('start_time', weekEnd + 'T23:59:59').order('start_time'),
-        supabase.from('clients').select('id, full_name').order('full_name'),
-      ]);
-      setAppointments(apts || []);
-      setClients(cls || []);
-    };
-    load();
+    fetchAppointments();
   }, [weekStart, weekEnd]);
 
   const getApptForSlot = (dayStr: string, hour: number) =>
@@ -91,7 +95,24 @@ export default function HomePage() {
     setSaving(true);
     const startDt = `${newDate}T${newStart}:00`;
     const endDt = `${newDate}T${newEnd}:00`;
+    const client = clients.find(c => c.id === newClientId);
     await supabase.from('appointments').insert({ client_id: newClientId, start_time: startDt, end_time: endDt, status: 'scheduled' });
+    // Push to Google Calendar
+    try {
+      await fetch('/api/gcal-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          event: {
+            title: client?.full_name || 'Session',
+            start: startDt,
+            end: endDt,
+            client_name: client?.full_name || 'Session',
+          },
+        }),
+      });
+    } catch {}
     setSaving(false);
     setShowAddModal(false);
     setWeekBase(new Date(weekBase));
@@ -108,15 +129,52 @@ export default function HomePage() {
     if (!appt) return;
     if (mode === 'single') {
       await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', id);
+      // Delete from Google Calendar
+      if (appt.gcal_event_id) {
+        try {
+          await fetch('/api/gcal-event', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', event: { gcal_event_id: appt.gcal_event_id } }),
+          });
+        } catch {}
+      }
     } else if (mode === 'all' && appt.recurrence_group) {
       await supabase.from('appointments').update({ status: 'cancelled' }).eq('recurrence_group', appt.recurrence_group);
     } else if (mode === 'following' && appt.recurrence_group) {
       await supabase.from('appointments').update({ status: 'cancelled' }).eq('recurrence_group', appt.recurrence_group).gte('start_time', appt.start_time);
     } else {
       await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', id);
+      if (appt.gcal_event_id) {
+        try {
+          await fetch('/api/gcal-event', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', event: { gcal_event_id: appt.gcal_event_id } }),
+          });
+        } catch {}
+      }
     }
     setAppointments(prev => prev.map(a => a.id === id || (mode !== 'single' && a.recurrence_group === appt.recurrence_group) ? { ...a, status: 'cancelled' } : a));
     setActionAppt(null);
+  };
+
+  const handleGCalSync = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/gcal-sync', { method: 'POST' });
+      const data = await res.json();
+      if (data.synced !== undefined) {
+        toast.success(`Synced ${data.synced} sessions from Google Calendar`);
+        await fetchAppointments();
+      } else {
+        toast.error('Sync failed: ' + (data.error || 'Unknown error'));
+      }
+    } catch {
+      toast.error('Sync failed');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -129,20 +187,31 @@ export default function HomePage() {
           <span style={{ fontSize: 20 }}>📅</span>
           <span style={{ fontWeight: 700, fontSize: 17 }}>Schedule</span>
         </div>
-        <button onClick={() => setShowAddModal(true)}
-          style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: '6px 12px', color: 'white', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-          + Add Session
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={handleGCalSync}
+            disabled={isSyncing}
+            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8, padding: '6px 10px', color: 'white', fontWeight: 600, fontSize: 12, cursor: isSyncing ? 'default' : 'pointer', opacity: isSyncing ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 4 }}
+            title="Sync from Google Calendar"
+          >
+            <i className={`ti ti-refresh${isSyncing ? ' spin' : ''}`} style={{ fontSize: 14 }}></i>
+            {isSyncing ? ' Syncing...' : ' Sync GCal'}
+          </button>
+          <button onClick={() => setShowAddModal(true)}
+            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: '6px 12px', color: 'white', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+            + Add Session
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px' }}>
         <button onClick={() => { const d = new Date(weekBase); d.setDate(d.getDate() - 7); setWeekBase(d); }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--brand-text)' }}>‹</button>
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--brand-text)' }}>&#8249;</button>
         <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--brand-text)' }}>
-          {weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          {weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} &#8211; {weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </span>
         <button onClick={() => { const d = new Date(weekBase); d.setDate(d.getDate() + 7); setWeekBase(d); }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--brand-text)' }}>›</button>
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--brand-text)' }}>&#8250;</button>
       </div>
 
       <div style={{ overflowX: 'auto' }}>
@@ -198,7 +267,7 @@ export default function HomePage() {
           <div style={{ background: 'var(--brand-surface)', borderRadius: '18px 18px 0 0', width: '100%', padding: 16 }} onClick={e => e.stopPropagation()}>
             <div style={{ width: 36, height: 4, background: 'var(--brand-border)', borderRadius: 2, margin: '0 auto 14px' }} />
             <div style={{ fontWeight: 700, color: 'var(--brand-text)', marginBottom: 12 }}>
-              {fmtTime(actionAppt.start_time)} — {clients.find(c => c.id === actionAppt.client_id)?.full_name || 'Session'}
+              {fmtTime(actionAppt.start_time)} &#8212; {clients.find(c => c.id === actionAppt.client_id)?.full_name || 'Session'}
             </div>
             {['scheduled', 'completed', 'cancelled'].map(s => (
               <button key={s} onClick={() => updateStatus(actionAppt.id, s)}
