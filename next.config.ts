@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   turbopack: {
-    root: "/tmp/symmetry-app",
+    root: path.resolve(__dirname),
   },
   // Enable React strict mode for better development experience
   reactStrictMode: true,

@@ -32,6 +32,13 @@ interface ClientPayment {
 
 type Tab = "upcoming" | "all";
 
+// Clients that should never get reminders
+const NO_REMINDER_CLIENTS = ["Celeste Lennon", "Troy"];
+
+function isNoReminderClient(name: string) {
+  return NO_REMINDER_CLIENTS.some(n => name.toLowerCase().includes(n.toLowerCase()));
+}
+
 const STATUS_META: Record<string, { bg: string; color: string; label: string }> = {
   pending:     { bg: "#f59e0b20", color: "#f59e0b", label: "Pending" },
   paused:      { bg: "rgba(100,100,120,0.15)", color: "#94a3b8", label: "Paused" },
@@ -53,7 +60,7 @@ function daysUntil(d: string, today: string) {
   return Math.round((new Date(d + "T00:00:00").getTime() - new Date(today + "T00:00:00").getTime()) / 86400000);
 }
 
-// ── Confirm Modal ──────────────────────────────────────────────────────────────
+// ── Confirm Modal (Send flow) ─────────────────────────────────────────────────
 interface ConfirmModalProps {
   client: ClientPayment;
   onClose: () => void;
@@ -71,7 +78,6 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
 
   useEffect(() => { inputRef.current?.select(); }, []);
 
-  // Close on backdrop click
   function handleBackdrop(e: React.MouseEvent<HTMLDivElement>) {
     if (e.target === e.currentTarget) onClose();
   }
@@ -81,9 +87,7 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
     setSending(true);
     setError(null);
     try {
-      // If there's no reminder row yet, we can't send via the API — just log
       if (!client.reminderId) {
-        // Create a reminder row first
         const nextMonth = new Date();
         nextMonth.setMonth(nextMonth.getMonth() + 1);
         const { data: newReminder, error: createErr } = await supabase
@@ -103,7 +107,6 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
           setSending(false);
           return;
         }
-        // Now send via API
         const res = await fetch("/api/reminders/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -116,7 +119,6 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
           return;
         }
       } else {
-        // Update amount/notes if changed, then send
         await supabase.from("payment_reminders").update({
           amount_due: parseFloat(amount) || client.amountDue,
           notes: notes || null,
@@ -155,7 +157,6 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
         className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
         style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}
       >
-        {/* Modal header */}
         <div className="px-5 py-4 flex items-center justify-between"
           style={{ background: "linear-gradient(135deg, #7f1d1d, #dc2626)", borderBottom: "1px solid var(--brand-border)" }}>
           <div>
@@ -165,9 +166,7 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
           <button onClick={onClose} className="text-red-200 hover:text-white text-xl leading-none">&times;</button>
         </div>
 
-        {/* Email preview */}
         <div className="px-5 py-4 space-y-4">
-          {/* To field */}
           <div className="rounded-xl p-3" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
             <p className="text-xs font-semibold mb-1" style={{ color: "var(--brand-text-secondary)" }}>TO</p>
             {client.clientEmail
@@ -175,7 +174,6 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
               : <p className="text-sm text-red-400 font-medium">No email on file — cannot send</p>}
           </div>
 
-          {/* Amount field (editable) */}
           <div>
             <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--brand-text-secondary)" }}>
               AMOUNT DUE <span className="text-xs font-normal">(edit to adjust)</span>
@@ -205,7 +203,6 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
             )}
           </div>
 
-          {/* Due date */}
           {client.dueDate && (
             <div className="rounded-xl p-3" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
               <p className="text-xs font-semibold mb-1" style={{ color: "var(--brand-text-secondary)" }}>DUE DATE</p>
@@ -213,7 +210,6 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
             </div>
           )}
 
-          {/* Notes */}
           <div>
             <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--brand-text-secondary)" }}>
               PERSONAL NOTE <span className="text-xs font-normal">(optional — included in email)</span>
@@ -232,7 +228,6 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
             />
           </div>
 
-          {/* Email preview snippet */}
           <div className="rounded-xl p-3 text-xs space-y-1"
             style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.2)" }}>
             <p className="font-semibold" style={{ color: "#dc2626" }}>Email Preview</p>
@@ -258,7 +253,6 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
           )}
         </div>
 
-        {/* Actions */}
         <div className="px-5 py-4 flex gap-3" style={{ borderTop: "1px solid var(--brand-border)" }}>
           <button
             onClick={onClose}
@@ -286,6 +280,225 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
   );
 }
 
+// ── New Payment Modal ─────────────────────────────────────────────────────────
+interface NewPaymentModalProps {
+  clients: ClientPayment[];
+  onClose: () => void;
+  onCreated: (clientId: string, reminder: Partial<ClientPayment>) => void;
+}
+
+function NewPaymentModal({ clients, onClose, onCreated }: NewPaymentModalProps) {
+  const supabase = createClient();
+  const [selectedClientId, setSelectedClientId] = useState(clients[0]?.clientId || "");
+  const [amount, setAmount] = useState(() => {
+    const c = clients[0];
+    return String(c?.currentFees || "");
+  });
+  const [dueDate, setDueDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return localDateStr(d);
+  });
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [sendAfter, setSendAfter] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    const c = clients.find(c => c.clientId === selectedClientId);
+    if (c?.currentFees) setAmount(String(c.currentFees));
+  }, [selectedClientId]);
+
+  function handleBackdrop(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.target === e.currentTarget) onClose();
+  }
+
+  async function handleSave(andSend: boolean) {
+    setSaving(true);
+    setSendAfter(andSend);
+    setError(null);
+    try {
+      const { data: newReminder, error: insertErr } = await supabase
+        .from("payment_reminders")
+        .insert({
+          client_id: selectedClientId,
+          due_date: dueDate,
+          amount_due: parseFloat(amount) || 0,
+          billing_credits: 0,
+          notification_status: "pending",
+          notes: notes || null,
+        })
+        .select("id")
+        .single();
+
+      if (insertErr || !newReminder) {
+        setError("Failed to create payment: " + (insertErr?.message || "unknown"));
+        setSaving(false);
+        return;
+      }
+
+      if (andSend) {
+        const client = clients.find(c => c.clientId === selectedClientId);
+        if (!client?.clientEmail) {
+          setError("This client has no email on file.");
+          setSaving(false);
+          return;
+        }
+        const res = await fetch("/api/reminders/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reminderId: newReminder.id }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error || "Failed to send reminder.");
+          setSaving(false);
+          return;
+        }
+      }
+
+      setDone(true);
+      setTimeout(() => {
+        onCreated(selectedClientId, {
+          reminderId: newReminder.id,
+          dueDate,
+          amountDue: parseFloat(amount) || 0,
+          notificationStatus: andSend ? "sent" : "pending",
+          notes: notes || null,
+          hasReminder: true,
+        });
+        onClose();
+      }, 1000);
+    } catch (e: any) {
+      setError(e.message || "Unexpected error");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      onClick={handleBackdrop}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
+        style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}
+      >
+        <div className="px-5 py-4 flex items-center justify-between"
+          style={{ background: "linear-gradient(135deg, #4c1d95, #7c3aed)", borderBottom: "1px solid var(--brand-border)" }}>
+          <div>
+            <h2 className="text-base font-bold text-white">New Payment</h2>
+            <p className="text-xs mt-0.5" style={{ color: "#c4b5fd" }}>Create a payment record</p>
+          </div>
+          <button onClick={onClose} className="text-purple-200 hover:text-white text-xl leading-none">&times;</button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          <div>
+            <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--brand-text-secondary)" }}>CLIENT</label>
+            <select
+              value={selectedClientId}
+              onChange={e => setSelectedClientId(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}
+            >
+              {clients.map(c => (
+                <option key={c.clientId} value={c.clientId}>{c.clientName}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--brand-text-secondary)" }}>AMOUNT</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold"
+                style={{ color: "var(--brand-text-secondary)" }}>$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                className="w-full pl-7 pr-4 py-3 rounded-xl text-xl font-bold outline-none"
+                style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "2px solid #7c3aed" }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--brand-text-secondary)" }}>DUE DATE</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--brand-text-secondary)" }}>NOTES (optional)</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={2}
+              placeholder="e.g. Great work this month!"
+              className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none"
+              style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}
+            />
+          </div>
+
+          {error && (
+            <div className="rounded-xl px-3 py-2 text-sm" style={{ background: "#ef444420", color: "#ef4444" }}>{error}</div>
+          )}
+          {done && (
+            <div className="rounded-xl px-3 py-2 text-sm font-medium text-center"
+              style={{ background: "#22c55e20", color: "#22c55e" }}>
+              {sendAfter ? "Payment created & reminder sent!" : "Payment created!"}
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid var(--brand-border)" }}>
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl text-sm font-semibold"
+            style={{ background: "var(--brand-bg)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => handleSave(false)}
+            disabled={saving || done}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
+            style={{
+              background: saving || done ? "rgba(124,58,237,0.3)" : "rgba(124,58,237,0.15)",
+              color: saving || done ? "#a78bfa" : "#7c3aed",
+              border: "1px solid rgba(124,58,237,0.3)",
+              cursor: saving || done ? "not-allowed" : "pointer",
+            }}
+          >
+            Save
+          </button>
+          <button
+            onClick={() => handleSave(true)}
+            disabled={saving || done}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all"
+            style={{
+              background: saving || done ? "rgba(124,58,237,0.4)" : "linear-gradient(135deg, #7c3aed, #6d28d9)",
+              cursor: saving || done ? "not-allowed" : "pointer",
+            }}
+          >
+            {saving ? "Saving…" : done ? "Done!" : "Save & Send"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function PaymentsClient({ clients }: { clients: ClientPayment[] }) {
   const supabase = createClient();
@@ -294,6 +507,17 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
   const [localClients, setLocalClients] = useState(clients);
   const [confirmClient, setConfirmClient] = useState<ClientPayment | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [showNewPayment, setShowNewPayment] = useState(false);
+
+  // Edit mode state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+
+  // Delete confirmation state
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const today = localDateStr();
   const thirtyDaysDate = new Date();
@@ -303,9 +527,8 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
   const filtered = localClients.filter(c => {
     if (search && !c.clientName.toLowerCase().includes(search.toLowerCase())) return false;
     if (tab === "upcoming") {
-      // Show: has a due date within 30 days, or no reminder yet (needs setup)
       if (c.notificationStatus === "paid" || c.notificationStatus === "cancelled") return false;
-      if (!c.dueDate) return true; // no reminder — always show in upcoming
+      if (!c.dueDate) return true;
       return c.dueDate >= today && c.dueDate <= thirtyStr;
     }
     return true;
@@ -346,22 +569,103 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
     ));
   }
 
+  function handleNewCreated(clientId: string, reminder: Partial<ClientPayment>) {
+    setLocalClients(prev => prev.map(p =>
+      p.clientId === clientId ? { ...p, ...reminder } : p
+    ));
+  }
+
+  function startEdit(c: ClientPayment) {
+    setEditingId(c.clientId);
+    setEditAmount(String(c.amountDue));
+    setEditDueDate(c.dueDate || localDateStr());
+    setEditNotes(c.notes || "");
+    setDeleteConfirmId(null);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+  }
+
+  async function saveEdit(c: ClientPayment) {
+    if (!c.reminderId) {
+      const { data: newR, error: insertErr } = await supabase
+        .from("payment_reminders")
+        .insert({
+          client_id: c.clientId,
+          due_date: editDueDate,
+          amount_due: parseFloat(editAmount) || 0,
+          billing_credits: 0,
+          notification_status: "pending",
+          notes: editNotes || null,
+        })
+        .select("id")
+        .single();
+      if (!insertErr && newR) {
+        setLocalClients(prev => prev.map(p =>
+          p.clientId === c.clientId
+            ? { ...p, reminderId: newR.id, dueDate: editDueDate, amountDue: parseFloat(editAmount) || 0, notes: editNotes || null, hasReminder: true, notificationStatus: "pending" }
+            : p
+        ));
+      }
+    } else {
+      await supabase.from("payment_reminders").update({
+        amount_due: parseFloat(editAmount) || c.amountDue,
+        due_date: editDueDate,
+        notes: editNotes || null,
+      }).eq("id", c.reminderId);
+      setLocalClients(prev => prev.map(p =>
+        p.clientId === c.clientId
+          ? { ...p, amountDue: parseFloat(editAmount) || c.amountDue, dueDate: editDueDate, notes: editNotes || null }
+          : p
+      ));
+    }
+    setEditingId(null);
+  }
+
+  async function confirmDelete(c: ClientPayment) {
+    if (!c.reminderId) {
+      setDeleteConfirmId(null);
+      return;
+    }
+    setDeletingId(c.clientId);
+    await supabase.from("payment_reminders").delete().eq("id", c.reminderId);
+    setLocalClients(prev => prev.map(p =>
+      p.clientId === c.clientId
+        ? { ...p, reminderId: null, dueDate: null, notificationStatus: "no_reminder", hasReminder: false, emailSentAt: null, notes: null }
+        : p
+    ));
+    setDeleteConfirmId(null);
+    setDeletingId(null);
+  }
+
   return (
     <div className="pb-24" style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
       {/* ── Red gradient header ───────────────────────────────── */}
       <div className="px-4 lg:px-6 pt-6 pb-5"
         style={{ background: "linear-gradient(135deg, #7f1d1d, #dc2626)" }}>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: "rgba(255,255,255,0.15)" }}>
-            <i className="ti ti-credit-card text-white text-lg" />
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(255,255,255,0.15)" }}>
+              <i className="ti ti-credit-card text-white text-lg" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">Payments</h1>
+              <p className="text-xs text-red-200">
+                {pendingCount} need action · ${totalOwed.toLocaleString()} total owed
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-white">Payments</h1>
-            <p className="text-xs text-red-200">
-              {pendingCount} need action · ${totalOwed.toLocaleString()} total owed
-            </p>
-          </div>
+          {/* New Payment button */}
+          <button
+            onClick={() => setShowNewPayment(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold flex-shrink-0"
+            style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "1px solid rgba(255,255,255,0.25)" }}
+          >
+            <i className="ti ti-plus text-sm" />
+            New Payment
+          </button>
         </div>
 
         {/* Summary pills */}
@@ -383,14 +687,14 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
       {/* ── Tabs + search ─────────────────────────────────────── */}
       <div className="px-4 lg:px-6 py-3 flex items-center gap-3 sticky top-0 z-10"
         style={{ background: "var(--brand-surface)", borderBottom: "1px solid var(--brand-border)" }}>
-        <div className="flex rounded-xl overflow-hidden border" style={{ borderColor: "var(--brand-border)" }}>
+        <div className="flex rounded-xl overflow-hidden border flex-shrink-0" style={{ borderColor: "var(--brand-border)" }}>
           {(["upcoming", "all"] as Tab[]).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className="px-4 py-1.5 text-xs font-semibold capitalize transition-all"
+              className="px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all"
               style={t === tab
                 ? { background: "#dc2626", color: "white" }
                 : { background: "var(--brand-surface)", color: "var(--brand-text-secondary)" }}>
-              {t === "upcoming" ? "Upcoming" : "All Clients"}
+              {t === "upcoming" ? "Upcoming" : "All"}
             </button>
           ))}
         </div>
@@ -398,7 +702,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search client…"
-          className="flex-1 px-3 py-1.5 text-sm rounded-xl outline-none"
+          className="flex-1 px-3 py-1.5 text-sm rounded-xl outline-none min-w-0"
           style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}
         />
       </div>
@@ -424,6 +728,10 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
           const isOverdue = days !== null && days < 0 && c.notificationStatus !== "paid";
           const isPaid = c.notificationStatus === "paid";
           const noReminder = c.notificationStatus === "no_reminder";
+          const isEditing = editingId === c.clientId;
+          const isDeleteConfirm = deleteConfirmId === c.clientId;
+          const isDeleting = deletingId === c.clientId;
+          const noReminderClient = isNoReminderClient(c.clientName);
 
           return (
             <div
@@ -478,85 +786,220 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                         {c.trainingFrequency && (
                           <span className="text-xs px-1.5 py-0.5 rounded-full"
                             style={{ background: "var(--brand-bg)", color: "var(--brand-text-secondary)" }}>
-                            {c.trainingFrequency}x/mo
+                            {c.trainingFrequency}x/week
                           </span>
                         )}
                       </div>
-                      {c.notes && (
+                      {c.notes && !isEditing && (
                         <p className="text-xs mt-1 italic" style={{ color: "var(--brand-text-secondary)" }}>{c.notes}</p>
                       )}
                     </div>
 
-                    {/* Amount */}
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-base font-bold" style={{ color: isPaid ? "#22c55e" : "var(--brand-text)" }}>
-                        ${net > 0 ? net.toLocaleString() : (c.currentFees ? c.currentFees.toLocaleString() : "—")}
-                      </p>
-                      {c.billingCredits > 0 && (
-                        <p className="text-xs" style={{ color: "#22c55e" }}>-${c.billingCredits} credit</p>
-                      )}
-                      {c.currentFees && !c.hasReminder && (
-                        <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                          rate: ${c.currentFees}/mo
+                    {/* Amount + delete button */}
+                    <div className="flex items-start gap-1 flex-shrink-0">
+                      <div className="text-right">
+                        <p className="text-base font-bold" style={{ color: isPaid ? "#22c55e" : "var(--brand-text)" }}>
+                          ${net > 0 ? net.toLocaleString() : (c.currentFees ? c.currentFees.toLocaleString() : "—")}
                         </p>
+                        {c.billingCredits > 0 && (
+                          <p className="text-xs" style={{ color: "#22c55e" }}>-${c.billingCredits} credit</p>
+                        )}
+                        {c.currentFees && !c.hasReminder && (
+                          <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+                            ${c.currentFees}/month
+                          </p>
+                        )}
+                      </div>
+                      {/* Delete button */}
+                      {c.reminderId && (
+                        <button
+                          onClick={() => {
+                            if (isDeleteConfirm) {
+                              setDeleteConfirmId(null);
+                            } else {
+                              setDeleteConfirmId(c.clientId);
+                              setEditingId(null);
+                            }
+                          }}
+                          disabled={isDeleting}
+                          className="p-1 rounded-lg transition-all"
+                          style={{ color: "#ef4444", opacity: isDeleting ? 0.4 : 1 }}
+                          title="Delete payment record"
+                        >
+                          <i className="ti ti-trash text-sm" />
+                        </button>
                       )}
                     </div>
                   </div>
 
-                  {/* Status badge + action buttons */}
-                  <div className="flex items-center gap-2 mt-3 flex-wrap">
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                      style={{ background: s.bg, color: s.color }}>
-                      {s.label}
-                    </span>
-
-                    {c.emailSentAt && (
-                      <span className="text-xs px-2 py-0.5 rounded-full"
-                        style={{ background: "#22c55e20", color: "#22c55e" }}>
-                        <i className="ti ti-mail text-[10px] mr-0.5" />Email sent
-                      </span>
-                    )}
-
-                    {/* PRIMARY: Confirm & Send */}
-                    {!isPaid && c.notificationStatus !== "cancelled" && (
+                  {/* Delete confirmation inline */}
+                  {isDeleteConfirm && (
+                    <div className="mt-2 flex items-center gap-2 p-2 rounded-xl"
+                      style={{ background: "#ef444415", border: "1px solid rgba(239,68,68,0.3)" }}>
+                      <p className="text-xs flex-1" style={{ color: "#ef4444" }}>Delete this payment record?</p>
                       <button
-                        onClick={() => setConfirmClient(c)}
-                        disabled={isUpdating}
-                        className="text-xs px-2.5 py-1 rounded-lg font-semibold transition-all"
-                        style={{
-                          background: "linear-gradient(135deg, #dc2626, #b91c1c)",
-                          color: "white",
-                          opacity: isUpdating ? 0.5 : 1,
-                        }}
-                      >
-                        {c.emailSentAt ? "Resend Reminder" : noReminder ? "Set Up & Send" : "Confirm & Send"}
-                      </button>
-                    )}
-
-                    {/* Mark Paid */}
-                    {!isPaid && c.hasReminder && c.notificationStatus !== "cancelled" && (
-                      <button
-                        onClick={() => handleMarkPaid(c)}
-                        disabled={isUpdating}
-                        className="text-xs px-2.5 py-1 rounded-lg font-medium"
-                        style={{ background: "#22c55e20", color: "#22c55e", opacity: isUpdating ? 0.5 : 1 }}
-                      >
-                        {isUpdating ? "…" : "Mark Paid"}
-                      </button>
-                    )}
-
-                    {/* Pause / Resume */}
-                    {c.hasReminder && !isPaid && c.notificationStatus !== "cancelled" && (
-                      <button
-                        onClick={() => handlePauseToggle(c)}
-                        disabled={isUpdating}
-                        className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                        onClick={() => setDeleteConfirmId(null)}
+                        className="text-xs px-2 py-1 rounded-lg"
                         style={{ background: "var(--brand-bg)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}
                       >
-                        {c.notificationStatus === "paused" ? "Resume" : "Pause"}
+                        Cancel
                       </button>
-                    )}
-                  </div>
+                      <button
+                        onClick={() => confirmDelete(c)}
+                        disabled={isDeleting}
+                        className="text-xs px-2 py-1 rounded-lg font-semibold"
+                        style={{ background: "#ef4444", color: "white" }}
+                      >
+                        {isDeleting ? "…" : "Delete"}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Inline edit form */}
+                  {isEditing && (
+                    <div className="mt-3 space-y-2 p-3 rounded-xl"
+                      style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className="text-xs font-semibold block mb-1" style={{ color: "var(--brand-text-secondary)" }}>AMOUNT</label>
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-sm"
+                              style={{ color: "var(--brand-text-secondary)" }}>$</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={editAmount}
+                              onChange={e => setEditAmount(e.target.value)}
+                              className="w-full pl-6 pr-2 py-2 rounded-lg text-sm font-bold outline-none"
+                              style={{ background: "var(--brand-surface)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs font-semibold block mb-1" style={{ color: "var(--brand-text-secondary)" }}>DUE DATE</label>
+                          <input
+                            type="date"
+                            value={editDueDate}
+                            onChange={e => setEditDueDate(e.target.value)}
+                            className="w-full px-2 py-2 rounded-lg text-sm outline-none"
+                            style={{ background: "var(--brand-surface)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold block mb-1" style={{ color: "var(--brand-text-secondary)" }}>NOTES</label>
+                        <textarea
+                          value={editNotes}
+                          onChange={e => setEditNotes(e.target.value)}
+                          rows={2}
+                          placeholder="Optional note…"
+                          className="w-full px-2 py-1.5 rounded-lg text-xs outline-none resize-none"
+                          style={{ background: "var(--brand-surface)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={cancelEdit}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold"
+                          style={{ background: "var(--brand-surface)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => saveEdit(c)}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-bold text-white"
+                          style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)" }}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Status badge + action buttons */}
+                  {!isEditing && (
+                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: s.bg, color: s.color }}>
+                        {s.label}
+                      </span>
+
+                      {c.emailSentAt && (
+                        <span className="text-xs px-2 py-0.5 rounded-full"
+                          style={{ background: "#22c55e20", color: "#22c55e" }}>
+                          <i className="ti ti-mail text-[10px] mr-0.5" />Email sent
+                        </span>
+                      )}
+
+                      {/* No-reminder clients: show disabled badge, no reminder buttons */}
+                      {noReminderClient ? (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{ background: "rgba(100,116,139,0.15)", color: "#64748b" }}>
+                          Reminders Disabled
+                        </span>
+                      ) : (
+                        <>
+                          {/* Edit button */}
+                          {!isPaid && c.notificationStatus !== "cancelled" && (
+                            <button
+                              onClick={() => startEdit(c)}
+                              disabled={isUpdating}
+                              className="text-xs px-2.5 py-1 rounded-lg font-semibold transition-all"
+                              style={{
+                                background: "var(--brand-bg)",
+                                color: "var(--brand-text-secondary)",
+                                border: "1px solid var(--brand-border)",
+                                opacity: isUpdating ? 0.5 : 1,
+                              }}
+                            >
+                              Edit
+                            </button>
+                          )}
+
+                          {/* Send button */}
+                          {!isPaid && c.notificationStatus !== "cancelled" && (
+                            <button
+                              onClick={() => setConfirmClient(c)}
+                              disabled={isUpdating}
+                              className="text-xs px-2.5 py-1 rounded-lg font-semibold transition-all"
+                              style={{
+                                background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
+                                color: "white",
+                                opacity: isUpdating ? 0.5 : 1,
+                              }}
+                            >
+                              {c.emailSentAt ? "Resend" : "Send"}
+                            </button>
+                          )}
+                        </>
+                      )}
+
+                      {/* Mark Paid */}
+                      {!isPaid && c.hasReminder && c.notificationStatus !== "cancelled" && (
+                        <button
+                          onClick={() => handleMarkPaid(c)}
+                          disabled={isUpdating}
+                          className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                          style={{ background: "#22c55e20", color: "#22c55e", opacity: isUpdating ? 0.5 : 1 }}
+                        >
+                          {isUpdating ? "…" : "Mark Paid"}
+                        </button>
+                      )}
+
+                      {/* Pause / Resume — only for non-no-reminder clients */}
+                      {!noReminderClient && c.hasReminder && !isPaid && c.notificationStatus !== "cancelled" && (
+                        <button
+                          onClick={() => handlePauseToggle(c)}
+                          disabled={isUpdating}
+                          className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                          style={{ background: "var(--brand-bg)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}
+                        >
+                          {c.notificationStatus === "paused" ? "Resume" : "Pause"}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -583,12 +1026,21 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
         })}
       </div>
 
-      {/* ── Confirm modal ─────────────────────────────────────── */}
+      {/* ── Confirm modal (Send flow) ──────────────────────────── */}
       {confirmClient && (
         <ConfirmModal
           client={confirmClient}
           onClose={() => setConfirmClient(null)}
           onSent={handleSent}
+        />
+      )}
+
+      {/* ── New Payment modal ──────────────────────────────────── */}
+      {showNewPayment && (
+        <NewPaymentModal
+          clients={localClients}
+          onClose={() => setShowNewPayment(false)}
+          onCreated={handleNewCreated}
         />
       )}
     </div>
