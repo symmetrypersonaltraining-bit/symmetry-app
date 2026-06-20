@@ -644,7 +644,7 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
       current_fees: form.current_fees ? Number(form.current_fees) : null,
       is_self_coached: form.is_self_coached,
     };
-    const { error } = await supabase.from("clients").update(payload).eq("id", clientId);
+    const { error } = await (supabase as any).from("clients").update(payload).eq("id", clientId);
     setSaving(false);
     if (error) { setSaveMsg("error"); } else { setSaveMsg("saved"); setEditing(false); }
     setTimeout(() => setSaveMsg(""), 3000);
