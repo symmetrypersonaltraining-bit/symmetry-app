@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-
-export default function RootAppPage() {
+export default function AppRootPage() {
   redirect("/home");
 }

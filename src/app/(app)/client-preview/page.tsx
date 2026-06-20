@@ -8,10 +8,8 @@ export default async function ClientPreviewPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  // Only the trainer can access this preview
   if (user.email !== TRAINER_EMAIL) redirect("/home");
 
-  // Fetch Dustin's own client record
   const { data: clientRecord } = await supabase
     .from("clients")
     .select("id, name")
@@ -69,12 +67,12 @@ export default async function ClientPreviewPage() {
       (new Date(today).getTime() - new Date(firstCompleted).getTime()) / 86400000
     );
     if (daysDiff <= 1) {
-      for (const d of completedDates) {
-        const expected = new Date(completedDates[0]);
-        expected.setDate(expected.getDate() - streakDays);
-        if (streakDays === 0) { streakDays++; }
-        else if (d === expected.toISOString().split("T")[0]) { streakDays++; }
-        else break;
+      for (let i = 0; i < completedDates.length; i++) {
+        if (i === 0) { streakDays++; continue; }
+        const prev = new Date(completedDates[i - 1] + "T00:00:00");
+        const curr = new Date(completedDates[i] + "T00:00:00");
+        const diff = Math.round((prev.getTime() - curr.getTime()) / 86400000);
+        if (diff === 1) { streakDays++; } else { break; }
       }
     }
   }
