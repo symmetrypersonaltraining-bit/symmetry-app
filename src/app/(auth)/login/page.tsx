@@ -86,7 +86,7 @@ export default function LoginPage() {
       <div className="flex flex-col items-center pt-16 pb-10 px-6">
         <Logo size={80} color="white" />
         <h1
-          className="text-2xl font-medium text-white mt-4 tracking-wide"
+          className="text-2xl font-medium text-white mt-4 tracking-wide symmetry-title-dark"
           style={{ letterSpacing: "0.5px" }}
         >
           Symmetry
