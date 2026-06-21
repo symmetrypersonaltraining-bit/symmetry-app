@@ -27,7 +27,7 @@ export default function ProgressPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--brand-bg)' }}>
       <div className="page-header page-header-progress">
-        <span style={{ fontSize: 20 }}>📈</span>
+        <span style={{ fontSize: 20 }}>\ud83d\udcc8</span>
         <span style={{ fontWeight: 700, fontSize: 17 }}>Progress</span>
       </div>
 
