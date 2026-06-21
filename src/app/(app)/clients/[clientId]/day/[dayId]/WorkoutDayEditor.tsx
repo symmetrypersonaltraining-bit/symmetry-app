@@ -42,7 +42,7 @@ interface Props {
 
 const VOLUME_TYPES = ["reps", "time", "distance", "calories"];
 
-// ── Add Exercise Drawer ──────────────────────────────────────────────────────
+// \u2500\u2500 Add Exercise Drawer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function AddExerciseDrawer({
   sectionId,
   exercises,
@@ -119,7 +119,7 @@ function AddExerciseDrawer({
           <div className="relative">
             <i className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sm"
               style={{ color: "var(--brand-text-secondary)" }} />
-            <input type="text" placeholder="Search exercises…" value={search}
+            <input type="text" placeholder="Search exercises\u2026" value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm border"
               style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)", color: "var(--brand-text)" }} />
@@ -136,7 +136,7 @@ function AddExerciseDrawer({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate" style={{ color: "var(--brand-text)" }}>{ex.name}</p>
                     <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                      {ex.muscle_group}{ex.modality ? ` · ${ex.modality}` : ""}
+                      {ex.muscle_group}{ex.modality ? ` \u00b7 ${ex.modality}` : ""}
                     </p>
                   </div>
                   <i className="ti ti-plus text-sm" style={{ color: "var(--brand-primary)" }} />
@@ -144,7 +144,7 @@ function AddExerciseDrawer({
               ))}
               {filtered.length > 20 && (
                 <div className="px-4 py-2 text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                  Showing 20 of {filtered.length} — refine search
+                  Showing 20 of {filtered.length} \u2014 refine search
                 </div>
               )}
             </div>
@@ -204,7 +204,7 @@ function AddExerciseDrawer({
                 <label className="text-[10px] font-semibold uppercase tracking-wide block mb-1"
                   style={{ color: "var(--brand-text-secondary)" }}>Coaching Cue (optional)</label>
                 <input type="text" value={cue} onChange={e => setCue(e.target.value)}
-                  placeholder="Keep core tight, neutral spine…"
+                  placeholder="Keep core tight, neutral spine\u2026"
                   className="w-full px-3 py-2 rounded-lg text-sm border"
                   style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)", color: "var(--brand-text)" }} />
               </div>
@@ -217,7 +217,7 @@ function AddExerciseDrawer({
             <button onClick={handleAdd} disabled={saving}
               className="w-full py-3 rounded-xl text-sm font-bold text-white"
               style={{ background: "var(--brand-primary)", opacity: saving ? 0.6 : 1 }}>
-              {saving ? "Adding…" : `Add ${sets}×${volumeValue} ${selectedEx.name}`}
+              {saving ? "Adding\u2026" : `Add ${sets}\u00d7${volumeValue} ${selectedEx.name}`}
             </button>
           </div>
         )}
@@ -226,7 +226,7 @@ function AddExerciseDrawer({
   );
 }
 
-// ── Edit Exercise Row ────────────────────────────────────────────────────────
+// \u2500\u2500 Edit Exercise Row \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function ExerciseRow({
   pe,
   onDelete,
@@ -251,7 +251,7 @@ function ExerciseRow({
     pe.sets ? `${pe.sets} sets` : null,
     pe.volume_value ? `${pe.volume_value} ${pe.volume_type || "reps"}` : null,
     pe.rest ? `rest ${pe.rest}` : null,
-  ].filter(Boolean).join(" · ");
+  ].filter(Boolean).join(" \u00b7 ");
 
   return (
     <div className="rounded-xl overflow-hidden border mb-2"
@@ -332,7 +332,7 @@ function ExerciseRow({
   );
 }
 
-// ── Main Editor ──────────────────────────────────────────────────────────────
+// \u2500\u2500 Main Editor \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 export default function WorkoutDayEditor({ dayId, clientId, sections: initialSections, exercises }: Props) {
   const [sections, setSections] = useState<Section[]>(initialSections);
   const [addingToSection, setAddingToSection] = useState<string | null>(null);
