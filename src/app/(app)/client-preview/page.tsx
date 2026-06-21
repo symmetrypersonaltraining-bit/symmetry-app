@@ -113,7 +113,7 @@ export default async function ClientPreviewPage() {
   return (
     <ClientDashboard
       firstName={firstName}
-      todayWorkout={todayWorkout as any}
+      todayWorkouts={todayWorkout ? [todayWorkout] as any[] : []}
       metrics={metrics as any[]}
       completedCount={completedCount}
       totalScheduled={totalScheduled}
