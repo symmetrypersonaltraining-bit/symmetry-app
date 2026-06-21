@@ -7,16 +7,16 @@ export async function POST(req: Request) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const body = await req.json();
-    const admin = createAdminClient();
 
-    const { data: clientRec } = await admin
+    // Use user's session to look up their client record (avoid admin PostgREST 403 issues)
+    const { data: clientRec, error: lookupErr } = await supabase
       .from("clients")
       .select("id")
-      .eq("email", user.email!)
+      .eq("auth_user_id", user.id)
       .maybeSingle();
 
+    if (lookupErr) return NextResponse.json({ error: lookupErr.message }, { status: 500 });
     if (!clientRec) return NextResponse.json({ error: "Client not found" }, { status: 404 });
 
     const updates: Record<string, any> = { onboarding_complete: true };
@@ -29,7 +29,8 @@ export async function POST(req: Request) {
     if (body.current_weight) updates.current_weight = Number(body.current_weight);
     if (body.current_body_fat_pct) updates.current_body_fat_pct = Number(body.current_body_fat_pct);
 
-    const { error: updateErr } = await admin
+    // Use supabase (user session) for UPDATE — covered by app_anon_all policy
+    const { error: updateErr } = await supabase
       .from("clients")
       .update(updates)
       .eq("id", clientRec.id);
@@ -41,6 +42,7 @@ export async function POST(req: Request) {
       const bf = body.current_body_fat_pct ? Number(body.current_body_fat_pct) : null;
       const lean = (w && bf) ? +(w * (1 - bf / 100)).toFixed(1) : null;
       const fat = (w && bf) ? +(w * (bf / 100)).toFixed(1) : null;
+      const admin = createAdminClient();
       await admin.from("metrics").insert({
         client_id: clientRec.id,
         metric_date: new Date().toISOString().split("T")[0],
