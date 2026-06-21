@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import ScheduleClient from "./ScheduleClient";
+import { isClientMode } from "@/lib/client-mode";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -12,7 +13,8 @@ export default async function SchedulePage() {
   const isTrainer = user.email === TRAINER_EMAIL;
 
   let clientId: string | null = null;
-  if (isTrainer) {
+  const clientMode = await isClientMode();
+  if (isTrainer && !clientMode) {
     const { data } = await supabase
       .from("clients")
       .select("id")
@@ -95,9 +97,9 @@ export default async function SchedulePage() {
       workoutDates={workoutDates}
       scheduledDows={scheduledDows}
       upcomingDays={upcomingDays}
-      isTrainer={isTrainer}
+      isTrainer={isTrainer && !clientMode}
       paymentReminders={[]}
-      defaultView={isTrainer ? "month" : "week"}
+      defaultView={(isTrainer && !clientMode) ? "month" : "week"}
     />
   );
 }
