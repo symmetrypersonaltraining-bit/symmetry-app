@@ -129,9 +129,10 @@ export default async function WorkoutsLibraryPage() {
               {/* Day cards */}
               <div className="space-y-2">
                 {group.days.map((day, idx) => (
-                  <div
+                  <Link
                     key={day.id}
-                    className="card card-hover flex items-center gap-4 p-4 cursor-pointer animate-slide-up"
+                    href={`/workout/${day.id}`}
+                    className="card card-hover flex items-center gap-4 p-4 cursor-pointer animate-slide-up block"
                     style={{ animationDelay: `${idx * 0.05}s` }}
                   >
                     {/* Day number badge */}
@@ -169,7 +170,7 @@ export default async function WorkoutsLibraryPage() {
                       <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
                         {day.phase_label}
                         {day.exercise_count > 0 && (
-                          <span> · {day.exercise_count} exercises</span>
+                          <span> Â· {day.exercise_count} exercises</span>
                         )}
                       </p>
                     </div>
@@ -179,7 +180,7 @@ export default async function WorkoutsLibraryPage() {
                       className="ti ti-chevron-right"
                       style={{ color: "var(--brand-text-secondary)", fontSize: 18 }}
                     />
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
