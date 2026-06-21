@@ -110,7 +110,7 @@ function LogModal({ clientId, onClose }: { clientId: string; onClose: () => void
       <div style={{ background: "var(--brand-surface)", borderRadius: "16px 16px 0 0", padding: "24px 20px 40px", width: "100%", maxWidth: 480 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ fontWeight: 700, fontSize: 16, color: "var(--brand-text)" }}>Log Measurements</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brand-text-secondary)", fontSize: 20 }}>×</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brand-text-secondary)", fontSize: 20 }}>\u00d7</button>
         </div>
         <div style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 12, color: "var(--brand-text-secondary)", fontWeight: 600 }}>Date</label>
@@ -129,7 +129,7 @@ function LogModal({ clientId, onClose }: { clientId: string; onClose: () => void
         </div>
         <button onClick={handleSave} disabled={saving || success || (!weight && !bodyFat)}
           style={{ width: "100%", padding: "13px", borderRadius: 10, border: "none", background: success ? "#22c55e" : "var(--brand-primary)", color: "white", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: (!weight && !bodyFat) ? 0.5 : 1 }}>
-          {success ? "✓ Saved!" : saving ? "Saving..." : "Save Measurement"}
+          {success ? "\u2713 Saved!" : saving ? "Saving..." : "Save Measurement"}
         </button>
       </div>
     </div>
