@@ -191,9 +191,9 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2 mb-3">
         {[
-          { label: "Workouts", value: totalWorkouts || "—", icon: "ti-barbell" },
-          { label: "Streak", value: "—", icon: "ti-flame" },
-          { label: "Avg mins", value: "—", icon: "ti-clock" },
+          { label: "Workouts", value: totalWorkouts || "\u2014", icon: "ti-barbell" },
+          { label: "Streak", value: "\u2014", icon: "ti-flame" },
+          { label: "Avg mins", value: "\u2014", icon: "ti-clock" },
         ].map((s) => (
           <div
             key={s.label}
@@ -223,7 +223,7 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
                   <div className="text-xs" style={{ color: "#4E6080" }}>{pr.date}</div>
                 </div>
                 <div className="text-sm font-medium" style={{ color: "#0F4C81" }}>
-                  {pr.weight} lb{pr.reps ? ` × ${pr.reps}` : ""}
+                  {pr.weight} lb{pr.reps ? ` \u00d7 ${pr.reps}` : ""}
                 </div>
               </div>
             ))}
@@ -266,7 +266,7 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
             disabled={saving || !logWeight}
             className="btn-primary disabled:opacity-50"
           >
-            {saving ? "Saving…" : saved ? "✓ Saved!" : "Log weight"}
+            {saving ? "Saving\u2026" : saved ? "\u2713 Saved!" : "Log weight"}
           </button>
         </form>
       </div>
