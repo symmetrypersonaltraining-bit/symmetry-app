@@ -40,7 +40,7 @@ interface Props {
 }
 
 // ---- Constants ----
-// Status-based chip colors â blue for scheduled/completed, orange for cancelled
+// Status-based chip colors \u00e2\u0080\u0094 blue for scheduled/completed, orange for cancelled
 const CHIP_BLUE = "#1A73E8";
 const CHIP_ORANGE = "#F97316";
 const CHIP_TEXT = "#ffffff";
@@ -140,7 +140,7 @@ function EventBlock({ ev, clients, onClick }: {
       </p>
       {height > 32 && (
         <p className="text-[10px] leading-tight" style={{ color: "rgba(255,255,255,0.85)" }}>
-          {fmtTime(start)}â{fmtTime(end)}
+          {fmtTime(start)}\u00e2\u0080\u0093{fmtTime(end)}
         </p>
       )}
     </div>
@@ -323,7 +323,7 @@ function AddSessionModal({ date, timeStr, clients, onClose, onSaved }: {
         <button onClick={save} disabled={saving}
           className="w-full py-3 rounded-xl font-bold text-sm"
           style={{ background: "var(--brand-primary)", color: "white", opacity: saving ? 0.7 : 1 }}>
-          {saving ? "Savingâ¦" : recurring !== "none" ? `Save (${recurring === "4w" ? 4 : recurring === "8w" ? 8 : 12} sessions)` : "Save Session"}
+          {saving ? "Saving\u00e2\u0080\u00a6" : recurring !== "none" ? `Save (${recurring === "4w" ? 4 : recurring === "8w" ? 8 : 12} sessions)` : "Save Session"}
         </button>
       </div>
     </div>
@@ -391,7 +391,7 @@ function SessionDetailPopup({ ev, clients, onClose, onSaved }: {
           <div className="flex items-center gap-2.5">
             <i className="ti ti-clock text-base" style={{ color: "var(--brand-text-secondary)" }} />
             <span className="text-sm" style={{ color: "var(--brand-text)" }}>
-              {fmtTime(start)} â {fmtTime(end)}
+              {fmtTime(start)} \u00e2\u0080\u0093 {fmtTime(end)}
             </span>
           </div>
 
@@ -589,8 +589,8 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
                           {displayName(ev)}
                         </p>
                         <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                          {fmtTime(start)} â {fmtTime(end)}
-                          {ev.title && ev.title !== "Training Session" ? ` Â· ${ev.title}` : ""}
+                          {fmtTime(start)} \u00e2\u0080\u0093 {fmtTime(end)}
+                          {ev.title && ev.title !== "Training Session" ? ` \u00c2\u00b7 ${ev.title}` : ""}
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -739,7 +739,7 @@ function TimeGrid({
 }
 
 
-// ---- ClientWorkoutWeekView â per-client programmed workout calendar ----
+// ---- ClientWorkoutWeekView \u00e2\u0080\u0094 per-client programmed workout calendar ----
 function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, clientName }: {
   days: Date[];
   todayStr: string;
@@ -866,7 +866,7 @@ function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, cl
       <div className="flex-shrink-0 px-4 py-3 border-t flex items-center justify-between"
         style={{ borderColor: "var(--brand-border)", background: "var(--brand-surface)" }}>
         <span className="text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>
-          {clientName} Â· Programmed workouts
+          {clientName} \u00c2\u00b7 Programmed workouts
         </span>
         <div className="flex items-center gap-2">
           <a href={`/clients/${clientId}/program`}
@@ -929,7 +929,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
   const [refreshKey, setRefreshKey] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // ââ Per-client workout calendar (fetched client-side when a client is selected) ââ
+  // \u00e2\u0094\u0080\u00e2\u0094\u0080 Per-client workout calendar (fetched client-side when a client is selected) \u00e2\u0094\u0080\u00e2\u0094\u0080
   const [clientWorkouts, setClientWorkouts] = useState<Array<{
     id: string; date: string; status: string;
     dayLabel: string; phaseLabel: string; programName: string; dayId: string | null;
@@ -1050,8 +1050,8 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
     const first = days[0], last = days[days.length - 1];
     const sameMonth = first.getMonth() === last.getMonth();
     headerLabel = sameMonth
-      ? `${first.toLocaleDateString("en-US", { month: "long" })} ${first.getDate()}â${last.getDate()}, ${first.getFullYear()}`
-      : `${first.toLocaleDateString("en-US", { month: "short", day: "numeric" })} â ${last.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+      ? `${first.toLocaleDateString("en-US", { month: "long" })} ${first.getDate()}\u00e2\u0080\u0093${last.getDate()}, ${first.getFullYear()}`
+      : `${first.toLocaleDateString("en-US", { month: "short", day: "numeric" })} \u00e2\u0080\u0093 ${last.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
   } else if (viewMode === "day") {
     headerLabel = dayAnchor.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   }
@@ -1209,7 +1209,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
                           style={{ color: "var(--brand-text-secondary)" }}>Workout</p>
                         <p className="text-sm font-medium truncate"
                           style={{ color, textDecoration: isDone ? "line-through" : "none" }}>
-                          {w.clientName} Â· {w.dayLabel}
+                          {w.clientName} \u00c2\u00b7 {w.dayLabel}
                         </p>
                       </div>
                       {isDone && <i className="ti ti-check text-sm" style={{ color: "#43A047" }} />}
@@ -1228,13 +1228,13 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
                       style={{ background: "var(--brand-bg)", borderLeft: `3px solid ${color}` }}>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                          {fmtTime(start)} â {fmtTime(end)}
+                          {fmtTime(start)} \u00e2\u0080\u0093 {fmtTime(end)}
                         </p>
                         <p className="text-sm font-medium truncate"
                           style={{ color: isCancelled ? "var(--brand-text-secondary)" : "var(--brand-text)",
                             textDecoration: isCancelled ? "line-through" : "none" }}>
                           {ev.clientName && ev.clientName !== "Unknown" ? ev.clientName : (ev.title || ev.assessmentName || "Assessment")}
-                          {ev.clientName && ev.title && ev.title !== "Training Session" ? ` Â· ${ev.title}` : ""}
+                          {ev.clientName && ev.title && ev.title !== "Training Session" ? ` \u00c2\u00b7 ${ev.title}` : ""}
                         </p>
                       </div>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize flex-shrink-0"
