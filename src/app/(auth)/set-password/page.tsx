@@ -37,7 +37,7 @@ export default function SetPasswordPage() {
         .eq("client_id", clientRec.id)
         .maybeSingle();
 
-      if (!settings?.password_is_temporary) { router.replace("/home"); return; }
+      if (!settings?.password_is_temporary && clientRec?.onboarding_complete) { router.replace("/home"); return; }
       setChecking(false);
     }
     check();
@@ -79,7 +79,7 @@ export default function SetPasswordPage() {
       }
 
       setDone(true);
-      setTimeout(() => { router.push("/home"); }, 1800);
+      setTimeout(() => { router.push("/onboarding"); }, 1800);
     } catch (err: any) {
       setError(err.message || "Failed to update password.");
       setLoading(false);
