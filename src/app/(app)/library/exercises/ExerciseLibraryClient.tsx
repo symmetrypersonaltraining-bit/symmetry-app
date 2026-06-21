@@ -62,16 +62,16 @@ function ExerciseDrawer({ ex, onClose }: { ex: Exercise; onClose: () => void }) 
         style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}
         onClick={e => e.stopPropagation()}>
 
-        {/* ── Drag handle (mobile) ── */}
+        {/* \u2500\u2500 Drag handle (mobile) \u2500\u2500 */}
         <div className="flex justify-center pt-3 pb-0 lg:hidden">
           <div className="w-10 h-1 rounded-full" style={{ background: "var(--brand-border)" }} />
         </div>
 
-        {/* ── Header ── */}
+        {/* \u2500\u2500 Header \u2500\u2500 */}
         <div className="flex items-start gap-4 px-5 pt-4 pb-4 border-b"
           style={{ borderColor: "var(--brand-border)" }}>
 
-          {/* Exercise visual — YouTube thumbnail or Symmetry logo placeholder */}
+          {/* Exercise visual \u2014 YouTube thumbnail or Symmetry logo placeholder */}
           {ytThumb ? (
             <div className="w-16 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-black">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -103,7 +103,7 @@ function ExerciseDrawer({ ex, onClose }: { ex: Exercise; onClose: () => void }) 
             </div>
           </div>
 
-          {/* Close button — prominent, always visible */}
+          {/* Close button \u2014 prominent, always visible */}
           <button onClick={onClose}
             className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
             style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}
@@ -112,7 +112,7 @@ function ExerciseDrawer({ ex, onClose }: { ex: Exercise; onClose: () => void }) 
           </button>
         </div>
 
-        {/* ── Details ── */}
+        {/* \u2500\u2500 Details \u2500\u2500 */}
         <div className="p-5 space-y-4">
           {ex.equipment && (
             <div className="flex items-center gap-3">
@@ -259,7 +259,7 @@ export default function ExerciseLibraryClient({ exercises }: Props) {
                       )}
                       {ex.modality && (
                         <>
-                          <span style={{ color: "var(--brand-border)" }}>·</span>
+                          <span style={{ color: "var(--brand-border)" }}>\u00b7</span>
                           <span className="text-[10px] capitalize" style={{ color: "var(--brand-text-secondary)" }}>{ex.modality}</span>
                         </>
                       )}
