@@ -40,8 +40,8 @@ export default async function ProfilePage() {
       const phases = prog?.phases || [];
       const latestPhase = [...phases].sort((a: any, b: any) => b.position - a.position)[0];
       programInfo = {
-        name: prog?.name || "—",
-        phase: latestPhase?.label || "—",
+        name: prog?.name || "\u2014",
+        phase: latestPhase?.label || "\u2014",
       };
     }
   }
@@ -113,7 +113,7 @@ export default async function ProfilePage() {
 
         {/* Version */}
         <p className="text-center text-xs mt-6 mb-4" style={{ color: "#C8D8EC" }}>
-          Symmetry Personal Training · v0.1.0
+          Symmetry Personal Training \u00b7 v0.1.0
         </p>
       </div>
     </>
