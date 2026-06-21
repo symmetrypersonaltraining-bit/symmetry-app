@@ -79,7 +79,7 @@ export default function SetPasswordPage() {
       }
 
       setDone(true);
-      setTimeout(() => { router.push("/onboarding"); }, 1800);
+      setTimeout(() => { window.location.href = "/onboarding"; }, 1800);
     } catch (err: any) {
       setError(err.message || "Failed to update password.");
       setLoading(false);
