@@ -39,7 +39,7 @@ export default async function WorkoutDayEditPage({
     .eq("id", dayId)
     .maybeSingle();
 
-  // Day not found — program not yet migrated
+  // Day not found \u2014 program not yet migrated
   if (!day) {
     return (
       <div style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
@@ -64,7 +64,7 @@ export default async function WorkoutDayEditPage({
             Program Not in App Yet
           </h2>
           <p className="text-sm max-w-xs mx-auto" style={{ color: "var(--brand-text-secondary)" }}>
-            This workout day hasn&apos;t been migrated from Everfit yet. Programs are being imported — check back soon.
+            This workout day hasn&apos;t been migrated from Everfit yet. Programs are being imported \u2014 check back soon.
           </p>
           <Link href={`/clients/${clientId}?tab=training`}
             className="inline-block mt-2 px-5 py-2.5 rounded-xl text-sm font-semibold"
@@ -101,7 +101,7 @@ export default async function WorkoutDayEditPage({
           <span className="text-white/70 text-sm">{(client as any).name}</span>
         </div>
         <h1 className="text-white text-xl font-bold">{d.label || "Workout Day"}</h1>
-        <p className="text-white/60 text-xs mt-0.5">{d.phases?.programs?.name} · {d.phases?.label}</p>
+        <p className="text-white/60 text-xs mt-0.5">{d.phases?.programs?.name} \u00b7 {d.phases?.label}</p>
       </div>
       <div className="p-4">
         <WorkoutDayEditor
