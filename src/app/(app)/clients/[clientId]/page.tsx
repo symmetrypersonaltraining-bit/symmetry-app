@@ -117,9 +117,9 @@ export default async function ClientProfilePage({
         {/* QUICK STATS inline */}
         <div className="flex gap-4 pb-1">
           {[
-            { label: "Weight", value: lm?.weight ? `${lm.weight} lb` : (client.current_weight ? `${client.current_weight} lb` : "—") },
-            { label: "Body Fat", value: lm?.body_fat_pct ? `${lm.body_fat_pct}%` : (client.current_body_fat_pct ? `${client.current_body_fat_pct}%` : "—") },
-            { label: "Lean Mass", value: lm?.lean_mass ? `${lm.lean_mass} lb` : "—" },
+            { label: "Weight", value: lm?.weight ? `${lm.weight} lb` : (client.current_weight ? `${client.current_weight} lb` : "\u2014") },
+            { label: "Body Fat", value: lm?.body_fat_pct ? `${lm.body_fat_pct}%` : (client.current_body_fat_pct ? `${client.current_body_fat_pct}%` : "\u2014") },
+            { label: "Lean Mass", value: lm?.lean_mass ? `${lm.lean_mass} lb` : "\u2014" },
           ].map((s) => (
             <div key={s.label} className="text-center">
               <div className="text-white text-sm font-bold">{s.value}</div>
