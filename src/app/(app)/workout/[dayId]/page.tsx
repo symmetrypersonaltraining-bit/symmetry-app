@@ -47,6 +47,7 @@ export default async function WorkoutDayPage({
     section.prescribed_exercises = [...(section.prescribed_exercises || [])].sort(
       (a: any, b: any) => a.position - b.position
     );
+    (section as any).label = (section as any).client_facing_name || (section as any).internal_name;
   }
 
   let clientId: string | null = null;
