@@ -235,7 +235,7 @@ const METRIC_CONFIG: { key: MetricKey; label: string; unit: string; color: strin
   { key: "fat_mass",     label: "Fat Mass",    unit: "lbs", color: "#ef4444",              icon: "ti-flame" },
 ];
 
-export default function ClientDashboard({ firstName, todayWorkouts = [], metrics, completedCount, totalScheduled, recentWorkouts, streakDays, weekWorkouts, allScheduled = [] }: Props) {
+export default function ClientDashboard({ firstName, todayWorkouts = [], metrics, completedCount, totalScheduled, recentWorkouts, streakDays, weekWorkouts, allScheduled = [], clientId }: Props) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
   const hour = new Date().getHours();
