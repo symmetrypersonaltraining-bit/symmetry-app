@@ -775,7 +775,7 @@ export default function WorkoutLogger({
             <i className="ti ti-arrow-left text-white text-lg" />
           </Link>
           <div className="flex-1">
-            <p className="text-white/60 text-xs">{program?.name} \u00b7 {phase?.label}</p>
+            <p className="text-white/60 text-xs">{program?.name} {'\u00b7'} {phase?.label}</p>
             <h1 className="text-white font-bold text-base">{day.label}</h1>
           </div>
           <div className="flex items-center gap-2">
