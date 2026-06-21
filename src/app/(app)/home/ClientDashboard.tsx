@@ -262,7 +262,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <div className="flex items-start justify-between pt-2">
           <div>
             <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{greeting},</p>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>{firstName} \u00f0\u009f\u0091\u008b</h1>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>{firstName} {'👋'}</h1>
           </div>
           {streakDays > 0 && (
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${isMilestone ? "animate-pulse" : ""}`} style={{ background: isMilestone ? "#f59e0b20" : "var(--brand-surface)", border: `1px solid ${isMilestone ? "#f59e0b" : "var(--brand-border)"}` }}>
@@ -275,7 +275,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <div className="metric-card">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>This Week</span>
-            <Link href="/client-preview/schedule" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View Schedule \u2192</Link>
+            <Link href="/client-preview/schedule" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View Schedule {'\u2192'}</Link>
           </div>
           <WeekRing allScheduled={scheduleSource} weekOffset={weekOffset} onPrev={() => setWeekOffset(o => o - 1)} onNext={() => setWeekOffset(o => Math.min(0, o + 1))} />
         </div>
@@ -294,7 +294,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
             })}
           </div>
         ) : (
-          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} /><p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p><p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program \u00f0\u009f\u0092\u00aa</p></div>
+          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} /><p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p><p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program {'💪'}</p></div>
         )}
 
         <div className="grid grid-cols-2 gap-3">
@@ -305,7 +305,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <div>
           <div className="flex items-center justify-between mb-2.5">
             <h2 className="text-base font-bold" style={{ color: "var(--brand-text)" }}>Progress</h2>
-            <Link href="/progress" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View all \u2192</Link>
+            <Link href="/progress" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View all {'\u2192'}</Link>
           </div>
           <div className="grid grid-cols-2 gap-3">
             {METRIC_CONFIG.map(mc => <MetricCard key={mc.key} label={mc.label} value={latestVal(mc.key)} unit={mc.unit} values={metricValues[mc.key]} color={mc.color} icon={mc.icon} onClick={() => setActiveMetric(mc.key)} />)}
