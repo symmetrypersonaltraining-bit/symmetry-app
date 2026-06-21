@@ -276,7 +276,7 @@ export default function AIAssistant({ isTrainer }: { isTrainer: boolean }) {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-                placeholder="Ask anything about trainingÃ¢ÂÂ¦"
+                placeholder="Ask anything about trainingâ¦"
                 className="flex-1 text-sm px-3.5 py-2.5 rounded-xl outline-none"
                 style={{
                   background: "var(--brand-bg)",
