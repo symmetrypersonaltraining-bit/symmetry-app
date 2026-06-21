@@ -170,7 +170,7 @@ export default async function WorkoutsLibraryPage() {
                       <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
                         {day.phase_label}
                         {day.exercise_count > 0 && (
-                          <span> · {day.exercise_count} exercises</span>
+                          <span> \u00b7 {day.exercise_count} exercises</span>
                         )}
                       </p>
                     </div>
