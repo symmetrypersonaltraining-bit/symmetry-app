@@ -49,7 +49,7 @@ export default async function HomePage() {
     type WE = { id: string; clientId: string; clientName: string; date: string; dayLabel: string; status: string };
     const workoutMapRange = new Date(today);
     workoutMapRange.setMonth(workoutMapRange.getMonth() + 3);
-    const { data: workoutRows } = await supabase
+    const { data: workoutRows } = await (supabase as any)
       .from("scheduled_workouts")
       .select("id, client_id, scheduled_date, status, days(label), clients(id, name)")
       .gte("scheduled_date", new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().split("T")[0])
@@ -68,13 +68,13 @@ export default async function HomePage() {
     thirtyDays.setDate(thirtyDays.getDate() + 30);
     const { data: remindersRaw } = await supabase
       .from("payment_reminders")
-      .select("id, client_id, due_date, amount_due, billing_credits, notification_status, sms_sent_at, clients(id, name)")
+      .select("id, client_id, due_date, amount_due, billing_credits, notification_status, email_sent_at, clients(id, name)")
       .gte("due_date", today.toISOString().split("T")[0])
       .lte("due_date", thirtyDays.toISOString().split("T")[0])
       .in("notification_status", ["pending", "paused"])
       .order("due_date");
 
-    const reminders = (remindersRaw || []).map((r: any) => ({ id: r.id, clientName: r.clients?.name || "Unknown", clientId: r.clients?.id || r.client_id, dueDate: r.due_date, amountDue: Number(r.amount_due), billingCredits: Number(r.billing_credits), notificationStatus: r.notification_status, smsSentAt: r.sms_sent_at }));
+    const reminders = (remindersRaw || []).map((r: any) => ({ id: r.id, clientName: r.clients?.name || "Unknown", clientId: r.clients?.id || r.client_id, dueDate: r.due_date, amountDue: Number(r.amount_due), billingCredits: Number(r.billing_credits), notificationStatus: r.notification_status, emailSentAt: r.email_sent_at }));
 
     return (
       <div className="p-4 lg:p-6">
