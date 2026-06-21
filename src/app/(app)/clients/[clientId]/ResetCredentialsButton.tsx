@@ -2,15 +2,7 @@
 
 import { useState } from "react";
 
-export default function ResetCredentialsButton({
-  clientId,
-  clientName,
-  clientEmail,
-}: {
-  clientId: string;
-  clientName: string;
-  clientEmail: string;
-}) {
+export default function ResetCredentialsButton({ clientId }: { clientId: string }) {
   const [step, setStep] = useState<"idle" | "confirm" | "sending" | "done" | "error">("idle");
   const [errMsg, setErrMsg] = useState("");
 
@@ -20,14 +12,14 @@ export default function ResetCredentialsButton({
       const res = await fetch("/api/invite-client", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, clientName, clientEmail }),
+        body: JSON.stringify({ clientId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to reset");
       setStep("done");
       setTimeout(() => setStep("idle"), 3000);
-    } catch (e: any) {
-      setErrMsg(e.message);
+    } catch (e: unknown) {
+      setErrMsg(e instanceof Error ? e.message : "Error");
       setStep("error");
       setTimeout(() => setStep("idle"), 3000);
     }
