@@ -44,12 +44,12 @@ interface Props {
   allScheduled?: ScheduledDay[];
 }
 
-// âââ Sparkline âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Sparkline Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length < 2) {
     return (
       <div className="flex items-center justify-center h-10 text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-        â
+        Ã¢ÂÂ
       </div>
     );
   }
@@ -78,13 +78,13 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
         <circle cx={lastPt[0]} cy={lastPt[1]} r="3" fill={color} />
       </svg>
       <span className="text-xs font-semibold tabular-nums" style={{ color: trendColor }}>
-        {delta > 0 ? "â" : delta < 0 ? "â" : "â"}{Math.abs(delta).toFixed(1)}
+        {delta > 0 ? "Ã¢ÂÂ" : delta < 0 ? "Ã¢ÂÂ" : "Ã¢ÂÂ"}{Math.abs(delta).toFixed(1)}
       </span>
     </div>
   );
 }
 
-// âââ Full Chart âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Full Chart Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function FullChart({ values, dates, color, label, unit }: { values: number[]; dates: string[]; color: string; label: string; unit: string }) {
   const [hovered, setHovered] = useState<number | null>(null);
   if (values.length < 2) return <div className="flex items-center justify-center h-48 text-sm" style={{ color: "var(--brand-text-secondary)" }}>Not enough data to chart</div>;
@@ -127,7 +127,7 @@ function FullChart({ values, dates, color, label, unit }: { values: number[]; da
   );
 }
 
-// âââ Metric Modal âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Metric Modal Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function MetricModal({ metricKey, label, unit, color, icon, metrics, onClose }: { metricKey: "weight" | "body_fat_pct" | "lean_mass" | "fat_mass"; label: string; unit: string; color: string; icon: string; metrics: MetricPoint[]; onClose: () => void }) {
   const values = metrics.map(m => m[metricKey]).filter((v): v is number => v != null);
   const dates = metrics.filter(m => m[metricKey] != null).map(m => m.metric_date);
@@ -149,7 +149,7 @@ function MetricModal({ metricKey, label, unit, color, icon, metrics, onClose }: 
   );
 }
 
-// âââ Metric Card ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Metric Card Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function MetricCard({ label, value, unit, values, color, icon, onClick }: { label: string; value: string | number | null; unit: string; values: number[]; color: string; icon: string; onClick: () => void }) {
   const hasData = value != null;
   return (
@@ -168,13 +168,13 @@ function MetricCard({ label, value, unit, values, color, icon, onClick }: { labe
       </div>
       <Sparkline values={values} color={color} />
       <p className="text-xs mt-1.5" style={{ color: "var(--brand-text-secondary)" }}>
-        {hasData ? "Tap to expand â" : "Logged after assessment"}
+        {hasData ? "Tap to expand Ã¢ÂÂ" : "Logged after assessment"}
       </p>
     </button>
   );
 }
 
-// âââ Week Ring ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Week Ring Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function WeekRing({ allScheduled = [], weekOffset, onPrev, onNext }: { allScheduled: ScheduledDay[]; weekOffset: number; onPrev: () => void; onNext: () => void }) {
   const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const today = new Date();
@@ -225,7 +225,7 @@ function WeekRing({ allScheduled = [], weekOffset, onPrev, onNext }: { allSchedu
   );
 }
 
-// âââ Main Dashboard âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Main Dashboard Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 type MetricKey = "weight" | "body_fat_pct" | "lean_mass" | "fat_mass";
 const METRIC_CONFIG: { key: MetricKey; label: string; unit: string; color: string; icon: string }[] = [
   { key: "weight",       label: "Body Weight", unit: "lbs", color: "var(--brand-primary)", icon: "ti-scale" },
@@ -261,11 +261,11 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <div className="flex items-start justify-between pt-2">
           <div>
             <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{greeting},</p>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>{firstName} ð</h1>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>{firstName} Ã°ÂÂÂ</h1>
           </div>
           {streakDays > 0 && (
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${isMilestone ? "animate-pulse" : ""}`} style={{ background: isMilestone ? "#f59e0b20" : "var(--brand-surface)", border: `1px solid ${isMilestone ? "#f59e0b" : "var(--brand-border)"}` }}>
-              <span className="text-base">{isMilestone ? "ð" : "ð¥"}</span>
+              <span className="text-base">{isMilestone ? "Ã°ÂÂÂ" : "Ã°ÂÂÂ¥"}</span>
               <div><span className="text-sm font-bold" style={{ color: isMilestone ? "#f59e0b" : "var(--brand-text)" }}>{streakDays}</span><span className="text-xs ml-0.5" style={{ color: "var(--brand-text-secondary)" }}>day{streakDays !== 1 ? "s" : ""}</span></div>
             </div>
           )}
@@ -274,7 +274,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <div className="metric-card">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>This Week</span>
-            <Link href="/schedule" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View Schedule â</Link>
+            <Link href="/client-preview/schedule" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View Schedule Ã¢ÂÂ</Link>
           </div>
           <WeekRing allScheduled={scheduleSource} weekOffset={weekOffset} onPrev={() => setWeekOffset(o => o - 1)} onNext={() => setWeekOffset(o => Math.min(0, o + 1))} />
         </div>
@@ -287,13 +287,13 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
               const don = tw.status === "completed";
               const crd = isCardioLabel(lbl);
               if (i === 0) {
-                return (<Link key={tw.id} href={`/workout/${lnk}`}><div className="rounded-2xl p-5 relative overflow-hidden" style={{ background: "var(--brand-primary)" }}><div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ background: "white", transform: "translate(30%,-30%)" }} /><div className="absolute bottom-0 left-0 w-20 h-20 rounded-full opacity-5" style={{ background: "white", transform: "translate(-30%,30%)" }} /><div className="relative"><p className="text-xs font-semibold text-white/70 mb-1 uppercase tracking-widest">{crd ? "Today's Cardio" : "Today's Workout"}</p><h2 className="text-xl font-bold text-white mb-3">{lbl}</h2>{don ? (<div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5"><i className="ti ti-check text-sm text-white" /><span className="text-xs text-white font-medium">Completed ✓</span></div>) : (<div className="inline-flex items-center gap-2 bg-white text-sm font-semibold rounded-full px-4 py-2" style={{ color: "var(--brand-primary)" }}><i className={`ti ${crd?"ti-run":"ti-player-play"}`} />{crd?"Start Cardio":"Start Workout"}</div>)}</div></div></Link>);
+                return (<Link key={tw.id} href={`/workout/${lnk}`}><div className="rounded-2xl p-5 relative overflow-hidden" style={{ background: "var(--brand-primary)" }}><div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ background: "white", transform: "translate(30%,-30%)" }} /><div className="absolute bottom-0 left-0 w-20 h-20 rounded-full opacity-5" style={{ background: "white", transform: "translate(-30%,30%)" }} /><div className="relative"><p className="text-xs font-semibold text-white/70 mb-1 uppercase tracking-widest">{crd ? "Today's Cardio" : "Today's Workout"}</p><h2 className="text-xl font-bold text-white mb-3">{lbl}</h2>{don ? (<div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5"><i className="ti ti-check text-sm text-white" /><span className="text-xs text-white font-medium">Completed â</span></div>) : (<div className="inline-flex items-center gap-2 bg-white text-sm font-semibold rounded-full px-4 py-2" style={{ color: "var(--brand-primary)" }}><i className={`ti ${crd?"ti-run":"ti-player-play"}`} />{crd?"Start Cardio":"Start Workout"}</div>)}</div></div></Link>);
               }
-              return (<Link key={tw.id} href={`/workout/${lnk}`}><div className="rounded-2xl p-4 flex items-center gap-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: don ? "#22c55e20" : "var(--brand-card)" }}><i className={`ti ${don?"ti-check":crd?"ti-run":"ti-barbell"} text-base`} style={{ color: don ? "#22c55e" : "var(--brand-primary)" }} /></div><div className="flex-1 min-w-0"><p className="text-xs font-semibold uppercase tracking-widest mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>{crd?"Today's Cardio":"Also Today"}</p><p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{lbl}</p></div>{don ? (<span className="text-xs font-medium flex-shrink-0" style={{ color: "#22c55e" }}>Done ✓</span>) : (<div className="flex items-center gap-1 flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-white" style={{ background: "var(--brand-primary)" }}><i className="ti ti-player-play text-xs" /> Start</div>)}</div></Link>);
+              return (<Link key={tw.id} href={`/workout/${lnk}`}><div className="rounded-2xl p-4 flex items-center gap-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: don ? "#22c55e20" : "var(--brand-card)" }}><i className={`ti ${don?"ti-check":crd?"ti-run":"ti-barbell"} text-base`} style={{ color: don ? "#22c55e" : "var(--brand-primary)" }} /></div><div className="flex-1 min-w-0"><p className="text-xs font-semibold uppercase tracking-widest mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>{crd?"Today's Cardio":"Also Today"}</p><p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{lbl}</p></div>{don ? (<span className="text-xs font-medium flex-shrink-0" style={{ color: "#22c55e" }}>Done â</span>) : (<div className="flex items-center gap-1 flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-white" style={{ background: "var(--brand-primary)" }}><i className="ti ti-player-play text-xs" /> Start</div>)}</div></Link>);
             })}
           </div>
         ) : (
-          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} /><p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p><p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program 💪</p></div>
+          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} /><p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p><p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program ðª</p></div>
         )}
 
         <div className="grid grid-cols-2 gap-3">
@@ -304,7 +304,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <div>
           <div className="flex items-center justify-between mb-2.5">
             <h2 className="text-base font-bold" style={{ color: "var(--brand-text)" }}>Progress</h2>
-            <Link href="/progress" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View all â</Link>
+            <Link href="/progress" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View all Ã¢ÂÂ</Link>
           </div>
           <div className="grid grid-cols-2 gap-3">
             {METRIC_CONFIG.map(mc => <MetricCard key={mc.key} label={mc.label} value={latestVal(mc.key)} unit={mc.unit} values={metricValues[mc.key]} color={mc.color} icon={mc.icon} onClick={() => setActiveMetric(mc.key)} />)}
