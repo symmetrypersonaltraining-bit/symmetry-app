@@ -53,7 +53,7 @@ export default function ScheduleClient({
   const [showPayments, setShowPayments] = useState(true);
   const [view, setView] = useState<"week" | "month">(defaultView);
 
-  // ── Week view helpers ────────────────────────────────────────────────────────
+  // \u2500\u2500 Week view helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   const nowDate = new Date();
   const nowStr = nowDate.toISOString().split("T")[0];
   const nowDow = nowDate.getDay(); // 0=Sun (matches our Sunday-first layout)
@@ -72,7 +72,7 @@ export default function ScheduleClient({
     return { dateStr, dayNum, dow: i, hasLog, isScheduled, isToday, upcoming };
   });
 
-  // ── Payment map (trainer only) ───────────────────────────────────────────────
+  // \u2500\u2500 Payment map (trainer only) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   const paymentDateMap: Record<string, PaymentReminder[]> = {};
   for (const pr of paymentReminders) {
     if (!paymentDateMap[pr.date]) paymentDateMap[pr.date] = [];
@@ -89,7 +89,7 @@ export default function ScheduleClient({
     })
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // ── Shared: view toggle UI ───────────────────────────────────────────────────
+  // \u2500\u2500 Shared: view toggle UI \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   const viewToggle = (
     <div className="flex rounded-xl overflow-hidden border" style={{ borderColor: "#C8D8EC" }}>
       {(["week", "month"] as const).map((v) => (
@@ -139,7 +139,7 @@ export default function ScheduleClient({
             </div>
           )}
 
-          {/* ── WEEK VIEW ─────────────────────────────────────────────── */}
+          {/* \u2500\u2500 WEEK VIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
           {view === "week" && (
             <>
               {/* Day headers */}
@@ -204,7 +204,7 @@ export default function ScheduleClient({
             </>
           )}
 
-          {/* ── MONTH VIEW ────────────────────────────────────────────── */}
+          {/* \u2500\u2500 MONTH VIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
           {view === "month" && (
             <>
               <div className="grid grid-cols-7 mb-2">
@@ -326,7 +326,7 @@ export default function ScheduleClient({
             <p className="label mt-4">all clients</p>
             <div className="card text-sm" style={{ color: "#4E6080", padding: "1rem" }}>
               <i className="ti ti-brand-google text-lg mr-2" style={{ color: "#0F4C81" }} />
-              Google Calendar sync — connect in Settings to push sessions both ways.
+              Google Calendar sync \u2014 connect in Settings to push sessions both ways.
             </div>
           </>
         )}
