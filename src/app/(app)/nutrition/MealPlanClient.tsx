@@ -180,7 +180,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     try {
       const { data } = await supabase.from("meal_adherence_logs").upsert({
         client_id: clientId, log_date: today, meal_id: offPlanModal.mealId,
-        meal_position: offPlanModal.position, adherence: "off_plan",
+        meal_position: offPlanModal.position, adherence: "Off-plan",
         off_plan_details: offPlanDetails || null,
         est_kcal:    offPlanKcal ? parseFloat(offPlanKcal) : null,
         est_protein: offPlanP    ? parseFloat(offPlanP)    : null,
