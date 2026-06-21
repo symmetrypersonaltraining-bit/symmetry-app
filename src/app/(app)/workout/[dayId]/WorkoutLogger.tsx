@@ -36,7 +36,7 @@ interface Section {
 }
 
 interface Props {
-  day: { id: string; label: string; notes: string | null };
+  day: { id: string; label: string; notes?: string | null };
   phase: { id: string; label: string };
   program: { id: string; name: string };
   sections: Section[];
@@ -50,7 +50,7 @@ interface Props {
 type SetData = { weight: string; reps: string; done: boolean };
 type HistoryEntry = { log_date: string; sets: { set_number: number; weight_lbs: number | null; reps: number | null }[] };
 
-// ─── iOS SCROLL-WHEEL TIMER ────────────────────────────────────────────────────
+// âââ iOS SCROLL-WHEEL TIMER ââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function WheelColumn({ values, selected, onChange }: {
   values: number[];
   selected: number;
@@ -184,7 +184,7 @@ function TimerWheel({ onClose }: { onClose: () => void }) {
               style={mode === md
                 ? { background: "var(--brand-primary)", color: "white" }
                 : { background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}>
-              {md === "timer" ? "⏱ Timer" : "⏲ Stopwatch"}
+              {md === "timer" ? "â± Timer" : "â² Stopwatch"}
             </button>
           ))}
         </div>
@@ -236,7 +236,7 @@ function TimerWheel({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── EXERCISE HISTORY DRAWER ────────────────────────────────────────────────────
+// âââ EXERCISE HISTORY DRAWER ââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
   exerciseId: string;
   exerciseName: string;
@@ -304,7 +304,7 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
           </div>
         </div>
         {loading ? (
-          <div className="py-8 text-center text-sm" style={{ color: "var(--brand-text-secondary)" }}>Loading…</div>
+          <div className="py-8 text-center text-sm" style={{ color: "var(--brand-text-secondary)" }}>Loadingâ¦</div>
         ) : history.length === 0 ? (
           <div className="py-8 text-center">
             <i className="ti ti-history text-3xl block mb-2" style={{ color: "var(--brand-text-secondary)" }} />
@@ -314,7 +314,7 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
           <div key={i} className="mb-4 rounded-xl p-4"
             style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)" }}>
             <p className="text-xs font-semibold mb-2" style={{ color: "var(--brand-primary)" }}>
-              {i === 0 ? "Most Recent · " : ""}{fmtDate(entry.log_date)}
+              {i === 0 ? "Most Recent Â· " : ""}{fmtDate(entry.log_date)}
             </p>
             {entry.sets.sort((a, b) => a.set_number - b.set_number).map(s => (
               <div key={s.set_number} className="flex items-center gap-3 py-1 text-sm">
@@ -322,8 +322,8 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
                 <span className="font-medium" style={{ color: "var(--brand-text)" }}>
                   {s.weight_lbs ? `${s.weight_lbs} lb` : "BW"}
                 </span>
-                <span style={{ color: "var(--brand-text-secondary)" }}>×</span>
-                <span style={{ color: "var(--brand-text)" }}>{s.reps ?? "—"} reps</span>
+                <span style={{ color: "var(--brand-text-secondary)" }}>Ã</span>
+                <span style={{ color: "var(--brand-text)" }}>{s.reps ?? "â"} reps</span>
               </div>
             ))}
           </div>
@@ -333,7 +333,7 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
   );
 }
 
-// ─── REST TIMER ────────────────────────────────────────────────────────────────
+// âââ REST TIMER ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => void }) {
   const [remaining, setRemaining] = useState(seconds);
   useEffect(() => {
@@ -370,7 +370,7 @@ function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => void })
   );
 }
 
-// ─── MAIN COMPONENT ─────────────────────────────────────────────────────────────
+// âââ MAIN COMPONENT âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 export default function WorkoutLogger({
   day, phase, program, sections, clientId, clientName, isTrainerSession,
   existingLogId, existingSetLogs,
@@ -533,7 +533,7 @@ export default function WorkoutLogger({
     r.start();
   }
 
-  // ─── WORKOUT COMPLETE ────────────────────────────────────────────────────────
+  // âââ WORKOUT COMPLETE ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   if (workoutComplete) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
@@ -542,7 +542,7 @@ export default function WorkoutLogger({
           <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ background: "#22c55e20" }}>
             <i className="ti ti-trophy text-5xl" style={{ color: "#22c55e" }} />
           </div>
-          <div className="absolute -top-1 -right-1 text-2xl animate-bounce">🎉</div>
+          <div className="absolute -top-1 -right-1 text-2xl animate-bounce">ð</div>
         </div>
         <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--brand-text)" }}>Session Complete!</h1>
         <p className="text-sm mb-2" style={{ color: "var(--brand-text-secondary)" }}>{day.label}</p>
@@ -556,7 +556,7 @@ export default function WorkoutLogger({
     );
   }
 
-  // ─── SESSION MODE ─────────────────────────────────────────────────────────────
+  // âââ SESSION MODE âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   if (sessionMode && currentExercise) {
     const peSets = sets[currentExercise.id] || [];
 
@@ -684,7 +684,7 @@ export default function WorkoutLogger({
           {/* Session note */}
           <div className="flex items-center gap-2 mb-3">
             <input type="text" value={sessionNote} onChange={e => setSessionNote(e.target.value)}
-              placeholder="Session note…" className="flex-1 text-sm px-4 py-2.5 rounded-xl outline-none"
+              placeholder="Session noteâ¦" className="flex-1 text-sm px-4 py-2.5 rounded-xl outline-none"
               style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(255,255,255,0.08)" }} />
             <button onClick={startVoiceNote}
               className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -703,7 +703,7 @@ export default function WorkoutLogger({
               </div>
               <div className="flex gap-2">
                 <input type="text" value={trainerNoteText} onChange={e => setTrainerNoteText(e.target.value)}
-                  placeholder="Note for AI program adjustments…"
+                  placeholder="Note for AI program adjustmentsâ¦"
                   className="flex-1 text-xs px-3 py-2 rounded-lg outline-none"
                   style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(139,92,246,0.3)" }} />
                 <button onClick={startTrainerVoice}
@@ -739,7 +739,7 @@ export default function WorkoutLogger({
                   background: progressPct === 100 ? "#22c55e" : "rgba(255,255,255,0.06)",
                   color: progressPct === 100 ? "white" : "rgba(255,255,255,0.3)",
                 }}>
-                {saving ? "Saving…" : "Complete ✓"}
+                {saving ? "Savingâ¦" : "Complete â"}
               </button>
             )}
           </div>
@@ -748,7 +748,7 @@ export default function WorkoutLogger({
     );
   }
 
-  // ─── STANDARD VIEW ──────────────────────────────────────────────────────────
+  // âââ STANDARD VIEW ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   return (
     <div style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
       {historyExercise && (
@@ -775,7 +775,7 @@ export default function WorkoutLogger({
             <i className="ti ti-arrow-left text-white text-lg" />
           </Link>
           <div className="flex-1">
-            <p className="text-white/60 text-xs">{program?.name} · {phase?.label}</p>
+            <p className="text-white/60 text-xs">{program?.name} Â· {phase?.label}</p>
             <h1 className="text-white font-bold text-base">{day.label}</h1>
           </div>
           <div className="flex items-center gap-2">
@@ -840,7 +840,7 @@ export default function WorkoutLogger({
                     <div className="flex-1">
                       <p className="font-semibold text-sm" style={{ color: "var(--brand-text)" }}>{pe.exercises?.name}</p>
                       <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                        {pe.sets} sets{pe.volume_value ? ` · ${pe.volume_value}` : ""}{pe.load_descriptor ? ` · ${pe.load_descriptor}` : ""}
+                        {pe.sets} sets{pe.volume_value ? ` Â· ${pe.volume_value}` : ""}{pe.load_descriptor ? ` Â· ${pe.load_descriptor}` : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
@@ -882,7 +882,7 @@ export default function WorkoutLogger({
                       </div>
                       <input type="number" value={setEntry.weight}
                         onChange={e => updateSet(pe.id, si, "weight", e.target.value)}
-                        disabled={setEntry.done} placeholder="—"
+                        disabled={setEntry.done} placeholder="â"
                         className="text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
@@ -891,7 +891,7 @@ export default function WorkoutLogger({
                         }} inputMode="decimal" />
                       <input type="number" value={setEntry.reps}
                         onChange={e => updateSet(pe.id, si, "reps", e.target.value)}
-                        disabled={setEntry.done} placeholder="—"
+                        disabled={setEntry.done} placeholder="â"
                         className="text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
@@ -922,7 +922,7 @@ export default function WorkoutLogger({
             </div>
             <div className="flex gap-2">
               <input type="text" value={trainerNoteText} onChange={e => setTrainerNoteText(e.target.value)}
-                placeholder="Record a note for AI program adjustments…"
+                placeholder="Record a note for AI program adjustmentsâ¦"
                 className="flex-1 text-sm px-3 py-2.5 rounded-xl outline-none"
                 style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid rgba(139,92,246,0.3)" }} />
               <button onClick={startTrainerVoice}
@@ -945,7 +945,7 @@ export default function WorkoutLogger({
           style={progressPct === 100
             ? { background: "#22c55e", color: "white" }
             : { background: "var(--brand-surface)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}>
-          {saving ? "Saving…" : progressPct === 100 ? "🏆 Complete Workout" : `${progressPct}% — keep going!`}
+          {saving ? "Savingâ¦" : progressPct === 100 ? "ð Complete Workout" : `${progressPct}% â keep going!`}
         </button>
       </div>
     </div>
