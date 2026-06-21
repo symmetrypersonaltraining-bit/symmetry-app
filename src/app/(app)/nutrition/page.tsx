@@ -34,7 +34,7 @@ export default async function NutritionPage({
       clientId = params.clientId;
       clientName = found?.name || "Client";
     }
-    // No default — trainer must pick a client
+    // No default \u2014 trainer must pick a client
   } else {
     const { data } = await supabase
       .from("clients")
