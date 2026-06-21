@@ -55,7 +55,7 @@ interface Props {
 
 // ---- Mini sparkline ----
 function MiniSparkline({ values, color }: { values: number[]; color: string }) {
-  if (values.length < 2) return <span style={{ color: "var(--brand-text-secondary)", fontSize: 12 }}>\u00c3\u00a2\u00c2\u0080\u00c2\u0094</span>;
+  if (values.length < 2) return <span style={{ color: "var(--brand-text-secondary)", fontSize: 12 }}>\u2014</span>;
   const w = 80, h = 28, pad = 3;
   const min = Math.min(...values), max = Math.max(...values);
   const range = max - min || 1;
@@ -145,8 +145,8 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
                 Last workout: <span style={{ color: "var(--brand-text)", fontWeight: 600 }}>
                   {recentCompleted.days?.label || "Workout"}
                 </span>
-                {recentCompleted.scheduled_date === todayStr ? " \u00c3\u00a2\u00c2\u0080\u00c2\u00a2 Today" :
-                  ` \u00c3\u00a2\u00c2\u0080\u00c2\u00a2 ${new Date(recentCompleted.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                {recentCompleted.scheduled_date === todayStr ? " \u2022 Today" :
+                  ` \u2022 ${new Date(recentCompleted.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
               </p>
             </div>
             {(recentCompleted.days?.id || recentCompleted.day_id) ? (
@@ -213,7 +213,7 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
               <div className="flex-1">
                 <p className="text-[10px]" style={{ color: "var(--brand-text-secondary)" }}>{m.label}</p>
                 <p className="text-base font-bold leading-tight" style={{ color: "var(--brand-text)" }}>
-                  {m.latest != null ? `${m.latest}${m.unit}` : "\u00c3\u00a2\u00c2\u0080\u00c2\u0094"}
+                  {m.latest != null ? `${m.latest}${m.unit}` : "\u2014"}
                   {m.delta != null && (
                     <span className="text-[10px] font-normal ml-1.5" style={{ color: m.delta <= 0 ? "#22c55e" : "#ef4444" }}>
                       {m.delta > 0 ? "+" : ""}{m.delta.toFixed(1)}{m.unit}
@@ -275,10 +275,10 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
           style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
           {[
             { label: "Email", value: client.email },
-            { label: "Phone", value: client.phone || "\u00c3\u00a2\u00c2\u0080\u00c2\u0094" },
-            { label: "Goal", value: client.primary_goal || "\u00c3\u00a2\u00c2\u0080\u00c2\u0094" },
-            { label: "Experience", value: client.experience_level || "\u00c3\u00a2\u00c2\u0080\u00c2\u0094" },
-            { label: "Frequency", value: client.training_frequency ? `${client.training_frequency}x / week` : "\u00c3\u00a2\u00c2\u0080\u00c2\u0094" },
+            { label: "Phone", value: client.phone || "\u2014" },
+            { label: "Goal", value: client.primary_goal || "\u2014" },
+            { label: "Experience", value: client.experience_level || "\u2014" },
+            { label: "Frequency", value: client.training_frequency ? `${client.training_frequency}x / week` : "\u2014" },
           ].map((row, i, arr) => (
             <div key={row.label} className={`flex items-start gap-4 px-4 py-3 ${i < arr.length - 1 ? "border-b" : ""}`}
               style={{ borderColor: "var(--brand-border)" }}>
@@ -357,7 +357,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
     endDate.setDate(weekAnchor.getDate() + weeks * 7 - 1);
     const startLabel = weekAnchor.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     const endLabel = endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    headerLabel = `${startLabel} \u00c3\u00a2\u00c2\u0080\u00c2\u0093 ${endLabel}`;
+    headerLabel = `${startLabel} \u2013 ${endLabel}`;
   }
 
   function WorkoutChip({ w, compact }: { w: WorkoutEntry; compact?: boolean }) {
@@ -381,7 +381,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
     );
   }
 
-  // Programming Engine button \u00c3\u00a2\u00c2\u0080\u00c2\u0094 appears above the calendar
+  // Programming Engine button \u2014 appears above the calendar
   const ProgrammingEngineButton = (
     <div className="flex justify-end mb-3">
       <Link
@@ -488,7 +488,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
                     <div className="space-y-1">
                       {dws.map(w => <WorkoutChip key={w.id} w={w} compact={false} />)}
                       {dws.length === 0 && (
-                        <p className="text-[9px] text-center mt-2" style={{ color: "var(--brand-text-secondary)" }}>\u00c3\u00a2\u00c2\u0080\u00c2\u0094</p>
+                        <p className="text-[9px] text-center mt-2" style={{ color: "var(--brand-text-secondary)" }}>\u2014</p>
                       )}
                     </div>
                   </div>
@@ -579,7 +579,7 @@ function MetricsTab({ metrics }: { metrics: MetricPoint[] }) {
             <div className="flex-1">
               <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{m.label}</p>
               <p className="text-lg font-bold" style={{ color: "var(--brand-text)" }}>
-                {latest != null ? `${latest}${m.unit}` : "\u00c3\u00a2\u00c2\u0080\u00c2\u0094"}
+                {latest != null ? `${latest}${m.unit}` : "\u2014"}
                 {delta != null && (
                   <span className="text-xs font-normal ml-2" style={{ color: delta <= 0 ? "#22c55e" : "#ef4444" }}>
                     {delta > 0 ? "+" : ""}{delta.toFixed(1)}{m.unit}
@@ -666,7 +666,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
         ) : (
           <span className="text-sm flex-1 pt-1.5"
             style={{ color: val ? "var(--brand-text)" : "var(--brand-text-secondary)" }}>
-            {val || "\u00c3\u00a2\u00c2\u0080\u00c2\u0094"}
+            {val || "\u2014"}
           </span>
         )}
       </div>
@@ -689,7 +689,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
         ) : (
           <span className="text-sm flex-1 pt-0.5"
             style={{ color: val ? "var(--brand-text)" : "var(--brand-text-secondary)", whiteSpace: "pre-wrap" }}>
-            {val || "\u00c3\u00a2\u00c2\u0080\u00c2\u0094"}
+            {val || "\u2014"}
           </span>
         )}
       </div>
@@ -709,13 +709,13 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
           <select value={val} onChange={e => set(field, e.target.value)}
             className="flex-1 text-sm rounded-lg px-2.5 py-1.5 outline-none"
             style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-primary)", color: "var(--brand-text)" }}>
-            <option value="">\u00c3\u00a2\u00c2\u0080\u00c2\u0094</option>
+            <option value="">\u2014</option>
             {options.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         ) : (
           <span className="text-sm flex-1 pt-1.5"
             style={{ color: val ? "var(--brand-text)" : "var(--brand-text-secondary)" }}>
-            {val || "\u00c3\u00a2\u00c2\u0080\u00c2\u0094"}
+            {val || "\u2014"}
           </span>
         )}
       </div>
@@ -724,7 +724,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
 
   const currentProgram = programs.find(p => p.id === currentProgramId);
   function fmtDate(d: string | null) {
-    if (!d) return "\u00c3\u00a2\u00c2\u0080\u00c2\u0094";
+    if (!d) return "\u2014";
     return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   }
 
@@ -733,7 +733,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
       {saveMsg && (
         <div className="rounded-xl px-4 py-2.5 text-sm font-medium"
           style={{ background: saveMsg === "saved" ? "#22c55e20" : "#ef444420", color: saveMsg === "saved" ? "#16a34a" : "#dc2626", border: `1px solid ${saveMsg === "saved" ? "#22c55e40" : "#ef444440"}` }}>
-          {saveMsg === "saved" ? "\u00c3\u00a2\u00c2\u009c\u00c2\u0093 Changes saved" : "\u00c3\u00a2\u00c2\u009c\u00c2\u0097 Save failed \u00c3\u00a2\u00c2\u0080\u00c2\u0094 try again"}
+          {saveMsg === "saved" ? "\u2713 Changes saved" : "\u2717 Save failed \u2014 try again"}
         </div>
       )}
       <div className="flex items-center justify-between px-4 py-3 rounded-xl"
@@ -761,7 +761,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
               style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}>Cancel</button>
             <button onClick={save} disabled={saving} className="px-3 py-1 rounded-lg text-xs font-semibold"
               style={{ background: "var(--brand-primary)", color: "white", opacity: saving ? 0.7 : 1 }}>
-              {saving ? "Saving\u00c3\u00a2\u00c2\u0080\u00c2\u00a6" : "Save"}
+              {saving ? "Saving\u2026" : "Save"}
             </button>
           </div>
         ) : (
@@ -838,7 +838,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
         <div className="flex items-center gap-3 px-4 py-3" style={{ borderColor: "var(--brand-border)" }}>
           <span className="text-xs font-medium w-28 flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }}>Client Since</span>
           <span className="text-sm" style={{ color: "var(--brand-text)" }}>
-            {client.created_at ? new Date(client.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "\u00c3\u00a2\u00c2\u0080\u00c2\u0094"}
+            {client.created_at ? new Date(client.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "\u2014"}
           </span>
         </div>
       </div>
