@@ -429,7 +429,7 @@ function WorkoutEditor({
           {editingWorkout
             ? `Edit: ${editingWorkout.days?.label || "Workout"}`
             : selectedDate
-              ? `Add Workout Â· ${selectedDate}`
+              ? `Add Workout \u00c2\u00b7 ${selectedDate}`
               : "Workout Editor"}
         </h2>
         <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center"
@@ -473,7 +473,7 @@ function WorkoutEditor({
                   style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)" }}>
                   <div className="font-semibold text-sm" style={{ color: "var(--brand-text)" }}>{day.label}</div>
                   <div className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                    {day.program_name} Â· {day.phase_label}
+                    {day.program_name} \u00c2\u00b7 {day.phase_label}
                   </div>
                 </button>
               ))
@@ -614,7 +614,7 @@ function WorkoutEditor({
                   <Link href={`/clients/${clientId}/day/${editingWorkout.day_id}`}
                     className="block text-center w-full py-2.5 rounded-xl text-sm font-semibold text-white mt-2"
                     style={{ background: "var(--brand-primary)" }}>
-                    Open Full Editor â
+                    Open Full Editor \u00e2\u0086\u0092
                   </Link>
                 )}
               </>
@@ -829,7 +829,7 @@ function LibraryPanel({
                       {d.day_label}
                     </div>
                     <div className="text-[10px] mb-1" style={{ color: "var(--brand-text-secondary)" }}>
-                      {d.phase_label} Â· {d.exercises.length} exercise{d.exercises.length !== 1 ? "s" : ""}
+                      {d.phase_label} \u00c2\u00b7 {d.exercises.length} exercise{d.exercises.length !== 1 ? "s" : ""}
                     </div>
                     {d.exercises.length > 0 && (
                       <div className="text-[10px] truncate" style={{ color: "var(--brand-text-secondary)" }}>
@@ -1101,7 +1101,7 @@ export default function ProgramPage() {
 
   const rangeLabel = (() => {
     const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    return `${fmt(allDays[0])} â ${fmt(allDays[allDays.length - 1])}`;
+    return `${fmt(allDays[0])} \u00e2\u0080\u0093 ${fmt(allDays[allDays.length - 1])}`;
   })();
 
   const workoutByDate: Record<string, ScheduledWorkout[]> = {};
@@ -1378,7 +1378,7 @@ export default function ProgramPage() {
           <div className="flex items-center gap-3">
             <i className="ti ti-copy text-lg" />
             <span className="text-sm font-semibold">
-              Copied: {copiedWorkout.days?.label || "Workout"} Â· Click any day to paste
+              Copied: {copiedWorkout.days?.label || "Workout"} \u00c2\u00b7 Click any day to paste
             </span>
           </div>
           <button onClick={() => setCopiedWorkout(null)}
