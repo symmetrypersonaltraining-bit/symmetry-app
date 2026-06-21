@@ -15,7 +15,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
-  const [gcalSync] = useState(false); // OFF by default — activate manually when ready
+  const [gcalSync] = useState(false); // OFF by default \u2014 activate manually when ready
   const [autoReminders] = useState(false); // OFF by default
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -60,7 +60,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
   return (
     <div className="space-y-8">
 
-      {/* ── Profile ── */}
+      {/* \u2500\u2500 Profile \u2500\u2500 */}
       <section>
         <p className="section-header">Profile</p>
         <div className="card p-4 space-y-3">
@@ -78,7 +78,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
               {userName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-semibold truncate" style={{ color: "var(--brand-text)" }}>{userName || "—"}</p>
+              <p className="font-semibold truncate" style={{ color: "var(--brand-text)" }}>{userName || "\u2014"}</p>
               <p className="text-sm truncate" style={{ color: "var(--brand-text-secondary)" }}>{userEmail}</p>
             </div>
             {isTrainer && (
@@ -88,7 +88,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
         </div>
       </section>
 
-      {/* ── Change Password ── */}
+      {/* \u2500\u2500 Change Password \u2500\u2500 */}
       <section>
         <p className="section-header">Security</p>
         <div className="card p-4">
@@ -140,7 +140,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
         </div>
       </section>
 
-      {/* ── Color Theme ── */}
+      {/* \u2500\u2500 Color Theme \u2500\u2500 */}
       <section>
         <p className="section-header">App Color Theme</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -160,7 +160,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
               <div className="text-xs font-semibold" style={{ color: t.primary }}>{t.label}</div>
               {theme === t.id && (
                 <div className="text-[10px] mt-0.5 font-medium" style={{ color: t.primary }}>
-                  ✓ Active
+                  \u2713 Active
                 </div>
               )}
             </button>
@@ -168,7 +168,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
         </div>
       </section>
 
-      {/* ── Trainer-only: Integrations ── */}
+      {/* \u2500\u2500 Trainer-only: Integrations \u2500\u2500 */}
       {isTrainer && (
         <section>
           <p className="section-header">Integrations</p>
@@ -210,7 +210,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
               <div
                 className="w-11 h-6 rounded-full relative transition-colors"
                 style={{ background: autoReminders ? "var(--brand-primary)" : "var(--brand-border)", cursor: "not-allowed" }}
-                title="Set to Automatic — coming soon"
+                title="Set to Automatic \u2014 coming soon"
               >
                 <div
                   className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all"
@@ -222,7 +222,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
         </section>
       )}
 
-      {/* ── App Info ── */}
+      {/* \u2500\u2500 App Info \u2500\u2500 */}
       <section>
         <p className="section-header">About</p>
         <div className="card p-4 space-y-3">
@@ -233,12 +233,12 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
           <div className="divider" />
           <div className="flex items-center justify-between">
             <span className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>Built by</span>
-            <span className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Symmetry PT × Claude AI</span>
+            <span className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Symmetry PT \u00d7 Claude AI</span>
           </div>
         </div>
       </section>
 
-      {/* ── Sign Out ── */}
+      {/* \u2500\u2500 Sign Out \u2500\u2500 */}
       <section>
         <button
           onClick={handleSignOut}
