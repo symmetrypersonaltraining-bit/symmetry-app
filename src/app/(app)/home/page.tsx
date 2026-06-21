@@ -88,7 +88,7 @@ export default async function HomePage() {
     );
   }
 
-  // ── CLIENT DASHBOARD ──────────────────────────────────────────────────────
+  // \u2500\u2500 CLIENT DASHBOARD \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   const { data: clientRecord } = await supabase
     .from("clients")
     .select("id, name")
