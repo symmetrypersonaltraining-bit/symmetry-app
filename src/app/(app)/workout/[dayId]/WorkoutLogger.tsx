@@ -432,7 +432,7 @@ export default function WorkoutLogger({
     const today = new Date().toISOString().split("T")[0];
     const { data, error } = await supabase.from("workout_logs").insert({
       client_id: clientId, day_id: day.id, log_date: today,
-      started_at: new Date().toISOString(), completed: false, status: "in_progress",
+      started_at: new Date().toISOString(), completed: false,
     }).select("id").single();
     if (error) throw error;
     setWorkoutLogId(data.id);
@@ -481,7 +481,7 @@ export default function WorkoutLogger({
     try {
       const logId = await ensureWorkoutLog();
       await supabase.from("workout_logs").update({
-        completed: true, completed_at: new Date().toISOString(), status: "completed",
+        completed: true, completed_at: new Date().toISOString(), status: "Done as planned",
         note: sessionNote || null,
       }).eq("id", logId);
       setWorkoutComplete(true);
