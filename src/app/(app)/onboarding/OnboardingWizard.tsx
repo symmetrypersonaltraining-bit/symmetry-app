@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 const GOALS = [
   "Fat Loss", "Muscle Gain", "Body Recomposition", "Strength",
@@ -30,8 +29,6 @@ interface Props {
 const STEPS = ["Welcome", "Goals", "Experience", "Body Stats", "Health", "Done"];
 
 export default function OnboardingWizard({ clientId, prefill }: Props) {
-  const router = useRouter();
-  const supabase = createClient();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
 
