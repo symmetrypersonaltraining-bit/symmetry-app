@@ -37,12 +37,12 @@ interface Props {
   clientId?: string | null;
 }
 
-// ─── Sparkline (mini, for metric cards) ──────────────────────────────────────
+// \u2500\u2500\u2500 Sparkline (mini, for metric cards) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length < 2) {
     return (
       <div className="flex items-center justify-center h-10 text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-        —
+        \u2014
       </div>
     );
   }
@@ -72,13 +72,13 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
         <circle cx={lastPt[0]} cy={lastPt[1]} r="3" fill={color} />
       </svg>
       <span className="text-xs font-semibold tabular-nums" style={{ color: trendColor }}>
-        {delta > 0 ? "↑" : delta < 0 ? "↓" : "–"}{Math.abs(delta).toFixed(1)}
+        {delta > 0 ? "\u2191" : delta < 0 ? "\u2193" : "\u2013"}{Math.abs(delta).toFixed(1)}
       </span>
     </div>
   );
 }
 
-// ─── Full Chart (modal) ───────────────────────────────────────────────────────
+// \u2500\u2500\u2500 Full Chart (modal) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function FullChart({
   values, dates, color, label, unit,
 }: {
@@ -192,7 +192,7 @@ function FullChart({
   );
 }
 
-// ─── Metric Modal ─────────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 Metric Modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function MetricModal({
   metricKey, label, unit, color, icon, metrics, onClose,
 }: {
@@ -254,7 +254,7 @@ function MetricModal({
   );
 }
 
-// ─── Metric Card ──────────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 Metric Card \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function MetricCard({
   label, value, unit, values, color, icon, onClick,
 }: {
@@ -279,13 +279,13 @@ function MetricCard({
       </div>
       <Sparkline values={values} color={color} />
       <p className="text-xs mt-1.5" style={{ color: "var(--brand-text-secondary)" }}>
-        Tap to expand ↗
+        Tap to expand \u2197
       </p>
     </button>
   );
 }
 
-// ─── Week Ring ────────────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 Week Ring \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function WeekRing({
   allScheduled = [],
   weekOffset,
@@ -399,7 +399,7 @@ function WeekRing({
   );
 }
 
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 Main Dashboard \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 type MetricKey = "weight" | "body_fat_pct" | "lean_mass" | "fat_mass";
 
 const METRIC_CONFIG: { key: MetricKey; label: string; unit: string; color: string; icon: string }[] = [
@@ -464,12 +464,12 @@ export default function ClientDashboard({
         <div className="flex items-start justify-between pt-2">
           <div>
             <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{greeting},</p>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>{firstName} 👋</h1>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>{firstName} \ud83d\udc4b</h1>
           </div>
           {streakDays > 0 && (
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${isMilestone ? "animate-pulse" : ""}`}
               style={{ background: isMilestone ? "#f59e0b20" : "var(--brand-surface)", border: `1px solid ${isMilestone ? "#f59e0b" : "var(--brand-border)"}` }}>
-              <span className="text-base">{isMilestone ? "🎉" : "🔥"}</span>
+              <span className="text-base">{isMilestone ? "\ud83c\udf89" : "\ud83d\udd25"}</span>
               <div>
                 <span className="text-sm font-bold" style={{ color: isMilestone ? "#f59e0b" : "var(--brand-text)" }}>{streakDays}</span>
                 <span className="text-xs ml-0.5" style={{ color: "var(--brand-text-secondary)" }}>day{streakDays !== 1 ? "s" : ""}</span>
@@ -483,7 +483,7 @@ export default function ClientDashboard({
             <span className="text-xs font-semibold uppercase tracking-widest"
               style={{ color: "var(--brand-text-secondary)" }}>This Week</span>
             <Link href="/workout" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
-              View Schedule →
+              View Schedule \u2192
             </Link>
           </div>
           <WeekRing
@@ -509,7 +509,7 @@ export default function ClientDashboard({
                 {twDone ? (
                   <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5">
                     <i className="ti ti-check text-sm text-white" />
-                    <span className="text-xs text-white font-medium">Completed ✓</span>
+                    <span className="text-xs text-white font-medium">Completed \u2713</span>
                   </div>
                 ) : (
                   <div className="inline-flex items-center gap-2 bg-white text-sm font-semibold rounded-full px-4 py-2"
@@ -526,7 +526,7 @@ export default function ClientDashboard({
             style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
             <i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
             <p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p>
-            <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program 💪</p>
+            <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program \ud83d\udcaa</p>
           </div>
         )}
 
@@ -561,7 +561,7 @@ export default function ClientDashboard({
           <div className="flex items-center justify-between mb-2.5">
             <h2 className="text-base font-bold" style={{ color: "var(--brand-text)" }}>Progress</h2>
             <Link href="/progress" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
-              View all →
+              View all \u2192
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-3">
