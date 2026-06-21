@@ -55,7 +55,7 @@ interface Props {
 
 // ---- Mini sparkline ----
 function MiniSparkline({ values, color }: { values: number[]; color: string }) {
-  if (values.length < 2) return <span style={{ color: "var(--brand-text-secondary)", fontSize: 12 }}>—</span>;
+  if (values.length < 2) return <span style={{ color: "var(--brand-text-secondary)", fontSize: 12 }}>â</span>;
   const w = 80, h = 28, pad = 3;
   const min = Math.min(...values), max = Math.max(...values);
   const range = max - min || 1;
@@ -145,12 +145,12 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
                 Last workout: <span style={{ color: "var(--brand-text)", fontWeight: 600 }}>
                   {recentCompleted.days?.label || "Workout"}
                 </span>
-                {recentCompleted.scheduled_date === todayStr ? " • Today" :
-                  ` • ${new Date(recentCompleted.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                {recentCompleted.scheduled_date === todayStr ? " â¢ Today" :
+                  ` â¢ ${new Date(recentCompleted.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
               </p>
             </div>
             {(recentCompleted.days?.id || recentCompleted.day_id) ? (
-              <Link href={`/clients/${clientId}/day/${recentCompleted.days?.id || recentCompleted.day_id}`}
+              <Link href={`/workout/${recentCompleted.days?.id || recentCompleted.day_id}?forClient=${clientId}`}
                 className="text-[10px] font-semibold px-2 py-1 rounded-lg"
                 style={{ background: "var(--brand-primary)15", color: "var(--brand-primary)" }}>
                 View
@@ -191,7 +191,7 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest mb-2"
               style={{ color: "var(--brand-text-secondary)" }}>Today's Session</p>
-            {dayId ? <Link href={`/clients/${clientId}/day/${dayId}`}>{sessionCard}</Link> : sessionCard}
+            {dayId ? <Link href={`/workout/${dayId}?forClient=${clientId}`}>{sessionCard}</Link> : sessionCard}
           </div>
         );
       })()}
@@ -213,7 +213,7 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
               <div className="flex-1">
                 <p className="text-[10px]" style={{ color: "var(--brand-text-secondary)" }}>{m.label}</p>
                 <p className="text-base font-bold leading-tight" style={{ color: "var(--brand-text)" }}>
-                  {m.latest != null ? `${m.latest}${m.unit}` : "—"}
+                  {m.latest != null ? `${m.latest}${m.unit}` : "â"}
                   {m.delta != null && (
                     <span className="text-[10px] font-normal ml-1.5" style={{ color: m.delta <= 0 ? "#22c55e" : "#ef4444" }}>
                       {m.delta > 0 ? "+" : ""}{m.delta.toFixed(1)}{m.unit}
@@ -275,10 +275,10 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
           style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
           {[
             { label: "Email", value: client.email },
-            { label: "Phone", value: client.phone || "—" },
-            { label: "Goal", value: client.primary_goal || "—" },
-            { label: "Experience", value: client.experience_level || "—" },
-            { label: "Frequency", value: client.training_frequency ? `${client.training_frequency}x / week` : "—" },
+            { label: "Phone", value: client.phone || "â" },
+            { label: "Goal", value: client.primary_goal || "â" },
+            { label: "Experience", value: client.experience_level || "â" },
+            { label: "Frequency", value: client.training_frequency ? `${client.training_frequency}x / week` : "â" },
           ].map((row, i, arr) => (
             <div key={row.label} className={`flex items-start gap-4 px-4 py-3 ${i < arr.length - 1 ? "border-b" : ""}`}
               style={{ borderColor: "var(--brand-border)" }}>
@@ -300,7 +300,7 @@ type ViewMode = "1w" | "2w" | "4w";
 function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; clientId: string }) {
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
-  const [viewMode, setViewMode] = useState<ViewMode>("4w");
+  const [viewMode, setViewMode] = useState<ViewMode>("1w");
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [weekAnchor, setWeekAnchor] = useState(() => {
     const d = new Date(today);
@@ -357,7 +357,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
     endDate.setDate(weekAnchor.getDate() + weeks * 7 - 1);
     const startLabel = weekAnchor.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     const endLabel = endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    headerLabel = `${startLabel} – ${endLabel}`;
+    headerLabel = `${startLabel} â ${endLabel}`;
   }
 
   function WorkoutChip({ w, compact }: { w: WorkoutEntry; compact?: boolean }) {
@@ -366,7 +366,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
     if (!dayId) return null;
     return (
       <Link
-        href={`/clients/${clientId}/day/${dayId}`}
+        href={`/workout/${dayId}?forClient=${clientId}`}
         className="block rounded px-1.5 truncate"
         style={{
           background: done ? "#22c55e20" : "var(--brand-primary)20",
@@ -381,7 +381,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
     );
   }
 
-  // Programming Engine button — appears above the calendar
+  // Programming Engine button â appears above the calendar
   const ProgrammingEngineButton = (
     <div className="flex justify-end mb-3">
       <Link
@@ -488,7 +488,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
                     <div className="space-y-1">
                       {dws.map(w => <WorkoutChip key={w.id} w={w} compact={false} />)}
                       {dws.length === 0 && (
-                        <p className="text-[9px] text-center mt-2" style={{ color: "var(--brand-text-secondary)" }}>—</p>
+                        <p className="text-[9px] text-center mt-2" style={{ color: "var(--brand-text-secondary)" }}>â</p>
                       )}
                     </div>
                   </div>
@@ -579,7 +579,7 @@ function MetricsTab({ metrics }: { metrics: MetricPoint[] }) {
             <div className="flex-1">
               <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{m.label}</p>
               <p className="text-lg font-bold" style={{ color: "var(--brand-text)" }}>
-                {latest != null ? `${latest}${m.unit}` : "—"}
+                {latest != null ? `${latest}${m.unit}` : "â"}
                 {delta != null && (
                   <span className="text-xs font-normal ml-2" style={{ color: delta <= 0 ? "#22c55e" : "#ef4444" }}>
                     {delta > 0 ? "+" : ""}{delta.toFixed(1)}{m.unit}
@@ -666,7 +666,7 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
         ) : (
           <span className="text-sm flex-1 pt-1.5"
             style={{ color: val ? "var(--brand-text)" : "var(--brand-text-secondary)" }}>
-            {val || "—"}
+            {val || "â"}
           </span>
         )}
       </div>
@@ -689,7 +689,7 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
         ) : (
           <span className="text-sm flex-1 pt-0.5"
             style={{ color: val ? "var(--brand-text)" : "var(--brand-text-secondary)", whiteSpace: "pre-wrap" }}>
-            {val || "—"}
+            {val || "â"}
           </span>
         )}
       </div>
@@ -709,13 +709,13 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
           <select value={val} onChange={e => set(field, e.target.value)}
             className="flex-1 text-sm rounded-lg px-2.5 py-1.5 outline-none"
             style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-primary)", color: "var(--brand-text)" }}>
-            <option value="">—</option>
+            <option value="">â</option>
             {options.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         ) : (
           <span className="text-sm flex-1 pt-1.5"
             style={{ color: val ? "var(--brand-text)" : "var(--brand-text-secondary)" }}>
-            {val || "—"}
+            {val || "â"}
           </span>
         )}
       </div>
@@ -724,7 +724,7 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
 
   const currentProgram = programs.find(p => p.id === currentProgramId);
   function fmtDate(d: string | null) {
-    if (!d) return "—";
+    if (!d) return "â";
     return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   }
 
@@ -733,7 +733,7 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
       {saveMsg && (
         <div className="rounded-xl px-4 py-2.5 text-sm font-medium"
           style={{ background: saveMsg === "saved" ? "#22c55e20" : "#ef444420", color: saveMsg === "saved" ? "#16a34a" : "#dc2626", border: `1px solid ${saveMsg === "saved" ? "#22c55e40" : "#ef444440"}` }}>
-          {saveMsg === "saved" ? "✓ Changes saved" : "✗ Save failed — try again"}
+          {saveMsg === "saved" ? "â Changes saved" : "â Save failed â try again"}
         </div>
       )}
       <div className="flex items-center justify-between px-4 py-3 rounded-xl"
@@ -761,7 +761,7 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
               style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}>Cancel</button>
             <button onClick={save} disabled={saving} className="px-3 py-1 rounded-lg text-xs font-semibold"
               style={{ background: "var(--brand-primary)", color: "white", opacity: saving ? 0.7 : 1 }}>
-              {saving ? "Saving…" : "Save"}
+              {saving ? "Savingâ¦" : "Save"}
             </button>
           </div>
         ) : (
@@ -838,7 +838,7 @@ function InfoTab({ client, programs, currentProgramId, clientId, onAssignProgram
         <div className="flex items-center gap-3 px-4 py-3" style={{ borderColor: "var(--brand-border)" }}>
           <span className="text-xs font-medium w-28 flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }}>Client Since</span>
           <span className="text-sm" style={{ color: "var(--brand-text)" }}>
-            {client.created_at ? new Date(client.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "—"}
+            {client.created_at ? new Date(client.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "â"}
           </span>
         </div>
       </div>
