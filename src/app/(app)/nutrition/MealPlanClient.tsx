@@ -10,11 +10,11 @@ interface AdherenceLog { id: string; meal_id: string | null; meal_position: numb
 interface MacroTarget { calories: number; protein: number; carbs: number; fats: number; }
 
 const ADHERENCE_OPTIONS = [
-  { key: "quarter",        label: "\u00bc",        color: "#ef4444", pct: 0.25 },
-  { key: "half",           label: "\u00bd",        color: "#f59e0b", pct: 0.5  },
-  { key: "three_quarters", label: "\u00be",        color: "#84cc16", pct: 0.75 },
-  { key: "full",           label: "Full",     color: "#22c55e", pct: 1.0  },
-  { key: "off_plan",       label: "Off Plan", color: "#8b5cf6", pct: null },
+  { key: "1/4",        label: "\u00bc",        color: "#ef4444", pct: 0.25 },
+  { key: "1/2",           label: "\u00bd",        color: "#f59e0b", pct: 0.5  },
+  { key: "3/4", label: "\u00be",        color: "#84cc16", pct: 0.75 },
+  { key: "Full",           label: "Full",     color: "#22c55e", pct: 1.0  },
+  { key: "Off-plan",       label: "Off Plan", color: "#8b5cf6", pct: null },
 ];
 
 const FREE_SLOTS = [
@@ -79,7 +79,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     for (const log of logs) {
       const opt = ADHERENCE_OPTIONS.find(o => o.key === log.adherence);
       if (!opt) continue;
-      if (log.adherence === "off_plan") {
+      if (log.adherence === "Off-plan") {
         kcal    += log.est_kcal    || 0;
         protein += log.est_protein || 0;
         carbs   += log.est_carbs   || 0;
@@ -107,7 +107,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const totalMeals  = mealPlan ? sortedMeals.length : 0;
 
   async function logAdherence(meal: Meal, adherenceKey: string) {
-    if (adherenceKey === "off_plan") {
+    if (adherenceKey === "Off-plan") {
       const existing = logs.find(l => l.meal_position === meal.position);
       setOffPlanDetails(existing?.off_plan_details || "");
       setOffPlanKcal(existing?.est_kcal?.toString() || "");
@@ -507,7 +507,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                   )}
 
                   {/* Off-plan details */}
-                  {mealLog?.adherence === "off_plan" && mealLog.off_plan_details && (
+                  {mealLog?.adherence === "Off-plan" && mealLog.off_plan_details && (
                     <div className="mx-4 my-2 px-3 py-2 rounded-xl text-xs"
                       style={{ background: "#8b5cf610", color: "#8b5cf6", border: "1px solid #8b5cf630" }}>
                       <span className="font-medium">Had: </span>{mealLog.off_plan_details}
@@ -598,7 +598,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                   const dateStr = clone.toISOString().split("T")[0];
                   const dayLogs = weekLogs.filter(l => l.log_date === dateStr);
                   const hasLog  = dayLogs.length > 0;
-                  const allFull = hasLog && dayLogs.every(l => l.adherence === "full");
+                  const allFull = hasLog && dayLogs.every(l => l.adherence === "Full");
                   return (
                     <div key={day} className="flex flex-col items-center gap-1">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center"
