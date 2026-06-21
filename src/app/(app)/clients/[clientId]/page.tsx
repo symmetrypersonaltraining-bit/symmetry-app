@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import ClientProfileTabs from "./ClientProfileTabs";
 import InviteClientButton from "./InviteClientButton";
+import ResetCredentialsButton from "./ResetCredentialsButton";
 
 export default async function ClientProfilePage({
   params,
@@ -105,6 +106,7 @@ export default async function ClientProfilePage({
               </span>
               {!client.auth_user_id && client.email && (
                 <InviteClientButton clientId={client.id} clientName={client.name} />
+                <ResetCredentialsButton clientId={client.id} clientName={client.name} clientEmail={client.email} />
               )}
             </div>
           </div>
