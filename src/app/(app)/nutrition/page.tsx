@@ -33,6 +33,10 @@ export default async function NutritionPage({
       const found = allClients.find((c) => c.id === params.clientId);
       clientId = params.clientId;
       clientName = found?.name || "Client";
+    } else if (params.viewAsClient) {
+      const { data: selfClient } = await supabase.from("clients").select("id, name").ilike("name", "%Dustin%").maybeSingle();
+      clientId = selfClient?.id || null;
+      clientName = selfClient?.name || null;
     }
     // No default \u2014 trainer must pick a client
   } else {
@@ -118,7 +122,7 @@ export default async function NutritionPage({
 
   return (
     <>
-      {isTrainer && (
+      {isTrainer && !params.viewAsClient && (
         <div style={{ background: "#0F4C81" }} className="px-4 py-3">
           <div className="flex items-center justify-between">
             <h1 className="text-white font-medium text-lg">Nutrition</h1>
@@ -134,7 +138,7 @@ export default async function NutritionPage({
         macroTarget={macroTarget as any}
         weekLogs={weekLogs}
         today={today}
-        isTrainer={isTrainer}
+        isTrainer={isTrainer && !params.viewAsClient}
       />
     </>
   );
