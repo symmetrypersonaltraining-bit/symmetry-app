@@ -85,7 +85,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
 
     setSaving(false);
     setStep(5); // Done step
-    setTimeout(() => router.push("/home"), 2000);
+    window.location.href = "/home";
   }
 
   const firstName = prefill.name.split(" ")[0];
