@@ -13,15 +13,14 @@ interface Props {
 
 // Client-mode bottom nav tabs
 const CLIENT_NAV = [
-  { href: "/client-preview", label: "Home",      icon: "ti-home" },
-  { href: "/client-preview/nutrition",  label: "Nutrition", icon: "ti-salad" },
-  { href: "/client-preview/progress",   label: "Progress",  icon: "ti-chart-line" },
-  { href: "/client-preview/schedule",   label: "Schedule",  icon: "ti-calendar" },
+  { href: "/home", label: "Home",      icon: "ti-home" },
+  { href: "/nutrition", label: "Nutrition", icon: "ti-salad" },
+  { href: "/progress", label: "Progress",  icon: "ti-chart-line" },
+  { href: "/schedule", label: "Schedule",  icon: "ti-calendar" },
 ];
 
 export default function TrainerLayoutWrapper({ children }: Props) {
   const [clientMode, setClientMode] = useState(false);
-  const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
@@ -32,8 +31,12 @@ export default function TrainerLayoutWrapper({ children }: Props) {
   function handleToggleMode() {
     const next = !clientMode;
     setClientMode(next);
-    localStorage.setItem("symmetry_view_mode", next ? "client" : "trainer");
-    router.push(next ? "/client-preview" : "/home");
+    if (next) {
+      document.cookie = "symmetry_client_mode=1; path=/; SameSite=Lax";
+    } else {
+      document.cookie = "symmetry_client_mode=; path=/; max-age=0; SameSite=Lax";
+    }
+    window.location.href = "/home";
   }
 
   // ── CLIENT MODE ──────────────────────────────────────────────────────────
