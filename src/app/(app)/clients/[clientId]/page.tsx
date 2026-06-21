@@ -105,8 +105,10 @@ export default async function ClientProfilePage({
                 {client.auth_user_id ? "Active" : "Pending"}
               </span>
               {!client.auth_user_id && client.email && (
-                <InviteClientButton clientId={client.id} clientName={client.name} />
-                <ResetCredentialsButton clientId={client.id} />
+                <>
+                  <InviteClientButton clientId={client.id} clientName={client.name} />
+                  <ResetCredentialsButton clientId={client.id} />
+                </>
               )}
             </div>
           </div>
