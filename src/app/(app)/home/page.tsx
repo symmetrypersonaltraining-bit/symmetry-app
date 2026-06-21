@@ -106,12 +106,21 @@ export default async function HomePage() {
   const today = new Date().toISOString().split("T")[0];
 
   // Cast as any to bypass generated-type constraint on day_id column
-  const { data: todayWorkout } = await (supabase as any)
+  // Fetch ALL workouts scheduled for today (clients can have strength + cardio same day)
+  const { data: todayWorkoutsRaw } = await (supabase as any)
     .from("scheduled_workouts")
     .select("id, day_id, status, days(id, label, phase_id, phases(label, programs(name)))")
     .eq("client_id", clientRecord.id)
     .eq("scheduled_date", today)
-    .maybeSingle();
+    .order("position");
+  // Sort: strength workouts first, cardio/conditioning second
+  const isCardioLabel = (label: string) => /cardio|treadmill|stair|walk|run/i.test(label);
+  const todayWorkouts = [...(todayWorkoutsRaw || [])].sort((a: any, b: any) => {
+    const aCardio = isCardioLabel(a.days?.label || "");
+    const bCardio = isCardioLabel(b.days?.label || "");
+    if (aCardio === bCardio) return 0;
+    return aCardio ? 1 : -1;
+  });
 
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
@@ -184,7 +193,7 @@ export default async function HomePage() {
       <PwaInstallBanner />
       <ClientDashboard
         firstName={firstName}
-        todayWorkout={todayWorkout as any}
+        todayWorkouts={todayWorkouts as any[]}
         metrics={metrics as any[]}
         completedCount={completedCount}
         totalScheduled={totalScheduled}
