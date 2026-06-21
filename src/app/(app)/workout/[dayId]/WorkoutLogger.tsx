@@ -322,7 +322,7 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
                 <span className="font-medium" style={{ color: "var(--brand-text)" }}>
                   {s.weight_lbs ? `${s.weight_lbs} lb` : "BW"}
                 </span>
-                <span style={{ color: "var(--brand-text-secondary)" }}>\u00d7</span>
+                <span style={{ color: "var(--brand-text-secondary)" }}>{'\u00d7'}</span>
                 <span style={{ color: "var(--brand-text)" }}>{s.reps ?? "\u2014"} reps</span>
               </div>
             ))}
@@ -542,7 +542,7 @@ export default function WorkoutLogger({
           <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ background: "#22c55e20" }}>
             <i className="ti ti-trophy text-5xl" style={{ color: "#22c55e" }} />
           </div>
-          <div className="absolute -top-1 -right-1 text-2xl animate-bounce">\u00f0\u009f\u008e\u0089</div>
+          <div className="absolute -top-1 -right-1 text-2xl animate-bounce">{'\ud83c\udf89'}</div>
         </div>
         <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--brand-text)" }}>Session Complete!</h1>
         <p className="text-sm mb-2" style={{ color: "var(--brand-text-secondary)" }}>{day.label}</p>
@@ -945,7 +945,7 @@ export default function WorkoutLogger({
           style={progressPct === 100
             ? { background: "#22c55e", color: "white" }
             : { background: "var(--brand-surface)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}>
-          {saving ? "Saving\u2026" : progressPct === 100 ? "\u00f0\u009f\u008f\u0086 Complete Workout" : `${progressPct}% \u2014 keep going!`}
+          {saving ? "Saving\u2026" : progressPct === 100 ? "\ud83c\udfc6 Complete Workout" : `${progressPct}% \u2014 keep going!`}
         </button>
       </div>
     </div>
