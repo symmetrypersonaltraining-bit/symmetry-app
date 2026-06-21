@@ -44,12 +44,12 @@ interface Props {
   allScheduled?: ScheduledDay[];
 }
 
-// ─── Sparkline ───────────────────────────────────────────────────────────────
+// âââ Sparkline âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length < 2) {
     return (
       <div className="flex items-center justify-center h-10 text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-        —
+        â
       </div>
     );
   }
@@ -78,13 +78,13 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
         <circle cx={lastPt[0]} cy={lastPt[1]} r="3" fill={color} />
       </svg>
       <span className="text-xs font-semibold tabular-nums" style={{ color: trendColor }}>
-        {delta > 0 ? "↑" : delta < 0 ? "↓" : "–"}{Math.abs(delta).toFixed(1)}
+        {delta > 0 ? "â" : delta < 0 ? "â" : "â"}{Math.abs(delta).toFixed(1)}
       </span>
     </div>
   );
 }
 
-// ─── Full Chart ───────────────────────────────────────────────────────────────
+// âââ Full Chart âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function FullChart({ values, dates, color, label, unit }: { values: number[]; dates: string[]; color: string; label: string; unit: string }) {
   const [hovered, setHovered] = useState<number | null>(null);
   if (values.length < 2) return <div className="flex items-center justify-center h-48 text-sm" style={{ color: "var(--brand-text-secondary)" }}>Not enough data to chart</div>;
@@ -127,7 +127,7 @@ function FullChart({ values, dates, color, label, unit }: { values: number[]; da
   );
 }
 
-// ─── Metric Modal ─────────────────────────────────────────────────────────────
+// âââ Metric Modal âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function MetricModal({ metricKey, label, unit, color, icon, metrics, onClose }: { metricKey: "weight" | "body_fat_pct" | "lean_mass" | "fat_mass"; label: string; unit: string; color: string; icon: string; metrics: MetricPoint[]; onClose: () => void }) {
   const values = metrics.map(m => m[metricKey]).filter((v): v is number => v != null);
   const dates = metrics.filter(m => m[metricKey] != null).map(m => m.metric_date);
@@ -149,7 +149,7 @@ function MetricModal({ metricKey, label, unit, color, icon, metrics, onClose }: 
   );
 }
 
-// ─── Metric Card ──────────────────────────────────────────────────────────────
+// âââ Metric Card ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function MetricCard({ label, value, unit, values, color, icon, onClick }: { label: string; value: string | number | null; unit: string; values: number[]; color: string; icon: string; onClick: () => void }) {
   const hasData = value != null;
   return (
@@ -168,13 +168,13 @@ function MetricCard({ label, value, unit, values, color, icon, onClick }: { labe
       </div>
       <Sparkline values={values} color={color} />
       <p className="text-xs mt-1.5" style={{ color: "var(--brand-text-secondary)" }}>
-        {hasData ? "Tap to expand ↗" : "Logged after assessment"}
+        {hasData ? "Tap to expand â" : "Logged after assessment"}
       </p>
     </button>
   );
 }
 
-// ─── Week Ring ────────────────────────────────────────────────────────────────
+// âââ Week Ring ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function WeekRing({ allScheduled = [], weekOffset, onPrev, onNext }: { allScheduled: ScheduledDay[]; weekOffset: number; onPrev: () => void; onNext: () => void }) {
   const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const today = new Date();
@@ -225,7 +225,7 @@ function WeekRing({ allScheduled = [], weekOffset, onPrev, onNext }: { allSchedu
   );
 }
 
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
+// âââ Main Dashboard âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 type MetricKey = "weight" | "body_fat_pct" | "lean_mass" | "fat_mass";
 const METRIC_CONFIG: { key: MetricKey; label: string; unit: string; color: string; icon: string }[] = [
   { key: "weight",       label: "Body Weight", unit: "lbs", color: "var(--brand-primary)", icon: "ti-scale" },
@@ -246,6 +246,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
     fat_mass:     metrics.map(m => m.fat_mass).filter((v): v is number => v != null),
   }), [metrics]);
   const latestVal = (key: MetricKey) => { const arr = metricValues[key]; return arr.length > 0 ? arr[arr.length - 1].toFixed(1) : null; };
+  const isCardioLabel = (label: string) => /cardio|treadmill|stair|walk|run/i.test(label);
   const isMilestone = streakDays > 0 && streakDays % 7 === 0;
   const scheduleSource: ScheduledDay[] = allScheduled.length > 0 ? allScheduled : weekWorkouts.map(w => ({ id: "", date: w.date, completed: w.completed }));
   const fmtDate = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -260,11 +261,11 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <div className="flex items-start justify-between pt-2">
           <div>
             <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{greeting},</p>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>{firstName} 👋</h1>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>{firstName} ð</h1>
           </div>
           {streakDays > 0 && (
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${isMilestone ? "animate-pulse" : ""}`} style={{ background: isMilestone ? "#f59e0b20" : "var(--brand-surface)", border: `1px solid ${isMilestone ? "#f59e0b" : "var(--brand-border)"}` }}>
-              <span className="text-base">{isMilestone ? "🎉" : "🔥"}</span>
+              <span className="text-base">{isMilestone ? "ð" : "ð¥"}</span>
               <div><span className="text-sm font-bold" style={{ color: isMilestone ? "#f59e0b" : "var(--brand-text)" }}>{streakDays}</span><span className="text-xs ml-0.5" style={{ color: "var(--brand-text-secondary)" }}>day{streakDays !== 1 ? "s" : ""}</span></div>
             </div>
           )}
@@ -273,7 +274,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <div className="metric-card">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>This Week</span>
-            <Link href="/schedule" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View Schedule →</Link>
+            <Link href="/schedule" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View Schedule â</Link>
           </div>
           <WeekRing allScheduled={scheduleSource} weekOffset={weekOffset} onPrev={() => setWeekOffset(o => o - 1)} onNext={() => setWeekOffset(o => Math.min(0, o + 1))} />
         </div>
@@ -304,7 +305,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
                         {twDone ? (
                           <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5">
                             <i className="ti ti-check text-sm text-white" />
-                            <span className="text-xs text-white font-medium">Completed ✓</span>
+                            <span className="text-xs text-white font-medium">Completed â</span>
                           </div>
                         ) : (
                           <div className="inline-flex items-center gap-2 bg-white text-sm font-semibold rounded-full px-4 py-2"
@@ -336,7 +337,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
                       <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{twLabel}</p>
                     </div>
                     {twDone ? (
-                      <span className="text-xs font-medium flex-shrink-0" style={{ color: "#22c55e" }}>Done ✓</span>
+                      <span className="text-xs font-medium flex-shrink-0" style={{ color: "#22c55e" }}>Done â</span>
                     ) : (
                       <div className="flex items-center gap-1 flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-white"
                         style={{ background: "var(--brand-primary)" }}>
@@ -353,7 +354,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
             style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
             <i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
             <p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p>
-            <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program 💪</p>
+            <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program ðª</p>
           </div>
         )}
 
@@ -365,7 +366,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <div>
           <div className="flex items-center justify-between mb-2.5">
             <h2 className="text-base font-bold" style={{ color: "var(--brand-text)" }}>Progress</h2>
-            <Link href="/progress" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View all →</Link>
+            <Link href="/progress" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View all â</Link>
           </div>
           <div className="grid grid-cols-2 gap-3">
             {METRIC_CONFIG.map(mc => <MetricCard key={mc.key} label={mc.label} value={latestVal(mc.key)} unit={mc.unit} values={metricValues[mc.key]} color={mc.color} icon={mc.icon} onClick={() => setActiveMetric(mc.key)} />)}
