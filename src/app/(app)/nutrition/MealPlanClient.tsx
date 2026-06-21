@@ -14,7 +14,8 @@ const ADHERENCE_OPTIONS = [
   { key: "1/2",           label: "\u00bd",        color: "#f59e0b", pct: 0.5  },
   { key: "3/4", label: "\u00be",        color: "#84cc16", pct: 0.75 },
   { key: "Full",           label: "Full",     color: "#22c55e", pct: 1.0  },
-  { key: "Off-plan",       label: "Off Plan", color: "#8b5cf6", pct: null },
+    { key: "Skipped",  label: "Skip",     color: "#6b7280", pct: 0    },
+{ key: "Off-plan",       label: "Off Plan", color: "#8b5cf6", pct: null },
 ];
 
 const FREE_SLOTS = [
@@ -56,6 +57,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const [offPlanF,    setOffPlanF]    = useState("");
   const [photoLoading, setPhotoLoading] = useState(false);
   const [photoResult,  setPhotoResult]  = useState<string | null>(null);
+  const [offPlanNotes, setOffPlanNotes] = useState("");
   const cameraRef = useRef<HTMLInputElement>(null);
 
   const sortedMeals = useMemo(() => {
@@ -188,9 +190,11 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         est_fats:    offPlanF    ? parseFloat(offPlanF)    : null,
         notes: notesMap[offPlanModal.position] || null,
         source: "client",
+        photo_url: null,
+        off_plan_notes: offPlanNotes || null,
       }, { onConflict: "client_id,log_date,meal_position" }).select().single();
       if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== offPlanModal.position), data as AdherenceLog]);
-      setOffPlanModal(null);
+      setOffPlanModal(null); setOffPlanNotes("");
     } finally { setSaving(null); }
   }
 
@@ -234,7 +238,8 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
             <div className="flex items-center justify-between mb-1">
               <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>
                 {mealPlan ? `Off-Plan: ${offPlanModal.mealName}` : `Log ${offPlanModal.mealName}`}
-              </h3>
+              </h3>              <button onClick={() => setOffPlanModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+
               <button
                 onClick={() => cameraRef.current?.click()}
                 disabled={photoLoading}
@@ -274,7 +279,14 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                 </div>
               ))}
             </div>
-            <button onClick={saveOffPlan} disabled={saving === offPlanSavingKey}
+                        <textarea
+              placeholder="What did you have? (optional)"
+              className="w-full border rounded-lg p-2 text-sm resize-none mb-2"
+              rows={2}
+              value={offPlanNotes}
+              onChange={e => setOffPlanNotes(e.target.value)}
+            />
+<button onClick={saveOffPlan} disabled={saving === offPlanSavingKey}
               className="w-full py-3.5 rounded-2xl text-sm font-bold text-white"
               style={{ background: "#8b5cf6" }}>
               {saving === offPlanSavingKey ? "Saving..." : mealPlan ? "Log Off-Plan" : "Save Meal"}
