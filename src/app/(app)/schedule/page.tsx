@@ -47,7 +47,7 @@ export default async function SchedulePage() {
   let scheduledDows: number[] = [];
 
   if (clientId) {
-    // Cast as any — scheduled_workouts.day_id is not in generated Supabase types
+    // Cast as any \u2014 scheduled_workouts.day_id is not in generated Supabase types
     const { data: monthWorkouts } = await (supabase as any)
       .from("scheduled_workouts")
       .select("id, day_id, scheduled_date, status")
@@ -59,7 +59,7 @@ export default async function SchedulePage() {
       .filter((w: any) => w.status === "completed")
       .map((w: any) => w.scheduled_date);
 
-    // Cast as any — scheduled_workouts.day_id is not in generated Supabase types
+    // Cast as any \u2014 scheduled_workouts.day_id is not in generated Supabase types
     const { data: upcoming } = await (supabase as any)
       .from("scheduled_workouts")
       .select("id, day_id, scheduled_date, status, days(id, label)")
