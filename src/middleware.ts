@@ -46,18 +46,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Trainer skips onboarding
+  // Trainer skips all client checks
   if (user.email === TRAINER_EMAIL) {
     return supabaseResponse;
   }
 
-  // For clients: check onboarding_complete
-  // Skip check if already on the onboarding page (prevent redirect loop)
-  if (pathname === "/onboarding") {
+  // Skip onboarding check on these pages to prevent redirect loops / flow interruption
+  if (pathname === "/onboarding" || pathname === "/set-password") {
     return supabaseResponse;
   }
 
-  // Only check on app pages (not API routes already excluded above)
+  // For clients: if onboarding not complete, redirect to onboarding wizard
   if (pathname.startsWith("/")) {
     const { data: clientRow } = await supabase
       .from("clients")
@@ -65,7 +64,6 @@ export async function middleware(request: NextRequest) {
       .eq("email", user.email!)
       .maybeSingle();
 
-    // If client exists and hasn't completed onboarding, redirect
     if (clientRow && clientRow.onboarding_complete === false) {
       return NextResponse.redirect(new URL("/onboarding", request.url));
     }
@@ -76,6 +74,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
