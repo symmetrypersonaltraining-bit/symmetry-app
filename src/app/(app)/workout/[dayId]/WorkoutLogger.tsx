@@ -29,14 +29,14 @@ interface PrescribedExercise {
 
 interface Section {
   id: string;
-  label: string;
+  internal_name: string;
+  client_facing_name: string;
   position: number;
-  notes: string | null;
   prescribed_exercises: PrescribedExercise[];
 }
 
 interface Props {
-  day: { id: string; label: string; notes: string | null };
+  day: { id: string; label: string; notes?: string | null };
   phase: { id: string; label: string };
   program: { id: string; name: string };
   sections: Section[];
@@ -50,7 +50,7 @@ interface Props {
 type SetData = { weight: string; reps: string; done: boolean };
 type HistoryEntry = { log_date: string; sets: { set_number: number; weight_lbs: number | null; reps: number | null }[] };
 
-// \u2500\u2500\u2500 iOS SCROLL-WHEEL TIMER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080 iOS SCROLL-WHEEL TIMER \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080
 function WheelColumn({ values, selected, onChange }: {
   values: number[];
   selected: number;
@@ -175,6 +175,8 @@ function TimerWheel({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
       <div className="w-full rounded-t-3xl p-5 pb-10" style={{ background: "var(--brand-surface)" }} onClick={e => e.stopPropagation()}>
         <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
+
+        {/* Mode toggle */}
         <div className="flex rounded-xl overflow-hidden mb-6 border" style={{ borderColor: "var(--brand-border)" }}>
           {(["timer", "stopwatch"] as const).map(md => (
             <button key={md} onClick={() => { setMode(md); reset(); }}
@@ -182,13 +184,14 @@ function TimerWheel({ onClose }: { onClose: () => void }) {
               style={mode === md
                 ? { background: "var(--brand-primary)", color: "white" }
                 : { background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}>
-              {md === "timer" ? "\u23f1 Timer" : "\u23f2 Stopwatch"}
+              {md === "timer" ? "\u00e2\u008f\u00b1 Timer" : "\u00e2\u008f\u00b2 Stopwatch"}
             </button>
           ))}
         </div>
 
         {!running && !expired && mode === "timer" ? (
           <div className="relative flex items-center justify-center gap-4 mb-4" style={{ userSelect: "none" }}>
+            {/* Selection highlight */}
             <div className="absolute left-0 right-0 pointer-events-none rounded-xl"
               style={{ top: "50%", transform: "translateY(-50%)", height: 56, background: "var(--brand-primary)", opacity: 0.1, zIndex: 1 }} />
             <div style={{ flex: 1 }}>
@@ -233,7 +236,7 @@ function TimerWheel({ onClose }: { onClose: () => void }) {
   );
 }
 
-// \u2500\u2500\u2500 EXERCISE HISTORY DRAWER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080 EXERCISE HISTORY DRAWER \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080
 function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
   exerciseId: string;
   exerciseName: string;
@@ -301,7 +304,7 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
           </div>
         </div>
         {loading ? (
-          <div className="py-8 text-center text-sm" style={{ color: "var(--brand-text-secondary)" }}>Loading\u2026</div>
+          <div className="py-8 text-center text-sm" style={{ color: "var(--brand-text-secondary)" }}>Loading\u00e2\u0080\u00a6</div>
         ) : history.length === 0 ? (
           <div className="py-8 text-center">
             <i className="ti ti-history text-3xl block mb-2" style={{ color: "var(--brand-text-secondary)" }} />
@@ -311,7 +314,7 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
           <div key={i} className="mb-4 rounded-xl p-4"
             style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)" }}>
             <p className="text-xs font-semibold mb-2" style={{ color: "var(--brand-primary)" }}>
-              {i === 0 ? "Most Recent \u00b7 " : ""}{fmtDate(entry.log_date)}
+              {i === 0 ? "Most Recent \u00c2\u00b7 " : ""}{fmtDate(entry.log_date)}
             </p>
             {entry.sets.sort((a, b) => a.set_number - b.set_number).map(s => (
               <div key={s.set_number} className="flex items-center gap-3 py-1 text-sm">
@@ -319,8 +322,8 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
                 <span className="font-medium" style={{ color: "var(--brand-text)" }}>
                   {s.weight_lbs ? `${s.weight_lbs} lb` : "BW"}
                 </span>
-                <span style={{ color: "var(--brand-text-secondary)" }}>\u00d7</span>
-                <span style={{ color: "var(--brand-text)" }}>{s.reps ?? "\u2014"} reps</span>
+                <span style={{ color: "var(--brand-text-secondary)" }}>\u00c3\u0097</span>
+                <span style={{ color: "var(--brand-text)" }}>{s.reps ?? "\u00e2\u0080\u0094"} reps</span>
               </div>
             ))}
           </div>
@@ -330,7 +333,7 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
   );
 }
 
-// \u2500\u2500\u2500 REST TIMER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080 REST TIMER \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080
 function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => void }) {
   const [remaining, setRemaining] = useState(seconds);
   useEffect(() => {
@@ -367,7 +370,7 @@ function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => void })
   );
 }
 
-// \u2500\u2500\u2500 MAIN COMPONENT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080 MAIN COMPONENT \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080
 export default function WorkoutLogger({
   day, phase, program, sections, clientId, clientName, isTrainerSession,
   existingLogId, existingSetLogs,
@@ -506,8 +509,10 @@ export default function WorkoutLogger({
     setSavingNote(true);
     try {
       await supabase.from("trainer_notes").insert({
-        client_id: clientId, day_id: day.id,
-        note: trainerNoteText.trim(), created_at: new Date().toISOString(),
+        client_id: clientId,
+        day_id: day.id,
+        note: trainerNoteText.trim(),
+        created_at: new Date().toISOString(),
       });
       setNoteSaved(true);
       setTimeout(() => setNoteSaved(false), 2500);
@@ -528,7 +533,7 @@ export default function WorkoutLogger({
     r.start();
   }
 
-  // \u2500\u2500\u2500 WORKOUT COMPLETE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080 WORKOUT COMPLETE \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080
   if (workoutComplete) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
@@ -537,7 +542,7 @@ export default function WorkoutLogger({
           <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ background: "#22c55e20" }}>
             <i className="ti ti-trophy text-5xl" style={{ color: "#22c55e" }} />
           </div>
-          <div className="absolute -top-1 -right-1 text-2xl animate-bounce">\ud83c\udf89</div>
+          <div className="absolute -top-1 -right-1 text-2xl animate-bounce">\u00f0\u009f\u008e\u0089</div>
         </div>
         <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--brand-text)" }}>Session Complete!</h1>
         <p className="text-sm mb-2" style={{ color: "var(--brand-text-secondary)" }}>{day.label}</p>
@@ -551,11 +556,9 @@ export default function WorkoutLogger({
     );
   }
 
-  // \u2500\u2500\u2500 SESSION MODE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080 SESSION MODE \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080
   if (sessionMode && currentExercise) {
     const peSets = sets[currentExercise.id] || [];
-    const doneCount = peSets.filter(s => s.done).length;
-    const allDone = doneCount === currentExercise.sets;
 
     return (
       <div className="fixed inset-0 flex flex-col" style={{ background: "#0D1117" }}>
@@ -567,6 +570,7 @@ export default function WorkoutLogger({
         )}
         {showTimer && <TimerWheel onClose={() => setShowTimer(false)} />}
 
+        {/* Top bar */}
         <div className="flex items-center justify-between px-4 pt-4 pb-3 flex-shrink-0">
           <button onClick={() => setSessionMode(false)}
             className="w-9 h-9 rounded-full flex items-center justify-center"
@@ -577,31 +581,25 @@ export default function WorkoutLogger({
             <p className="text-white/40 text-xs">{day.label}</p>
             <p className="text-white/60 text-xs">{globalIdx + 1} / {totalExercises}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowTimer(true)}
-              className="w-9 h-9 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(255,255,255,0.08)" }}>
-              <i className="ti ti-clock text-white text-base" />
-            </button>
-            <div className="w-9 h-9 rounded-full flex items-center justify-center"
-              style={{ background: progressPct === 100 ? "#22c55e20" : "rgba(255,255,255,0.08)" }}>
-              <span className="text-xs font-bold" style={{ color: progressPct === 100 ? "#22c55e" : "white" }}>
-                {progressPct}%
-              </span>
-            </div>
-          </div>
+          <button onClick={() => setShowTimer(true)}
+            className="w-9 h-9 rounded-full flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.08)" }}>
+            <i className="ti ti-clock text-white/60 text-base" />
+          </button>
         </div>
 
+        {/* Progress bar */}
         <div className="mx-4 h-0.5 rounded-full mb-4" style={{ background: "rgba(255,255,255,0.08)" }}>
           <div className="h-full rounded-full transition-all duration-500"
             style={{ width: `${progressPct}%`, background: "var(--brand-primary)" }} />
         </div>
 
+        {/* Exercise header */}
         <div className="px-5 mb-4 flex-shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "var(--brand-primary)" }}>
-                {currentSection.label}
+                {currentSection.client_facing_name || currentSection.internal_name}
               </p>
               <h2 className="text-2xl font-bold text-white leading-tight">{currentExercise.exercises?.name}</h2>
               {currentExercise.load_descriptor && (
@@ -616,28 +614,32 @@ export default function WorkoutLogger({
             <button onClick={() => setHistoryExercise({ id: currentExercise.id, name: currentExercise.exercises?.name })}
               className="flex-shrink-0 ml-3 mt-1 w-10 h-10 rounded-xl flex items-center justify-center"
               style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <i className="ti ti-history text-white/50 text-base" />
+              <i className="ti ti-chart-bar text-white/50 text-base" />
             </button>
           </div>
           <div className="flex gap-2 mt-3 flex-wrap">
             {currentExercise.volume_value && (
-              <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: "rgba(14,165,233,0.15)", color: "#0EA5E9" }}>
+              <span className="text-xs px-2.5 py-1 rounded-full"
+                style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>
                 {currentExercise.volume_value}
               </span>
             )}
             {currentExercise.tempo && (
-              <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
+              <span className="text-xs px-2.5 py-1 rounded-full"
+                style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
                 {currentExercise.tempo}
               </span>
             )}
             {currentExercise.unilateral && (
-              <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
+              <span className="text-xs px-2.5 py-1 rounded-full"
+                style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
                 Unilateral
               </span>
             )}
           </div>
         </div>
 
+        {/* Sets */}
         <div className="flex-1 overflow-y-auto px-5">
           <div className="flex gap-2 mb-3">
             <div className="w-8" />
@@ -669,7 +671,7 @@ export default function WorkoutLogger({
                 }} inputMode="numeric" />
               <button onClick={() => { if (!setEntry.done) logSet(currentExercise.id, si); }}
                 disabled={setEntry.done || saving}
-                className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all"
+                className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
                 style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}>
                 <i className={`ti ${setEntry.done ? "ti-check" : "ti-player-play"} text-xl text-white`} />
               </button>
@@ -677,11 +679,12 @@ export default function WorkoutLogger({
           ))}
         </div>
 
+        {/* Bottom controls */}
         <div className="flex-shrink-0 px-5 pb-8 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          <div className="flex items-center gap-2 mb-4">
+          {/* Session note */}
+          <div className="flex items-center gap-2 mb-3">
             <input type="text" value={sessionNote} onChange={e => setSessionNote(e.target.value)}
-              placeholder="Session note\u2026"
-              className="flex-1 text-sm px-4 py-2.5 rounded-xl outline-none"
+              placeholder="Session note\u00e2\u0080\u00a6" className="flex-1 text-sm px-4 py-2.5 rounded-xl outline-none"
               style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(255,255,255,0.08)" }} />
             <button onClick={startVoiceNote}
               className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -690,6 +693,33 @@ export default function WorkoutLogger({
                 style={{ color: listening ? "white" : "rgba(255,255,255,0.4)" }} />
             </button>
           </div>
+
+          {/* Trainer AI note */}
+          {isTrainerSession && (
+            <div className="mb-3 rounded-xl p-3" style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
+              <div className="flex items-center gap-2 mb-2">
+                <i className="ti ti-brain text-sm" style={{ color: "#8b5cf6" }} />
+                <p className="text-xs font-semibold" style={{ color: "#8b5cf6" }}>AI Programming Note</p>
+              </div>
+              <div className="flex gap-2">
+                <input type="text" value={trainerNoteText} onChange={e => setTrainerNoteText(e.target.value)}
+                  placeholder="Note for AI program adjustments\u00e2\u0080\u00a6"
+                  className="flex-1 text-xs px-3 py-2 rounded-lg outline-none"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(139,92,246,0.3)" }} />
+                <button onClick={startTrainerVoice}
+                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.3)" }}>
+                  <i className="ti ti-microphone text-sm" style={{ color: "#8b5cf6" }} />
+                </button>
+                <button onClick={saveTrainerNote} disabled={savingNote || !trainerNoteText.trim()}
+                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: noteSaved ? "#22c55e" : "rgba(139,92,246,0.8)" }}>
+                  <i className={`ti ${noteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <button onClick={() => navigateToGlobal(Math.max(0, globalIdx - 1))} disabled={globalIdx === 0}
               className="flex-1 py-3.5 rounded-2xl text-sm font-semibold transition-all"
@@ -709,7 +739,7 @@ export default function WorkoutLogger({
                   background: progressPct === 100 ? "#22c55e" : "rgba(255,255,255,0.06)",
                   color: progressPct === 100 ? "white" : "rgba(255,255,255,0.3)",
                 }}>
-                {saving ? "Saving\u2026" : "Complete \u2713"}
+                {saving ? "Saving\u00e2\u0080\u00a6" : "Complete \u00e2\u009c\u0093"}
               </button>
             )}
           </div>
@@ -718,14 +748,16 @@ export default function WorkoutLogger({
     );
   }
 
-  // \u2500\u2500\u2500 STANDARD VIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080 STANDARD VIEW \u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080\u00e2\u0094\u0080
   return (
     <div style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
       {historyExercise && (
         <ExerciseHistory exerciseId={historyExercise.id} exerciseName={historyExercise.name}
-          onClose={() => setHistoryExercise(null)} />
+          onClose={() => setHistoryExercise(null)}
+          onPrefill={(w, r) => prefillSets(historyExercise.id, w, r)} />
       )}
       {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
+      {showTimer && <TimerWheel onClose={() => setShowTimer(false)} />}
 
       {isTrainerSession && clientName && (
         <div className="flex items-center gap-2 px-4 py-2 text-xs font-medium" style={{ background: "#f59e0b", color: "white" }}>
@@ -734,6 +766,7 @@ export default function WorkoutLogger({
         </div>
       )}
 
+      {/* Header */}
       <div style={{ background: "var(--brand-primary)" }} className="px-4 pt-4 pb-6">
         <div className="flex items-center gap-3 mb-3">
           <Link href={isTrainerSession ? `/clients/${clientId}` : "/home"}
@@ -742,14 +775,14 @@ export default function WorkoutLogger({
             <i className="ti ti-arrow-left text-white text-lg" />
           </Link>
           <div className="flex-1">
-            <p className="text-white/60 text-xs">{program?.name} \u00b7 {phase?.label}</p>
+            <p className="text-white/60 text-xs">{program?.name} \u00c2\u00b7 {phase?.label}</p>
             <h1 className="text-white font-bold text-base">{day.label}</h1>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowTimer(true)}
               className="w-9 h-9 rounded-full flex items-center justify-center"
               style={{ background: "rgba(255,255,255,0.15)" }}>
-              <i className="ti ti-clock text-white text-sm" />
+              <i className="ti ti-clock text-white text-base" />
             </button>
             <button onClick={() => setSessionMode(true)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
@@ -758,17 +791,17 @@ export default function WorkoutLogger({
             </button>
           </div>
         </div>
-        {showTimer && <TimerWheel onClose={() => setShowTimer(false)} />}
         <div className="flex items-center gap-3">
           <div className="flex-1 h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.2)" }}>
             <div className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${progressPct}%`, background: "#0EA5E9" }} />
+              style={{ width: `${progressPct}%`, background: "rgba(255,255,255,0.9)" }} />
           </div>
           <span className="text-white/70 text-xs font-medium">{progressPct}%</span>
         </div>
       </div>
 
       <div className="px-4 -mt-2 pb-8">
+        {/* Section tabs */}
         <div className="flex gap-2 overflow-x-auto py-3 no-scrollbar">
           {sections.map((sec, i) => (
             <button key={sec.id} onClick={() => { setActiveSectionIdx(i); setActiveExerciseIdx(0); }}
@@ -776,17 +809,12 @@ export default function WorkoutLogger({
               style={i === activeSectionIdx
                 ? { background: "var(--brand-primary)", color: "white", borderColor: "var(--brand-primary)" }
                 : { background: "var(--brand-surface)", color: "var(--brand-text-secondary)", borderColor: "var(--brand-border)" }}>
-              {sec.label}
+              {sec.client_facing_name || sec.internal_name}
             </button>
           ))}
         </div>
 
-        {day.notes && (
-          <div className="mb-3 px-4 py-3 rounded-xl text-sm" style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}>
-            {day.notes}
-          </div>
-        )}
-
+        {/* Exercise cards */}
         {currentSection?.prescribed_exercises.map((pe, i) => {
           const peSets = sets[pe.id] || [];
           const doneCount = peSets.filter(s => s.done).length;
@@ -812,17 +840,20 @@ export default function WorkoutLogger({
                     <div className="flex-1">
                       <p className="font-semibold text-sm" style={{ color: "var(--brand-text)" }}>{pe.exercises?.name}</p>
                       <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                        {pe.sets} sets{pe.volume_value ? ` \u00b7 ${pe.volume_value}` : ""}
-                        {pe.load_descriptor ? ` \u00b7 ${pe.load_descriptor}` : ""}
+                        {pe.sets} sets{pe.volume_value ? ` \u00c2\u00b7 ${pe.volume_value}` : ""}{pe.load_descriptor ? ` \u00c2\u00b7 ${pe.load_descriptor}` : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
                       <button onClick={e => { e.stopPropagation(); setHistoryExercise({ id: pe.id, name: pe.exercises?.name }); }}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--brand-card)" }}>
-                        <i className="ti ti-history text-sm" style={{ color: "var(--brand-text-secondary)" }} />
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ background: "var(--brand-card)" }} title="View history">
+                        <i className="ti ti-chart-bar text-sm" style={{ color: "var(--brand-primary)" }} />
                       </button>
                       <div className="text-xs font-medium px-2 py-1 rounded-full"
-                        style={{ background: allDone ? "#22c55e20" : "var(--brand-card)", color: allDone ? "#22c55e" : "var(--brand-text-secondary)" }}>
+                        style={{
+                          background: allDone ? "#22c55e20" : "var(--brand-card)",
+                          color: allDone ? "#22c55e" : "var(--brand-text-secondary)",
+                        }}>
                         {doneCount}/{pe.sets}
                       </div>
                     </div>
@@ -846,10 +877,12 @@ export default function WorkoutLogger({
                   {peSets.map((setEntry, si) => (
                     <div key={si} className="grid mb-2 items-center" style={{ gridTemplateColumns: "28px 1fr 1fr 40px", gap: "8px" }}>
                       <div className="text-center text-xs font-bold"
-                        style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>
+                        style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>
+                        {si + 1}
+                      </div>
                       <input type="number" value={setEntry.weight}
                         onChange={e => updateSet(pe.id, si, "weight", e.target.value)}
-                        disabled={setEntry.done} placeholder="\u2014"
+                        disabled={setEntry.done} placeholder="\u00e2\u0080\u0094"
                         className="text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
@@ -858,7 +891,7 @@ export default function WorkoutLogger({
                         }} inputMode="decimal" />
                       <input type="number" value={setEntry.reps}
                         onChange={e => updateSet(pe.id, si, "reps", e.target.value)}
-                        disabled={setEntry.done} placeholder="\u2014"
+                        disabled={setEntry.done} placeholder="\u00e2\u0080\u0094"
                         className="text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
@@ -879,29 +912,31 @@ export default function WorkoutLogger({
           );
         })}
 
+        {/* Trainer AI programming note */}
         {isTrainerSession && (
-          <div className="mt-4 mb-3 rounded-2xl p-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-            <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--brand-text-secondary)" }}>
-              Trainer Note
-            </p>
-            <div className="flex items-center gap-2">
-              <textarea value={trainerNoteText} onChange={e => setTrainerNoteText(e.target.value)}
-                placeholder="Add a session note\u2026" rows={2}
-                className="flex-1 text-sm px-3 py-2 rounded-xl outline-none resize-none"
-                style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
-              <div className="flex flex-col gap-2">
-                <button onClick={startTrainerVoice}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center"
-                  style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)" }}>
-                  <i className="ti ti-microphone text-sm" style={{ color: "var(--brand-text-secondary)" }} />
-                </button>
-                <button onClick={saveTrainerNote} disabled={savingNote || !trainerNoteText.trim()}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center"
-                  style={{ background: noteSaved ? "#22c55e" : "var(--brand-primary)" }}>
-                  <i className={`ti ${noteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
-                </button>
-              </div>
+          <div className="rounded-2xl p-4 mb-3"
+            style={{ background: "var(--brand-surface)", border: "1px solid rgba(139,92,246,0.3)" }}>
+            <div className="flex items-center gap-2 mb-3">
+              <i className="ti ti-brain text-sm" style={{ color: "#8b5cf6" }} />
+              <p className="text-xs font-semibold" style={{ color: "#8b5cf6" }}>AI Programming Note</p>
             </div>
+            <div className="flex gap-2">
+              <input type="text" value={trainerNoteText} onChange={e => setTrainerNoteText(e.target.value)}
+                placeholder="Record a note for AI program adjustments\u00e2\u0080\u00a6"
+                className="flex-1 text-sm px-3 py-2.5 rounded-xl outline-none"
+                style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid rgba(139,92,246,0.3)" }} />
+              <button onClick={startTrainerVoice}
+                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)" }}>
+                <i className="ti ti-microphone text-sm" style={{ color: "#8b5cf6" }} />
+              </button>
+              <button onClick={saveTrainerNote} disabled={savingNote || !trainerNoteText.trim()}
+                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: noteSaved ? "#22c55e" : "#8b5cf6" }}>
+                <i className={`ti ${noteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
+              </button>
+            </div>
+            {noteSaved && <p className="text-xs mt-2" style={{ color: "#22c55e" }}>Note saved!</p>}
           </div>
         )}
 
@@ -910,7 +945,7 @@ export default function WorkoutLogger({
           style={progressPct === 100
             ? { background: "#22c55e", color: "white" }
             : { background: "var(--brand-surface)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}>
-          {saving ? "Saving\u2026" : progressPct === 100 ? "\ud83c\udfc6 Complete Workout" : `${progressPct}% \u2014 keep going!`}
+          {saving ? "Saving\u00e2\u0080\u00a6" : progressPct === 100 ? "\u00f0\u009f\u008f\u0086 Complete Workout" : `${progressPct}% \u00e2\u0080\u0094 keep going!`}
         </button>
       </div>
     </div>
