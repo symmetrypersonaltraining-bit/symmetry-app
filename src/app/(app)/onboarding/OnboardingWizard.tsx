@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 const GOALS = [
   "Fat Loss", "Muscle Gain", "Body Recomposition", "Strength",
@@ -53,39 +52,18 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
 
   async function handleFinish() {
     setSaving(true);
-    const updates: Record<string, any> = {
-      onboarding_complete: true,
-    };
-    if (form.phone) updates.phone = form.phone;
-    if (form.date_of_birth) updates.date_of_birth = form.date_of_birth;
-    if (form.primary_goal) updates.primary_goal = form.primary_goal;
-    if (form.experience_level) updates.experience_level = form.experience_level;
-    if (form.training_frequency) updates.training_frequency = Number(form.training_frequency);
-    if (form.injuries_limitations) updates.injuries_limitations = form.injuries_limitations;
-    if (form.current_weight) updates.current_weight = Number(form.current_weight);
-    if (form.current_body_fat_pct) updates.current_body_fat_pct = Number(form.current_body_fat_pct);
-
-    await supabase.from("clients").update(updates).eq("id", clientId);
-
-    // Log initial metrics if provided
-    if (form.current_weight || form.current_body_fat_pct) {
-      const w = form.current_weight ? Number(form.current_weight) : null;
-      const bf = form.current_body_fat_pct ? Number(form.current_body_fat_pct) : null;
-      const lean = (w && bf) ? +(w * (1 - bf / 100)).toFixed(1) : null;
-      const fat = (w && bf) ? +(w * (bf / 100)).toFixed(1) : null;
-      await supabase.from("metrics").insert({
-        client_id: clientId,
-        metric_date: new Date().toISOString().split("T")[0],
-        weight: w,
-        body_fat_pct: bf,
-        lean_mass: lean,
-        fat_mass: fat,
+    try {
+      const res = await fetch("/api/complete-onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      window.location.href = "/home";
+    } catch {
+      setSaving(false);
     }
-
-    setSaving(false);
-    setStep(5); // Done step
-    window.location.href = "/home";
   }
 
   const firstName = prefill.name.split(" ")[0];
