@@ -140,7 +140,7 @@ function EventBlock({ ev, clients, onClick }: {
       </p>
       {height > 32 && (
         <p className="text-[10px] leading-tight" style={{ color: "rgba(255,255,255,0.85)" }}>
-          {fmtTime(start)}\u2013{fmtTime(end)}
+          {fmtTime(start)}{'\u2013'}{fmtTime(end)}
         </p>
       )}
     </div>
