@@ -57,7 +57,7 @@ export default function NewClientModal({ onClose }: Props) {
       setSuccess(
         data.invited
           ? `${data.name} created! Invite email sent to ${form.email}.`
-          : `${data.name} created! No invite sent — link their account later.`
+          : `${data.name} created! No invite sent \u2014 link their account later.`
       );
       setTimeout(() => {
         onClose();
@@ -82,7 +82,7 @@ export default function NewClientModal({ onClose }: Props) {
           <div>
             <h2 className="text-base font-bold" style={{ color: "var(--brand-text)" }}>New Client</h2>
             <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-              Fill in what you know — client will complete the rest on first login
+              Fill in what you know \u2014 client will complete the rest on first login
             </p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full"
