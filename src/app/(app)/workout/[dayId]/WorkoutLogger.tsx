@@ -304,7 +304,7 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
           </div>
         </div>
         {loading ? (
-          <div className="py-8 text-center text-sm" style={{ color: "var(--brand-text-secondary)" }}>Loading\u2026</div>
+          <div className="py-8 text-center text-sm" style={{ color: "var(--brand-text-secondary)" }}>Loading{'\u2026'}</div>
         ) : history.length === 0 ? (
           <div className="py-8 text-center">
             <i className="ti ti-history text-3xl block mb-2" style={{ color: "var(--brand-text-secondary)" }} />
@@ -684,7 +684,7 @@ export default function WorkoutLogger({
           {/* Session note */}
           <div className="flex items-center gap-2 mb-3">
             <input type="text" value={sessionNote} onChange={e => setSessionNote(e.target.value)}
-              placeholder="Session note\u2026" className="flex-1 text-sm px-4 py-2.5 rounded-xl outline-none"
+              placeholder={'Session note\u2026'} className="flex-1 text-sm px-4 py-2.5 rounded-xl outline-none"
               style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(255,255,255,0.08)" }} />
             <button onClick={startVoiceNote}
               className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -703,7 +703,7 @@ export default function WorkoutLogger({
               </div>
               <div className="flex gap-2">
                 <input type="text" value={trainerNoteText} onChange={e => setTrainerNoteText(e.target.value)}
-                  placeholder="Note for AI program adjustments\u2026"
+                  placeholder={'Note for AI program adjustments\u2026'}
                   className="flex-1 text-xs px-3 py-2 rounded-lg outline-none"
                   style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(139,92,246,0.3)" }} />
                 <button onClick={startTrainerVoice}
@@ -882,7 +882,7 @@ export default function WorkoutLogger({
                       </div>
                       <input type="number" value={setEntry.weight}
                         onChange={e => updateSet(pe.id, si, "weight", e.target.value)}
-                        disabled={setEntry.done} placeholder="\u2014"
+                        disabled={setEntry.done} placeholder={'\u2014'}
                         className="text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
@@ -891,7 +891,7 @@ export default function WorkoutLogger({
                         }} inputMode="decimal" />
                       <input type="number" value={setEntry.reps}
                         onChange={e => updateSet(pe.id, si, "reps", e.target.value)}
-                        disabled={setEntry.done} placeholder="\u2014"
+                        disabled={setEntry.done} placeholder={'\u2014'}
                         className="text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
@@ -922,7 +922,7 @@ export default function WorkoutLogger({
             </div>
             <div className="flex gap-2">
               <input type="text" value={trainerNoteText} onChange={e => setTrainerNoteText(e.target.value)}
-                placeholder="Record a note for AI program adjustments\u2026"
+                placeholder={'Record a note for AI program adjustments\u2026'}
                 className="flex-1 text-sm px-3 py-2.5 rounded-xl outline-none"
                 style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid rgba(139,92,246,0.3)" }} />
               <button onClick={startTrainerVoice}
