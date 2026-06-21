@@ -38,7 +38,7 @@ export default function InviteClientButton({
     return (
       <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
         style={{ background: "rgba(34,197,94,0.3)", color: "white" }}>
-        ✓ Invite sent!
+        \u2713 Invite sent!
       </span>
     );
   }
@@ -59,7 +59,7 @@ export default function InviteClientButton({
       className="text-[10px] px-2 py-0.5 rounded-full font-medium transition-opacity hover:opacity-80"
       style={{ background: "rgba(255,255,255,0.25)", color: "white", border: "1px solid rgba(255,255,255,0.4)" }}
     >
-      {state === "sending" ? "Sending..." : "✉ Invite to App"}
+      {state === "sending" ? "Sending..." : "\u2709 Invite to App"}
     </button>
   );
 }
