@@ -52,7 +52,7 @@ export default function LoginPage() {
             }
           }
         }
-      } catch (_) { /* ignore — just go to home */ }
+      } catch (_) { /* ignore â just go to home */ }
       router.push("/home");
       router.refresh();
     }
@@ -115,7 +115,7 @@ export default function LoginPage() {
             <p className="text-sm" style={{ color: "#4E6080" }}>
               We sent a login link to{" "}
               <span className="font-medium">{email}</span>. Click the link to
-              sign in — no password needed.
+              sign in â no password needed.
             </p>
             <button
               onClick={() => setMagicSent(false)}
@@ -201,7 +201,7 @@ export default function LoginPage() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="â¢â¢â¢â¢â¢â¢â¢â¢"
                     required
                     className="w-full rounded-lg px-4 py-3 text-sm border"
                     style={{
@@ -226,7 +226,7 @@ export default function LoginPage() {
                 style={{ background: "#0F4C81" }}
               >
                 {loading
-                  ? "Signing in…"
+                  ? "Signing inâ¦"
                   : mode === "password"
                   ? "Sign in"
                   : "Send magic link"}
