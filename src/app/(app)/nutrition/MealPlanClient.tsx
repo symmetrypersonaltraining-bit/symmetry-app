@@ -124,7 +124,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         client_id: clientId, log_date: today, meal_id: meal.id,
         meal_position: meal.position, adherence: adherenceKey,
         off_plan_details: null, est_kcal: null, est_protein: null,
-        est_carbs: null, est_fats: null, source: "client_app",
+        est_carbs: null, est_fats: null, source: "client",
         notes: notesMap[meal.position] || null,
       }, { onConflict: "client_id,log_date,meal_position" }).select().single();
       if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== meal.position), data as AdherenceLog]);
@@ -187,7 +187,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         est_carbs:   offPlanC    ? parseFloat(offPlanC)    : null,
         est_fats:    offPlanF    ? parseFloat(offPlanF)    : null,
         notes: notesMap[offPlanModal.position] || null,
-        source: "client_app",
+        source: "client",
       }, { onConflict: "client_id,log_date,meal_position" }).select().single();
       if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== offPlanModal.position), data as AdherenceLog]);
       setOffPlanModal(null);
