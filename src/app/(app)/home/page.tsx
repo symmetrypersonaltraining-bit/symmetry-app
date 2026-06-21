@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import TrainerCalendar from "./TrainerCalendar";
 import ClientDashboard from "./ClientDashboard";
+import { isClientMode } from "@/lib/client-mode";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
 import PendingRemindersPanel from "@/components/PendingRemindersPanel";
 
@@ -14,7 +15,8 @@ export default async function HomePage() {
 
   const isTrainer = (user?.email ?? "") === TRAINER_EMAIL;
 
-  if (isTrainer) {
+  const clientMode = await isClientMode();
+  if (isTrainer && !clientMode) {
     const { data: clients } = await supabase
       .from("clients")
       .select("id, name")
