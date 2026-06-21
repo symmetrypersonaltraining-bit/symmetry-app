@@ -262,7 +262,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <div className="flex items-start justify-between pt-2">
           <div>
             <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{greeting},</p>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>{firstName} {'👋'}</h1>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>{firstName} {'\uD83D\uDC4B'}</h1>
           </div>
           {streakDays > 0 && (
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${isMilestone ? "animate-pulse" : ""}`} style={{ background: isMilestone ? "#f59e0b20" : "var(--brand-surface)", border: `1px solid ${isMilestone ? "#f59e0b" : "var(--brand-border)"}` }}>
@@ -294,7 +294,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
             })}
           </div>
         ) : (
-          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} /><p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p><p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program {'💪'}</p></div>
+          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} /><p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p><p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program {'\uD83D\uDCAA'}</p></div>
         )}
 
         <div className="grid grid-cols-2 gap-3">
