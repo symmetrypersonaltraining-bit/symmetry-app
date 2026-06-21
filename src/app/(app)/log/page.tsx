@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import LogClient from "./LogClient";
+import { isClientMode } from "@/lib/client-mode";
 
 export default async function LogPage() {
   const supabase = await createClient();
@@ -10,7 +11,8 @@ export default async function LogPage() {
   const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
   let clientRecord: { id: string; name: string } | null = null;
 
-  if (isTrainer) {
+  const clientMode = await isClientMode();
+  if (isTrainer && !clientMode) {
     const { data } = await supabase
       .from("clients")
       .select("id, name")
