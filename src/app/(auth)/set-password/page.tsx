@@ -25,7 +25,7 @@ export default function SetPasswordPage() {
 
       const { data: clientRec } = await supabase
         .from("clients")
-        .select("id")
+        .select("id, onboarding_complete")
         .eq("auth_user_id", user.id)
         .maybeSingle();
 
