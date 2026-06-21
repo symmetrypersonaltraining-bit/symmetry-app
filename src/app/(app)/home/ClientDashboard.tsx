@@ -282,42 +282,18 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         {todayWorkouts.length > 0 ? (
           <div className="space-y-3">
             {todayWorkouts.map((tw, i) => {
-              const linkId = (tw as any).day_id || tw.id;
-              const twLabel = tw.days?.label || "Today's Workout";
-              const twDone2 = tw.status === "completed";
-              const isCardio = isCardioLabel(twLabel);
+              const lnk = (tw as any).day_id || tw.id;
+              const lbl = tw.days?.label || "Today's Workout";
+              const don = tw.status === "completed";
+              const crd = isCardioLabel(lbl);
               if (i === 0) {
-                return (
-                  <Link key={tw.id} href={`/workout/${linkId}`}>
-                    <div className="rounded-2xl p-5 relative overflow-hidden cursor-pointer" style={{ background: "var(--brand-primary)" }}>
-                      <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ background: "white", transform: "translate(30%, -30%)" }} />
-                      <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full opacity-5" style={{ background: "white", transform: "translate(-30%, 30%)" }} />
-                      <div className="relative">
-                        <p className="text-xs font-semibold text-white/70 mb-1 uppercase tracking-widest">{isCardio ? "Today's Cardio" : "Today's Workout"}</p>
-                        <h2 className="text-xl font-bold text-white mb-3">{twLabel}</h2>
-                        {twDone2 ? (<div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5"><i className="ti ti-check text-sm text-white" /><span className="text-xs text-white font-medium">Completed ✓</span></div>) : (<div className="inline-flex items-center gap-2 bg-white text-sm font-semibold rounded-full px-4 py-2" style={{ color: "var(--brand-primary)" }}><i className={`ti ${isCardio ? "ti-run" : "ti-player-play"}`} />{isCardio ? "Start Cardio" : "Start Workout"}</div>)}
-                      </div>
-                    </div>
-                  </Link>
-                );
+                return (<Link key={tw.id} href={`/workout/${lnk}`}><div className="rounded-2xl p-5 relative overflow-hidden" style={{ background: "var(--brand-primary)" }}><div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ background: "white", transform: "translate(30%,-30%)" }} /><div className="absolute bottom-0 left-0 w-20 h-20 rounded-full opacity-5" style={{ background: "white", transform: "translate(-30%,30%)" }} /><div className="relative"><p className="text-xs font-semibold text-white/70 mb-1 uppercase tracking-widest">{crd ? "Today's Cardio" : "Today's Workout"}</p><h2 className="text-xl font-bold text-white mb-3">{lbl}</h2>{don ? (<div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5"><i className="ti ti-check text-sm text-white" /><span className="text-xs text-white font-medium">Completed ✓</span></div>) : (<div className="inline-flex items-center gap-2 bg-white text-sm font-semibold rounded-full px-4 py-2" style={{ color: "var(--brand-primary)" }}><i className={`ti ${crd?"ti-run":"ti-player-play"}`} />{crd?"Start Cardio":"Start Workout"}</div>)}</div></div></Link>);
               }
-              return (
-                <Link key={tw.id} href={`/workout/${linkId}`}>
-                  <div className="rounded-2xl p-4 flex items-center gap-4 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: twDone2 ? "#22c55e20" : "var(--brand-card)" }}><i className={`ti ${twDone2 ? "ti-check" : isCardio ? "ti-run" : "ti-barbell"} text-base`} style={{ color: twDone2 ? "#22c55e" : "var(--brand-primary)" }} /></div>
-                    <div className="flex-1 min-w-0"><p className="text-xs font-semibold uppercase tracking-widest mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>{isCardio ? "Today's Cardio" : "Also Today"}</p><p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{twLabel}</p></div>
-                    {twDone2 ? (<span className="text-xs font-medium flex-shrink-0" style={{ color: "#22c55e" }}>Done ✓</span>) : (<div className="flex items-center gap-1 flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-white" style={{ background: "var(--brand-primary)" }}><i className="ti ti-player-play text-xs" /> Start</div>)}
-                  </div>
-                </Link>
-              );
+              return (<Link key={tw.id} href={`/workout/${lnk}`}><div className="rounded-2xl p-4 flex items-center gap-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: don ? "#22c55e20" : "var(--brand-card)" }}><i className={`ti ${don?"ti-check":crd?"ti-run":"ti-barbell"} text-base`} style={{ color: don ? "#22c55e" : "var(--brand-primary)" }} /></div><div className="flex-1 min-w-0"><p className="text-xs font-semibold uppercase tracking-widest mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>{crd?"Today's Cardio":"Also Today"}</p><p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{lbl}</p></div>{don ? (<span className="text-xs font-medium flex-shrink-0" style={{ color: "#22c55e" }}>Done ✓</span>) : (<div className="flex items-center gap-1 flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-white" style={{ background: "var(--brand-primary)" }}><i className="ti ti-player-play text-xs" /> Start</div>)}</div></Link>);
             })}
           </div>
         ) : (
-          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-            <i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
-            <p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p>
-            <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program 💪</p>
-          </div>
+          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} /><p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p><p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program 💪</p></div>
         )}
 
         <div className="grid grid-cols-2 gap-3">
