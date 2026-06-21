@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import MealPlanClient from "./MealPlanClient";
 import ClientSelector from "@/components/ClientSelector";
+import { isClientMode } from "@/lib/client-mode";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -21,7 +22,8 @@ export default async function NutritionPage({
   let clientName = "";
   let allClients: { id: string; name: string }[] = [];
 
-  if (isTrainer) {
+  const clientMode = await isClientMode();
+  if (isTrainer && !clientMode) {
     // Fetch all clients for dropdown
     const { data: clientList } = await supabase
       .from("clients")
