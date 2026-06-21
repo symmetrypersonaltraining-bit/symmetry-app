@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 Types \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 interface AssessmentData {
   // Personal Info
@@ -85,7 +85,7 @@ const SECTIONS = [
   'AI Recommendation',
 ];
 
-// ─── Toggle Component ─────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 Toggle Component \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
@@ -108,7 +108,7 @@ function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: bool
   );
 }
 
-// ─── Field Component ──────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 Field Component \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 function Field({
   label, children, className = ''
@@ -126,7 +126,7 @@ function Field({
 const inputClass = "w-full px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 transition-all"
   + " bg-white/5 border-white/10 text-white placeholder-white/30 focus:ring-purple-500/50 focus:border-purple-500/50";
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 Main Component \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 export default function AssessmentPage() {
   const router = useRouter();
@@ -140,7 +140,7 @@ export default function AssessmentPage() {
   const set = (field: keyof AssessmentData, value: any) =>
     setData(prev => ({ ...prev, [field]: value }));
 
-  // ─── Voice Input ──────────────────────────────────────────────────────────
+  // \u2500\u2500\u2500 Voice Input \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   const startVoice = (field: keyof AssessmentData) => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -220,7 +220,7 @@ export default function AssessmentPage() {
     );
   }
 
-  // ─── AI Recommendation ────────────────────────────────────────────────────
+  // \u2500\u2500\u2500 AI Recommendation \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   const getAIRecommendation = async () => {
     setAiLoading(true);
@@ -239,7 +239,7 @@ export default function AssessmentPage() {
     }
   };
 
-  // ─── Save ─────────────────────────────────────────────────────────────────
+  // \u2500\u2500\u2500 Save \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   const saveAssessment = async (createAccount: boolean) => {
     setSaving(true);
@@ -328,11 +328,11 @@ export default function AssessmentPage() {
     }
   };
 
-  // ─── Progress Bar ─────────────────────────────────────────────────────────
+  // \u2500\u2500\u2500 Progress Bar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   const progress = ((step + 1) / SECTIONS.length) * 100;
 
-  // ─── Render Sections ──────────────────────────────────────────────────────
+  // \u2500\u2500\u2500 Render Sections \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   const renderSection = () => {
     switch (step) {
@@ -539,9 +539,9 @@ export default function AssessmentPage() {
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { value: 'sedentary', label: 'Sedentary', desc: 'Little to no exercise' },
-                  { value: 'lightly_active', label: 'Lightly Active', desc: '1–3 days/week' },
-                  { value: 'active', label: 'Active', desc: '3–5 days/week' },
-                  { value: 'very_active', label: 'Very Active', desc: '6–7 days/week' },
+                  { value: 'lightly_active', label: 'Lightly Active', desc: '1\u20133 days/week' },
+                  { value: 'active', label: 'Active', desc: '3\u20135 days/week' },
+                  { value: 'very_active', label: 'Very Active', desc: '6\u20137 days/week' },
                 ].map(opt => (
                   <button
                     key={opt.value}
@@ -820,7 +820,7 @@ export default function AssessmentPage() {
             )}
 
             {/* Assessment Summary (editable) */}
-            <Field label="Assessment Summary (Client-Facing — Editable)">
+            <Field label="Assessment Summary (Client-Facing \u2014 Editable)">
               <textarea
                 value={aiResult.assessment_summary || ''}
                 onChange={e => setAiResult((prev: any) => ({ ...prev, assessment_summary: e.target.value }))}
@@ -846,7 +846,7 @@ export default function AssessmentPage() {
     }
   };
 
-  // ─── Main Render ──────────────────────────────────────────────────────────
+  // \u2500\u2500\u2500 Main Render \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--brand-bg, #0f0f1a)' }}>
@@ -910,7 +910,7 @@ export default function AssessmentPage() {
           <h2 className="text-lg font-bold text-white">{SECTIONS[step]}</h2>
           {step === 2 && (
             <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>
-              Overhead Squat Assessment — check each compensation observed
+              Overhead Squat Assessment \u2014 check each compensation observed
             </p>
           )}
         </div>
