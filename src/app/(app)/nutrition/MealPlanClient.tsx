@@ -10,9 +10,9 @@ interface AdherenceLog { id: string; meal_id: string | null; meal_position: numb
 interface MacroTarget { calories: number; protein: number; carbs: number; fats: number; }
 
 const ADHERENCE_OPTIONS = [
-  { key: "quarter",        label: "¼",        color: "#ef4444", pct: 0.25 },
-  { key: "half",           label: "½",        color: "#f59e0b", pct: 0.5  },
-  { key: "three_quarters", label: "¾",        color: "#84cc16", pct: 0.75 },
+  { key: "quarter",        label: "\u00bc",        color: "#ef4444", pct: 0.25 },
+  { key: "half",           label: "\u00bd",        color: "#f59e0b", pct: 0.5  },
+  { key: "three_quarters", label: "\u00be",        color: "#84cc16", pct: 0.75 },
   { key: "full",           label: "Full",     color: "#22c55e", pct: 1.0  },
   { key: "off_plan",       label: "Off Plan", color: "#8b5cf6", pct: null },
 ];
@@ -513,7 +513,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                       <span className="font-medium">Had: </span>{mealLog.off_plan_details}
                       {(mealLog.est_protein || mealLog.est_carbs || mealLog.est_fats) && (
                         <span className="ml-2 opacity-80">
-                          {mealLog.est_kcal ? `${Math.round(mealLog.est_kcal)} cal · ` : ""}
+                          {mealLog.est_kcal ? `${Math.round(mealLog.est_kcal)} cal \u00b7 ` : ""}
                           {mealLog.est_protein ? `${Math.round(mealLog.est_protein)}P` : ""}
                           {mealLog.est_carbs   ? ` ${Math.round(mealLog.est_carbs)}C`  : ""}
                           {mealLog.est_fats    ? ` ${Math.round(mealLog.est_fats)}F`   : ""}
@@ -522,7 +522,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                     </div>
                   )}
 
-                  {/* Adherence pill chips: ¼ · ½ · ¾ · Full · Off Plan + Camera */}
+                  {/* Adherence pill chips: \u00bc \u00b7 \u00bd \u00b7 \u00be \u00b7 Full \u00b7 Off Plan + Camera */}
                   <div className="px-3 pt-2 pb-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {ADHERENCE_OPTIONS.map(opt => {
@@ -542,7 +542,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                           </button>
                         );
                       })}
-                      {/* Camera button — beside Off Plan */}
+                      {/* Camera button \u2014 beside Off Plan */}
                       <button
                         onClick={() => {
                           const existing = logs.find(l => l.meal_position === meal.position);
