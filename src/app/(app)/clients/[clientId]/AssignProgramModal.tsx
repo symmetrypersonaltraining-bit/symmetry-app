@@ -159,7 +159,7 @@ export default function AssignProgramModal({ clientId, clientName, programs, cur
             <button onClick={handleAssign} disabled={saving || !selectedProgramId}
               className="flex-1 py-3 rounded-xl text-sm font-semibold text-white transition-opacity"
               style={{ background: "var(--brand-primary)", opacity: saving || !selectedProgramId ? 0.6 : 1 }}>
-              {saving ? "Assigning…" : "Assign Program"}
+              {saving ? "Assigning\u2026" : "Assign Program"}
             </button>
           </div>
         </div>
