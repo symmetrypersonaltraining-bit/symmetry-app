@@ -119,10 +119,7 @@ export default function AIAssistant({ isTrainer }: { isTrainer: boolean }) {
           style={{ background: "var(--brand-primary)" }}
           aria-label="Open AI assistant"
         >
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
-            <path d="M12 16v-4M12 8h.01"/>
-          </svg>
+          <i className="ti ti-sparkles text-2xl" style={{ color: "white" }} />
         </button>
       )}
 
@@ -150,10 +147,7 @@ export default function AIAssistant({ isTrainer }: { isTrainer: boolean }) {
             <div className="flex items-center gap-3 px-4 py-3 rounded-t-2xl flex-shrink-0"
               style={{ background: "var(--brand-primary)", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
-                  <path d="M12 16v-4M12 8h.01"/>
-                </svg>
+                <i className="ti ti-sparkles text-sm" style={{ color: "white" }} />
               </div>
               <div className="flex-1">
                 <p className="text-white font-semibold text-sm">Symmetry AI</p>
@@ -282,7 +276,7 @@ export default function AIAssistant({ isTrainer }: { isTrainer: boolean }) {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-                placeholder="Ask anything about trainingâ¦"
+                placeholder="Ask anything about trainingÃ¢ÂÂ¦"
                 className="flex-1 text-sm px-3.5 py-2.5 rounded-xl outline-none"
                 style={{
                   background: "var(--brand-bg)",
