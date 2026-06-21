@@ -40,7 +40,7 @@ interface Props {
 }
 
 // ---- Constants ----
-// Status-based chip colors — blue for scheduled/completed, orange for cancelled
+// Status-based chip colors â blue for scheduled/completed, orange for cancelled
 const CHIP_BLUE = "#1A73E8";
 const CHIP_ORANGE = "#F97316";
 const CHIP_TEXT = "#ffffff";
@@ -140,7 +140,7 @@ function EventBlock({ ev, clients, onClick }: {
       </p>
       {height > 32 && (
         <p className="text-[10px] leading-tight" style={{ color: "rgba(255,255,255,0.85)" }}>
-          {fmtTime(start)}–{fmtTime(end)}
+          {fmtTime(start)}â{fmtTime(end)}
         </p>
       )}
     </div>
@@ -323,7 +323,7 @@ function AddSessionModal({ date, timeStr, clients, onClose, onSaved }: {
         <button onClick={save} disabled={saving}
           className="w-full py-3 rounded-xl font-bold text-sm"
           style={{ background: "var(--brand-primary)", color: "white", opacity: saving ? 0.7 : 1 }}>
-          {saving ? "Saving…" : recurring !== "none" ? `Save (${recurring === "4w" ? 4 : recurring === "8w" ? 8 : 12} sessions)` : "Save Session"}
+          {saving ? "Savingâ¦" : recurring !== "none" ? `Save (${recurring === "4w" ? 4 : recurring === "8w" ? 8 : 12} sessions)` : "Save Session"}
         </button>
       </div>
     </div>
@@ -391,7 +391,7 @@ function SessionDetailPopup({ ev, clients, onClose, onSaved }: {
           <div className="flex items-center gap-2.5">
             <i className="ti ti-clock text-base" style={{ color: "var(--brand-text-secondary)" }} />
             <span className="text-sm" style={{ color: "var(--brand-text)" }}>
-              {fmtTime(start)} – {fmtTime(end)}
+              {fmtTime(start)} â {fmtTime(end)}
             </span>
           </div>
 
@@ -589,8 +589,8 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
                           {displayName(ev)}
                         </p>
                         <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                          {fmtTime(start)} – {fmtTime(end)}
-                          {ev.title && ev.title !== "Training Session" ? ` · ${ev.title}` : ""}
+                          {fmtTime(start)} â {fmtTime(end)}
+                          {ev.title && ev.title !== "Training Session" ? ` Â· ${ev.title}` : ""}
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -739,7 +739,7 @@ function TimeGrid({
 }
 
 
-// ---- ClientWorkoutWeekView — per-client programmed workout calendar ----
+// ---- ClientWorkoutWeekView â per-client programmed workout calendar ----
 function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, clientName }: {
   days: Date[];
   todayStr: string;
@@ -866,7 +866,7 @@ function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, cl
       <div className="flex-shrink-0 px-4 py-3 border-t flex items-center justify-between"
         style={{ borderColor: "var(--brand-border)", background: "var(--brand-surface)" }}>
         <span className="text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>
-          {clientName} · Programmed workouts
+          {clientName} Â· Programmed workouts
         </span>
         <div className="flex items-center gap-2">
           <a href={`/clients/${clientId}/program`}
@@ -906,16 +906,16 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
     return appointmentMapProp;
   }, [allAppointments, appointmentMapProp]);
 
-  function getMonday(d: Date) {
+  function getSunday(d: Date) {
     const copy = new Date(d);
     const dow = copy.getDay();
-    copy.setDate(copy.getDate() - (dow === 0 ? 6 : dow - 1));
+    copy.setDate(copy.getDate() - dow);
     copy.setHours(0, 0, 0, 0);
     return copy;
   }
 
   const [viewMode, setViewMode] = useState<ViewMode>("week");
-  const [weekAnchor, setWeekAnchor] = useState(() => getMonday(today));
+  const [weekAnchor, setWeekAnchor] = useState(() => getSunday(today));
   const [dayAnchor, setDayAnchor] = useState(() => {
     const d = new Date(today);
     d.setHours(0, 0, 0, 0);
@@ -929,7 +929,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
   const [refreshKey, setRefreshKey] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // ── Per-client workout calendar (fetched client-side when a client is selected) ──
+  // ââ Per-client workout calendar (fetched client-side when a client is selected) ââ
   const [clientWorkouts, setClientWorkouts] = useState<Array<{
     id: string; date: string; status: string;
     dayLabel: string; phaseLabel: string; programName: string; dayId: string | null;
@@ -1017,7 +1017,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
   }
 
   function goToday() {
-    setWeekAnchor(getMonday(today));
+    setWeekAnchor(getSunday(today));
     const d = new Date(today);
     d.setHours(0, 0, 0, 0);
     setDayAnchor(d);
@@ -1025,7 +1025,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
   }
 
   function handleMiniCalClick(d: Date) {
-    setWeekAnchor(getMonday(d));
+    setWeekAnchor(getSunday(d));
     const copy = new Date(d);
     copy.setHours(0, 0, 0, 0);
     setDayAnchor(copy);
@@ -1050,8 +1050,8 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
     const first = days[0], last = days[days.length - 1];
     const sameMonth = first.getMonth() === last.getMonth();
     headerLabel = sameMonth
-      ? `${first.toLocaleDateString("en-US", { month: "long" })} ${first.getDate()}–${last.getDate()}, ${first.getFullYear()}`
-      : `${first.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${last.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+      ? `${first.toLocaleDateString("en-US", { month: "long" })} ${first.getDate()}â${last.getDate()}, ${first.getFullYear()}`
+      : `${first.toLocaleDateString("en-US", { month: "short", day: "numeric" })} â ${last.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
   } else if (viewMode === "day") {
     headerLabel = dayAnchor.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   }
@@ -1209,7 +1209,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
                           style={{ color: "var(--brand-text-secondary)" }}>Workout</p>
                         <p className="text-sm font-medium truncate"
                           style={{ color, textDecoration: isDone ? "line-through" : "none" }}>
-                          {w.clientName} · {w.dayLabel}
+                          {w.clientName} Â· {w.dayLabel}
                         </p>
                       </div>
                       {isDone && <i className="ti ti-check text-sm" style={{ color: "#43A047" }} />}
@@ -1228,13 +1228,13 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
                       style={{ background: "var(--brand-bg)", borderLeft: `3px solid ${color}` }}>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                          {fmtTime(start)} – {fmtTime(end)}
+                          {fmtTime(start)} â {fmtTime(end)}
                         </p>
                         <p className="text-sm font-medium truncate"
                           style={{ color: isCancelled ? "var(--brand-text-secondary)" : "var(--brand-text)",
                             textDecoration: isCancelled ? "line-through" : "none" }}>
                           {ev.clientName && ev.clientName !== "Unknown" ? ev.clientName : (ev.title || ev.assessmentName || "Assessment")}
-                          {ev.clientName && ev.title && ev.title !== "Training Session" ? ` · ${ev.title}` : ""}
+                          {ev.clientName && ev.title && ev.title !== "Training Session" ? ` Â· ${ev.title}` : ""}
                         </p>
                       </div>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize flex-shrink-0"
