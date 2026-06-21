@@ -60,7 +60,7 @@ function daysUntil(d: string, today: string) {
   return Math.round((new Date(d + "T00:00:00").getTime() - new Date(today + "T00:00:00").getTime()) / 86400000);
 }
 
-// ── Confirm Modal (Send flow) ─────────────────────────────────────────────────
+// \u2500\u2500 Confirm Modal (Send flow) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 interface ConfirmModalProps {
   client: ClientPayment;
   onClose: () => void;
@@ -171,7 +171,7 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
             <p className="text-xs font-semibold mb-1" style={{ color: "var(--brand-text-secondary)" }}>TO</p>
             {client.clientEmail
               ? <p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>{client.clientEmail}</p>
-              : <p className="text-sm text-red-400 font-medium">No email on file — cannot send</p>}
+              : <p className="text-sm text-red-400 font-medium">No email on file \u2014 cannot send</p>}
           </div>
 
           <div>
@@ -212,7 +212,7 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
 
           <div>
             <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--brand-text-secondary)" }}>
-              PERSONAL NOTE <span className="text-xs font-normal">(optional — included in email)</span>
+              PERSONAL NOTE <span className="text-xs font-normal">(optional \u2014 included in email)</span>
             </label>
             <textarea
               value={notes}
@@ -272,7 +272,7 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
               cursor: sending || sent || !client.clientEmail ? "not-allowed" : "pointer",
             }}
           >
-            {sending ? "Sending…" : sent ? "Sent!" : "Send Reminder"}
+            {sending ? "Sending\u2026" : sent ? "Sent!" : "Send Reminder"}
           </button>
         </div>
       </div>
@@ -280,7 +280,7 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
   );
 }
 
-// ── New Payment Modal ─────────────────────────────────────────────────────────
+// \u2500\u2500 New Payment Modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 interface NewPaymentModalProps {
   clients: ClientPayment[];
   onClose: () => void;
@@ -491,7 +491,7 @@ function NewPaymentModal({ clients, onClose, onCreated }: NewPaymentModalProps) 
               cursor: saving || done ? "not-allowed" : "pointer",
             }}
           >
-            {saving ? "Saving…" : done ? "Done!" : "Save & Send"}
+            {saving ? "Saving\u2026" : done ? "Done!" : "Save & Send"}
           </button>
         </div>
       </div>
@@ -499,7 +499,7 @@ function NewPaymentModal({ clients, onClose, onCreated }: NewPaymentModalProps) 
   );
 }
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+// \u2500\u2500 Main Component \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 export default function PaymentsClient({ clients }: { clients: ClientPayment[] }) {
   const supabase = createClient();
   const [tab, setTab] = useState<Tab>("upcoming");
@@ -641,7 +641,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
 
   return (
     <div className="pb-24" style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
-      {/* ── Red gradient header ───────────────────────────────── */}
+      {/* \u2500\u2500 Red gradient header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
       <div className="px-4 lg:px-6 pt-6 pb-5"
         style={{ background: "linear-gradient(135deg, #7f1d1d, #dc2626)" }}>
         <div className="flex items-start justify-between gap-3 mb-3">
@@ -653,7 +653,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
             <div>
               <h1 className="text-xl font-bold text-white">Payments</h1>
               <p className="text-xs text-red-200">
-                {pendingCount} need action · ${totalOwed.toLocaleString()} total owed
+                {pendingCount} need action \u00b7 ${totalOwed.toLocaleString()} total owed
               </p>
             </div>
           </div>
@@ -684,7 +684,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
         </div>
       </div>
 
-      {/* ── Tabs + search ─────────────────────────────────────── */}
+      {/* \u2500\u2500 Tabs + search \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
       <div className="px-4 lg:px-6 py-3 flex items-center gap-3 sticky top-0 z-10"
         style={{ background: "var(--brand-surface)", borderBottom: "1px solid var(--brand-border)" }}>
         <div className="flex rounded-xl overflow-hidden border flex-shrink-0" style={{ borderColor: "var(--brand-border)" }}>
@@ -701,20 +701,20 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search client…"
+          placeholder="Search client\u2026"
           className="flex-1 px-3 py-1.5 text-sm rounded-xl outline-none min-w-0"
           style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}
         />
       </div>
 
-      {/* ── Client list ───────────────────────────────────────── */}
+      {/* \u2500\u2500 Client list \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
       <div className="px-4 lg:px-6 space-y-2 mt-3">
         {filtered.length === 0 && (
           <div className="py-12 text-center rounded-2xl"
             style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
             <i className="ti ti-check-circle text-4xl block mb-2" style={{ color: "#22c55e" }} />
             <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
-              {tab === "upcoming" ? "All clear — no upcoming payments in the next 30 days." : "No clients found."}
+              {tab === "upcoming" ? "All clear \u2014 no upcoming payments in the next 30 days." : "No clients found."}
             </p>
           </div>
         )}
@@ -777,7 +777,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                                 : `Due in ${days}d`}
                             </span>
                             <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                              · {fmtDate(c.dueDate)}
+                              \u00b7 {fmtDate(c.dueDate)}
                             </span>
                           </>
                         ) : (
@@ -799,7 +799,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                     <div className="flex items-start gap-1 flex-shrink-0">
                       <div className="text-right">
                         <p className="text-base font-bold" style={{ color: isPaid ? "#22c55e" : "var(--brand-text)" }}>
-                          ${net > 0 ? net.toLocaleString() : (c.currentFees ? c.currentFees.toLocaleString() : "—")}
+                          ${net > 0 ? net.toLocaleString() : (c.currentFees ? c.currentFees.toLocaleString() : "\u2014")}
                         </p>
                         {c.billingCredits > 0 && (
                           <p className="text-xs" style={{ color: "#22c55e" }}>-${c.billingCredits} credit</p>
@@ -850,7 +850,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                         className="text-xs px-2 py-1 rounded-lg font-semibold"
                         style={{ background: "#ef4444", color: "white" }}
                       >
-                        {isDeleting ? "…" : "Delete"}
+                        {isDeleting ? "\u2026" : "Delete"}
                       </button>
                     </div>
                   )}
@@ -893,7 +893,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                           value={editNotes}
                           onChange={e => setEditNotes(e.target.value)}
                           rows={2}
-                          placeholder="Optional note…"
+                          placeholder="Optional note\u2026"
                           className="w-full px-2 py-1.5 rounded-lg text-xs outline-none resize-none"
                           style={{ background: "var(--brand-surface)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}
                         />
@@ -983,11 +983,11 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                           className="text-xs px-2.5 py-1 rounded-lg font-medium"
                           style={{ background: "#22c55e20", color: "#22c55e", opacity: isUpdating ? 0.5 : 1 }}
                         >
-                          {isUpdating ? "…" : "Mark Paid"}
+                          {isUpdating ? "\u2026" : "Mark Paid"}
                         </button>
                       )}
 
-                      {/* Pause / Resume — only for non-no-reminder clients */}
+                      {/* Pause / Resume \u2014 only for non-no-reminder clients */}
                       {!noReminderClient && c.hasReminder && !isPaid && c.notificationStatus !== "cancelled" && (
                         <button
                           onClick={() => handlePauseToggle(c)}
@@ -1015,8 +1015,8 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                         color: r.notificationStatus === "paid" ? "#22c55e" : "var(--brand-text-secondary)",
                         border: "1px solid var(--brand-border)",
                       }}>
-                      {fmtDate(r.dueDate)} · ${r.amountDue}
-                      {r.notificationStatus === "paid" ? " ✓" : ""}
+                      {fmtDate(r.dueDate)} \u00b7 ${r.amountDue}
+                      {r.notificationStatus === "paid" ? " \u2713" : ""}
                     </span>
                   ))}
                 </div>
@@ -1026,7 +1026,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
         })}
       </div>
 
-      {/* ── Confirm modal (Send flow) ──────────────────────────── */}
+      {/* \u2500\u2500 Confirm modal (Send flow) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
       {confirmClient && (
         <ConfirmModal
           client={confirmClient}
@@ -1035,7 +1035,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
         />
       )}
 
-      {/* ── New Payment modal ──────────────────────────────────── */}
+      {/* \u2500\u2500 New Payment modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
       {showNewPayment && (
         <NewPaymentModal
           clients={localClients}
