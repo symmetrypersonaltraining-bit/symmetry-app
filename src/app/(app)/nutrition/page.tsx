@@ -8,7 +8,7 @@ const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 export default async function NutritionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ clientId?: string }>;
+  searchParams: Promise<{ clientId?: string; viewAsClient?: string }>;
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
