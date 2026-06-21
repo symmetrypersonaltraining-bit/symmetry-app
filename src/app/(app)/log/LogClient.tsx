@@ -91,7 +91,7 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
       {success && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-sm font-semibold text-white shadow-lg"
           style={{ background: "#22c55e" }}>
-          ✓ {success}
+          \u2713 {success}
         </div>
       )}
 
@@ -107,7 +107,7 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
             style={t === tab
               ? { background: "var(--brand-primary)", color: "white" }
               : { background: "var(--brand-surface)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}>
-            {t === "weigh" ? "⚖️ Weigh-In" : "🏃 Cardio"}
+            {t === "weigh" ? "\u2696\ufe0f Weigh-In" : "\ud83c\udfc3 Cardio"}
           </button>
         ))}
       </div>
@@ -141,7 +141,7 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
               <button onClick={saveWeighIn} disabled={saving || !weight}
                 className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all"
                 style={{ background: weight ? "var(--brand-primary)" : "var(--brand-card)", opacity: weight ? 1 : 0.5 }}>
-                {saving ? "Saving…" : "Log Weight"}
+                {saving ? "Saving\u2026" : "Log Weight"}
               </button>
             </div>
             {/* Recent */}
@@ -195,21 +195,21 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
                 <div>
                   <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Distance (mi)</label>
                   <input type="number" value={distance} onChange={e => setDistance(e.target.value)}
-                    placeholder="—" inputMode="decimal"
+                    placeholder="\u2014" inputMode="decimal"
                     className="w-full px-3 py-3 rounded-xl text-base font-semibold text-center outline-none"
                     style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
                 </div>
                 <div>
                   <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Calories</label>
                   <input type="number" value={cardioKcal} onChange={e => setCardioKcal(e.target.value)}
-                    placeholder="—" inputMode="numeric"
+                    placeholder="\u2014" inputMode="numeric"
                     className="w-full px-3 py-3 rounded-xl text-base font-semibold text-center outline-none"
                     style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
                 </div>
                 <div>
                   <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Avg HR (bpm)</label>
                   <input type="number" value={avgHr} onChange={e => setAvgHr(e.target.value)}
-                    placeholder="—" inputMode="numeric"
+                    placeholder="\u2014" inputMode="numeric"
                     className="w-full px-3 py-3 rounded-xl text-base font-semibold text-center outline-none"
                     style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
                 </div>
@@ -217,7 +217,7 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
               <button onClick={saveCardio} disabled={saving || !duration}
                 className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all"
                 style={{ background: duration ? "#f59e0b" : "var(--brand-card)", opacity: duration ? 1 : 0.5 }}>
-                {saving ? "Saving…" : "Log Cardio"}
+                {saving ? "Saving\u2026" : "Log Cardio"}
               </button>
             </div>
             {/* Recent */}
