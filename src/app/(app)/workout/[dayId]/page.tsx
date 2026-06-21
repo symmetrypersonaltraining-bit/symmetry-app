@@ -20,7 +20,7 @@ export default async function WorkoutDayPage({
   const { data: day } = await supabase
     .from("days")
     .select(`
-      id, label, notes,
+      id, label,
       phases(id, label, program_id,
         programs(id, name)
       ),
@@ -94,7 +94,7 @@ export default async function WorkoutDayPage({
 
   return (
     <WorkoutLogger
-      day={{ id: day.id, label: (day as any).label, notes: (day as any).notes }}
+      day={{ id: day.id, label: (day as any).label }}
       phase={{ id: phase?.id, label: phase?.label }}
       program={{ id: program?.id, name: program?.name }}
       sections={sortedSections}
