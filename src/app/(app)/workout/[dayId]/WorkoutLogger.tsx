@@ -50,7 +50,7 @@ interface Props {
 type SetData = { weight: string; reps: string; done: boolean };
 type HistoryEntry = { log_date: string; sets: { set_number: number; weight_lbs: number | null; reps: number | null }[] };
 
-// ─── iOS SCROLL-WHEEL TIMER ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 iOS SCROLL-WHEEL TIMER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function WheelColumn({ values, selected, onChange }: {
   values: number[];
   selected: number;
@@ -182,7 +182,7 @@ function TimerWheel({ onClose }: { onClose: () => void }) {
               style={mode === md
                 ? { background: "var(--brand-primary)", color: "white" }
                 : { background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}>
-              {md === "timer" ? "⏱ Timer" : "⏲ Stopwatch"}
+              {md === "timer" ? "\u23f1 Timer" : "\u23f2 Stopwatch"}
             </button>
           ))}
         </div>
@@ -233,7 +233,7 @@ function TimerWheel({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── EXERCISE HISTORY DRAWER ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 EXERCISE HISTORY DRAWER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
   exerciseId: string;
   exerciseName: string;
@@ -301,7 +301,7 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
           </div>
         </div>
         {loading ? (
-          <div className="py-8 text-center text-sm" style={{ color: "var(--brand-text-secondary)" }}>Loading…</div>
+          <div className="py-8 text-center text-sm" style={{ color: "var(--brand-text-secondary)" }}>Loading\u2026</div>
         ) : history.length === 0 ? (
           <div className="py-8 text-center">
             <i className="ti ti-history text-3xl block mb-2" style={{ color: "var(--brand-text-secondary)" }} />
@@ -311,7 +311,7 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
           <div key={i} className="mb-4 rounded-xl p-4"
             style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)" }}>
             <p className="text-xs font-semibold mb-2" style={{ color: "var(--brand-primary)" }}>
-              {i === 0 ? "Most Recent · " : ""}{fmtDate(entry.log_date)}
+              {i === 0 ? "Most Recent \u00b7 " : ""}{fmtDate(entry.log_date)}
             </p>
             {entry.sets.sort((a, b) => a.set_number - b.set_number).map(s => (
               <div key={s.set_number} className="flex items-center gap-3 py-1 text-sm">
@@ -319,8 +319,8 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
                 <span className="font-medium" style={{ color: "var(--brand-text)" }}>
                   {s.weight_lbs ? `${s.weight_lbs} lb` : "BW"}
                 </span>
-                <span style={{ color: "var(--brand-text-secondary)" }}>×</span>
-                <span style={{ color: "var(--brand-text)" }}>{s.reps ?? "—"} reps</span>
+                <span style={{ color: "var(--brand-text-secondary)" }}>\u00d7</span>
+                <span style={{ color: "var(--brand-text)" }}>{s.reps ?? "\u2014"} reps</span>
               </div>
             ))}
           </div>
@@ -330,7 +330,7 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
   );
 }
 
-// ─── REST TIMER ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 REST TIMER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => void }) {
   const [remaining, setRemaining] = useState(seconds);
   useEffect(() => {
@@ -367,7 +367,7 @@ function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => void })
   );
 }
 
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 MAIN COMPONENT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 export default function WorkoutLogger({
   day, phase, program, sections, clientId, clientName, isTrainerSession,
   existingLogId, existingSetLogs,
@@ -528,7 +528,7 @@ export default function WorkoutLogger({
     r.start();
   }
 
-  // ─── WORKOUT COMPLETE ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  // \u2500\u2500\u2500 WORKOUT COMPLETE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   if (workoutComplete) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
@@ -537,7 +537,7 @@ export default function WorkoutLogger({
           <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ background: "#22c55e20" }}>
             <i className="ti ti-trophy text-5xl" style={{ color: "#22c55e" }} />
           </div>
-          <div className="absolute -top-1 -right-1 text-2xl animate-bounce">🎉</div>
+          <div className="absolute -top-1 -right-1 text-2xl animate-bounce">\ud83c\udf89</div>
         </div>
         <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--brand-text)" }}>Session Complete!</h1>
         <p className="text-sm mb-2" style={{ color: "var(--brand-text-secondary)" }}>{day.label}</p>
@@ -551,7 +551,7 @@ export default function WorkoutLogger({
     );
   }
 
-  // ─── SESSION MODE ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  // \u2500\u2500\u2500 SESSION MODE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   if (sessionMode && currentExercise) {
     const peSets = sets[currentExercise.id] || [];
     const doneCount = peSets.filter(s => s.done).length;
@@ -680,7 +680,7 @@ export default function WorkoutLogger({
         <div className="flex-shrink-0 px-5 pb-8 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           <div className="flex items-center gap-2 mb-4">
             <input type="text" value={sessionNote} onChange={e => setSessionNote(e.target.value)}
-              placeholder="Session note…"
+              placeholder="Session note\u2026"
               className="flex-1 text-sm px-4 py-2.5 rounded-xl outline-none"
               style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(255,255,255,0.08)" }} />
             <button onClick={startVoiceNote}
@@ -709,7 +709,7 @@ export default function WorkoutLogger({
                   background: progressPct === 100 ? "#22c55e" : "rgba(255,255,255,0.06)",
                   color: progressPct === 100 ? "white" : "rgba(255,255,255,0.3)",
                 }}>
-                {saving ? "Saving…" : "Complete ✓"}
+                {saving ? "Saving\u2026" : "Complete \u2713"}
               </button>
             )}
           </div>
@@ -718,7 +718,7 @@ export default function WorkoutLogger({
     );
   }
 
-  // ─── STANDARD VIEW ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  // \u2500\u2500\u2500 STANDARD VIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   return (
     <div style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
       {historyExercise && (
@@ -742,7 +742,7 @@ export default function WorkoutLogger({
             <i className="ti ti-arrow-left text-white text-lg" />
           </Link>
           <div className="flex-1">
-            <p className="text-white/60 text-xs">{program?.name} · {phase?.label}</p>
+            <p className="text-white/60 text-xs">{program?.name} \u00b7 {phase?.label}</p>
             <h1 className="text-white font-bold text-base">{day.label}</h1>
           </div>
           <div className="flex items-center gap-2">
@@ -812,8 +812,8 @@ export default function WorkoutLogger({
                     <div className="flex-1">
                       <p className="font-semibold text-sm" style={{ color: "var(--brand-text)" }}>{pe.exercises?.name}</p>
                       <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                        {pe.sets} sets{pe.volume_value ? ` · ${pe.volume_value}` : ""}
-                        {pe.load_descriptor ? ` · ${pe.load_descriptor}` : ""}
+                        {pe.sets} sets{pe.volume_value ? ` \u00b7 ${pe.volume_value}` : ""}
+                        {pe.load_descriptor ? ` \u00b7 ${pe.load_descriptor}` : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
@@ -849,7 +849,7 @@ export default function WorkoutLogger({
                         style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>
                       <input type="number" value={setEntry.weight}
                         onChange={e => updateSet(pe.id, si, "weight", e.target.value)}
-                        disabled={setEntry.done} placeholder="—"
+                        disabled={setEntry.done} placeholder="\u2014"
                         className="text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
@@ -858,7 +858,7 @@ export default function WorkoutLogger({
                         }} inputMode="decimal" />
                       <input type="number" value={setEntry.reps}
                         onChange={e => updateSet(pe.id, si, "reps", e.target.value)}
-                        disabled={setEntry.done} placeholder="—"
+                        disabled={setEntry.done} placeholder="\u2014"
                         className="text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
@@ -886,7 +886,7 @@ export default function WorkoutLogger({
             </p>
             <div className="flex items-center gap-2">
               <textarea value={trainerNoteText} onChange={e => setTrainerNoteText(e.target.value)}
-                placeholder="Add a session note…" rows={2}
+                placeholder="Add a session note\u2026" rows={2}
                 className="flex-1 text-sm px-3 py-2 rounded-xl outline-none resize-none"
                 style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
               <div className="flex flex-col gap-2">
@@ -910,7 +910,7 @@ export default function WorkoutLogger({
           style={progressPct === 100
             ? { background: "#22c55e", color: "white" }
             : { background: "var(--brand-surface)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}>
-          {saving ? "Saving…" : progressPct === 100 ? "🏆 Complete Workout" : `${progressPct}% — keep going!`}
+          {saving ? "Saving\u2026" : progressPct === 100 ? "\ud83c\udfc6 Complete Workout" : `${progressPct}% \u2014 keep going!`}
         </button>
       </div>
     </div>
