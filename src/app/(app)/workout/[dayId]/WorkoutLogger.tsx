@@ -561,7 +561,7 @@ export default function WorkoutLogger({
     const peSets = sets[currentExercise.id] || [];
 
     return (
-      <div className="fixed inset-0 flex flex-col" style={{ background: "#0D1117" }}>
+      <div className="fixed inset-0 flex flex-col z-[100]" style={{ background: "#0D1117" }}>
         {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
         {historyExercise && (
           <ExerciseHistory exerciseId={historyExercise.id} exerciseName={historyExercise.name}
