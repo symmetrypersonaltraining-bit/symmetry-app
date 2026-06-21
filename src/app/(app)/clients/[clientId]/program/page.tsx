@@ -82,12 +82,12 @@ const EXERCISE_LIST = [
 function getWeekDates(weekOffset: number): Date[] {
   const today = new Date();
   const dow = today.getDay();
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1) + weekOffset * 7);
-  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - dow + weekOffset * 7);
+  sunday.setHours(0, 0, 0, 0);
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
     return d;
   });
 }
@@ -116,7 +116,7 @@ function addDays(base: Date, n: number): Date {
   return d;
 }
 
-const DOW_SHORT = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const DOW_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const AVATAR_BG = ["#DDEEFF","#FEF3C7","#F3E8FF","#FEE2E2","#D1FAE5","#FCE7F3"];
 const AVATAR_TX = ["#0F4C81","#92400E","#6B21A8","#991B1B","#065F46","#9D174D"];
 
@@ -429,7 +429,7 @@ function WorkoutEditor({
           {editingWorkout
             ? `Edit: ${editingWorkout.days?.label || "Workout"}`
             : selectedDate
-              ? `Add Workout · ${selectedDate}`
+              ? `Add Workout Â· ${selectedDate}`
               : "Workout Editor"}
         </h2>
         <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center"
@@ -473,7 +473,7 @@ function WorkoutEditor({
                   style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)" }}>
                   <div className="font-semibold text-sm" style={{ color: "var(--brand-text)" }}>{day.label}</div>
                   <div className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                    {day.program_name} · {day.phase_label}
+                    {day.program_name} Â· {day.phase_label}
                   </div>
                 </button>
               ))
@@ -614,7 +614,7 @@ function WorkoutEditor({
                   <Link href={`/clients/${clientId}/day/${editingWorkout.day_id}`}
                     className="block text-center w-full py-2.5 rounded-xl text-sm font-semibold text-white mt-2"
                     style={{ background: "var(--brand-primary)" }}>
-                    Open Full Editor →
+                    Open Full Editor â
                   </Link>
                 )}
               </>
@@ -829,7 +829,7 @@ function LibraryPanel({
                       {d.day_label}
                     </div>
                     <div className="text-[10px] mb-1" style={{ color: "var(--brand-text-secondary)" }}>
-                      {d.phase_label} · {d.exercises.length} exercise{d.exercises.length !== 1 ? "s" : ""}
+                      {d.phase_label} Â· {d.exercises.length} exercise{d.exercises.length !== 1 ? "s" : ""}
                     </div>
                     {d.exercises.length > 0 && (
                       <div className="text-[10px] truncate" style={{ color: "var(--brand-text-secondary)" }}>
@@ -982,11 +982,11 @@ export default function ProgramPage() {
 
   const today = todayStr();
 
-  const baseMonday = (() => {
+  const baseSunday = (() => {
     const t = new Date();
     const dow = t.getDay();
     const m = new Date(t);
-    m.setDate(t.getDate() - (dow === 0 ? 6 : dow - 1));
+    m.setDate(t.getDate() - dow);
     m.setHours(0, 0, 0, 0);
     return m;
   })();
@@ -1079,7 +1079,7 @@ export default function ProgramPage() {
     setBulkPasting(true);
     const insertRows: any[] = [];
     for (let w = 0; w < count; w++) {
-      const weekStart = addWeeks(baseMonday, startWeekOffset + w);
+      const weekStart = addWeeks(baseSunday, startWeekOffset + w);
       for (const workout of copiedWeek) {
         if (!workout.day_id) continue;
         insertRows.push({
@@ -1101,7 +1101,7 @@ export default function ProgramPage() {
 
   const rangeLabel = (() => {
     const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    return `${fmt(allDays[0])} – ${fmt(allDays[allDays.length - 1])}`;
+    return `${fmt(allDays[0])} â ${fmt(allDays[allDays.length - 1])}`;
   })();
 
   const workoutByDate: Record<string, ScheduledWorkout[]> = {};
@@ -1378,7 +1378,7 @@ export default function ProgramPage() {
           <div className="flex items-center gap-3">
             <i className="ti ti-copy text-lg" />
             <span className="text-sm font-semibold">
-              Copied: {copiedWorkout.days?.label || "Workout"} · Click any day to paste
+              Copied: {copiedWorkout.days?.label || "Workout"} Â· Click any day to paste
             </span>
           </div>
           <button onClick={() => setCopiedWorkout(null)}
