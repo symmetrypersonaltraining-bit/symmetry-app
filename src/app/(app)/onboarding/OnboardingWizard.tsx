@@ -10,7 +10,7 @@ const GOALS = [
 ];
 const EXPERIENCE_LEVELS = [
   { val: "beginner", label: "Beginner", desc: "New to structured training" },
-  { val: "intermediate", label: "Intermediate", desc: "1â3 years consistent training" },
+  { val: "intermediate", label: "Intermediate", desc: "1–3 years consistent training" },
   { val: "advanced", label: "Advanced", desc: "3+ years, strong foundation" },
   { val: "athlete", label: "Athlete", desc: "Competitive / high performance" },
 ];
@@ -129,11 +129,11 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
       {/* Step content */}
       <div className="flex-1 px-5 pb-8">
 
-        {/* Step 0 â Welcome */}
+        {/* Step 0 — Welcome */}
         {step === 0 && (
           <div className="pt-4">
             <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--brand-text)" }}>
-              Welcome, {firstName}! ð
+              Welcome, {firstName}! 👋
             </h1>
             <p className="text-sm mb-8 leading-relaxed" style={{ color: "var(--brand-text-secondary)" }}>
               Let&apos;s take 2 minutes to set up your profile. This helps Dustin customize your training and track your progress accurately.
@@ -181,12 +181,12 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
             <button onClick={() => setStep(1)}
               className="w-full py-3.5 rounded-xl text-white font-bold text-sm"
               style={{ background: "var(--brand-primary)" }}>
-              Let&apos;s Go â
+              Let&apos;s Go →
             </button>
           </div>
         )}
 
-        {/* Step 1 â Goals */}
+        {/* Step 1 — Goals */}
         {step === 1 && (
           <div className="pt-4">
             <h2 className="text-xl font-bold mb-1" style={{ color: "var(--brand-text)" }}>What&apos;s your main goal?</h2>
@@ -212,17 +212,17 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
               <button onClick={() => setStep(2)}
                 className="flex-1 py-3 rounded-xl text-white font-bold text-sm"
                 style={{ background: "var(--brand-primary)" }}>
-                Next â
+                Next →
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 2 â Experience */}
+        {/* Step 2 — Experience */}
         {step === 2 && (
           <div className="pt-4">
             <h2 className="text-xl font-bold mb-1" style={{ color: "var(--brand-text)" }}>Training experience</h2>
-            <p className="text-sm mb-6" style={{ color: "var(--brand-text-secondary)" }}>Be honest â this shapes your program design.</p>
+            <p className="text-sm mb-6" style={{ color: "var(--brand-text-secondary)" }}>Be honest — this shapes your program design.</p>
             <div className="space-y-2.5 mb-6">
               {EXPERIENCE_LEVELS.map(lvl => (
                 <button key={lvl.val} onClick={() => set("experience_level", lvl.val)}
@@ -264,18 +264,18 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
               <button onClick={() => setStep(3)}
                 className="flex-1 py-3 rounded-xl text-white font-bold text-sm"
                 style={{ background: "var(--brand-primary)" }}>
-                Next â
+                Next →
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 3 â Body Stats */}
+        {/* Step 3 — Body Stats */}
         {step === 3 && (
           <div className="pt-4">
             <h2 className="text-xl font-bold mb-1" style={{ color: "var(--brand-text)" }}>Starting stats</h2>
             <p className="text-sm mb-6" style={{ color: "var(--brand-text-secondary)" }}>
-              These create your baseline. Skip if you don&apos;t know â you can log them anytime.
+              These create your baseline. Skip if you don&apos;t know — you can log them anytime.
             </p>
             <div className="space-y-4 mb-8">
               <div>
@@ -305,13 +305,13 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
               <button onClick={() => setStep(4)}
                 className="flex-1 py-3 rounded-xl text-white font-bold text-sm"
                 style={{ background: "var(--brand-primary)" }}>
-                Next â
+                Next →
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 4 â Health / Injuries */}
+        {/* Step 4 — Health / Injuries */}
         {step === 4 && (
           <div className="pt-4">
             <h2 className="text-xl font-bold mb-1" style={{ color: "var(--brand-text)" }}>Injuries & limitations</h2>
@@ -333,13 +333,13 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
               <button onClick={handleFinish} disabled={saving}
                 className="flex-1 py-3 rounded-xl text-white font-bold text-sm"
                 style={{ background: "var(--brand-primary)", opacity: saving ? 0.6 : 1 }}>
-                {saving ? "Saving..." : "Finish Setup â"}
+                {saving ? "Saving..." : "Finish Setup ✓"}
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 5 â Done */}
+        {/* Step 5 — Done */}
         {step === 5 && (
           <div className="pt-8 text-center">
             <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
