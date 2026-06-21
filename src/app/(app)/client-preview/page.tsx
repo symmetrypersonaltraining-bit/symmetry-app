@@ -121,6 +121,7 @@ export default async function ClientPreviewPage() {
       streakDays={streakDays}
       weekWorkouts={weekWorkouts}
       allScheduled={allScheduled}
+      clientId={clientRecord.id}
     />
   );
 }
