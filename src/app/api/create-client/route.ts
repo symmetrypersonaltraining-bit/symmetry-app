@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     // Send Supabase auth invite — client gets an email to set their password
     const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
       data: { full_name: name },
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || "https://symmetry-app.vercel.app"}/onboarding`,
+      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || "https://symmetry-app.vercel.app"}/set-password`,
     });
     if (inviteErr) {
       return NextResponse.json({ error: inviteErr.message }, { status: 500 });
@@ -76,6 +76,13 @@ export async function POST(req: NextRequest) {
 
   if (clientErr) {
     return NextResponse.json({ error: clientErr.message }, { status: 500 });
+  }
+
+  if (send_invite && authUserId && clientRow?.id) {
+    await supabase.from("client_app_settings").upsert({
+      client_id: clientRow.id,
+      password_is_temporary: true,
+    });
   }
 
   return NextResponse.json({
