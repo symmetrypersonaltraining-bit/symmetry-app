@@ -93,7 +93,7 @@ export default async function WorkoutPage() {
             {/* Today's workout card */}
             <div className="card card-glow">
               <p className="text-xs mb-1" style={{ color: "var(--brand-text-secondary)" }}>
-                Today Â· {todayDay.phase_label}
+                Today · {todayDay.phase_label}
               </p>
               <h2
                 className="text-lg font-medium mb-3"
@@ -108,7 +108,7 @@ export default async function WorkoutPage() {
                 href={`/workout/${todayDay.id}`}
                 className="btn btn-primary block text-center"
               >
-                Start workout â
+                Start workout →
               </Link>
             </div>
 
