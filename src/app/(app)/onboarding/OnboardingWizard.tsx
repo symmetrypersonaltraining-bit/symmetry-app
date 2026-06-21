@@ -7,10 +7,10 @@ const GOALS = [
   "Endurance", "General Health", "Athletic Performance", "Maintenance",
 ];
 const EXPERIENCE_LEVELS = [
-  { val: "beginner", label: "Beginner", desc: "New to structured training" },
-  { val: "intermediate", label: "Intermediate", desc: "1\u20133 years consistent training" },
-  { val: "advanced", label: "Advanced", desc: "3+ years, strong foundation" },
-  { val: "athlete", label: "Athlete", desc: "Competitive / high performance" },
+  { val: "Beginner", label: "Beginner", desc: "New to structured training" },
+  { val: "Intermediate", label: "Intermediate", desc: "1\u20133 years consistent training" },
+  { val: "Advanced", label: "Advanced", desc: "3+ years, strong foundation" },
+  { val: "Competitive", label: "Athlete", desc: "Competitive / high performance" },
 ];
 
 interface Props {
@@ -156,7 +156,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
             <button onClick={() => setStep(1)}
               className="w-full py-3.5 rounded-xl text-white font-bold text-sm"
               style={{ background: "var(--brand-primary)" }}>
-              Let&apos;s Go {'→'}
+              Let&apos;s Go {'â'}
             </button>
           </div>
         )}
@@ -187,7 +187,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
               <button onClick={() => setStep(2)}
                 className="flex-1 py-3 rounded-xl text-white font-bold text-sm"
                 style={{ background: "var(--brand-primary)" }}>
-                Next {'→'}
+                Next {'â'}
               </button>
             </div>
           </div>
@@ -239,7 +239,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
               <button onClick={() => setStep(3)}
                 className="flex-1 py-3 rounded-xl text-white font-bold text-sm"
                 style={{ background: "var(--brand-primary)" }}>
-                Next {'→'}
+                Next {'â'}
               </button>
             </div>
           </div>
@@ -280,7 +280,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
               <button onClick={() => setStep(4)}
                 className="flex-1 py-3 rounded-xl text-white font-bold text-sm"
                 style={{ background: "var(--brand-primary)" }}>
-                Next {'→'}
+                Next {'â'}
               </button>
             </div>
           </div>
