@@ -156,7 +156,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
             <button onClick={() => setStep(1)}
               className="w-full py-3.5 rounded-xl text-white font-bold text-sm"
               style={{ background: "var(--brand-primary)" }}>
-              Let&apos;s Go {'â'}
+              Let&apos;s Go {'\u2192'}
             </button>
           </div>
         )}
@@ -187,7 +187,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
               <button onClick={() => setStep(2)}
                 className="flex-1 py-3 rounded-xl text-white font-bold text-sm"
                 style={{ background: "var(--brand-primary)" }}>
-                Next {'â'}
+                Next {'\u2192'}
               </button>
             </div>
           </div>
@@ -239,7 +239,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
               <button onClick={() => setStep(3)}
                 className="flex-1 py-3 rounded-xl text-white font-bold text-sm"
                 style={{ background: "var(--brand-primary)" }}>
-                Next {'â'}
+                Next {'\u2192'}
               </button>
             </div>
           </div>
@@ -280,7 +280,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
               <button onClick={() => setStep(4)}
                 className="flex-1 py-3 rounded-xl text-white font-bold text-sm"
                 style={{ background: "var(--brand-primary)" }}>
-                Next {'â'}
+                Next {'\u2192'}
               </button>
             </div>
           </div>
