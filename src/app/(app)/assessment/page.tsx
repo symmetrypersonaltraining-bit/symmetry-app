@@ -124,7 +124,7 @@ function Field({
 }
 
 const inputClass = "w-full px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 transition-all"
-  + " bg-white/5 border-white/10 text-white placeholder-white/30 focus:ring-purple-500/50 focus:border-purple-500/50";
+  + " bg-[var(--brand-surface)] border-[var(--brand-border)] text-[var(--brand-text)] placeholder-[var(--brand-text-secondary)] focus:ring-purple-500/50 focus:border-purple-500/50";
 
 // \u2500\u2500\u2500 Main Component \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
