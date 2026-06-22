@@ -1,66 +1,148 @@
-'use client';
-import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import MetricCards from '@/components/MetricCards';
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import ProgressCharts from "./ProgressCharts";
+import ClientSelector from "@/components/ClientSelector";
 
-interface ClientRow {
-  id: string;
-  name: string;
-}
+const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
-export default function ProgressPage() {
-  const [clients, setClients] = useState<ClientRow[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState<string>('');
-  const supabase = createClient();
+export default async function ProgressPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ clientId?: string }>;
+}) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-  useEffect(() => {
-    const loadClients = async () => {
-      const { data } = await supabase.from('clients').select('id, name').order('name');
-      if (data && data.length > 0) {
-        setClients(data);
-        setSelectedClientId(data[0].id);
+  const isTrainer = user.email === TRAINER_EMAIL;
+  const params = await searchParams;
+
+  let clientId: string | null = null;
+  let clientName = "You";
+  let allClients: { id: string; name: string }[] = [];
+
+  if (isTrainer) {
+    // Fetch all clients for dropdown
+    const { data: clientList } = await supabase
+      .from("clients")
+      .select("id, name")
+      .order("name");
+    allClients = clientList || [];
+
+    // Use selected client from query param, or default to Dustin
+    if (params.clientId) {
+      const found = allClients.find((c) => c.id === params.clientId);
+      clientId = params.clientId;
+      clientName = found?.name || "Client";
+    } else {
+      const dustin = allClients.find((c) => c.name.toLowerCase().includes("dustin"));
+      clientId = dustin?.id || null;
+      clientName = dustin?.name || "Select a client";
+    }
+  } else {
+    const { data } = await supabase
+      .from("clients")
+      .select("id, name")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+    clientId = data?.id || null;
+    clientName = data?.name || "You";
+  }
+
+  // Body weight history (last 90 days)
+  let weightLogs: { metric_date: string; weight: number; body_fat_pct: number | null; lean_mass: number | null; fat_mass: number | null }[] = [];
+  if (clientId) {
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const { data } = await supabase
+      .from("body_weight_logs")
+      .select("logged_at, weight_lbs, body_fat_pct")
+      .eq("client_id", clientId)
+      .gte("logged_at", ninetyDaysAgo.toISOString().split("T")[0])
+      .order("logged_at", { ascending: true });
+    // Map body_weight_logs fields to the WeightLog shape ProgressCharts expects
+    weightLogs = (data || []).map((d: any) => ({
+      metric_date: d.logged_at,
+      weight: d.weight_lbs,
+      body_fat_pct: d.body_fat_pct ?? null,
+      lean_mass: null,
+      fat_mass: null,
+    }));
+  }
+
+  // Workout log counts
+  let totalWorkouts = 0;
+  if (clientId) {
+    const { count } = await supabase
+      .from("workout_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", clientId)
+      .eq("completed", true);
+    totalWorkouts = count || 0;
+  }
+
+  // Recent PRs
+  let recentPRs: { exercise_name: string; weight: number; reps: number | null; date: string }[] = [];
+  if (clientId) {
+    const { data: setLogs } = await supabase
+      .from("set_logs")
+      .select("weight_lbs, weight, reps, logged_at, prescribed_exercises(exercises(name))")
+      .eq("client_id", clientId)
+      .eq("completed", true)
+      .order("weight_lbs", { ascending: false })
+      .limit(100);
+
+    if (setLogs) {
+      const prMap = new Map<string, { weight: number; reps: number | null; date: string }>();
+      for (const sl of setLogs as any[]) {
+        const name = sl.prescribed_exercises?.exercises?.name;
+        if (!name) continue;
+        const w = sl.weight_lbs ?? sl.weight ?? 0;
+        if (!prMap.has(name) || w > prMap.get(name)!.weight) {
+          prMap.set(name, {
+            weight: w,
+            reps: sl.reps,
+            date: sl.logged_at?.split("T")[0] || "",
+          });
+        }
       }
-    };
-    loadClients();
-  }, []);
+      recentPRs = Array.from(prMap.entries())
+        .map(([name, val]) => ({ exercise_name: name, ...val }))
+        .slice(0, 5);
+    }
+  }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--brand-bg)' }}>
-      <div className="page-header page-header-progress">
-        <span style={{ fontSize: 20 }}>\ud83d\udcc8</span>
-        <span style={{ fontWeight: 700, fontSize: 17 }}>Progress</span>
-      </div>
-
-      {/* Client selector */}
-      {clients.length > 0 && (
-        <div style={{ padding: '8px 16px 0' }}>
-          <select
-            value={selectedClientId}
-            onChange={e => setSelectedClientId(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              borderRadius: 10,
-              border: '1px solid var(--brand-border)',
-              background: 'var(--brand-surface)',
-              color: 'var(--brand-text)',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            {clients.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <div style={{ padding: '12px 16px 24px' }}>
-        {selectedClientId && (
-          <MetricCards clientId={selectedClientId} isTrainer={true} />
+    <>
+      <div style={{ background: "#0F4C81" }} className="px-4 py-4">
+        <h1 className="text-white font-medium text-lg">Progress</h1>
+        {isTrainer ? (
+          <div className="mt-2">
+            <ClientSelector
+              clients={allClients}
+              selectedId={clientId}
+              label="Viewing"
+            />
+          </div>
+        ) : (
+          <p className="text-white/60 text-sm">{clientName}</p>
         )}
       </div>
-    </div>
+
+      <div className="px-4 py-4">
+        {clientId ? (
+          <ProgressCharts
+            weightLogs={weightLogs}
+            totalWorkouts={totalWorkouts}
+            recentPRs={recentPRs}
+            clientId={clientId}
+          />
+        ) : (
+          <p className="text-center py-12" style={{ color: "var(--brand-text-secondary)" }}>
+            Select a client above to view their progress.
+          </p>
+        )}
+      </div>
+    </>
   );
 }
