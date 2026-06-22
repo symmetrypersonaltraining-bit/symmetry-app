@@ -48,7 +48,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
           <Logo size={28} color="white" className="flex-shrink-0" />
           <div className="flex-1">
             <span className="text-white font-semibold text-sm">Symmetry</span>
-            <span className="text-white/50 text-xs ml-2">Â· My Training</span>
+            <span className="text-white/50 text-xs ml-2">· My Training</span>
           </div>
           <button
             onClick={handleToggleMode}
