@@ -4,7 +4,23 @@ import { createClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-  // Use service role key if available, fall back to anon key
+  // ── GCal sync guard ──────────────────────────────────────────────────
+  // Check if trainer has enabled sync in Settings before doing anything
+  const _guardKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const _guardDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, _guardKey!);
+  const { data: _syncRows } = await _guardDb
+    .from('trainer_settings')
+    .select('gcal_sync_enabled')
+    .eq('gcal_sync_enabled', true)
+    .limit(1);
+  if (!_syncRows || _syncRows.length === 0) {
+    return NextResponse.json(
+      { skipped: true, reason: 'GCal sync is disabled — enable in Settings to activate' },
+      { status: 200 }
+    );
+  }
+  // ── End guard ─────────────────────────────────────────────────────────
+    // Use service role key if available, fall back to anon key
   // Service role bypasses RLS; anon key relies on table grants + RLS policies
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(
