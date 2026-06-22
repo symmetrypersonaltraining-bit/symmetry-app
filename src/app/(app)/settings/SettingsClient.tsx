@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useTheme, THEMES } from "@/components/ThemeProvider";
@@ -9,13 +9,15 @@ interface Props {
   userEmail: string;
   userName: string;
   isTrainer: boolean;
+  userId: string;
+  gcalSyncEnabled?: boolean;
 }
 
-export default function SettingsClient({ userEmail, userName, isTrainer }: Props) {
+export default function SettingsClient({ userEmail, userName, isTrainer, userId, gcalSyncEnabled }: Props) {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
-  const [gcalSync, setGcalSync] = useState(false); // OFF by default \u2014 activate manually when ready
+  const [gcalSync, setGcalSync] = useState(gcalSyncEnabled ?? false); // OFF by default \u2014 activate manually when ready
   const [autoReminders] = useState(false); // OFF by default
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -24,21 +26,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
 
-  useEffect(() => {
-    const supabase = createClient();
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from("trainer_settings")
-        .select("gcal_sync_enabled")
-        .eq("user_id", user.id)
-        .single();
-      if (data) setGcalSync(data.gcal_sync_enabled ?? false);
-    })();
-  }, []);
-
-    async function handleSignOut() {
+  async function handleSignOut() {
     setSigningOut(true);
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -201,15 +189,13 @@ export default function SettingsClient({ userEmail, userName, isTrainer }: Props
               <div
                 className="w-11 h-6 rounded-full relative transition-colors"
                 style={{ background: gcalSync ? "var(--brand-primary)" : "var(--brand-border)", cursor: "pointer" }}
-                title={gcalSync ? "GCal sync is ON — click to disable" : "Click to enable GCal 2-way sync"}
+                title={gcalSync ? "GCal sync is ON â click to disable" : "Click to enable GCal 2-way sync"}
                 onClick={async () => {
                   const newVal = !gcalSync;
                   setGcalSync(newVal);
                   const supabase = createClient();
-                  const { data: { user } } = await supabase.auth.getUser();
-                  if (!user) return;
                   await supabase.from("trainer_settings").upsert(
-                    { user_id: user.id, gcal_sync_enabled: newVal },
+                    { user_id: userId, gcal_sync_enabled: newVal },
                     { onConflict: "user_id" }
                   );
                 }}
