@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import TrainerSidebar from "./TrainerSidebar";
 import AIAssistant from "./AIAssistant";
@@ -13,10 +13,11 @@ interface Props {
 
 // Client-mode bottom nav tabs
 const CLIENT_NAV = [
-  { href: "/home", label: "Home",      icon: "ti-home" },
-  { href: "/nutrition", label: "Nutrition", icon: "ti-salad" },
-  { href: "/progress", label: "Progress",  icon: "ti-chart-line" },
-  { href: "/schedule", label: "Schedule",  icon: "ti-calendar" },
+  { href: "/client-preview", label: "Home",      icon: "ti-home" },
+  { href: "/client-preview/nutrition",  label: "Nutrition", icon: "ti-salad" },
+  { href: "/client-preview/progress",   label: "Progress",  icon: "ti-chart-line" },
+  { href: "/workout",                   label: "Workout",   icon: "ti-barbell" },
+  { href: "/log",                       label: "Log",       icon: "ti-plus-circle" },
 ];
 
 export default function TrainerLayoutWrapper({ children }: Props) {
@@ -30,19 +31,16 @@ export default function TrainerLayoutWrapper({ children }: Props) {
 
   function handleToggleMode() {
     const next = !clientMode;
-    if (next) {
-      window.location.href = "/api/set-client-mode?mode=1";
-    } else {
-      window.location.href = "/api/set-client-mode?mode=0";
-    }
+    localStorage.setItem("symmetry_view_mode", next ? "client" : "trainer");
+    window.location.href = next ? "/api/set-client-mode?mode=1" : "/api/set-client-mode?mode=0";
   }
 
-  // ââ CLIENT MODE ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── CLIENT MODE ──────────────────────────────────────────────────────────
   if (clientMode) {
     return (
       <div className="flex flex-col min-h-screen" style={{ background: "var(--brand-bg)" }}>
 
-        {/* Top bar â mirrors what a client would see on mobile */}
+        {/* Top bar — mirrors what a client would see on mobile */}
         <div className="flex items-center gap-3 px-4 pb-3 sticky top-0 z-40 shadow-sm"
           style={{ background: "var(--brand-primary)", paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
           <Logo size={28} color="white" className="flex-shrink-0" />
@@ -85,7 +83,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
     );
   }
 
-  // ââ TRAINER MODE ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── TRAINER MODE ──────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-screen" style={{ background: "var(--brand-bg)" }}>
       <TrainerSidebar
