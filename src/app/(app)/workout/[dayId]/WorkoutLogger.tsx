@@ -370,6 +370,86 @@ function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => void })
   );
 }
 
+
+function SwapModal({ pe, onClose, onSwap }) {
+  const supabase = createClient();
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [swapping, setSwapping] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      if (!query.trim()) { setResults([]); return; }
+      setLoading(true);
+      const { data } = await supabase
+        .from("exercises")
+        .select("id, name, modality, muscle_group, equipment_required")
+        .ilike("name", `%${query}%`)
+        .limit(30);
+      setResults(data || []);
+      setLoading(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query]); // eslint-disable-line
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
+      <div className="w-full rounded-t-3xl p-5 pb-10 max-h-[80vh] flex flex-col"
+        style={{ background: "var(--brand-surface)" }} onClick={e => e.stopPropagation()}>
+        <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-xs uppercase tracking-widest mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>Swap Exercise</p>
+            <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>{pe.exercises?.name}</h3>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center"
+            style={{ background: "var(--brand-card)" }}>
+            <i className="ti ti-x text-sm" style={{ color: "var(--brand-text-secondary)" }} />
+          </button>
+        </div>
+        <div className="relative mb-4">
+          <i className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--brand-text-secondary)" }} />
+          <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
+            placeholder="Search exercises..."
+            className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
+            style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
+        </div>
+        <div className="overflow-y-auto flex-1">
+          {loading && <p className="text-center text-sm py-6" style={{ color: "var(--brand-text-secondary)" }}>Searching...</p>}
+          {!loading && query && results.length === 0 && (
+            <p className="text-center text-sm py-6" style={{ color: "var(--brand-text-secondary)" }}>No exercises found</p>
+          )}
+          {!query && (
+            <p className="text-center text-sm py-6" style={{ color: "var(--brand-text-secondary)" }}>Type to search the exercise library</p>
+          )}
+          {results.map(ex => (
+            <button key={ex.id} disabled={swapping}
+              onClick={async () => { setSwapping(true); await onSwap(ex); setSwapping(false); }}
+              className="w-full text-left flex items-center gap-3 p-3 rounded-xl mb-2 transition-all active:opacity-70"
+              style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)" }}>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: "var(--brand-surface)" }}>
+                <i className="ti ti-barbell text-sm" style={{ color: "var(--brand-primary)" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate" style={{ color: "var(--brand-text)" }}>{ex.name}</p>
+                {ex.muscle_group && (
+                  <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{ex.muscle_group}</p>
+                )}
+              </div>
+              {swapping
+                ? <span className="text-xs flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }}>Saving...</span>
+                : <i className="ti ti-arrow-right text-sm flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }} />
+              }
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // \u2500\u2500\u2500 MAIN COMPONENT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 export default function WorkoutLogger({
   day, phase, program, sections, clientId, clientName, isTrainerSession,
@@ -406,21 +486,23 @@ export default function WorkoutLogger({
   const [trainerNoteText, setTrainerNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
+  const [localSections, setLocalSections] = useState(sections);
+  const [swapTargetPe, setSwapTargetPe] = useState(null);
   const recognitionRef = useRef<any>(null);
 
-  const allFlat = sections.flatMap(s => s.prescribed_exercises);
+  const allFlat = localSections.flatMap(s => s.prescribed_exercises);
   const totalSets = Object.values(sets).reduce((a, arr) => a + arr.length, 0);
   const doneSets = Object.values(sets).reduce((a, arr) => a + arr.filter(s => s.done).length, 0);
   const progressPct = totalSets > 0 ? Math.round((doneSets / totalSets) * 100) : 0;
-  const currentSection = sections[activeSectionIdx];
+  const currentSection = localSections[activeSectionIdx];
   const currentExercise = currentSection?.prescribed_exercises[activeExerciseIdx];
-  const globalIdx = sections.slice(0, activeSectionIdx).reduce((a, s) => a + s.prescribed_exercises.length, 0) + activeExerciseIdx;
+  const globalIdx = localSections.slice(0, activeSectionIdx).reduce((a, s) => a + s.prescribed_exercises.length, 0) + activeExerciseIdx;
   const totalExercises = allFlat.length;
 
   function navigateToGlobal(idx: number) {
     let count = 0;
-    for (let si = 0; si < sections.length; si++) {
-      for (let ei = 0; ei < sections[si].prescribed_exercises.length; ei++) {
+    for (let si = 0; si < localSections.length; si++) {
+      for (let ei = 0; ei < localSections[si].prescribed_exercises.length; ei++) {
         if (count === idx) { setActiveSectionIdx(si); setActiveExerciseIdx(ei); return; }
         count++;
       }
@@ -534,7 +616,20 @@ export default function WorkoutLogger({
   }
 
   // \u2500\u2500\u2500 WORKOUT COMPLETE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  if (workoutComplete) {
+  async function handleSwap(newExercise) {
+    if (!swapTargetPe) return;
+    const peId = swapTargetPe.id;
+    await supabase.from("prescribed_exercises").update({ exercise_id: newExercise.id }).eq("id", peId);
+    setLocalSections(prev => prev.map(sec => ({
+      ...sec,
+      prescribed_exercises: sec.prescribed_exercises.map(pe =>
+        pe.id === peId ? { ...pe, exercises: newExercise } : pe
+      ),
+    })));
+    setSwapTargetPe(null);
+  }
+
+    if (workoutComplete) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
         style={{ background: "var(--brand-bg)" }}>
@@ -569,6 +664,7 @@ export default function WorkoutLogger({
             onPrefill={(w, r) => prefillSets(currentExercise.id, w, r)} />
         )}
         {showTimer && <TimerWheel onClose={() => setShowTimer(false)} />}
+        {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
 
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 pt-4 pb-3 flex-shrink-0">
@@ -611,11 +707,20 @@ export default function WorkoutLogger({
                 </p>
               )}
             </div>
-            <button onClick={() => setHistoryExercise({ id: currentExercise.id, name: currentExercise.exercises?.name })}
-              className="flex-shrink-0 ml-3 mt-1 w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <i className="ti ti-chart-bar text-white/50 text-base" />
-            </button>
+            <div className="flex flex-col gap-2 ml-3 mt-1 flex-shrink-0">
+              <button onClick={() => setHistoryExercise({ id: currentExercise.id, name: currentExercise.exercises?.name })}
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+                title="View history">
+                <i className="ti ti-chart-bar text-white/50 text-base" />
+              </button>
+              <button onClick={() => setSwapTargetPe(currentExercise)}
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+                title="Swap exercise">
+                <i className="ti ti-switch-horizontal text-white/50 text-base" />
+              </button>
+            </div>
           </div>
           <div className="flex gap-2 mt-3 flex-wrap">
             {currentExercise.volume_value && (
@@ -758,6 +863,7 @@ export default function WorkoutLogger({
       )}
       {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
       {showTimer && <TimerWheel onClose={() => setShowTimer(false)} />}
+      {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
 
       {isTrainerSession && clientName && (
         <div className="flex items-center gap-2 px-4 py-2 text-xs font-medium" style={{ background: "#f59e0b", color: "white" }}>
@@ -803,7 +909,7 @@ export default function WorkoutLogger({
       <div className="px-4 -mt-2 pb-8">
         {/* Section tabs */}
         <div className="flex gap-2 overflow-x-auto py-3 no-scrollbar">
-          {sections.map((sec, i) => (
+          {localSections.map((sec, i) => (
             <button key={sec.id} onClick={() => { setActiveSectionIdx(i); setActiveExerciseIdx(0); }}
               className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all"
               style={i === activeSectionIdx
@@ -848,6 +954,11 @@ export default function WorkoutLogger({
                         className="w-8 h-8 rounded-lg flex items-center justify-center"
                         style={{ background: "var(--brand-card)" }} title="View history">
                         <i className="ti ti-chart-bar text-sm" style={{ color: "var(--brand-primary)" }} />
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); setSwapTargetPe(pe); }}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ background: "var(--brand-card)" }} title="Swap exercise">
+                        <i className="ti ti-switch-horizontal text-sm" style={{ color: "var(--brand-text-secondary)" }} />
                       </button>
                       <div className="text-xs font-medium px-2 py-1 rounded-full"
                         style={{
