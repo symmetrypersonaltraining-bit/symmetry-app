@@ -2,8 +2,7 @@
 
 export default function ExitClientModeButton() {
   function exit() {
-    document.cookie = "symmetry_client_mode=; path=/; max-age=0; SameSite=Lax";
-    window.location.href = "/home";
+    window.location.href = "/api/set-client-mode?mode=0";
   }
   return (
     <button
