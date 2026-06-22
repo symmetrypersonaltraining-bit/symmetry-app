@@ -4,8 +4,6 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 interface MetricPoint {
   metric_date: string;
@@ -250,13 +248,6 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
-  const router = useRouter();
-  const supabase = createClient();
-
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.push("/login");
-  }
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const metricValues = useMemo(() => ({
@@ -355,16 +346,6 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <button
           onClick={handleSignOut}
           className="w-full py-3 rounded-2xl text-sm font-medium mt-2"
-          style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}
-        >
-          <i className="ti ti-logout text-sm mr-2" />
-          Sign Out
-        </button>
-
-        {/* Sign Out */}
-        <button
-          onClick={handleSignOut}
-          className="w-full py-3 rounded-2xl text-sm font-medium"
           style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}
         >
           <i className="ti ti-logout text-sm mr-2" />
