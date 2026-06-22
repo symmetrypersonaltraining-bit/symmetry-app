@@ -371,10 +371,10 @@ function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => void })
 }
 
 
-function SwapModal({ pe, onClose, onSwap }) {
+function SwapModal({ pe, onClose, onSwap }: { pe: PrescribedExercise; onClose: () => void; onSwap: (exercise: Exercise) => Promise<void> }) {
   const supabase = createClient();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(false);
   const [swapping, setSwapping] = useState(false);
 
@@ -486,8 +486,8 @@ export default function WorkoutLogger({
   const [trainerNoteText, setTrainerNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
-  const [localSections, setLocalSections] = useState(sections);
-  const [swapTargetPe, setSwapTargetPe] = useState(null);
+  const [localSections, setLocalSections] = useState<Section[]>(sections);
+  const [swapTargetPe, setSwapTargetPe] = useState<PrescribedExercise | null>(null);
   const recognitionRef = useRef<any>(null);
 
   const allFlat = localSections.flatMap(s => s.prescribed_exercises);
@@ -616,7 +616,7 @@ export default function WorkoutLogger({
   }
 
   // \u2500\u2500\u2500 WORKOUT COMPLETE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  async function handleSwap(newExercise) {
+  async function handleSwap(newExercise: Exercise) {
     if (!swapTargetPe) return;
     const peId = swapTargetPe.id;
     await supabase.from("prescribed_exercises").update({ exercise_id: newExercise.id }).eq("id", peId);
