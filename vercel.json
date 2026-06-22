@@ -3,6 +3,10 @@
     {
       "path": "/api/reminders/send",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/gcal-sync",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
