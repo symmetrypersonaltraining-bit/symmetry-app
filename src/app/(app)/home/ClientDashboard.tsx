@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 interface MetricPoint {
   metric_date: string;
@@ -236,6 +238,14 @@ const METRIC_CONFIG: { key: MetricKey; label: string; unit: string; color: strin
 ];
 
 export default function ClientDashboard({ firstName, todayWorkouts = [], metrics, completedCount, totalScheduled, recentWorkouts, streakDays, weekWorkouts, allScheduled = [], clientId }: Props) {
+  const router = useRouter();
+  const supabase = createClient();
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
+
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
   const hour = new Date().getHours();
@@ -299,7 +309,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
 
         <div className="grid grid-cols-2 gap-3">
           <Link href="/nutrition?viewAsClient=true"><div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#22c55e20" }}><i className="ti ti-salad text-lg" style={{ color: "#22c55e" }} /></div><div><p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Nutrition</p><p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Log meals</p></div></div></Link>
-          <Link href="/log"><div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#f59e0b20" }}><i className="ti ti-plus-circle text-lg" style={{ color: "#f59e0b" }} /></div><div><p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Log</p><p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Cardio & weight</p></div></div></Link>
+          <Link href="/log"><div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#f59e0b20" }}><i className="ti ti-circle-plus text-lg" style={{ color: "#f59e0b" }} /></div><div><p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Log</p><p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Cardio & weight</p></div></div></Link>
         </div>
 
         <div>
@@ -331,6 +341,16 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
             </div>
           )}
         </div>
+
+        {/* Logout */}
+        <button
+          onClick={handleSignOut}
+          className="w-full py-3 rounded-2xl text-sm font-medium mt-2"
+          style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}
+        >
+          <i className="ti ti-logout text-sm mr-2" />
+          Sign Out
+        </button>
       </div>
     </>
   );
