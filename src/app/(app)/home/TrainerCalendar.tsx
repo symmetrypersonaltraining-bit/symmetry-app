@@ -101,10 +101,11 @@ function layoutEvents(events: AE[]): Array<AE & { lane: number; laneCount: numbe
 }
 
 // ---- EventBlock (time grid) ----
-function EventBlock({ ev, clients, onClick }: {
+function EventBlock({ ev, clients, onClick, isDraggable }: {
   ev: AE & { lane: number; laneCount: number };
   clients: Client[];
   onClick: (ev: AE) => void;
+  isDraggable?: boolean;
 }) {
   const start = parseAppt(ev.scheduledAt);
   const end = ev.endsAt ? parseAppt(ev.endsAt) : new Date(start.getTime() + 3600000);
@@ -117,9 +118,18 @@ function EventBlock({ ev, clients, onClick }: {
   const pct = 100 / ev.laneCount;
   const left = ev.lane * pct;
   const isCancelled = ev.status === "cancelled" || ev.status === "cancelled_client" || ev.status === "cancelled_trainer";
+  const durationMin = Math.round((end.getTime() - start.getTime()) / 60000);
 
   return (
     <div
+      draggable={isDraggable}
+      onDragStart={isDraggable ? e => {
+        e.stopPropagation();
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("apptId", ev.id);
+        e.dataTransfer.setData("apptTime", ev.scheduledAt);
+        e.dataTransfer.setData("apptDuration", String(durationMin));
+      } : undefined}
       onClick={(e) => { e.stopPropagation(); onClick(ev); }}
       style={{
         position: "absolute",
@@ -129,7 +139,7 @@ function EventBlock({ ev, clients, onClick }: {
         border: `1px solid ${color}`,
         borderRadius: 6,
         padding: "2px 5px",
-        cursor: "pointer",
+        cursor: isDraggable ? "grab" : "pointer",
         overflow: "hidden",
         zIndex: 2,
         opacity: isCancelled ? 0.6 : 1,
@@ -633,7 +643,7 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
 // ---- Time Grid (shared between Week and Day views) ----
 function TimeGrid({
   days, clients, getDayEvents, getDayWorkouts, today, todayStr,
-  onEventClick, onTimeClick, onDayHeaderClick, scrollRef
+  onEventClick, onTimeClick, onDayHeaderClick, scrollRef, onApptDrop
 }: {
   days: Date[];
   clients: Client[];
@@ -645,7 +655,10 @@ function TimeGrid({
   onTimeClick: (day: Date, e: React.MouseEvent<HTMLDivElement>) => void;
   onDayHeaderClick: (day: Date) => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
+  onApptDrop?: (apptId: string, newDate: string, timeStr: string, durationMin: number) => Promise<void>;
 }) {
+  const [apptDropTarget, setApptDropTarget] = useState<string | null>(null);
+
   function handleTimeGridClick(day: Date, e: React.MouseEvent<HTMLDivElement>) {
     onTimeClick(day, e);
   }
@@ -706,7 +719,33 @@ function TimeGrid({
 
             return (
               <div key={ds} className="flex-1 relative border-l"
-                style={{ borderColor: "var(--brand-border)", background: isToday ? "rgba(229,57,53,0.02)" : "transparent" }}
+                onDragOver={e => {
+                  if (e.dataTransfer.types.includes("apptid")) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setApptDropTarget(ds);
+                  }
+                }}
+                onDragLeave={e => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setApptDropTarget(null);
+                }}
+                onDrop={async e => {
+                  e.preventDefault();
+                  const apptId = e.dataTransfer.getData("apptId");
+                  const apptTime = e.dataTransfer.getData("apptTime");
+                  const duration = parseInt(e.dataTransfer.getData("apptDuration") || "60");
+                  setApptDropTarget(null);
+                  if (apptId && onApptDrop) {
+                    const orig = parseAppt(apptTime);
+                    const timeStr = `${String(orig.getHours()).padStart(2, "0")}:${String(orig.getMinutes()).padStart(2, "0")}`;
+                    await onApptDrop(apptId, ds, timeStr, duration);
+                  }
+                }}
+                style={{
+                  borderColor: apptDropTarget === ds ? "var(--brand-primary)" : "var(--brand-border)",
+                  background: apptDropTarget === ds ? "rgba(14,165,233,0.06)" : isToday ? "rgba(229,57,53,0.02)" : "transparent",
+                  transition: "background 0.15s, border-color 0.15s",
+                }}
                 onClick={e => handleTimeGridClick(day, e)}>
                 {Array.from({ length: TOTAL_HOURS }, (_, i) => (
                   <div key={i} style={{
@@ -727,7 +766,7 @@ function TimeGrid({
                   </div>
                 )}
                 {laid.map(ev => (
-                  <EventBlock key={ev.id} ev={ev} clients={clients} onClick={onEventClick} />
+                  <EventBlock key={ev.id} ev={ev} clients={clients} onClick={onEventClick} isDraggable={!!onApptDrop} />
                 ))}
               </div>
             );
@@ -740,14 +779,18 @@ function TimeGrid({
 
 
 // ---- ClientWorkoutWeekView \u2014 per-client programmed workout calendar ----
-function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, clientName }: {
+function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, clientName, onReschedule }: {
   days: Date[];
   todayStr: string;
   workouts: Array<{ id: string; date: string; status: string; dayLabel: string; phaseLabel: string; programName: string; dayId: string | null }>;
   loading: boolean;
   clientId: string;
   clientName: string;
+  onReschedule: (workoutId: string, newDate: string) => Promise<void>;
 }) {
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+
   const workoutByDate = useMemo(() => {
     const map: Record<string, typeof workouts[0]> = {};
     for (const w of workouts) map[w.date] = w;
@@ -803,21 +846,53 @@ function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, cl
 
               return (
                 <div key={ds} className="flex-1 border-l p-1.5 flex flex-col gap-1.5"
+                  onDragOver={e => {
+                    if (e.dataTransfer.types.includes("workoutid")) {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      setDropTarget(ds);
+                    }
+                  }}
+                  onDragLeave={e => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null);
+                  }}
+                  onDrop={async e => {
+                    e.preventDefault();
+                    const id = e.dataTransfer.getData("workoutId");
+                    const fromDate = e.dataTransfer.getData("workoutDate");
+                    setDropTarget(null);
+                    setDragId(null);
+                    if (id && fromDate !== ds) {
+                      await onReschedule(id, ds);
+                    }
+                  }}
                   style={{
-                    borderColor: "var(--brand-border)",
-                    background: isToday ? "rgba(229,57,53,0.02)" : "transparent",
+                    borderColor: dropTarget === ds ? "var(--brand-primary)" : "var(--brand-border)",
+                    background: dropTarget === ds ? "rgba(14,165,233,0.08)" : isToday ? "rgba(229,57,53,0.02)" : "transparent",
                     minWidth: 0,
+                    transition: "background 0.15s, border-color 0.15s",
                   }}>
                   {workout ? (
                     <a
+                      draggable={workout.status !== "completed"}
+                      onDragStart={workout.status !== "completed" ? e => {
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("workoutId", workout.id);
+                        e.dataTransfer.setData("workoutDate", ds);
+                        setDragId(workout.id);
+                      } : undefined}
+                      onDragEnd={() => { setDragId(null); setDropTarget(null); }}
                       href={workout.dayId
                         ? `/clients/${clientId}/day/${workout.dayId}`
                         : `/clients/${clientId}?tab=training`}
-                      className="flex flex-col gap-1 rounded-xl p-2 cursor-pointer hover:opacity-90 transition-opacity"
+                      className="flex flex-col gap-1 rounded-xl p-2 hover:opacity-90 transition-opacity"
                       style={{
                         background: isDone ? `${statusColor}15` : `${statusColor}12`,
                         border: `1.5px solid ${statusColor}40`,
                         textDecoration: "none",
+                        opacity: dragId === workout.id ? 0.35 : 1,
+                        cursor: workout.status !== "completed" ? "grab" : "pointer",
+                        userSelect: "none",
                       }}>
                       {/* Status dot + label */}
                       <div className="flex items-center gap-1.5">
@@ -1030,6 +1105,25 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
     copy.setHours(0, 0, 0, 0);
     setDayAnchor(copy);
     setViewMode("week");
+  }
+
+  async function handleRescheduleWorkout(workoutId: string, newDate: string) {
+    const supabase = createClient();
+    await supabase.from("scheduled_workouts").update({ scheduled_date: newDate }).eq("id", workoutId);
+    setWeekAnchor(a => new Date(a));
+  }
+
+  async function handleRescheduleAppt(apptId: string, newDate: string, timeStr: string, durationMin: number) {
+    const supabase = createClient();
+    const [y, mo, d] = newDate.split("-").map(Number);
+    const [h, mi] = timeStr.split(":").map(Number);
+    const newStart = new Date(y, mo - 1, d, h, mi);
+    const newEnd = new Date(newStart.getTime() + durationMin * 60000);
+    await supabase.from("appointments").update({
+      scheduled_at: newStart.toISOString(),
+      ends_at: newEnd.toISOString(),
+    }).eq("id", apptId);
+    setRefreshKey(k => k + 1);
   }
 
   function handleTimeGridClick(day: Date, e: React.MouseEvent<HTMLDivElement>) {
@@ -1354,6 +1448,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
             onTimeClick={handleTimeGridClick}
             onDayHeaderClick={(day) => setDayDrawer(day)}
             scrollRef={scrollRef}
+            onApptDrop={handleRescheduleAppt}
           />
         )}
         {viewMode === "week" && selectedClientId && (
@@ -1364,6 +1459,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
             loading={loadingClientWorkouts}
             clientId={selectedClientId}
             clientName={clients.find(c => c.id === selectedClientId)?.name || ""}
+            onReschedule={handleRescheduleWorkout}
           />
         )}
         {viewMode === "day" && (
@@ -1378,6 +1474,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
             onTimeClick={handleTimeGridClick}
             onDayHeaderClick={(day) => setDayDrawer(day)}
             scrollRef={scrollRef}
+            onApptDrop={handleRescheduleAppt}
           />
         )}
         {viewMode === "agenda" && <AgendaView />}
