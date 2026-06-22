@@ -16,7 +16,7 @@ if (!user) redirect("/login");
 const isTrainer = (user?.email ?? "") === TRAINER_EMAIL;
 
 const clientMode = await isClientMode();
-if (isTrainer && !clientMode) {
+if (isTrainer) {
 const { data: clients } = await supabase
 .from("clients")
 .select("id, name")

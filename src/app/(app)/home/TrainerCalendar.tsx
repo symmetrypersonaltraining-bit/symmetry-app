@@ -989,7 +989,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
     return copy;
   }
 
-  const [viewMode, setViewMode] = useState<ViewMode>("week");
+  const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [weekAnchor, setWeekAnchor] = useState(() => getSunday(today));
   const [dayAnchor, setDayAnchor] = useState(() => {
     const d = new Date(today);
