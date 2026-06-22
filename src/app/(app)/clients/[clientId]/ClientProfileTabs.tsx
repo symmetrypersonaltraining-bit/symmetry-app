@@ -320,7 +320,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
     return map;
   }, [workouts]);
 
-  const DOW_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   function prev() {
     if (viewMode === "4w") {
@@ -488,7 +488,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
                     <div className="space-y-1">
                       {dws.map(w => <WorkoutChip key={w.id} w={w} compact={false} />)}
                       {dws.length === 0 && (
-                        <p className="text-[9px] text-center mt-2" style={{ color: "var(--brand-text-secondary)" }}>\u2014</p>
+                        <p className="text-[9px] text-center mt-2" style={{ color: "var(--brand-text-secondary)" }}>—</p>
                       )}
                     </div>
                   </div>
