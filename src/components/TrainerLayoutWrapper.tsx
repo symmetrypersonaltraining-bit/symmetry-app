@@ -6,18 +6,16 @@ import Link from "next/link";
 import TrainerSidebar from "./TrainerSidebar";
 import AIAssistant from "./AIAssistant";
 import Logo from "./Logo";
+import MacroNavChart from "./MacroNavChart";
 
 interface Props {
   children: React.ReactNode;
 }
 
-// Client-mode bottom nav tabs
 const CLIENT_NAV = [
-  { href: "/client-preview", label: "Home",      icon: "ti-home" },
-  { href: "/client-preview/nutrition",  label: "Nutrition", icon: "ti-salad" },
-  { href: "/client-preview/progress",   label: "Progress",  icon: "ti-chart-line" },
-  { href: "/workout",                   label: "Workout",   icon: "ti-barbell" },
-  { href: "/log",                       label: "Log",       icon: "ti-plus-circle" },
+  { href: "/client-preview", label: "Home", icon: "ti-home" },
+  { href: "/workout", label: "Workout", icon: "ti-barbell" },
+  { href: "/client-preview/nutrition", label: "Nutrition", icon: "ti-salad" },
 ];
 
 export default function TrainerLayoutWrapper({ children }: Props) {
@@ -37,12 +35,9 @@ export default function TrainerLayoutWrapper({ children }: Props) {
     router.push(next ? "/client-preview" : "/home");
   }
 
-  // ── CLIENT MODE ──────────────────────────────────────────────────────────
   if (clientMode) {
     return (
       <div className="flex flex-col min-h-screen" style={{ background: "var(--brand-bg)" }}>
-
-        {/* Top bar — mirrors what a client would see on mobile */}
         <div className="flex items-center gap-3 px-4 pb-3 sticky top-0 z-40 shadow-sm"
           style={{ background: "var(--brand-primary)", paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
           <Logo size={28} color="white" className="flex-shrink-0" />
@@ -59,12 +54,10 @@ export default function TrainerLayoutWrapper({ children }: Props) {
           </button>
         </div>
 
-        {/* Page content */}
         <div className="flex-1 pb-20 overflow-y-auto">
           {children}
         </div>
 
-        {/* Client bottom nav */}
         <div className="fixed bottom-0 left-0 right-0 z-40 flex items-end"
           style={{ background: "var(--brand-surface)", borderTop: "1px solid var(--brand-border)", paddingBottom: "env(safe-area-inset-bottom)" }}>
           {CLIENT_NAV.map((item) => {
@@ -78,12 +71,23 @@ export default function TrainerLayoutWrapper({ children }: Props) {
               </Link>
             );
           })}
+          {/* Daily macro chart — replaces Log */}
+          <Link href="/client-preview/nutrition"
+            className="flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors">
+            <MacroNavChart active={pathname.startsWith("/client-preview/nutrition")} />
+          </Link>
+          {/* Progress */}
+          <Link href="/client-preview/progress"
+            className="flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors"
+            style={{ color: pathname.startsWith("/client-preview/progress") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>
+            <i className="ti ti-chart-line text-xl" />
+            <span className="text-[10px] font-medium">Progress</span>
+          </Link>
         </div>
       </div>
     );
   }
 
-  // ── TRAINER MODE ──────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-screen" style={{ background: "var(--brand-bg)" }}>
       <TrainerSidebar
@@ -99,4 +103,4 @@ export default function TrainerLayoutWrapper({ children }: Props) {
       <AIAssistant isTrainer={true} />
     </div>
   );
-}
+          }
