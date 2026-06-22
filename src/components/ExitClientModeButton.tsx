@@ -5,25 +5,18 @@ export default function ExitClientModeButton() {
     window.location.href = "/api/set-client-mode?mode=0";
   }
   return (
-    <button
-      onClick={exit}
-      style={{
-        position: "fixed",
-        top: 12,
-        right: 12,
-        zIndex: 9999,
-        background: "var(--brand-accent, #6C63FF)",
-        color: "#fff",
-        border: "none",
-        borderRadius: 20,
-        padding: "6px 14px",
-        fontSize: 13,
-        fontWeight: 600,
-        cursor: "pointer",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-      }}
+    <div
+      className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-2"
+      style={{ background: "var(--brand-primary)", borderBottom: "1px solid rgba(255,255,255,0.2)" }}
     >
-      ← Trainer View
-    </button>
+      <span className="text-white/70 text-xs">Previewing client view</span>
+      <button
+        onClick={exit}
+        className="flex items-center gap-1 text-white text-xs font-semibold"
+      >
+        <i className="ti ti-arrow-left text-xs" />
+        Trainer View
+      </button>
+    </div>
   );
 }
