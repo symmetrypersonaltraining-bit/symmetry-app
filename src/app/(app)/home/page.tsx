@@ -85,7 +85,7 @@ return (
 <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
 </div>
 <PendingRemindersPanel reminders={reminders} />
-<TrainerCalendar clients={clients || []} appointmentMap={appointmentMap} workoutMap={workoutMap} startDate="" />
+<TrainerCalendar clients={clients || []} appointmentMap={appointmentMap} workoutMap={{}} startDate="" />
 </div>
 );
 }
