@@ -5,6 +5,7 @@ import { useState, useMemo, useCallback } from "react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import AssignProgramModal from "./AssignProgramModal";
+import ProgressCharts from "@/app/(app)/progress/ProgressCharts";
 
 interface MetricPoint {
   metric_date: string;
@@ -856,7 +857,7 @@ export default function ClientProfileTabs({ client, metrics, allWorkouts, client
   const TABS = [
     { id: "overview" as const, label: "Overview", icon: "ti-layout-dashboard" },
     { id: "training" as const, label: "Training", icon: "ti-calendar" },
-    { id: "metrics" as const, label: "Metrics", icon: "ti-chart-line" },
+    { id: "metrics" as const, label: "Progress", icon: "ti-chart-line" },
     { id: "info" as const, label: "Info", icon: "ti-user" },
   ];
 
@@ -879,7 +880,7 @@ export default function ClientProfileTabs({ client, metrics, allWorkouts, client
             programs={programs} currentProgramId={currentProgramId} onAssignProgram={() => setShowAssignModal(true)} />
         )}
         {tab === "training" && <TrainingCalendar workouts={allWorkouts} clientId={clientId} />}
-        {tab === "metrics" && <MetricsTab metrics={metrics} />}
+        {tab === "metrics" && <ProgressCharts weightLogs={metrics as any} clientId={clientId} totalWorkouts={allWorkouts.length} recentPRs={[]} />}
         {tab === "info" && (
           <InfoTab client={client} programs={programs} currentProgramId={currentProgramId}
             clientId={clientId} />
