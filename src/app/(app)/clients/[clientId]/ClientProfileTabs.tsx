@@ -779,16 +779,16 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
           <span className="text-xs font-medium w-28 flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }}>Email</span>
           <span className="text-sm" style={{ color: "var(--brand-text)" }}>{client.email}</span>
         </div>
-        <Row label="Phone" field="phone" type="tel" placeholder="+1 (555) 000-0000" />
+        {Row({label:"Phone", field:"phone", type:"tel", placeholder:"+1 (555) 000-0000"})}
       </div>
       <div className="rounded-xl overflow-hidden" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
         <div className="px-4 py-2 border-b" style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)" }}>
           <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>Training</p>
         </div>
-        <Row label="Primary Goal" field="primary_goal" placeholder="e.g. Fat loss, muscle gain" />
-        <Row label="Secondary Goals" field="secondary_goals" placeholder="e.g. Improve endurance" />
-        <SelectRow label="Experience" field="experience_level" options={["Beginner", "Intermediate", "Advanced", "Elite"]} />
-        <Row label="Frequency" field="training_frequency" type="number" placeholder="3" />
+        {Row({label:"Primary Goal", field:"primary_goal", placeholder:"e.g. Fat loss, muscle gain"})}
+        {Row({label:"Secondary Goals", field:"secondary_goals", placeholder:"e.g. Improve endurance"})}
+        {SelectRow({options:["Beginner", "Intermediate", "Advanced", "Elite"], label:"Experience", field:"experience_level"})}
+        {Row({label:"Frequency", field:"training_frequency", type:"number", placeholder:"3"})}
         <div className="flex items-center gap-3 px-4 py-3 border-b last:border-b-0" style={{ borderColor: "var(--brand-border)" }}>
           <span className="text-xs font-medium w-28 flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }}>Start Date</span>
           <span className="text-sm" style={{ color: "var(--brand-text)" }}>{fmtDate(client.start_date)}</span>
@@ -802,23 +802,23 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
         <div className="px-4 py-2 border-b" style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)" }}>
           <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>Body Metrics</p>
         </div>
-        <Row label="Weight (lbs)" field="current_weight" type="number" placeholder="0.0" />
-        <Row label="Body Fat %" field="current_body_fat_pct" type="number" placeholder="0.0" />
+        {Row({label:"Weight (lbs)", field:"current_weight", type:"number", placeholder:"0.0"})}
+        {Row({label:"Body Fat %", field:"current_body_fat_pct", type:"number", placeholder:"0.0"})}
       </div>
       <div className="rounded-xl overflow-hidden" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
         <div className="px-4 py-2 border-b" style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)" }}>
           <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>Notes & Limitations</p>
         </div>
         {(form.injuries_limitations || editing) && (
-          <TextAreaRow label="Injuries / Limits" field="injuries_limitations" placeholder="Any injuries or movement restrictions" />
+          {TextAreaRow({label:"Injuries / Limits", field:"injuries_limitations", placeholder:"Any injuries or movement restrictions"})}
         )}
-        <TextAreaRow label="Trainer Notes" field="notes" placeholder="Internal notes (not visible to client)" />
+        {TextAreaRow({label:"Trainer Notes", field:"notes", placeholder:"Internal notes (not visible to client)"})}
       </div>
       <div className="rounded-xl overflow-hidden" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
         <div className="px-4 py-2 border-b" style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)" }}>
           <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>Admin</p>
         </div>
-        <Row label="Monthly Fee" field="current_fees" type="number" placeholder="0" />
+        {Row({label:"Monthly Fee", field:"current_fees", type:"number", placeholder:"0"})}
         <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: "var(--brand-border)" }}>
           <span className="text-xs font-medium w-28 flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }}>Self-Coached</span>
           {editing ? (
