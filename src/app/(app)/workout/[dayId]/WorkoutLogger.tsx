@@ -452,6 +452,34 @@ function SwapModal({ pe, onClose, onSwap }: { pe: PrescribedExercise; onClose: (
 }
 
 // \u2500\u2500\u2500 MAIN COMPONENT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function VideoModal({ url, onClose }: { url: string; onClose: () => void }) {
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^&?#]+)/);
+  const id = m ? m[1] : null;
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480 }}>
+        {id ? (
+          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 12, overflow: "hidden", background: "#000" }}>
+            <iframe
+              src={"https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&rel=0&playsinline=1"}
+              title="Exercise demo"
+              style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: 0 }}
+              allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        ) : (
+          <div style={{ background: "var(--brand-surface)", borderRadius: 12, padding: 20, textAlign: "center" }}>
+            <p style={{ color: "var(--brand-text)", marginBottom: 12, fontSize: 14 }}>No in-app demo set for this exercise yet.</p>
+            <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa", fontWeight: 600, fontSize: 14 }}>Find one on YouTube</a>
+          </div>
+        )}
+        <button onClick={onClose} type="button" style={{ marginTop: 12, width: "100%", padding: 11, borderRadius: 10, background: "rgba(255,255,255,0.15)", color: "white", border: "none", fontWeight: 600, cursor: "pointer" }}>Close</button>
+      </div>
+    </div>
+  );
+}
+
 export default function WorkoutLogger({
   day, phase, program, sections, clientId, clientName, isTrainerSession,
   existingLogId, existingSetLogs,
@@ -480,6 +508,7 @@ export default function WorkoutLogger({
   const [workoutComplete, setWorkoutComplete] = useState(false);
   const [sessionMode, setSessionMode] = useState(false);
   const [restTimer, setRestTimer] = useState<number | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [historyExercise, setHistoryExercise] = useState<{ id: string; name: string } | null>(null);
   const [sessionNote, setSessionNote] = useState("");
   const [listening, setListening] = useState(false);
@@ -659,6 +688,7 @@ export default function WorkoutLogger({
     return (
       <div className="fixed inset-0 flex flex-col z-[100]" style={{ background: "#0D1117" }}>
         {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
+        {videoUrl && <VideoModal url={videoUrl} onClose={() => setVideoUrl(null)} />}
         {historyExercise && (
           <ExerciseHistory exerciseId={historyExercise.id} exerciseName={historyExercise.name}
             onClose={() => setHistoryExercise(null)}
@@ -700,11 +730,11 @@ export default function WorkoutLogger({
               </p>
               <h2 className="text-2xl font-bold text-white leading-tight">{currentExercise.exercises?.name}</h2>
             {currentExercise.exercises?.video_url && (
-              <a href={currentExercise.exercises.video_url} target="_blank" rel="noopener noreferrer"
+              <button type="button" onClick={() => setVideoUrl(currentExercise.exercises!.video_url!)}
                 className="inline-flex items-center gap-1.5 mt-1.5 text-sm font-medium"
-                style={{ color: "#60a5fa" }}>
-                <i className="ti ti-player-play text-base" /> Watch demo
-              </a>
+                style={{ color: "#60a5fa", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                <i className="ti ti-video text-base" /> Watch demo
+              </button>
             )}
               {currentExercise.load_descriptor && (
                 <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>{currentExercise.load_descriptor}</p>
