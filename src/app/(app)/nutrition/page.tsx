@@ -59,7 +59,7 @@ export default async function NutritionPage({
     }
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
   let mealPlan: any = null;
   let todayLogs: any[] = [];

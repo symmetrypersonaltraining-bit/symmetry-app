@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
@@ -58,6 +58,21 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const [photoLoading, setPhotoLoading] = useState(false);
   const [photoResult,  setPhotoResult]  = useState<string | null>(null);
   const [offPlanNotes, setOffPlanNotes] = useState("");
+
+  const [selectedDate, setSelectedDate] = useState(today);
+  function shiftDate(s: string, delta: number) { const [y,m,d]=s.split("-").map(Number); const dt=new Date(y, m-1, d); dt.setDate(dt.getDate()+delta); const mm=String(dt.getMonth()+1).padStart(2,"0"); const dd=String(dt.getDate()).padStart(2,"0"); return dt.getFullYear()+"-"+mm+"-"+dd; }
+  function formatNutritionDate(s: string) { const [y,m,d]=s.split("-").map(Number); const dt=new Date(y, m-1, d); return dt.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}); }
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data } = await supabase.from("meal_adherence_logs").select("*").eq("client_id", clientId).eq("log_date", selectedDate);
+      if (!active) return;
+      const rows = (data as AdherenceLog[]) || [];
+      setLogs(rows);
+      const m: Record<number, string> = {}; for (const l of rows) if ((l as any).notes) m[(l as any).meal_position] = (l as any).notes; setNotesMap(m);
+    })();
+    return () => { active = false; };
+  }, [selectedDate, clientId]);
   const cameraRef = useRef<HTMLInputElement>(null);
 
   const sortedMeals = useMemo(() => {
@@ -123,7 +138,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     setSaving(meal.id);
     try {
       const { data } = await supabase.from("meal_adherence_logs").upsert({
-        client_id: clientId, log_date: today, meal_id: meal.id,
+        client_id: clientId, log_date: selectedDate, meal_id: meal.id,
         meal_position: meal.position, adherence: adherenceKey,
         off_plan_details: null, est_kcal: null, est_protein: null,
         est_carbs: null, est_fats: null, source: "client",
@@ -181,7 +196,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     setSaving(key);
     try {
       const { data } = await supabase.from("meal_adherence_logs").upsert({
-        client_id: clientId, log_date: today, meal_id: offPlanModal.mealId,
+        client_id: clientId, log_date: selectedDate, meal_id: offPlanModal.mealId,
         meal_position: offPlanModal.position, adherence: "Off-plan",
         off_plan_details: offPlanDetails || null,
         est_kcal:    offPlanKcal ? parseFloat(offPlanKcal) : null,
@@ -223,6 +238,16 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
   return (
     <div className="pb-24" style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
+
+      {/* Date navigation (supports back-filling previous days) */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <button onClick={() => setSelectedDate(shiftDate(selectedDate, -1))} aria-label="Previous day" className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}><i className="ti ti-chevron-left" /></button>
+        <div className="text-center">
+          <div className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>{formatNutritionDate(selectedDate)}</div>
+          {selectedDate !== today ? (<button onClick={() => setSelectedDate(today)} className="text-xs underline" style={{ color: "var(--brand-primary)" }}>Back to today</button>) : (<div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Today</div>)}
+        </div>
+        <button onClick={() => setSelectedDate(shiftDate(selectedDate, 1))} disabled={selectedDate >= today} aria-label="Next day" className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", opacity: selectedDate >= today ? 0.4 : 1 }}><i className="ti ti-chevron-right" /></button>
+      </div>
 
       {/* Hidden camera input */}
       <input ref={cameraRef} type="file" accept="image/*" capture="environment"
