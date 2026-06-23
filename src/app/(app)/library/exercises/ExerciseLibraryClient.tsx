@@ -53,6 +53,7 @@ function ExerciseDrawer({ ex, onClose }: { ex: Exercise; onClose: () => void }) 
   const icon = MODALITY_ICON[ex.modality?.toLowerCase() || ""] || "ti-barbell";
   const color = MODALITY_COLOR[ex.modality?.toLowerCase() || ""] || "var(--brand-primary)";
   const ytThumb = getYouTubeThumbnail(ex.video_url);
+  const ytId = ex.video_url ? (ex.video_url.match(/(?:watch\?v=|youtu\.be\/|embed\/|shorts\/)([^&?#]+)/)?.[1] || null) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
@@ -72,18 +73,15 @@ function ExerciseDrawer({ ex, onClose }: { ex: Exercise; onClose: () => void }) 
           style={{ borderColor: "var(--brand-border)" }}>
 
           {/* Exercise visual \u2014 YouTube thumbnail or Symmetry logo placeholder */}
-          {ytThumb ? (
-            <div className="w-16 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-black">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ytThumb} alt={ex.name}
-                className="w-full h-full object-cover" />
-            </div>
-          ) : (
-            <div className="w-16 h-16 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: color + "18", border: `1.5px solid ${color}30` }}>
-              <Logo size={36} color={color} />
-            </div>
-          )}
+          {ytId ? (
+                <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 8, overflow: "hidden", background: "#000" }}>
+                  <iframe src={"https://www.youtube-nocookie.com/embed/" + ytId + "?rel=0&playsinline=1"} title="Exercise demo" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: 0 }} allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                </div>
+              ) : (
+                <a href={ex.video_url!} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--brand-primary)", fontWeight: 600, fontSize: 13 }}>
+                  <i className="ti ti-brand-youtube" /> Find a demo on YouTube
+                </a>
+              )}
 
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-bold leading-snug" style={{ color: "var(--brand-text)" }}>{ex.name}</h2>
