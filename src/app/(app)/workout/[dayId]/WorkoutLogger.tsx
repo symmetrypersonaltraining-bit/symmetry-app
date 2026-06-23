@@ -662,17 +662,26 @@ export default function WorkoutLogger({
   }
 
     if (workoutComplete) {
+    const symLines = ["That's the rep you won't remember and the one that counted.", "Logged. The work doesn't care how you felt about it.", "Showed up. Did the work. That's the whole thing.", "Not talked about. Done.", "It wasn't easy. It was worth it.", "The discipline is doing it when you don't feel it. You did."];
+    const completionLine = symLines[(day.label ? day.label.length : 0) % symLines.length];
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
         style={{ background: "var(--brand-bg)" }}>
-        <div className="relative mb-6">
-          <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ background: "#22c55e20" }}>
-            <i className="ti ti-trophy text-5xl" style={{ color: "#22c55e" }} />
-          </div>
-          <div className="absolute -top-1 -right-1 text-2xl animate-bounce">{'\ud83c\udf89'}</div>
+        <div className="relative mb-6" style={{ width: 120, height: 120 }}>
+          <style>{"@keyframes symL{from{transform:translateX(-16px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes symR{from{transform:translateX(16px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes symChk{to{stroke-dashoffset:0}}"}</style>
+          <svg width="120" height="120" viewBox="0 0 120 120">
+            <g style={{ animation: "symL 0.7s ease both" }}>
+              <path d="M60 14 A46 46 0 0 0 60 106" fill="none" stroke="var(--brand-primary)" strokeWidth="6" strokeLinecap="round" />
+            </g>
+            <g style={{ animation: "symR 0.7s ease both" }}>
+              <path d="M60 14 A46 46 0 0 1 60 106" fill="none" stroke="var(--brand-primary)" strokeWidth="6" strokeLinecap="round" />
+            </g>
+            <path d="M44 61 l11 12 l22 -24" fill="none" stroke="#22c55e" strokeWidth="6.5" strokeLinecap="round" strokeLinejoin="round" style={{ strokeDasharray: 70, strokeDashoffset: 70, animation: "symChk 0.5s ease 0.7s forwards" }} />
+          </svg>
         </div>
-        <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--brand-text)" }}>Session Complete!</h1>
+        <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--brand-text)" }}>Session done.</h1>
         <p className="text-sm mb-2" style={{ color: "var(--brand-text-secondary)" }}>{day.label}</p>
+        <p className="text-base font-medium mb-1" style={{ color: "var(--brand-text)", maxWidth: 320, lineHeight: 1.45 }}>{completionLine}</p>
         <p className="text-lg font-bold mb-6" style={{ color: "var(--brand-primary)" }}>{doneSets} sets logged</p>
         <Link href={isTrainerSession ? `/clients/${clientId}` : "/home"}
           className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold text-white"
