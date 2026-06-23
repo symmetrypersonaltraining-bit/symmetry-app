@@ -22,11 +22,6 @@ export default function TrainerLayoutWrapper({ children }: Props) {
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    const stored = localStorage.getItem("symmetry_view_mode");
-    if (stored === "client") setClientMode(true);
-  }, []);
-
   function handleToggleMode() {
     const next = !clientMode;
     setClientMode(next);

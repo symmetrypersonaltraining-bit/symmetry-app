@@ -797,7 +797,7 @@ export default function WorkoutLogger({
               <input type="number" value={setEntry.weight}
                 onChange={e => updateSet(currentExercise.id, si, "weight", e.target.value)}
                 disabled={setEntry.done} placeholder="0"
-                className="flex-1 text-center text-xl font-bold py-2 rounded-lg outline-none"
+                className="flex-1 min-w-0 text-center text-xl font-bold py-2 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
@@ -806,7 +806,7 @@ export default function WorkoutLogger({
               <input type="number" value={setEntry.reps}
                 onChange={e => updateSet(currentExercise.id, si, "reps", e.target.value)}
                 disabled={setEntry.done} placeholder="0"
-                className="flex-1 text-center text-xl font-bold py-2 rounded-lg outline-none"
+                className="flex-1 min-w-0 text-center text-xl font-bold py-2 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
@@ -1032,7 +1032,7 @@ export default function WorkoutLogger({
                       <input type="number" value={setEntry.weight}
                         onChange={e => updateSet(pe.id, si, "weight", e.target.value)}
                         disabled={setEntry.done} placeholder={'\u2014'}
-                        className="text-center text-base font-semibold py-2.5 rounded-xl outline-none"
+                        className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
                           color: setEntry.done ? "#22c55e" : "var(--brand-text)",
@@ -1041,7 +1041,7 @@ export default function WorkoutLogger({
                       <input type="number" value={setEntry.reps}
                         onChange={e => updateSet(pe.id, si, "reps", e.target.value)}
                         disabled={setEntry.done} placeholder={'\u2014'}
-                        className="text-center text-base font-semibold py-2.5 rounded-xl outline-none"
+                        className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
                           color: setEntry.done ? "#22c55e" : "var(--brand-text)",
