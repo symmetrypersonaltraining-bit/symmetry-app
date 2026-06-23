@@ -5,7 +5,7 @@ import { useState, useMemo, useCallback } from "react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import AssignProgramModal from "./AssignProgramModal";
-import ProgressCharts from "@/app/(app)/progress/ProgressCharts";
+import MetricCards from "@/components/MetricCards";
 
 interface MetricPoint {
   metric_date: string;
@@ -880,7 +880,7 @@ export default function ClientProfileTabs({ client, metrics, allWorkouts, client
             programs={programs} currentProgramId={currentProgramId} onAssignProgram={() => setShowAssignModal(true)} />
         )}
         {tab === "training" && <TrainingCalendar workouts={allWorkouts} clientId={clientId} />}
-        {tab === "metrics" && <ProgressCharts weightLogs={metrics as any} clientId={clientId} totalWorkouts={allWorkouts.length} recentPRs={[]} />}
+        {tab === "metrics" && <MetricCards clientId={clientId} />}
         {tab === "info" && (
           <InfoTab client={client} programs={programs} currentProgramId={currentProgramId}
             clientId={clientId} />
