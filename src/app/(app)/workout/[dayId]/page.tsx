@@ -17,6 +17,16 @@ export default async function WorkoutDayPage({
 
   const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
 
+  let resolvedDayId = dayId;
+  {
+    const { data: schedRow } = await supabase
+      .from("scheduled_workouts")
+      .select("day_id")
+      .eq("id", dayId)
+      .maybeSingle();
+    if (schedRow?.day_id) resolvedDayId = schedRow.day_id;
+  }
+
   const { data: day } = await supabase
     .from("days")
     .select(`
@@ -35,7 +45,7 @@ export default async function WorkoutDayPage({
         )
       )
     `)
-    .eq("id", dayId)
+    .eq("id", resolvedDayId)
     .maybeSingle();
 
   if (!day) notFound();
@@ -86,7 +96,7 @@ export default async function WorkoutDayPage({
     .from("workout_logs")
     .select("id, completed, set_logs(*)")
     .eq("client_id", clientId || "")
-    .eq("day_id", dayId)
+    .eq("day_id", resolvedDayId)
     .gte("log_date", today)
     .maybeSingle();
 
