@@ -343,15 +343,15 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
           )}
         </div>
 
-        {/* Logout */}
-        <button
-          onClick={handleSignOut}
-          className="w-full py-3 rounded-2xl text-sm font-medium mt-2"
+        {/* Settings (logout + appearance live here) */}
+        <Link
+          href="/settings"
+          className="w-full py-3 rounded-2xl text-sm font-medium mt-2 flex items-center justify-center"
           style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}
         >
-          <i className="ti ti-logout text-sm mr-2" />
-          Sign Out
-        </button>
+          <i className="ti ti-settings text-sm mr-2" />
+          Settings
+        </Link>
       </div>
     </>
   );
