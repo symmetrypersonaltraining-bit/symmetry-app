@@ -214,22 +214,43 @@ function MacroLine({ values, color, index, width, height }: { values: number[]; 
   );
 }
 
+function RingGauge({ value, goal, color, label, unit }: { value: number; goal: number; color: string; label: string; unit: string }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setMounted(true), 60); return () => clearTimeout(t); }, []);
+  const R = 30;
+  const CIRC = 2 * Math.PI * R;
+  const pct = goal > 0 ? Math.min(1, value / goal) : 0;
+  const pctLabel = goal > 0 ? Math.round((value / goal) * 100) + '%' : '—';
+  const offset = mounted ? CIRC * (1 - pct) : CIRC;
+  return (
+    <div style={{ textAlign: 'center', flex: 1, minWidth: 68 }}>
+      <svg width="74" height="74" viewBox="0 0 74 74" style={{ display: 'block', margin: '0 auto' }}>
+        <circle cx="37" cy="37" r={R} fill="none" stroke="var(--brand-bg)" strokeWidth="7" />
+        <circle cx="37" cy="37" r={R} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
+          strokeDasharray={CIRC} strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 1s ease', transform: 'rotate(-90deg)', transformOrigin: '37px 37px' }} />
+        <text x="37" y="42" textAnchor="middle" style={{ fontSize: 15, fontWeight: 800, fill: 'var(--brand-text)' }}>{pctLabel}</text>
+      </svg>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand-text)', marginTop: 4 }}>{Math.round(value)} / {Math.round(goal)}{unit}</div>
+      <div style={{ fontSize: 11, color: 'var(--brand-text-secondary)' }}>{label}</div>
+    </div>
+  );
+}
+
 function MacrosCard({ data, onClose, targets }: { data: DailyMacro[]; onClose: () => void; targets: { kcal: number; protein: number; carbs: number; fats: number } | null }) {
-  const W = 320, H = 130;
 
   const avg = (k: keyof DailyMacro) =>
     data.length ? data.reduce((acc, d) => acc + (d[k] as number), 0) / data.length : 0;
 
   const hasData = data.length >= 1;
-  const enoughForLine = data.length >= 2;
 
   return (
     <div style={{
       background: 'var(--brand-surface)',
       borderRadius: 14,
       padding: 16,
-      border: '1.5px solid #0F4C81',
-      borderTop: '3px solid #0F4C81',
+      border: '1.5px solid #0EA5E9',
+      borderTop: '3px solid #0EA5E9',
       marginBottom: 10,
       animationName: 'mcFadeUp',
       animationDuration: '0.4s',
@@ -244,40 +265,11 @@ function MacrosCard({ data, onClose, targets }: { data: DailyMacro[]; onClose: (
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--brand-text-secondary)', lineHeight: 1, padding: 4 }}>✕</button>
       </div>
 
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 12 }}>
-        {MACRO_SERIES.map(ser => (
-          <div key={ser.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: ser.color, display: 'inline-block' }} />
-            <span style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600 }}>{ser.label}</span>
-            <span style={{ fontSize: 13, color: 'var(--brand-text)', fontWeight: 800 }}>
-              {Math.round(avg(ser.key as keyof DailyMacro))}
-              {targets && targets[ser.key as 'kcal' | 'protein' | 'carbs' | 'fats'] > 0
-                ? <span style={{ fontWeight: 600, color: 'var(--brand-text-secondary)' }}>{' / ' + Math.round(targets[ser.key as 'kcal' | 'protein' | 'carbs' | 'fats']) + ser.unit}</span>
-                : ser.unit}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ position: 'relative' }}>
-        {enoughForLine ? (
-          <svg width="100%" viewBox={'0 0 ' + W + ' ' + H} preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }}>
-            {MACRO_SERIES.map((ser, i) => (
-              <MacroLine
-                key={ser.key}
-                values={data.map(d => d[ser.key as keyof DailyMacro] as number)}
-                color={ser.color}
-                index={i}
-                width={W}
-                height={H}
-              />
-            ))}
-          </svg>
-        ) : (
-          <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-text-secondary)', fontSize: 13 }}>
-            {hasData ? 'Need 2+ logged days to chart a trend' : 'Log nutrition to see your trend here'}
-          </div>
-        )}
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'space-around' }}>
+        <RingGauge value={avg('kcal')} goal={targets ? targets.kcal : 0} color="#0EA5E9" label="Calories" unit="" />
+        <RingGauge value={avg('protein')} goal={targets ? targets.protein : 0} color="#22c55e" label="Protein" unit="g" />
+        <RingGauge value={avg('carbs')} goal={targets ? targets.carbs : 0} color="#f59e0b" label="Carbs" unit="g" />
+        <RingGauge value={avg('fats')} goal={targets ? targets.fats : 0} color="#e84e4e" label="Fat" unit="g" />
       </div>
     </div>
   );
@@ -765,8 +757,8 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
               background: 'var(--brand-surface)',
               borderRadius: 12,
               padding: '12px 14px',
-              borderTop: '3px solid #0F4C81',
-              border: expandedKey === 'macros' ? '1.5px solid #0F4C81' : '1px solid var(--brand-border)',
+              borderTop: '3px solid #0EA5E9',
+              border: expandedKey === 'macros' ? '1.5px solid #0EA5E9' : '1.5px solid #0EA5E966',
               borderTopWidth: 3,
               cursor: 'pointer',
               transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.15s',
@@ -784,7 +776,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
               <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--brand-text-secondary)', marginLeft: 2 }}>avg</span>
             </div>
             <div style={{ marginTop: 8 }}>
-              <Sparkline data={macrosInWindow.map(dm => dm.kcal)} color="#0F4C81" />
+              <Sparkline data={macrosInWindow.map(dm => dm.kcal)} color="#0EA5E9" />
             </div>
           </div>
         )}
@@ -803,7 +795,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
                 borderRadius: 12,
                 padding: '12px 14px',
                 borderTop: `3px solid ${cfg.color}`,
-                border: isActive ? `1.5px solid ${cfg.color}` : '1px solid var(--brand-border)',
+                border: isActive ? `1.5px solid ${cfg.color}` : `1.5px solid ${cfg.color}66`,
                 borderTopWidth: 3,
                 cursor: 'pointer',
                 transform: isActive ? 'scale(1.01)' : undefined,
