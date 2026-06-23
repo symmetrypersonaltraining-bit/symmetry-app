@@ -27,22 +27,30 @@ export default function MacrosProgressChart({ clientId }: { clientId: string | n
     let active = true;
     (async () => {
       setLoading(true);
-      const { data } = await (supabase as any)
+      const { data: logs } = await (supabase as any)
         .from("meal_adherence_logs")
-        .select("log_date, adherence, est_kcal, est_protein, est_carbs, est_fats, meals(meal_items(protein, carbs, fats))")
+        .select("log_date, adherence, est_kcal, est_protein, est_carbs, est_fats, meal_id")
         .eq("client_id", clientId)
         .order("log_date");
+      const rows = (logs || []) as any[];
+      const mealIds = Array.from(new Set(rows.map(r => r.meal_id).filter(Boolean)));
+      const planned: Record<string, { p: number; c: number; f: number }> = {};
+      if (mealIds.length) {
+        const { data: items } = await (supabase as any).from("meal_items").select("meal_id, protein, carbs, fats").in("meal_id", mealIds);
+        for (const it of (items || []) as any[]) {
+          const m = planned[it.meal_id] || (planned[it.meal_id] = { p: 0, c: 0, f: 0 });
+          m.p += Number(it.protein || 0); m.c += Number(it.carbs || 0); m.f += Number(it.fats || 0);
+        }
+      }
       if (!active) return;
       const byDate: Record<string, Daily> = {};
-      for (const row of (data || []) as any[]) {
-        const items = (row.meals && row.meals.meal_items) || [];
-        let pp = 0, cc = 0, ff = 0;
-        for (const it of items) { pp += Number(it.protein||0); cc += Number(it.carbs||0); ff += Number(it.fats||0); }
+      for (const row of rows) {
+        const pl = planned[row.meal_id] || { p: 0, c: 0, f: 0 };
         const skip = (row.adherence || "").toLowerCase() === "skip";
-        const kcal = row.est_kcal != null ? Number(row.est_kcal) : (skip ? 0 : 4*pp + 4*cc + 9*ff);
-        const pr = row.est_protein != null ? Number(row.est_protein) : (skip ? 0 : pp);
-        const ca = row.est_carbs != null ? Number(row.est_carbs) : (skip ? 0 : cc);
-        const fa = row.est_fats != null ? Number(row.est_fats) : (skip ? 0 : ff);
+        const kcal = row.est_kcal != null ? Number(row.est_kcal) : (skip ? 0 : 4*pl.p + 4*pl.c + 9*pl.f);
+        const pr = row.est_protein != null ? Number(row.est_protein) : (skip ? 0 : pl.p);
+        const ca = row.est_carbs != null ? Number(row.est_carbs) : (skip ? 0 : pl.c);
+        const fa = row.est_fats != null ? Number(row.est_fats) : (skip ? 0 : pl.f);
         const d = byDate[row.log_date] || (byDate[row.log_date] = { date: row.log_date, calories: 0, protein: 0, carbs: 0, fats: 0 });
         d.calories += kcal; d.protein += pr; d.carbs += ca; d.fats += fa;
       }
