@@ -214,7 +214,7 @@ function MacroLine({ values, color, index, width, height }: { values: number[]; 
   );
 }
 
-function MacrosCard({ data }: { data: DailyMacro[] }) {
+function MacrosCard({ data, onClose }: { data: DailyMacro[]; onClose: () => void }) {
   const W = 320, H = 130;
 
   const avg = (k: keyof DailyMacro) =>
@@ -228,9 +228,9 @@ function MacrosCard({ data }: { data: DailyMacro[] }) {
       background: 'var(--brand-surface)',
       borderRadius: 14,
       padding: 16,
-      border: '1px solid var(--brand-border)',
+      border: '1.5px solid #0F4C81',
       borderTop: '3px solid #0F4C81',
-      marginBottom: 12,
+      marginBottom: 10,
       animationName: 'mcFadeUp',
       animationDuration: '0.4s',
       animationTimingFunction: 'ease',
@@ -241,6 +241,7 @@ function MacrosCard({ data }: { data: DailyMacro[] }) {
         <span style={{ fontSize: 11, color: 'var(--brand-text-secondary)' }}>
           {hasData ? (data.length + ' day' + (data.length === 1 ? '' : 's') + ' logged · daily avg') : 'No nutrition logged this range'}
         </span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--brand-text-secondary)', lineHeight: 1, padding: 4 }}>✕</button>
       </div>
 
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -723,11 +724,11 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
         )}
       </div>
 
-      {/* Calories & Macros — animated multi-series */}
-      <MacrosCard data={macrosInWindow} />
-
       {/* Expanded panel */}
-      {expandedKey && (() => {
+      {expandedKey === 'macros' && (
+        <MacrosCard data={macrosInWindow} onClose={() => setExpandedKey(null)} />
+      )}
+      {expandedKey && expandedKey !== 'macros' && (() => {
         const cfg = METRIC_CONFIGS.find(c => c.key === expandedKey);
         if (!cfg) return null;
         return (
@@ -791,6 +792,36 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
             </div>
           );
         })}
+        {macrosInWindow.length > 0 && (
+          <div
+            onClick={() => setExpandedKey(expandedKey === 'macros' ? null : 'macros')}
+            style={{
+              background: 'var(--brand-surface)',
+              borderRadius: 12,
+              padding: '12px 14px',
+              borderTop: '3px solid #0F4C81',
+              border: expandedKey === 'macros' ? '1.5px solid #0F4C81' : '1px solid var(--brand-border)',
+              borderTopWidth: 3,
+              cursor: 'pointer',
+              transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.15s',
+              animationName: 'mcFadeUp',
+              animationDuration: '0.4s',
+              animationTimingFunction: 'ease',
+              animationFillMode: 'both',
+            }}
+          >
+            <div style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600, marginBottom: 4 }}>
+              Calories
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--brand-text)', lineHeight: 1.1 }}>
+              {Math.round(macrosInWindow.reduce((acc, dm) => acc + dm.kcal, 0) / macrosInWindow.length)}
+              <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--brand-text-secondary)', marginLeft: 2 }}>avg</span>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <Sparkline data={macrosInWindow.map(dm => dm.kcal)} color="#0F4C81" />
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
