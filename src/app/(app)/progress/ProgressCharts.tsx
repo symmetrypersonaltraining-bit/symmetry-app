@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import MacrosProgressChart from "@/components/MacrosProgressChart";
 
 type WeightLog = { metric_date: string; weight: number; body_fat_pct: number | null; lean_mass: number | null; fat_mass: number | null };
 type PR = { exercise_name: string; weight: number; reps: number | null; date: string };
@@ -172,6 +173,8 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
           </button>
         ))}
       </div>
+
+      <MacrosProgressChart clientId={clientId} />
 
       {/* Weight chart */}
       <div className="card">
