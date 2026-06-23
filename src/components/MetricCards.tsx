@@ -214,7 +214,7 @@ function MacroLine({ values, color, index, width, height }: { values: number[]; 
   );
 }
 
-function MacrosCard({ data, onClose }: { data: DailyMacro[]; onClose: () => void }) {
+function MacrosCard({ data, onClose, targets }: { data: DailyMacro[]; onClose: () => void; targets: { kcal: number; protein: number; carbs: number; fats: number } | null }) {
   const W = 320, H = 130;
 
   const avg = (k: keyof DailyMacro) =>
@@ -250,7 +250,10 @@ function MacrosCard({ data, onClose }: { data: DailyMacro[]; onClose: () => void
             <span style={{ width: 10, height: 10, borderRadius: 3, background: ser.color, display: 'inline-block' }} />
             <span style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600 }}>{ser.label}</span>
             <span style={{ fontSize: 13, color: 'var(--brand-text)', fontWeight: 800 }}>
-              {Math.round(avg(ser.key as keyof DailyMacro))}{ser.unit}
+              {Math.round(avg(ser.key as keyof DailyMacro))}
+              {targets && targets[ser.key as 'kcal' | 'protein' | 'carbs' | 'fats'] > 0
+                ? <span style={{ fontWeight: 600, color: 'var(--brand-text-secondary)' }}>{' / ' + Math.round(targets[ser.key as 'kcal' | 'protein' | 'carbs' | 'fats']) + ser.unit}</span>
+                : ser.unit}
             </span>
           </div>
         ))}
@@ -508,6 +511,7 @@ function ExpandedPanel({
 export default function MetricCards({ clientId }: MetricCardsProps) {
   const [allMetrics, setAllMetrics] = useState<MetricRow[]>([]);
   const [dailyMacros, setDailyMacros] = useState<DailyMacro[]>([]);
+  const [targets, setTargets] = useState<{ kcal: number; protein: number; carbs: number; fats: number } | null>(null);
   const [workoutCount, setWorkoutCount] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -639,6 +643,16 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
     });
     setDailyMacros(daily);
 
+    const { data: tgt } = await supabase
+      .from('macro_targets')
+      .select('calories, protein, carbs, fats, effective_date')
+      .eq('client_id', clientId)
+      .lte('effective_date', centralToday())
+      .order('effective_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setTargets(tgt ? { kcal: Number(tgt.calories) || 0, protein: Number(tgt.protein) || 0, carbs: Number(tgt.carbs) || 0, fats: Number(tgt.fats) || 0 } : null);
+
     setLoading(false);
   }, [clientId]);
 
@@ -726,7 +740,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
 
       {/* Expanded panel */}
       {expandedKey === 'macros' && (
-        <MacrosCard data={macrosInWindow} onClose={() => setExpandedKey(null)} />
+        <MacrosCard data={macrosInWindow} onClose={() => setExpandedKey(null)} targets={targets} />
       )}
       {expandedKey && expandedKey !== 'macros' && (() => {
         const cfg = METRIC_CONFIGS.find(c => c.key === expandedKey);
@@ -744,6 +758,36 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
 
       {/* Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+        {macrosInWindow.length > 0 && (
+          <div
+            onClick={() => setExpandedKey(expandedKey === 'macros' ? null : 'macros')}
+            style={{
+              background: 'var(--brand-surface)',
+              borderRadius: 12,
+              padding: '12px 14px',
+              borderTop: '3px solid #0F4C81',
+              border: expandedKey === 'macros' ? '1.5px solid #0F4C81' : '1px solid var(--brand-border)',
+              borderTopWidth: 3,
+              cursor: 'pointer',
+              transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.15s',
+              animationName: 'mcFadeUp',
+              animationDuration: '0.4s',
+              animationTimingFunction: 'ease',
+              animationFillMode: 'both',
+            }}
+          >
+            <div style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600, marginBottom: 4 }}>
+              Calories
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--brand-text)', lineHeight: 1.1 }}>
+              {Math.round(macrosInWindow.reduce((acc, dm) => acc + dm.kcal, 0) / macrosInWindow.length)}
+              <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--brand-text-secondary)', marginLeft: 2 }}>avg</span>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <Sparkline data={macrosInWindow.map(dm => dm.kcal)} color="#0F4C81" />
+            </div>
+          </div>
+        )}
         {METRIC_CONFIGS.map((cfg, idx) => {
           const { current, change, changeNum } = getSummary(cfg.key);
           const sparkData = getDataPoints(cfg.key).map(d => d.value);
@@ -792,36 +836,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
             </div>
           );
         })}
-        {macrosInWindow.length > 0 && (
-          <div
-            onClick={() => setExpandedKey(expandedKey === 'macros' ? null : 'macros')}
-            style={{
-              background: 'var(--brand-surface)',
-              borderRadius: 12,
-              padding: '12px 14px',
-              borderTop: '3px solid #0F4C81',
-              border: expandedKey === 'macros' ? '1.5px solid #0F4C81' : '1px solid var(--brand-border)',
-              borderTopWidth: 3,
-              cursor: 'pointer',
-              transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.15s',
-              animationName: 'mcFadeUp',
-              animationDuration: '0.4s',
-              animationTimingFunction: 'ease',
-              animationFillMode: 'both',
-            }}
-          >
-            <div style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600, marginBottom: 4 }}>
-              Calories
-            </div>
-            <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--brand-text)', lineHeight: 1.1 }}>
-              {Math.round(macrosInWindow.reduce((acc, dm) => acc + dm.kcal, 0) / macrosInWindow.length)}
-              <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--brand-text-secondary)', marginLeft: 2 }}>avg</span>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <Sparkline data={macrosInWindow.map(dm => dm.kcal)} color="#0F4C81" />
-            </div>
-          </div>
-        )}
+
       </div>
     </>
   );

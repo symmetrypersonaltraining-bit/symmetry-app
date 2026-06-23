@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-interface DayMacros { cal: number; calGoal: number; p: number; c: number; f: number; }
+interface DayMacros { cal: number; calGoal: number; p: number; c: number; f: number; pGoal: number; cGoal: number; fGoal: number; }
 
 function fraction(a: string | null): number {
   switch (String(a || "").toLowerCase()) {
@@ -29,16 +29,19 @@ export default function DailyMacrosRing() {
       try {
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { setD({ cal: 0, calGoal: 2000, p: 0, c: 0, f: 0 }); return; }
+        if (!user) { setD({ cal: 0, calGoal: 2000, p: 0, c: 0, f: 0, pGoal: 0, cGoal: 0, fGoal: 0 }); return; }
         const { data: client } = await supabase.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
         const clientId = client?.id;
-        if (!clientId) { setD({ cal: 0, calGoal: 2000, p: 0, c: 0, f: 0 }); return; }
+        if (!clientId) { setD({ cal: 0, calGoal: 2000, p: 0, c: 0, f: 0, pGoal: 0, cGoal: 0, fGoal: 0 }); return; }
         const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
         const [{ data: target }, { data: logs }] = await Promise.all([
           supabase.from("macro_targets").select("calories, protein, carbs, fats, effective_date").eq("client_id", clientId).lte("effective_date", today).order("effective_date", { ascending: false }).limit(1).maybeSingle(),
           supabase.from("meal_adherence_logs").select("adherence, meal_id, est_kcal, est_protein, est_carbs, est_fats, trainer_macro_override").eq("client_id", clientId).eq("log_date", today),
         ]);
         const calGoal = Number(target?.calories ?? 2000);
+        const pGoal = Number(target?.protein ?? 0);
+        const cGoal = Number(target?.carbs ?? 0);
+        const fGoal = Number(target?.fats ?? 0);
         const rows = (logs as any[]) || [];
         const ids = [...new Set(rows.map(l => l.meal_id).filter(Boolean))] as string[];
         const planned: Record<string, { p: number; c: number; f: number }> = {};
@@ -64,9 +67,9 @@ export default function DailyMacrosRing() {
           if (fr > 0 && pl) { p += pl.p * fr; c += pl.c * fr; f += pl.f * fr; }
         }
         const cal = Math.round(4 * p + 4 * c + 9 * f);
-        setD({ cal, calGoal, p: Math.round(p), c: Math.round(c), f: Math.round(f) });
+        setD({ cal, calGoal, pGoal, cGoal, fGoal, p: Math.round(p), c: Math.round(c), f: Math.round(f) });
       } catch {
-        setD({ cal: 0, calGoal: 2000, p: 0, c: 0, f: 0 });
+        setD({ cal: 0, calGoal: 2000, p: 0, c: 0, f: 0, pGoal: 0, cGoal: 0, fGoal: 0 });
       }
     })();
   }, []);
@@ -77,7 +80,7 @@ export default function DailyMacrosRing() {
   const offset = mounted ? CIRC * (1 - pct) : CIRC;
 
   return (
-    <Link href="/nutrition">
+    <Link href="/nutrition" className="block h-full">
       <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer h-full"
         style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
         <div className="relative flex-shrink-0" style={{ width: 60, height: 60 }}>
@@ -95,10 +98,10 @@ export default function DailyMacrosRing() {
         <div className="min-w-0">
           <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Macros</p>
           <p className="text-xs mb-1" style={{ color: "var(--brand-text-secondary)" }}>{d ? ("of " + d.calGoal) : "Today"}</p>
-          <div className="flex gap-2" style={{ fontSize: "10px", fontWeight: 600 }}>
-            <span style={{ color: "#22c55e" }}>P {d ? d.p : 0}</span>
-            <span style={{ color: "#f59e0b" }}>C {d ? d.c : 0}</span>
-            <span style={{ color: "#ef4444" }}>F {d ? d.f : 0}</span>
+          <div className="flex gap-2 flex-wrap" style={{ fontSize: "10px", fontWeight: 600 }}>
+            <span style={{ color: "#22c55e" }}>P {d ? d.p : 0}/{d ? d.pGoal : 0}</span>
+            <span style={{ color: "#f59e0b" }}>C {d ? d.c : 0}/{d ? d.cGoal : 0}</span>
+            <span style={{ color: "#ef4444" }}>F {d ? d.f : 0}/{d ? d.fGoal : 0}</span>
           </div>
         </div>
       </div>
