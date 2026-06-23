@@ -771,23 +771,24 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
             <div style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600, marginBottom: 4 }}>
               Calories
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', gap: 4, marginTop: 6 }}>
+            <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 5 }}>
               {([
-                { k: 'kcal', label: 'Cal', color: '#0EA5E9' },
-                { k: 'protein', label: 'P', color: '#22c55e' },
-                { k: 'carbs', label: 'C', color: '#f59e0b' },
-                { k: 'fats', label: 'F', color: '#e84e4e' },
+                { k: 'kcal', label: 'Cal', color: '#0EA5E9', unit: '' },
+                { k: 'protein', label: 'P', color: '#22c55e', unit: 'g' },
+                { k: 'carbs', label: 'C', color: '#f59e0b', unit: 'g' },
+                { k: 'fats', label: 'F', color: '#e84e4e', unit: 'g' },
               ] as const).map(b => {
                 const avgv = macrosInWindow.length ? macrosInWindow.reduce((s, dm) => s + (dm[b.k] as number), 0) / macrosInWindow.length : 0;
                 const tgt = targets ? (targets[b.k as 'kcal' | 'protein' | 'carbs' | 'fats'] || 0) : 0;
-                const pct = tgt > 0 ? Math.min(1, avgv / tgt) : 0;
+                const pct = tgt > 0 ? avgv / tgt : 0;
                 return (
-                  <div key={b.k} style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ height: 40, display: 'flex', alignItems: 'flex-end' }}>
-                      <div style={{ width: '100%', height: Math.max(3, Math.round(pct * 40)), background: b.color, borderRadius: 3, transition: 'height 0.5s ease' }} />
+                  <div key={b.k} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 22, fontSize: 9, fontWeight: 700, color: b.color }}>{b.label}</span>
+                    <div style={{ flex: 1, height: 14, borderRadius: 7, background: 'var(--brand-bg)', position: 'relative', overflow: 'hidden' }}>
+                      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: Math.min(100, Math.round(pct * 100)) + '%', background: b.color, borderRadius: 7, transition: 'width 0.6s ease' }} />
+                      <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: 'var(--brand-text)' }}>{tgt > 0 ? Math.round(pct * 100) + '%' : '—'}</span>
                     </div>
-                    <div style={{ fontSize: 9, color: 'var(--brand-text-secondary)', marginTop: 3 }}>{b.label}</div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--brand-text)' }}>{Math.round(avgv)}</div>
+                    <span style={{ fontSize: 8, fontWeight: 600, color: 'var(--brand-text-secondary)', minWidth: 42, textAlign: 'right' }}>{Math.round(avgv)}/{Math.round(tgt)}{b.unit}</span>
                   </div>
                 );
               })}
