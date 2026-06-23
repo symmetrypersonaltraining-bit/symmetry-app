@@ -259,6 +259,24 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
         </div>
       </div>
 
+      {/* Trainer: open this client's nutrition plan + logging stats */}
+      <Link
+        href={"/nutrition?clientId=" + clientId}
+        className="flex items-center justify-between rounded-xl p-4"
+        style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#22c55e20" }}>
+            <i className="ti ti-salad text-base" style={{ color: "#22c55e" }} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Nutrition Plan &amp; Logs</p>
+            <p className="text-[10px]" style={{ color: "var(--brand-text-secondary)" }}>Meal plan, macros &amp; adherence</p>
+          </div>
+        </div>
+        <i className="ti ti-chevron-right text-sm" style={{ color: "var(--brand-text-secondary)" }} />
+      </Link>
+
       {client.injuries_limitations && (
         <div className="rounded-xl p-4"
           style={{ background: "#fef3c720", border: "1px solid #f59e0b40" }}>
