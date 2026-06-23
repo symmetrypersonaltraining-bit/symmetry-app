@@ -771,12 +771,26 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
             <div style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600, marginBottom: 4 }}>
               Calories
             </div>
-            <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--brand-text)', lineHeight: 1.1 }}>
-              {Math.round(macrosInWindow.reduce((acc, dm) => acc + dm.kcal, 0) / macrosInWindow.length)}
-              <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--brand-text-secondary)', marginLeft: 2 }}>avg</span>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <Sparkline data={macrosInWindow.map(dm => dm.kcal)} color="#0EA5E9" />
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', gap: 4, marginTop: 6 }}>
+              {([
+                { k: 'kcal', label: 'Cal', color: '#0EA5E9' },
+                { k: 'protein', label: 'P', color: '#22c55e' },
+                { k: 'carbs', label: 'C', color: '#f59e0b' },
+                { k: 'fats', label: 'F', color: '#e84e4e' },
+              ] as const).map(b => {
+                const avgv = macrosInWindow.length ? macrosInWindow.reduce((s, dm) => s + (dm[b.k] as number), 0) / macrosInWindow.length : 0;
+                const tgt = targets ? (targets[b.k as 'kcal' | 'protein' | 'carbs' | 'fats'] || 0) : 0;
+                const pct = tgt > 0 ? Math.min(1, avgv / tgt) : 0;
+                return (
+                  <div key={b.k} style={{ flex: 1, textAlign: 'center' }}>
+                    <div style={{ height: 40, display: 'flex', alignItems: 'flex-end' }}>
+                      <div style={{ width: '100%', height: Math.max(3, Math.round(pct * 40)), background: b.color, borderRadius: 3, transition: 'height 0.5s ease' }} />
+                    </div>
+                    <div style={{ fontSize: 9, color: 'var(--brand-text-secondary)', marginTop: 3 }}>{b.label}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--brand-text)' }}>{Math.round(avgv)}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
