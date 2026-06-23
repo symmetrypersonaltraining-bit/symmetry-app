@@ -114,30 +114,18 @@ export default async function WorkoutPage() {
 
             {/* All phases / days */}
             {allPhases.map((phase) => (
-              <div key={phase.id}>
-                <p className="label mt-4">{phase.label}</p>
-                <div className="card card-hover animate-slide-up" style={{ padding: "0.5rem 1rem" }}>
+              <div key={phase.id} style={{ marginTop: "1.25rem" }}>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>{phase.label}</p>
+                <div className="space-y-2">
                   {phase.days.map((day) => (
-                    <Link
-                      key={day.id}
-                      href={`/workout/${day.id}`}
-                      className="flex items-center gap-3 py-3 border-b last:border-b-0 -mx-4 px-4"
-                      style={{ borderColor: "var(--brand-border)" }}
-                    >
-                      <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ background: "var(--brand-card)" }}
-                      >
-                        <i
-                          className="ti ti-calendar text-sm"
-                          style={{ color: "var(--brand-primary)" }}
-                        />
+                    <Link key={day.id} href={"/workout/" + day.id}
+                      className="flex items-center gap-3 rounded-2xl p-3.5"
+                      style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
+                        <i className="ti ti-barbell text-base" style={{ color: "white" }} />
                       </div>
-                      <span className="text-sm flex-1">{day.label}</span>
-                      <i
-                        className="ti ti-chevron-right"
-                        style={{ color: "var(--brand-border)" }}
-                      />
+                      <span className="text-sm font-medium flex-1" style={{ color: "var(--brand-text)" }}>{day.label}</span>
+                      <i className="ti ti-chevron-right text-sm" style={{ color: "var(--brand-text-secondary)" }} />
                     </Link>
                   ))}
                 </div>
