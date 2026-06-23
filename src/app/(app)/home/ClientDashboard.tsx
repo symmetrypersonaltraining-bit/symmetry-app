@@ -276,9 +276,12 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
             <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>{firstName} {'\uD83D\uDC4B'}</h1>
           </div>
           {streakDays > 0 && (
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${isMilestone ? "animate-pulse" : ""}`} style={{ background: isMilestone ? "#f59e0b20" : "var(--brand-surface)", border: `1px solid ${isMilestone ? "#f59e0b" : "var(--brand-border)"}` }}>
-              <span className="text-base">{isMilestone ? "\u00f0\u009f\u008e\u0089" : "\u00f0\u009f\u0094\u00a5"}</span>
-              <div><span className="text-sm font-bold" style={{ color: isMilestone ? "#f59e0b" : "var(--brand-text)" }}>{streakDays}</span><span className="text-xs ml-0.5" style={{ color: "var(--brand-text-secondary)" }}>day{streakDays !== 1 ? "s" : ""}</span></div>
+            <div className="flex items-center px-3 py-1.5 rounded-full"
+              style={{ background: "var(--brand-surface)", border: isMilestone ? "1px solid var(--brand-primary)" : "1px solid var(--brand-border)" }}>
+              <div style={{ lineHeight: 1.15 }}>
+                <span className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>{streakDays} day{streakDays !== 1 ? "s" : ""}</span>
+                <div className="text-[10px] font-medium" style={{ color: isMilestone ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>still proving</div>
+              </div>
             </div>
           )}
         </div>
