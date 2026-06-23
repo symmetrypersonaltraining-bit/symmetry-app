@@ -746,20 +746,20 @@ export default function WorkoutLogger({
 
         {/* Sets */}
         <div className="flex-1 overflow-y-auto px-5">
-          <div className="flex gap-2 mb-3">
+          <div className="flex gap-2 mb-2">
             <div className="w-8" />
             <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>WEIGHT (lb)</div>
             <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>REPS</div>
             <div className="w-12" />
           </div>
           {peSets.map((setEntry, si) => (
-            <div key={si} className="flex items-center gap-3 mb-3">
+            <div key={si} className="flex items-center gap-2 mb-2">
               <div className="w-8 text-center text-sm font-bold"
                 style={{ color: setEntry.done ? "#22c55e" : "rgba(255,255,255,0.25)" }}>S{si + 1}</div>
               <input type="number" value={setEntry.weight}
                 onChange={e => updateSet(currentExercise.id, si, "weight", e.target.value)}
                 disabled={setEntry.done} placeholder="0"
-                className="flex-1 text-center text-2xl font-bold py-3 rounded-xl outline-none"
+                className="flex-1 text-center text-xl font-bold py-2 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
@@ -768,7 +768,7 @@ export default function WorkoutLogger({
               <input type="number" value={setEntry.reps}
                 onChange={e => updateSet(currentExercise.id, si, "reps", e.target.value)}
                 disabled={setEntry.done} placeholder="0"
-                className="flex-1 text-center text-2xl font-bold py-3 rounded-xl outline-none"
+                className="flex-1 text-center text-xl font-bold py-2 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
@@ -776,7 +776,7 @@ export default function WorkoutLogger({
                 }} inputMode="numeric" />
               <button onClick={() => { if (!setEntry.done) logSet(currentExercise.id, si); }}
                 disabled={setEntry.done || saving}
-                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}>
                 <i className={`ti ${setEntry.done ? "ti-check" : "ti-player-play"} text-xl text-white`} />
               </button>
