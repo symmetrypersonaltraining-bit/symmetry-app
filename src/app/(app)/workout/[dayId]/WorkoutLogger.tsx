@@ -10,6 +10,7 @@ interface Exercise {
   modality?: string | null;
   muscle_group: string | null;
   equipment_required?: string[] | null;
+  video_url?: string | null;
 }
 
 interface PrescribedExercise {
