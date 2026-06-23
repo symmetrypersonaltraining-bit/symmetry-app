@@ -25,6 +25,14 @@ interface DataPoint {
   value: number;
 }
 
+interface DailyMacro {
+  date: string;
+  kcal: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+}
+
 interface MetricConfig {
   key: string;
   label: string;
@@ -43,12 +51,31 @@ const METRIC_CONFIGS: MetricConfig[] = [
   { key: 'streak',       label: 'Streak',    unit: 'days',color: '#f59e0b', lowerIsBetter: false, canLog: false },
 ];
 
+const MACRO_SERIES = [
+  { key: 'kcal',    label: 'Calories', unit: '',  color: '#0F4C81' },
+  { key: 'protein', label: 'Protein',  unit: 'g', color: '#22c55e' },
+  { key: 'carbs',   label: 'Carbs',    unit: 'g', color: '#f59e0b' },
+  { key: 'fats',    label: 'Fat',      unit: 'g', color: '#e84e4e' },
+] as const;
+
 const RANGES = [
   { label: '1w',  days: 7  },
   { label: '2w',  days: 14 },
   { label: '4w',  days: 28 },
   { label: '8w',  days: 56 },
 ];
+
+// ─── Date helpers (America/Chicago) ───────────────────────────────────────────
+
+function centralToday(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+}
+
+function isoDaysAgo(base: string, n: number): string {
+  const d = new Date(base + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString().split('T')[0];
+}
 
 // ─── Animated SVG Sparkline ───────────────────────────────────────────────────
 
@@ -137,6 +164,121 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 
 // ─── Expanded Panel with Chart.js ─────────────────────────────────────────────
 
+function MacroLine({ values, color, index, width, height }: { values: number[]; color: string; index: number; width: number; height: number }) {
+  const pathRef = useRef<SVGPathElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 60);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (!pathRef.current || !mounted || values.length < 2) return;
+    const len = pathRef.current.getTotalLength();
+    pathRef.current.style.strokeDasharray = String(len);
+    pathRef.current.style.strokeDashoffset = String(len);
+    requestAnimationFrame(() => {
+      if (pathRef.current) {
+        pathRef.current.style.transition = 'stroke-dashoffset 1s ease ' + (index * 0.12) + 's';
+        pathRef.current.style.strokeDashoffset = '0';
+      }
+    });
+  }, [mounted, values.length, index]);
+
+  if (values.length < 2) return null;
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const PAD = 6;
+  const pts = values.map((v, i) => ({
+    x: PAD + (i / (values.length - 1)) * (width - PAD * 2),
+    y: height - PAD - ((v - min) / range) * (height - PAD * 2),
+  }));
+
+  let d = 'M ' + pts[0].x.toFixed(1) + ' ' + pts[0].y.toFixed(1);
+  for (let i = 1; i < pts.length; i++) {
+    const prev = pts[i - 1];
+    const curr = pts[i];
+    const cpx = (prev.x + curr.x) / 2;
+    d += ' Q ' + cpx.toFixed(1) + ' ' + prev.y.toFixed(1) + ' ' + cpx.toFixed(1) + ' ' + ((prev.y + curr.y) / 2).toFixed(1);
+    d += ' Q ' + cpx.toFixed(1) + ' ' + curr.y.toFixed(1) + ' ' + curr.x.toFixed(1) + ' ' + curr.y.toFixed(1);
+  }
+
+  return (
+    <>
+      <path ref={pathRef} d={d} fill="none" stroke={color} strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r="3" fill={color} />
+    </>
+  );
+}
+
+function MacrosCard({ data }: { data: DailyMacro[] }) {
+  const W = 320, H = 130;
+
+  const avg = (k: keyof DailyMacro) =>
+    data.length ? data.reduce((acc, d) => acc + (d[k] as number), 0) / data.length : 0;
+
+  const hasData = data.length >= 1;
+  const enoughForLine = data.length >= 2;
+
+  return (
+    <div style={{
+      background: 'var(--brand-surface)',
+      borderRadius: 14,
+      padding: 16,
+      border: '1px solid var(--brand-border)',
+      borderTop: '3px solid #0F4C81',
+      marginBottom: 12,
+      animationName: 'mcFadeUp',
+      animationDuration: '0.4s',
+      animationTimingFunction: 'ease',
+      animationFillMode: 'both',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+        <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--brand-text)' }}>Calories &amp; Macros</span>
+        <span style={{ fontSize: 11, color: 'var(--brand-text-secondary)' }}>
+          {hasData ? (data.length + ' day' + (data.length === 1 ? '' : 's') + ' logged · daily avg') : 'No nutrition logged this range'}
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 12 }}>
+        {MACRO_SERIES.map(ser => (
+          <div key={ser.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: ser.color, display: 'inline-block' }} />
+            <span style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600 }}>{ser.label}</span>
+            <span style={{ fontSize: 13, color: 'var(--brand-text)', fontWeight: 800 }}>
+              {Math.round(avg(ser.key as keyof DailyMacro))}{ser.unit}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ position: 'relative' }}>
+        {enoughForLine ? (
+          <svg width="100%" viewBox={'0 0 ' + W + ' ' + H} preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }}>
+            {MACRO_SERIES.map((ser, i) => (
+              <MacroLine
+                key={ser.key}
+                values={data.map(d => d[ser.key as keyof DailyMacro] as number)}
+                color={ser.color}
+                index={i}
+                width={W}
+                height={H}
+              />
+            ))}
+          </svg>
+        ) : (
+          <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-text-secondary)', fontSize: 13 }}>
+            {hasData ? 'Need 2+ logged days to chart a trend' : 'Log nutrition to see your trend here'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ExpandedPanel({
   cfg,
   allData,
@@ -155,15 +297,13 @@ function ExpandedPanel({
   const [rangeIdx, setRangeIdx] = useState(2);
   const [showLog, setShowLog] = useState(false);
   const [logValue, setLogValue] = useState('');
-  const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
+  const [logDate, setLogDate] = useState(centralToday());
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const supabase = createClient();
 
   const filteredData = (() => {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - RANGES[rangeIdx].days);
-    const cutoffStr = cutoff.toISOString().split('T')[0];
+    const cutoffStr = isoDaysAgo(centralToday(), RANGES[rangeIdx].days);
     return allData.filter(d => d.date >= cutoffStr);
   })();
 
@@ -366,6 +506,7 @@ function ExpandedPanel({
 
 export default function MetricCards({ clientId }: MetricCardsProps) {
   const [allMetrics, setAllMetrics] = useState<MetricRow[]>([]);
+  const [dailyMacros, setDailyMacros] = useState<DailyMacro[]>([]);
   const [workoutCount, setWorkoutCount] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -373,28 +514,45 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
   const [refreshKey, setRefreshKey] = useState(0);
   const supabase = createClient();
 
+  const [rangeMode, setRangeMode] = useState(3);
+  const [customStart, setCustomStart] = useState(isoDaysAgo(centralToday(), 28));
+  const [customEnd, setCustomEnd] = useState(centralToday());
+
+  const today = centralToday();
+  const startDate = rangeMode < 4 ? isoDaysAgo(today, RANGES[rangeMode].days) : customStart;
+  const endDate = rangeMode < 4 ? today : customEnd;
+  const inWindow = (dateStr: string) => dateStr >= startDate && dateStr <= endDate;
+
   const load = useCallback(async () => {
     if (!clientId) return;
     setLoading(true);
 
-    const since = new Date();
-    since.setDate(since.getDate() - 56);
-    const sinceStr = since.toISOString().split('T')[0];
+    const wideSince = isoDaysAgo(centralToday(), 180);
 
-    const [{ data: mData }, { count: wCount }, { data: wDates }] = await Promise.all([
+    const [
+      { data: mData },
+      { count: wCount },
+      { data: wDates },
+      { data: logData },
+    ] = await Promise.all([
       supabase.from('metrics')
         .select('id, client_id, metric_date, weight, body_fat_pct, lean_mass, fat_mass')
         .eq('client_id', clientId)
-        .gte('metric_date', sinceStr)
+        .gte('metric_date', wideSince)
         .order('metric_date', { ascending: true }),
       supabase.from('workout_logs')
         .select('id', { count: 'exact', head: true })
         .eq('client_id', clientId)
-        .gte('logged_at', sinceStr + 'T00:00:00'),
+        .gte('logged_at', wideSince + 'T00:00:00'),
       supabase.from('workout_logs')
         .select('logged_at')
         .eq('client_id', clientId)
         .order('logged_at', { ascending: false }),
+      supabase.from('meal_adherence_logs')
+        .select('log_date, adherence, meal_id, est_kcal, est_protein, est_carbs, est_fats, trainer_macro_override')
+        .eq('client_id', clientId)
+        .gte('log_date', wideSince)
+        .order('log_date', { ascending: true }),
     ]);
 
     setAllMetrics(mData || []);
@@ -406,13 +564,65 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
       ].sort().reverse() as string[];
       let streak = 0;
       for (let i = 0; i < uniqueDates.length; i++) {
-        const expected = new Date();
-        expected.setDate(expected.getDate() - i);
-        if (uniqueDates[i] === expected.toISOString().split('T')[0]) streak++;
+        const expected = isoDaysAgo(centralToday(), i);
+        if (uniqueDates[i] === expected) streak++;
         else break;
       }
       setStreakDays(streak);
+    } else {
+      setStreakDays(0);
     }
+
+    const logs = (logData as any[]) || [];
+    const mealIds = [...new Set(logs.map(l => l.meal_id).filter(Boolean))] as string[];
+
+    const plannedByMeal: Record<string, { kcal: number; protein: number; carbs: number; fats: number }> = {};
+    if (mealIds.length > 0) {
+      const { data: items } = await supabase
+        .from('meal_items')
+        .select('meal_id, protein, carbs, fats')
+        .in('meal_id', mealIds);
+      for (const it of (items as any[]) || []) {
+        const p = Number(it.protein) || 0, c = Number(it.carbs) || 0, f = Number(it.fats) || 0;
+        const cur = plannedByMeal[it.meal_id] || { kcal: 0, protein: 0, carbs: 0, fats: 0 };
+        cur.protein += p; cur.carbs += c; cur.fats += f; cur.kcal += 4 * p + 4 * c + 9 * f;
+        plannedByMeal[it.meal_id] = cur;
+      }
+    }
+
+    const macroForLog = (l: any) => {
+      const ov = l.trainer_macro_override;
+      if (ov && (ov.protein != null || ov.carbs != null || ov.fats != null || ov.kcal != null)) {
+        const p = Number(ov.protein) || 0, c = Number(ov.carbs) || 0, f = Number(ov.fats) || 0;
+        return { kcal: ov.kcal != null ? Number(ov.kcal) : 4 * p + 4 * c + 9 * f, protein: p, carbs: c, fats: f };
+      }
+      const hasEst = l.est_protein != null || l.est_carbs != null || l.est_fats != null || l.est_kcal != null;
+      if (hasEst) {
+        const p = Number(l.est_protein) || 0, c = Number(l.est_carbs) || 0, f = Number(l.est_fats) || 0;
+        return { kcal: l.est_kcal != null ? Number(l.est_kcal) : 4 * p + 4 * c + 9 * f, protein: p, carbs: c, fats: f };
+      }
+      if (String(l.adherence || '').toLowerCase() === 'skip') return { kcal: 0, protein: 0, carbs: 0, fats: 0 };
+      if (l.meal_id && plannedByMeal[l.meal_id]) return plannedByMeal[l.meal_id];
+      return { kcal: 0, protein: 0, carbs: 0, fats: 0 };
+    };
+
+    const byDate: Record<string, DailyMacro> = {};
+    for (const l of logs) {
+      const dt = l.log_date;
+      if (!dt) continue;
+      const m = macroForLog(l);
+      const cur = byDate[dt] || { date: dt, kcal: 0, protein: 0, carbs: 0, fats: 0 };
+      cur.kcal += m.kcal; cur.protein += m.protein; cur.carbs += m.carbs; cur.fats += m.fats;
+      byDate[dt] = cur;
+    }
+    const daily = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+    daily.forEach(dd => {
+      dd.kcal = Math.round(dd.kcal);
+      dd.protein = Math.round(dd.protein);
+      dd.carbs = Math.round(dd.carbs);
+      dd.fats = Math.round(dd.fats);
+    });
+    setDailyMacros(daily);
 
     setLoading(false);
   }, [clientId]);
@@ -422,7 +632,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
   const getDataPoints = (key: string): DataPoint[] => {
     if (key === 'workouts' || key === 'streak') return [];
     return allMetrics
-      .filter(m => m[key as keyof MetricRow] != null)
+      .filter(m => m[key as keyof MetricRow] != null && inWindow(m.metric_date))
       .map(m => ({ date: m.metric_date, value: Number(m[key as keyof MetricRow]) }));
   };
 
@@ -447,6 +657,8 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
     );
   }
 
+  const macrosInWindow = dailyMacros.filter(d => inWindow(d.date));
+
   return (
     <>
       <style>{`
@@ -455,6 +667,50 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
           to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+
+      {/* Global range control — drives every chart at once */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {RANGES.map((r, i) => (
+            <button key={r.label} onClick={() => setRangeMode(i)} style={{
+              padding: '6px 14px', borderRadius: 9, border: 'none', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              background: rangeMode === i ? '#0F4C81' : 'var(--brand-bg)',
+              color: rangeMode === i ? 'white' : 'var(--brand-text-secondary)',
+              transition: 'all 0.15s',
+            }}>
+              {r.label}
+            </button>
+          ))}
+          <button onClick={() => setRangeMode(4)} style={{
+            padding: '6px 14px', borderRadius: 9, border: 'none', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+            background: rangeMode === 4 ? '#0F4C81' : 'var(--brand-bg)',
+            color: rangeMode === 4 ? 'white' : 'var(--brand-text-secondary)',
+            transition: 'all 0.15s',
+          }}>
+            Custom
+          </button>
+        </div>
+
+        {rangeMode === 4 && (
+          <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600, display: 'block', marginBottom: 4 }}>From</label>
+              <input type="date" value={customStart} max={customEnd} onChange={e => setCustomStart(e.target.value)}
+                style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--brand-border)', background: 'var(--brand-surface)', color: 'var(--brand-text)', fontSize: 13 }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--brand-text-secondary)', fontWeight: 600, display: 'block', marginBottom: 4 }}>To</label>
+              <input type="date" value={customEnd} min={customStart} max={today} onChange={e => setCustomEnd(e.target.value)}
+                style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--brand-border)', background: 'var(--brand-surface)', color: 'var(--brand-text)', fontSize: 13 }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Calories & Macros — animated multi-series */}
+      <MacrosCard data={macrosInWindow} />
 
       {/* Expanded panel */}
       {expandedKey && (() => {
