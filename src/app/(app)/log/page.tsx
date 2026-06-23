@@ -32,7 +32,7 @@ export default async function LogPage() {
     <div className="p-6 text-center" style={{ color: "var(--brand-text-secondary)" }}>No client record found.</div>
   );
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
   const { data: recentMetrics } = await supabase
     .from("metrics")

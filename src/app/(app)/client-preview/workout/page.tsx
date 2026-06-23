@@ -24,7 +24,7 @@ export default async function ClientPreviewWorkoutPage() {
     );
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
   // Try today's workout first, then most recent scheduled
   const { data: todayWorkout } = await supabase

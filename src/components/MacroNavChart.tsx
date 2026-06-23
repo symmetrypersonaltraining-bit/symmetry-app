@@ -18,7 +18,7 @@ export default function MacroNavChart({ active = false }: { active?: boolean }) 
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const today = new Date().toISOString().split("T")[0];
+        const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
         const { data: target } = await supabase
           .from("macro_targets")
           .select("calories, protein, carbs, fats")

@@ -511,7 +511,7 @@ export default function WorkoutLogger({
 
   async function ensureWorkoutLog(): Promise<string> {
     if (workoutLogId) return workoutLogId;
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
     const { data, error } = await supabase.from("workout_logs").insert({
       client_id: clientId, day_id: day.id, log_date: today,
       started_at: new Date().toISOString(), completed: false,

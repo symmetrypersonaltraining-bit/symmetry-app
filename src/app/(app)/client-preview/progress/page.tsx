@@ -75,7 +75,7 @@ export default function ClientPreviewProgressPage() {
 
 function LogModal({ clientId, onClose }: { clientId: string; onClose: () => void }) {
   const supabase = createClient();
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const [weight, setWeight] = useState("");
   const [bodyFat, setBodyFat] = useState("");
   const [date, setDate] = useState(today);
