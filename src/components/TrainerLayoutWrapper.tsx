@@ -6,7 +6,6 @@ import Link from "next/link";
 import TrainerSidebar from "./TrainerSidebar";
 import AIAssistant from "./AIAssistant";
 import Logo from "./Logo";
-import MacroNavChart from "./MacroNavChart";
 
 interface Props {
   children: React.ReactNode;
@@ -71,11 +70,6 @@ export default function TrainerLayoutWrapper({ children }: Props) {
               </Link>
             );
           })}
-          {/* Daily macro chart — replaces Log */}
-          <Link href="/client-preview/nutrition"
-            className="flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors">
-            <MacroNavChart active={pathname.startsWith("/client-preview/nutrition")} />
-          </Link>
           {/* Progress */}
           <Link href="/client-preview/progress"
             className="flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors"
