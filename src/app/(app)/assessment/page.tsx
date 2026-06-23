@@ -340,10 +340,10 @@ export default function AssessmentPage() {
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="First Name">
-              <VoiceInput field="first_name" placeholder="Jane" />
+              {VoiceInput({ field: "first_name", placeholder: "Jane" })}
             </Field>
             <Field label="Last Name">
-              <VoiceInput field="last_name" placeholder="Smith" />
+              {VoiceInput({ field: "last_name", placeholder: "Smith" })}
             </Field>
             <Field label="Email">
               <div className="relative">
@@ -357,7 +357,7 @@ export default function AssessmentPage() {
               </div>
             </Field>
             <Field label="Phone">
-              <VoiceInput field="phone" placeholder="(555) 000-0000" />
+              {VoiceInput({ field: "phone", placeholder: "(555) 000-0000" })}
             </Field>
             <Field label="Date of Birth">
               <input
@@ -369,10 +369,10 @@ export default function AssessmentPage() {
             </Field>
             <div />
             <Field label="Emergency Contact Name">
-              <VoiceInput field="emergency_contact_name" placeholder="John Smith" />
+              {VoiceInput({ field: "emergency_contact_name", placeholder: "John Smith" })}
             </Field>
             <Field label="Emergency Contact Phone">
-              <VoiceInput field="emergency_contact_phone" placeholder="(555) 000-0001" />
+              {VoiceInput({ field: "emergency_contact_phone", placeholder: "(555) 000-0001" })}
             </Field>
           </div>
         );
@@ -398,7 +398,7 @@ export default function AssessmentPage() {
             {data.has_pain && (
               <div className="pl-4 border-l-2 border-purple-500/40 space-y-3">
                 <Field label="Pain Location">
-                  <VoiceInput field="pain_location" placeholder="e.g., lower back, left knee" />
+                  {VoiceInput({ field: "pain_location", placeholder: "e.g., lower back, left knee" })}
                 </Field>
                 <Field label="Pain Onset">
                   <div className="flex gap-2">
@@ -425,16 +425,16 @@ export default function AssessmentPage() {
               </div>
             )}
             <Field label="Current Injuries">
-              <VoiceInput field="current_injuries" placeholder="Describe any current injuries..." multiline />
+              {VoiceInput({ field: "current_injuries", placeholder: "Describe any current injuries...", multiline: true })}
             </Field>
             <Field label="Chronic Conditions">
-              <VoiceInput field="chronic_conditions" placeholder="e.g., diabetes, hypertension..." multiline />
+              {VoiceInput({ field: "chronic_conditions", placeholder: "e.g., diabetes, hypertension...", multiline: true })}
             </Field>
             <Field label="Medications">
-              <VoiceInput field="medications" placeholder="List any relevant medications..." multiline />
+              {VoiceInput({ field: "medications", placeholder: "List any relevant medications...", multiline: true })}
             </Field>
             <Field label="Prior Surgeries">
-              <VoiceInput field="prior_surgeries" placeholder="e.g., ACL repair 2019, hip replacement 2022..." multiline />
+              {VoiceInput({ field: "prior_surgeries", placeholder: "e.g., ACL repair 2019, hip replacement 2022...", multiline: true })}
             </Field>
           </div>
         );
@@ -492,7 +492,7 @@ export default function AssessmentPage() {
               </button>
             ))}
             <Field label="OHSA Notes" className="mt-4">
-              <VoiceInput field="ohsa_notes" placeholder="Additional movement observations..." multiline />
+              {VoiceInput({ field: "ohsa_notes", placeholder: "Additional movement observations...", multiline: true })}
             </Field>
           </div>
         );
@@ -644,7 +644,7 @@ export default function AssessmentPage() {
             </Field>
 
             <Field label="Goal Timeline">
-              <VoiceInput field="goal_timeline" placeholder="e.g., 3 months, 1 year, ongoing..." />
+              {VoiceInput({ field: "goal_timeline", placeholder: "e.g., 3 months, 1 year, ongoing..." })}
             </Field>
 
             <Field label="Target Weight (lbs, optional)">
@@ -658,7 +658,7 @@ export default function AssessmentPage() {
             </Field>
 
             <Field label="Goal Notes">
-              <VoiceInput field="goal_notes" placeholder="Any additional context about their goals..." multiline />
+              {VoiceInput({ field: "goal_notes", placeholder: "Any additional context about their goals...", multiline: true })}
             </Field>
           </div>
         );
@@ -722,7 +722,7 @@ export default function AssessmentPage() {
             </Field>
 
             <Field label="Nutrition / Dietary Notes">
-              <VoiceInput field="nutrition_notes" placeholder="Dietary restrictions, eating habits, supplements..." multiline />
+              {VoiceInput({ field: "nutrition_notes", placeholder: "Dietary restrictions, eating habits, supplements...", multiline: true })}
             </Field>
           </div>
         );
