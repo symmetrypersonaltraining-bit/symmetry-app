@@ -173,9 +173,9 @@ export default function AIAssistant({ isTrainer }: { isTrainer: boolean }) {
                 <div className="flex flex-col items-center justify-center h-full text-center px-4">
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
                     style={{ background: "var(--brand-primary)" + "20" }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--brand-primary)" strokeWidth="2" strokeLinecap="round">
-                      <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
-                      <path d="M12 16v-4M12 8h.01"/>
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="var(--brand-primary)" aria-hidden="true">
+                      <path d="M12 2l1.7 4.6L18 8.3l-4.3 1.7L12 14.6l-1.7-4.6L6 8.3l4.3-1.7z"/>
+                      <path d="M18.5 13l.85 2.15L21.5 16l-2.15.85L18.5 19l-.85-2.15L15.5 16l2.15-.85z"/>
                     </svg>
                   </div>
                   <p className="font-semibold text-sm mb-1" style={{ color: "var(--brand-text)" }}>Symmetry AI Assistant</p>
