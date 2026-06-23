@@ -37,7 +37,7 @@ export default async function WorkoutDayPage({
       sections(
         id, internal_name, client_facing_name, position,
         prescribed_exercises(
-          id, position, sets, volume_type, volume_value,
+          id, position, sets, tracked_fields, volume_type, volume_value,
           unilateral, tempo, load_descriptor, cue, rest,
           superset_group, intensity_type, use_drop_sets,
           use_rest_pause, use_partials,

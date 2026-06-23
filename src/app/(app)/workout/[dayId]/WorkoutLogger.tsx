@@ -14,6 +14,7 @@ interface Exercise {
 }
 
 interface PrescribedExercise {
+  tracked_fields?: string[] | null;
   id: string;
   position: number;
   sets: number;
@@ -509,6 +510,7 @@ export default function WorkoutLogger({
   const [sessionMode, setSessionMode] = useState(false);
   const [restTimer, setRestTimer] = useState<number | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [fieldCfg, setFieldCfg] = useState<Record<string, string[]>>({});
   const [historyExercise, setHistoryExercise] = useState<{ id: string; name: string } | null>(null);
   const [sessionNote, setSessionNote] = useState("");
   const [listening, setListening] = useState(false);
@@ -684,6 +686,8 @@ export default function WorkoutLogger({
   // \u2500\u2500\u2500 SESSION MODE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   if (sessionMode && currentExercise) {
     const peSets = sets[currentExercise.id] || [];
+    const xFields = fieldCfg[currentExercise.id] || (currentExercise as any).tracked_fields || ["weight", "reps"];
+    const saveFields = async (nf: string[]) => { setFieldCfg(prev => ({ ...prev, [currentExercise.id]: nf })); try { await supabase.from("prescribed_exercises").update({ tracked_fields: nf }).eq("id", currentExercise.id); } catch {} };
 
     return (
       <div className="fixed inset-0 flex flex-col z-[100]" style={{ background: "#0D1117" }}>
@@ -784,17 +788,32 @@ export default function WorkoutLogger({
 
         {/* Sets */}
         <div className="flex-1 overflow-y-auto px-5">
+          {isTrainerSession && (
+            <div className="flex items-center gap-2 mb-2" style={{ flexWrap: "wrap" }}>
+              <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>Track:</span>
+              {["weight", "reps"].map((f) => {
+                const on = xFields.includes(f);
+                return (
+                  <button key={f} type="button" onClick={() => saveFields(on ? xFields.filter((x: string) => x !== f) : [...xFields, f])}
+                    className="px-2.5 py-1 rounded-full text-xs font-medium"
+                    style={{ background: on ? "var(--brand-primary)" : "rgba(255,255,255,0.08)", color: on ? "white" : "rgba(255,255,255,0.5)", border: "none" }}>
+                    {f === "weight" ? "Weight" : "Reps"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="flex gap-2 mb-2">
             <div className="w-8" />
-            <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>WEIGHT (lb)</div>
-            <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>REPS</div>
+            {xFields.includes("weight") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>WEIGHT (lb)</div>}
+            {xFields.includes("reps") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>REPS</div>}
             <div className="w-12" />
           </div>
           {peSets.map((setEntry, si) => (
             <div key={si} className="flex items-center gap-2 mb-2">
               <div className="w-8 text-center text-sm font-bold"
                 style={{ color: setEntry.done ? "#22c55e" : "rgba(255,255,255,0.25)" }}>S{si + 1}</div>
-              <input type="number" value={setEntry.weight}
+              {xFields.includes("weight") && (<input type="number" value={setEntry.weight}
                 onChange={e => updateSet(currentExercise.id, si, "weight", e.target.value)}
                 disabled={setEntry.done} placeholder="0"
                 className="flex-1 min-w-0 text-center text-xl font-bold py-2 rounded-lg outline-none"
@@ -802,8 +821,8 @@ export default function WorkoutLogger({
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
-                }} inputMode="decimal" />
-              <input type="number" value={setEntry.reps}
+                }} inputMode="decimal" />)}
+              {xFields.includes("reps") && (<input type="number" value={setEntry.reps}
                 onChange={e => updateSet(currentExercise.id, si, "reps", e.target.value)}
                 disabled={setEntry.done} placeholder="0"
                 className="flex-1 min-w-0 text-center text-xl font-bold py-2 rounded-lg outline-none"
@@ -811,7 +830,7 @@ export default function WorkoutLogger({
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
-                }} inputMode="numeric" />
+                }} inputMode="numeric" />)}
               <button onClick={() => { if (!setEntry.done) logSet(currentExercise.id, si); }}
                 disabled={setEntry.done || saving}
                 className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
