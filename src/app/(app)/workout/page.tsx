@@ -108,7 +108,7 @@ export default async function WorkoutPage() {
                 href={`/workout/${todayDay.id}`}
                 className="btn btn-primary block text-center"
               >
-                Start workout \u2192
+                Start workout →
               </Link>
             </div>
 
