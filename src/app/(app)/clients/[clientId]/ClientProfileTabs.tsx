@@ -810,7 +810,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
           <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>Notes & Limitations</p>
         </div>
         {(form.injuries_limitations || editing) && (
-          {TextAreaRow({label:"Injuries / Limits", field:"injuries_limitations", placeholder:"Any injuries or movement restrictions"})}
+          TextAreaRow({label:"Injuries / Limits", field:"injuries_limitations", placeholder:"Any injuries or movement restrictions"})
         )}
         {TextAreaRow({label:"Trainer Notes", field:"notes", placeholder:"Internal notes (not visible to client)"})}
       </div>
