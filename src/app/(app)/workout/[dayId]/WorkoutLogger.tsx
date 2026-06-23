@@ -698,6 +698,13 @@ export default function WorkoutLogger({
                 {currentSection.client_facing_name || currentSection.internal_name}
               </p>
               <h2 className="text-2xl font-bold text-white leading-tight">{currentExercise.exercises?.name}</h2>
+            {currentExercise.exercises?.video_url && (
+              <a href={currentExercise.exercises.video_url} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 mt-1.5 text-sm font-medium"
+                style={{ color: "#60a5fa" }}>
+                <i className="ti ti-player-play text-base" /> Watch demo
+              </a>
+            )}
               {currentExercise.load_descriptor && (
                 <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>{currentExercise.load_descriptor}</p>
               )}
