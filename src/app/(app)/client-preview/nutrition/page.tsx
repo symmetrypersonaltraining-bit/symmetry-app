@@ -26,7 +26,7 @@ export default async function ClientPreviewNutritionPage() {
 
   const clientId = clientRecord.id;
   const clientName = clientRecord.name || "Dustin";
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
   const [mpRes, tlRes, mtRes, wlRes] = await Promise.all([
     supabase
