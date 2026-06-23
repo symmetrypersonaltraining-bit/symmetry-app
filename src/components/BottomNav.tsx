@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import MacroNavChart from "./MacroNavChart";
 
 export default function BottomNav() {
   const pathname = usePathname();
@@ -40,11 +39,6 @@ export default function BottomNav() {
           style={{ color: isActive("/nutrition") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }} />
         <span className="text-[10px] font-medium"
           style={{ color: isActive("/nutrition") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>Nutrition</span>
-      </Link>
-
-      {/* Daily macro circle chart — replaces Log button */}
-      <Link href="/nutrition" className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors">
-        <MacroNavChart active={isActive("/nutrition")} />
       </Link>
 
       <Link href="/progress" className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors">
