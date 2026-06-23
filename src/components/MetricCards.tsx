@@ -601,8 +601,22 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
         const p = Number(l.est_protein) || 0, c = Number(l.est_carbs) || 0, f = Number(l.est_fats) || 0;
         return { kcal: l.est_kcal != null ? Number(l.est_kcal) : 4 * p + 4 * c + 9 * f, protein: p, carbs: c, fats: f };
       }
-      if (String(l.adherence || '').toLowerCase() === 'skip') return { kcal: 0, protein: 0, carbs: 0, fats: 0 };
-      if (l.meal_id && plannedByMeal[l.meal_id]) return plannedByMeal[l.meal_id];
+      const frac = (() => {
+        switch (String(l.adherence || '').toLowerCase()) {
+          case 'full': return 1;
+          case '3/4': return 0.75;
+          case '1/2': return 0.5;
+          case 'partial': return 0.5;
+          case 'skipped': return 0;
+          case 'off-plan': return 0;
+          default: return 1;
+        }
+      })();
+      if (frac > 0 && l.meal_id && plannedByMeal[l.meal_id]) {
+        const pl = plannedByMeal[l.meal_id];
+        const p = pl.protein * frac, c = pl.carbs * frac, f = pl.fats * frac;
+        return { kcal: 4 * p + 4 * c + 9 * f, protein: p, carbs: c, fats: f };
+      }
       return { kcal: 0, protein: 0, carbs: 0, fats: 0 };
     };
 
