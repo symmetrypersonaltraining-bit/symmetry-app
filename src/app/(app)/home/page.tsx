@@ -105,7 +105,7 @@ return (
 );
 }
 
-const today = new Date().toISOString().split("T")[0];
+const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
 // Cast as any to bypass generated-type constraint on day_id column
 // Fetch ALL workouts scheduled for today (clients can have strength + cardio same day)
