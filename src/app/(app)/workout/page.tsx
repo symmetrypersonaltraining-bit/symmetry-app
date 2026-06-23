@@ -93,7 +93,7 @@ export default async function WorkoutPage() {
             {/* Today's workout card */}
             <div className="card card-glow">
               <p className="text-xs mb-1" style={{ color: "var(--brand-text-secondary)" }}>
-                Today \u00b7 {todayDay.phase_label}
+                Today · {todayDay.phase_label}
               </p>
               <h2
                 className="text-lg font-medium mb-3"
