@@ -291,7 +291,7 @@ export default function AssessmentPage() {
 
       const { data: assessment, error: assessErr } = await supabase
         .from('client_assessments')
-        .insert(Object.fromEntries(Object.entries(assessmentPayload).map(([k, v]) => [k, v === '' ? null : v])) as any)
+        .insert(Object.fromEntries(Object.entries(assessmentPayload as any).map(([k, v]) => [k, v === '' ? null : v])) as any)
         .select()
         .single();
 
@@ -313,7 +313,7 @@ export default function AssessmentPage() {
             injuries: data.current_injuries,
             medical_notes: data.chronic_conditions,
             assessment_id: assessment.id,
-          }).map(([k, v]) => [k, v === '' ? null : v])) as any);
+          } as any).map(([k, v]) => [k, v === '' ? null : v])) as any);
 
         if (clientErr) throw clientErr;
         router.push('/clients');
