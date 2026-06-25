@@ -520,6 +520,58 @@ export default function WorkoutLogger({
   const [noteSaved, setNoteSaved] = useState(false);
   const [localSections, setLocalSections] = useState<Section[]>(sections);
   const [swapTargetPe, setSwapTargetPe] = useState<PrescribedExercise | null>(null);
+
+  // --- Auto-save / resume draft: persists logged sets so leaving the browser never loses progress ---
+  const __draftKey = `symmetry_wl_${clientId || 'me'}_${day?.id || 'day'}_${isTrainerSession ? 't' : 'c'}`;
+  const __hydrated = useRef(false);
+  const __snapshot = () => ({ sets, activeSectionIdx, activeExerciseIdx, sessionMode, sessionNote, workoutLogId, savedAt: Date.now() });
+  useEffect(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(__draftKey) : null;
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d && typeof d === 'object') {
+          if (d.sets && Object.keys(d.sets).length) setSets(d.sets);
+          if (typeof d.activeSectionIdx === 'number') setActiveSectionIdx(d.activeSectionIdx);
+          if (typeof d.activeExerciseIdx === 'number') setActiveExerciseIdx(d.activeExerciseIdx);
+          if (typeof d.sessionMode === 'boolean') setSessionMode(d.sessionMode);
+          if (typeof d.sessionNote === 'string') setSessionNote(d.sessionNote);
+          if (d.workoutLogId) setWorkoutLogId(d.workoutLogId);
+        }
+      }
+    } catch (e) {}
+    __hydrated.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!__hydrated.current) return;
+    try {
+      if (workoutComplete) { window.localStorage.removeItem(__draftKey); return; }
+      window.localStorage.setItem(__draftKey, JSON.stringify(__snapshot()));
+    } catch (e) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sets, activeSectionIdx, activeExerciseIdx, sessionMode, sessionNote, workoutLogId, workoutComplete]);
+  useEffect(() => {
+    const flush = () => {
+      if (!__hydrated.current || workoutComplete) return;
+      try { window.localStorage.setItem(__draftKey, JSON.stringify(__snapshot())); } catch (e) {}
+    };
+    const onVis = () => { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') flush(); };
+    if (typeof window !== 'undefined') {
+      document.addEventListener('visibilitychange', onVis);
+      window.addEventListener('beforeunload', flush);
+      window.addEventListener('pagehide', flush);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVis);
+        window.removeEventListener('beforeunload', flush);
+        window.removeEventListener('pagehide', flush);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sets, activeSectionIdx, activeExerciseIdx, sessionMode, sessionNote, workoutLogId, workoutComplete]);
+  // --- end auto-save ---
   const recognitionRef = useRef<any>(null);
 
   const allFlat = localSections.flatMap(s => s.prescribed_exercises);
