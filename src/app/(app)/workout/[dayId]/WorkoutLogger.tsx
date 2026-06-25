@@ -616,7 +616,7 @@ export default function WorkoutLogger({
       const st = __swipeStart.current; __swipeStart.current = null;
       if (!st) return;
       const tgt = e.target as HTMLElement | null;
-      if (tgt && tgt.closest && tgt.closest('input, textarea, button, a, video, [data-no-swipe]')) return;
+      if (tgt && tgt.closest && tgt.closest('iframe, [data-no-swipe]')) return;
       const t = e.changedTouches[0];
       const dx = t.clientX - st.x, dy = t.clientY - st.y;
       if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
@@ -944,7 +944,7 @@ export default function WorkoutLogger({
               {currentExercise?.exercises?.video_url ? (() => {
               const __vid = __ytId(currentExercise.exercises.video_url);
               return (
-                <div data-no-swipe style={{ position: 'relative', width: '100%', height: 'min(11vh, 86px)', borderRadius: '14px', overflow: 'hidden', background: '#000', marginBottom: '8px' }}>
+                <div data-no-swipe style={{ position: 'relative', width: '100%', height: 'min(9vh, 70px)', borderRadius: '14px', overflow: 'hidden', background: '#000', marginBottom: '8px' }}>
                   {__inlinePlay && __vid ? (
                     <iframe
                       src={'https://www.youtube-nocookie.com/embed/' + __vid + '?autoplay=1&playsinline=1&rel=0&modestbranding=1'}
@@ -1041,13 +1041,13 @@ export default function WorkoutLogger({
             <div className="w-12" />
           </div>
           {peSets.map((setEntry, si) => (
-            <div key={si} className="flex items-center gap-2 mb-2">
+            <div key={si} className="flex items-center gap-1.5 mb-1">
               <div className="w-8 text-center text-sm font-bold"
                 style={{ color: setEntry.done ? "#22c55e" : "rgba(255,255,255,0.25)" }}>S{si + 1}</div>
               {xFields.includes("weight") && (<input type="number" value={setEntry.weight}
                 onChange={e => updateSet(currentExercise.id, si, "weight", e.target.value)}
                 disabled={setEntry.done} placeholder=""
-                className="flex-1 min-w-0 text-center text-lg font-bold py-1.5 rounded-lg outline-none"
+                className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
@@ -1056,7 +1056,7 @@ export default function WorkoutLogger({
               {xFields.includes("reps") && (<input type="number" value={setEntry.reps}
                 onChange={e => updateSet(currentExercise.id, si, "reps", e.target.value)}
                 disabled={setEntry.done} placeholder=""
-                className="flex-1 min-w-0 text-center text-lg font-bold py-1.5 rounded-lg outline-none"
+                className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
@@ -1090,7 +1090,7 @@ export default function WorkoutLogger({
           {/* Trainer AI note */}
           {isTrainerSession && (
             <div className="mb-3 rounded-xl p-3" style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-1.5 mb-1">
                 <i className="ti ti-brain text-sm" style={{ color: "#8b5cf6" }} />
                 <p className="text-xs font-semibold" style={{ color: "#8b5cf6" }}>AI Programming Note</p>
               </div>
