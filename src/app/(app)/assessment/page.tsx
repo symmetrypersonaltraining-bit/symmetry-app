@@ -100,7 +100,7 @@ function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: bool
         onClick={() => onChange(!value)}
         className="relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
         style={{
-          backgroundColor: value ? 'var(--brand-purple)' : 'rgba(255,255,255,0.15)',
+          backgroundColor: value ? '#7c3aed' : 'var(--brand-bg)',
         }}
       >
         <span
@@ -172,8 +172,8 @@ export default function AssessmentPage() {
       onClick={() => startVoice(field)}
       className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-colors"
       style={{
-        backgroundColor: listenField === field ? 'rgba(168,85,247,0.3)' : 'rgba(255,255,255,0.08)',
-        color: listenField === field ? '#c084fc' : 'rgba(255,255,255,0.4)',
+        backgroundColor: listenField === field ? 'rgba(168,85,247,0.3)' : 'var(--brand-bg)',
+        color: listenField === field ? '#7c3aed' : 'var(--brand-text-secondary)',
       }}
       title="Voice input"
     >
@@ -200,8 +200,8 @@ export default function AssessmentPage() {
               onClick={() => startVoice(field)}
               className="p-1.5 rounded-full transition-colors"
               style={{
-                backgroundColor: listenField === field ? 'rgba(168,85,247,0.3)' : 'rgba(255,255,255,0.08)',
-                color: listenField === field ? '#c084fc' : 'rgba(255,255,255,0.4)',
+                backgroundColor: listenField === field ? 'rgba(168,85,247,0.3)' : 'var(--brand-bg)',
+                color: listenField === field ? '#7c3aed' : 'var(--brand-text-secondary)',
               }}
             >
               <i className={`ti ti-${listenField === field ? 'loader-2 animate-spin' : 'microphone'} text-sm`} />
@@ -416,9 +416,9 @@ export default function AssessmentPage() {
                         onClick={() => set('pain_onset', opt.value)}
                         className="flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-all"
                         style={{
-                          backgroundColor: data.pain_onset === opt.value ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.05)',
-                          borderColor: data.pain_onset === opt.value ? 'rgba(168,85,247,0.6)' : 'rgba(255,255,255,0.1)',
-                          color: data.pain_onset === opt.value ? '#c084fc' : 'rgba(255,255,255,0.6)',
+                          backgroundColor: data.pain_onset === opt.value ? 'rgba(168,85,247,0.2)' : 'var(--brand-bg)',
+                          borderColor: data.pain_onset === opt.value ? 'rgba(168,85,247,0.6)' : 'var(--brand-border)',
+                          color: data.pain_onset === opt.value ? '#7c3aed' : 'var(--brand-text-secondary)',
                         }}
                       >
                         {opt.label}
@@ -475,20 +475,20 @@ export default function AssessmentPage() {
                 onClick={() => set(key as keyof AssessmentData, !data[key as keyof AssessmentData])}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left card-hover"
                 style={{
-                  backgroundColor: data[key as keyof AssessmentData] ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)',
-                  borderColor: data[key as keyof AssessmentData] ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)',
+                  backgroundColor: data[key as keyof AssessmentData] ? 'rgba(239,68,68,0.12)' : 'var(--brand-bg)',
+                  borderColor: data[key as keyof AssessmentData] ? 'rgba(239,68,68,0.4)' : 'var(--brand-border)',
                 }}
               >
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{
-                    backgroundColor: data[key as keyof AssessmentData] ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)',
+                    backgroundColor: data[key as keyof AssessmentData] ? 'rgba(239,68,68,0.2)' : 'var(--brand-bg)',
                   }}>
-                  <i className={`${icon} text-sm`} style={{ color: data[key as keyof AssessmentData] ? '#f87171' : 'rgba(255,255,255,0.4)' }} />
+                  <i className={`${icon} text-sm`} style={{ color: data[key as keyof AssessmentData] ? '#f87171' : 'var(--brand-text-secondary)' }} />
                 </div>
-                <span className="text-sm flex-1" style={{ color: 'rgba(255,255,255,0.85)' }}>{label}</span>
+                <span className="text-sm flex-1" style={{ color: 'var(--brand-text)' }}>{label}</span>
                 <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
                   style={{
-                    borderColor: data[key as keyof AssessmentData] ? '#f87171' : 'rgba(255,255,255,0.2)',
+                    borderColor: data[key as keyof AssessmentData] ? '#f87171' : 'var(--brand-border)',
                     backgroundColor: data[key as keyof AssessmentData] ? 'rgba(239,68,68,0.2)' : 'transparent',
                   }}>
                   {data[key as keyof AssessmentData] && <i className="ti ti-check text-xs" style={{ color: '#f87171' }} />}
@@ -514,9 +514,9 @@ export default function AssessmentPage() {
                     onClick={() => set('experience_level', lvl)}
                     className="py-3 rounded-xl border text-sm font-medium capitalize transition-all"
                     style={{
-                      backgroundColor: data.experience_level === lvl ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.04)',
-                      borderColor: data.experience_level === lvl ? 'rgba(168,85,247,0.6)' : 'rgba(255,255,255,0.08)',
-                      color: data.experience_level === lvl ? '#c084fc' : 'rgba(255,255,255,0.6)',
+                      backgroundColor: data.experience_level === lvl ? 'rgba(168,85,247,0.2)' : 'var(--brand-bg)',
+                      borderColor: data.experience_level === lvl ? 'rgba(168,85,247,0.6)' : 'var(--brand-border)',
+                      color: data.experience_level === lvl ? '#7c3aed' : 'var(--brand-text-secondary)',
                     }}
                   >
                     {lvl}
@@ -553,14 +553,14 @@ export default function AssessmentPage() {
                     onClick={() => set('activity_level', opt.value)}
                     className="p-3 rounded-xl border text-left transition-all"
                     style={{
-                      backgroundColor: data.activity_level === opt.value ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.04)',
-                      borderColor: data.activity_level === opt.value ? 'rgba(168,85,247,0.6)' : 'rgba(255,255,255,0.08)',
+                      backgroundColor: data.activity_level === opt.value ? 'rgba(168,85,247,0.2)' : 'var(--brand-bg)',
+                      borderColor: data.activity_level === opt.value ? 'rgba(168,85,247,0.6)' : 'var(--brand-border)',
                     }}
                   >
-                    <div className="text-sm font-medium" style={{ color: data.activity_level === opt.value ? '#c084fc' : 'rgba(255,255,255,0.85)' }}>
+                    <div className="text-sm font-medium" style={{ color: data.activity_level === opt.value ? '#7c3aed' : 'var(--brand-text)' }}>
                       {opt.label}
                     </div>
-                    <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{opt.desc}</div>
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--brand-text-secondary)' }}>{opt.desc}</div>
                   </button>
                 ))}
               </div>
@@ -575,7 +575,7 @@ export default function AssessmentPage() {
                 onChange={e => set('days_per_week', parseInt(e.target.value))}
                 className="w-full accent-purple-500"
               />
-              <div className="flex justify-between text-xs mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--brand-text-secondary)' }}>
                 {[1,2,3,4,5,6,7].map(n => <span key={n}>{n}</span>)}
               </div>
             </Field>
@@ -589,9 +589,9 @@ export default function AssessmentPage() {
                     onClick={() => set('preferred_time', t)}
                     className="py-3 rounded-xl border text-sm font-medium capitalize transition-all"
                     style={{
-                      backgroundColor: data.preferred_time === t ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.04)',
-                      borderColor: data.preferred_time === t ? 'rgba(168,85,247,0.6)' : 'rgba(255,255,255,0.08)',
-                      color: data.preferred_time === t ? '#c084fc' : 'rgba(255,255,255,0.6)',
+                      backgroundColor: data.preferred_time === t ? 'rgba(168,85,247,0.2)' : 'var(--brand-bg)',
+                      borderColor: data.preferred_time === t ? 'rgba(168,85,247,0.6)' : 'var(--brand-border)',
+                      color: data.preferred_time === t ? '#7c3aed' : 'var(--brand-text-secondary)',
                     }}
                   >
                     {t}
@@ -623,12 +623,12 @@ export default function AssessmentPage() {
                     onClick={() => set('primary_goal', g.value)}
                     className="flex flex-col items-center gap-2 p-4 rounded-xl border transition-all"
                     style={{
-                      backgroundColor: data.primary_goal === g.value ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.04)',
-                      borderColor: data.primary_goal === g.value ? 'rgba(168,85,247,0.6)' : 'rgba(255,255,255,0.08)',
+                      backgroundColor: data.primary_goal === g.value ? 'rgba(168,85,247,0.2)' : 'var(--brand-bg)',
+                      borderColor: data.primary_goal === g.value ? 'rgba(168,85,247,0.6)' : 'var(--brand-border)',
                     }}
                   >
-                    <i className={`${g.icon} text-xl`} style={{ color: data.primary_goal === g.value ? '#c084fc' : 'rgba(255,255,255,0.4)' }} />
-                    <span className="text-xs font-medium text-center" style={{ color: data.primary_goal === g.value ? '#c084fc' : 'rgba(255,255,255,0.7)' }}>
+                    <i className={`${g.icon} text-xl`} style={{ color: data.primary_goal === g.value ? '#7c3aed' : 'var(--brand-text-secondary)' }} />
+                    <span className="text-xs font-medium text-center" style={{ color: data.primary_goal === g.value ? '#7c3aed' : 'var(--brand-text-secondary)' }}>
                       {g.label}
                     </span>
                   </button>
@@ -684,14 +684,14 @@ export default function AssessmentPage() {
                     onClick={() => set('occupation_type', opt.value)}
                     className="p-3 rounded-xl border text-center transition-all"
                     style={{
-                      backgroundColor: data.occupation_type === opt.value ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.04)',
-                      borderColor: data.occupation_type === opt.value ? 'rgba(168,85,247,0.6)' : 'rgba(255,255,255,0.08)',
+                      backgroundColor: data.occupation_type === opt.value ? 'rgba(168,85,247,0.2)' : 'var(--brand-bg)',
+                      borderColor: data.occupation_type === opt.value ? 'rgba(168,85,247,0.6)' : 'var(--brand-border)',
                     }}
                   >
-                    <div className="text-sm font-medium" style={{ color: data.occupation_type === opt.value ? '#c084fc' : 'rgba(255,255,255,0.85)' }}>
+                    <div className="text-sm font-medium" style={{ color: data.occupation_type === opt.value ? '#7c3aed' : 'var(--brand-text)' }}>
                       {opt.label}
                     </div>
-                    <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{opt.desc}</div>
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--brand-text-secondary)' }}>{opt.desc}</div>
                   </button>
                 ))}
               </div>
@@ -706,7 +706,7 @@ export default function AssessmentPage() {
                 onChange={e => set('stress_level', parseInt(e.target.value))}
                 className="w-full accent-purple-500"
               />
-              <div className="flex justify-between text-xs mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--brand-text-secondary)' }}>
                 <span>1 - Very Low</span>
                 <span>10 - Very High</span>
               </div>
@@ -736,7 +736,7 @@ export default function AssessmentPage() {
           return (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <div className="w-16 h-16 rounded-full border-4 border-purple-500/30 border-t-purple-500 animate-spin" />
-              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>Analyzing assessment data...</p>
+              <p className="text-sm" style={{ color: 'var(--brand-text-secondary)' }}>Analyzing assessment data...</p>
             </div>
           );
         }
@@ -746,11 +746,11 @@ export default function AssessmentPage() {
             <div className="flex flex-col items-center justify-center py-20 gap-6">
               <div className="w-20 h-20 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: 'rgba(168,85,247,0.15)' }}>
-                <i className="ti ti-robot text-4xl" style={{ color: '#c084fc' }} />
+                <i className="ti ti-robot text-4xl" style={{ color: '#7c3aed' }} />
               </div>
               <div className="text-center">
                 <h3 className="text-lg font-semibold text-white mb-2">Ready for AI Analysis</h3>
-                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                <p className="text-sm" style={{ color: 'var(--brand-text-secondary)' }}>
                   Generate a program recommendation based on the completed assessment
                 </p>
               </div>
@@ -774,14 +774,14 @@ export default function AssessmentPage() {
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: 'rgba(168,85,247,0.2)' }}>
-                  <i className="ti ti-award text-lg" style={{ color: '#c084fc' }} />
+                  <i className="ti ti-award text-lg" style={{ color: '#7c3aed' }} />
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: 'rgba(168,85,247,0.8)' }}>
                     Recommended Program
                   </div>
                   <div className="text-lg font-bold text-white">{aiResult.recommended_program}</div>
-                  <div className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                  <div className="text-sm mt-0.5" style={{ color: 'var(--brand-text-secondary)' }}>
                     Starting at {aiResult.recommended_phase}
                   </div>
                 </div>
@@ -794,27 +794,27 @@ export default function AssessmentPage() {
                 <div className="text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: 'rgba(239,68,68,0.7)' }}>
                   Primary Finding
                 </div>
-                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.8)' }}>{aiResult.primary_corrective_finding}</p>
+                <p className="text-sm" style={{ color: 'var(--brand-text)' }}>{aiResult.primary_corrective_finding}</p>
               </div>
             )}
 
             {/* Rationale */}
-            <div className="p-4 rounded-xl" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <div className="text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <div className="p-4 rounded-xl" style={{ backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+              <div className="text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: 'var(--brand-text-secondary)' }}>
                 Program Rationale
               </div>
-              <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.75)' }}>{aiResult.program_rationale}</p>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--brand-text-secondary)' }}>{aiResult.program_rationale}</p>
             </div>
 
             {/* Key Considerations */}
             {aiResult.key_considerations?.length > 0 && (
-              <div className="p-4 rounded-xl" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div className="text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <div className="p-4 rounded-xl" style={{ backgroundColor: 'var(--brand-bg)', border: '1px solid var(--brand-border)' }}>
+                <div className="text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: 'var(--brand-text-secondary)' }}>
                   Key Considerations
                 </div>
                 <ul className="space-y-2">
                   {aiResult.key_considerations.map((c: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2 text-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                    <li key={i} className="flex items-start gap-2 text-sm" style={{ color: 'var(--brand-text-secondary)' }}>
                       <i className="ti ti-point-filled mt-1 flex-shrink-0" style={{ color: '#a855f7' }} />
                       {c}
                     </li>
@@ -837,7 +837,7 @@ export default function AssessmentPage() {
               type="button"
               onClick={getAIRecommendation}
               className="flex items-center gap-2 text-sm py-2 px-3 rounded-lg transition-colors"
-              style={{ color: 'rgba(255,255,255,0.4)', backgroundColor: 'rgba(255,255,255,0.05)' }}
+              style={{ color: 'var(--brand-text-secondary)', backgroundColor: 'var(--brand-bg)' }}
             >
               <i className="ti ti-refresh" />
               Regenerate
@@ -867,14 +867,14 @@ export default function AssessmentPage() {
             </button>
             <h1 className="text-xl font-bold text-white">Client Assessment</h1>
           </div>
-          <p className="text-sm ml-8" style={{ color: 'rgba(255,255,255,0.7)' }}>
+          <p className="text-sm ml-8" style={{ color: 'var(--brand-text-secondary)' }}>
             {data.first_name ? `${data.first_name} ${data.last_name}`.trim() : 'New Client'}
           </p>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="h-1 w-full" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+      <div className="h-1 w-full" style={{ backgroundColor: 'var(--brand-bg)' }}>
         <div
           className="h-full transition-all duration-500"
           style={{
@@ -894,8 +894,8 @@ export default function AssessmentPage() {
               onClick={() => i <= step && setStep(i)}
               className="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
               style={{
-                backgroundColor: i === step ? 'rgba(168,85,247,0.25)' : i < step ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.04)',
-                color: i === step ? '#c084fc' : i < step ? 'rgba(168,85,247,0.7)' : 'rgba(255,255,255,0.3)',
+                backgroundColor: i === step ? 'rgba(168,85,247,0.25)' : i < step ? 'rgba(168,85,247,0.1)' : 'var(--brand-bg)',
+                color: i === step ? '#7c3aed' : i < step ? 'rgba(168,85,247,0.7)' : 'var(--brand-text-secondary)',
                 border: `1px solid ${i === step ? 'rgba(168,85,247,0.5)' : 'transparent'}`,
                 cursor: i <= step ? 'pointer' : 'default',
               }}
@@ -913,7 +913,7 @@ export default function AssessmentPage() {
         <div className="mb-6">
           <h2 className="text-lg font-bold text-white">{SECTIONS[step]}</h2>
           {step === 2 && (
-            <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            <p className="text-sm mt-1" style={{ color: 'var(--brand-text-secondary)' }}>
               Overhead Squat Assessment \u2014 check each compensation observed
             </p>
           )}
@@ -930,7 +930,7 @@ export default function AssessmentPage() {
         style={{
           backgroundColor: 'rgba(15,15,26,0.95)',
           backdropFilter: 'blur(12px)',
-          borderColor: 'rgba(255,255,255,0.08)',
+          borderColor: 'var(--brand-border)',
         }}>
         <div className="max-w-2xl mx-auto">
           {step < SECTIONS.length - 1 ? (
@@ -940,7 +940,7 @@ export default function AssessmentPage() {
                   type="button"
                   onClick={() => setStep(s => s - 1)}
                   className="flex-1 py-3 rounded-xl font-semibold border transition-all"
-                  style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)' }}
+                  style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text-secondary)' }}
                 >
                   Back
                 </button>
@@ -967,7 +967,7 @@ export default function AssessmentPage() {
                 onClick={() => saveAssessment(false)}
                 disabled={saving}
                 className="flex-1 py-3 rounded-xl font-semibold border transition-all"
-                style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)' }}
+                style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text-secondary)' }}
               >
                 {saving ? 'Saving...' : 'Archive Records'}
               </button>
