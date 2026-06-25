@@ -243,10 +243,10 @@ export default function ExerciseLibraryClient({ exercises }: Props) {
                   onClick={() => setSelected(ex)}
                   className="w-full flex items-center gap-4 px-4 py-3.5 border-b last:border-b-0 text-left transition-colors hover:bg-opacity-50"
                   style={{ borderColor: "var(--brand-border)" }}>
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  {(() => { const __t = getYouTubeThumbnail(ex.video_url); return __t ? (<img src={__t} alt="" loading="lazy" className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />) : (<div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: color + "15" }}>
                     <i className={`ti ${icon} text-lg`} style={{ color }} />
-                  </div>
+                  </div>); })()}
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate" style={{ color: "var(--brand-text)" }}>
                       {ex.name}
