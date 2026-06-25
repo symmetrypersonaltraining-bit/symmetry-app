@@ -607,6 +607,40 @@ export default function WorkoutLogger({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sets, sessionMode, currentExercise, activeSectionIdx, activeExerciseIdx, localSections]);
   // --- end auto-advance ---
+  // --- Manual swipe between exercises (any time) ---
+  const __goPrevExercise = () => {
+    if (activeExerciseIdx > 0) { setActiveExerciseIdx(activeExerciseIdx - 1); return; }
+    const secs = localSections || [];
+    if (activeSectionIdx > 0) {
+      const prevSec = secs[activeSectionIdx - 1];
+      const lastIdx = prevSec && Array.isArray(prevSec.prescribed_exercises) ? Math.max(0, prevSec.prescribed_exercises.length - 1) : 0;
+      setActiveSectionIdx(activeSectionIdx - 1);
+      setActiveExerciseIdx(lastIdx);
+    }
+  };
+  const __swipeStart = useRef<{x:number;y:number}|null>(null);
+  useEffect(() => {
+    if (!sessionMode) return;
+    const onStart = (e: TouchEvent) => {
+      const t = e.changedTouches[0];
+      __swipeStart.current = { x: t.clientX, y: t.clientY };
+    };
+    const onEnd = (e: TouchEvent) => {
+      const st = __swipeStart.current; __swipeStart.current = null;
+      if (!st) return;
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && tgt.closest && tgt.closest('input, textarea, button, a, video, [data-no-swipe]')) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - st.x, dy = t.clientY - st.y;
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      if (dx < 0) __goNextExercise(); else __goPrevExercise();
+    };
+    document.addEventListener('touchstart', onStart, { passive: true });
+    document.addEventListener('touchend', onEnd, { passive: true });
+    return () => { document.removeEventListener('touchstart', onStart); document.removeEventListener('touchend', onEnd); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionMode, activeSectionIdx, activeExerciseIdx, localSections]);
+  // --- end manual swipe ---
   const globalIdx = localSections.slice(0, activeSectionIdx).reduce((a, s) => a + s.prescribed_exercises.length, 0) + activeExerciseIdx;
   const totalExercises = allFlat.length;
 
