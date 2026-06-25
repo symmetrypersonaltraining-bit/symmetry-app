@@ -918,7 +918,7 @@ export default function WorkoutLogger({
               {currentExercise?.exercises?.video_url ? (() => {
               const __vid = __ytId(currentExercise.exercises.video_url);
               return (
-                <div data-no-swipe style={{ position: 'relative', width: '100%', height: 'min(17vh, 124px)', borderRadius: '14px', overflow: 'hidden', background: '#000', marginBottom: '14px' }}>
+                <div data-no-swipe style={{ position: 'relative', width: '100%', height: 'min(11vh, 86px)', borderRadius: '14px', overflow: 'hidden', background: '#000', marginBottom: '8px' }}>
                   {__inlinePlay && __vid ? (
                     <iframe
                       src={'https://www.youtube-nocookie.com/embed/' + __vid + '?autoplay=1&playsinline=1&rel=0&modestbranding=1'}
@@ -1021,7 +1021,7 @@ export default function WorkoutLogger({
               {xFields.includes("weight") && (<input type="number" value={setEntry.weight}
                 onChange={e => updateSet(currentExercise.id, si, "weight", e.target.value)}
                 disabled={setEntry.done} placeholder=""
-                className="flex-1 min-w-0 text-center text-xl font-bold py-2 rounded-lg outline-none"
+                className="flex-1 min-w-0 text-center text-lg font-bold py-1.5 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
@@ -1030,7 +1030,7 @@ export default function WorkoutLogger({
               {xFields.includes("reps") && (<input type="number" value={setEntry.reps}
                 onChange={e => updateSet(currentExercise.id, si, "reps", e.target.value)}
                 disabled={setEntry.done} placeholder=""
-                className="flex-1 min-w-0 text-center text-xl font-bold py-2 rounded-lg outline-none"
+                className="flex-1 min-w-0 text-center text-lg font-bold py-1.5 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
