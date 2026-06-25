@@ -1040,7 +1040,21 @@ export default function WorkoutLogger({
             {xFields.includes("reps") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>REPS</div>}
             <div className="w-12" />
           </div>
-          {peSets.map((setEntry, si) => (
+          {isTrainerSession && currentExercise ? (
+                <div data-no-swipe style={{ display: "flex", gap: "6px", alignItems: "center", margin: "2px 0 8px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Track</span>
+                  {["weight", "reps"].map((f) => {
+                    const active = xFields.includes(f);
+                    return (
+                      <button key={f} type="button" data-no-swipe onClick={() => { const nf = active ? xFields.filter((x: string) => x !== f) : [...xFields, f]; saveFields(nf); }}
+                        style={{ fontSize: "12px", padding: "3px 11px", borderRadius: "999px", cursor: "pointer", border: active ? "1px solid #7c3aed" : "1px solid rgba(255,255,255,0.2)", background: active ? "rgba(124,58,237,0.25)" : "transparent", color: active ? "#c4b5fd" : "rgba(255,255,255,0.55)" }}>
+                        {f === "weight" ? "Weight" : "Reps"}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              {peSets.map((setEntry, si) => (
             <div key={si} className="flex items-center gap-1.5 mb-1">
               <div className="w-8 text-center text-sm font-bold"
                 style={{ color: setEntry.done ? "#22c55e" : "rgba(255,255,255,0.25)" }}>S{si + 1}</div>
