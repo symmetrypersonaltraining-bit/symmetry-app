@@ -632,7 +632,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
   const [form, setForm] = useState({ name: client.name || "", email: client.email || "", date_of_birth: client.date_of_birth || "", start_date: client.start_date || "", 
     phone: client.phone || "",
     primary_goal: client.primary_goal || "",
-    secondary_goals: client.secondary_goals || "",
+    secondary_goals: Array.isArray(client.secondary_goals) ? client.secondary_goals.join(", ") : "",
     experience_level: client.experience_level || "",
     training_frequency: client.training_frequency != null ? String(client.training_frequency) : "",
     current_weight: client.current_weight != null ? String(client.current_weight) : "",
@@ -653,7 +653,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
     const payload: Record<string, string | number | boolean | null> = {
       name: form.name || client.name, email: form.email || null, date_of_birth: form.date_of_birth || null, start_date: form.start_date || null, phone: form.phone || null,
       primary_goal: form.primary_goal || null,
-      secondary_goals: form.secondary_goals || null,
+      secondary_goals: form.secondary_goals ? form.secondary_goals.split(",").map((g: string) => g.trim()).filter(Boolean) : null,
       experience_level: form.experience_level || null,
       training_frequency: form.training_frequency ? Number(form.training_frequency) : null,
       current_weight: form.current_weight ? Number(form.current_weight) : null,
@@ -775,7 +775,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
         <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>Client Details</h3>
         {editing ? (
           <div className="flex gap-2">
-            <button onClick={() => { setEditing(false); setForm({ name: client.name || "", email: client.email || "", date_of_birth: client.date_of_birth || "", start_date: client.start_date || "", phone: client.phone || "", primary_goal: client.primary_goal || "", secondary_goals: client.secondary_goals || "", experience_level: client.experience_level || "", training_frequency: client.training_frequency != null ? String(client.training_frequency) : "", current_weight: client.current_weight != null ? String(client.current_weight) : "", current_body_fat_pct: client.current_body_fat_pct != null ? String(client.current_body_fat_pct) : "", injuries_limitations: client.injuries_limitations || "", notes: client.notes || "", current_fees: client.current_fees != null ? String(client.current_fees) : "", is_self_coached: client.is_self_coached ?? false }); }}
+            <button onClick={() => { setEditing(false); setForm({ name: client.name || "", email: client.email || "", date_of_birth: client.date_of_birth || "", start_date: client.start_date || "", phone: client.phone || "", primary_goal: client.primary_goal || "", secondary_goals: Array.isArray(client.secondary_goals) ? client.secondary_goals.join(", ") : "", experience_level: client.experience_level || "", training_frequency: client.training_frequency != null ? String(client.training_frequency) : "", current_weight: client.current_weight != null ? String(client.current_weight) : "", current_body_fat_pct: client.current_body_fat_pct != null ? String(client.current_body_fat_pct) : "", injuries_limitations: client.injuries_limitations || "", notes: client.notes || "", current_fees: client.current_fees != null ? String(client.current_fees) : "", is_self_coached: client.is_self_coached ?? false }); }}
               className="px-3 py-1 rounded-lg text-xs font-medium"
               style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}>Cancel</button>
             <button onClick={save} disabled={saving} className="px-3 py-1 rounded-lg text-xs font-semibold"
