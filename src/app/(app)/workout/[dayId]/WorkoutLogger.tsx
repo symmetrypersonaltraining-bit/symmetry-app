@@ -494,7 +494,7 @@ export default function WorkoutLogger({
         const logs = existingSetLogs.filter(sl => sl.prescribed_exercise_id === pe.id);
         result[pe.id] = Array.from({ length: pe.sets }, (_, i) => {
           const ex = logs.find(l => l.set_number === i + 1);
-          return { weight: ex?.weight_lbs?.toString() || "", reps: ex?.reps?.toString() || (pe.volume_type === "reps" && pe.volume_value != null ? String(pe.volume_value) : ""), done: ex?.completed ?? false };
+          return { weight: ex?.weight_lbs?.toString() || "", reps: ex?.reps?.toString() || ((pe.volume_type === "reps" || pe.volume_type === "rep_range") && pe.volume_value ? (String(pe.volume_value).match(/\d+/)?.[0] || "") : ""), done: ex?.completed ?? false };
         });
       }
     }
@@ -592,20 +592,7 @@ export default function WorkoutLogger({
       setActiveExerciseIdx(0);
     }
   };
-  useEffect(() => {
-    if (!sessionMode || !currentExercise) return;
-    const cs = (sets as any)[currentExercise.id];
-    if (!cs || !cs.length) return;
-    if (!cs.every((x: any) => x && x.done)) return;
-    const secs = localSections || [];
-    const cur = secs[activeSectionIdx];
-    const lastInSection = !cur || !Array.isArray(cur.prescribed_exercises) || activeExerciseIdx >= cur.prescribed_exercises.length - 1;
-    const lastSection = activeSectionIdx >= secs.length - 1;
-    if (lastInSection && lastSection) return;
-    const t = setTimeout(() => { __goNextExercise(); }, 700);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sets, sessionMode, currentExercise, activeSectionIdx, activeExerciseIdx, localSections]);
+  
   // --- end auto-advance ---
   // --- Manual swipe between exercises (any time) ---
   const __goPrevExercise = () => {
@@ -931,7 +918,7 @@ export default function WorkoutLogger({
               {currentExercise?.exercises?.video_url ? (() => {
               const __vid = __ytId(currentExercise.exercises.video_url);
               return (
-                <div data-no-swipe style={{ position: 'relative', width: '100%', height: 'min(26vh, 168px)', borderRadius: '14px', overflow: 'hidden', background: '#000', marginBottom: '14px' }}>
+                <div data-no-swipe style={{ position: 'relative', width: '100%', height: 'min(17vh, 124px)', borderRadius: '14px', overflow: 'hidden', background: '#000', marginBottom: '14px' }}>
                   {__inlinePlay && __vid ? (
                     <iframe
                       src={'https://www.youtube-nocookie.com/embed/' + __vid + '?autoplay=1&playsinline=1&rel=0&modestbranding=1'}
@@ -1007,7 +994,7 @@ export default function WorkoutLogger({
         {/* Sets */}
         <div className="flex-1 overflow-y-auto px-5">
           {isTrainerSession && (
-            <div className="flex items-center gap-2 mb-2" style={{ flexWrap: "wrap" }}>
+            <div className="flex items-center gap-2 mb-1" style={{ flexWrap: "wrap" }}>
               <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>Track:</span>
               {["weight", "reps"].map((f) => {
                 const on = xFields.includes(f);
@@ -1033,7 +1020,7 @@ export default function WorkoutLogger({
                 style={{ color: setEntry.done ? "#22c55e" : "rgba(255,255,255,0.25)" }}>S{si + 1}</div>
               {xFields.includes("weight") && (<input type="number" value={setEntry.weight}
                 onChange={e => updateSet(currentExercise.id, si, "weight", e.target.value)}
-                disabled={setEntry.done} placeholder="0"
+                disabled={setEntry.done} placeholder=""
                 className="flex-1 min-w-0 text-center text-xl font-bold py-2 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
@@ -1042,7 +1029,7 @@ export default function WorkoutLogger({
                 }} inputMode="decimal" />)}
               {xFields.includes("reps") && (<input type="number" value={setEntry.reps}
                 onChange={e => updateSet(currentExercise.id, si, "reps", e.target.value)}
-                disabled={setEntry.done} placeholder="0"
+                disabled={setEntry.done} placeholder=""
                 className="flex-1 min-w-0 text-center text-xl font-bold py-2 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
