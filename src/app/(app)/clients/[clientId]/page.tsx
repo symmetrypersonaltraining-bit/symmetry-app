@@ -47,7 +47,7 @@ export default async function ClientProfilePage({
 
   const { data: assignment } = await supabase
     .from("program_assignments")
-    .select("id, program_id, start_date, active")
+    .select("id, program_id, start_date:assigned_at, active")
     .eq("client_id", clientId)
     .eq("active", true)
     .maybeSingle();
