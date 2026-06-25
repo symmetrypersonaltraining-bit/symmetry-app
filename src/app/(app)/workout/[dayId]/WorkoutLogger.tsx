@@ -283,7 +283,7 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
-      <div className="w-full rounded-t-3xl p-5 max-h-[75vh] overflow-y-auto"
+      <div className="w-full rounded-t-3xl p-5 flex-1 min-h-0 overflow-y-auto"
         style={{ background: "var(--brand-surface)" }} onClick={e => e.stopPropagation()}>
         <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
         <div className="flex items-center justify-between mb-4">
@@ -494,7 +494,7 @@ export default function WorkoutLogger({
         const logs = existingSetLogs.filter(sl => sl.prescribed_exercise_id === pe.id);
         result[pe.id] = Array.from({ length: pe.sets }, (_, i) => {
           const ex = logs.find(l => l.set_number === i + 1);
-          return { weight: ex?.weight_lbs?.toString() || "", reps: ex?.reps?.toString() || "", done: ex?.completed ?? false };
+          return { weight: ex?.weight_lbs?.toString() || "", reps: ex?.reps?.toString() || (pe.volume_type === "reps" && pe.volume_value != null ? String(pe.volume_value) : ""), done: ex?.completed ?? false };
         });
       }
     }
@@ -931,7 +931,7 @@ export default function WorkoutLogger({
               {currentExercise?.exercises?.video_url ? (() => {
               const __vid = __ytId(currentExercise.exercises.video_url);
               return (
-                <div data-no-swipe style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: '14px', overflow: 'hidden', background: '#000', marginBottom: '14px' }}>
+                <div data-no-swipe style={{ position: 'relative', width: '100%', height: 'min(26vh, 168px)', borderRadius: '14px', overflow: 'hidden', background: '#000', marginBottom: '14px' }}>
                   {__inlinePlay && __vid ? (
                     <iframe
                       src={'https://www.youtube-nocookie.com/embed/' + __vid + '?autoplay=1&playsinline=1&rel=0&modestbranding=1'}
