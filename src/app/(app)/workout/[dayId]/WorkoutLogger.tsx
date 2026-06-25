@@ -1126,7 +1126,7 @@ export default function WorkoutLogger({
                 Next <i className="ti ti-arrow-right ml-1" />
               </button>
             ) : (
-              <button onClick={completeWorkout} disabled={progressPct < 100 || saving}
+              <button onClick={completeWorkout} disabled={saving}
                 className="flex-1 py-3.5 rounded-2xl text-sm font-semibold transition-all"
                 style={{
                   background: progressPct === 100 ? "#22c55e" : "rgba(255,255,255,0.06)",
@@ -1339,7 +1339,7 @@ export default function WorkoutLogger({
           </div>
         )}
 
-        <button onClick={completeWorkout} disabled={saving || progressPct < 100}
+        <button onClick={completeWorkout} disabled={saving}
           className="w-full rounded-2xl py-4 text-sm font-bold transition-all mt-2"
           style={progressPct === 100
             ? { background: "#22c55e", color: "white" }
