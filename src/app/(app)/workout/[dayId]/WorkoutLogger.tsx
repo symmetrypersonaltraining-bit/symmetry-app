@@ -686,6 +686,32 @@ export default function WorkoutLogger({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prevByPe]);
   // --- end previous weights ---
+  // --- Fill blank reps with prescribed/recommended reps (survives draft hydration) ---
+  useEffect(() => {
+    if (!__hydrated.current) return;
+    const repsByPe: Record<string, string> = {};
+    (localSections || []).forEach((sec: any) => (sec.prescribed_exercises || []).forEach((pe: any) => {
+      if ((pe.volume_type === "reps" || pe.volume_type === "rep_range") && pe.volume_value) {
+        const mm = String(pe.volume_value).match(/\d+/);
+        if (mm) repsByPe[pe.id] = mm[0];
+      }
+    }));
+    if (!Object.keys(repsByPe).length) return;
+    setSets((prev: any) => {
+      let changed = false;
+      const next: any = { ...prev };
+      for (const peId of Object.keys(next)) {
+        if (!repsByPe[peId] || !Array.isArray(next[peId])) continue;
+        next[peId] = next[peId].map((row: any) => {
+          if (!row.done && (row.reps === "" || row.reps == null)) { changed = true; return { ...row, reps: repsByPe[peId] }; }
+          return row;
+        });
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localSections, sets]);
+  // --- end fill reps ---
   // --- Inline exercise video (thumbnail + tap to play) ---
   const __ytId = (u: any): string | null => {
     if (!u) return null;
