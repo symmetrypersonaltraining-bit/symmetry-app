@@ -629,7 +629,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<"" | "saved" | "error">("");
-  const [form, setForm] = useState({
+  const [form, setForm] = useState({ name: client.name || "", email: client.email || "", date_of_birth: client.date_of_birth || "", start_date: client.start_date || "", 
     phone: client.phone || "",
     primary_goal: client.primary_goal || "",
     secondary_goals: client.secondary_goals || "",
