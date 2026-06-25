@@ -580,6 +580,33 @@ export default function WorkoutLogger({
   const progressPct = totalSets > 0 ? Math.round((doneSets / totalSets) * 100) : 0;
   const currentSection = localSections[activeSectionIdx];
   const currentExercise = currentSection?.prescribed_exercises[activeExerciseIdx];
+
+  // --- Auto-advance to the next exercise once the current one is fully logged ---
+  const __goNextExercise = () => {
+    const secs = localSections || [];
+    const cur = secs[activeSectionIdx];
+    if (cur && Array.isArray(cur.prescribed_exercises) && activeExerciseIdx < cur.prescribed_exercises.length - 1) {
+      setActiveExerciseIdx(activeExerciseIdx + 1);
+    } else if (activeSectionIdx < secs.length - 1) {
+      setActiveSectionIdx(activeSectionIdx + 1);
+      setActiveExerciseIdx(0);
+    }
+  };
+  useEffect(() => {
+    if (!sessionMode || !currentExercise) return;
+    const cs = (sets as any)[currentExercise.id];
+    if (!cs || !cs.length) return;
+    if (!cs.every((x: any) => x && x.done)) return;
+    const secs = localSections || [];
+    const cur = secs[activeSectionIdx];
+    const lastInSection = !cur || !Array.isArray(cur.prescribed_exercises) || activeExerciseIdx >= cur.prescribed_exercises.length - 1;
+    const lastSection = activeSectionIdx >= secs.length - 1;
+    if (lastInSection && lastSection) return;
+    const t = setTimeout(() => { __goNextExercise(); }, 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sets, sessionMode, currentExercise, activeSectionIdx, activeExerciseIdx, localSections]);
+  // --- end auto-advance ---
   const globalIdx = localSections.slice(0, activeSectionIdx).reduce((a, s) => a + s.prescribed_exercises.length, 0) + activeExerciseIdx;
   const totalExercises = allFlat.length;
 
