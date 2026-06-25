@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
+
+// Convert empty-string form values to null so Postgres accepts number/date columns
+const __clean = (o: any): any => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v === '' ? null : v]));
+
 // \u2500\u2500\u2500 Types \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 interface AssessmentData {
@@ -291,7 +295,7 @@ export default function AssessmentPage() {
 
       const { data: assessment, error: assessErr } = await supabase
         .from('client_assessments')
-        .insert(assessmentPayload)
+        .insert(__clean(assessmentPayload) as any)
         .select()
         .single();
 
@@ -300,7 +304,7 @@ export default function AssessmentPage() {
       if (createAccount) {
         const { error: clientErr } = await supabase
           .from('clients')
-          .insert({
+          .insert(__clean({
             name: `${data.first_name} ${data.last_name}`.trim(),
             email: data.email,
             phone: data.phone,
@@ -313,7 +317,7 @@ export default function AssessmentPage() {
             injuries: data.current_injuries,
             medical_notes: data.chronic_conditions,
             assessment_id: assessment.id,
-          });
+          }) as any);
 
         if (clientErr) throw clientErr;
         router.push('/clients');
