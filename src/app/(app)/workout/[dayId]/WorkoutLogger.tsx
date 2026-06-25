@@ -641,6 +641,64 @@ export default function WorkoutLogger({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionMode, activeSectionIdx, activeExerciseIdx, localSections]);
   // --- end manual swipe ---
+  // --- Auto-load previous weights per movement (editable) ---
+  const [prevByPe, setPrevByPe] = useState<Record<string, Record<number, { weight: string; reps: string }>>>({});
+  useEffect(() => {
+    if (!clientId) return;
+    const peIds = (localSections || []).flatMap((sec: any) => (sec.prescribed_exercises || []).map((p: any) => p.id));
+    if (!peIds.length) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('set_logs')
+          .select('prescribed_exercise_id, set_number, weight_lbs, reps, workout_log_id, logged_at')
+          .eq('client_id', clientId)
+          .in('prescribed_exercise_id', peIds)
+          .order('logged_at', { ascending: false });
+        if (cancelled || !data) return;
+        const map: Record<string, Record<number, { weight: string; reps: string }>> = {};
+        const chosen: Record<string, string> = {};
+        for (const row of data as any[]) {
+          const pe = row.prescribed_exercise_id as string;
+          if (workoutLogId && row.workout_log_id === workoutLogId) continue;
+          if (!chosen[pe]) chosen[pe] = row.workout_log_id;
+          if (row.workout_log_id !== chosen[pe]) continue;
+          if (!map[pe]) map[pe] = {};
+          map[pe][row.set_number] = {
+            weight: row.weight_lbs != null ? String(row.weight_lbs) : '',
+            reps: row.reps != null ? String(row.reps) : '',
+          };
+        }
+        setPrevByPe(map);
+      } catch (e) {}
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, localSections, workoutLogId]);
+  useEffect(() => {
+    if (!__hydrated.current) return;
+    if (!prevByPe || !Object.keys(prevByPe).length) return;
+    setSets((prev: any) => {
+      let changed = false;
+      const next: any = { ...prev };
+      for (const pe of Object.keys(next)) {
+        const pv = prevByPe[pe];
+        if (!pv || !Array.isArray(next[pe])) continue;
+        next[pe] = next[pe].map((row: any, i: number) => {
+          const p = pv[i + 1] || pv[i];
+          if (p && !row.done && (row.weight === '' || row.weight == null)) {
+            changed = true;
+            return { ...row, weight: p.weight, reps: (row.reps === '' || row.reps == null) ? p.reps : row.reps };
+          }
+          return row;
+        });
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prevByPe]);
+  // --- end previous weights ---
   const globalIdx = localSections.slice(0, activeSectionIdx).reduce((a, s) => a + s.prescribed_exercises.length, 0) + activeExerciseIdx;
   const totalExercises = allFlat.length;
 
