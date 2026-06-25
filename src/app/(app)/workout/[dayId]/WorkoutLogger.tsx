@@ -699,6 +699,22 @@ export default function WorkoutLogger({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prevByPe]);
   // --- end previous weights ---
+  // --- Inline exercise video (thumbnail + tap to play) ---
+  const __ytId = (u: any): string | null => {
+    if (!u) return null;
+    const str = String(u);
+    let id: string | null = null;
+    if (str.includes('/embed/')) id = str.split('/embed/')[1];
+    else if (str.includes('/shorts/')) id = str.split('/shorts/')[1];
+    else if (str.includes('youtu.be/')) id = str.split('youtu.be/')[1];
+    else if (str.includes('v=')) id = str.split('v=')[1];
+    if (!id) return null;
+    id = id.split(/[?&/]/)[0];
+    return id || null;
+  };
+  const [__inlinePlay, setInlinePlay] = useState(false);
+  useEffect(() => { setInlinePlay(false); }, [currentExercise?.id]);
+  // --- end inline video hooks ---
   const globalIdx = localSections.slice(0, activeSectionIdx).reduce((a, s) => a + s.prescribed_exercises.length, 0) + activeExerciseIdx;
   const totalExercises = allFlat.length;
 
@@ -912,7 +928,29 @@ export default function WorkoutLogger({
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "var(--brand-primary)" }}>
                 {currentSection.client_facing_name || currentSection.internal_name}
               </p>
-              <h2 className="text-2xl font-bold text-white leading-tight">{currentExercise.exercises?.name}</h2>
+              {currentExercise?.exercises?.video_url ? (() => {
+              const __vid = __ytId(currentExercise.exercises.video_url);
+              return (
+                <div data-no-swipe style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: '14px', overflow: 'hidden', background: '#000', marginBottom: '14px' }}>
+                  {__inlinePlay && __vid ? (
+                    <iframe
+                      src={'https://www.youtube-nocookie.com/embed/' + __vid + '?autoplay=1&playsinline=1&rel=0&modestbranding=1'}
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
+                      allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <button type="button" data-no-swipe onClick={() => setInlinePlay(true)}
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', padding: 0, border: 'none', cursor: 'pointer', backgroundColor: '#111', backgroundImage: __vid ? ('url(https://img.youtube.com/vi/' + __vid + '/hqdefault.jpg)') : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                      <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '58px', height: '58px', borderRadius: '50%', background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ width: 0, height: 0, borderTop: '11px solid transparent', borderBottom: '11px solid transparent', borderLeft: '18px solid #fff', marginLeft: '4px' }} />
+                      </span>
+                    </button>
+                  )}
+                </div>
+              );
+            })() : null}
+            <h2 className="text-2xl font-bold text-white leading-tight">{currentExercise.exercises?.name}</h2>
             {currentExercise.exercises?.video_url && (
               <button type="button" onClick={() => setVideoUrl(currentExercise.exercises!.video_url!)}
                 className="inline-flex items-center gap-1.5 mt-1.5 text-sm font-medium"
