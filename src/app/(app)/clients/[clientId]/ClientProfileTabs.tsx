@@ -653,7 +653,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
     const payload: Record<string, string | number | boolean | null> = {
       name: form.name || client.name, email: form.email || null, date_of_birth: form.date_of_birth || null, start_date: form.start_date || null, phone: form.phone || null,
       primary_goal: form.primary_goal || null,
-      secondary_goals: form.secondary_goals ? form.secondary_goals.split(",").map((g: string) => g.trim()).filter(Boolean) : null,
+      secondary_goals: (form.secondary_goals ? form.secondary_goals.split(",").map((g: string) => g.trim()).filter(Boolean) : null) as any,
       experience_level: form.experience_level || null,
       training_frequency: form.training_frequency ? Number(form.training_frequency) : null,
       current_weight: form.current_weight ? Number(form.current_weight) : null,
