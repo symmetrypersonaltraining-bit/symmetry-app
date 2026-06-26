@@ -132,7 +132,7 @@ export default function DailyMacrosRing() {
               <Ring value={dd.c} goal={dd.cGoal} color="#f59e0b" size={70} stroke={7} showNum sub="g" label={"Carbs " + dd.c + "/" + dd.cGoal} />
               <Ring value={dd.f} goal={dd.fGoal} color="#e84e4e" size={70} stroke={7} showNum sub="g" label={"Fat " + dd.f + "/" + dd.fGoal} />
             </div>
-            <Link href="/nutrition" className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold" style={{ background: "var(--brand-primary)", color: "white" }}>
+            <Link href="/nutrition?viewAsClient=true" className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold" style={{ background: "var(--brand-primary)", color: "white" }}>
               <i className="ti ti-salad" /> Log nutrition
             </Link>
             <button onClick={() => setOpen(false)} type="button" className="w-full mt-2 py-2 text-sm" style={{ background: "none", border: "none", color: "var(--brand-text-secondary)" }}>Close</button>
