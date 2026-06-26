@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import HapticTap from "@/components/HapticTap";
+import FeedbackButton from "@/components/FeedbackButton";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
 
@@ -37,6 +38,7 @@ export default function RootLayout({
       </head>
       <body>
         <HapticTap />
+        <FeedbackButton />
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
