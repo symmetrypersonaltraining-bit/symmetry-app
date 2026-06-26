@@ -920,3 +920,39 @@ button:active,[role="button"]:active,a[class*="btn"]:active,.tap:active{transfor
   --brand-border: #F0CEDD;
   --brand-sidebar: #B0306A;
 }
+
+[data-theme="slatepop"] {
+  --brand-bg: #F2F4F8;
+  --brand-surface: #FFFFFF;
+  --brand-card: #E3E8F2;
+  --brand-primary: #2E4374;
+  --brand-accent: #FF6B6B;
+  --brand-text: #1B2541;
+  --brand-text-secondary: #5C6788;
+  --brand-border: #D5DCEA;
+  --brand-sidebar: #2E4374;
+}
+
+[data-theme="plumdusk"] {
+  --brand-bg: #F6F2F8;
+  --brand-surface: #FFFFFF;
+  --brand-card: #E9DEF0;
+  --brand-primary: #5E3A87;
+  --brand-accent: #E0568A;
+  --brand-text: #2E1B42;
+  --brand-text-secondary: #7C648E;
+  --brand-border: #DECEEC;
+  --brand-sidebar: #5E3A87;
+}
+
+[data-theme="carbonneon"] {
+  --brand-bg: #14161C;
+  --brand-surface: #1E222B;
+  --brand-card: #262B36;
+  --brand-primary: #00C2A8;
+  --brand-accent: #FF5DA2;
+  --brand-text: #EAF0F6;
+  --brand-text-secondary: #9AA6B5;
+  --brand-border: #333A47;
+  --brand-sidebar: #1E222B;
+}
