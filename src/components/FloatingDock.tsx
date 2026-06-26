@@ -13,6 +13,7 @@ export default function FloatingDock() {
   const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const [listening, setListening] = useState(false);
   const dockRef = useRef<HTMLDivElement>(null);
   const d = useRef({ active: false, moved: false, offX: 0, offY: 0, hold: 0 as any });
 
@@ -53,6 +54,19 @@ export default function FloatingDock() {
     window.addEventListener("mousemove", mm); window.addEventListener("mouseup", mu);
   }
 
+  function startVoice() {
+    try {
+      const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      if (!SR) { alert("Voice input is not supported on this browser."); return; }
+      const rec = new SR();
+      rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
+      rec.onstart = () => setListening(true);
+      rec.onend = () => setListening(false);
+      rec.onerror = () => setListening(false);
+      rec.onresult = (e: any) => { const t = e.results[0][0].transcript; setMsg((m) => (m ? m + " " : "") + t); };
+      rec.start();
+    } catch { setListening(false); }
+  }
   async function submit() {
     if (!msg.trim() && !sentiment) return;
     setSending(true); buzz([10, 40, 10]);
@@ -96,6 +110,7 @@ export default function FloatingDock() {
                 <button onClick={() => { buzz(12); setSentiment("change"); }} style={{ flex: 1, padding: "9px 0", borderRadius: 11, cursor: "pointer", border: "1px solid var(--brand-border, rgba(255,255,255,.15))", background: sentiment === "change" ? "var(--brand-primary)" : "transparent", color: sentiment === "change" ? "#fff" : "inherit", fontWeight: 600 }}>Change</button>
               </div>
               <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={3} placeholder="What do you like, or what should change?" style={{ width: "100%", resize: "vertical", borderRadius: 11, padding: "9px 10px", fontSize: 14, background: "var(--brand-surface, rgba(0,0,0,.25))", color: "inherit", border: "1px solid var(--brand-border, rgba(255,255,255,.15))", boxSizing: "border-box" }} />
+              <button type="button" onClick={startVoice} style={{ marginTop: 8, width: "100%", padding: "9px 0", borderRadius: 11, border: "1px solid var(--brand-border, rgba(255,255,255,.15))", background: listening ? "var(--brand-primary)" : "transparent", color: listening ? "#fff" : "inherit", fontWeight: 600, cursor: "pointer" }}>{listening ? "Listening, tap to stop" : "Dictate with voice"}</button>
               <button onClick={submit} disabled={sending} style={{ marginTop: 10, width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--brand-primary)", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", opacity: sending ? 0.6 : 1 }}>{sending ? "Sending..." : "Send to Coach Claude"}</button>
               <div style={{ marginTop: 8, fontSize: 11, opacity: 0.6, textAlign: "center" }}>Tip: press &amp; hold the buttons to drag them anywhere.</div>
             </>
