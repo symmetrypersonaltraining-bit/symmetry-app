@@ -1,56 +1,67 @@
-'use client';
-import { useState } from 'react';
-
-const CATEGORIES = ['Bug', 'UI change', 'New feature', 'Content', 'Other'];
+"use client";
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function FeedbackButton() {
   const [open, setOpen] = useState(false);
-  const [cat, setCat] = useState('Bug');
-  const [text, setText] = useState('');
-  const [sent, setSent] = useState(false);
+  const [sentiment, setSentiment] = useState<"like" | "change" | null>(null);
+  const [msg, setMsg] = useState("");
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
 
-  const send = async () => {
-    setSent(true);
-    setTimeout(() => { setOpen(false); setSent(false); setText(''); }, 1500);
-  };
+  const buzz = (ms: number | number[]) => { try { (navigator as any).vibrate && (navigator as any).vibrate(ms as any); } catch {} };
+
+  async function submit() {
+    if (!msg.trim() && !sentiment) return;
+    setSending(true);
+    buzz([10, 40, 10]);
+    try {
+      const supabase: any = createClient();
+      let source = "app";
+      try { const m = localStorage.getItem("symmetry_view_mode"); if (m) source = m + "-app"; } catch {}
+      const tag = sentiment === "like" ? "[LIKE] " : sentiment === "change" ? "[CHANGE] " : "";
+      await supabase.from("app_feedback").insert({
+        source,
+        client_context: typeof window !== "undefined" ? window.location.pathname : null,
+        transcript: tag + msg.trim(),
+        status: "new",
+      });
+      setDone(true);
+      setMsg("");
+      setSentiment(null);
+      setTimeout(() => { setDone(false); setOpen(false); }, 1700);
+    } catch {
+      setSending(false);
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <>
-      <button className="fab-feedback" onClick={() => setOpen(true)} title="Log app update note">✏️</button>
+      <button
+        aria-label="Send feedback"
+        onClick={() => { buzz(12); setOpen((o) => !o); }}
+        style={{ position: "fixed", right: 16, bottom: 86, zIndex: 1000, width: 52, height: 52, borderRadius: 16, border: "none", background: "var(--brand-primary)", color: "#fff", fontSize: 22, boxShadow: "0 8px 24px rgba(0,0,0,.35)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+      >
+        {open ? "\u00d7" : "\u2728"}
+      </button>
+
       {open && (
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:200,display:'flex',alignItems:'flex-end'}}
-             onClick={(e: React.MouseEvent<HTMLDivElement>) => e.target === e.currentTarget && setOpen(false)}>
-          <div style={{background:'var(--brand-surface)',borderRadius:'18px 18px 0 0',width:'100%',padding:16,maxHeight:'60vh'}}>
-            <div style={{width:36,height:4,background:'var(--brand-border)',borderRadius:2,margin:'0 auto 14px'}}/>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:2,color:'var(--brand-text)'}}>📝 App Update Note</div>
-            <div style={{fontSize:11,color:'var(--brand-text-secondary)',marginBottom:12}}>
-              Logged with page context automatically
-            </div>
-            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:10}}>
-              {CATEGORIES.map(c => (
-                <div key={c} onClick={() => setCat(c)}
-                  style={{padding:'4px 12px',borderRadius:20,fontSize:11,fontWeight:500,cursor:'pointer',
-                    background: cat===c ? 'var(--brand-primary)' : 'transparent',
-                    color: cat===c ? 'white' : 'var(--brand-text-secondary)',
-                    border: `1px solid ${cat===c ? 'var(--brand-primary)' : 'var(--brand-border)'}`}}>
-                  {c}
-                </div>
-              ))}
-            </div>
-            <textarea value={text} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setText(e.target.value)}
-              style={{width:'100%',padding:'9px 10px',borderRadius:10,border:'1px solid var(--brand-border)',
-                background:'var(--brand-bg)',color:'var(--brand-text)',fontSize:12,fontFamily:'inherit',resize:'none',boxSizing:'border-box'}}
-              rows={3} placeholder="Describe the issue or change needed..."/>
-            {sent ? (
-              <div style={{textAlign:'center',color:'#22c55e',fontWeight:600,marginTop:10}}>✓ Sent!</div>
-            ) : (
-              <button onClick={send}
-                style={{width:'100%',marginTop:10,background:'var(--brand-primary)',color:'white',border:'none',
-                  padding:11,borderRadius:10,fontSize:13,fontWeight:600,cursor:'pointer'}}>
-                Send note
-              </button>
-            )}
-          </div>
+        <div style={{ position: "fixed", right: 16, bottom: 150, zIndex: 1000, width: 290, maxWidth: "calc(100vw - 32px)", background: "var(--brand-card, #1b1f2a)", color: "var(--brand-text, #fff)", border: "1px solid var(--brand-border, rgba(255,255,255,.12))", borderRadius: 18, padding: 16, boxShadow: "0 16px 48px rgba(0,0,0,.5)" }}>
+          {done ? (
+            <div style={{ textAlign: "center", padding: "18px 6px", fontWeight: 600 }}>Sent &mdash; thanks, I&apos;m on it.</div>
+          ) : (
+            <>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10 }}>Send feedback</div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <button onClick={() => { buzz(12); setSentiment("like"); }} style={{ flex: 1, padding: "9px 0", borderRadius: 11, cursor: "pointer", border: "1px solid var(--brand-border, rgba(255,255,255,.15))", background: sentiment === "like" ? "var(--brand-primary)" : "transparent", color: sentiment === "like" ? "#fff" : "inherit", fontWeight: 600 }}>Like</button>
+                <button onClick={() => { buzz(12); setSentiment("change"); }} style={{ flex: 1, padding: "9px 0", borderRadius: 11, cursor: "pointer", border: "1px solid var(--brand-border, rgba(255,255,255,.15))", background: sentiment === "change" ? "var(--brand-primary)" : "transparent", color: sentiment === "change" ? "#fff" : "inherit", fontWeight: 600 }}>Change</button>
+              </div>
+              <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={3} placeholder="What do you like, or what should change?" style={{ width: "100%", resize: "vertical", borderRadius: 11, padding: "9px 10px", fontSize: 14, background: "var(--brand-surface, rgba(0,0,0,.25))", color: "inherit", border: "1px solid var(--brand-border, rgba(255,255,255,.15))", boxSizing: "border-box" }} />
+              <button onClick={submit} disabled={sending} style={{ marginTop: 10, width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--brand-primary)", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", opacity: sending ? 0.6 : 1 }}>{sending ? "Sending..." : "Send to Coach Claude"}</button>
+            </>
+          )}
         </div>
       )}
     </>
