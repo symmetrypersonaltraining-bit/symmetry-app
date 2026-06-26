@@ -100,7 +100,9 @@ export default function TrainerLayoutWrapper({ children }: Props) {
         <div className="lg:hidden h-14" />
         {children}
       </div>
-      <AIAssistant isTrainer={true} />
+      {!clientMode && !(pathname || "").startsWith("/workout") && (
+          <AIAssistant isTrainer={true} />
+        )}
     </div>
   );
           }
