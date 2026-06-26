@@ -13,7 +13,7 @@ interface Props {
 const CLIENT_NAV = [
   { href: "/client-preview", label: "Home", icon: "ti-home" },
   { href: "/workout", label: "Workout", icon: "ti-barbell" },
-  { href: "/client-preview/nutrition", label: "Nutrition", icon: "ti-salad" },
+  { href: "/log", label: "Log", icon: "ti-stopwatch" }, { href: "/client-preview/nutrition", label: "Nutrition", icon: "ti-salad" },
 ];
 
 export default function TrainerLayoutWrapper({ children }: Props) {
