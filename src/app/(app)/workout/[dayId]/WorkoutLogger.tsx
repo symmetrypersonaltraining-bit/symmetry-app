@@ -885,7 +885,7 @@ export default function WorkoutLogger({
         {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
 
         {/* Top bar */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-3 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 pt-2 pb-2 flex-shrink-0">
           <button onClick={() => setSessionMode(false)}
             className="w-9 h-9 rounded-full flex items-center justify-center"
             style={{ background: "rgba(255,255,255,0.08)" }}>
@@ -1048,7 +1048,7 @@ export default function WorkoutLogger({
         </div>
 
         {/* Bottom controls */}
-        <div className="flex-shrink-0 px-5 pb-8 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           {/* Trainer AI note */}
           {isTrainerSession && (
             <div className="mb-3 rounded-xl p-3" style={{ display: isTrainerSession ? undefined : "none", background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
@@ -1123,7 +1123,7 @@ export default function WorkoutLogger({
       )}
 
       {/* Header */}
-      <div style={{ background: "var(--brand-primary)" }} className="px-4 pt-4 pb-6">
+      <div style={{ background: "var(--brand-primary)" }} className="px-4 pt-2 pb-3">
         <div className="flex items-center gap-3 mb-3">
           <Link href={isTrainerSession ? `/clients/${clientId}` : "/home"}
             className="w-9 h-9 rounded-full flex items-center justify-center"
