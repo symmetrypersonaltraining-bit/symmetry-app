@@ -115,7 +115,7 @@ export default function AIAssistant({ isTrainer }: { isTrainer: boolean }) {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-24 right-4 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+          className="fixed bottom-4 right-4 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
           style={{ background: "var(--brand-primary)" }}
           aria-label="Open AI assistant"
         >
