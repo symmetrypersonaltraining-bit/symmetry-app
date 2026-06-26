@@ -856,3 +856,21 @@ nav.bottom-nav-bar {
   transition: transform 0.2s, box-shadow 0.2s;
 }
 .fab-feedback:hover { transform: scale(1.1); box-shadow: 0 6px 24px rgba(0,0,0,0.25); }
+
+/* ===== Symmetry polish layer: animations + micro-interactions ===== */
+@keyframes symm-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes symm-pop{0%{transform:scale(.85)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+@keyframes symm-pulse{0%{box-shadow:0 0 0 0 rgba(125,125,125,.25)}70%{box-shadow:0 0 0 9px rgba(125,125,125,0)}100%{box-shadow:0 0 0 0 rgba(125,125,125,0)}}
+@keyframes symm-buzz{0%,100%{transform:translateX(0)}20%{transform:translateX(-2px)}40%{transform:translateX(2px)}60%{transform:translateX(-1px)}80%{transform:translateX(1px)}}
+.symm-rise{animation:symm-rise .45s cubic-bezier(.22,1,.36,1) both}
+.symm-pop{animation:symm-pop .28s ease both}
+.symm-buzz{animation:symm-buzz .3s ease}
+.symm-stagger>*{animation:symm-rise .45s cubic-bezier(.22,1,.36,1) both}
+.symm-stagger>*:nth-child(2){animation-delay:.05s}
+.symm-stagger>*:nth-child(3){animation-delay:.1s}
+.symm-stagger>*:nth-child(4){animation-delay:.15s}
+.symm-stagger>*:nth-child(5){animation-delay:.2s}
+.symm-stagger>*:nth-child(6){animation-delay:.25s}
+button,[role="button"],a[class*="btn"],.tap{transition:transform .09s ease,filter .2s ease,background-color .2s ease,border-color .2s ease}
+button:active,[role="button"]:active,a[class*="btn"]:active,.tap:active{transform:scale(.97)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
