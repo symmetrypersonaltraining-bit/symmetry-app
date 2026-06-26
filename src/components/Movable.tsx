@@ -28,7 +28,8 @@ export default function Movable({ storageKey, children, defaultStyle }: { storag
     window.addEventListener("mousemove", mm); window.addEventListener("mouseup", mu);
   }
 
-  const base: CSSProperties = pos ? { position: "fixed", left: pos.x, top: pos.y, zIndex: 900 } : { position: "fixed", zIndex: 900, ...(defaultStyle || {}) };
+  const base: CSSProperties = { ...(defaultStyle || {}), position: "fixed", zIndex: 900 };
+  if (pos) { base.left = pos.x; base.top = pos.y; base.right = "auto"; base.bottom = "auto"; }
   return (
     <div ref={ref} onTouchStart={ts} onTouchMove={tm} onTouchEnd={te} onMouseDown={md}
       style={{ ...base, touchAction: dragging ? "none" : "auto", boxShadow: dragging ? "0 14px 44px rgba(0,0,0,.55)" : undefined, transition: dragging ? "none" : "box-shadow .2s", cursor: dragging ? "grabbing" : "grab" }}>
