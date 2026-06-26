@@ -98,7 +98,7 @@ export default function ScheduleClient({
           onClick={() => setView(v)}
           className="flex-1 py-1.5 text-xs font-semibold transition-all"
           style={view === v
-            ? { background: "#0F4C81", color: "white", border: "none", cursor: "pointer", padding: "6px 0" }
+            ? { background: "var(--brand-primary)", color: "white", border: "none", cursor: "pointer", padding: "6px 0" }
             : { background: "transparent", color: "#4E6080", border: "none", cursor: "pointer", padding: "6px 0" }
           }
         >
@@ -110,7 +110,7 @@ export default function ScheduleClient({
 
   return (
     <>
-      <div style={{ background: "#0F4C81" }} className="px-4 py-4">
+      <div style={{ background: "var(--brand-primary)" }} className="px-4 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-white font-medium text-lg">Schedule</h1>
@@ -160,18 +160,18 @@ export default function ScheduleClient({
                           hasLog
                             ? { background: "#059669", color: "white" }
                             : isToday
-                              ? { background: "#0F4C81", color: "white" }
+                              ? { background: "var(--brand-primary)", color: "white" }
                               : isScheduled
-                                ? { background: "#DDEEFF", color: "#0F4C81", border: "1px solid #0F4C81" }
+                                ? { background: "#DDEEFF", color: "var(--brand-primary)", border: "1px solid var(--brand-primary)" }
                                 : { background: "#F0F4F8", color: "#4E6080" }
                         }
                       >
                         {hasLog ? <i className="ti ti-check text-xs" /> : dayNum}
                       </div>
-                      <span className="text-xs" style={{ color: isToday ? "#0F4C81" : "#4E6080" }}>{DOW[dow]}</span>
+                      <span className="text-xs" style={{ color: isToday ? "var(--brand-primary)" : "#4E6080" }}>{DOW[dow]}</span>
                       {isScheduled && !hasLog && (
                         <div className="text-center">
-                          <span className="text-xs font-medium" style={{ color: "#0F4C81" }}>
+                          <span className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
                             {upcoming?.label || "Workout"}
                           </span>
                         </div>
@@ -197,7 +197,7 @@ export default function ScheduleClient({
                   <span className="text-xs" style={{ color: "#4E6080" }}>Logged</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ background: "#0F4C81" }} />
+                  <div className="w-2 h-2 rounded-full" style={{ background: "var(--brand-primary)" }} />
                   <span className="text-xs" style={{ color: "#4E6080" }}>Scheduled</span>
                 </div>
               </div>
@@ -230,9 +230,9 @@ export default function ScheduleClient({
                         className="w-8 h-8 flex items-center justify-center text-sm rounded-full"
                         style={
                           isToday
-                            ? { background: "#0F4C81", color: "white", fontWeight: 500 }
+                            ? { background: "var(--brand-primary)", color: "white", fontWeight: 500 }
                             : isScheduled
-                              ? { color: "#0F4C81", fontWeight: 500 }
+                              ? { color: "var(--brand-primary)", fontWeight: 500 }
                               : { color: "#0D1B2E" }
                         }
                       >
@@ -308,7 +308,7 @@ export default function ScheduleClient({
                   style={{ borderColor: "#EDF2F7" }}>
                   <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
                     style={{ background: "#DDEEFF" }}>
-                    <i className="ti ti-calendar text-lg" style={{ color: "#0F4C81" }} />
+                    <i className="ti ti-calendar text-lg" style={{ color: "var(--brand-primary)" }} />
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium">{wd.label ? (<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-label="Workout" style={{ display: "block", margin: "2px auto 0", color: "var(--brand-primary)" }}><path d="M20.57 14.86 22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z"/></svg>) : null}</div>
@@ -325,7 +325,7 @@ export default function ScheduleClient({
           <>
             <p className="label mt-4">all clients</p>
             <div className="card text-sm" style={{ color: "#4E6080", padding: "1rem" }}>
-              <i className="ti ti-brand-google text-lg mr-2" style={{ color: "#0F4C81" }} />
+              <i className="ti ti-brand-google text-lg mr-2" style={{ color: "var(--brand-primary)" }} />
               Google Calendar sync \u2014 connect in Settings to push sessions both ways.
             </div>
           </>

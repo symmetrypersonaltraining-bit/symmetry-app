@@ -78,7 +78,7 @@ export default function TrainerSidebar({
   }
 
   const sidebarContent = (
-    <div className="flex flex-col h-full" style={{ background: "linear-gradient(180deg, #0D3F6E 0%, #0F4C81 40%, #0A3A6B 100%)", color: "white" }}>
+    <div className="flex flex-col h-full" style={{ background: "linear-gradient(180deg, #0D3F6E 0%, var(--brand-primary) 40%, #0A3A6B 100%)", color: "white" }}>
       {/* Logo */}
       <div className="flex items-center gap-3 px-3 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.15)", background: "rgba(0,0,0,0.15)" }}>
         <Link href="/home" className="flex items-center gap-2 flex-1 min-w-0">
@@ -200,7 +200,7 @@ export default function TrainerSidebar({
     <div>
       {/* Mobile top bar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center px-4 gap-3"
-        style={{ paddingTop: "calc(12px + env(safe-area-inset-top))", paddingBottom: "12px", background: "linear-gradient(135deg, #0D3F6E, #0F4C81)" }}>
+        style={{ paddingTop: "calc(12px + env(safe-area-inset-top))", paddingBottom: "12px", background: "linear-gradient(135deg, #0D3F6E, var(--brand-primary))" }}>
         <button onClick={() => setMobileOpen(true)}
           className="w-9 h-9 rounded-lg flex items-center justify-center"
           style={{ background: "rgba(255,255,255,0.15)" }}>

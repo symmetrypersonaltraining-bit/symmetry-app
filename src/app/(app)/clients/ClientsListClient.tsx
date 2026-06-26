@@ -5,7 +5,7 @@ import Link from "next/link";
 import NewClientModal from "./NewClientModal";
 
 const AVATAR_COLORS = [
-  { bg: "#DDEEFF", text: "#0F4C81" },
+  { bg: "#DDEEFF", text: "var(--brand-primary)" },
   { bg: "#FEF3C7", text: "#92400E" },
   { bg: "#F3E8FF", text: "#6B21A8" },
   { bg: "#FEE2E2", text: "#991B1B" },

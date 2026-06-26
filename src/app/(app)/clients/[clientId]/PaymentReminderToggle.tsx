@@ -70,7 +70,7 @@ export default function PaymentReminderToggle({
   const statusLabel = (s: string) => {
     if (s === "paused") return { label: "Paused", bg: "#FEF3C7", color: "#92400E" };
     if (s === "sent") return { label: "Sent", bg: "#D1FAE5", color: "#065F46" };
-    if (s === "approved") return { label: "Approved", bg: "#DDEEFF", color: "#0F4C81" };
+    if (s === "approved") return { label: "Approved", bg: "#DDEEFF", color: "var(--brand-primary)" };
     return { label: "Pending", bg: "#F0F4F8", color: "#4E6080" };
   };
 

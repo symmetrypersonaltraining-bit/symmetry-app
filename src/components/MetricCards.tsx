@@ -43,7 +43,7 @@ interface MetricConfig {
 }
 
 const METRIC_CONFIGS: MetricConfig[] = [
-  { key: 'weight',       label: 'Weight',    unit: 'lbs', color: '#0F4C81', lowerIsBetter: true,  canLog: true  },
+  { key: 'weight',       label: 'Weight',    unit: 'lbs', color: 'var(--brand-primary)', lowerIsBetter: true,  canLog: true  },
   { key: 'body_fat_pct', label: 'Body Fat',  unit: '%',   color: '#e87c3e', lowerIsBetter: true,  canLog: true  },
   { key: 'lean_mass',    label: 'Lean Mass', unit: 'lbs', color: '#22c55e', lowerIsBetter: false, canLog: false },
   { key: 'fat_mass',     label: 'Fat Mass',  unit: 'lbs', color: '#e84e4e', lowerIsBetter: true,  canLog: false },
@@ -52,7 +52,7 @@ const METRIC_CONFIGS: MetricConfig[] = [
 ];
 
 const MACRO_SERIES = [
-  { key: 'kcal',    label: 'Calories', unit: '',  color: '#0F4C81' },
+  { key: 'kcal',    label: 'Calories', unit: '',  color: 'var(--brand-primary)' },
   { key: 'protein', label: 'Protein',  unit: 'g', color: '#22c55e' },
   { key: 'carbs',   label: 'Carbs',    unit: 'g', color: '#f59e0b' },
   { key: 'fats',    label: 'Fat',      unit: 'g', color: '#e84e4e' },
@@ -695,7 +695,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
           {RANGES.map((r, i) => (
             <button key={r.label} onClick={() => setRangeMode(i)} style={{
               padding: '6px 14px', borderRadius: 9, border: 'none', fontWeight: 700, fontSize: 12, cursor: 'pointer',
-              background: rangeMode === i ? '#0F4C81' : 'var(--brand-bg)',
+              background: rangeMode === i ? 'var(--brand-primary)' : 'var(--brand-bg)',
               color: rangeMode === i ? 'white' : 'var(--brand-text-secondary)',
               transition: 'all 0.15s',
             }}>
@@ -704,7 +704,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
           ))}
           <button onClick={() => setRangeMode(4)} style={{
             padding: '6px 14px', borderRadius: 9, border: 'none', fontWeight: 700, fontSize: 12, cursor: 'pointer',
-            background: rangeMode === 4 ? '#0F4C81' : 'var(--brand-bg)',
+            background: rangeMode === 4 ? 'var(--brand-primary)' : 'var(--brand-bg)',
             color: rangeMode === 4 ? 'white' : 'var(--brand-text-secondary)',
             transition: 'all 0.15s',
           }}>

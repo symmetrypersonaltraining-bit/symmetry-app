@@ -67,7 +67,7 @@ export default async function ClientProfilePage({
   const prog = programs.find(p => p.id === (assignment as any)?.program_id);
   const initials = client.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
   const avatarBgs = ["#DDEEFF","#FEF3C7","#F3E8FF","#FEE2E2","#D1FAE5","#FCE7F3"];
-  const avatarTexts = ["#0F4C81","#92400E","#6B21A8","#991B1B","#065F46","#9D174D"];
+  const avatarTexts = ["var(--brand-primary)","#92400E","#6B21A8","#991B1B","#065F46","#9D174D"];
   const ci = client.name.charCodeAt(0) % avatarBgs.length;
   const lm = latestMetrics?.[0] as any;
   const metrics = (latestMetrics || []).reverse() as any[];

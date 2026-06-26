@@ -105,7 +105,7 @@ export default async function NutritionPage({
   if (isTrainer && !clientId) {
     return (
       <>
-        <div style={{ background: "#0F4C81" }} className="px-4 py-4">
+        <div style={{ background: "var(--brand-primary)" }} className="px-4 py-4">
           <h1 className="text-white font-medium text-lg">Nutrition</h1>
           <div className="mt-2">
             <ClientSelector clients={allClients} selectedId={null} label="Client" />
@@ -125,7 +125,7 @@ export default async function NutritionPage({
   return (
     <>
       {isTrainer && !params.viewAsClient && (
-        <div style={{ background: "#0F4C81" }} className="px-4 py-3">
+        <div style={{ background: "var(--brand-primary)" }} className="px-4 py-3">
           <div className="flex items-center justify-between">
             <h1 className="text-white font-medium text-lg">Nutrition</h1>
             <ClientSelector clients={allClients} selectedId={clientId} label="Client" />

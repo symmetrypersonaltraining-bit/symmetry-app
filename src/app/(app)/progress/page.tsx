@@ -49,7 +49,7 @@ export default async function ProgressPage({
 
   return (
     <>
-      <div style={{ background: "#0F4C81" }} className="px-4 py-4">
+      <div style={{ background: "var(--brand-primary)" }} className="px-4 py-4">
         <h1 className="text-white font-medium text-lg">Progress</h1>
         {isTrainer ? (
           <div className="mt-2">

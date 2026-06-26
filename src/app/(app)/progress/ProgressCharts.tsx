@@ -85,8 +85,8 @@ function WeightChart({ logs }: { logs: WeightLog[] }) {
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ overflow: "visible" }}>
         <defs>
           <linearGradient id="wGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#0F4C81" stopOpacity="0.15" />
-            <stop offset="100%" stopColor="#0F4C81" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--brand-primary)" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="var(--brand-primary)" stopOpacity="0" />
           </linearGradient>
         </defs>
         {/* Grid lines */}
@@ -104,13 +104,13 @@ function WeightChart({ logs }: { logs: WeightLog[] }) {
         {/* Fill area */}
         <path d={fillD} fill="url(#wGrad)" />
         {/* Line */}
-        <path d={pathD} fill="none" stroke="#0F4C81" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={pathD} fill="none" stroke="var(--brand-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         {/* Points */}
         {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r="3" fill="#0F4C81" />
+          <circle key={i} cx={p.x} cy={p.y} r="3" fill="var(--brand-primary)" />
         ))}
         {/* Latest point label */}
-        <circle cx={latest.x} cy={latest.y} r="5" fill="#0F4C81" />
+        <circle cx={latest.x} cy={latest.y} r="5" fill="var(--brand-primary)" />
         {/* X-axis labels: show first, middle, last */}
         {[0, Math.floor(points.length / 2), points.length - 1]
           .filter((v, i, a) => a.indexOf(v) === i && v < points.length)
@@ -165,7 +165,7 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
             className="px-3 py-1.5 rounded-full text-xs border transition-all"
             style={
               range === r
-                ? { background: "#0F4C81", color: "white", borderColor: "#0F4C81" }
+                ? { background: "var(--brand-primary)", color: "white", borderColor: "var(--brand-primary)" }
                 : { background: "white", color: "#4E6080", borderColor: "#C8D8EC" }
             }
           >
@@ -203,8 +203,8 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
             className="stat-card rounded-xl p-3 text-center"
             style={{ background: "#EDF2F7", border: "0.5px solid #C8D8EC" }}
           >
-            <i className={`ti ${s.icon} text-base mb-1 block`} style={{ color: "#0F4C81" }} />
-            <div className="stat-value text-xl font-medium" style={{ color: "#0F4C81" }}>{s.value}</div>
+            <i className={`ti ${s.icon} text-base mb-1 block`} style={{ color: "var(--brand-primary)" }} />
+            <div className="stat-value text-xl font-medium" style={{ color: "var(--brand-primary)" }}>{s.value}</div>
             <div className="stat-label text-xs mt-0.5" style={{ color: "#4E6080" }}>{s.label}</div>
           </div>
         ))}
@@ -225,7 +225,7 @@ export default function ProgressCharts({ weightLogs, totalWorkouts, recentPRs, c
                   <div className="text-sm font-medium">{pr.exercise_name}</div>
                   <div className="text-xs" style={{ color: "#4E6080" }}>{pr.date}</div>
                 </div>
-                <div className="text-sm font-medium" style={{ color: "#0F4C81" }}>
+                <div className="text-sm font-medium" style={{ color: "var(--brand-primary)" }}>
                   {pr.weight} lb{pr.reps ? ` \u00d7 ${pr.reps}` : ""}
                 </div>
               </div>

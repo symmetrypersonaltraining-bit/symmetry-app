@@ -29,7 +29,7 @@ export default async function ClientPreviewProgressPage() {
 
   return (
     <>
-      <div style={{ background: "#0F4C81" }} className="px-4 py-4">
+      <div style={{ background: "var(--brand-primary)" }} className="px-4 py-4">
         <h1 className="text-white font-medium text-lg">Progress</h1>
         <p className="text-white/60 text-sm">{clientName}</p>
       </div>

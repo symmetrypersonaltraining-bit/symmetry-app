@@ -48,7 +48,7 @@ export default async function ProfilePage() {
 
   return (
     <>
-      <div style={{ background: "#0F4C81" }} className="px-4 py-4">
+      <div style={{ background: "var(--brand-primary)" }} className="px-4 py-4">
         <h1 className="text-white font-medium text-lg">Profile</h1>
       </div>
 
@@ -57,7 +57,7 @@ export default async function ProfilePage() {
         <div className="card-blue flex items-center gap-4 mt-1">
           <div
             className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-medium flex-shrink-0"
-            style={{ background: "#0F4C81", color: "white" }}
+            style={{ background: "var(--brand-primary)", color: "white" }}
           >
             {initials}
           </div>

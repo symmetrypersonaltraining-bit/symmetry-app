@@ -118,7 +118,7 @@ function addDays(base: Date, n: number): Date {
 
 const DOW_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const AVATAR_BG = ["#DDEEFF","#FEF3C7","#F3E8FF","#FEE2E2","#D1FAE5","#FCE7F3"];
-const AVATAR_TX = ["#0F4C81","#92400E","#6B21A8","#991B1B","#065F46","#9D174D"];
+const AVATAR_TX = ["var(--brand-primary)","#92400E","#6B21A8","#991B1B","#065F46","#9D174D"];
 
 // ---- EditExerciseRow ----
 function EditExerciseRow({ pe, onSave }: {
@@ -1391,7 +1391,7 @@ export default function ProgramPage() {
 
       {copiedWeek && (
         <div className="fixed bottom-0 left-0 right-0 z-50 px-4 py-3 flex flex-wrap items-center gap-3 shadow-2xl"
-          style={{ background: "#0f4c81", color: "white" }}>
+          style={{ background: "var(--brand-primary)", color: "white" }}>
           <div className="flex items-center gap-2 flex-shrink-0">
             <i className="ti ti-calendar-copy text-lg" />
             <span className="text-sm font-semibold">

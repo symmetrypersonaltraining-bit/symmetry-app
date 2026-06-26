@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 type Daily = { date: string; calories: number; protein: number; carbs: number; fats: number };
 const RANGES = ["1wk", "2wk", "4wk", "8wk", "Custom"];
 const METRICS = [
-  { key: "calories", label: "Calories", color: "#0F4C81", unit: "kcal" },
+  { key: "calories", label: "Calories", color: "var(--brand-primary)", unit: "kcal" },
   { key: "protein", label: "Protein", color: "#1D9E75", unit: "g" },
   { key: "carbs", label: "Carbs", color: "#EF9F27", unit: "g" },
   { key: "fats", label: "Fat", color: "#D85A30", unit: "g" },
@@ -104,7 +104,7 @@ export default function MacrosProgressChart({ clientId }: { clientId: string | n
       <div className="flex gap-1.5 flex-wrap mb-2">
         {RANGES.map(r => (
           <button key={r} onClick={() => setRange(r)} className="px-3 py-1.5 rounded-full text-xs border transition-all"
-            style={range === r ? { background: "#0F4C81", color: "white", borderColor: "#0F4C81" } : { background: "white", color: "#4E6080", borderColor: "#C8D8EC" }}>{r}</button>
+            style={range === r ? { background: "var(--brand-primary)", color: "white", borderColor: "var(--brand-primary)" } : { background: "white", color: "#4E6080", borderColor: "#C8D8EC" }}>{r}</button>
         ))}
       </div>
       {range === "Custom" && (
