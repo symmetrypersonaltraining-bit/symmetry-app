@@ -1,5 +1,4 @@
 "use client";
-import Movable from "@/components/Movable";
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -1065,7 +1064,7 @@ export default function WorkoutLogger({
 
           {/* Trainer AI note */}
           {isTrainerSession && (
-            <Movable storageKey="symmetry_progNote_pos" defaultStyle={{ left: 8, bottom: 90, width: "calc(100vw - 16px)", maxWidth: 440 }}><div className="mb-3 rounded-xl p-3" style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
+            <div className="mb-3 rounded-xl p-3" style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
               <div className="flex items-center gap-1.5 mb-1">
                 <i className="ti ti-brain text-sm" style={{ color: "#8b5cf6" }} />
                 <p className="text-xs font-semibold" style={{ color: "#8b5cf6" }}>AI Programming Note</p>
@@ -1086,7 +1085,7 @@ export default function WorkoutLogger({
                   <i className={`ti ${noteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
                 </button>
               </div>
-            </div></Movable>
+            </div>
           )}
 
           <div className="flex gap-3">
