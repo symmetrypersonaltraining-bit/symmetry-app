@@ -9,7 +9,7 @@ export const THEMES = [
   { id: "gunmetal", label: "Gunmetal", primary: "#37474F", bg: "#EAEEF2" },
   { id: "purple", label: "Deep Purple", primary: "#4A148C", bg: "#F3F0F8" },
   { id: "orange", label: "Burnt Orange", primary: "#BF360C", bg: "#FFF3E0" },
-  { id: "rose", label: "Rose", primary: "#880E4F", bg: "#FFF0F3" },
+  { id: "rose", label: "Rose", primary: "#880E4F", bg: "#FFF0F3" }, { id: "blush", label: "Blush", primary: "#C2185B", bg: "#FFF0F5" },
   { id: "midnight", label: "Midnight", primary: "#58A6FF", bg: "#0D1117" },
 ] as const;
 
