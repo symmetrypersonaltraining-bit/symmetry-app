@@ -126,15 +126,6 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   async function logAdherence(meal: Meal, adherenceKey: string) {
     if (adherenceKey === "Off-plan") {
       const existing = logs.find(l => l.meal_position === meal.position);
-    // UN-LOG: tap the active status again to remove the entry.
-    if (existing && existing.adherence === adherenceKey) {
-      const removedId = existing.id;
-      setSaving(true);
-      await supabase.from("meal_adherence_logs").delete().eq("id", removedId);
-      setLogs((prev) => prev.filter((l) => l.id !== removedId));
-      setSaving(false);
-      return;
-    }
       setOffPlanDetails(existing?.off_plan_details || "");
       setOffPlanKcal(existing?.est_kcal?.toString() || "");
       setOffPlanP(existing?.est_protein?.toString() || "");
