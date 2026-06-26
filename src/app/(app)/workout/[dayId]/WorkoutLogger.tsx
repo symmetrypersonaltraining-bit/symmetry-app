@@ -492,7 +492,7 @@ export default function WorkoutLogger({
     for (const section of sections) {
       for (const pe of section.prescribed_exercises) {
         const logs = existingSetLogs.filter(sl => sl.prescribed_exercise_id === pe.id);
-        result[pe.id] = Array.from({ length: pe.sets }, (_, i) => {
+        result[pe.id] = Array.from({ length: (pe.sets || 3) }, (_, i) => {
           const ex = logs.find(l => l.set_number === i + 1);
           return { weight: ex?.weight_lbs?.toString() || "", reps: ex?.reps?.toString() || ((pe.volume_type === "reps" || pe.volume_type === "rep_range") && pe.volume_value ? (String(pe.volume_value).match(/\d+/)?.[0] || "") : ""), done: ex?.completed ?? false };
         });
