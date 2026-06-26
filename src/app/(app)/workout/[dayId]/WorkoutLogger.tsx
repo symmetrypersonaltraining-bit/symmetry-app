@@ -1049,19 +1049,6 @@ export default function WorkoutLogger({
 
         {/* Bottom controls */}
         <div className="flex-shrink-0 px-5 pb-8 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          {/* Session note */}
-          <div className="flex items-center gap-2 mb-3">
-            <input type="text" value={sessionNote} onChange={e => setSessionNote(e.target.value)}
-              placeholder={'Session note\u2026'} className="flex-1 text-sm px-4 py-2.5 rounded-xl outline-none"
-              style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(255,255,255,0.08)" }} />
-            <button onClick={startVoiceNote}
-              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: listening ? "#ef4444" : "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <i className={`ti ${listening ? "ti-microphone-off" : "ti-microphone"} text-base`}
-                style={{ color: listening ? "white" : "rgba(255,255,255,0.4)" }} />
-            </button>
-          </div>
-
           {/* Trainer AI note */}
           {isTrainerSession && (
             <div className="mb-3 rounded-xl p-3" style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
