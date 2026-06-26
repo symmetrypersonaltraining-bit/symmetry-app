@@ -1049,6 +1049,7 @@ export default function WorkoutLogger({
 
         {/* Bottom controls */}
         <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          <button type="button" onClick={() => { document.querySelectorAll("button").forEach((b) => { const el = b as HTMLElement; if (!(el.className.includes("w-10") && el.querySelector(".ti-check"))) return; const r = el.getBoundingClientRect(); if (r.top < 0 || r.bottom > window.innerHeight) return; const rgb = (getComputedStyle(el).backgroundColor.match(/\d+/g) || []).slice(0,3).join(","); if (rgb !== "34,197,94") el.click(); }); }} className="w-full mb-3 py-3 rounded-xl font-semibold text-white" style={{ background: "var(--brand-primary)" }}>Check all sets complete</button>
           {/* Trainer AI note */}
           {isTrainerSession && (
             <div className="mb-3 rounded-xl p-3" style={{ display: isTrainerSession ? undefined : "none", background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
