@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -42,10 +42,10 @@ export default function FloatingDock() {
     if (d.current.active) { setPos((p) => { if (p) { try { localStorage.setItem("symmetry_dock_pos", JSON.stringify(p)); } catch {} } return p; }); }
     d.current.active = false; setDragging(false); clearTimeout(d.current.hold);
   }
-  function onTouchStart(e: React.TouchEvent) { d.current.moved = false; const t = e.touches[0]; d.current.hold = setTimeout(() => start(t.clientX, t.clientY), 260); }
-  function onTouchMove(e: React.TouchEvent) { const t = e.touches[0]; if (d.current.active) { e.preventDefault(); move(t.clientX, t.clientY); } else { clearTimeout(d.current.hold); } }
+  function onTouchStart(e: any) { d.current.moved = false; const t = e.touches[0]; d.current.hold = setTimeout(() => start(t.clientX, t.clientY), 260); }
+  function onTouchMove(e: any) { const t = e.touches[0]; if (d.current.active) { e.preventDefault(); move(t.clientX, t.clientY); } else { clearTimeout(d.current.hold); } }
   function onTouchEnd() { clearTimeout(d.current.hold); end(); }
-  function onMouseDown(e: React.MouseEvent) {
+  function onMouseDown(e: any) {
     d.current.moved = false;
     d.current.hold = setTimeout(() => start(e.clientX, e.clientY), 260);
     const mm = (ev: MouseEvent) => { if (d.current.active) move(ev.clientX, ev.clientY); };
@@ -67,10 +67,10 @@ export default function FloatingDock() {
     } catch {} finally { setSending(false); }
   }
 
-  const dockStyle: React.CSSProperties = pos
+  const dockStyle: CSSProperties = pos
     ? { position: "fixed", left: pos.x, top: pos.y, zIndex: 1000 }
     : { position: "fixed", right: 14, bottom: 18, zIndex: 1000 };
-  const btn: React.CSSProperties = { width: 52, height: 52, borderRadius: 16, border: "none", background: "var(--brand-primary)", color: "#fff", boxShadow: "0 8px 24px rgba(0,0,0,.35)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", touchAction: "none" };
+  const btn: CSSProperties = { width: 52, height: 52, borderRadius: 16, border: "none", background: "var(--brand-primary)", color: "#fff", boxShadow: "0 8px 24px rgba(0,0,0,.35)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", touchAction: "none" };
 
   return (
     <>
