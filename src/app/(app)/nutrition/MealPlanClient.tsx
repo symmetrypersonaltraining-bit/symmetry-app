@@ -125,7 +125,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
   async function logAdherence(meal: Meal, adherenceKey: string) {
     if (adherenceKey === "Off-plan") {
-      const existing = logs.find(l => l.meal_position === meal.position);
+      const existing = logs.find(l => l.meal_id === meal.id);
       setOffPlanDetails(existing?.off_plan_details || "");
       setOffPlanKcal(existing?.est_kcal?.toString() || "");
       setOffPlanP(existing?.est_protein?.toString() || "");
@@ -471,7 +471,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
           {/* Meal cards */}
           <div className="px-4 mt-4 space-y-3">
             {sortedMeals.map(meal => {
-              const mealLog  = logs.find(l => l.meal_position === meal.position);
+              const mealLog  = logs.find(l => l.meal_id === meal.id);
               const macros   = getMealMacros(meal);
               const isLogged = !!mealLog;
               const logOpt   = mealLog ? ADHERENCE_OPTIONS.find(o => o.key === mealLog.adherence) : null;
@@ -582,7 +582,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                       {/* Camera button \u2014 beside Off Plan */}
                       <button
                         onClick={() => {
-                          const existing = logs.find(l => l.meal_position === meal.position);
+                          const existing = logs.find(l => l.meal_id === meal.id);
                           setOffPlanDetails(existing?.off_plan_details || "");
                           setOffPlanKcal(existing?.est_kcal?.toString() || "");
                           setOffPlanP(existing?.est_protein?.toString() || "");
