@@ -873,7 +873,7 @@ export default function WorkoutLogger({
     const saveFields = async (nf: string[]) => { setFieldCfg(prev => ({ ...prev, [currentExercise.id]: nf })); try { await supabase.from("prescribed_exercises").update({ tracked_fields: nf }).eq("id", currentExercise.id); } catch {} };
 
     return (
-      <div className="fixed inset-0 flex flex-col z-[100]" style={{ background: "#0D1117" }}>
+      <div className="fixed inset-0 flex flex-col z-[100]" style={{ background: "var(--session-bg)" }}>
         {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
         {videoUrl && <VideoModal url={videoUrl} onClose={() => setVideoUrl(null)} />}
         {historyExercise && (
