@@ -17,7 +17,7 @@ const CLIENT_NAV = [
   { href: "/client-preview/nutrition", label: "Nutrition", icon: "ti-salad" },
 ];
 
-export default function TrainerLayoutWrapper({ children }: Props) {
+export default function TrainerLayoutWrapper({ children, isTrainer }: Props & { isTrainer?: boolean }) {
   const [clientMode, setClientMode] = useState(false);
   useEffect(() => {
     try {
@@ -100,7 +100,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
         <div className="lg:hidden h-14" />
         {children}
       </div>
-      {!clientMode && !(pathname || "").startsWith("/workout") && (
+      {isTrainer && !clientMode && !(pathname || "").startsWith("/workout") && (
           <AIAssistant isTrainer={true} />
         )}
     </div>
