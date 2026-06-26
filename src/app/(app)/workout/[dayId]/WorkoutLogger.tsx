@@ -686,32 +686,6 @@ export default function WorkoutLogger({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prevByPe]);
   // --- end previous weights ---
-  // --- Fill blank reps with prescribed/recommended reps (survives draft hydration) ---
-  useEffect(() => {
-    if (!__hydrated.current) return;
-    const repsByPe: Record<string, string> = {};
-    (localSections || []).forEach((sec: any) => (sec.prescribed_exercises || []).forEach((pe: any) => {
-      if ((pe.volume_type === "reps" || pe.volume_type === "rep_range") && pe.volume_value) {
-        const mm = String(pe.volume_value).match(/\d+/);
-        if (mm) repsByPe[pe.id] = mm[0];
-      }
-    }));
-    if (!Object.keys(repsByPe).length) return;
-    setSets((prev: any) => {
-      let changed = false;
-      const next: any = { ...prev };
-      for (const peId of Object.keys(next)) {
-        if (!repsByPe[peId] || !Array.isArray(next[peId])) continue;
-        next[peId] = next[peId].map((row: any) => {
-          if (!row.done && (row.reps === "" || row.reps == null)) { changed = true; return { ...row, reps: repsByPe[peId] }; }
-          return row;
-        });
-      }
-      return changed ? next : prev;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localSections, sets]);
-  // --- end fill reps ---
   // --- Inline exercise video (thumbnail + tap to play) ---
   const __ytId = (u: any): string | null => {
     if (!u) return null;
@@ -1045,7 +1019,7 @@ export default function WorkoutLogger({
             <div key={si} className="flex items-center gap-1.5 mb-1">
               <div className="w-8 text-center text-sm font-bold"
                 style={{ color: setEntry.done ? "#22c55e" : "rgba(255,255,255,0.25)" }}>S{si + 1}</div>
-              {xFields.includes("weight") && (<input type="number" value={setEntry.weight}
+              {xFields.includes("weight") && (<input type="text" value={setEntry.weight}
                 onChange={e => updateSet(currentExercise.id, si, "weight", e.target.value)}
                 disabled={setEntry.done} placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
@@ -1054,7 +1028,7 @@ export default function WorkoutLogger({
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="decimal" />)}
-              {xFields.includes("reps") && (<input type="number" value={setEntry.reps}
+              {xFields.includes("reps") && (<input type="text" value={setEntry.reps}
                 onChange={e => updateSet(currentExercise.id, si, "reps", e.target.value)}
                 disabled={setEntry.done} placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
@@ -1280,7 +1254,7 @@ export default function WorkoutLogger({
                         style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>
                         {si + 1}
                       </div>
-                      <input type="number" value={setEntry.weight}
+                      <input type="text" value={setEntry.weight}
                         onChange={e => updateSet(pe.id, si, "weight", e.target.value)}
                         disabled={setEntry.done} placeholder={'\u2014'}
                         className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
@@ -1289,7 +1263,7 @@ export default function WorkoutLogger({
                           color: setEntry.done ? "#22c55e" : "var(--brand-text)",
                           border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
                         }} inputMode="decimal" />
-                      <input type="number" value={setEntry.reps}
+                      <input type="text" value={setEntry.reps}
                         onChange={e => updateSet(pe.id, si, "reps", e.target.value)}
                         disabled={setEntry.done} placeholder={'\u2014'}
                         className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
