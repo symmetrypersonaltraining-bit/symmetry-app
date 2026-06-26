@@ -47,12 +47,6 @@ export default function BottomNav() {
         <span className="text-[10px] font-medium"
           style={{ color: isActive("/progress") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>Progress</span>
       </Link>
-      <Link href="/log" className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors">
-        <i className="ti ti-stopwatch text-xl"
-          style={{ color: isActive("/log") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }} />
-        <span className="text-[10px] font-medium"
-          style={{ color: isActive("/log") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>Log</span>
-      </Link>
     </nav>
   );
 }
