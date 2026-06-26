@@ -22,8 +22,12 @@ export default function TrainerLayoutWrapper({ children }: Props) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("symmetry_view_mode");
-      if (saved === "client") setClientMode(true);
-      else if (saved === "trainer") setClientMode(false);
+      if (saved === "client") {
+        setClientMode(true);
+        if (pathname && !pathname.startsWith("/client-preview")) router.replace("/client-preview");
+      } else if (saved === "trainer") {
+        setClientMode(false);
+      }
     } catch {}
   }, []);
   const router = useRouter();
