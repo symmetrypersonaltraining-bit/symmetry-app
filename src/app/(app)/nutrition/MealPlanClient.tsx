@@ -128,9 +128,10 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       const existing = logs.find(l => l.meal_position === meal.position);
     // UN-LOG: tap the active status again to remove the entry.
     if (existing && existing.adherence === adherenceKey) {
+      const removedId = existing.id;
       setSaving(true);
-      await supabase.from("meal_adherence_logs").delete().eq("id", existing.id);
-      setLogs((prev) => prev.filter((l) => l.id !== existing.id));
+      await supabase.from("meal_adherence_logs").delete().eq("id", removedId);
+      setLogs((prev) => prev.filter((l) => l.id !== removedId));
       setSaving(false);
       return;
     }
