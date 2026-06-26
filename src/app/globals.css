@@ -94,6 +94,18 @@
   --brand-sidebar: #880E4F;
 }
 
+[data-theme="blush"] {
+  --brand-bg: #FFF0F5;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FCE0EA;
+  --brand-primary: #C2185B;
+  --brand-accent: #FF4D8D;
+  --brand-text: #4B1528;
+  --brand-text-secondary: #A83A63;
+  --brand-border: #F8C2D6;
+  --brand-sidebar: #C2185B;
+}
+
 /* ===== THEME: Midnight (dark) ===== */
 [data-theme="midnight"] {
   --brand-bg: #0D1117;
