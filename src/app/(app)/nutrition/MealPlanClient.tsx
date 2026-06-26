@@ -125,7 +125,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
   async function logAdherence(meal: Meal, adherenceKey: string) {
     // Tap an already-logged status again to UN-LOG it (remove the entry).
-    const __existing = logs.find((l: any) => l.meal_position === meal.position);
+    const __existing = logs.find((l) => l.meal_position === meal.position);
     if (__existing && __existing.adherence === adherenceKey) {
       setSaving(true);
       await supabase
@@ -134,7 +134,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         .eq("client_id", clientId)
         .eq("log_date", selectedDate)
         .eq("meal_position", meal.position);
-      setLogs((prev: any) => prev.filter((l: any) => l.meal_position !== meal.position));
+      setLogs((prev) => prev.filter((l) => l.meal_position !== meal.position));
       setSaving(false);
       return;
     }
