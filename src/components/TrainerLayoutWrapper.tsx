@@ -23,7 +23,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
       const saved = localStorage.getItem("symmetry_view_mode");
       if (saved === "client") {
         setClientMode(true);
-        if (pathname && !pathname.startsWith("/client-preview")) router.replace("/client-preview");
+        if (pathname === "/" || pathname === "/home") router.replace("/client-preview");
       } else if (saved === "trainer") {
         setClientMode(false);
       }
