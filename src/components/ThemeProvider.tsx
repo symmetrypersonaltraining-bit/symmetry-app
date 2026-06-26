@@ -13,6 +13,9 @@ export const THEMES = [
     { id: "lagoon", label: "Lagoon", primary: "#0E7C86", bg: "#EEF8F8" },
     { id: "orchid", label: "Orchid", primary: "#8E2DAF", bg: "#FAF4FB" },
     { id: "berry", label: "Berry", primary: "#B0306A", bg: "#FBF1F5" },
+    { id: "slatepop", label: "Slate Pop", primary: "#2E4374", bg: "#F2F4F8" },
+    { id: "plumdusk", label: "Plum Dusk", primary: "#5E3A87", bg: "#F6F2F8" },
+    { id: "carbonneon", label: "Carbon Neon", primary: "#00C2A8", bg: "#14161C" },
   { id: "midnight", label: "Midnight", primary: "#58A6FF", bg: "#0D1117" },
 ] as const;
 
