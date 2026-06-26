@@ -939,7 +939,11 @@ export default function WorkoutLogger({
             })() : null}
             <h2 className="text-2xl font-bold text-white leading-tight">{currentExercise.exercises?.name}</h2>
             {currentExercise.exercises?.video_url && (
-              
+              <button type="button" onClick={() => setVideoUrl(currentExercise.exercises!.video_url!)}
+                className="inline-flex items-center gap-1.5 mt-1.5 text-sm font-medium"
+                style={{ color: "#60a5fa", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                <i className="ti ti-video text-base" /> Watch demo
+              </button>
             )}
               {currentExercise.load_descriptor && (
                 <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>{currentExercise.load_descriptor}</p>
