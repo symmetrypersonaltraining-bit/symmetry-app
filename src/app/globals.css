@@ -874,3 +874,13 @@ nav.bottom-nav-bar {
 button,[role="button"],a[class*="btn"],.tap{transition:transform .09s ease,filter .2s ease,background-color .2s ease,border-color .2s ease}
 button:active,[role="button"]:active,a[class*="btn"]:active,.tap:active{transform:scale(.97)}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+
+/* ===== Workout session screen: dark surface tinted by the active color scheme (distinct from rest of app) ===== */
+:root{ --session-bg:#0D1117; --session-surface:#161B22; --session-border:rgba(255,255,255,.10); }
+@supports (background: color-mix(in srgb, white, black)){
+  :root,[data-theme]{
+    --session-bg: color-mix(in srgb, var(--brand-primary) 20%, #0a0c10);
+    --session-surface: color-mix(in srgb, var(--brand-primary) 26%, #11141a);
+    --session-border: color-mix(in srgb, var(--brand-primary) 45%, transparent);
+  }
+}
