@@ -540,11 +540,11 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
       supabase.from('workout_logs')
         .select('id', { count: 'exact', head: true })
         .eq('client_id', clientId)
-        .gte('logged_at', wideSince + 'T00:00:00'),
+        .gte('log_date', wideSince + 'T00:00:00'),
       supabase.from('workout_logs')
-        .select('logged_at')
+        .select('log_date, completed, status')
         .eq('client_id', clientId)
-        .order('logged_at', { ascending: false }),
+        .order('log_date', { ascending: false }),
       supabase.from('meal_adherence_logs')
         .select('log_date, adherence, meal_id, est_kcal, est_protein, est_carbs, est_fats, trainer_macro_override')
         .eq('client_id', clientId)
@@ -557,7 +557,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
 
     if (wDates && wDates.length > 0) {
       const uniqueDates = [
-        ...new Set((wDates as any[]).map(w => w.logged_at?.split('T')[0]).filter(Boolean)),
+        ...new Set((wDates as any[]).filter((w: any) => w.completed || w.status).map((w: any) => w.log_date).filter(Boolean)),
       ].sort().reverse() as string[];
       let streak = 0;
       for (let i = 0; i < uniqueDates.length; i++) {
