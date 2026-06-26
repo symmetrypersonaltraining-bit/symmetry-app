@@ -884,3 +884,39 @@ button:active,[role="button"]:active,a[class*="btn"]:active,.tap:active{transfor
     --session-border: color-mix(in srgb, var(--brand-primary) 45%, transparent);
   }
 }
+
+[data-theme="lagoon"] {
+  --brand-bg: #EEF8F8;
+  --brand-surface: #FFFFFF;
+  --brand-card: #DBF0F0;
+  --brand-primary: #0E7C86;
+  --brand-accent: #FF7A59;
+  --brand-text: #0B3A3E;
+  --brand-text-secondary: #4E8A8F;
+  --brand-border: #C2E4E5;
+  --brand-sidebar: #0E7C86;
+}
+
+[data-theme="orchid"] {
+  --brand-bg: #FAF4FB;
+  --brand-surface: #FFFFFF;
+  --brand-card: #F3E6F7;
+  --brand-primary: #8E2DAF;
+  --brand-accent: #00B295;
+  --brand-text: #3B1B47;
+  --brand-text-secondary: #8A6796;
+  --brand-border: #E4D2EC;
+  --brand-sidebar: #8E2DAF;
+}
+
+[data-theme="berry"] {
+  --brand-bg: #FBF1F5;
+  --brand-surface: #FFFFFF;
+  --brand-card: #F8DEE9;
+  --brand-primary: #B0306A;
+  --brand-accent: #5A4FCF;
+  --brand-text: #4A1730;
+  --brand-text-secondary: #9A5E78;
+  --brand-border: #F0CEDD;
+  --brand-sidebar: #B0306A;
+}
