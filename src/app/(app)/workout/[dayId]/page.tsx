@@ -2,8 +2,6 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import WorkoutLogger from "./WorkoutLogger";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export default async function WorkoutDayPage({
   params,
