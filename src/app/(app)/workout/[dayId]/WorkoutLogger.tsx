@@ -1051,7 +1051,7 @@ export default function WorkoutLogger({
         <div className="flex-shrink-0 px-5 pb-8 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           {/* Trainer AI note */}
           {isTrainerSession && (
-            <div className="mb-3 rounded-xl p-3" style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
+            <div className="mb-3 rounded-xl p-3" style={{ display: isTrainerSession ? undefined : "none", background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
               <div className="flex items-center gap-1.5 mb-1">
                 <i className="ti ti-brain text-sm" style={{ color: "#8b5cf6" }} />
                 <p className="text-xs font-semibold" style={{ color: "#8b5cf6" }}>AI Programming Note</p>
