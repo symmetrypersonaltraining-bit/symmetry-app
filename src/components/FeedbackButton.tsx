@@ -42,13 +42,13 @@ export default function FeedbackButton() {
       <button
         aria-label="Send feedback"
         onClick={() => { buzz(12); setOpen((o) => !o); }}
-        style={{ position: "fixed", right: 16, bottom: 86, zIndex: 1000, width: 52, height: 52, borderRadius: 16, border: "none", background: "var(--brand-primary)", color: "#fff", fontSize: 22, boxShadow: "0 8px 24px rgba(0,0,0,.35)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+        style={{ position: "fixed", right: 16, bottom: 168, zIndex: 1000, width: 52, height: 52, borderRadius: 16, border: "none", background: "var(--brand-primary)", color: "#fff", fontSize: 22, boxShadow: "0 8px 24px rgba(0,0,0,.35)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
       >
         {open ? "\u00d7" : "\u2728"}
       </button>
 
       {open && (
-        <div style={{ position: "fixed", right: 16, bottom: 150, zIndex: 1000, width: 290, maxWidth: "calc(100vw - 32px)", background: "var(--brand-card, #1b1f2a)", color: "var(--brand-text, #fff)", border: "1px solid var(--brand-border, rgba(255,255,255,.12))", borderRadius: 18, padding: 16, boxShadow: "0 16px 48px rgba(0,0,0,.5)" }}>
+        <div style={{ position: "fixed", right: 16, bottom: 250, zIndex: 1000, width: 290, maxWidth: "calc(100vw - 32px)", background: "var(--brand-card, #1b1f2a)", color: "var(--brand-text, #fff)", border: "1px solid var(--brand-border, rgba(255,255,255,.12))", borderRadius: 18, padding: 16, boxShadow: "0 16px 48px rgba(0,0,0,.5)" }}>
           {done ? (
             <div style={{ textAlign: "center", padding: "18px 6px", fontWeight: 600 }}>Sent &mdash; thanks, I&apos;m on it.</div>
           ) : (
