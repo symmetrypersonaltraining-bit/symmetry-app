@@ -13,5 +13,11 @@ export default function HapticTap() {
     document.addEventListener("click", onClick, { passive: true } as any);
     return () => document.removeEventListener("click", onClick);
   }, []);
+
+  useEffect(() => {
+    const onShow = (e: any) => { if (e && e.persisted) { try { location.reload(); } catch {} } };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
   return null;
 }
