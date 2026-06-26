@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import HapticTap from "@/components/HapticTap";
-import FeedbackButton from "@/components/FeedbackButton";
+import FloatingDock from "@/components/FloatingDock";
+import AIAssistant from "@/components/AIAssistant";
 import ChartZoom from "@/components/ChartZoom";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
@@ -39,7 +40,8 @@ export default function RootLayout({
       </head>
       <body>
         <HapticTap />
-        <FeedbackButton />
+        <FloatingDock />
+        <AIAssistant />
         <ChartZoom />
         <ThemeProvider>{children}</ThemeProvider>
       </body>
