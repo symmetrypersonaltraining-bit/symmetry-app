@@ -3,6 +3,7 @@ import HapticTap from "@/components/HapticTap";
 import FloatingDock from "@/components/FloatingDock";
 import AIAssistant from "@/components/AIAssistant";
 import ChartZoom from "@/components/ChartZoom";
+import VideoZoom from "@/components/VideoZoom";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
 
@@ -43,6 +44,7 @@ export default function RootLayout({
         <FloatingDock />
         <AIAssistant />
         <ChartZoom />
+        <VideoZoom />
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
