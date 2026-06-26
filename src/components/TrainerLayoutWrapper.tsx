@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import TrainerSidebar from "./TrainerSidebar";
-import AIAssistant from "./AIAssistant";
 import Logo from "./Logo";
 
 interface Props {
@@ -17,7 +16,7 @@ const CLIENT_NAV = [
   { href: "/client-preview/nutrition", label: "Nutrition", icon: "ti-salad" },
 ];
 
-export default function TrainerLayoutWrapper({ children, isTrainer }: Props & { isTrainer?: boolean }) {
+export default function TrainerLayoutWrapper({ children }: Props) {
   const [clientMode, setClientMode] = useState(false);
   useEffect(() => {
     try {
@@ -100,9 +99,7 @@ export default function TrainerLayoutWrapper({ children, isTrainer }: Props & { 
         <div className="lg:hidden h-14" />
         {children}
       </div>
-      {isTrainer && !clientMode && !(pathname || "").startsWith("/workout") && (
-          <AIAssistant isTrainer={true} />
-        )}
+      
     </div>
   );
           }
