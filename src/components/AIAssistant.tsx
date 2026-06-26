@@ -1,4 +1,5 @@
 "use client";
+import { createClient } from "@/lib/supabase/client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
@@ -16,7 +17,11 @@ declare global {
   }
 }
 
-export default function AIAssistant({ isTrainer }: { isTrainer: boolean }) {
+export default function AIAssistant() {
+  const [isTrainer, setIsTrainer] = useState(false);
+  useEffect(() => {
+    (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (data?.user?.email === "symmetrypersonaltraining@gmail.com") setIsTrainer(true); } catch {} })();
+  }, []);
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const h = () => setOpen(true);
