@@ -452,7 +452,7 @@ function ExpandedPanel({
       {/* Log entry */}
       {cfg.canLog && (
         !showLog
-          ? <button onClick={() => setShowLog(true)} style={{
+          ? <button onClick={() => (expandedKey === "body_fat_pct" ? (window.location.href = "/log-bodyfat?clientId=" + clientId) : setShowLog(true))} style={{
               width: '100%', padding: '10px', borderRadius: 10,
               border: `1.5px dashed ${cfg.color}`, background: cfg.color + '10',
               color: cfg.color, fontWeight: 700, fontSize: 13, cursor: 'pointer',
