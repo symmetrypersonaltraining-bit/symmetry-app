@@ -113,7 +113,7 @@ const { data: todayWorkoutsRaw } = await (supabase as any)
 .from("scheduled_workouts")
 .select("id, day_id, status, days(id, label, phase_id, phases(label, programs(name)))")
 .eq("client_id", clientRecord.id)
-.eq("scheduled_date", today)
+.eq("scheduled_date", new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
 .order("position");
 // Sort: strength workouts first, cardio/conditioning second
 const isCardioLabel = (label: string) => /cardio|treadmill|stair|walk|run/i.test(label);
