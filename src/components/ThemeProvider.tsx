@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 export const THEMES = [
-  { id: "navy", label: "Navy Blue", primary: "#0F4C81", bg: "#EDF2F7" },
+  { id: "pastel", label: "Soft Pastel", primary: "#7c9cf5", bg: "#f4f6fb" }, { id: "navy", label: "Navy Blue", primary: "#0F4C81", bg: "#EDF2F7" },
   { id: "charcoal", label: "Charcoal", primary: "#2D2D2D", bg: "#F0F0F0" },
   { id: "forest", label: "Forest Green", primary: "#1B5E20", bg: "#F0F7F0" },
   { id: "gunmetal", label: "Gunmetal", primary: "#37474F", bg: "#EAEEF2" },
