@@ -94,6 +94,18 @@
   --brand-sidebar: #880E4F;
 }
 
+[data-theme="pastel"] {
+  --brand-bg: #f4f6fb;
+  --brand-surface: #ffffff;
+  --brand-card: #ffffff;
+  --brand-primary: #7c9cf5;
+  --brand-accent: #5ec9a3;
+  --brand-text: #2a3147;
+  --brand-text-secondary: #8893ab;
+  --brand-border: #e3e9f3;
+  --brand-sidebar: #eef2fa;
+}
+
 [data-theme="blush"] {
   --brand-bg: #FFF0F5;
   --brand-surface: #FFFFFF;
