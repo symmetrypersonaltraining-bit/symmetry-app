@@ -968,3 +968,9 @@ button:active,[role="button"]:active,a[class*="btn"]:active,.tap:active{transfor
   --brand-border: #333A47;
   --brand-sidebar: #1E222B;
 }
+
+
+/* Redesign: airy card polish (Soft Pastel direction) */
+.card, .metric-card { border-radius: 20px; box-shadow: 0 8px 26px rgba(20, 30, 55, 0.07); }
+.stat-card { border-radius: 18px; }
+.card-elevated { border-radius: 20px; }
