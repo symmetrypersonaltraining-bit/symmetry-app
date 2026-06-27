@@ -57,15 +57,15 @@ export default function LogBodyFatPage() {
     if (!clientId || !bfValid || saving) return;
     setSaving(true);
     const today = new Date().toISOString().slice(0, 10);
-    await supabase.from("skinfold_logs").insert({
+    const __r1 = await supabase.from("skinfold_logs").insert({
       client_id: clientId, log_date: today, method: method + "-site",
       sites: vals, sum_mm: sum, body_density: Number(D.toFixed(4)),
       body_fat_pct: Number(bf.toFixed(1)), age: ageN, sex: male ? "male" : "female",
     });
-    await supabase.from("metrics").insert({
+    const __r2 = await supabase.from("metrics").insert({
       client_id: clientId, metric_date: today, body_fat_pct: Number(bf.toFixed(1)), source: "caliper",
     });
-    setDone(true);
+    if (__r1.error || __r2.error) { alert("Save failed: " + (__r1.error ? __r1.error.message : "ok") + " | " + (__r2.error ? __r2.error.message : "ok")); setSaving(false); return; }\n    setDone(true);
     setSaving(false);
     setTimeout(() => router.back(), 700);
   }
