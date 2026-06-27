@@ -56,7 +56,7 @@ export default function LogBodyFatPage() {
   async function save() {
     if (!clientId || !bfValid || saving) return;
     setSaving(true);
-    const today = new Date().toISOString().slice(0, 10);
+    const __d = new Date(); const today = __d.getFullYear() + "-" + String(__d.getMonth()+1).padStart(2,"0") + "-" + String(__d.getDate()).padStart(2,"0");
     const __r1 = await supabase.from("skinfold_logs").insert({
       client_id: clientId, log_date: today, method: method + "-site",
       sites: vals, sum_mm: sum, body_density: Number(D.toFixed(4)),
