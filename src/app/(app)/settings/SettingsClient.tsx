@@ -158,7 +158,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer, userId,
                 transform: theme === t.id ? "scale(1.03)" : "scale(1)",
               }}
             >
-              <div className="w-8 h-8 rounded-lg mb-2" style={{ background: t.primary }} />
+              <div className="w-8 h-8 rounded-lg mb-2 overflow-hidden flex"><div className="flex-1" style={{ background: t.bg }} /><div className="flex-1" style={{ background: t.primary }} /><div className="flex-1" style={{ background: ({pastel:"#5ec9a3",navy:"#0EA5E9",charcoal:"#555555",forest:"#43A047",gunmetal:"#607D8B",purple:"#7B1FA2",orange:"#E64A19",rose:"#E91E63",blush:"#FF4D8D",lagoon:"#FF7A59",orchid:"#00B295",berry:"#5A4FCF",slatepop:"#FF6B6B",plumdusk:"#E0568A",carbonneon:"#FF5DA2",midnight:"#79C0FF"} as Record<string, string>)[t.id] ?? t.primary }} /></div>
               <div className="text-xs font-semibold" style={{ color: t.primary }}>{t.label}</div>
               {theme === t.id && (
                 <div className="text-[10px] mt-0.5 font-medium" style={{ color: t.primary }}>
