@@ -383,14 +383,6 @@ function ExpandedPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeIdx, cfg.color, cfg.unit]);
 
-  const openLog = () => {
-    if (expandedKey === "body_fat_pct") {
-      window.location.href = "/log-bodyfat?clientId=" + clientId;
-      return;
-    }
-    setShowLog(true);
-  };
-
   const handleLog = async () => {
     if (!logValue || !logDate) return;
     setSaving(true);
@@ -460,7 +452,7 @@ function ExpandedPanel({
       {/* Log entry */}
       {cfg.canLog && (
         !showLog
-          ? <button onClick={() => openLog()} style={{
+          ? <button onClick={() => setShowLog(true)} style={{
               width: '100%', padding: '10px', borderRadius: 10,
               border: `1.5px dashed ${cfg.color}`, background: cfg.color + '10',
               color: cfg.color, fontWeight: 700, fontSize: 13, cursor: 'pointer',
