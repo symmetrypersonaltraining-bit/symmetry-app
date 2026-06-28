@@ -974,3 +974,33 @@ button:active,[role="button"]:active,a[class*="btn"]:active,.tap:active{transfor
 .card, .metric-card { border-radius: 20px; box-shadow: 0 8px 26px rgba(20, 30, 55, 0.07); }
 .stat-card { border-radius: 18px; }
 .card-elevated { border-radius: 20px; }
+
+
+/* ===== REDESIGN-POLISH-V2 (appended safe global layer — visual only) ===== */
+:root{
+  --rd-radius-lg:24px;
+  --rd-shadow:0 6px 22px rgba(20,30,55,0.08);
+  --rd-shadow-hover:0 12px 34px rgba(20,30,55,0.13);
+  --rd-ring:rgba(124,156,245,0.38);
+}
+body{ -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+.card, .metric-card{
+  border-radius:var(--rd-radius-lg);
+  box-shadow:var(--rd-shadow);
+  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+@media (hover:hover){
+  .card:hover, .metric-card:hover{ transform:translateY(-2px); box-shadow:var(--rd-shadow-hover); }
+}
+.btn, .btn-primary{
+  border-radius:14px;
+  transition:transform .12s ease, box-shadow .12s ease, filter .12s ease;
+}
+.btn:active, .btn-primary:active{ transform:translateY(1px) scale(.99); }
+.btn-primary{ box-shadow:0 6px 16px -5px var(--brand-primary); }
+.btn-primary:hover{ filter:brightness(1.05); box-shadow:0 10px 22px -6px var(--brand-primary); }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible{
+  outline:none; box-shadow:0 0 0 3px var(--rd-ring);
+}
+input, textarea, select{ border-radius:12px; transition:border-color .15s ease, box-shadow .15s ease; }
+/* ===== end REDESIGN-POLISH-V2 ===== */
