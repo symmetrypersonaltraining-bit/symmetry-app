@@ -39,7 +39,6 @@ interface Props {
   isOwnTrainerView?: boolean;
 }
 
-// ─── Sparkline (mini, for metric cards) ──────────────────────────────────────
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length < 2) {
     return (
@@ -80,7 +79,6 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
   );
 }
 
-// ─── Full Chart (modal) ───────────────────────────────────────────────────────
 function FullChart({
   values, dates, color, label, unit,
 }: {
@@ -112,12 +110,10 @@ function FullChart({
   const pathD = `M ${pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")}`;
   const fillD = `M ${pts[0].x},${H - padB} L ${pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")} L ${pts[pts.length - 1].x},${H - padB} Z`;
 
-  // Y-axis labels (3 ticks)
   const yTicks = [min, min + range / 2, max].map(v => ({
     v, y: padY + (1 - (v - min) / range) * chartH,
   }));
 
-  // X-axis labels (first, middle, last)
   const xTicks = [0, Math.floor(pts.length / 2), pts.length - 1].map(i => pts[i]);
 
   function fmtDate(d: string) {
@@ -140,32 +136,20 @@ function FullChart({
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
         </defs>
-
-        {/* Grid lines */}
         {yTicks.map((t, i) => (
           <line key={i} x1={padX} y1={t.y} x2={W - padX} y2={t.y}
             stroke="var(--brand-border)" strokeWidth="1" strokeDasharray="3,3" />
         ))}
-
-        {/* Area fill */}
         <path d={fillD} fill={`url(#${gradId})`} />
-
-        {/* Line */}
         <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-
-        {/* Y-axis labels */}
         {yTicks.map((t, i) => (
           <text key={i} x={padX - 4} y={t.y + 4} textAnchor="end" fontSize="9"
             fill="var(--brand-text-secondary)">{t.v.toFixed(1)}</text>
         ))}
-
-        {/* X-axis labels */}
         {xTicks.map((p, i) => (
           <text key={i} x={p.x} y={H - 4} textAnchor="middle" fontSize="9"
             fill="var(--brand-text-secondary)">{fmtDate(p.date)}</text>
         ))}
-
-        {/* Data points + hover zones */}
         {pts.map((p, i) => (
           <g key={i} onMouseEnter={() => setHovered(i)}>
             <circle cx={p.x} cy={p.y} r="16" fill="transparent" />
@@ -183,8 +167,6 @@ function FullChart({
           </g>
         ))}
       </svg>
-
-      {/* Stats row */}
       <div className="grid grid-cols-3 gap-2 mt-3">
         {[
           { label: "Current", val: values[values.length - 1] },
@@ -204,7 +186,6 @@ function FullChart({
   );
 }
 
-// ─── Metric Modal ─────────────────────────────────────────────────────────────
 function MetricModal({
   metricKey, label, unit, color, icon, metrics, onClose,
 }: {
@@ -226,9 +207,7 @@ function MetricModal({
         className="w-full max-w-lg rounded-t-3xl p-6 pb-8"
         style={{ background: "var(--brand-bg)", maxHeight: "85vh", overflowY: "auto" }}
       >
-        {/* Handle */}
         <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: "var(--brand-border)" }} />
-
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -250,9 +229,7 @@ function MetricModal({
             <i className="ti ti-x text-sm" style={{ color: "var(--brand-text-secondary)" }} />
           </button>
         </div>
-
         <FullChart values={values} dates={dates} color={color} label={label} unit={unit} />
-
         <Link
           href="/progress"
           onClick={onClose}
@@ -267,7 +244,6 @@ function MetricModal({
   );
 }
 
-// ─── Metric Card ──────────────────────────────────────────────────────────────
 function MetricCard({
   label, value, unit, values, color, icon, onClick,
 }: {
@@ -298,21 +274,17 @@ function MetricCard({
   );
 }
 
-// ─── Workout type helpers ─────────────────────────────────────────────────────
 function isCardioLabel(label?: string): boolean {
   if (!label) return false;
   return /cardio/i.test(label);
 }
 
-// Returns dot color based on workout type:
-// Green = cardio, Blue (brand-primary) = lift/strength, Gray = rest/none
 function workoutDotColor(label?: string): string {
   if (!label) return "var(--brand-border)";
   if (isCardioLabel(label)) return "#22c55e";
   return "var(--brand-primary)";
 }
 
-// ─── Week Ring ────────────────────────────────────────────────────────────────
 function WeekRing({
   allScheduled = [],
   weekOffset,
@@ -329,7 +301,6 @@ function WeekRing({
   const todayDow = today.getDay();
   const todayStr = today.toISOString().split("T")[0];
 
-  // Compute the start of the displayed week
   const displayWeekStart = new Date(today);
   displayWeekStart.setDate(today.getDate() - todayDow + weekOffset * 7);
 
@@ -341,7 +312,6 @@ function WeekRing({
         ? `${Math.abs(weekOffset)} Weeks Ago`
         : "";
 
-  // Build the 7-day array for the displayed week
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(displayWeekStart);
     d.setDate(displayWeekStart.getDate() + i);
@@ -350,7 +320,6 @@ function WeekRing({
     return { dow: i, dateStr, workout, isToday: dateStr === todayStr };
   });
 
-  // Adherence for this week
   const scheduled = weekDays.filter(d => d.workout).length;
   const completed = weekDays.filter(d => d.workout?.completed).length;
   const adherence = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0;
@@ -439,7 +408,6 @@ function WeekRing({
   );
 }
 
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
 type MetricKey = "weight" | "body_fat_pct" | "lean_mass" | "fat_mass";
 
 const METRIC_CONFIG: { key: MetricKey; label: string; unit: string; color: string; icon: string }[] = [
@@ -476,8 +444,6 @@ export default function ClientDashboard({
   const twDone = todayWorkout?.status === "completed";
   const isMilestone = streakDays > 0 && streakDays % 7 === 0;
 
-  // Merge weekWorkouts (server-side current week) and allScheduled for week ring
-  // allScheduled is the full 60-day history; if empty fall back to weekWorkouts
   const scheduleSource: ScheduledDay[] = allScheduled.length > 0
     ? allScheduled
     : weekWorkouts.map(w => ({ id: "", date: w.date, completed: w.completed }));
@@ -491,7 +457,6 @@ export default function ClientDashboard({
 
   return (
     <>
-      {/* Metric Modal */}
       {activeMetric && activeMetricConfig && (
         <MetricModal
           metricKey={activeMetric}
@@ -505,7 +470,6 @@ export default function ClientDashboard({
       )}
 
       <div className="p-4 pb-28 space-y-4 max-w-lg mx-auto">
-        {/* Header */}
         <div className="flex items-start justify-between pt-2">
           <div>
             <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{greeting},</p>
@@ -523,7 +487,6 @@ export default function ClientDashboard({
           )}
         </div>
 
-        {/* Week overview */}
         <div className="metric-card">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold uppercase tracking-widest"
@@ -540,7 +503,6 @@ export default function ClientDashboard({
           />
         </div>
 
-        {/* Today's Workout */}
         {todayWorkout ? (
           <Link href={`/workout/${todayWorkout.id}`}>
             <div className="rounded-2xl p-5 relative overflow-hidden cursor-pointer"
@@ -576,7 +538,6 @@ export default function ClientDashboard({
           </div>
         )}
 
-        {/* Quick links */}
         <div className="grid grid-cols-2 gap-3">
           <Link href="/nutrition">
             <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer"
@@ -604,7 +565,6 @@ export default function ClientDashboard({
           </Link>
         </div>
 
-        {/* AI Analysis — only shown when trainer is viewing their own client dashboard */}
         {isOwnTrainerView && (
           <div className="rounded-2xl p-4"
             style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
@@ -628,7 +588,6 @@ export default function ClientDashboard({
           </div>
         )}
 
-        {/* Metrics */}
         <div>
           <div className="flex items-center justify-between mb-2.5">
             <h2 className="text-base font-bold" style={{ color: "var(--brand-text)" }}>Progress</h2>
@@ -661,7 +620,6 @@ export default function ClientDashboard({
           )}
         </div>
 
-        {/* Recent Workouts */}
         <div>
           <h2 className="text-base font-bold mb-2.5" style={{ color: "var(--brand-text)" }}>Recent Workouts</h2>
           {recentWorkouts.length === 0 ? (
