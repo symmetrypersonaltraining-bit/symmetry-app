@@ -15,6 +15,59 @@ function dwCoef(age: number, male: boolean) {
   return { C: r[1], M: r[2] };
 }
 
+function CaliperGuide({ method }: { method: string }) {
+  const SITE: Record<string, { x: number; y: number; label: string; dir: string }> = {
+    chest:       { x: 30,  y: 52,  label: "Chest",       dir: "Diagonal fold between armpit and nipple" },
+    midaxillary: { x: 49,  y: 64,  label: "Midaxillary", dir: "Vertical fold on the side, at sternum level" },
+    abdominal:   { x: 36,  y: 74,  label: "Abdominal",   dir: "Vertical fold, 2 cm beside the navel" },
+    suprailiac:  { x: 47,  y: 82,  label: "Suprailiac",  dir: "Diagonal fold just above the hip bone" },
+    thigh:       { x: 33,  y: 112, label: "Thigh",       dir: "Vertical fold, front midline of the thigh" },
+    biceps:      { x: 15,  y: 58,  label: "Biceps",      dir: "Vertical fold, front of the upper arm" },
+    triceps:     { x: 186, y: 60,  label: "Triceps",     dir: "Vertical fold, back of the upper arm" },
+    subscapular: { x: 176, y: 52,  label: "Subscapular", dir: "Diagonal fold below the shoulder blade" },
+  };
+  const SETS: Record<string, string[]> = {
+    "7": ["chest","midaxillary","triceps","subscapular","abdominal","suprailiac","thigh"],
+    "4": ["biceps","triceps","subscapular","suprailiac"],
+  };
+  const active = SETS[method] || SETS["7"];
+  const body = (tx: number) => (
+    <g transform={"translate(" + tx + ",14)"} fill="rgba(124,156,245,0.14)" stroke="var(--brand-border)" strokeWidth="1">
+      <circle cx="25" cy="11" r="9" />
+      <rect x="13" y="21" width="24" height="46" rx="9" />
+      <rect x="3" y="23" width="8" height="40" rx="4" />
+      <rect x="39" y="23" width="8" height="40" rx="4" />
+      <rect x="15" y="65" width="9" height="56" rx="4" />
+      <rect x="26" y="65" width="9" height="56" rx="4" />
+    </g>
+  );
+  return (
+    <div style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)", borderRadius: 18, padding: 14, marginBottom: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--brand-text)", marginBottom: 6 }}>Where to measure — {method}-site</div>
+      <svg viewBox="0 0 230 152" style={{ width: "100%", maxWidth: 360, display: "block", margin: "0 auto" }}>
+        {body(10)}
+        {body(140)}
+        <text x="35" y="148" textAnchor="middle" fontSize="9" fill="var(--brand-text-secondary)">FRONT</text>
+        <text x="165" y="148" textAnchor="middle" fontSize="9" fill="var(--brand-text-secondary)">BACK</text>
+        {active.map((k, i) => (
+          <g key={k}>
+            <circle cx={SITE[k].x} cy={SITE[k].y} r="8" fill="var(--brand-primary)" />
+            <text x={SITE[k].x} y={SITE[k].y + 3} textAnchor="middle" fontSize="9" fontWeight="700" fill="#fff">{i + 1}</text>
+          </g>
+        ))}
+      </svg>
+      <ol style={{ margin: "8px 0 0", padding: 0, listStyle: "none", fontSize: 12, color: "var(--brand-text)" }}>
+        {active.map((k, i) => (
+          <li key={k} style={{ display: "flex", gap: 8, padding: "3px 0", alignItems: "center" }}>
+            <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: "var(--brand-primary)", color: "#fff", fontWeight: 700, fontSize: 11, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
+            <span><b>{SITE[k].label}</b> <span style={{ color: "var(--brand-text-secondary)" }}>— {SITE[k].dir}</span></span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 export default function LogBodyFatPage() {
   const router = useRouter();
   const params = useSearchParams();
@@ -106,7 +159,8 @@ export default function LogBodyFatPage() {
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          {sites.map((s) => (
+          {method ? <CaliperGuide method={method} /> : null}
+      {sites.map((s) => (
             <div key={s}>
               <label style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-text-secondary)" }}>{s} (mm)</label>
               <input style={inputStyle} type="number" inputMode="decimal" value={vals[s] || ""} onChange={(e) => setVals({ ...vals, [s]: e.target.value })} />
