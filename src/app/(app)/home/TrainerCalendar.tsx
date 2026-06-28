@@ -341,8 +341,8 @@ function AddSessionModal({ date, timeStr, clients, onClose, onSaved }: {
 }
 
 // ---- Session Detail Popup ----
-function SessionDetailPopup({ ev, clients, onClose, onSaved }: {
-  ev: AE; clients: Client[]; onClose: () => void; onSaved: () => void;
+function SessionDetailPopup({ ev, clients, workoutMap, onClose, onSaved }: {
+  ev: AE; clients: Client[]; workoutMap: Record<string, WorkoutEv[]>; onClose: () => void; onSaved: () => void;
 }) {
   const color = chipColor(ev.status);
   const start = parseAppt(ev.scheduledAt);
@@ -428,6 +428,22 @@ function SessionDetailPopup({ ev, clients, onClose, onSaved }: {
 
         {/* Action buttons */}
         <div className="px-5 pb-5 space-y-2">
+          {ev.clientId && (() => {
+            const evDateStr = dayStr(parseAppt(ev.scheduledAt));
+            const clientWorkouts = (workoutMap[evDateStr] || []).filter(w => w.clientId === ev.clientId);
+            if (clientWorkouts.length === 0) return null;
+            const workout = clientWorkouts[0];
+            const isDoneWorkout = workout.status === "completed";
+            return (
+              <Link
+                href={`/workout/${workout.id}?forClient=${ev.clientId}`}
+                className="w-full py-2.5 rounded-xl font-bold text-sm text-center flex items-center justify-center gap-2"
+                style={{ background: isDoneWorkout ? "#43A047" : "var(--brand-primary)", color: "white" }}>
+                <i className={`ti ${isDoneWorkout ? "ti-check" : "ti-player-play"} text-sm`} />
+                {isDoneWorkout ? "View Workout Log" : "Launch Workout"}
+              </Link>
+            );
+          })()}
           {isToday && ev.status === "scheduled" && ev.clientId && (
             <Link href={`/clients/${ev.clientId}?tab=training`}
               className="w-full py-2.5 rounded-xl font-bold text-sm text-center flex items-center justify-center gap-2"
@@ -575,11 +591,59 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
         {/* Content */}
         <div className="overflow-y-auto flex-1 px-5 py-3 space-y-2">
 
+          {/* Programmed Workouts — launch buttons for trainer */}
+          {workouts.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>
+                Workouts
+              </p>
+              <div className="space-y-1.5">
+                {workouts.map(w => {
+                  const isDone = w.status === "completed";
+                  const statusColor = isDone ? "#43A047" : "var(--brand-primary)";
+                  return (
+                    <div key={w.id}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                      style={{ background: "var(--brand-bg)", border: `1px solid ${statusColor}30` }}>
+                      <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ background: statusColor }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>
+                          {w.clientName}
+                        </p>
+                        <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{w.dayLabel}</p>
+                      </div>
+                      {isDone ? (
+                        <Link
+                          href={`/clients/${w.clientId}`}
+                          onClick={close}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1"
+                          style={{ background: "#43A04720", color: "#43A047", border: "1px solid #43A04740" }}>
+                          <i className="ti ti-check text-xs" /> Done
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/workout/${w.id}?forClient=${w.clientId}`}
+                          onClick={close}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"
+                          style={{ background: "var(--brand-primary)", color: "#fff" }}>
+                          <i className="ti ti-player-play text-xs" /> Launch
+                        </Link>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-          {/* Sessions */}
+          {/* Appointment Sessions */}
           {sorted.length > 0 ? (
             <div>
-  
+              {workouts.length > 0 && (
+                <p className="text-xs font-semibold uppercase tracking-widest mb-1.5 mt-2" style={{ color: "var(--brand-text-secondary)" }}>
+                  Appointments
+                </p>
+              )}
               <div className="space-y-1.5">
                 {sorted.map(ev => {
                   const color = chipColor(ev.status);
@@ -599,8 +663,8 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
                           {displayName(ev)}
                         </p>
                         <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                          {fmtTime(start)} \u2013 {fmtTime(end)}
-                          {ev.title && ev.title !== "Training Session" ? ` \u00b7 ${ev.title}` : ""}
+                          {fmtTime(start)} – {fmtTime(end)}
+                          {ev.title && ev.title !== "Training Session" ? ` · ${ev.title}` : ""}
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -1508,6 +1572,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
         <SessionDetailPopup
           ev={popupEv}
           clients={clients}
+          workoutMap={workoutMap}
           onClose={() => setPopupEv(null)}
           onSaved={() => setRefreshKey(k => k + 1)}
         />
