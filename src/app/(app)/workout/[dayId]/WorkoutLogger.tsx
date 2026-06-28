@@ -580,6 +580,7 @@ export default function WorkoutLogger({
   const progressPct = totalSets > 0 ? Math.round((doneSets / totalSets) * 100) : 0;
   const currentSection = localSections[activeSectionIdx];
   const currentExercise = currentSection?.prescribed_exercises[activeExerciseIdx];
+  const isCardioEx = (pe: any) => !!pe && (pe.volume_type === "duration" || /conditioning/i.test((pe.exercises && pe.exercises.modality) || ""));
 
   // --- Auto-advance to the next exercise once the current one is fully logged ---
   const __goNextExercise = () => {
@@ -750,8 +751,11 @@ export default function WorkoutLogger({
       const s = sets[peId][si];
       await supabase.from("set_logs").upsert({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
-        set_number: si + 1, weight_lbs: s.weight ? parseFloat(s.weight) || 0 : null,
-        reps: s.reps ? parseInt(s.reps) || 0 : null, completed: true, logged_at: new Date().toISOString(),
+        set_number: si + 1,
+        weight_lbs: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (s.weight ? parseFloat(s.weight) || 0 : null),
+        reps: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (s.reps ? parseInt(s.reps) || 0 : null),
+        duration_seconds: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.reps ? Math.round((parseFloat(s.reps) || 0) * 60) : null) : null,
+        completed: true, logged_at: new Date().toISOString(),
       }, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
       updateSet(peId, si, "done", true);
       if (navigator.vibrate) navigator.vibrate(50);
@@ -1204,6 +1208,7 @@ export default function WorkoutLogger({
           const doneCount = peSets.filter(s => s.done).length;
           const isActive = i === activeExerciseIdx;
           const allDone = doneCount === pe.sets;
+          const cardio = isCardioEx(pe);
           return (
             <div key={pe.id} className="rounded-2xl mb-3 overflow-hidden cursor-pointer"
               onClick={() => setActiveExerciseIdx(i)}
@@ -1257,7 +1262,7 @@ export default function WorkoutLogger({
                       &ldquo;{pe.cue}&rdquo;
                     </p>
                   )}
-                  <div className="grid mb-2 mt-3" style={{ gridTemplateColumns: "28px 1fr 1fr 40px", gap: "8px" }}>
+                  {cardio ? (<><div className="grid mb-2 mt-3" style={{ gridTemplateColumns: "28px 1fr 40px", gap: "8px" }}><div /><div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>MINUTES</div><div /></div>{peSets.map((setEntry, si) => (<div key={si} className="grid mb-2 items-center" style={{ gridTemplateColumns: "28px 1fr 40px", gap: "8px" }}><div className="text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div><input type="text" value={setEntry.reps} onChange={e => updateSet(pe.id, si, "reps", e.target.value)} disabled={setEntry.done} placeholder={"min"} className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" /><button onClick={e => { e.stopPropagation(); if (!setEntry.done) logSet(pe.id, si); }} disabled={setEntry.done || saving} className="w-10 h-10 rounded-xl flex items-center justify-center transition-all" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="grid mb-2 mt-3" style={{ gridTemplateColumns: "28px 1fr 1fr 40px", gap: "8px" }}>
                     <div />
                     <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>LBS</div>
                     <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>REPS</div>
@@ -1294,7 +1299,7 @@ export default function WorkoutLogger({
                         <i className="ti ti-check text-sm text-white" />
                       </button>
                     </div>
-                  ))}
+                  ))}</>)}
                 </div>
               )}
             </div>
