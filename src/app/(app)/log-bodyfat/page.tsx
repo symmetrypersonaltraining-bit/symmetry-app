@@ -42,7 +42,7 @@ function CaliperGuide({ method }: { method: string }) {
     </g>
   );
   return (
-    <div style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)", borderRadius: 18, padding: 14, marginBottom: 14 }}>
+    <div style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)", borderRadius: 18, padding: 14, marginBottom: 14, gridColumn: "1 / -1", width: "100%" }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: "var(--brand-text)", marginBottom: 6 }}>Where to measure — {method}-site</div>
       <svg viewBox="0 0 230 152" style={{ width: "100%", maxWidth: 360, display: "block", margin: "0 auto" }}>
         {body(10)}
