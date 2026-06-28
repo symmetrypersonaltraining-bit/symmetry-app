@@ -183,14 +183,14 @@ function WeekRing({ allScheduled = [], weekOffset, onPrev, onNext }: { allSchedu
   const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const today = new Date();
   const todayDow = today.getDay();
-  const todayStr = today.toISOString().split("T")[0];
+  const todayStr = today.toLocaleDateString("en-CA",{timeZone:"America/Chicago"});
   const displayWeekStart = new Date(today);
   displayWeekStart.setDate(today.getDate() - todayDow + weekOffset * 7);
   const weekLabel = weekOffset === 0 ? "This Week" : weekOffset === -1 ? "Last Week" : weekOffset < -1 ? `${Math.abs(weekOffset)} Weeks Ago` : "";
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(displayWeekStart);
     d.setDate(displayWeekStart.getDate() + i);
-    const dateStr = d.toISOString().split("T")[0];
+    const dateStr = d.toLocaleDateString("en-CA",{timeZone:"America/Chicago"});
     const workout = allScheduled.find(w => w.date === dateStr);
     return { dow: i, dateStr, workout, isToday: dateStr === todayStr };
   });
