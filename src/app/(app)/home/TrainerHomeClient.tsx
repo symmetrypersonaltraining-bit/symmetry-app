@@ -176,8 +176,8 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
           {clients.map((c: Client) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-          <button onClick={() => router.push('/clients/' + selectedClientId)} style={{ flex: 1, padding: '10px 0', borderRadius: 12, background: 'var(--brand-primary)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Progress charts</button>
-          <button onClick={() => router.push('/nutrition')} style={{ flex: 1, padding: '10px 0', borderRadius: 12, background: '#5ec9a3', color: '#fff', border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Meal plan &amp; log</button>
+          <button onClick={() => router.push('/progress')} style={{ flex: 1, padding: '10px 0', borderRadius: 12, background: 'var(--brand-primary)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Progress charts</button>
+          <button onClick={() => router.push('/nutrition?clientId=' + selectedClientId)} style={{ flex: 1, padding: '10px 0', borderRadius: 12, background: '#5ec9a3', color: '#fff', border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Meal plan &amp; log</button>
         </div>
         <button onClick={() => router.push('/clients')} style={{ width: '100%', padding: '8px 0', borderRadius: 12, background: 'transparent', color: 'var(--brand-primary)', border: '1.5px solid var(--brand-primary)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>All clients</button>
       </div>
