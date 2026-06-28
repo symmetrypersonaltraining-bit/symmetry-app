@@ -348,8 +348,8 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <div style={{ padding:"14px 16px 0", display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8 }}>
           {[
             { href:"/nutrition?viewAsClient=true", emoji:"🥗", label:"Log meal" },
-            { href:"/log-bodyfat",                 emoji:"⚖️", label:"Weigh in" },
-            { href:"/client-preview/schedule",      emoji:"🏃", label:"Cardio" },
+            { href:"/log",                           emoji:"⚖️", label:"Weigh in" },
+            { href:"/log-bodyfat",                   emoji:"📊", label:"Body fat" },
             { href:"/progress",                     emoji:"📈", label:"Progress" },
           ].map(({ href, emoji, label }) => (
             <Link key={label} href={href} style={{ textDecoration:"none" }}>
