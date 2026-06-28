@@ -124,7 +124,7 @@ export default async function HomePage() {
     );
   }
 
-  // ── CLIENT DASHBOARD (client users + trainer in client-mode) ─────────────────────────────────────────────────────────────────────────────────
+  // ── CLIENT DASHBOARD (client users + trainer in client-mode) ─────────────
   let clientRecord: { id: string; name: string } | null = null;
 
   if (isOwnTrainerView) {
