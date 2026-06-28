@@ -1166,8 +1166,8 @@ export default function WorkoutLogger({
       )}
 
       {/* Header */}
-      <div style={{ background: "var(--brand-primary)" }} className="px-4 pt-2 pb-3">
-        <div className="flex items-center gap-3 mb-3">
+      <div style={{ background: "var(--brand-primary)" }} className="px-4 pt-1.5 pb-2">
+        <div className="flex items-center gap-3 mb-2">
           <Link href={isTrainerSession ? `/clients/${clientId}` : "/home"}
             className="w-9 h-9 rounded-full flex items-center justify-center"
             style={{ background: "rgba(255,255,255,0.15)" }}>
@@ -1201,7 +1201,7 @@ export default function WorkoutLogger({
 
       <div className="px-4 -mt-2 pb-8">
         {/* Section tabs */}
-        <div className="flex gap-2 overflow-x-auto py-3 no-scrollbar">
+        <div className="flex gap-2 overflow-x-auto py-1.5 no-scrollbar">
           {localSections.map((sec, i) => (
             <button key={sec.id} onClick={() => { setActiveSectionIdx(i); setActiveExerciseIdx(0); }}
               className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all"
