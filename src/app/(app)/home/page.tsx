@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import TrainerHomeClient from "./TrainerHomeClient";
 import ClientDashboard from "./ClientDashboard";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
+import { isClientMode } from "@/lib/client-mode";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -12,8 +13,9 @@ export default async function HomePage() {
   if (!user) redirect("/login");
 
   const isTrainer = (user?.email ?? "") === TRAINER_EMAIL;
+  const isInClientMode = await isClientMode(); // boolean
 
-  if (isTrainer) {
+  if (isTrainer && !isInClientMode) {
     const { data: clients } = await supabase
       .from("clients")
       .select("id, name")
@@ -72,12 +74,25 @@ export default async function HomePage() {
     );
   }
 
-  // âââ CLIENT DASHBOARD ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-  const { data: clientRecord } = await supabase
-    .from("clients")
-    .select("id, name")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
+  // ─── CLIENT DASHBOARD (regular clients + trainer in client mode) ──────────────────────────────────────
+  let clientRecord: { id: string; name: string } | null = null;
+
+  if (isTrainer && isInClientMode) {
+    // Trainer viewing their own client dashboard — look up by email
+    const { data } = await supabase
+      .from("clients")
+      .select("id, name")
+      .eq("email", user.email!)
+      .maybeSingle();
+    clientRecord = data ?? null;
+  } else {
+    const { data } = await supabase
+      .from("clients")
+      .select("id, name")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+    clientRecord = data ?? null;
+  }
 
   if (!clientRecord) {
     return (
@@ -105,7 +120,7 @@ export default async function HomePage() {
   const sixtyStr = sixtyDaysAgo.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const { data: recentScheduled } = await supabase
     .from("scheduled_workouts")
-    .select("id, scheduled_date, status")
+    .select("id, scheduled_date, status, days(label)")
     .eq("client_id", clientRecord.id)
     .gte("scheduled_date", sixtyStr)
     .lte("scheduled_date", thirtyAheadStr)
@@ -158,6 +173,7 @@ export default async function HomePage() {
   const allScheduled = (recentScheduled || []).map((w: any) => ({
     id: w.id as string,
     date: w.scheduled_date as string,
+    label: (w.days as any)?.label as string | undefined,
     completed: w.status === "completed",
   }));
 
@@ -192,12 +208,15 @@ export default async function HomePage() {
 
   const firstName = (clientRecord.name || "").split(" ")[0];
 
+  // isOwnTrainerView = true when trainer Dustin is viewing his own client dashboard
+  const isOwnTrainerView = isTrainer && isInClientMode;
+
   return (
     <>
       <PwaInstallBanner />
       <ClientDashboard
         firstName={firstName}
-        todayWorkouts={todayWorkout as any}
+        todayWorkout={todayWorkout as any}
         metrics={metrics as any[]}
         completedCount={completedCount}
         totalScheduled={totalScheduled}
@@ -206,6 +225,7 @@ export default async function HomePage() {
         weekWorkouts={weekWorkouts}
         allScheduled={allScheduled}
         notifications={notifications}
+        isOwnTrainerView={isOwnTrainerView}
       />
     </>
   );
