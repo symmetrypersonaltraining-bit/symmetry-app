@@ -1,10 +1,11 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { pausePaymentReminder } from './actions';
 
-type TodaySession = { id: string; clientId: string; clientName: string; workoutLabel: string; status: string; };
+type TodaySession = { id: string; clientId: string; clientName: string; workoutLabel: string; dayId: string; status: string; };
 type Client = { id: string; name: string };
-type Reminder = { id: string; clientName: string; dueDate: string; amountDue: number; };
+type Reminder = { id: string; clientId: string; clientName: string; dueDate: string; amountDue: number; };
 interface Props { clients: Client[]; todaySessions: TodaySession[]; loggedTodayCount: number; reminders: Reminder[]; notifCount: number; }
 
 const AVATAR_COLORS = ['#7c9cf5','#5ec9a3','#a78bfa','#f59e5a','#f472b6','#34d399'];
@@ -19,6 +20,7 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [greeting, setGreeting] = useState('');
   const [dateStr, setDateStr] = useState('');
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const clusterRef = useRef<HTMLDivElement>(null);
   const drag = useRef({ on: false, sx: 0, sy: 0, or: 0, ob: 0 });
 
@@ -67,10 +69,17 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
     e.preventDefault();
   };
 
-  const paymentTotal = reminders.reduce((a: number, r: Reminder) => a + r.amountDue, 0);
+  const handlePause = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setDismissedIds(prev => new Set([...prev, id]));
+    await pausePaymentReminder(id);
+  };
+
+  const visibleReminders = reminders.filter((r: Reminder) => !dismissedIds.has(r.id));
 
   const card: React.CSSProperties = { background: 'var(--brand-card)', borderRadius: 24, padding: '16px 18px', boxShadow: '0 6px 20px rgba(20,30,55,.07)', marginBottom: 14 };
   const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '.08em', color: 'var(--brand-text-secondary)', textTransform: 'uppercase' as const, marginBottom: 10 };
+  const statCard: React.CSSProperties = { ...card, marginBottom: 0, cursor: 'pointer' };
 
   return (
     <div style={{ background: 'var(--brand-bg)', minHeight: '100vh', padding: '20px 16px', paddingBottom: 100 }}>
@@ -87,21 +96,21 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
         </button>
       </div>
 
-      {/* 4 Stat cards */}
+      {/* 4 Stat cards -- all clickable */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
-        <div style={{ ...card, marginBottom: 0 }}>
+        <div style={statCard} onClick={() => router.push('/clients')}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-text-secondary)', textTransform: 'uppercase' as const, letterSpacing: '.07em' }}>Active clients</div>
           <div style={{ fontSize: 32, fontWeight: 900, color: 'var(--brand-primary)', lineHeight: 1 }}>{clients.length}</div>
         </div>
-        <div style={{ ...card, marginBottom: 0 }}>
+        <div style={statCard} onClick={() => router.push('/schedule')}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-text-secondary)', textTransform: 'uppercase' as const, letterSpacing: '.07em' }}>Sessions today</div>
           <div style={{ fontSize: 32, fontWeight: 900, color: '#5ec9a3', lineHeight: 1 }}>{todaySessions.length}</div>
         </div>
-        <div style={{ ...card, marginBottom: 0 }}>
+        <div style={statCard} onClick={() => router.push('/schedule')}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-text-secondary)', textTransform: 'uppercase' as const, letterSpacing: '.07em' }}>Logged today</div>
           <div style={{ fontSize: 32, fontWeight: 900, color: '#34d399', lineHeight: 1 }}>{loggedTodayCount}</div>
         </div>
-        <div style={{ ...card, marginBottom: 0 }}>
+        <div style={statCard} onClick={() => router.push('/payments')}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-text-secondary)', textTransform: 'uppercase' as const, letterSpacing: '.07em' }}>Notifications</div>
           <div style={{ fontSize: 32, fontWeight: 900, color: notifCount > 0 ? '#fbbf24' : 'var(--brand-text-secondary)', lineHeight: 1 }}>{notifCount}</div>
         </div>
@@ -111,7 +120,7 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
       <div style={card}>
         <div style={lbl}>Today&apos;s Sessions</div>
         {todaySessions.length === 0 ? (
-          <div style={{ color: 'var(--brand-text-secondary)', fontSize: 14 }}>No sessions scheduled today</div>
+          <div style={{ color: 'var(--brand-text-secondary)', fontSize: 14 }}>No supervised sessions today</div>
         ) : (
           <div style={{ overflowY: 'auto', maxHeight: 280 }}>
             {todaySessions.map((s: TodaySession) => (
@@ -124,9 +133,9 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
                   <div style={{ fontSize: 12, color: 'var(--brand-text-secondary)' }}>{s.workoutLabel}</div>
                 </div>
                 {s.status === 'completed' ? (
-                  <button onClick={() => router.push('/clients/' + s.clientId + '?tab=log')} style={{ fontSize: 12, fontWeight: 600, color: '#34d399', background: 'rgba(52,211,153,.1)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}>View log</button>
+                  <button onClick={() => router.push('/clients/' + s.clientId)} style={{ fontSize: 12, fontWeight: 600, color: '#34d399', background: 'rgba(52,211,153,.1)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}>View log</button>
                 ) : (
-                  <button onClick={() => router.push('/log-workout?session=' + s.id + '&client=' + s.clientId)} style={{ fontSize: 12, fontWeight: 600, color: '#fff', background: 'var(--brand-primary)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}>Start</button>
+                  <button onClick={() => router.push('/workout/' + s.dayId + '?forClient=' + s.clientId)} style={{ fontSize: 12, fontWeight: 600, color: '#fff', background: 'var(--brand-primary)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}>Start</button>
                 )}
               </div>
             ))}
@@ -134,21 +143,29 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
         )}
       </div>
 
-      {/* Needs Attention - Payments */}
-      {reminders.length > 0 && (
+      {/* Needs Attention */}
+      {visibleReminders.length > 0 && (
         <div style={card}>
-          <div style={lbl}>Needs Attention</div>
-          {reminders.slice(0, 3).map((r: Reminder) => (
-            <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--brand-border)' }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--brand-text)' }}>{r.clientName}</div>
-                <div style={{ fontSize: 12, color: 'var(--brand-text-secondary)' }}>Due {r.dueDate}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={lbl}>Needs Attention</div>
+            <div style={{ fontSize: 12, color: 'var(--brand-text-secondary)' }}>{visibleReminders.length} due</div>
+          </div>
+          <div style={{ overflowY: 'auto', maxHeight: 320 }}>
+            {visibleReminders.map((r: Reminder) => (
+              <div key={r.id} onClick={() => router.push('/payments')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--brand-border)', cursor: 'pointer' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--brand-text)' }}>{r.clientName}</div>
+                  <div style={{ fontSize: 12, color: 'var(--brand-text-secondary)' }}>Due {r.dueDate}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#f87171' }}>${r.amountDue}</div>
+                  <button onClick={(e: React.MouseEvent) => handlePause(e, r.id)} title='Pause reminder' style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(251,191,36,.12)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i className='ti ti-player-pause' style={{ fontSize: 14, color: '#fbbf24' }} />
+                  </button>
+                </div>
               </div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: '#f87171' }}>${r.amountDue}</div>
-            </div>
-          ))}
-          {reminders.length > 3 && <div style={{ fontSize: 12, color: 'var(--brand-text-secondary)', marginTop: 8 }}>+{reminders.length - 3} more</div>}
-          <div style={{ marginTop: 10, fontSize: 12, color: 'var(--brand-text-secondary)' }}>Total: ${paymentTotal.toLocaleString()}</div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -159,31 +176,18 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
           {clients.map((c: Client) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-          <button onClick={() => router.push('/clients/' + selectedClientId + '?tab=progress')} style={{ flex: 1, padding: '10px 0', borderRadius: 12, background: 'var(--brand-primary)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Progress charts</button>
-          <button onClick={() => router.push('/clients/' + selectedClientId + '?tab=nutrition')} style={{ flex: 1, padding: '10px 0', borderRadius: 12, background: '#5ec9a3', color: '#fff', border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Meal plan &amp; log</button>
+          <button onClick={() => router.push('/clients/' + selectedClientId)} style={{ flex: 1, padding: '10px 0', borderRadius: 12, background: 'var(--brand-primary)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Progress charts</button>
+          <button onClick={() => router.push('/nutrition')} style={{ flex: 1, padding: '10px 0', borderRadius: 12, background: '#5ec9a3', color: '#fff', border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Meal plan &amp; log</button>
         </div>
         <button onClick={() => router.push('/clients')} style={{ width: '100%', padding: '8px 0', borderRadius: 12, background: 'transparent', color: 'var(--brand-primary)', border: '1.5px solid var(--brand-primary)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>All clients</button>
       </div>
 
       {/* Floating AI + Feedback cluster */}
-      <div
-        ref={clusterRef}
-        onMouseDown={startDrag}
-        onTouchStart={startDrag}
-        style={{ position: 'fixed', bottom: 24, right: 20, display: 'flex', gap: 8, zIndex: 200, cursor: 'grab', userSelect: 'none', touchAction: 'none' }}
-      >
-        <button
-          onClick={() => window.dispatchEvent(new Event('symmetry:open:ai'))}
-          title='AI assistant'
-          style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--brand-primary)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,156,245,.35)' }}
-        >
+      <div ref={clusterRef} onMouseDown={startDrag} onTouchStart={startDrag} style={{ position: 'fixed', bottom: 24, right: 20, display: 'flex', gap: 8, zIndex: 200, cursor: 'grab', userSelect: 'none', touchAction: 'none' }}>
+        <button onClick={() => window.dispatchEvent(new Event('symmetry:open:ai'))} title='AI assistant' style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--brand-primary)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,156,245,.35)' }}>
           <i className='ti ti-sparkles' style={{ fontSize: 20, color: '#fff' }} />
         </button>
-        <button
-          onClick={() => setFeedbackOpen(true)}
-          title='App Feedback'
-          style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--brand-card)', border: '1.5px solid var(--brand-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(20,30,55,.10)' }}
-        >
+        <button onClick={() => setFeedbackOpen(true)} title='App Feedback' style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--brand-card)', border: '1.5px solid var(--brand-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(20,30,55,.10)' }}>
           <i className='ti ti-message-2' style={{ fontSize: 18, color: 'var(--brand-text-secondary)' }} />
         </button>
       </div>
