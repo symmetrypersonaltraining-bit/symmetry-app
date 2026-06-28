@@ -82,16 +82,16 @@ export default async function SchedulePage() {
     .map(([dow]) => parseInt(dow));
 
   const nowIso = new Date().toISOString();
-  const futureIso = new Date(Date.now() + 14 * 86400000).toISOString();
+  const futureIso = new Date(Date.now() + 42 * 86400000).toISOString();
 
   let upcomingQ = supabase
     .from("appointments")
-    .select("id, client_id, scheduled_at, title, clients(name)")
+    .select("id, client_id, scheduled_at, ends_at, title, gcal_event_id, gcal_recurring_id, clients(name)")
     .gte("scheduled_at", nowIso)
     .lte("scheduled_at", futureIso)
     .neq("status", "cancelled")
     .order("scheduled_at", { ascending: true })
-    .limit(20);
+    .limit(200);
 
   if (!isTrainer && clientId) { upcomingQ = upcomingQ.eq("client_id", clientId); }
 
@@ -105,7 +105,36 @@ export default async function SchedulePage() {
     const dow = dowMap[dowStr] ?? 0;
     const clientName = (appt.clients as { name?: string } | null)?.name ?? "Client";
     const label = isTrainer ? `${clientName} — ${timeStr}` : ((appt.title as string | null) ?? timeStr);
-    return { id: appt.id as string, label, date: dateStr, dow };
+
+    // Extract HH:mm in 24h for time grid positioning
+    const startTime = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d).replace(/^24:/, "00:");
+
+    let endTime: string | undefined;
+    if (appt.ends_at) {
+      const endD = new Date(appt.ends_at as string);
+      endTime = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Chicago",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(endD).replace(/^24:/, "00:");
+    }
+
+    return {
+      id: appt.id as string,
+      label,
+      date: dateStr,
+      dow,
+      startTime,
+      endTime,
+      gcalEventId: (appt.gcal_event_id as string | null) ?? undefined,
+      gcalRecurringId: (appt.gcal_recurring_id as string | null) ?? undefined,
+    };
   });
 
   let paymentReminders: { date: string; clientName: string; amount: number; status: string }[] = [];
