@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { markClientPaid, setPaymentStatus, updateAmountDue } from "./paymentActions";
 
 interface ReminderSummary {
   id: string;
@@ -22,7 +24,7 @@ interface ClientPayment {
   dueDate: string | null;
   amountDue: number;
   billingCredits: number;
-  notificationStatus: string; // "pending"|"paused"|"sent"|"paid"|"cancelled"|"no_reminder"
+  notificationStatus: string; // "pending"|"paused"|"disabled"|"sent"|"paid"|"cancelled"|"no_reminder"
   emailSentAt: string | null;
   approvedAt: string | null;
   notes: string | null;
@@ -40,13 +42,22 @@ function isNoReminderClient(name: string) {
 }
 
 const STATUS_META: Record<string, { bg: string; color: string; label: string }> = {
-  pending:     { bg: "#f59e0b20", color: "#f59e0b", label: "Pending" },
-  paused:      { bg: "rgba(100,100,120,0.15)", color: "#94a3b8", label: "Paused" },
-  sent:        { bg: "#22c55e20", color: "#22c55e", label: "Reminder Sent" },
-  paid:        { bg: "#0EA5E920", color: "#0EA5E9", label: "Paid" },
-  cancelled:   { bg: "#ef444420", color: "#ef4444", label: "Cancelled" },
+  pending: { bg: "#f59e0b20", color: "#f59e0b", label: "Pending" },
+  paused: { bg: "rgba(100,100,120,0.15)", color: "#94a3b8", label: "Paused" },
+  disabled: { bg: "rgba(80,80,100,0.12)", color: "#64748b", label: "Disabled" },
+  sent: { bg: "#22c55e20", color: "#22c55e", label: "Reminder Sent" },
+  paid: { bg: "#0EA5E920", color: "#0EA5E9", label: "Paid" },
+  cancelled: { bg: "#ef444420", color: "#ef4444", label: "Cancelled" },
   no_reminder: { bg: "rgba(100,100,120,0.1)", color: "#64748b", label: "No Reminder" },
 };
+
+// Sort weight: pending/sent = 0, paused = 1, disabled = 2, everything else = 3
+function statusSortWeight(status: string): number {
+  if (status === "pending" || status === "sent") return 0;
+  if (status === "paused") return 1;
+  if (status === "disabled") return 2;
+  return 3;
+}
 
 function localDateStr(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -60,7 +71,7 @@ function daysUntil(d: string, today: string) {
   return Math.round((new Date(d + "T00:00:00").getTime() - new Date(today + "T00:00:00").getTime()) / 86400000);
 }
 
-// \u2500\u2500 Confirm Modal (Send flow) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── Confirm Modal (Send flow) ────────────────────────────────────────────────
 interface ConfirmModalProps {
   client: ClientPayment;
   onClose: () => void;
@@ -171,7 +182,7 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
             <p className="text-xs font-semibold mb-1" style={{ color: "var(--brand-text-secondary)" }}>TO</p>
             {client.clientEmail
               ? <p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>{client.clientEmail}</p>
-              : <p className="text-sm text-red-400 font-medium">No email on file \u2014 cannot send</p>}
+              : <p className="text-sm text-red-400 font-medium">No email on file — cannot send</p>}
           </div>
 
           <div>
@@ -212,7 +223,7 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
 
           <div>
             <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--brand-text-secondary)" }}>
-              PERSONAL NOTE <span className="text-xs font-normal">(optional \u2014 included in email)</span>
+              PERSONAL NOTE <span className="text-xs font-normal">(optional — included in email)</span>
             </label>
             <textarea
               value={notes}
@@ -272,7 +283,7 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
               cursor: sending || sent || !client.clientEmail ? "not-allowed" : "pointer",
             }}
           >
-            {sending ? "Sending\u2026" : sent ? "Sent!" : "Send Reminder"}
+            {sending ? "Sending…" : sent ? "Sent!" : "Send Reminder"}
           </button>
         </div>
       </div>
@@ -280,7 +291,7 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
   );
 }
 
-// \u2500\u2500 New Payment Modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── New Payment Modal ───────────────────────────────────────────────────────
 interface NewPaymentModalProps {
   clients: ClientPayment[];
   onClose: () => void;
@@ -491,7 +502,7 @@ function NewPaymentModal({ clients, onClose, onCreated }: NewPaymentModalProps) 
               cursor: saving || done ? "not-allowed" : "pointer",
             }}
           >
-            {saving ? "Saving\u2026" : done ? "Done!" : "Save & Send"}
+            {saving ? "Saving…" : done ? "Done!" : "Save & Send"}
           </button>
         </div>
       </div>
@@ -499,9 +510,10 @@ function NewPaymentModal({ clients, onClose, onCreated }: NewPaymentModalProps) 
   );
 }
 
-// \u2500\u2500 Main Component \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── Main Component ──────────────────────────────────────────────────────────
 export default function PaymentsClient({ clients }: { clients: ClientPayment[] }) {
   const supabase = createClient();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("upcoming");
   const [search, setSearch] = useState("");
   const [localClients, setLocalClients] = useState(clients);
@@ -509,52 +521,91 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
   const [updating, setUpdating] = useState<string | null>(null);
   const [showNewPayment, setShowNewPayment] = useState(false);
 
-  // Edit mode state
+  // Full edit mode state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState("");
   const [editDueDate, setEditDueDate] = useState("");
   const [editNotes, setEditNotes] = useState("");
 
+  // Inline amount editing state
+  const [editingAmountId, setEditingAmountId] = useState<string | null>(null);
+  const [inlineAmount, setInlineAmount] = useState("");
+  const inlineAmountRef = useRef<HTMLInputElement>(null);
+
   // Delete confirmation state
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Focus inline amount input when opened
+  useEffect(() => {
+    if (editingAmountId && inlineAmountRef.current) {
+      inlineAmountRef.current.select();
+    }
+  }, [editingAmountId]);
 
   const today = localDateStr();
   const thirtyDaysDate = new Date();
   thirtyDaysDate.setDate(thirtyDaysDate.getDate() + 30);
   const thirtyStr = localDateStr(thirtyDaysDate);
 
-  const filtered = localClients.filter(c => {
-    if (search && !c.clientName.toLowerCase().includes(search.toLowerCase())) return false;
-    if (tab === "upcoming") {
-      if (c.notificationStatus === "paid" || c.notificationStatus === "cancelled") return false;
-      if (!c.dueDate) return true;
-      return c.dueDate >= today && c.dueDate <= thirtyStr;
-    }
-    return true;
-  });
+  const filtered = localClients
+    .filter(c => {
+      if (search && !c.clientName.toLowerCase().includes(search.toLowerCase())) return false;
+      if (tab === "upcoming") {
+        if (c.notificationStatus === "paid" || c.notificationStatus === "cancelled") return false;
+        if (!c.dueDate) return true;
+        return c.dueDate >= today && c.dueDate <= thirtyStr;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const wa = statusSortWeight(a.notificationStatus);
+      const wb = statusSortWeight(b.notificationStatus);
+      if (wa !== wb) return wa - wb;
+      // Within same group: sort by due_date ASC, nulls last
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0;
+    });
 
   const pendingCount = filtered.filter(c => c.notificationStatus === "pending" || c.notificationStatus === "no_reminder").length;
   const totalOwed = filtered
-    .filter(c => c.notificationStatus !== "paid" && c.notificationStatus !== "cancelled" && c.notificationStatus !== "no_reminder")
+    .filter(c => c.notificationStatus !== "paid" && c.notificationStatus !== "cancelled" && c.notificationStatus !== "no_reminder" && c.notificationStatus !== "disabled")
     .reduce((a, c) => a + c.amountDue - c.billingCredits, 0);
   const overdueCount = filtered.filter(c => c.dueDate && daysUntil(c.dueDate, today) < 0 && c.notificationStatus !== "paid").length;
 
   async function handleMarkPaid(c: ClientPayment) {
     if (!c.reminderId) return;
     setUpdating(c.clientId);
-    await supabase.from("payment_reminders").update({ notification_status: "paid" }).eq("id", c.reminderId);
+    // Use server action: delete current + create next month
+    await markClientPaid(c.reminderId);
+    // Optimistic update: remove reminder from local state (page refresh will reload fresh data)
     setLocalClients(prev => prev.map(p =>
-      p.clientId === c.clientId ? { ...p, notificationStatus: "paid" } : p
+      p.clientId === c.clientId
+        ? { ...p, notificationStatus: "no_reminder", reminderId: null, hasReminder: false }
+        : p
     ));
     setUpdating(null);
+    router.refresh();
   }
 
   async function handlePauseToggle(c: ClientPayment) {
     if (!c.reminderId) return;
     const next = c.notificationStatus === "paused" ? "pending" : "paused";
     setUpdating(c.clientId);
-    await supabase.from("payment_reminders").update({ notification_status: next }).eq("id", c.reminderId);
+    await setPaymentStatus(c.reminderId, next);
+    setLocalClients(prev => prev.map(p =>
+      p.clientId === c.clientId ? { ...p, notificationStatus: next } : p
+    ));
+    setUpdating(null);
+  }
+
+  async function handleDisableToggle(c: ClientPayment) {
+    if (!c.reminderId) return;
+    const next = c.notificationStatus === "disabled" ? "pending" : "disabled";
+    setUpdating(c.clientId);
+    await setPaymentStatus(c.reminderId, next as 'pending' | 'paused' | 'disabled');
     setLocalClients(prev => prev.map(p =>
       p.clientId === c.clientId ? { ...p, notificationStatus: next } : p
     ));
@@ -581,6 +632,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
     setEditDueDate(c.dueDate || localDateStr());
     setEditNotes(c.notes || "");
     setDeleteConfirmId(null);
+    setEditingAmountId(null);
   }
 
   function cancelEdit() {
@@ -639,9 +691,30 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
     setDeletingId(null);
   }
 
+  function startInlineAmountEdit(c: ClientPayment) {
+    setEditingAmountId(c.clientId);
+    setInlineAmount(String(c.amountDue));
+    setEditingId(null);
+  }
+
+  async function saveInlineAmount(c: ClientPayment) {
+    const newAmt = parseFloat(inlineAmount);
+    if (isNaN(newAmt) || newAmt === c.amountDue) {
+      setEditingAmountId(null);
+      return;
+    }
+    if (c.reminderId) {
+      await updateAmountDue(c.reminderId, newAmt);
+    }
+    setLocalClients(prev => prev.map(p =>
+      p.clientId === c.clientId ? { ...p, amountDue: newAmt } : p
+    ));
+    setEditingAmountId(null);
+  }
+
   return (
     <div className="pb-24" style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
-      {/* \u2500\u2500 Red gradient header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+      {/* ── Red gradient header ──────────────────────────────── */}
       <div className="px-4 lg:px-6 pt-6 pb-5"
         style={{ background: "linear-gradient(135deg, #7f1d1d, #dc2626)" }}>
         <div className="flex items-start justify-between gap-3 mb-3">
@@ -653,7 +726,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
             <div>
               <h1 className="text-xl font-bold text-white">Payments</h1>
               <p className="text-xs text-red-200">
-                {pendingCount} need action \u00b7 ${totalOwed.toLocaleString()} total owed
+                {pendingCount} need action · ${totalOwed.toLocaleString()} total owed
               </p>
             </div>
           </div>
@@ -684,7 +757,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
         </div>
       </div>
 
-      {/* \u2500\u2500 Tabs + search \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+      {/* ── Tabs + search ─────────────────────────────────────── */}
       <div className="px-4 lg:px-6 py-3 flex items-center gap-3 sticky top-0 z-10"
         style={{ background: "var(--brand-surface)", borderBottom: "1px solid var(--brand-border)" }}>
         <div className="flex rounded-xl overflow-hidden border flex-shrink-0" style={{ borderColor: "var(--brand-border)" }}>
@@ -701,20 +774,20 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search client\u2026"
+          placeholder="Search client…"
           className="flex-1 px-3 py-1.5 text-sm rounded-xl outline-none min-w-0"
           style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}
         />
       </div>
 
-      {/* \u2500\u2500 Client list \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+      {/* ── Client list ───────────────────────────────────────── */}
       <div className="px-4 lg:px-6 space-y-2 mt-3">
         {filtered.length === 0 && (
           <div className="py-12 text-center rounded-2xl"
             style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
             <i className="ti ti-check-circle text-4xl block mb-2" style={{ color: "#22c55e" }} />
             <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
-              {tab === "upcoming" ? "All clear \u2014 no upcoming payments in the next 30 days." : "No clients found."}
+              {tab === "upcoming" ? "All clear — no upcoming payments in the next 30 days." : "No clients found."}
             </p>
           </div>
         )}
@@ -727,11 +800,13 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
           const initials = c.clientName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
           const isOverdue = days !== null && days < 0 && c.notificationStatus !== "paid";
           const isPaid = c.notificationStatus === "paid";
+          const isDisabled = c.notificationStatus === "disabled";
           const noReminder = c.notificationStatus === "no_reminder";
           const isEditing = editingId === c.clientId;
           const isDeleteConfirm = deleteConfirmId === c.clientId;
           const isDeleting = deletingId === c.clientId;
           const noReminderClient = isNoReminderClient(c.clientName);
+          const isEditingAmount = editingAmountId === c.clientId;
 
           return (
             <div
@@ -739,7 +814,8 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
               className="rounded-2xl overflow-hidden transition-all"
               style={{
                 background: "var(--brand-surface)",
-                border: `1px solid ${isOverdue ? "rgba(239,68,68,0.4)" : "var(--brand-border)"}`,
+                border: `1px solid ${isOverdue ? "rgba(239,68,68,0.4)" : isDisabled ? "rgba(100,116,139,0.2)" : "var(--brand-border)"}`,
+                opacity: isDisabled ? 0.75 : 1,
               }}
             >
               <div className="flex items-start gap-3 p-4">
@@ -748,6 +824,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                   className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
                   style={{
                     background: isPaid ? "#22c55e"
+                      : isDisabled ? "#64748b"
                       : isOverdue ? "#ef4444"
                       : noReminder ? "#6b7280"
                       : "#dc2626",
@@ -777,7 +854,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                                 : `Due in ${days}d`}
                             </span>
                             <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                              \u00b7 {fmtDate(c.dueDate)}
+                              · {fmtDate(c.dueDate)}
                             </span>
                           </>
                         ) : (
@@ -798,9 +875,40 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                     {/* Amount + delete button */}
                     <div className="flex items-start gap-1 flex-shrink-0">
                       <div className="text-right">
-                        <p className="text-base font-bold" style={{ color: isPaid ? "#22c55e" : "var(--brand-text)" }}>
-                          ${net > 0 ? net.toLocaleString() : (c.currentFees ? c.currentFees.toLocaleString() : "\u2014")}
-                        </p>
+                        {/* Inline amount edit */}
+                        {isEditingAmount && c.reminderId ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-bold" style={{ color: "var(--brand-text-secondary)" }}>$</span>
+                            <input
+                              ref={inlineAmountRef}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={inlineAmount}
+                              onChange={e => setInlineAmount(e.target.value)}
+                              onBlur={() => saveInlineAmount(c)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter") saveInlineAmount(c);
+                                if (e.key === "Escape") setEditingAmountId(null);
+                              }}
+                              className="w-20 px-1.5 py-0.5 rounded-lg text-sm font-bold outline-none text-right"
+                              style={{
+                                background: "var(--brand-bg)",
+                                color: "var(--brand-text)",
+                                border: "2px solid #dc2626",
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <p
+                            className="text-base font-bold cursor-pointer hover:underline"
+                            title="Click to edit amount"
+                            style={{ color: isPaid ? "#22c55e" : "var(--brand-text)" }}
+                            onClick={() => !isPaid && !isDisabled && c.reminderId && startInlineAmountEdit(c)}
+                          >
+                            ${net > 0 ? net.toLocaleString() : (c.currentFees ? c.currentFees.toLocaleString() : "—")}
+                          </p>
+                        )}
                         {c.billingCredits > 0 && (
                           <p className="text-xs" style={{ color: "#22c55e" }}>-${c.billingCredits} credit</p>
                         )}
@@ -819,6 +927,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                             } else {
                               setDeleteConfirmId(c.clientId);
                               setEditingId(null);
+                              setEditingAmountId(null);
                             }
                           }}
                           disabled={isDeleting}
@@ -850,7 +959,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                         className="text-xs px-2 py-1 rounded-lg font-semibold"
                         style={{ background: "#ef4444", color: "white" }}
                       >
-                        {isDeleting ? "\u2026" : "Delete"}
+                        {isDeleting ? "…" : "Delete"}
                       </button>
                     </div>
                   )}
@@ -893,7 +1002,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                           value={editNotes}
                           onChange={e => setEditNotes(e.target.value)}
                           rows={2}
-                          placeholder="Optional note\u2026"
+                          placeholder="Optional note…"
                           className="w-full px-2 py-1.5 rounded-lg text-xs outline-none resize-none"
                           style={{ background: "var(--brand-surface)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}
                         />
@@ -918,7 +1027,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                   )}
 
                   {/* Status badge + action buttons */}
-                  {!isEditing && (
+                  {!isEditing && !isEditingAmount && (
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
                         style={{ background: s.bg, color: s.color }}>
@@ -941,7 +1050,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                       ) : (
                         <>
                           {/* Edit button */}
-                          {!isPaid && c.notificationStatus !== "cancelled" && (
+                          {!isPaid && !isDisabled && c.notificationStatus !== "cancelled" && (
                             <button
                               onClick={() => startEdit(c)}
                               disabled={isUpdating}
@@ -958,7 +1067,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                           )}
 
                           {/* Send button */}
-                          {!isPaid && c.notificationStatus !== "cancelled" && (
+                          {!isPaid && !isDisabled && c.notificationStatus !== "cancelled" && (
                             <button
                               onClick={() => setConfirmClient(c)}
                               disabled={isUpdating}
@@ -976,19 +1085,19 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                       )}
 
                       {/* Mark Paid */}
-                      {!isPaid && c.hasReminder && c.notificationStatus !== "cancelled" && (
+                      {!isPaid && c.hasReminder && !isDisabled && c.notificationStatus !== "cancelled" && (
                         <button
                           onClick={() => handleMarkPaid(c)}
                           disabled={isUpdating}
                           className="text-xs px-2.5 py-1 rounded-lg font-medium"
                           style={{ background: "#22c55e20", color: "#22c55e", opacity: isUpdating ? 0.5 : 1 }}
                         >
-                          {isUpdating ? "\u2026" : "Mark Paid"}
+                          {isUpdating ? "…" : "Mark Paid"}
                         </button>
                       )}
 
-                      {/* Pause / Resume \u2014 only for non-no-reminder clients */}
-                      {!noReminderClient && c.hasReminder && !isPaid && c.notificationStatus !== "cancelled" && (
+                      {/* Pause / Resume */}
+                      {!noReminderClient && c.hasReminder && !isPaid && !isDisabled && c.notificationStatus !== "cancelled" && (
                         <button
                           onClick={() => handlePauseToggle(c)}
                           disabled={isUpdating}
@@ -996,6 +1105,23 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                           style={{ background: "var(--brand-bg)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}
                         >
                           {c.notificationStatus === "paused" ? "Resume" : "Pause"}
+                        </button>
+                      )}
+
+                      {/* Disable / Enable */}
+                      {!noReminderClient && c.hasReminder && !isPaid && c.notificationStatus !== "cancelled" && (
+                        <button
+                          onClick={() => handleDisableToggle(c)}
+                          disabled={isUpdating}
+                          className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                          style={{
+                            background: isDisabled ? "rgba(100,116,139,0.15)" : "rgba(100,116,139,0.1)",
+                            color: isDisabled ? "#94a3b8" : "#64748b",
+                            border: "1px solid rgba(100,116,139,0.25)",
+                            opacity: isUpdating ? 0.5 : 1,
+                          }}
+                        >
+                          {isDisabled ? "Enable" : "Disable"}
                         </button>
                       )}
                     </div>
@@ -1015,8 +1141,8 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                         color: r.notificationStatus === "paid" ? "#22c55e" : "var(--brand-text-secondary)",
                         border: "1px solid var(--brand-border)",
                       }}>
-                      {fmtDate(r.dueDate)} \u00b7 ${r.amountDue}
-                      {r.notificationStatus === "paid" ? " \u2713" : ""}
+                      {fmtDate(r.dueDate)} · ${r.amountDue}
+                      {r.notificationStatus === "paid" ? " ✓" : ""}
                     </span>
                   ))}
                 </div>
@@ -1026,7 +1152,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
         })}
       </div>
 
-      {/* \u2500\u2500 Confirm modal (Send flow) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+      {/* ── Confirm modal (Send flow) ──────────────────────── */}
       {confirmClient && (
         <ConfirmModal
           client={confirmClient}
@@ -1035,7 +1161,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
         />
       )}
 
-      {/* \u2500\u2500 New Payment modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+      {/* ── New Payment modal ────────────────────────────────── */}
       {showNewPayment && (
         <NewPaymentModal
           clients={localClients}
