@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import TrainerHomeClient from "./TrainerHomeClient";
 import ClientDashboard from "./ClientDashboard";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
-import TrainerHomeClient from "./TrainerHomeClient";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -19,14 +19,16 @@ export default async function HomePage() {
       .select("id, name")
       .order("name");
 
+    // Today's supervised sessions (trainer-led only)
     const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+    const clientIds = (clients ?? []).map((c: any) => c.id);
 
     const { data: todaySessionsRaw } = await supabase
       .from("scheduled_workouts")
       .select("id, client_id, status, days(id, label), clients(id, name)")
       .eq("scheduled_date", todayStr)
       .eq("supervised", true)
-      .in("client_id", (clients ?? []).map((c: any) => c.id))
+      .in("client_id", clientIds)
       .order("status", { ascending: true });
 
     const todaySessions = (todaySessionsRaw ?? []).map((sw: any) => ({
@@ -40,14 +42,14 @@ export default async function HomePage() {
 
     const loggedTodayCount = todaySessions.filter((s: any) => s.status === "completed").length;
 
+    // Pending payment reminders (Needs Attention)
     const thirtyDays = new Date();
     thirtyDays.setDate(thirtyDays.getDate() + 30);
-
     const { data: remindersRaw } = await supabase
       .from("payment_reminders")
       .select("id, client_id, due_date, amount_due, clients(id, name)")
       .gte("due_date", todayStr)
-      .lte("due_date", thirtyDays.toISOString().split("T")[0])
+      .lte("due_date", thirtyDays.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
       .eq("notification_status", "pending")
       .order("due_date");
 
@@ -70,7 +72,7 @@ export default async function HomePage() {
     );
   }
 
-  // CLIENT DASHBOARD
+  // ─── CLIENT DASHBOARD ──────────────────────────────────────────────────────
   const { data: clientRecord } = await supabase
     .from("clients")
     .select("id, name")
@@ -85,7 +87,7 @@ export default async function HomePage() {
     );
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
   const { data: todayWorkout } = await supabase
     .from("scheduled_workouts")
@@ -94,23 +96,26 @@ export default async function HomePage() {
     .eq("scheduled_date", today)
     .maybeSingle();
 
+  // 60 days of history for week nav + streak
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+  const sixtyStr = sixtyDaysAgo.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const { data: recentScheduled } = await supabase
     .from("scheduled_workouts")
     .select("id, scheduled_date, status")
     .eq("client_id", clientRecord.id)
-    .gte("scheduled_date", sixtyDaysAgo.toISOString().split("T")[0])
+    .gte("scheduled_date", sixtyStr)
     .lte("scheduled_date", today)
     .order("scheduled_date", { ascending: false });
 
   const thirtyAgo = new Date();
   thirtyAgo.setDate(thirtyAgo.getDate() - 30);
-  const thirtyStr = thirtyAgo.toISOString().split("T")[0];
+  const thirtyStr = thirtyAgo.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const recent30 = (recentScheduled || []).filter((w: any) => w.scheduled_date >= thirtyStr);
   const totalScheduled = recent30.length;
   const completedCount = recent30.filter((w: any) => w.status === "completed").length;
 
+  // Streak calc
   const sorted = [...(recentScheduled || [])].sort((a: any, b: any) =>
     b.scheduled_date.localeCompare(a.scheduled_date)
   );
@@ -134,11 +139,15 @@ export default async function HomePage() {
     }
   }
 
-  const todayDow = new Date().getDay();
-  const weekStart = new Date();
+  // Current week
+  const todayDate = new Date();
+  const todayDow = todayDate.getDay();
+  const weekStart = new Date(todayDate);
   weekStart.setDate(weekStart.getDate() - todayDow);
-  const weekStartStr = weekStart.toISOString().split("T")[0];
-  const weekEndStr = new Date(weekStart.getTime() + 6 * 86400000).toISOString().split("T")[0];
+  const weekStartStr = weekStart.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  const weekEndStr = weekEnd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const weekWorkouts = (recentScheduled || [])
     .filter((w: any) => w.scheduled_date >= weekStartStr && w.scheduled_date <= weekEndStr)
     .map((w: any) => ({ date: w.scheduled_date, completed: w.status === "completed" }));
@@ -149,6 +158,7 @@ export default async function HomePage() {
     completed: w.status === "completed",
   }));
 
+  // Metrics
   const { data: metricsHistory } = await supabase
     .from("metrics")
     .select("metric_date, weight, body_fat_pct, lean_mass, fat_mass")
@@ -165,6 +175,18 @@ export default async function HomePage() {
     .order("scheduled_date", { ascending: false })
     .limit(5);
 
+  // Payment notifications (show 1 week before due, persist until dismissed)
+  const { data: notificationsRaw } = await supabase
+    .from("client_notifications")
+    .select("id, type, title, body, amount_due, due_date")
+    .eq("client_id", clientRecord.id)
+    .eq("type", "payment_due")
+    .is("dismissed_at", null)
+    .eq("is_read", false)
+    .order("due_date", { ascending: true });
+
+  const notifications = (notificationsRaw ?? []) as any[];
+
   const firstName = (clientRecord.name || "").split(" ")[0];
 
   return (
@@ -180,6 +202,7 @@ export default async function HomePage() {
         streakDays={streakDays}
         weekWorkouts={weekWorkouts}
         allScheduled={allScheduled}
+        notifications={notifications}
       />
     </>
   );
