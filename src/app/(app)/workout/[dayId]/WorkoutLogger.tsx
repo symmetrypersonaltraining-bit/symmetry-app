@@ -750,8 +750,8 @@ export default function WorkoutLogger({
       const s = sets[peId][si];
       await supabase.from("set_logs").upsert({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
-        set_number: si + 1, weight_lbs: s.weight ? parseFloat(s.weight) : null,
-        reps: s.reps ? parseInt(s.reps) : null, completed: true, logged_at: new Date().toISOString(),
+        set_number: si + 1, weight_lbs: s.weight ? parseFloat(s.weight) || 0 : null,
+        reps: s.reps ? parseInt(s.reps) || 0 : null, completed: true, logged_at: new Date().toISOString(),
       }, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
       updateSet(peId, si, "done", true);
       if (navigator.vibrate) navigator.vibrate(50);
