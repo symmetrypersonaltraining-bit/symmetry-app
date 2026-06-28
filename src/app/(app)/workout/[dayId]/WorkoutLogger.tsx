@@ -764,6 +764,33 @@ export default function WorkoutLogger({
     finally { setSaving(false); }
   }
 
+  async function logAllCurrentSets() {
+    if (!currentExercise) return;
+    setSaving(true);
+    try {
+      const logId = await ensureWorkoutLog();
+      const peId = currentExercise.id;
+      const arr = sets[peId] || [];
+      const rows = arr.map((s, i) => ({
+        workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
+        set_number: i + 1,
+        weight_lbs: s.weight ? parseFloat(s.weight) || 0 : null,
+        reps: s.reps ? parseInt(s.reps) || 0 : null,
+        completed: true, logged_at: new Date().toISOString(),
+      }));
+      if (rows.length) {
+        await supabase.from("set_logs").upsert(rows, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
+      }
+      setSets(prev => {
+        const u = { ...prev };
+        u[peId] = (u[peId] || []).map(s => ({ ...s, done: true }));
+        return u;
+      });
+      if (navigator.vibrate) navigator.vibrate(50);
+    } catch (e) { console.error(e); }
+    finally { setSaving(false); }
+  }
+
   async function completeWorkout() {
     setSaving(true);
     try {
@@ -1049,7 +1076,7 @@ export default function WorkoutLogger({
 
         {/* Bottom controls */}
         <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          <button type="button" onClick={() => { document.querySelectorAll("button").forEach((b) => { const el = b as HTMLElement; if (!(el.className.includes("w-10") && el.querySelector(".ti-check"))) return; const r = el.getBoundingClientRect(); if (r.top < 0 || r.bottom > window.innerHeight) return; const rgb = (getComputedStyle(el).backgroundColor.match(/\d+/g) || []).slice(0,3).join(","); if (rgb !== "34,197,94") el.click(); }); }} className="w-full mb-1 py-1 rounded-lg text-xs font-medium text-white" style={{ background: "var(--brand-primary)" }}>Check all sets complete</button>
+          <button type="button" onClick={logAllCurrentSets} className="w-full mb-1 py-1 rounded-lg text-xs font-medium text-white" style={{ background: "var(--brand-primary)" }}>Check all sets complete</button>
           {/* Trainer AI note */}
           {isTrainerSession && (
             <div className="mb-3 rounded-xl p-3" style={{ display: isTrainerSession ? undefined : "none", background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
