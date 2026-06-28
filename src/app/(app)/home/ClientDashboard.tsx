@@ -122,7 +122,7 @@ function PaymentNotificationBanner({
   );
 }
 
-// ─── Sparkline (mini, for metric cards) ────────────────────────────────────────────
+// ─── Sparkline (mini, for metric cards) ──────────────────────────────────────────────
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length < 2) {
     return (
@@ -163,7 +163,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
   );
 }
 
-// ─── Full Chart (modal) ──────────────────────────────────────────────────────────────────────────
+// ─── Full Chart (modal) ────────────────────────────────────────────────────────────────────────────────────
 function FullChart({
   values, dates, color, label, unit,
 }: {
@@ -271,7 +271,7 @@ function FullChart({
   );
 }
 
-// ─── Metric Modal ────────────────────────────────────────────────────────────────────────────────
+// ─── Metric Modal ─────────────────────────────────────────────────────────────────────────────
 function MetricModal({
   metricKey, label, unit, color, icon, metrics, onClose, basePath = "",
 }: {
@@ -331,7 +331,7 @@ function MetricModal({
   );
 }
 
-// ─── Metric Card ──────────────────────────────────────────────────────────────────────────────────
+// ─── Metric Card ────────────────────────────────────────────────────────────────────────────────
 function MetricCard({
   label, value, unit, values, color, icon, onClick,
 }: {
@@ -356,7 +356,7 @@ function MetricCard({
   );
 }
 
-// ─── helpers ──────────────────────────────────────────────────────────────────────────────────────────────
+// ─── helpers ──────────────────────────────────────────────────────────────────────────────────────
 function isCardioLabel(label?: string) {
   return /cardio/i.test(label ?? "");
 }
@@ -365,7 +365,7 @@ function workoutDotColor(label?: string) {
   return isCardioLabel(label) ? "#22c55e" : "var(--brand-primary)";
 }
 
-// ─── Week Ring ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// ─── Week Ring ────────────────────────────────────────────────────────────────────────────────────
 function WeekRing({
   allScheduled = [], weekOffset, onPrev, onNext, basePath = "",
 }: {
@@ -449,7 +449,7 @@ function WeekRing({
   );
 }
 
-// ─── Main Dashboard ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// ─── Main Dashboard ───────────────────────────────────────────────────────────────────────────────────
 type MetricKey = "weight" | "body_fat_pct" | "lean_mass" | "fat_mass";
 
 const METRIC_CONFIG: { key: MetricKey; label: string; unit: string; color: string; icon: string }[] = [
@@ -482,7 +482,7 @@ export default function ClientDashboard({
     return arr.length > 0 ? arr[arr.length - 1].toFixed(1) : null;
   };
 
-  const twStr = todayWorkout?.days?.label || "Today’s Workout";
+  const twStr = todayWorkout?.days?.label || "Today's Workout";
   const twDone = todayWorkout?.status === "completed";
   const isMilestone = streakDays > 0 && streakDays % 7 === 0;
 
