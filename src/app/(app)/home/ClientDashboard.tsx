@@ -274,6 +274,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
           <div>
             <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{greeting},</p>
             <h1 className="text-3xl font-bold tracking-tight" style={{ color: "var(--brand-text)" }}>{firstName} {'\uD83D\uDC4B'}</h1>
+            <p style={{ fontSize: "12.5px", fontWeight: 600, marginTop: "2px", color: "var(--brand-text-secondary)" }}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" })}</p>
           </div>
           {streakDays > 0 && (
             <div className="flex items-center px-3 py-1.5 rounded-full"
@@ -286,15 +287,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
           )}
         </div>
 
-        <div className="metric-card">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>This Week</span>
-            <Link href="/client-preview/schedule" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View Schedule {'\u2192'}</Link>
-          </div>
-          <WeekRing allScheduled={scheduleSource} weekOffset={weekOffset} onPrev={() => setWeekOffset(o => o - 1)} onNext={() => setWeekOffset(o => Math.min(0, o + 1))} />
-        </div>
-
-        {todayWorkouts.length > 0 ? (
+{todayWorkouts.length > 0 ? (
           <div className="space-y-3">
             {todayWorkouts.map((tw, i) => {
               const lnk = (tw as any).day_id || tw.id;
@@ -311,10 +304,64 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
           <div className="rounded-3xl p-5 text-center shadow-[0_8px_26px_rgba(20,30,55,0.08)]" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} /><p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p><p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program {'\uD83D\uDCAA'}</p></div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <Link href="/nutrition?viewAsClient=true" className="block h-full"><div className="rounded-3xl p-4 flex items-center gap-3 cursor-pointer h-full shadow-[0_8px_26px_rgba(20,30,55,0.08)]" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}><div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#22c55e20" }}><i className="ti ti-salad text-lg" style={{ color: "#22c55e" }} /></div><div><p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Nutrition</p><p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Log meals</p></div></div></Link>
-          <DailyMacrosRing />
+        
+        {/* THIS WEEK — dot strip */}
+        <div style={{ padding: "14px 16px 0" }}>
+          <div style={{ background: "var(--brand-card,#fff)", border: "1px solid var(--brand-border,#e3e9f3)", borderRadius: 20, padding: "13px 11px", boxShadow: "0 8px 26px rgba(20,30,55,.07)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "0 4px 9px" }}>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".6px", color: "var(--brand-text-secondary)" }}>THIS WEEK</span>
+              <Link href="/client-preview/schedule" style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--brand-primary,#7c9cf5)", textDecoration: "none" }}>View schedule</Link>
+            </div>
+            {(() => {
+              const _tc = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+              const _ref = new Date(new Date().toLocaleDateString("en-US", { timeZone: "America/Chicago" }));
+              const _sun = new Date(_ref); _sun.setDate(_ref.getDate() - _ref.getDay());
+              return (
+                <div style={{ display: "flex", gap: 5 }}>
+                  {["Su","Mo","Tu","We","Th","Fr","Sa"].map((dn, i) => {
+                    const _dd = new Date(_sun); _dd.setDate(_sun.getDate() + i);
+                    const _ds = _dd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+                    const _it = _ds === _tc;
+                    const _hw = allScheduled.some((w: { date: Date | string }) =>
+                      new Date(w.date).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }) === _ds);
+                    const _dc = _hw ? "var(--brand-primary,#7c9cf5)" : "#cdd5e3";
+                    return (
+                      <div key={dn} style={{ flex:1, textAlign:"center", borderRadius:13, padding:"8px 0 6px",
+                        background: _it ? "var(--brand-primary,#7c9cf5)" : "var(--brand-surface,#eef2fa)" }}>
+                        <div style={{ fontSize:10.5, fontWeight:700, color: _it ? "rgba(255,255,255,0.85)" : "var(--brand-text-secondary)" }}>{dn}</div>
+                        <div style={{ fontSize:14, fontWeight:800, color: _it ? "#fff" : "var(--brand-text)" }}>{_dd.getDate()}</div>
+                        <div style={{ width:5, height:5, borderRadius:"50%", background: _it ? "#fff" : _dc, margin:"4px auto 0" }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+            <div style={{ display:"flex", gap:14, margin:"10px 4px 0", fontSize:"10.5px", fontWeight:700, color:"var(--brand-text-secondary)" }}>
+              <span><i style={{ display:"inline-block", width:7, height:7, borderRadius:"50%", background:"var(--brand-primary,#7c9cf5)", marginRight:4 }} />Lift</span>
+              <span><i style={{ display:"inline-block", width:7, height:7, borderRadius:"50%", background:"#5ec9a3", marginRight:4 }} />Cardio</span>
+              <span><i style={{ display:"inline-block", width:7, height:7, borderRadius:"50%", background:"#cdd5e3", marginRight:4 }} />Rest</span>
+            </div>
+          </div>
         </div>
+        {/* Quick actions */}
+        <div style={{ padding:"14px 16px 0", display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8 }}>
+          {[
+            { href:"/nutrition?viewAsClient=true", emoji:"🥗", label:"Log meal" },
+            { href:"/log-bodyfat",                 emoji:"⚖️", label:"Weigh in" },
+            { href:"/client-preview/schedule",      emoji:"🏃", label:"Cardio" },
+            { href:"/progress",                     emoji:"📈", label:"Progress" },
+          ].map(({ href, emoji, label }) => (
+            <Link key={label} href={href} style={{ textDecoration:"none" }}>
+              <div style={{ background:"var(--brand-card,#fff)", border:"1px solid var(--brand-border,#e3e9f3)",
+                borderRadius:16, padding:"11px 4px", textAlign:"center", boxShadow:"0 6px 18px rgba(20,30,55,.05)" }}>
+                <div style={{ fontSize:18 }}>{emoji}</div>
+                <div style={{ fontSize:"10.5px", fontWeight:700, marginTop:4, color:"var(--brand-text)" }}>{label}</div>
+              </div>
+            </Link>
+          ))}
+        </div>
+
 
         <div>
           <div className="flex items-center justify-between mb-2.5">
