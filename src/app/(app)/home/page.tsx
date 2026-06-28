@@ -74,7 +74,7 @@ export default async function HomePage() {
     );
   }
 
-  // ─── CLIENT DASHBOARD (regular clients + trainer in client mode) ──────────────────────────────────────
+  // ─── CLIENT DASHBOARD (regular clients + trainer in client mode) ────────────────────────────
   let clientRecord: { id: string; name: string } | null = null;
 
   if (isTrainer && isInClientMode) {
