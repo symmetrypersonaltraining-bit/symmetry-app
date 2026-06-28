@@ -18,6 +18,13 @@ declare global {
 }
 
 export default function AIAssistant() {
+  const [_ok, _setOk] = useState(false);
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => {
+      _setOk(data.user?.email === 'symmetrypersonaltraining@gmail.com');
+    });
+  }, []);
+  if (!_ok) return null;
   const [isTrainer, setIsTrainer] = useState(false);
   useEffect(() => {
     (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (data?.user?.email === "symmetrypersonaltraining@gmail.com") setIsTrainer(true); } catch {} })();
