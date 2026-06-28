@@ -1,21 +1,20 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import Link from "next/link";
+import { useState, useMemo, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { updateGCalEvent, deleteGCalEvent } from "./scheduleActions";
 
-interface UpcomingDay {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Appointment {
   id: string;
   label: string;
-  date: string; // YYYY-MM-DD
-  dow: number;
-}
-
-interface PaymentReminder {
-  date: string;
-  clientName: string;
-  amount: number;
-  status: string;
+  date: string;       // YYYY-MM-DD
+  dow: number;        // 0=Sun … 6=Sat
+  startTime?: string; // HH:mm (24h) in Chicago time
+  endTime?: string;   // HH:mm (24h) in Chicago time
+  gcalEventId?: string;
+  gcalRecurringId?: string;
 }
 
 interface Props {
@@ -27,619 +26,484 @@ interface Props {
   today: number;
   workoutDates: string[];
   scheduledDows: number[];
-  upcomingDays: UpcomingDay[];
-  isTrainer: boolean;
-  paymentReminders: PaymentReminder[];
-  workoutsByDate?: Record<string, { id: string; label: string }[]>;
+  upcomingDays: Appointment[];
+  isTrainer?: boolean;
+  paymentReminders?: { date: string; clientName: string; amount: number; status: string }[];
 }
 
-const GRAPE = "#7C3AED";
-const GRAPE_LIGHT = "#EDE9FE";
-const SHORT_DAY = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-function buildWeekDays(todayStr: string) {
-  const [y, m, day] = todayStr.split("-").map(Number);
-  const base = new Date(y, m - 1, day);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return { dateStr, dayNum: d.getDate(), dow: d.getDay(), isToday: i === 0 };
-  });
+const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const HOUR_START = 6;   // 6 AM
+const HOUR_END = 21;    // 9 PM
+const PX_PER_HOUR = 64; // pixels per hour row
+
+function timeToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
 }
 
-export default function ScheduleClient({
-  monthName,
-  year,
-  month,
-  daysInMonth,
-  firstDay,
-  today,
-  workoutDates,
-  scheduledDows,
-  upcomingDays,
-  isTrainer,
-  paymentReminders,
-  workoutsByDate = {},
-}: Props) {
-  const router = useRouter();
+function formatHour(h: number): string {
+  if (h === 0) return "12 AM";
+  if (h < 12) return \`\${h} AM\`;
+  if (h === 12) return "12 PM";
+  return \`\${h - 12} PM\`;
+}
 
-  const [viewMode, setViewMode] = useState<"week" | "month">("week");
-  const [expandedDay, setExpandedDay] = useState<string | null>(null);
-  const [showPayments, setShowPayments] = useState(true);
-  const [pickerDate, setPickerDate] = useState<string | null>(null);
-  const [pickerWorkouts, setPickerWorkouts] = useState<{ id: string; label: string }[]>([]);
+function formatTime12(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  const ampm = h < 12 ? "AM" : "PM";
+  const h12 = h % 12 || 12;
+  return m === 0 ? \`\${h12} \${ampm}\` : \`\${h12}:\${String(m).padStart(2, "0")} \${ampm}\`;
+}
 
-  const dowNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+function getCentralDateStr(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(date);
+}
 
-  const todayStr = `${year}-${String(month).padStart(2, "0")}-${String(today).padStart(2, "0")}`;
+function getWeekStart(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  const dow = dt.getDay();
+  dt.setDate(d - dow);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return \`\${dt.getFullYear()}-\${pad(dt.getMonth() + 1)}-\${pad(dt.getDate())}\`;
+}
 
-  const appointmentsByDate = useMemo(() => {
-    const map: Record<string, UpcomingDay[]> = {};
-    for (const ud of upcomingDays) {
-      if (!map[ud.date]) map[ud.date] = [];
-      map[ud.date].push(ud);
+function addDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return \`\${dt.getFullYear()}-\${pad(dt.getMonth() + 1)}-\${pad(dt.getDate())}\`;
+}
+
+function formatDateLabel(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+// ─── Edit Drawer ──────────────────────────────────────────────────────────────
+
+interface DrawerProps {
+  appt: Appointment;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function EditDrawer({ appt, onClose, onSaved }: DrawerProps) {
+  const [title, setTitle] = useState(appt.label.split(" — ")[0]);
+  const [startTime, setStartTime] = useState(appt.startTime ?? "");
+  const [endTime, setEndTime] = useState(appt.endTime ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const handleUpdate = (updateSeries: boolean) => {
+    if (!appt.gcalEventId) {
+      setError("No Google Calendar event linked.");
+      return;
     }
-    return map;
-  }, [upcomingDays]);
+    setError(null);
 
-  const paymentDateMap: Record<string, PaymentReminder[]> = {};
-  for (const pr of paymentReminders) {
-    if (!paymentDateMap[pr.date]) paymentDateMap[pr.date] = [];
-    paymentDateMap[pr.date].push(pr);
-  }
-
-  const upcomingPayments = paymentReminders
-    .filter((pr) => {
-      const d = new Date(pr.date + "T00:00:00");
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      const diff = (d.getTime() - now.getTime()) / 86400000;
-      return diff >= 0 && diff <= 30 && pr.status === "pending";
-    })
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  const weekDays = useMemo(() => buildWeekDays(todayStr), [todayStr]);
-
-  function toggleDay(dateStr: string) {
-    setExpandedDay((prev) => (prev === dateStr ? null : dateStr));
-  }
-
-  function handleWeekDayClick(dateStr: string) {
-    toggleDay(dateStr);
-  }
-
-  function handleAppointmentClick(appt: UpcomingDay) {
-    if (!isTrainer) {
-      router.push(`/workout/${appt.id}`);
+    let startIso: string | undefined;
+    let endIso: string | undefined;
+    if (startTime && endTime) {
+      startIso = \`\${appt.date}T\${startTime}:00-05:00\`;
+      endIso = \`\${appt.date}T\${endTime}:00-05:00\`;
     }
-  }
 
-  function handleMonthDayClick(dateStr: string) {
-    if (!isTrainer) {
-      const workouts = workoutsByDate[dateStr] || [];
-      const appts = appointmentsByDate[dateStr] || [];
-      if (workouts.length === 0 && appts.length === 0) {
-        toggleDay(dateStr);
-        return;
+    startTransition(async () => {
+      const res = await updateGCalEvent({
+        appointmentId: appt.id,
+        gcalEventId: appt.gcalEventId!,
+        title: title !== appt.label.split(" — ")[0] ? title : undefined,
+        startIso,
+        endIso,
+        updateSeries,
+      });
+      if (res.success) {
+        onSaved();
+      } else {
+        setError(res.error ?? "Update failed");
       }
-      if (workouts.length === 1 && appts.length === 0) {
-        router.push(`/workout/${workouts[0].id}`);
-        return;
-      }
-      if (workouts.length > 1) {
-        setPickerDate(dateStr);
-        setPickerWorkouts(workouts);
-        return;
-      }
-      toggleDay(dateStr);
-    } else {
-      toggleDay(dateStr);
+    });
+  };
+
+  const handleDelete = (deleteSeries: boolean) => {
+    if (!appt.gcalEventId) {
+      setError("No Google Calendar event linked.");
+      return;
     }
-  }
+    if (!confirm(deleteSeries ? "Delete ALL future occurrences?" : "Delete this session?")) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await deleteGCalEvent({
+        appointmentId: appt.id,
+        gcalEventId: appt.gcalEventId!,
+        deleteSeries,
+      });
+      if (res.success) {
+        onSaved();
+      } else {
+        setError(res.error ?? "Delete failed");
+      }
+    });
+  };
 
-  // ── Week View ────────────────────────────────────────────────────────────────
-  function WeekView() {
-    return (
-      <div className="px-4 space-y-2 pb-4">
-        {weekDays.map(({ dateStr, dayNum, dow, isToday }) => {
-          const appts = appointmentsByDate[dateStr] || [];
-          const isExpanded = expandedDay === dateStr;
-          const hasAppts = appts.length > 0;
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-full max-w-sm bg-white shadow-2xl z-50 flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-lg font-semibold text-gray-900">Edit Session</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none" aria-label="Close">×</button>
+        </div>
 
-          return (
-            <div
-              key={dateStr}
-              className="rounded-2xl overflow-hidden"
-              style={{
-                border: isToday ? "1.5px solid #0F4C81" : "1px solid #EDF2F7",
-                background: isToday ? "#0F4C81" : "var(--brand-bg, #fff)",
-                boxShadow: isToday
-                  ? "0 2px 12px rgba(15,76,129,0.18)"
-                  : "0 1px 3px rgba(0,0,0,0.04)",
-              }}
-            >
-              <button
-                className="w-full flex items-center gap-3 px-4 py-3 text-left"
-                onClick={() => handleWeekDayClick(dateStr)}
-                style={{ background: "transparent" }}
-              >
-                <div className="flex-shrink-0 w-14">
-                  <div
-                    className="text-xs font-bold tracking-widest"
-                    style={{ color: isToday ? "rgba(255,255,255,0.7)" : "#4E6080" }}
-                  >
-                    {SHORT_DAY[dow]}
-                  </div>
-                  <div
-                    className="text-2xl font-bold leading-tight"
-                    style={{ color: isToday ? "#fff" : "#0D1B2E" }}
-                  >
-                    {dayNum}
-                  </div>
-                </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Client / Title</label>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
 
-                <div className="flex-1 min-w-0">
-                  {hasAppts ? (
-                    <div className="space-y-0.5">
-                      {appts.slice(0, isExpanded ? appts.length : 2).map((appt) => (
-                        <div
-                          key={appt.id}
-                          className="text-sm truncate"
-                          style={{ color: isToday ? "rgba(255,255,255,0.9)" : "#0D1B2E" }}
-                        >
-                          <span
-                            className="font-medium"
-                            style={{ color: isToday ? "rgba(255,255,255,0.55)" : "#0EA5E9" }}
-                          >
-                            ●
-                          </span>{" "}
-                          {appt.label}
-                        </div>
-                      ))}
-                      {!isExpanded && appts.length > 2 && (
-                        <div
-                          className="text-xs"
-                          style={{ color: isToday ? "rgba(255,255,255,0.5)" : "#4E6080" }}
-                        >
-                          +{appts.length - 2} more
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div
-                      className="text-sm"
-                      style={{ color: isToday ? "rgba(255,255,255,0.45)" : "#C8D8EC" }}
-                    >
-                      {isToday ? "No sessions today" : "Rest day"}
-                    </div>
-                  )}
-                </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+          </div>
 
-                <div className="flex-shrink-0">
-                  <i
-                    className={`ti ti-chevron-${isExpanded ? "up" : "down"} text-sm`}
-                    style={{ color: isToday ? "rgba(255,255,255,0.4)" : "#C8D8EC" }}
-                  />
-                </div>
+          <div className="text-xs text-gray-500 bg-gray-50 rounded p-2">
+            Date: {formatDateLabel(appt.date)}
+            {appt.gcalRecurringId && <span className="ml-2 text-indigo-600">● Recurring</span>}
+          </div>
+
+          {error && <div className="text-sm text-red-600 bg-red-50 rounded p-2">{error}</div>}
+        </div>
+
+        <div className="p-4 border-t space-y-2">
+          <button onClick={() => handleUpdate(false)} disabled={isPending} className="w-full bg-indigo-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            {isPending ? "Saving…" : "Update This Session"}
+          </button>
+          {appt.gcalRecurringId && (
+            <button onClick={() => handleUpdate(true)} disabled={isPending} className="w-full bg-indigo-100 text-indigo-700 rounded-lg py-2.5 text-sm font-medium hover:bg-indigo-200 disabled:opacity-50 transition-colors">
+              Update All Future Sessions
+            </button>
+          )}
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => handleDelete(false)} disabled={isPending} className="flex-1 bg-red-50 text-red-600 rounded-lg py-2.5 text-sm font-medium hover:bg-red-100 disabled:opacity-50 transition-colors">
+              Delete This
+            </button>
+            {appt.gcalRecurringId && (
+              <button onClick={() => handleDelete(true)} disabled={isPending} className="flex-1 bg-red-100 text-red-700 rounded-lg py-2.5 text-sm font-medium hover:bg-red-200 disabled:opacity-50 transition-colors">
+                Delete All Future
               </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
 
-              {isExpanded && (
-                <div
-                  style={{
-                    borderTop: isToday
-                      ? "1px solid rgba(255,255,255,0.15)"
-                      : "1px solid #EDF2F7",
-                  }}
-                >
-                  {hasAppts ? (
-                    appts.map((appt, idx) => (
-                      <div
-                        key={appt.id}
-                        className="flex items-center gap-3 px-4 py-3"
-                        style={{
-                          borderBottom:
-                            idx < appts.length - 1
-                              ? isToday
-                                ? "1px solid rgba(255,255,255,0.1)"
-                                : "1px solid #EDF2F7"
-                              : "none",
-                          cursor: !isTrainer ? "pointer" : "default",
-                        }}
-                        onClick={() => handleAppointmentClick(appt)}
-                      >
-                        <div
-                          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{
-                            background: isToday ? "rgba(255,255,255,0.15)" : "#DDEEFF",
-                          }}
-                        >
-                          <i
-                            className="ti ti-barbell text-base"
-                            style={{ color: isToday ? "#fff" : "#0F4C81" }}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div
-                            className="text-sm font-medium truncate"
-                            style={{ color: isToday ? "#fff" : "#0D1B2E" }}
-                          >
-                            {appt.label}
-                          </div>
-                          <div
-                            className="text-xs"
-                            style={{ color: isToday ? "rgba(255,255,255,0.55)" : "#4E6080" }}
-                          >
-                            {new Date(appt.date + "T00:00:00").toLocaleDateString("en-US", {
-                              weekday: "long",
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </div>
-                        </div>
-                        {!isTrainer && (
-                          <i
-                            className="ti ti-chevron-right text-sm"
-                            style={{ color: isToday ? "rgba(255,255,255,0.4)" : "#C8D8EC" }}
-                          />
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div
-                      className="px-4 py-4 text-sm text-center"
-                      style={{ color: isToday ? "rgba(255,255,255,0.5)" : "#C8D8EC" }}
-                    >
-                      No sessions scheduled
-                    </div>
-                  )}
-                </div>
+// ─── Month View ───────────────────────────────────────────────────────────────
+
+interface MonthViewProps {
+  year: number;
+  month: number;
+  daysInMonth: number;
+  firstDay: number;
+  today: number;
+  workoutDates: string[];
+  upcomingDays: Appointment[];
+  paymentReminders: { date: string; clientName: string; amount: number; status: string }[];
+  isTrainer: boolean;
+}
+
+function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, upcomingDays, paymentReminders, isTrainer }: MonthViewProps) {
+  const [showPayments, setShowPayments] = useState(false);
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  const workoutSet = useMemo(() => new Set(workoutDates), [workoutDates]);
+  const scheduledSet = useMemo(() => {
+    const s = new Set<string>();
+    upcomingDays.forEach((a) => s.add(a.date));
+    return s;
+  }, [upcomingDays]);
+  const paymentSet = useMemo(() => {
+    const s = new Set<string>();
+    paymentReminders.forEach((p) => s.add(p.date));
+    return s;
+  }, [paymentReminders]);
+
+  const todayStr = \`\${year}-\${pad(month)}-\${pad(today)}\`;
+
+  const cells: { dateStr: string; dayNum: number }[] = [];
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+  for (let i = 0; i < totalCells; i++) {
+    const dayNum = i - firstDay + 1;
+    if (dayNum < 1 || dayNum > daysInMonth) {
+      cells.push({ dateStr: "", dayNum });
+    } else {
+      cells.push({ dateStr: \`\${year}-\${pad(month)}-\${pad(dayNum)}\`, dayNum });
+    }
+  }
+
+  return (
+    <div>
+      {isTrainer && (
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3 text-xs">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Logged</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />Scheduled</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />Payment</span>
+          </div>
+          <button onClick={() => setShowPayments((v) => !v)} className="text-xs text-purple-600 hover:text-purple-800 font-medium">
+            {showPayments ? "Hide Payments" : "Show Payments"}
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-7 border-l border-t border-gray-200 rounded-lg overflow-hidden">
+        {DOW_LABELS.map((d) => (
+          <div key={d} className="border-r border-b border-gray-200 bg-gray-50 text-center text-xs font-semibold text-gray-500 py-2">{d}</div>
+        ))}
+        {cells.map((cell, i) => {
+          const isToday = cell.dateStr === todayStr;
+          const hasWorkout = cell.dateStr ? workoutSet.has(cell.dateStr) : false;
+          const hasScheduled = cell.dateStr ? scheduledSet.has(cell.dateStr) : false;
+          const hasPayment = cell.dateStr ? paymentSet.has(cell.dateStr) : false;
+          return (
+            <div key={i} className={\`border-r border-b border-gray-200 min-h-[64px] p-1.5 \${cell.dateStr ? "bg-white" : "bg-gray-50"}\`}>
+              {cell.dateStr && (
+                <>
+                  <span className={\`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full \${isToday ? "bg-indigo-600 text-white" : "text-gray-700"}\`}>
+                    {cell.dayNum}
+                  </span>
+                  <div className="flex gap-1 mt-1 flex-wrap">
+                    {hasWorkout && <span className="w-2 h-2 rounded-full bg-green-500" />}
+                    {hasScheduled && <span className="w-2 h-2 rounded-full bg-blue-500" />}
+                    {hasPayment && showPayments && <span className="w-2 h-2 rounded-full bg-purple-500" />}
+                  </div>
+                </>
               )}
             </div>
           );
         })}
       </div>
-    );
-  }
 
-  // ── Month View ───────────────────────────────────────────────────────────────
-  function MonthView() {
-    return (
-      <div className="px-4 pb-4">
-        <div className="card">
-          {isTrainer && (
-            <div
-              className="flex items-center justify-between mb-3 pb-3"
-              style={{ borderBottom: "0.5px solid #EDF2F7" }}
-            >
-              <span className="text-xs font-medium" style={{ color: "#4E6080" }}>
-                Payment reminders
-              </span>
-              <button
-                onClick={() => setShowPayments((v) => !v)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all"
-                style={
-                  showPayments
-                    ? { background: GRAPE_LIGHT, color: GRAPE, border: `1px solid ${GRAPE}` }
-                    : { background: "#F0F4F8", color: "#4E6080", border: "1px solid #C8D8EC" }
-                }
-              >
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: showPayments ? GRAPE : "#C8D8EC" }}
-                />
-                {showPayments ? "Showing" : "Hidden"}
-              </button>
-            </div>
-          )}
-
-          <div className="grid grid-cols-7 mb-2">
-            {dowNames.map((d) => (
-              <div
-                key={d}
-                className="text-center text-xs font-medium py-1"
-                style={{ color: "#4E6080" }}
-              >
-                {d}
+      {isTrainer && showPayments && paymentReminders.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Payment Reminders</h3>
+          <div className="space-y-2">
+            {paymentReminders.map((p, i) => (
+              <div key={i} className="flex items-center justify-between bg-purple-50 rounded-lg px-3 py-2 text-sm">
+                <span className="font-medium text-purple-900">{p.clientName}</span>
+                <span className="text-purple-700">\${p.amount.toFixed(2)}</span>
+                <span className="text-xs text-gray-500">{p.date}</span>
+                <span className={\`text-xs px-2 py-0.5 rounded-full \${p.status === "sent" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}\`}>{p.status}</span>
               </div>
             ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-y-1">
-            {Array.from({ length: firstDay }, (_, i) => (
-              <div key={`empty-${i}`} />
-            ))}
-            {Array.from({ length: daysInMonth }, (_, i) => {
-              const day = i + 1;
-              const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-              const isToday = day === today;
-              const hasLog = workoutDates.includes(dateStr);
-              const dow = new Date(year, month - 1, day).getDay();
-              const isScheduled = scheduledDows.includes(dow);
-              const hasPayment = showPayments && !!paymentDateMap[dateStr]?.length;
-              const dayWorkouts = workoutsByDate[dateStr] || [];
-              const dayAppts = appointmentsByDate[dateStr] || [];
-              const hasWorkout = !isTrainer && (dayWorkouts.length > 0 || dayAppts.length > 0);
-              const isClickable = hasWorkout || isTrainer;
-              const isExpanded = expandedDay === dateStr;
-
-              return (
-                <div
-                  key={day}
-                  className="relative flex flex-col items-center py-1"
-                  onClick={isClickable ? () => handleMonthDayClick(dateStr) : undefined}
-                  style={isClickable ? { cursor: "pointer" } : undefined}
-                >
-                  <div
-                    className="w-8 h-8 flex items-center justify-center text-sm rounded-full transition-all"
-                    style={
-                      isToday
-                        ? { background: "#0F4C81", color: "white", fontWeight: 500 }
-                        : isExpanded
-                        ? { background: "#DDEEFF", color: "#0F4C81", fontWeight: 600 }
-                        : isScheduled || hasWorkout
-                        ? { color: "#0F4C81", fontWeight: 500 }
-                        : { color: "#0D1B2E" }
-                    }
-                  >
-                    {day}
-                  </div>
-                  <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
-                    {hasLog && (
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#059669" }} />
-                    )}
-                    {(isScheduled || hasWorkout) && !hasLog && (
-                      <div
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: isToday ? "white" : "#0EA5E9" }}
-                      />
-                    )}
-                    {hasPayment && (
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: GRAPE }} />
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div
-            className="flex flex-wrap gap-4 mt-3 pt-3"
-            style={{ borderTop: "0.5px solid #EDF2F7" }}
-          >
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full" style={{ background: "#059669" }} />
-              <span className="text-xs" style={{ color: "#4E6080" }}>Logged</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full" style={{ background: "#0EA5E9" }} />
-              <span className="text-xs" style={{ color: "#4E6080" }}>Scheduled</span>
-            </div>
-            {isTrainer && showPayments && (
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full" style={{ background: GRAPE }} />
-                <span className="text-xs" style={{ color: "#4E6080" }}>Payment due</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {expandedDay && (() => {
-          const appts = appointmentsByDate[expandedDay] || [];
-          const wkts = workoutsByDate[expandedDay] || [];
-          if (appts.length === 0 && wkts.length === 0) return null;
-          const d = new Date(expandedDay + "T00:00:00");
-          const label = d.toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          });
-          const items = appts.length > 0 ? appts : null;
-          return (
-            <div className="mt-3 card" style={{ padding: "0.75rem 1rem" }}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#4E6080" }}>
-                  {label}
-                </p>
-                <button onClick={() => setExpandedDay(null)}>
-                  <i className="ti ti-x text-sm" style={{ color: "#C8D8EC" }} />
-                </button>
-              </div>
-              {items
-                ? items.map((appt) => (
-                    <div
-                      key={appt.id}
-                      className="flex items-center gap-3 py-2.5 border-b last:border-b-0 -mx-4 px-4"
-                      style={{ borderColor: "#EDF2F7", cursor: !isTrainer ? "pointer" : "default" }}
-                      onClick={() => !isTrainer && router.push(`/workout/${appt.id}`)}
-                    >
-                      <div
-                        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ background: "#DDEEFF" }}
-                      >
-                        <i className="ti ti-barbell text-base" style={{ color: "#0F4C81" }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate" style={{ color: "#0D1B2E" }}>
-                          {appt.label}
-                        </div>
-                      </div>
-                      {!isTrainer && (
-                        <i className="ti ti-chevron-right text-sm" style={{ color: "#C8D8EC" }} />
-                      )}
-                    </div>
-                  ))
-                : wkts.map((w) => (
-                    <div
-                      key={w.id}
-                      className="flex items-center gap-3 py-2.5 border-b last:border-b-0 -mx-4 px-4"
-                      style={{ borderColor: "#EDF2F7", cursor: "pointer" }}
-                      onClick={() => router.push(`/workout/${w.id}`)}
-                    >
-                      <div
-                        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ background: "#DDEEFF" }}
-                      >
-                        <i className="ti ti-barbell text-base" style={{ color: "#0F4C81" }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate" style={{ color: "#0D1B2E" }}>
-                          {w.label}
-                        </div>
-                      </div>
-                      <i className="ti ti-chevron-right text-sm" style={{ color: "#C8D8EC" }} />
-                    </div>
-                  ))}
-            </div>
-          );
-        })()}
-
-        {isTrainer && showPayments && upcomingPayments.length > 0 && (
-          <>
-            <p className="label mt-4">upcoming payments</p>
-            <div className="card" style={{ padding: "0.5rem 1rem" }}>
-              {upcomingPayments.map((pr, i) => {
-                const d = new Date(pr.date + "T00:00:00");
-                const lbl = d.toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                });
-                return (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 py-3 border-b last:border-b-0 -mx-4 px-4"
-                    style={{ borderColor: "#EDF2F7" }}
-                  >
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: GRAPE_LIGHT }}
-                    >
-                      <i className="ti ti-credit-card text-lg" style={{ color: GRAPE }} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium" style={{ color: "#0D1B2E" }}>
-                        {pr.clientName}
-                      </div>
-                      <div className="text-xs" style={{ color: "#4E6080" }}>{lbl}</div>
-                    </div>
-                    <div className="text-sm font-semibold" style={{ color: GRAPE }}>
-                      ${pr.amount.toLocaleString()}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {isTrainer && (
-          <>
-            <p className="label mt-4">all clients</p>
-            <div className="card text-sm" style={{ color: "#4E6080", padding: "1rem" }}>
-              <i className="ti ti-brand-google text-lg mr-2" style={{ color: "#0F4C81" }} />
-              Google Calendar sync — connect in Settings to push sessions both ways.
-            </div>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {pickerDate && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center"
-          style={{ background: "rgba(0,0,0,0.5)" }}
-          onClick={() => setPickerDate(null)}
-        >
-          <div
-            className="w-full max-w-lg rounded-t-2xl pb-8"
-            style={{ background: "var(--brand-bg, #fff)" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full" style={{ background: "#C8D8EC" }} />
-            </div>
-            <div className="px-5 py-3" style={{ borderBottom: "0.5px solid #EDF2F7" }}>
-              <p
-                className="text-xs font-semibold uppercase tracking-widest"
-                style={{ color: "#4E6080" }}
-              >
-                Choose a workout
-              </p>
-              <p className="text-sm font-medium mt-0.5" style={{ color: "#0D1B2E" }}>
-                {new Date(pickerDate + "T00:00:00").toLocaleDateString("en-US", {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
-            </div>
-            <div className="px-5 py-3 space-y-2">
-              {pickerWorkouts.map((w) => (
-                <Link
-                  key={w.id}
-                  href={`/workout/${w.id}`}
-                  className="flex items-center gap-3 rounded-xl px-4 py-3"
-                  style={{ background: "#DDEEFF", border: "1px solid #0F4C8120" }}
-                >
-                  <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: "#0F4C81" }}
-                  >
-                    <i className="ti ti-barbell text-base" style={{ color: "#fff" }} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold" style={{ color: "#0D1B2E" }}>
-                      {w.label}
-                    </p>
-                  </div>
-                  <i className="ti ti-chevron-right text-sm" style={{ color: "#0F4C81" }} />
-                </Link>
-              ))}
-            </div>
-            <div className="px-5 pt-1">
-              <button
-                onClick={() => setPickerDate(null)}
-                className="w-full py-3 rounded-xl text-sm font-semibold"
-                style={{ background: "#F0F4F8", color: "#4E6080" }}
-              >
-                Cancel
-              </button>
-            </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-      <div style={{ background: "#0F4C81" }} className="px-4 py-4">
-        <h1 className="text-white font-medium text-lg">Schedule</h1>
-        <p className="text-white/60 text-sm">{monthName}</p>
-      </div>
+// ─── Week Time Grid ────────────────────────────────────────────────────────────
 
-      <div className="px-4 pt-3 pb-1">
-        <div
-          className="flex rounded-xl p-1 gap-1"
-          style={{ background: "#F0F4F8", border: "1px solid #EDF2F7" }}
-        >
-          {(["week", "month"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => { setViewMode(mode); setExpandedDay(null); }}
-              className="flex-1 py-2 rounded-lg text-sm font-semibold transition-all"
-              style={
-                viewMode === mode
-                  ? { background: "#0F4C81", color: "#fff", boxShadow: "0 1px 4px rgba(15,76,129,0.25)" }
-                  : { background: "transparent", color: "#4E6080" }
-              }
-            >
-              {mode === "week" ? "1 Week" : "1 Month"}
-            </button>
-          ))}
+interface WeekGridProps {
+  weekStart: string;
+  todayStr: string;
+  appointments: Appointment[];
+  isTrainer: boolean;
+  onClickAppt: (appt: Appointment) => void;
+}
+
+function WeekGrid({ weekStart, todayStr, appointments, isTrainer, onClickAppt }: WeekGridProps) {
+  const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i);
+  const totalHeight = hours.length * PX_PER_HOUR;
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  const byDate = useMemo(() => {
+    const map: Record<string, Appointment[]> = {};
+    appointments.forEach((a) => {
+      if (!map[a.date]) map[a.date] = [];
+      map[a.date].push(a);
+    });
+    return map;
+  }, [appointments]);
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[640px]">
+        <div className="flex border-b border-gray-200 bg-white sticky top-0 z-10">
+          <div className="w-14 flex-shrink-0" />
+          {days.map((dateStr, i) => {
+            const isToday = dateStr === todayStr;
+            const [, , d] = dateStr.split("-");
+            return (
+              <div key={dateStr} className={\`flex-1 text-center py-2 border-l border-gray-200 \${isToday ? "bg-indigo-50" : ""}\`}>
+                <div className="text-xs text-gray-500 font-medium">{DOW_LABELS[i]}</div>
+                <div className={\`text-lg font-semibold mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-full \${isToday ? "bg-indigo-600 text-white" : "text-gray-800"}\`}>
+                  {parseInt(d)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex">
+          <div className="w-14 flex-shrink-0 relative" style={{ height: totalHeight }}>
+            {hours.map((h) => (
+              <div key={h} className="absolute w-full pr-2 text-right" style={{ top: (h - HOUR_START) * PX_PER_HOUR - 8 }}>
+                <span className="text-xs text-gray-400">{formatHour(h)}</span>
+              </div>
+            ))}
+          </div>
+
+          {days.map((dateStr) => {
+            const isToday = dateStr === todayStr;
+            const dayAppts = byDate[dateStr] ?? [];
+            const allDayAppts = dayAppts.filter((a) => !a.startTime);
+            const timedAppts = dayAppts.filter((a) => !!a.startTime);
+
+            return (
+              <div key={dateStr} className={\`flex-1 border-l border-gray-200 relative \${isToday ? "bg-indigo-50/30" : "bg-white"}\`} style={{ height: totalHeight }}>
+                {hours.map((h) => (
+                  <div key={h} className="absolute w-full border-t border-gray-100" style={{ top: (h - HOUR_START) * PX_PER_HOUR }} />
+                ))}
+
+                {allDayAppts.map((appt) => (
+                  <div
+                    key={appt.id}
+                    onClick={() => isTrainer && onClickAppt(appt)}
+                    className={\`mx-0.5 mb-0.5 rounded text-white text-xs px-1 py-0.5 truncate \${isTrainer ? "cursor-pointer hover:opacity-80" : "cursor-default"} bg-indigo-500\`}
+                    style={{ position: "relative", zIndex: 1 }}
+                    title={appt.label}
+                  >
+                    {appt.label}
+                  </div>
+                ))}
+
+                {timedAppts.map((appt) => {
+                  const startMins = timeToMinutes(appt.startTime!);
+                  const endMins = appt.endTime ? timeToMinutes(appt.endTime) : startMins + 60;
+                  const topPx = (startMins - HOUR_START * 60) * (PX_PER_HOUR / 60);
+                  const heightPx = Math.max((endMins - startMins) * (PX_PER_HOUR / 60), 24);
+                  if (startMins < HOUR_START * 60 || startMins >= HOUR_END * 60) return null;
+                  const shortLabel = appt.label.split(" — ")[0];
+                  const timeLabel = appt.endTime
+                    ? \`\${formatTime12(appt.startTime!)}–\${formatTime12(appt.endTime)}\`
+                    : formatTime12(appt.startTime!);
+                  return (
+                    <div
+                      key={appt.id}
+                      onClick={() => isTrainer && onClickAppt(appt)}
+                      className={\`absolute left-0.5 right-0.5 rounded bg-indigo-600 text-white text-xs overflow-hidden shadow-sm \${isTrainer ? "cursor-pointer hover:bg-indigo-700 hover:shadow-md" : "cursor-default"} transition-all\`}
+                      style={{ top: topPx, height: heightPx, zIndex: 2 }}
+                      title={\`\${appt.label}\n\${timeLabel}\`}
+                    >
+                      <div className="px-1.5 pt-0.5 font-medium leading-tight truncate">{shortLabel}</div>
+                      {heightPx > 28 && <div className="px-1.5 text-indigo-200 leading-tight truncate">{timeLabel}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
+    </div>
+  );
+}
 
-      {viewMode === "week" ? <WeekView /> : <MonthView />}
-    </>
+// ─── Main Component ────────────────────────────────────────────────────────────
+
+export default function ScheduleClient({
+  monthName, year, month, daysInMonth, firstDay, today, workoutDates, scheduledDows, upcomingDays, isTrainer = false, paymentReminders = [],
+}: Props) {
+  const router = useRouter();
+
+  const todayStr = useMemo(() => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return \`\${year}-\${pad(month)}-\${pad(today)}\`;
+  }, [year, month, today]);
+
+  const [viewMode, setViewMode] = useState<"week" | "month">("week");
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(todayStr));
+  const [editingAppt, setEditingAppt] = useState<Appointment | null>(null);
+
+  const weekAppts = useMemo(() => {
+    const weekEnd = addDays(weekStart, 7);
+    return upcomingDays.filter((a) => a.date >= weekStart && a.date < weekEnd);
+  }, [upcomingDays, weekStart]);
+
+  const weekEndStr = addDays(weekStart, 6);
+  const weekLabel = \`\${formatDateLabel(weekStart)} – \${formatDateLabel(weekEndStr)}\`;
+
+  const goToPrevWeek = useCallback(() => setWeekStart((s) => addDays(s, -7)), []);
+  const goToNextWeek = useCallback(() => setWeekStart((s) => addDays(s, 7)), []);
+  const goToToday = useCallback(() => setWeekStart(getWeekStart(todayStr)), [todayStr]);
+
+  const handleSaved = useCallback(() => {
+    setEditingAppt(null);
+    router.refresh();
+  }, [router]);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold text-gray-900">Schedule</h1>
+          <div className="flex bg-white border border-gray-200 rounded-lg overflow-hidden text-sm">
+            <button onClick={() => setViewMode("week")} className={\`px-4 py-2 font-medium transition-colors \${viewMode === "week" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-50"}\`}>Week</button>
+            <button onClick={() => setViewMode("month")} className={\`px-4 py-2 font-medium transition-colors \${viewMode === "month" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-50"}\`}>Month</button>
+          </div>
+        </div>
+
+        {viewMode === "week" && (
+          <div className="flex items-center gap-3 mb-4">
+            <button onClick={goToToday} className="px-3 py-1.5 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Today</button>
+            <div className="flex items-center gap-1">
+              <button onClick={goToPrevWeek} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600" aria-label="Previous week">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <button onClick={goToNextWeek} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600" aria-label="Next week">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </button>
+            </div>
+            <span className="text-base font-semibold text-gray-800">{weekLabel}</span>
+          </div>
+        )}
+
+        {viewMode === "month" && (
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">{monthName} {year}</h2>
+          </div>
+        )}
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          {viewMode === "week" ? (
+            <WeekGrid weekStart={weekStart} todayStr={todayStr} appointments={weekAppts} isTrainer={isTrainer} onClickAppt={setEditingAppt} />
+          ) : (
+            <div className="p-4">
+              <MonthView year={year} month={month} daysInMonth={daysInMonth} firstDay={firstDay} today={today} workoutDates={workoutDates} upcomingDays={upcomingDays} paymentReminders={paymentReminders} isTrainer={isTrainer} />
+            </div>
+          )}
+        </div>
+
+        {isTrainer && viewMode === "week" && (
+          <p className="text-xs text-gray-400 mt-3 text-center">Click any session block to edit or reschedule</p>
+        )}
+      </div>
+
+      {editingAppt && (
+        <EditDrawer appt={editingAppt} onClose={() => setEditingAppt(null)} onSaved={handleSaved} />
+      )}
+    </div>
   );
 }
