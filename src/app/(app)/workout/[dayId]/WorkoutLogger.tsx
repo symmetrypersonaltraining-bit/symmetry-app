@@ -49,7 +49,7 @@ interface Props {
   existingSetLogs: any[];
 }
 
-type SetData = { weight: string; reps: string; done: boolean };
+type SetData = { weight: string; reps: string; time: string; speed: string; hr: string; done: boolean };
 type HistoryEntry = { log_date: string; sets: { set_number: number; weight_lbs: number | null; reps: number | null }[] };
 
 // \u2500\u2500\u2500 iOS SCROLL-WHEEL TIMER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -494,7 +494,7 @@ export default function WorkoutLogger({
         const logs = existingSetLogs.filter(sl => sl.prescribed_exercise_id === pe.id);
         result[pe.id] = Array.from({ length: (pe.sets || 3) }, (_, i) => {
           const ex = logs.find(l => l.set_number === i + 1);
-          return { weight: ex?.weight_lbs?.toString() || "", reps: ex?.reps?.toString() || ((pe.volume_type === "reps" || pe.volume_type === "rep_range") && pe.volume_value ? (String(pe.volume_value).match(/\d+/)?.[0] || "") : ""), done: ex?.completed ?? false };
+          return { weight: ex?.weight_lbs?.toString() || "", reps: ex?.reps?.toString() || ((pe.volume_type === "reps" || pe.volume_type === "rep_range") && pe.volume_value ? (String(pe.volume_value).match(/\d+/)?.[0] || "") : ""), time: ex?.duration_seconds != null ? String(Math.round(ex.duration_seconds / 60)) : "", speed: ex?.speed != null ? String(ex.speed) : "", hr: ex?.heart_rate != null ? String(ex.heart_rate) : "", done: ex?.completed ?? false };
         });
       }
     }
@@ -754,7 +754,9 @@ export default function WorkoutLogger({
         set_number: si + 1,
         weight_lbs: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (s.weight ? parseFloat(s.weight) || 0 : null),
         reps: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (s.reps ? parseInt(s.reps) || 0 : null),
-        duration_seconds: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.reps ? Math.round((parseFloat(s.reps) || 0) * 60) : null) : null,
+        duration_seconds: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.time ? Math.round((parseFloat(s.time) || 0) * 60) : null) : null,
+        speed: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.speed ? parseFloat(s.speed) || 0 : null) : null,
+        heart_rate: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
         completed: true, logged_at: new Date().toISOString(),
       }, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
       updateSet(peId, si, "done", true);
@@ -1262,7 +1264,7 @@ export default function WorkoutLogger({
                       &ldquo;{pe.cue}&rdquo;
                     </p>
                   )}
-                  {cardio ? (<><div className="grid mb-2 mt-3" style={{ gridTemplateColumns: "28px 1fr 40px", gap: "8px" }}><div /><div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>MINUTES</div><div /></div>{peSets.map((setEntry, si) => (<div key={si} className="grid mb-2 items-center" style={{ gridTemplateColumns: "28px 1fr 40px", gap: "8px" }}><div className="text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div><input type="text" value={setEntry.reps} onChange={e => updateSet(pe.id, si, "reps", e.target.value)} disabled={setEntry.done} placeholder={"min"} className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" /><button onClick={e => { e.stopPropagation(); if (!setEntry.done) logSet(pe.id, si); }} disabled={setEntry.done || saving} className="w-10 h-10 rounded-xl flex items-center justify-center transition-all" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="grid mb-2 mt-3" style={{ gridTemplateColumns: "28px 1fr 1fr 40px", gap: "8px" }}>
+                  {cardio ? (<><div className="grid mb-2 mt-3" style={{ gridTemplateColumns: "24px 1fr 1fr 1fr 36px", gap: "5px" }}><div /><div className="text-center text-[10px] font-medium" style={{ color: "var(--brand-text-secondary)" }}>TIME</div><div className="text-center text-[10px] font-medium" style={{ color: "var(--brand-text-secondary)" }}>SPEED</div><div className="text-center text-[10px] font-medium" style={{ color: "var(--brand-text-secondary)" }}>HR</div><div /></div>{peSets.map((setEntry, si) => (<div key={si} className="grid mb-2 items-center" style={{ gridTemplateColumns: "24px 1fr 1fr 1fr 36px", gap: "5px" }}><div className="text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div><input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} disabled={setEntry.done} placeholder={"min"} className="w-full min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" /><input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} disabled={setEntry.done} placeholder={"mph"} className="w-full min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" /><input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} disabled={setEntry.done} placeholder={"bpm"} className="w-full min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" /><button onClick={e => { e.stopPropagation(); if (!setEntry.done) logSet(pe.id, si); }} disabled={setEntry.done || saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="grid mb-2 mt-3" style={{ gridTemplateColumns: "28px 1fr 1fr 40px", gap: "8px" }}>
                     <div />
                     <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>LBS</div>
                     <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>REPS</div>
