@@ -24,14 +24,14 @@ export type ThemeId = (typeof THEMES)[number]["id"];
 const ThemeContext = createContext<{
   theme: ThemeId;
   setTheme: (t: ThemeId) => void;
-}>({ theme: "navy", setTheme: () => {} });
+}>({ theme: "pastel", setTheme: () => {} });
 
 export function useTheme() {
   return useContext(ThemeContext);
 }
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeId>("navy");
+  const [theme, setThemeState] = useState<ThemeId>("pastel");
 
   useEffect(() => {
     const stored = localStorage.getItem("symmetry_theme") as ThemeId | null;
