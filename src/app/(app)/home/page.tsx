@@ -194,7 +194,7 @@ export default async function HomePage() {
       <PwaInstallBanner />
       <ClientDashboard
         firstName={firstName}
-        todayWorkout={todayWorkout as any}
+        todayWorkouts={todayWorkout as any}
         metrics={metrics as any[]}
         completedCount={completedCount}
         totalScheduled={totalScheduled}
