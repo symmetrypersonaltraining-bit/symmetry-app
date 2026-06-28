@@ -165,7 +165,7 @@ function MetricCard({ label, value, unit, values, color, icon, onClick }: { labe
           style={{ color: hasData ? color : "var(--brand-text-secondary)", opacity: hasData ? 1 : 0.45 }}
         />
       </div>
-      <div className="text-lg font-bold mb-2" style={{ color: "var(--brand-text)" }}>
+      <div className="text-2xl font-extrabold mb-1" style={{ color: "var(--brand-text)" }}>
         {hasData
           ? <span>{value}<span className="text-xs font-normal ml-0.5" style={{ color: "var(--brand-text-secondary)" }}>{unit}</span></span>
           : <span className="text-xs font-normal" style={{ color: "var(--brand-text-secondary)" }}>Nothing logged yet</span>}
