@@ -273,7 +273,7 @@ export default function ClientDashboard({ firstName, todayWorkouts = [], metrics
         <div className="flex items-start justify-between pt-2">
           <div>
             <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{greeting},</p>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>{firstName} {'\uD83D\uDC4B'}</h1>
+            <h1 className="text-3xl font-bold tracking-tight" style={{ color: "var(--brand-text)" }}>{firstName} {'\uD83D\uDC4B'}</h1>
           </div>
           {streakDays > 0 && (
             <div className="flex items-center px-3 py-1.5 rounded-full"
