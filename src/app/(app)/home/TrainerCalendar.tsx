@@ -356,6 +356,15 @@ function SessionDetailPopup({ ev, clients, workoutMap, onClose, onSaved }: {
     setUpdating(true);
     const supabase = createClient();
     await supabase.from("appointments").update({ status }).eq("id", ev.id);
+    if (status === "cancelled" && ev.clientId) {
+      const { data: cl } = await supabase.from("clients").select("current_fees,training_frequency").eq("id", ev.clientId).single();
+      if (cl?.current_fees && cl?.training_frequency) {
+        const rate = parseFloat(String(cl.current_fees)) / ((cl.training_frequency as number) * 4);
+        const credit = Math.round(rate * 50) / 100;
+        const d = new Date(ev.scheduledAt);
+        await supabase.from("billing_adjustments").insert({ client_id: ev.clientId, appointment_id: ev.id, amount: credit, reason: "Cancelled session \u2014 half-price credit", apply_to_month: new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split("T")[0], applied: false });
+      }
+    }
     setUpdating(false);
     onSaved();
     onClose();
@@ -501,6 +510,9 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
   const [visible, setVisible] = useState(false);
   const [startY, setStartY] = useState(0);
   const [dragDelta, setDragDelta] = useState(0);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkCancelling, setBulkCancelling] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -509,6 +521,8 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
 
   function close() {
     setVisible(false);
+    setSelectMode(false);
+    setSelectedIds(new Set());
     setTimeout(onClose, 300);
   }
 
@@ -581,17 +595,26 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
               {sorted.length} session{sorted.length !== 1 ? "s" : ""}
             </p>
           </div>
-          <button onClick={close}
-            className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
-            style={{ background: "var(--brand-bg)" }}>
-            <i className="ti ti-x text-sm" style={{ color: "var(--brand-text-secondary)" }} />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {sorted.filter(e => e.status !== "cancelled").length > 1 && (
+              <button onClick={() => { setSelectMode(v => !v); setSelectedIds(new Set()); }}
+                className="h-8 px-3 flex items-center justify-center rounded-lg text-xs font-semibold"
+                style={{ background: selectMode ? "#E5393520" : "var(--brand-bg)", color: selectMode ? "#E53935" : "var(--brand-text-secondary)", border: selectMode ? "1px solid #E5393540" : "none" }}>
+                {selectMode ? "Done" : "Select"}
+              </button>
+            )}
+            <button onClick={close}
+              className="w-8 h-8 flex items-center justify-center rounded-lg"
+              style={{ background: "var(--brand-bg)" }}>
+              <i className="ti ti-x text-sm" style={{ color: "var(--brand-text-secondary)" }} />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
         <div className="overflow-y-auto flex-1 px-5 py-3 space-y-2">
 
-          {/* Programmed Workouts — launch buttons for trainer */}
+          {/* Programmed Workouts â launch buttons for trainer */}
           {workouts.length > 0 && (
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>
@@ -652,9 +675,19 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
                   const isCancelled = ev.status === "cancelled" || ev.status === "cancelled_client" || ev.status === "cancelled_trainer";
                   return (
                     <button key={ev.id}
-                      onClick={() => { close(); setTimeout(() => onEventClick(ev), 100); }}
+                      onClick={() => {
+                        if (selectMode && !isCancelled) {
+                          setSelectedIds(prev => { const n = new Set(prev); n.has(ev.id) ? n.delete(ev.id) : n.add(ev.id); return n; });
+                        } else { close(); setTimeout(() => onEventClick(ev), 100); }
+                      }}
                       className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left"
-                      style={{ background: "var(--brand-bg)", border: `1px solid ${color}30` }}>
+                      style={{ background: selectMode && selectedIds.has(ev.id) ? "#E5393508" : "var(--brand-bg)", border: `1px solid ${selectMode && selectedIds.has(ev.id) ? "#E53935" : color}30` }}>
+                      {selectMode && !isCancelled && (
+                        <div className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center"
+                          style={{ border: selectedIds.has(ev.id) ? "none" : "2px solid var(--brand-border)", background: selectedIds.has(ev.id) ? "#E53935" : "transparent" }}>
+                          {selectedIds.has(ev.id) && <i className="ti ti-check text-[10px] text-white" />}
+                        </div>
+                      )}
                       <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ background: color }} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate"
@@ -663,8 +696,8 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
                           {displayName(ev)}
                         </p>
                         <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                          {fmtTime(start)} – {fmtTime(end)}
-                          {ev.title && ev.title !== "Training Session" ? ` · ${ev.title}` : ""}
+                          {fmtTime(start)} â {fmtTime(end)}
+                          {ev.title && ev.title !== "Training Session" ? ` Â· ${ev.title}` : ""}
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -692,12 +725,37 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
 
         {/* Footer */}
         <div className="px-5 py-4 flex-shrink-0" style={{ borderTop: "1px solid var(--brand-border)" }}>
-          <button onClick={() => { close(); setTimeout(() => onAddSession(date), 200); }}
+          {selectMode && selectedIds.size > 0 ? (
+            <button disabled={bulkCancelling} onClick={async () => {
+              setBulkCancelling(true);
+              const supabase = createClient();
+              const ids = Array.from(selectedIds);
+              const { data: appts } = await supabase.from("appointments").select("id,client_id,scheduled_at").in("id", ids);
+              await supabase.from("appointments").update({ status: "cancelled" }).in("id", ids);
+              for (const appt of appts ?? []) {
+                const { data: cl } = await supabase.from("clients").select("current_fees,training_frequency").eq("id", appt.client_id).single();
+                if (cl?.current_fees && cl?.training_frequency) {
+                  const rate = parseFloat(String(cl.current_fees)) / ((cl.training_frequency as number) * 4);
+                  const credit = Math.round(rate * 50) / 100;
+                  const d = new Date(appt.scheduled_at);
+                  await supabase.from("billing_adjustments").insert({ client_id: appt.client_id, appointment_id: appt.id, amount: credit, reason: "Bulk cancel \u2014 half-price credit", apply_to_month: new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split("T")[0], applied: false });
+                }
+              }
+              setBulkCancelling(false);
+              close();
+            }}
             className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
-            style={{ background: "var(--brand-primary)", color: "white" }}>
-            <i className="ti ti-plus text-sm" />
-            Add Session
-          </button>
+            style={{ background: bulkCancelling ? "#9E9E9E" : "#E53935", color: "white", opacity: bulkCancelling ? 0.7 : 1 }}>
+              {bulkCancelling ? "Cancelling..." : `Cancel ${selectedIds.size} Session${selectedIds.size !== 1 ? "s" : ""} + Credit`}
+            </button>
+          ) : !selectMode && (
+            <button onClick={() => { close(); setTimeout(() => onAddSession(date), 200); }}
+              className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
+              style={{ background: "var(--brand-primary)", color: "white" }}>
+              <i className="ti ti-plus text-sm" />
+              Add Session
+            </button>
+          )}
         </div>
       </div>
     </>
