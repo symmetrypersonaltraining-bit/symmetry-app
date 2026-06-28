@@ -24,7 +24,6 @@ export default function AIAssistant() {
       _setOk(data.user?.email === 'symmetrypersonaltraining@gmail.com');
     });
   }, []);
-  if (!_ok) return null;
   const [isTrainer, setIsTrainer] = useState(false);
   useEffect(() => {
     (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (data?.user?.email === "symmetrypersonaltraining@gmail.com") setIsTrainer(true); } catch {} })();
@@ -125,6 +124,8 @@ export default function AIAssistant() {
 
   // Initial greeting
   const isEmpty = messages.length === 0;
+
+  if (!_ok) return null;
 
   return (
     <>
@@ -293,7 +294,7 @@ export default function AIAssistant() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-                placeholder="Ask anything about trainingâ¦"
+                placeholder="Ask anything about trainingÃ¢ÂÂ¦"
                 className="flex-1 text-sm px-3.5 py-2.5 rounded-xl outline-none"
                 style={{
                   background: "var(--brand-bg)",
