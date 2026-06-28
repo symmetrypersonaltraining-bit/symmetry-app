@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { dismissClientNotification } from "./notifActions";
 
 interface MetricPoint {
   metric_date: string;
@@ -22,16 +21,8 @@ interface RecentWorkout {
 interface ScheduledDay {
   id: string;
   date: string;
+  label?: string;
   completed: boolean;
-}
-
-interface ClientNotification {
-  id: string;
-  type: string;
-  title: string;
-  body: string | null;
-  amount_due: number | null;
-  due_date: string | null;
 }
 
 interface Props {
@@ -44,80 +35,8 @@ interface Props {
   streakDays: number;
   weekWorkouts: { date: string; completed: boolean }[];
   allScheduled?: ScheduledDay[];
-  basePath?: string;
-  notifications?: ClientNotification[];
-}
-
-// ─── Payment Notification Banner ─────────────────────────────────────────────
-function PaymentNotificationBanner({
-  notifications,
-}: {
-  notifications: ClientNotification[];
-}) {
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-
-  const visible = notifications.filter(n => !dismissed.has(n.id));
-  if (visible.length === 0) return null;
-
-  function fmtDate(d: string) {
-    const dt = new Date(d + "T00:00:00");
-    return dt.toLocaleDateString("en-US", { month: "long", day: "numeric" });
-  }
-
-  async function handleDismiss(id: string) {
-    setDismissed(prev => new Set([...prev, id]));
-    await dismissClientNotification(id);
-  }
-
-  return (
-    <div className="space-y-2">
-      {visible.map(n => (
-        <div
-          key={n.id}
-          className="rounded-2xl p-4 relative"
-          style={{
-            background: "rgba(245,158,11,0.08)",
-            border: "1.5px solid rgba(245,158,11,0.35)",
-          }}
-        >
-          <div className="flex items-start gap-3">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "rgba(245,158,11,0.15)" }}
-            >
-              <i className="ti ti-credit-card text-base" style={{ color: "#f59e0b" }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>{n.title}</p>
-              {n.body && (
-                <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{n.body}</p>
-              )}
-              <div className="flex items-center gap-3 mt-2 flex-wrap">
-                {n.amount_due != null && (
-                  <span className="text-sm font-bold" style={{ color: "#f59e0b" }}>
-                    ${n.amount_due.toFixed(2)}
-                  </span>
-                )}
-                {n.due_date && (
-                  <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                    Due {fmtDate(n.due_date)}
-                  </span>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={() => handleDismiss(n.id)}
-              className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }}
-              title="Dismiss"
-            >
-              <i className="ti ti-x text-xs" style={{ color: "#f59e0b" }} />
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  notifications?: any[];
+  isOwnTrainerView?: boolean;
 }
 
 // ─── Sparkline (mini, for metric cards) ──────────────────────────────────────
@@ -193,10 +112,12 @@ function FullChart({
   const pathD = `M ${pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")}`;
   const fillD = `M ${pts[0].x},${H - padB} L ${pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")} L ${pts[pts.length - 1].x},${H - padB} Z`;
 
+  // Y-axis labels (3 ticks)
   const yTicks = [min, min + range / 2, max].map(v => ({
     v, y: padY + (1 - (v - min) / range) * chartH,
   }));
 
+  // X-axis labels (first, middle, last)
   const xTicks = [0, Math.floor(pts.length / 2), pts.length - 1].map(i => pts[i]);
 
   function fmtDate(d: string) {
@@ -219,20 +140,32 @@ function FullChart({
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
         </defs>
+
+        {/* Grid lines */}
         {yTicks.map((t, i) => (
           <line key={i} x1={padX} y1={t.y} x2={W - padX} y2={t.y}
             stroke="var(--brand-border)" strokeWidth="1" strokeDasharray="3,3" />
         ))}
+
+        {/* Area fill */}
         <path d={fillD} fill={`url(#${gradId})`} />
+
+        {/* Line */}
         <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* Y-axis labels */}
         {yTicks.map((t, i) => (
           <text key={i} x={padX - 4} y={t.y + 4} textAnchor="end" fontSize="9"
             fill="var(--brand-text-secondary)">{t.v.toFixed(1)}</text>
         ))}
+
+        {/* X-axis labels */}
         {xTicks.map((p, i) => (
           <text key={i} x={p.x} y={H - 4} textAnchor="middle" fontSize="9"
             fill="var(--brand-text-secondary)">{fmtDate(p.date)}</text>
         ))}
+
+        {/* Data points + hover zones */}
         {pts.map((p, i) => (
           <g key={i} onMouseEnter={() => setHovered(i)}>
             <circle cx={p.x} cy={p.y} r="16" fill="transparent" />
@@ -250,6 +183,8 @@ function FullChart({
           </g>
         ))}
       </svg>
+
+      {/* Stats row */}
       <div className="grid grid-cols-3 gap-2 mt-3">
         {[
           { label: "Current", val: values[values.length - 1] },
@@ -271,13 +206,12 @@ function FullChart({
 
 // ─── Metric Modal ─────────────────────────────────────────────────────────────
 function MetricModal({
-  metricKey, label, unit, color, icon, metrics, onClose, basePath = "",
+  metricKey, label, unit, color, icon, metrics, onClose,
 }: {
   metricKey: "weight" | "body_fat_pct" | "lean_mass" | "fat_mass";
   label: string; unit: string; color: string; icon: string;
   metrics: MetricPoint[];
   onClose: () => void;
-  basePath?: string;
 }) {
   const values = metrics.map(m => m[metricKey]).filter((v): v is number => v != null);
   const dates = metrics.filter(m => m[metricKey] != null).map(m => m.metric_date);
@@ -292,7 +226,9 @@ function MetricModal({
         className="w-full max-w-lg rounded-t-3xl p-6 pb-8"
         style={{ background: "var(--brand-bg)", maxHeight: "85vh", overflowY: "auto" }}
       >
+        {/* Handle */}
         <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: "var(--brand-border)" }} />
+
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -314,9 +250,11 @@ function MetricModal({
             <i className="ti ti-x text-sm" style={{ color: "var(--brand-text-secondary)" }} />
           </button>
         </div>
+
         <FullChart values={values} dates={dates} color={color} label={label} unit={unit} />
+
         <Link
-          href={`${basePath}/progress`}
+          href="/progress"
           onClick={onClose}
           className="flex items-center justify-center gap-2 mt-5 py-3 rounded-2xl text-sm font-semibold"
           style={{ background: "var(--brand-primary)", color: "white" }}
@@ -337,7 +275,11 @@ function MetricCard({
   values: number[]; color: string; icon: string; onClick: () => void;
 }) {
   return (
-    <button onClick={onClick} className="metric-card text-left w-full" style={{ cursor: "pointer" }}>
+    <button
+      onClick={onClick}
+      className="metric-card text-left w-full"
+      style={{ cursor: "pointer" }}
+    >
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>{label}</span>
         <i className={`ti ${icon} text-sm`} style={{ color }} />
@@ -349,28 +291,57 @@ function MetricCard({
         }
       </div>
       <Sparkline values={values} color={color} />
-      <p className="text-xs mt-1.5" style={{ color: "var(--brand-text-secondary)" }}>Tap to expand ↗</p>
+      <p className="text-xs mt-1.5" style={{ color: "var(--brand-text-secondary)" }}>
+        Tap to expand ↗
+      </p>
     </button>
   );
 }
 
+// ─── Workout type helpers ─────────────────────────────────────────────────────
+function isCardioLabel(label?: string): boolean {
+  if (!label) return false;
+  return /cardio/i.test(label);
+}
+
+// Returns dot color based on workout type:
+// Green = cardio, Blue (brand-primary) = lift/strength, Gray = rest/none
+function workoutDotColor(label?: string): string {
+  if (!label) return "var(--brand-border)";
+  if (isCardioLabel(label)) return "#22c55e";
+  return "var(--brand-primary)";
+}
+
 // ─── Week Ring ────────────────────────────────────────────────────────────────
 function WeekRing({
-  allScheduled = [], weekOffset, onPrev, onNext, basePath = "",
+  allScheduled = [],
+  weekOffset,
+  onPrev,
+  onNext,
 }: {
   allScheduled: ScheduledDay[];
-  weekOffset: number; onPrev: () => void; onNext: () => void; basePath?: string;
+  weekOffset: number;
+  onPrev: () => void;
+  onNext: () => void;
 }) {
   const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const today = new Date();
   const todayDow = today.getDay();
   const todayStr = today.toISOString().split("T")[0];
 
+  // Compute the start of the displayed week
   const displayWeekStart = new Date(today);
   displayWeekStart.setDate(today.getDate() - todayDow + weekOffset * 7);
 
-  const weekLabel = weekOffset === 0 ? "This Week" : weekOffset === -1 ? "Last Week" : `${Math.abs(weekOffset)} Weeks Ago`;
+  const weekLabel = weekOffset === 0
+    ? "This Week"
+    : weekOffset === -1
+      ? "Last Week"
+      : weekOffset < -1
+        ? `${Math.abs(weekOffset)} Weeks Ago`
+        : "";
 
+  // Build the 7-day array for the displayed week
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(displayWeekStart);
     d.setDate(displayWeekStart.getDate() + i);
@@ -379,16 +350,21 @@ function WeekRing({
     return { dow: i, dateStr, workout, isToday: dateStr === todayStr };
   });
 
+  // Adherence for this week
   const scheduled = weekDays.filter(d => d.workout).length;
   const completed = weekDays.filter(d => d.workout?.completed).length;
   const adherence = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0;
+
   const canGoNext = weekOffset < 0;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <button onClick={onPrev} className="w-7 h-7 rounded-full flex items-center justify-center"
-          style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+        <button
+          onClick={onPrev}
+          className="w-7 h-7 rounded-full flex items-center justify-center"
+          style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}
+        >
           <i className="ti ti-chevron-left text-xs" style={{ color: "var(--brand-text-secondary)" }} />
         </button>
         <div className="text-center">
@@ -397,25 +373,64 @@ function WeekRing({
             <p className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>{adherence}% adherence</p>
           )}
         </div>
-        <button onClick={onNext} disabled={!canGoNext} className="w-7 h-7 rounded-full flex items-center justify-center"
-          style={{ background: canGoNext ? "var(--brand-surface)" : "transparent", border: canGoNext ? "1px solid var(--brand-border)" : "none", opacity: canGoNext ? 1 : 0.3 }}>
+        <button
+          onClick={onNext}
+          disabled={!canGoNext}
+          className="w-7 h-7 rounded-full flex items-center justify-center"
+          style={{
+            background: canGoNext ? "var(--brand-surface)" : "transparent",
+            border: canGoNext ? "1px solid var(--brand-border)" : "none",
+            opacity: canGoNext ? 1 : 0.3,
+          }}
+        >
           <i className="ti ti-chevron-right text-xs" style={{ color: "var(--brand-text-secondary)" }} />
         </button>
       </div>
+
       <div className="flex gap-1.5 justify-center">
         {weekDays.map(({ dow, dateStr, workout, isToday }) => {
           const done = workout?.completed;
-          const sched = !!workout;
+          const isScheduled = !!workout;
+          const dotColor = workoutDotColor(workout?.label);
+          const isCardio = isCardioLabel(workout?.label);
+
           const circle = (
-            <div className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
-              style={{ background: done ? "#22c55e20" : sched ? "var(--brand-card)" : "transparent", border: isToday ? "2px solid var(--brand-primary)" : done ? "1.5px solid #22c55e" : sched ? "1px solid var(--brand-border)" : "1px dashed var(--brand-border)" }}>
-              {done ? <i className="ti ti-check text-xs" style={{ color: "#22c55e" }} /> : sched ? <i className="ti ti-barbell text-xs" style={{ color: "var(--brand-text-secondary)" }} /> : null}
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+              style={{
+                background: done
+                  ? `${dotColor}20`
+                  : isScheduled
+                    ? "var(--brand-card)"
+                    : "transparent",
+                border: isToday
+                  ? "2px solid var(--brand-primary)"
+                  : done
+                    ? `1.5px solid ${dotColor}`
+                    : isScheduled
+                      ? `1px solid ${dotColor}80`
+                      : "1px dashed var(--brand-border)",
+              }}
+            >
+              {done ? (
+                <i className="ti ti-check text-xs" style={{ color: dotColor }} />
+              ) : isScheduled ? (
+                <i
+                  className={`ti ${isCardio ? "ti-run" : "ti-barbell"} text-xs`}
+                  style={{ color: dotColor }}
+                />
+              ) : null}
             </div>
           );
+
           return (
             <div key={dow} className="flex flex-col items-center gap-1">
-              {workout?.id ? <Link href={`${basePath}/workout/${workout.id}`}>{circle}</Link> : circle}
-              <span className="text-xs" style={{ color: isToday ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>{DAYS[dow]}</span>
+              {workout?.id ? (
+                <Link href={`/workout/${workout.id}`}>{circle}</Link>
+              ) : circle}
+              <span className="text-xs" style={{ color: isToday ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>
+                {DAYS[dow]}
+              </span>
             </div>
           );
         })}
@@ -428,16 +443,16 @@ function WeekRing({
 type MetricKey = "weight" | "body_fat_pct" | "lean_mass" | "fat_mass";
 
 const METRIC_CONFIG: { key: MetricKey; label: string; unit: string; color: string; icon: string }[] = [
-  { key: "weight",       label: "Body Weight", unit: "lbs", color: "var(--brand-primary)", icon: "ti-scale"      },
-  { key: "body_fat_pct", label: "Body Fat",    unit: "%",   color: "#f59e0b",              icon: "ti-percentage" },
-  { key: "lean_mass",    label: "Lean Mass",   unit: "lbs", color: "#22c55e",              icon: "ti-barbell"    },
-  { key: "fat_mass",     label: "Fat Mass",    unit: "lbs", color: "#ef4444",              icon: "ti-flame"      },
+  { key: "weight",      label: "Body Weight", unit: "lbs", color: "var(--brand-primary)", icon: "ti-scale"      },
+  { key: "body_fat_pct",label: "Body Fat",    unit: "%",   color: "#f59e0b",              icon: "ti-percentage" },
+  { key: "lean_mass",   label: "Lean Mass",   unit: "lbs", color: "#22c55e",              icon: "ti-barbell"    },
+  { key: "fat_mass",    label: "Fat Mass",    unit: "lbs", color: "#ef4444",              icon: "ti-flame"      },
 ];
 
 export default function ClientDashboard({
   firstName, todayWorkout, metrics, completedCount, totalScheduled,
-  recentWorkouts, streakDays, weekWorkouts, allScheduled = [], basePath = "",
-  notifications = [],
+  recentWorkouts, streakDays, weekWorkouts, allScheduled = [],
+  notifications = [], isOwnTrainerView = false,
 }: Props) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
@@ -461,6 +476,8 @@ export default function ClientDashboard({
   const twDone = todayWorkout?.status === "completed";
   const isMilestone = streakDays > 0 && streakDays % 7 === 0;
 
+  // Merge weekWorkouts (server-side current week) and allScheduled for week ring
+  // allScheduled is the full 60-day history; if empty fall back to weekWorkouts
   const scheduleSource: ScheduledDay[] = allScheduled.length > 0
     ? allScheduled
     : weekWorkouts.map(w => ({ id: "", date: w.date, completed: w.completed }));
@@ -474,6 +491,7 @@ export default function ClientDashboard({
 
   return (
     <>
+      {/* Metric Modal */}
       {activeMetric && activeMetricConfig && (
         <MetricModal
           metricKey={activeMetric}
@@ -483,7 +501,6 @@ export default function ClientDashboard({
           icon={activeMetricConfig.icon}
           metrics={metrics}
           onClose={() => setActiveMetric(null)}
-          basePath={basePath}
         />
       )}
 
@@ -506,28 +523,32 @@ export default function ClientDashboard({
           )}
         </div>
 
-        {/* Payment Notifications */}
-        {notifications.length > 0 && (
-          <PaymentNotificationBanner notifications={notifications} />
-        )}
-
         {/* Week overview */}
         <div className="metric-card">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>This Week</span>
-            <Link href={`${basePath}/workout`} className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
+            <span className="text-xs font-semibold uppercase tracking-widest"
+              style={{ color: "var(--brand-text-secondary)" }}>This Week</span>
+            <Link href="/workout" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
               View Schedule →
             </Link>
           </div>
-          <WeekRing allScheduled={scheduleSource} weekOffset={weekOffset} onPrev={() => setWeekOffset(o => o - 1)} onNext={() => setWeekOffset(o => Math.min(0, o + 1))} basePath={basePath} />
+          <WeekRing
+            allScheduled={scheduleSource}
+            weekOffset={weekOffset}
+            onPrev={() => setWeekOffset(o => o - 1)}
+            onNext={() => setWeekOffset(o => Math.min(0, o + 1))}
+          />
         </div>
 
         {/* Today's Workout */}
         {todayWorkout ? (
-          <Link href={`${basePath}/workout/${todayWorkout.id}`}>
-            <div className="rounded-2xl p-5 relative overflow-hidden cursor-pointer" style={{ background: "var(--brand-primary)" }}>
-              <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ background: "white", transform: "translate(30%, -30%)" }} />
-              <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full opacity-5" style={{ background: "white", transform: "translate(-30%, 30%)" }} />
+          <Link href={`/workout/${todayWorkout.id}`}>
+            <div className="rounded-2xl p-5 relative overflow-hidden cursor-pointer"
+              style={{ background: "var(--brand-primary)" }}>
+              <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10"
+                style={{ background: "white", transform: "translate(30%, -30%)" }} />
+              <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full opacity-5"
+                style={{ background: "white", transform: "translate(-30%, 30%)" }} />
               <div className="relative">
                 <p className="text-xs font-semibold text-white/70 mb-1 uppercase tracking-widest">Today&apos;s Workout</p>
                 <h2 className="text-xl font-bold text-white mb-3">{twStr}</h2>
@@ -537,7 +558,8 @@ export default function ClientDashboard({
                     <span className="text-xs text-white font-medium">Completed ✓</span>
                   </div>
                 ) : (
-                  <div className="inline-flex items-center gap-2 bg-white text-sm font-semibold rounded-full px-4 py-2" style={{ color: "var(--brand-primary)" }}>
+                  <div className="inline-flex items-center gap-2 bg-white text-sm font-semibold rounded-full px-4 py-2"
+                    style={{ color: "var(--brand-primary)" }}>
                     <i className="ti ti-player-play" />
                     Start Workout
                   </div>
@@ -546,7 +568,8 @@ export default function ClientDashboard({
             </div>
           </Link>
         ) : (
-          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+          <div className="rounded-2xl p-5 text-center"
+            style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
             <i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
             <p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p>
             <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program 💪</p>
@@ -555,8 +578,9 @@ export default function ClientDashboard({
 
         {/* Quick links */}
         <div className="grid grid-cols-2 gap-3">
-          <Link href={`${basePath}/nutrition`}>
-            <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+          <Link href="/nutrition">
+            <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer"
+              style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#22c55e20" }}>
                 <i className="ti ti-salad text-lg" style={{ color: "#22c55e" }} />
               </div>
@@ -567,7 +591,8 @@ export default function ClientDashboard({
             </div>
           </Link>
           <Link href="/log">
-            <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+            <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer"
+              style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#f59e0b20" }}>
                 <i className="ti ti-plus-circle text-lg" style={{ color: "#f59e0b" }} />
               </div>
@@ -579,21 +604,59 @@ export default function ClientDashboard({
           </Link>
         </div>
 
+        {/* AI Analysis — only shown when trainer is viewing their own client dashboard */}
+        {isOwnTrainerView && (
+          <div className="rounded-2xl p-4"
+            style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#8b5cf620" }}>
+                <i className="ti ti-brain text-lg" style={{ color: "#8b5cf6" }} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>AI Insights</p>
+                <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Trainer view only</p>
+              </div>
+            </div>
+            <Link
+              href="/ai-analysis"
+              className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
+              style={{ background: "#8b5cf620", color: "#8b5cf6", border: "1px solid #8b5cf640" }}
+            >
+              <i className="ti ti-sparkles" />
+              View AI Analysis
+            </Link>
+          </div>
+        )}
+
         {/* Metrics */}
         <div>
           <div className="flex items-center justify-between mb-2.5">
             <h2 className="text-base font-bold" style={{ color: "var(--brand-text)" }}>Progress</h2>
-            <Link href={`${basePath}/progress`} className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>View all →</Link>
+            <Link href="/progress" className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
+              View all →
+            </Link>
           </div>
           <div className="grid grid-cols-2 gap-3">
             {METRIC_CONFIG.map(mc => (
-              <MetricCard key={mc.key} label={mc.label} value={latestVal(mc.key)} unit={mc.unit} values={metricValues[mc.key]} color={mc.color} icon={mc.icon} onClick={() => setActiveMetric(mc.key)} />
+              <MetricCard
+                key={mc.key}
+                label={mc.label}
+                value={latestVal(mc.key)}
+                unit={mc.unit}
+                values={metricValues[mc.key]}
+                color={mc.color}
+                icon={mc.icon}
+                onClick={() => setActiveMetric(mc.key)}
+              />
             ))}
           </div>
           {metrics.length === 0 && (
-            <div className="rounded-2xl py-8 text-center mt-2" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+            <div className="rounded-2xl py-8 text-center mt-2"
+              style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               <i className="ti ti-chart-line text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
-              <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>Your trainer will log your metrics after each assessment.</p>
+              <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
+                Your trainer will log your metrics after each assessment.
+              </p>
             </div>
           )}
         </div>
@@ -602,21 +665,33 @@ export default function ClientDashboard({
         <div>
           <h2 className="text-base font-bold mb-2.5" style={{ color: "var(--brand-text)" }}>Recent Workouts</h2>
           {recentWorkouts.length === 0 ? (
-            <div className="rounded-2xl py-8 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+            <div className="rounded-2xl py-8 text-center"
+              style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               <i className="ti ti-trophy text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
-              <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>Complete your first workout to see history here.</p>
+              <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
+                Complete your first workout to see history here.
+              </p>
             </div>
           ) : (
-            <div className="rounded-2xl overflow-hidden" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+            <div className="rounded-2xl overflow-hidden"
+              style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               {recentWorkouts.map((w, i) => (
-                <Link key={w.id} href={`${basePath}/workout/${w.id}`}>
-                  <div className={`flex items-center gap-3 px-4 py-3.5 ${i < recentWorkouts.length - 1 ? "border-b" : ""}`} style={{ borderColor: "var(--brand-border)" }}>
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#22c55e20" }}>
+                <Link key={w.id} href={`/workout/${w.id}`}>
+                  <div
+                    className={`flex items-center gap-3 px-4 py-3.5 ${i < recentWorkouts.length - 1 ? "border-b" : ""}`}
+                    style={{ borderColor: "var(--brand-border)" }}
+                  >
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: "#22c55e20" }}>
                       <i className="ti ti-check text-xs" style={{ color: "#22c55e" }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: "var(--brand-text)" }}>{w.days?.label || "Workout"}</p>
-                      <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{fmtDate(w.scheduled_date)}</p>
+                      <p className="text-sm font-medium truncate" style={{ color: "var(--brand-text)" }}>
+                        {w.days?.label || "Workout"}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
+                        {fmtDate(w.scheduled_date)}
+                      </p>
                     </div>
                     <i className="ti ti-chevron-right text-xs" style={{ color: "var(--brand-text-secondary)" }} />
                   </div>
