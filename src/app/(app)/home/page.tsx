@@ -5,6 +5,7 @@ import ClientDashboard from "./ClientDashboard";
 import { isClientMode } from "@/lib/client-mode";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
 import PendingRemindersPanel from "@/components/PendingRemindersPanel";
+import TrainerHomeClient from "./TrainerHomeClient";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -78,17 +79,25 @@ const { data: remindersRaw } = await supabase
 
 const reminders = (remindersRaw || []).map((r: any) => ({ id: r.id, clientName: r.clients?.name || "Unknown", clientId: r.clients?.id || r.client_id, dueDate: r.due_date, amountDue: Number(r.amount_due), billingCredits: Number(r.billing_credits), notificationStatus: r.notification_status, emailSentAt: r.email_sent_at }));
 
-return (
-<div className="p-4 lg:p-6">
-<div className="mb-6">
-<h1 className="text-2xl font-bold gradient-text">Schedule</h1>
-<p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
-</div>
-<PendingRemindersPanel reminders={reminders} />
-<TrainerCalendar clients={clients || []} appointmentMap={appointmentMap} workoutMap={{}} startDate="" />
-</div>
-);
-}
+  // Today's sessions across all trainer clients
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  const { data: todaySessionsRaw } = await (supabase as any)
+    .from('scheduled_workouts')
+    .select('id, client_id, status, days(label), clients(id, name)')
+    .eq('scheduled_date', todayStr)
+    .in('client_id', (clients ?? []).map((c: any) => c.id))
+    .order('status', { ascending: true });
+  const todaySessions = (todaySessionsRaw || []).map((r: any) => ({
+    id: r.id,
+    clientId: r.client_id,
+    clientName: r.clients?.name || 'Client',
+    workoutLabel: r.days?.label || 'Workout',
+    status: r.status || 'scheduled',
+  }));
+  const loggedTodayCount = todaySessions.filter((s: any) => s.status === 'completed').length;
+  const notifCount = reminders.length;
+
+  return <TrainerHomeClient clients={clients ?? []} todaySessions={todaySessions} loggedTodayCount={loggedTodayCount} reminders={reminders} notifCount={notifCount} />;
 
 // -- CLIENT DASHBOARD ------------------------------------------------------------------
 const { data: clientRecord } = await supabase
