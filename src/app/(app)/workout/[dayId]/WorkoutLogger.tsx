@@ -1087,10 +1087,10 @@ export default function WorkoutLogger({
               </button>
             </div>
           ))}
-        </div>
+        <button type="button" onClick={logAllCurrentSets} className="w-full mb-3 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "var(--brand-primary)" }}>Check all sets complete</button></div>
 
         {/* Bottom controls */}
-        <button type="button" onClick={logAllCurrentSets} className="w-full mb-3 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "var(--brand-primary)" }}>Check all sets complete</button><div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           
           {/* Trainer AI note */}
           {isTrainerSession && (
