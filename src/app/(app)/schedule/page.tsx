@@ -86,6 +86,26 @@ export default async function SchedulePage() {
     scheduledDows = Array.from(dowSet);
   }
 
+  // Fetch payment reminders for trainer calendar overlay
+  let paymentReminders: { date: string; clientName: string; amount: number; status: string }[] = [];
+  if (isTrainer) {
+    const thirtyDays = new Date(now);
+    thirtyDays.setDate(now.getDate() + 30);
+    const { data: remindersRaw } = await (supabase as any)
+      .from('payment_reminders')
+      .select('id, due_date, amount_due, notification_status, clients(name)')
+      .gte('due_date', todayStr)
+      .lte('due_date', thirtyDays.toISOString().split('T')[0])
+      .in('notification_status', ['pending', 'paused'])
+      .order('due_date');
+    paymentReminders = (remindersRaw || []).map((r: any) => ({
+      date: r.due_date,
+      clientName: r.clients?.name || 'Client',
+      amount: r.amount_due,
+      status: r.notification_status,
+    }));
+  }
+
   return (
     <ScheduleClient
       monthName={monthName}
@@ -98,7 +118,7 @@ export default async function SchedulePage() {
       scheduledDows={scheduledDows}
       upcomingDays={upcomingDays}
       isTrainer={isTrainer && !clientMode}
-      paymentReminders={[]}
+      paymentReminders={paymentReminders}
       defaultView={(isTrainer && !clientMode) ? "month" : "week"}
     />
   );
