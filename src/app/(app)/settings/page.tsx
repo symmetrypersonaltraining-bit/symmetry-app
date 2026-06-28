@@ -2,50 +2,33 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SettingsClient from "./SettingsClient";
 
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ gcal?: string }> }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = user.email === TRAINER_EMAIL;
+  const { data: profile } = await supabase.from("clients").select("name").eq("auth_user_id", user.id).maybeSingle();
+  const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
+  const userName = isTrainer ? "Dustin Gautreaux" : (profile?.name ?? user.email ?? "");
 
-  // Fetch client record for non-trainer
-  let clientName: string | null = null;
-  if (!isTrainer) {
-    const { data } = await supabase
-      .from("clients")
-      .select("name")
-      .eq("auth_user_id", user.id)
-      .maybeSingle();
-    clientName = data?.name || null;
-  } else {
-    clientName = "Dustin Gautreaux";
-  }
+  const { data: trainerSettings } = isTrainer
+    ? await supabase.from("trainer_settings").select("gcal_sync_enabled, google_refresh_token").eq("user_id", user.id).maybeSingle()
+    : { data: null };
 
-  // Fetch trainer's GCal sync setting (server-side — bypasses client auth issues)
-  let gcalSyncEnabled = false;
-  if (isTrainer) {
-    const { data: ts } = await supabase
-      .from("trainer_settings")
-      .select("gcal_sync_enabled")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    gcalSyncEnabled = ts?.gcal_sync_enabled ?? false;
-  }
+  const sp = await searchParams;
+  const gcalStatus = sp?.gcal ?? null;
 
   return (
-    <div className="p-4 lg:p-6 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6" style={{ color: "var(--brand-text)" }}>
-        Settings
-      </h1>
+    <div className="p-4 lg:p-6">
+      <h1 className="text-2xl font-bold mb-6" style={{ color: "var(--brand-text)" }}>Settings</h1>
       <SettingsClient
-        userEmail={user.email || ""}
-        userName={clientName || ""}
+        userEmail={user.email ?? ""}
+        userName={userName}
         isTrainer={isTrainer}
         userId={user.id}
-        gcalSyncEnabled={gcalSyncEnabled}
+        gcalSyncEnabled={trainerSettings?.gcal_sync_enabled ?? false}
+        gcalConnected={!!(trainerSettings?.google_refresh_token)}
+        gcalStatus={gcalStatus}
       />
     </div>
   );
