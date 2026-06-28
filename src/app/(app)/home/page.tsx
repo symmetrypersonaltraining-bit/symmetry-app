@@ -98,6 +98,7 @@ const reminders = (remindersRaw || []).map((r: any) => ({ id: r.id, clientName: 
   const notifCount = reminders.length;
 
   return <TrainerHomeClient clients={clients ?? []} todaySessions={todaySessions} loggedTodayCount={loggedTodayCount} reminders={reminders} notifCount={notifCount} />;
+}
 
 // -- CLIENT DASHBOARD ------------------------------------------------------------------
 const { data: clientRecord } = await supabase
