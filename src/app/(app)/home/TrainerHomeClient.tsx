@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 type TodaySession = { id: string; clientId: string; clientName: string; workoutLabel: string; status: string; };
@@ -101,7 +101,7 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div style={lbl}>{"Today's sessions"}</div>
-          <button onClick={() => router.push('/schedule')} style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-primary)', background: 'rgba(124,156,245,.1)', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}>Full schedule â</button>
+          <button onClick={() => router.push('/schedule')} style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-primary)', background: 'rgba(124,156,245,.1)', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}>Full schedule Ã¢ÂÂ</button>
         </div>
         <div style={{ maxHeight: 260, overflowY: 'auto' }}>
           {todaySessions.length === 0 ? (
@@ -136,7 +136,7 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
             );
           })}
         </div>
-        {todaySessions.length > 3 && <div style={{ textAlign: 'center', paddingTop: 6, color: '#c5ccdb', fontSize: 10, fontWeight: 600 }}>â scroll for full day</div>}
+        {todaySessions.length > 3 && <div style={{ textAlign: 'center', paddingTop: 6, color: '#c5ccdb', fontSize: 10, fontWeight: 600 }}>Ã¢ÂÂ scroll for full day</div>}
       </div>
 
       {/* Needs Attention */}
@@ -149,7 +149,7 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: 13 }}>{reminders.length} payment{reminders.length !== 1 ? 's' : ''} due</div>
-              <div style={{ fontSize: 11, color: 'var(--brand-text-secondary)' }}>${paymentTotal} Â· review drafts to send</div>
+              <div style={{ fontSize: 11, color: 'var(--brand-text-secondary)' }}>${paymentTotal} ÃÂ· review drafts to send</div>
             </div>
             <i className="ti ti-chevron-right" style={{ fontSize: 16, color: '#c5ccdb' }} />
           </div>
@@ -160,7 +160,7 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div style={lbl}>Client quick access</div>
-          <button onClick={() => router.push('/clients')} style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-primary)', background: 'rgba(124,156,245,.1)', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}>All clients â</button>
+          <button onClick={() => router.push('/clients')} style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-primary)', background: 'rgba(124,156,245,.1)', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}>All clients Ã¢ÂÂ</button>
         </div>
         <select value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)}
           style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1.5px solid var(--brand-border)', background: 'var(--brand-bg)', color: 'var(--brand-text)', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', marginBottom: 12 }}>
@@ -185,7 +185,7 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
             <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4, color: 'var(--brand-text)' }}>App Feedback</div>
             <div style={{ fontSize: 12, color: 'var(--brand-text-secondary)', marginBottom: 14 }}>{"What's working, what needs fixing?"}</div>
             {feedbackSent ? (
-              <div style={{ textAlign: 'center', padding: '20px 0', color: '#5ec9a3', fontWeight: 700, fontSize: 16 }}>â Thanks! Sent.</div>
+              <div style={{ textAlign: 'center', padding: '20px 0', color: '#5ec9a3', fontWeight: 700, fontSize: 16 }}>Ã¢ÂÂ Thanks! Sent.</div>
             ) : (
               <>
                 <textarea value={feedbackText} onChange={e => setFeedbackText(e.target.value)} placeholder="Describe what you noticed..." rows={4}
@@ -206,7 +206,7 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
         </div>
       )}
 
-      {/* Floating AI + Feedback â trainer only, draggable pair */}
+      {/* Floating AI + Feedback Ã¢ÂÂ trainer only, draggable pair */}
       <div ref={clusterRef} onMouseDown={startDrag} onTouchStart={startDrag}
         style={{ position: 'fixed', bottom: 24, right: 20, display: 'flex', gap: 8, zIndex: 200, cursor: 'grab', userSelect: 'none', touchAction: 'none' }}>
         <button onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}
