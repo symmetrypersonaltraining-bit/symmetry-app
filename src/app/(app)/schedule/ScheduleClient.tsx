@@ -45,16 +45,16 @@ function timeToMinutes(hhmm: string): number {
 
 function formatHour(h: number): string {
   if (h === 0) return "12 AM";
-  if (h < 12) return \`\${h} AM\`;
+  if (h < 12) return `${h} AM`;
   if (h === 12) return "12 PM";
-  return \`\${h - 12} PM\`;
+  return `${h - 12} PM`;
 }
 
 function formatTime12(hhmm: string): string {
   const [h, m] = hhmm.split(":").map(Number);
   const ampm = h < 12 ? "AM" : "PM";
   const h12 = h % 12 || 12;
-  return m === 0 ? \`\${h12} \${ampm}\` : \`\${h12}:\${String(m).padStart(2, "0")} \${ampm}\`;
+  return m === 0 ? `${h12} ${ampm}` : `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
 function getCentralDateStr(date: Date): string {
@@ -67,14 +67,14 @@ function getWeekStart(dateStr: string): string {
   const dow = dt.getDay();
   dt.setDate(d - dow);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return \`\${dt.getFullYear()}-\${pad(dt.getMonth() + 1)}-\${pad(dt.getDate())}\`;
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 }
 
 function addDays(dateStr: string, days: number): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   const dt = new Date(y, m - 1, d + days);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return \`\${dt.getFullYear()}-\${pad(dt.getMonth() + 1)}-\${pad(dt.getDate())}\`;
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 }
 
 function formatDateLabel(dateStr: string): string {
@@ -107,8 +107,8 @@ function EditDrawer({ appt, onClose, onSaved }: DrawerProps) {
     let startIso: string | undefined;
     let endIso: string | undefined;
     if (startTime && endTime) {
-      startIso = \`\${appt.date}T\${startTime}:00-05:00\`;
-      endIso = \`\${appt.date}T\${endTime}:00-05:00\`;
+      startIso = `${appt.date}T${startTime}:00-05:00`;
+      endIso = `${appt.date}T${endTime}:00-05:00`;
     }
 
     startTransition(async () => {
@@ -238,7 +238,7 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
     return s;
   }, [paymentReminders]);
 
-  const todayStr = \`\${year}-\${pad(month)}-\${pad(today)}\`;
+  const todayStr = `${year}-${pad(month)}-${pad(today)}`;
 
   const cells: { dateStr: string; dayNum: number }[] = [];
   const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
@@ -247,7 +247,7 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
     if (dayNum < 1 || dayNum > daysInMonth) {
       cells.push({ dateStr: "", dayNum });
     } else {
-      cells.push({ dateStr: \`\${year}-\${pad(month)}-\${pad(dayNum)}\`, dayNum });
+      cells.push({ dateStr: `${year}-${pad(month)}-${pad(dayNum)}`, dayNum });
     }
   }
 
@@ -276,10 +276,10 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
           const hasScheduled = cell.dateStr ? scheduledSet.has(cell.dateStr) : false;
           const hasPayment = cell.dateStr ? paymentSet.has(cell.dateStr) : false;
           return (
-            <div key={i} className={\`border-r border-b border-gray-200 min-h-[64px] p-1.5 \${cell.dateStr ? "bg-white" : "bg-gray-50"}\`}>
+            <div key={i} className={`border-r border-b border-gray-200 min-h-[64px] p-1.5 ${cell.dateStr ? "bg-white" : "bg-gray-50"}`}>
               {cell.dateStr && (
                 <>
-                  <span className={\`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full \${isToday ? "bg-indigo-600 text-white" : "text-gray-700"}\`}>
+                  <span className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${isToday ? "bg-indigo-600 text-white" : "text-gray-700"}`}>
                     {cell.dayNum}
                   </span>
                   <div className="flex gap-1 mt-1 flex-wrap">
@@ -301,9 +301,9 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
             {paymentReminders.map((p, i) => (
               <div key={i} className="flex items-center justify-between bg-purple-50 rounded-lg px-3 py-2 text-sm">
                 <span className="font-medium text-purple-900">{p.clientName}</span>
-                <span className="text-purple-700">\${p.amount.toFixed(2)}</span>
+                <span className="text-purple-700">${p.amount.toFixed(2)}</span>
                 <span className="text-xs text-gray-500">{p.date}</span>
-                <span className={\`text-xs px-2 py-0.5 rounded-full \${p.status === "sent" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}\`}>{p.status}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === "sent" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{p.status}</span>
               </div>
             ))}
           </div>
@@ -346,9 +346,9 @@ function WeekGrid({ weekStart, todayStr, appointments, isTrainer, onClickAppt }:
             const isToday = dateStr === todayStr;
             const [, , d] = dateStr.split("-");
             return (
-              <div key={dateStr} className={\`flex-1 text-center py-2 border-l border-gray-200 \${isToday ? "bg-indigo-50" : ""}\`}>
+              <div key={dateStr} className={`flex-1 text-center py-2 border-l border-gray-200 ${isToday ? "bg-indigo-50" : ""}`}>
                 <div className="text-xs text-gray-500 font-medium">{DOW_LABELS[i]}</div>
-                <div className={\`text-lg font-semibold mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-full \${isToday ? "bg-indigo-600 text-white" : "text-gray-800"}\`}>
+                <div className={`text-lg font-semibold mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-full ${isToday ? "bg-indigo-600 text-white" : "text-gray-800"}`}>
                   {parseInt(d)}
                 </div>
               </div>
@@ -372,7 +372,7 @@ function WeekGrid({ weekStart, todayStr, appointments, isTrainer, onClickAppt }:
             const timedAppts = dayAppts.filter((a) => !!a.startTime);
 
             return (
-              <div key={dateStr} className={\`flex-1 border-l border-gray-200 relative \${isToday ? "bg-indigo-50/30" : "bg-white"}\`} style={{ height: totalHeight }}>
+              <div key={dateStr} className={`flex-1 border-l border-gray-200 relative ${isToday ? "bg-indigo-50/30" : "bg-white"}`} style={{ height: totalHeight }}>
                 {hours.map((h) => (
                   <div key={h} className="absolute w-full border-t border-gray-100" style={{ top: (h - HOUR_START) * PX_PER_HOUR }} />
                 ))}
@@ -381,7 +381,7 @@ function WeekGrid({ weekStart, todayStr, appointments, isTrainer, onClickAppt }:
                   <div
                     key={appt.id}
                     onClick={() => isTrainer && onClickAppt(appt)}
-                    className={\`mx-0.5 mb-0.5 rounded text-white text-xs px-1 py-0.5 truncate \${isTrainer ? "cursor-pointer hover:opacity-80" : "cursor-default"} bg-indigo-500\`}
+                    className={`mx-0.5 mb-0.5 rounded text-white text-xs px-1 py-0.5 truncate ${isTrainer ? "cursor-pointer hover:opacity-80" : "cursor-default"} bg-indigo-500`}
                     style={{ position: "relative", zIndex: 1 }}
                     title={appt.label}
                   >
@@ -397,15 +397,15 @@ function WeekGrid({ weekStart, todayStr, appointments, isTrainer, onClickAppt }:
                   if (startMins < HOUR_START * 60 || startMins >= HOUR_END * 60) return null;
                   const shortLabel = appt.label.split(" — ")[0];
                   const timeLabel = appt.endTime
-                    ? \`\${formatTime12(appt.startTime!)}–\${formatTime12(appt.endTime)}\`
+                    ? `${formatTime12(appt.startTime!)}–${formatTime12(appt.endTime)}`
                     : formatTime12(appt.startTime!);
                   return (
                     <div
                       key={appt.id}
                       onClick={() => isTrainer && onClickAppt(appt)}
-                      className={\`absolute left-0.5 right-0.5 rounded bg-indigo-600 text-white text-xs overflow-hidden shadow-sm \${isTrainer ? "cursor-pointer hover:bg-indigo-700 hover:shadow-md" : "cursor-default"} transition-all\`}
+                      className={`absolute left-0.5 right-0.5 rounded bg-indigo-600 text-white text-xs overflow-hidden shadow-sm ${isTrainer ? "cursor-pointer hover:bg-indigo-700 hover:shadow-md" : "cursor-default"} transition-all`}
                       style={{ top: topPx, height: heightPx, zIndex: 2 }}
-                      title={\`\${appt.label}\n\${timeLabel}\`}
+                      title={`${appt.label}\n${timeLabel}`}
                     >
                       <div className="px-1.5 pt-0.5 font-medium leading-tight truncate">{shortLabel}</div>
                       {heightPx > 28 && <div className="px-1.5 text-indigo-200 leading-tight truncate">{timeLabel}</div>}
@@ -430,7 +430,7 @@ export default function ScheduleClient({
 
   const todayStr = useMemo(() => {
     const pad = (n: number) => String(n).padStart(2, "0");
-    return \`\${year}-\${pad(month)}-\${pad(today)}\`;
+    return `${year}-${pad(month)}-${pad(today)}`;
   }, [year, month, today]);
 
   const [viewMode, setViewMode] = useState<"week" | "month">("week");
@@ -443,7 +443,7 @@ export default function ScheduleClient({
   }, [upcomingDays, weekStart]);
 
   const weekEndStr = addDays(weekStart, 6);
-  const weekLabel = \`\${formatDateLabel(weekStart)} – \${formatDateLabel(weekEndStr)}\`;
+  const weekLabel = `${formatDateLabel(weekStart)} – ${formatDateLabel(weekEndStr)}`;
 
   const goToPrevWeek = useCallback(() => setWeekStart((s) => addDays(s, -7)), []);
   const goToNextWeek = useCallback(() => setWeekStart((s) => addDays(s, 7)), []);
@@ -460,8 +460,8 @@ export default function ScheduleClient({
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-gray-900">Schedule</h1>
           <div className="flex bg-white border border-gray-200 rounded-lg overflow-hidden text-sm">
-            <button onClick={() => setViewMode("week")} className={\`px-4 py-2 font-medium transition-colors \${viewMode === "week" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-50"}\`}>Week</button>
-            <button onClick={() => setViewMode("month")} className={\`px-4 py-2 font-medium transition-colors \${viewMode === "month" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-50"}\`}>Month</button>
+            <button onClick={() => setViewMode("week")} className={`px-4 py-2 font-medium transition-colors ${viewMode === "week" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}>Week</button>
+            <button onClick={() => setViewMode("month")} className={`px-4 py-2 font-medium transition-colors ${viewMode === "month" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}>Month</button>
           </div>
         </div>
 
