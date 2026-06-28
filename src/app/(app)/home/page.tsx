@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import TrainerCalendar from "./TrainerCalendar";
+import TrainerHomeClient from "./TrainerHomeClient";
 import ClientDashboard from "./ClientDashboard";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
-import PendingRemindersPanel from "@/components/PendingRemindersPanel";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -20,103 +19,60 @@ export default async function HomePage() {
       .select("id, name")
       .order("name");
 
-    const today = new Date();
-    const rangeStart = new Date(today);
-    rangeStart.setMonth(rangeStart.getMonth() - 1);
-    const rangeEnd = new Date(today);
-    rangeEnd.setMonth(rangeEnd.getMonth() + 12);
-    const startStr = rangeStart.toISOString().split("T")[0];
-    const endStr = rangeEnd.toISOString().split("T")[0];
+    // Today's supervised sessions (trainer-led only)
+    const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+    const clientIds = (clients ?? []).map((c: any) => c.id);
 
-    const { data: apptRows } = await supabase
-      .from("appointments")
-      .select("id, client_id, scheduled_at, ends_at, status, title, clients(id, name)")
-      .gte("scheduled_at", startStr + "T00:00:00")
-      .lte("scheduled_at", endStr + "T23:59:59")
-      .order("scheduled_at");
-
-    type AE = { id: string; clientId: string; clientName: string; title: string; startTime: string; endTime: string; status: string; scheduledAt: string; endsAt: string | null };
-    const appointmentMap: Record<string, AE[]> = {};
-    for (const a of apptRows || []) {
-      const row = a as any;
-      const dateKey = row.scheduled_at.substring(0, 10);
-      const startTime = row.scheduled_at.length > 10 ? row.scheduled_at.substring(11, 16) : "00:00";
-      const endTime = row.ends_at ? row.ends_at.substring(11, 16) : "01:00";
-      if (!appointmentMap[dateKey]) appointmentMap[dateKey] = [];
-      appointmentMap[dateKey].push({
-        id: row.id,
-        clientId: row.clients?.id || row.client_id,
-        clientName: row.clients?.name || "Unknown",
-        title: row.title || row.clients?.name || "Training Session",
-        startTime,
-        endTime,
-        status: row.status || "scheduled",
-        scheduledAt: row.scheduled_at,
-        endsAt: row.ends_at || null,
-      });
-    }
-
-    type WE = { id: string; clientId: string; clientName: string; date: string; dayLabel: string; status: string };
-    const workoutMapRange = new Date(today);
-    workoutMapRange.setMonth(workoutMapRange.getMonth() + 3);
-    const { data: workoutRows } = await supabase
+    const { data: todaySessionsRaw } = await supabase
       .from("scheduled_workouts")
-      .select("id, client_id, scheduled_date, status, days(label), clients(id, name)")
-      .gte("scheduled_date", new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().split("T")[0])
-      .lte("scheduled_date", workoutMapRange.toISOString().split("T")[0])
-      .order("scheduled_date");
+      .select("id, client_id, status, days(id, label), clients(id, name)")
+      .eq("scheduled_date", todayStr)
+      .eq("supervised", true)
+      .in("client_id", clientIds)
+      .order("status", { ascending: true });
 
-    const workoutMap: Record<string, WE[]> = {};
-    for (const w of workoutRows || []) {
-      const row = w as any;
-      const dateKey = row.scheduled_date;
-      if (!workoutMap[dateKey]) workoutMap[dateKey] = [];
-      workoutMap[dateKey].push({
-        id: row.id,
-        clientId: row.clients?.id || row.client_id,
-        clientName: row.clients?.name || "Unknown",
-        date: dateKey,
-        dayLabel: row.days?.label || "Workout",
-        status: row.status || "scheduled",
-      });
-    }
+    const todaySessions = (todaySessionsRaw ?? []).map((sw: any) => ({
+      id: sw.id,
+      clientId: sw.clients?.id ?? sw.client_id,
+      clientName: sw.clients?.name ?? "",
+      workoutLabel: sw.days?.label ?? "Session",
+      dayId: sw.days?.id ?? "",
+      status: sw.status ?? "scheduled",
+    }));
 
+    const loggedTodayCount = todaySessions.filter((s: any) => s.status === "completed").length;
+
+    // Pending payment reminders (Needs Attention)
     const thirtyDays = new Date();
     thirtyDays.setDate(thirtyDays.getDate() + 30);
     const { data: remindersRaw } = await supabase
       .from("payment_reminders")
-      .select("id, client_id, due_date, amount_due, billing_credits, notification_status, email_sent_at, clients(id, name)")
-      .gte("due_date", today.toISOString().split("T")[0])
-      .lte("due_date", thirtyDays.toISOString().split("T")[0])
-      .in("notification_status", ["pending", "paused"])
+      .select("id, client_id, due_date, amount_due, clients(id, name)")
+      .gte("due_date", todayStr)
+      .lte("due_date", thirtyDays.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
+      .eq("notification_status", "pending")
       .order("due_date");
 
-    const reminders = (remindersRaw || []).map((r: any) => ({
+    const reminders = (remindersRaw ?? []).map((r: any) => ({
       id: r.id,
-      clientName: r.clients?.name || "Unknown",
-      clientId: r.clients?.id || r.client_id,
+      clientId: r.clients?.id ?? r.client_id,
+      clientName: r.clients?.name ?? "Unknown",
       dueDate: r.due_date,
       amountDue: Number(r.amount_due),
-      billingCredits: Number(r.billing_credits),
-      notificationStatus: r.notification_status,
-      emailSentAt: r.email_sent_at,
     }));
 
     return (
-      <div className="p-4 lg:p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold gradient-text">Schedule</h1>
-          <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
-            {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-          </p>
-        </div>
-        <PendingRemindersPanel reminders={reminders} />
-        <TrainerCalendar clients={clients || []} appointmentMap={appointmentMap} workoutMap={workoutMap} startDate="" />
-      </div>
+      <TrainerHomeClient
+        clients={clients ?? []}
+        todaySessions={todaySessions}
+        loggedTodayCount={loggedTodayCount}
+        reminders={reminders}
+        notifCount={reminders.length}
+      />
     );
   }
 
-  // ── CLIENT DASHBOARD ────────────────────────────────────────────────────────────────────────────
+  // âââ CLIENT DASHBOARD ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   const { data: clientRecord } = await supabase
     .from("clients")
     .select("id, name")
@@ -131,7 +87,10 @@ export default async function HomePage() {
     );
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const thirtyAhead = new Date();
+  thirtyAhead.setDate(thirtyAhead.getDate() + 30);
+  const thirtyAheadStr = thirtyAhead.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
   const { data: todayWorkout } = await supabase
     .from("scheduled_workouts")
@@ -140,33 +99,27 @@ export default async function HomePage() {
     .eq("scheduled_date", today)
     .maybeSingle();
 
-  // Fetch 60 days of history PLUS 30 days of future workouts for the week ring
-  // This ensures upcoming workout days have IDs so clicking them navigates correctly
+  // 60 days of history for week nav + streak
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-  const thirtyDaysAhead = new Date();
-  thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30);
-
-  const { data: allScheduledRaw } = await supabase
+  const sixtyStr = sixtyDaysAgo.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const { data: recentScheduled } = await supabase
     .from("scheduled_workouts")
     .select("id, scheduled_date, status")
     .eq("client_id", clientRecord.id)
-    .gte("scheduled_date", sixtyDaysAgo.toISOString().split("T")[0])
-    .lte("scheduled_date", thirtyDaysAhead.toISOString().split("T")[0])
+    .gte("scheduled_date", sixtyStr)
+    .lte("scheduled_date", thirtyAheadStr)
     .order("scheduled_date", { ascending: false });
-
-  // Past only (for stats and streak)
-  const recentScheduled = (allScheduledRaw || []).filter((w: any) => w.scheduled_date <= today);
 
   const thirtyAgo = new Date();
   thirtyAgo.setDate(thirtyAgo.getDate() - 30);
-  const thirtyStr = thirtyAgo.toISOString().split("T")[0];
-  const recent30 = recentScheduled.filter((w: any) => w.scheduled_date >= thirtyStr);
+  const thirtyStr = thirtyAgo.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const recent30 = (recentScheduled || []).filter((w: any) => w.scheduled_date >= thirtyStr);
   const totalScheduled = recent30.length;
   const completedCount = recent30.filter((w: any) => w.status === "completed").length;
 
   // Streak calc
-  const sorted = [...recentScheduled].sort((a: any, b: any) =>
+  const sorted = [...(recentScheduled || [])].sort((a: any, b: any) =>
     b.scheduled_date.localeCompare(a.scheduled_date)
   );
   const seenDates = new Set<string>();
@@ -189,24 +142,26 @@ export default async function HomePage() {
     }
   }
 
-  // Current week for initial render
-  const todayDow = new Date().getDay();
-  const weekStart = new Date();
+  // Current week
+  const todayDate = new Date();
+  const todayDow = todayDate.getDay();
+  const weekStart = new Date(todayDate);
   weekStart.setDate(weekStart.getDate() - todayDow);
-  const weekStartStr = weekStart.toISOString().split("T")[0];
-  const weekEndStr = new Date(weekStart.getTime() + 6 * 86400000).toISOString().split("T")[0];
-  const weekWorkouts = recentScheduled
+  const weekStartStr = weekStart.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  const weekEndStr = weekEnd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const weekWorkouts = (recentScheduled || [])
     .filter((w: any) => w.scheduled_date >= weekStartStr && w.scheduled_date <= weekEndStr)
     .map((w: any) => ({ date: w.scheduled_date, completed: w.status === "completed" }));
 
-  // Full history + future for week ring navigation (includes workout id for linking)
-  const allScheduled = (allScheduledRaw || []).map((w: any) => ({
+  const allScheduled = (recentScheduled || []).map((w: any) => ({
     id: w.id as string,
     date: w.scheduled_date as string,
     completed: w.status === "completed",
   }));
 
-  // Up to 30 metric data points for expanded chart modal
+  // Metrics
   const { data: metricsHistory } = await supabase
     .from("metrics")
     .select("metric_date, weight, body_fat_pct, lean_mass, fat_mass")
@@ -223,6 +178,18 @@ export default async function HomePage() {
     .order("scheduled_date", { ascending: false })
     .limit(5);
 
+  // Payment notifications (show 1 week before due, persist until dismissed)
+  const { data: notificationsRaw } = await supabase
+    .from("client_notifications")
+    .select("id, type, title, body, amount_due, due_date")
+    .eq("client_id", clientRecord.id)
+    .eq("type", "payment_due")
+    .is("dismissed_at", null)
+    .eq("is_read", false)
+    .order("due_date", { ascending: true });
+
+  const notifications = (notificationsRaw ?? []) as any[];
+
   const firstName = (clientRecord.name || "").split(" ")[0];
 
   return (
@@ -230,7 +197,7 @@ export default async function HomePage() {
       <PwaInstallBanner />
       <ClientDashboard
         firstName={firstName}
-        todayWorkout={todayWorkout as any}
+        todayWorkouts={todayWorkout as any}
         metrics={metrics as any[]}
         completedCount={completedCount}
         totalScheduled={totalScheduled}
@@ -238,6 +205,7 @@ export default async function HomePage() {
         streakDays={streakDays}
         weekWorkouts={weekWorkouts}
         allScheduled={allScheduled}
+        notifications={notifications}
       />
     </>
   );
