@@ -26,14 +26,14 @@ export default async function ClientPreviewPage() {
     );
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
   const { data: todayWorkout } = await supabase
     .from("scheduled_workouts")
     .select("id, day_id, status, days(id, label, phase_id, phases(label, programs(name)))")
     .eq("client_id", clientRecord.id)
     .eq("scheduled_date", today)
-    .maybeSingle();
+    .order("position");
 
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
@@ -113,7 +113,7 @@ export default async function ClientPreviewPage() {
   return (
     <ClientDashboard
       firstName={firstName}
-      todayWorkouts={todayWorkout ? [todayWorkout] as any[] : []}
+      todayWorkouts={(todayWorkout as any[]) || []}
       metrics={metrics as any[]}
       completedCount={completedCount}
       totalScheduled={totalScheduled}
