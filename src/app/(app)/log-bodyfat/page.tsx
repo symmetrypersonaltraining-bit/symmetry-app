@@ -159,13 +159,14 @@ export default function LogBodyFatPage() {
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          {method ? <CaliperGuide method={method} /> : null}
+          
       {sites.map((s) => (
             <div key={s}>
               <label style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-text-secondary)" }}>{s} (mm)</label>
               <input style={inputStyle} type="number" inputMode="decimal" value={vals[s] || ""} onChange={(e) => setVals({ ...vals, [s]: e.target.value })} />
             </div>
           ))}
+      {method ? <CaliperGuide method={method} /> : null}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14, background: "color-mix(in srgb, var(--brand-primary) 9%, transparent)", borderRadius: 14, padding: 14, marginTop: 8 }}>
           <div style={{ fontSize: 34, fontWeight: 800, color: "var(--brand-primary)" }}>{bfValid ? bf.toFixed(1) + "%" : "\u2014"}</div>
