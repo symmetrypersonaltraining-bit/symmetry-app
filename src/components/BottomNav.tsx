@@ -3,6 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+const NAV_ITEMS = [
+  { href: "/home", label: "Home", icon: "ti-home" },
+  { href: "/workout", label: "Workout", icon: "ti-barbell" },
+  { href: "/nutrition", label: "Nutrition", icon: "ti-salad" },
+  { href: "/log", label: "Log", icon: "ti-plus-circle" },
+  { href: "/progress", label: "Progress", icon: "ti-chart-line" },
+  { href: "/settings", label: "Settings", icon: "ti-settings" },
+];
+
 export default function BottomNav() {
   const pathname = usePathname();
 
@@ -20,33 +29,27 @@ export default function BottomNav() {
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
-      <Link href="/home" className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors">
-        <i className="ti ti-home text-xl"
-          style={{ color: isActive("/home") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }} />
-        <span className="text-[10px] font-medium"
-          style={{ color: isActive("/home") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>Home</span>
-      </Link>
-
-      <Link href="/workout" className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors">
-        <i className="ti ti-barbell text-xl"
-          style={{ color: isActive("/workout") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }} />
-        <span className="text-[10px] font-medium"
-          style={{ color: isActive("/workout") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>Workout</span>
-      </Link>
-
-      <Link href="/nutrition" className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors">
-        <i className="ti ti-salad text-xl"
-          style={{ color: isActive("/nutrition") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }} />
-        <span className="text-[10px] font-medium"
-          style={{ color: isActive("/nutrition") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>Nutrition</span>
-      </Link>
-
-      <Link href="/progress" className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors">
-        <i className="ti ti-chart-line text-xl"
-          style={{ color: isActive("/progress") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }} />
-        <span className="text-[10px] font-medium"
-          style={{ color: isActive("/progress") ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>Progress</span>
-      </Link>
+      {NAV_ITEMS.map((item) => {
+        const active = isActive(item.href);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors"
+          >
+            <i
+              className={`ti ${item.icon} text-xl`}
+              style={{ color: active ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}
+            />
+            <span
+              className="text-[10px] font-medium"
+              style={{ color: active ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}
+            >
+              {item.label}
+            </span>
+          </Link>
+        );
+      })}
     </nav>
   );
 }
