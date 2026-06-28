@@ -13,24 +13,22 @@ interface SidebarItem {
 }
 
 const TRAINER_NAV: SidebarItem[] = [
-  { href: "/home",       label: "Home",           icon: "ti-home"            },
-  { href: "/schedule",   label: "Schedule",        icon: "ti-calendar"        },
-  { href: "/clients",    label: "Clients",         icon: "ti-users"           },
-  { href: "/assessment", label: "New Assessment",  icon: "ti-clipboard-list"  },
-  { href: "/clients",    label: "Programming",     icon: "ti-calendar-bolt"   },
+  { href: "/home", label: "Home", icon: "ti-home" },
+  { href: "/schedule", label: "Schedule", icon: "ti-calendar" },
+  { href: "/clients", label: "Clients", icon: "ti-users" },
   {
     label: "Library",
     icon: "ti-books",
     children: [
-      { href: "/library/exercises", label: "Exercise Library", icon: "ti-barbell"    },
-      { href: "/library/workouts",  label: "Workouts",         icon: "ti-list-check" },
-      { href: "/library/programs",  label: "Programs",         icon: "ti-trophy"     },
+      { href: "/library/exercises", label: "Exercise Library", icon: "ti-barbell" },
+      { href: "/library/workouts", label: "Workouts", icon: "ti-list-check" },
+      { href: "/library/programs", label: "Programs", icon: "ti-trophy" },
     ],
   },
-  { href: "/nutrition", label: "Nutrition", icon: "ti-salad"      },
-  { href: "/progress",  label: "Progress",  icon: "ti-chart-line" },
-  { href: "/payments",  label: "Payments",  icon: "ti-credit-card"},
-  { href: "/settings",  label: "Settings",  icon: "ti-settings"   },
+  { href: "/nutrition", label: "Nutrition", icon: "ti-salad" },
+  { href: "/progress", label: "Progress", icon: "ti-chart-line" },
+  { href: "/payments", label: "Payments", icon: "ti-credit-card" },
+  { href: "/settings", label: "Settings", icon: "ti-settings" },
 ];
 
 function isChildActive(children: { href: string }[], pathname: string) {
@@ -71,8 +69,6 @@ export default function TrainerSidebar({
   function isActive(href?: string) {
     if (!href) return false;
     if (href === "/home") return pathname === "/home" || pathname === "/";
-    if (href === "/schedule") return pathname.startsWith("/schedule");
-    if (href === "/clients") return pathname.startsWith("/clients");
     return pathname.startsWith(href);
   }
 
@@ -145,7 +141,7 @@ export default function TrainerSidebar({
             );
           }
           return (
-            <Link key={item.label} href={item.href!}
+            <Link key={item.href} href={item.href!}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 transition-all"
               style={{
                 background: isActive(item.href) ? "rgba(255,255,255,0.18)" : "transparent",
