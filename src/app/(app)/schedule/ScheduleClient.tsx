@@ -68,7 +68,8 @@ export default function ScheduleClient({
     const hasLog = workoutDates.includes(dateStr);
     const isScheduled = scheduledDows.includes(i); // i = 0..6 Sun=0
     const isToday = dateStr === nowStr;
-    const upcoming = upcomingDays.find(u => u.date === dateStr);
+    const dayWorkouts = upcomingDays.filter(u => u.date === dateStr);
+        const upcoming = dayWorkouts[0];
     return { dateStr, dayNum, dow: i, hasLog, isScheduled, isToday, upcoming };
   });
 
@@ -170,10 +171,13 @@ export default function ScheduleClient({
                       </div>
                       <span className="text-xs" style={{ color: isToday ? "var(--brand-primary)" : "#4E6080" }}>{DOW[dow]}</span>
                       {isScheduled && !hasLog && (
-              <div style={{ textAlign: 'center', marginTop: 2 }}>
-                {upcoming?.label?.toLowerCase().includes('cardio')
-                  ? <i className="ti ti-run" style={{ fontSize: 14, color: '#5ec9a3' }} />
-                  : <i className="ti ti-barbell" style={{ fontSize: 14, color: 'var(--brand-primary)' }} />}
+              <div style={{ textAlign: 'center', marginTop: 2, display: 'flex', justifyContent: 'center', gap: 3 }}>
+                {dayWorkouts.some(w => !w.label?.toLowerCase().includes('cardio')) && (
+                  <i className="ti ti-barbell" style={{ fontSize: 14, color: 'var(--brand-primary)' }} />
+                )}
+                {dayWorkouts.some(w => w.label?.toLowerCase().includes('cardio')) && (
+                  <i className="ti ti-run" style={{ fontSize: 14, color: '#5ec9a3' }} />
+                )}
               </div>
             )}
                     </div>
