@@ -47,7 +47,7 @@ export default async function NutritionPage({
         clientId = clientRow?.id ?? null;
         clientName = clientRow?.name ?? "You";
       }
-      // else: trainer NOT in client mode, no clientId → show picker below
+      // else: trainer NOT in client mode, no clientId from URL → show picker below
     } else {
       const found = allClients.find((c) => c.id === clientId);
       clientName = found?.name || "Client";
