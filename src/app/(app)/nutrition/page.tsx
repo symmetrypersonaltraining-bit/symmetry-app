@@ -18,45 +18,85 @@ export default async function NutritionPage({
   const isTrainer = user.email === TRAINER_EMAIL;
   const params = await searchParams;
 
-  let clientId: string | null = null;
+  const isInClientMode = await isClientMode(); // boolean
+  let clientId: string | null = params?.clientId ?? null;
   let clientName = "";
   let allClients: { id: string; name: string }[] = [];
 
-  const clientMode = await isClientMode();
-  if (isTrainer && !clientMode) {
-    // Fetch all clients for dropdown
-    const { data: clientList } = await supabase
-      .from("clients")
-      .select("id, name")
-      .order("name");
-    allClients = clientList || [];
+  if (!clientId) {
+    if (isTrainer && isInClientMode) {
+      // Trainer viewing their own client dashboard — look up their client record by email
+      const { data: ownClient } = await supabase
+        .from("clients")
+        .select("id, name")
+        .eq("email", user.email!)
+        .maybeSingle();
+      clientId = ownClient?.id ?? null;
+      clientName = ownClient?.name ?? "You";
+    } else if (isTrainer && !isInClientMode) {
+      // Trainer in normal mode — fetch all clients for dropdown
+      const { data: clientList } = await supabase
+        .from("clients")
+        .select("id, name")
+        .order("name");
+      allClients = clientList || [];
 
-    if (params.clientId) {
-      const found = allClients.find((c) => c.id === params.clientId);
-      clientId = params.clientId;
-      clientName = found?.name || "Client";
-    } else if (params.viewAsClient) {
-      const { data: selfClient } = await supabase.from("clients").select("id, name").ilike("name", "%Dustin%").maybeSingle();
-      clientId = selfClient?.id || null;
-      clientName = selfClient?.name || null;
+      if (params.clientId) {
+        const found = allClients.find((c) => c.id === params.clientId);
+        clientId = params.clientId;
+        clientName = found?.name || "Client";
+      }
+      // No default — trainer must pick a client
+    } else {
+      // Regular client — look up their client record by auth user id
+      const { data: clientRow } = await supabase
+        .from("clients")
+        .select("id, name")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      clientId = clientRow?.id ?? null;
+      clientName = clientRow?.name ?? "You";
+
+      if (!clientId) {
+        return (
+          <div className="p-6 text-center" style={{ color: "var(--brand-text-secondary)" }}>
+            No client record found.
+          </div>
+        );
+      }
     }
-    // No default \u2014 trainer must pick a client
   } else {
-    const { data } = await supabase
-      .from("clients")
-      .select("id, name")
-      .eq("auth_user_id", user.id)
-      .maybeSingle();
-    clientId = data?.id || null;
-    clientName = data?.name || "You";
-
-    if (!clientId) {
-      return (
-        <div className="p-6 text-center" style={{ color: "var(--brand-text-secondary)" }}>
-          No client record found.
-        </div>
-      );
+    // clientId came from URL param — look up name
+    if (isTrainer && !isInClientMode) {
+      const { data: clientList } = await supabase
+        .from("clients")
+        .select("id, name")
+        .order("name");
+      allClients = clientList || [];
+      const found = allClients.find((c) => c.id === clientId);
+      clientName = found?.name || "Client";
     }
+  }
+
+  // Only trainer without client mode and without URL param sees picker
+  if (isTrainer && !isInClientMode && !clientId) {
+    return (
+      <>
+        <div style={{ background: "var(--brand-primary)" }} className="px-4 py-4">
+          <h1 className="text-white font-medium text-lg">Nutrition</h1>
+          <div className="mt-2">
+            <ClientSelector clients={allClients} selectedId={null} label="Client" />
+          </div>
+        </div>
+        <div className="card text-center py-16 mt-4">
+          <i className="ti ti-salad" style={{ fontSize: 56, color: "var(--brand-border)", display: "block", marginBottom: 16 }} />
+          <p className="font-semibold text-lg mb-2" style={{ color: "var(--brand-text)" }}>No client selected</p>
+          <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
+            Choose a client from the dropdown above to view their meal plan, macros, and adherence log.
+          </p>
+        </div>
+      </>
+    );
   }
 
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
@@ -102,29 +142,9 @@ export default async function NutritionPage({
     weekLogs = wlRes.data || [];
   }
 
-  if (isTrainer && !clientId) {
-    return (
-      <>
-        <div style={{ background: "var(--brand-primary)" }} className="px-4 py-4">
-          <h1 className="text-white font-medium text-lg">Nutrition</h1>
-          <div className="mt-2">
-            <ClientSelector clients={allClients} selectedId={null} label="Client" />
-          </div>
-        </div>
-        <div className="card text-center py-16 mt-4">
-          <i className="ti ti-salad" style={{ fontSize: 56, color: "var(--brand-border)", display: "block", marginBottom: 16 }} />
-          <p className="font-semibold text-lg mb-2" style={{ color: "var(--brand-text)" }}>No client selected</p>
-          <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
-            Choose a client from the dropdown above to view their meal plan, macros, and adherence log.
-          </p>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
-      {isTrainer && !params.viewAsClient && (
+      {isTrainer && !isInClientMode && (
         <div style={{ background: "var(--brand-primary)" }} className="px-4 py-3">
           <div className="flex items-center justify-between">
             <h1 className="text-white font-medium text-lg">Nutrition</h1>
@@ -140,7 +160,7 @@ export default async function NutritionPage({
         macroTarget={macroTarget as any}
         weekLogs={weekLogs}
         today={today}
-        isTrainer={isTrainer && !params.viewAsClient}
+        isTrainer={isTrainer && !isInClientMode}
       />
     </>
   );
