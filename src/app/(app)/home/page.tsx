@@ -152,6 +152,7 @@ export default async function HomePage() {
         date: dateKey,
         dayLabel: row.days?.label || "Workout",
         status: row.status || "scheduled",
+        dayId: row.days?.id || row.day_id || null,
       });
     }
 
