@@ -128,12 +128,12 @@ export default async function HomePage() {
     const loggedTodayCount = trainerHomeSessions.filter((s) => s.status === "completed").length;
 
     // Workout map (programmed workouts — separate calendar layer, do NOT modify)
-    type WE = { id: string; clientId: string; clientName: string; date: string; dayLabel: string; status: string };
+    type WE = { id: string; dayId: string | null; clientId: string; clientName: string; date: string; dayLabel: string; status: string };
     const workoutRangeEnd = new Date();
     workoutRangeEnd.setMonth(workoutRangeEnd.getMonth() + 3);
     const { data: workoutRows } = await supabase
       .from("scheduled_workouts")
-      .select("id, client_id, scheduled_date, status, days(label), clients(id, name)")
+      .select("id, day_id, client_id, scheduled_date, status, days(id, label), clients(id, name)")
       .gte("scheduled_date", new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
         .toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
       .lte("scheduled_date", workoutRangeEnd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
@@ -146,6 +146,7 @@ export default async function HomePage() {
       if (!workoutMap[dateKey]) workoutMap[dateKey] = [];
       workoutMap[dateKey].push({
         id: row.id,
+      dayId: row.day_id || null,
         clientId: row.clients?.id || row.client_id,
         clientName: row.clients?.name || "Unknown",
         date: dateKey,
