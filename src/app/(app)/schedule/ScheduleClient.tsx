@@ -249,7 +249,7 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
     return s;
   }, [paymentReminders]);
 
-  const todayStr = `${year}-${pad(month)}-${pad(today)}`;
+  const todayStr = `${year}-${pad(month + 1)}-${pad(today)}`;
 
   const cells: { dateStr: string; dayNum: number }[] = [];
   const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
@@ -258,7 +258,7 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
     if (dayNum < 1 || dayNum > daysInMonth) {
       cells.push({ dateStr: "", dayNum });
     } else {
-      cells.push({ dateStr: `${year}-${pad(month)}-${pad(dayNum)}`, dayNum });
+      cells.push({ dateStr: `${year}-${pad(month + 1)}-${pad(dayNum)}`, dayNum });
     }
   }
 
@@ -510,7 +510,7 @@ export default function ScheduleClient({
 
   const todayStr = useMemo(() => {
     const pad = (n: number) => String(n).padStart(2, "0");
-    return `${year}-${pad(month)}-${pad(today)}`;
+    return `${year}-${pad(month + 1)}-${pad(today)}`;
   }, [year, month, today]);
 
   const [viewMode, setViewMode] = useState<"week" | "month">("week");
