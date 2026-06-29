@@ -101,6 +101,15 @@ export default async function WorkoutDayPage({
     .gte("log_date", today)
     .maybeSingle();
 
+  const { data: swInst } = await supabase
+    .from("scheduled_workouts")
+    .select("id")
+    .eq("day_id", resolvedDayId)
+    .eq("client_id", clientId || "")
+    .eq("scheduled_date", new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }))
+    .maybeSingle();
+  const scheduledWorkoutId = swInst?.id || null;
+
   const phase = (day as any).phases;
   const program = phase?.programs;
 
@@ -115,6 +124,7 @@ export default async function WorkoutDayPage({
       isTrainerSession={isTrainer && !!forClient}
       existingLogId={existingLog?.id || null}
       existingSetLogs={existingLog?.set_logs || []}
+      scheduledWorkoutId={scheduledWorkoutId}
     />
   );
 }
