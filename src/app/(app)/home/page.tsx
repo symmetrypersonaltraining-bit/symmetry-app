@@ -135,7 +135,7 @@ export default async function HomePage() {
               </div>
               <div className="divide-y" style={{ borderColor: "var(--brand-border)" }}>
                 {todaySessions.map((s: any) => (
-                  <a key={s.id} href={`/workout/${s.id}`}
+                  <a key={s.id} href={`/workout/${s.id}?forClient=${s.clientId}`}
                     className="flex items-center gap-3 px-4 py-3 hover:opacity-80 transition-opacity">
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                       style={{ background: s.status === "completed" ? "#22c55e20" : "var(--brand-primary)20" }}>
