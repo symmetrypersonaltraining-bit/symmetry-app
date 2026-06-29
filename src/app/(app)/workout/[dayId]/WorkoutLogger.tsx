@@ -87,7 +87,7 @@ function smartDefaults(pe: PrescribedExercise): { w: boolean; r: boolean; t: boo
   const equip = (pe.exercises?.equipment_required ?? []).map((e: string) => e.toLowerCase()).join(' ');
 
   // Unilateral: single-leg, lunge, split, one-arm, etc.
-  const u = /\b(single[- ]leg|single[- ]arm|one[- ]arm|one[- ]leg|unilateral|lunge|split squat|bulgarian|pistol|step.?up)\b/.test(name);
+  const u = true; // default all exercises to unilateral — toggle off for bilateral
 
   // Time-based: cardio, holds, carries, planks
   if (/\b(run|bike|row|sprint|jog|walk|plank|hold|carry|sled|march|cycle|interval|hiit|jump rope|assault)\b/.test(name) ||
@@ -188,7 +188,7 @@ export default function WorkoutLogger({
           return {
             weight: ex?.weight_lbs?.toString() ?? '',
             reps: ex?.reps?.toString() ?? '',
-            time: ex?.duration_seconds != null ? fmtTime(ex.duration_seconds) : '',
+            time: ex?.duration_seconds?.toString() ?? '',
             done: ex?.completed ?? false,
           };
         });
@@ -446,7 +446,7 @@ export default function WorkoutLogger({
           <div />
           {tW && <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--brand-text-secondary)', textAlign: 'center', letterSpacing: '0.06em' }}>WEIGHT</div>}
           {tR && <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--brand-text-secondary)', textAlign: 'center', letterSpacing: '0.06em' }}>{tU ? 'REPS/SIDE' : 'REPS'}</div>}
-          {tT && <div style={{ fontSize: 9, fontWeight: 700, color: '#0EA5E9', textAlign: 'center', letterSpacing: '0.06em' }}>{tU ? 'TIME/SIDE' : 'TIME'}</div>}
+          {tT && <div style={{ fontSize: 9, fontWeight: 700, color: '#0EA5E9', textAlign: 'center', letterSpacing: '0.06em' }}>{tU ? 'TIME/SIDE(s)' : 'TIME(s)'}</div>}
           <div />
         </div>
 
@@ -482,9 +482,9 @@ export default function WorkoutLogger({
 
             {tT && (
               <input
-                type="text" placeholder={tU ? '0:00/side' : '0:00'} value={se.time}
+                type="number" inputMode="numeric" placeholder={tU ? 'sec/side' : 'sec'} value={se.time}
                 onChange={e => updateSet(peId, si, 'time', e.target.value)}
-                style={{ textAlign: 'center', width: '100%', minWidth: 0, border: '1px solid ' + (se.done ? 'rgba(34,197,94,0.25)' : 'rgba(14,165,233,0.4)'), borderRadius: 7, background: 'transparent', padding: '5px 2px', color: se.done ? '#22c55e' : '#0EA5E9', fontSize: 14, fontWeight: 600, outline: 'none' }}
+                style={{ textAlign: 'center', width: '100%', minWidth: 0, border: '1px solid ' + (se.done ? 'rgba(34,197,94,0.25)' : 'var(--brand-border)'), borderRadius: 7, background: 'transparent', padding: '5px 2px', color: se.done ? '#22c55e' : 'var(--brand-text)', fontSize: 14, fontWeight: 600, outline: 'none', WebkitAppearance: 'none' }}
               />
             )}
 
