@@ -15,7 +15,6 @@ const CLIENT_NAV = [
   { href: "/home", label: "Home", icon: "ti-home" },
   { href: "/workout", label: "Workout", icon: "ti-barbell" },
   { href: "/nutrition", label: "Nutrition", icon: "ti-salad" },
-  { href: "/log", label: "Log", icon: "ti-plus-circle" },
   { href: "/progress", label: "Progress", icon: "ti-chart-line" },
   { href: "/settings", label: "Settings", icon: "ti-settings" },
 ];
