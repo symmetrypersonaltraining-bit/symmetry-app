@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useLayoutEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import TrainerSidebar from "./TrainerSidebar";
@@ -19,7 +19,7 @@ const CLIENT_NAV = [
 
 export default function TrainerLayoutWrapper({ children }: Props) {
   const [clientMode, setClientMode] = useState(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     try {
       const saved = localStorage.getItem("symmetry_view_mode");
       if (saved === "client") {
