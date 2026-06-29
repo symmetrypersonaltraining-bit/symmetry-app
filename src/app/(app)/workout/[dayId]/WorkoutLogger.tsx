@@ -695,3 +695,4 @@ export default function WorkoutLogger({
     </div>
   );
 }
+
