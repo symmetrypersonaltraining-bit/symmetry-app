@@ -22,151 +22,105 @@ function getCentralNow() {
 
 export default async function SchedulePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const isTrainer = user.email === TRAINER_EMAIL;
 
-  const { year, month, day } = getCentralNow();
-  const firstDay = new Date(year, month - 1, 1).getDay();
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const monthName = new Date(year, month - 1, 1).toLocaleString("en-US", { month: "long" });
-
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const monthStart = `${year}-${pad(month)}-01`;
-  const monthEnd = `${year}-${pad(month)}-${pad(daysInMonth)}`;
-
   let clientId: string | null = null;
-  if (!isTrainer) {
-    const { data: clientRow } = await supabase
+  if (isTrainer) {
+    const { data } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("email", TRAINER_EMAIL)
+      .maybeSingle();
+    clientId = data?.id || null;
+  } else {
+    const { data } = await supabase
       .from("clients")
       .select("id")
       .eq("auth_user_id", user.id)
-      .single();
-    clientId = clientRow?.id ?? null;
-    if (!clientId) redirect("/home");
+      .maybeSingle();
+    clientId = data?.id || null;
   }
 
-  let apptQ = supabase
-    .from("appointments")
-    .select("id, client_id, scheduled_at, title, clients(name)")
-    .gte("scheduled_at", `${monthStart}T00:00:00`)
-    .lte("scheduled_at", `${monthEnd}T23:59:59`)
-    .neq("status", "cancelled")
-    .order("scheduled_at", { ascending: true });
+  const { year, month: month1, day } = getCentralNow();
+  const year_val = year;
+  const month = month1 - 1;
+  const today = day;
+  const firstDay = new Date(year_val, month, 1).getDay();
+  const daysInMonth = new Date(year_val, month + 1, 0).getDate();
+  const monthName = new Date(year_val, month, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const monthStart = `${year_val}-${pad(month + 1)}-01`;
+  const monthEnd = `${year_val}-${pad(month + 1)}-${pad(daysInMonth)}`;
+  const todayStr = `${year_val}-${pad(month + 1)}-${pad(today)}`;
+  const futureEnd = new Date(year_val, month, today + 30);
+  const futureEndStr = `${futureEnd.getFullYear()}-${pad(futureEnd.getMonth() + 1)}-${pad(futureEnd.getDate())}`;
 
-  if (!isTrainer && clientId) {
-    apptQ = apptQ.eq("client_id", clientId);
-  }
+  let workoutDates: string[] = [];
+  let upcomingDays: { id: string; label: string; date: string; dow: number }[] = [];
+  let scheduledDows: number[] = [];
+  let monthScheduledWorkouts: { id: string; date: string; status: string; label: string }[] = [];
 
-  const { data: appts } = await apptQ;
+  if (clientId) {
+    const { data: monthWorkouts } = await supabase
+      .from("scheduled_workouts")
+      .select("id, scheduled_date, status, days(id, label)")
+      .eq("client_id", clientId)
+      .gte("scheduled_date", monthStart)
+      .lte("scheduled_date", monthEnd);
 
-  const workoutDates: string[] = [];
-  const seenDates = new Set<string>();
-  const dowCounts: Record<number, number> = {};
-  const dowMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-
-  for (const appt of appts ?? []) {
-    const d = new Date(appt.scheduled_at as string);
-    const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(d);
-    if (!seenDates.has(dateStr)) { seenDates.add(dateStr); workoutDates.push(dateStr); }
-    const dowStr = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", weekday: "short" }).format(d);
-    const dow = dowMap[dowStr] ?? 0;
-    dowCounts[dow] = (dowCounts[dow] ?? 0) + 1;
-  }
-
-  const scheduledDows = Object.entries(dowCounts)
-    .filter(([, count]) => (count as number) >= 2)
-    .map(([dow]) => parseInt(dow));
-
-  const nowIso = new Date().toISOString();
-  const futureIso = new Date(Date.now() + 42 * 86400000).toISOString();
-
-  let upcomingQ = supabase
-    .from("appointments")
-    .select("id, client_id, scheduled_at, ends_at, title, gcal_event_id, gcal_recurring_id, clients(name)")
-    .gte("scheduled_at", nowIso)
-    .lte("scheduled_at", futureIso)
-    .neq("status", "cancelled")
-    .order("scheduled_at", { ascending: true })
-    .limit(200);
-
-  if (!isTrainer && clientId) { upcomingQ = upcomingQ.eq("client_id", clientId); }
-
-  const { data: upcomingAppts } = await upcomingQ;
-
-  const upcomingDays = (upcomingAppts ?? []).map((appt) => {
-    const d = new Date(appt.scheduled_at as string);
-    const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(d);
-    const timeStr = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }).format(d);
-    const dowStr = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", weekday: "short" }).format(d);
-    const dow = dowMap[dowStr] ?? 0;
-    const clientName = (appt.clients as { name?: string } | null)?.name ?? "Client";
-    const label = isTrainer ? `${clientName} — ${timeStr}` : ((appt.title as string | null) ?? timeStr);
-
-    // Extract HH:mm in 24h for time grid positioning
-    const startTime = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Chicago",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(d).replace(/^24:/, "00:");
-
-    let endTime: string | undefined;
-    if (appt.ends_at) {
-      const endD = new Date(appt.ends_at as string);
-      endTime = new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/Chicago",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).format(endD).replace(/^24:/, "00:");
-    }
-
-    return {
-      id: appt.id as string,
-      label,
-      date: dateStr,
-      dow,
-      startTime,
-      endTime,
-      gcalEventId: (appt.gcal_event_id as string | null) ?? undefined,
-      gcalRecurringId: (appt.gcal_recurring_id as string | null) ?? undefined,
-    };
-  });
-
-  let paymentReminders: { date: string; clientName: string; amount: number; status: string }[] = [];
-  if (isTrainer) {
-    const { data: reminders } = await supabase
-      .from("payment_reminders")
-      .select("id, due_date, amount_due, notification_status, clients(name)")
-      .gte("due_date", monthStart)
-      .lte("due_date", monthEnd)
-      .order("due_date", { ascending: true });
-
-    paymentReminders = (reminders ?? []).map((r) => ({
-      date: r.due_date as string,
-      clientName: (r.clients as { name?: string } | null)?.name ?? "Client",
-      amount: parseFloat(String(r.amount_due)),
-      status: (r.notification_status as string | null) ?? "pending",
+    monthScheduledWorkouts = (monthWorkouts || []).map((w: any) => ({
+      id: w.id as string,
+      date: w.scheduled_date as string,
+      status: w.status as string,
+      label: ((w.days as any)?.label || "Workout") as string,
     }));
+
+    workoutDates = (monthWorkouts || [])
+      .filter((w: any) => w.status === "completed")
+      .map((w: any) => w.scheduled_date);
+
+    const { data: upcoming } = await supabase
+      .from("scheduled_workouts")
+      .select("id, day_id, scheduled_date, status, days(id, label)")
+      .eq("client_id", clientId)
+      .gte("scheduled_date", todayStr)
+      .lte("scheduled_date", futureEndStr)
+      .neq("status", "completed")
+      .order("scheduled_date")
+      .limit(10);
+
+    upcomingDays = (upcoming || []).map((w: any) => ({
+      id: (w.day_id || (w.days as any)?.id || w.id) as string,
+      label: ((w.days as any)?.label || "Workout") as string,
+      date: w.scheduled_date as string,
+      dow: new Date(w.scheduled_date + "T00:00:00").getDay(),
+    }));
+
+    const dowSet = new Set<number>();
+    for (const w of upcoming || []) {
+      dowSet.add(new Date((w as any).scheduled_date + "T00:00:00").getDay());
+    }
+    scheduledDows = Array.from(dowSet);
   }
 
   return (
     <ScheduleClient
       monthName={monthName}
-      year={year}
+      year={year_val}
       month={month}
       daysInMonth={daysInMonth}
       firstDay={firstDay}
-      today={day}
+      today={today}
       workoutDates={workoutDates}
       scheduledDows={scheduledDows}
       upcomingDays={upcomingDays}
       isTrainer={isTrainer}
-      paymentReminders={paymentReminders}
+      paymentReminders={[]}
+      clientId={clientId}
+      monthScheduledWorkouts={monthScheduledWorkouts}
     />
   );
 }
