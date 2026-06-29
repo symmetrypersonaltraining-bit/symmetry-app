@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 
 // ---- Types ----
 type ViewMode = "week" | "month" | "day" | "agenda";
@@ -1075,6 +1076,7 @@ function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, cl
 
 // ---- Main Component ----
 export default function TrainerCalendar({ clients, appointmentMap: appointmentMapProp, allAppointments, workoutMap }: Props) {
+  const router = useRouter();
   const today = new Date();
   const todayStr = dayStr(today);
 
@@ -1623,7 +1625,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
           clients={clients}
           workoutMap={workoutMap}
           onClose={() => setPopupEv(null)}
-          onSaved={() => setRefreshKey(k => k + 1)}
+          onSaved={() => { setRefreshKey(k => k + 1); router.refresh(); }}
         />
       )}
 
@@ -1634,7 +1636,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
           timeStr={addModal.timeStr}
           clients={clients}
           onClose={() => setAddModal(null)}
-          onSaved={() => setRefreshKey(k => k + 1)}
+          onSaved={() => { setRefreshKey(k => k + 1); router.refresh(); }}
         />
       )}
     </div>
