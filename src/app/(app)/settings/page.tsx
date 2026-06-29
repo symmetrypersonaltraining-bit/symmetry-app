@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import SettingsClient from "./SettingsClient";
 
@@ -9,6 +10,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
   const { data: profile } = await supabase.from("clients").select("name").eq("auth_user_id", user.id).maybeSingle();
   const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
+  const cookieStore = await cookies();
+  const isInClientMode = isTrainer && cookieStore.get("symmetry_client_mode")?.value === "1";
   const userName = isTrainer ? "Dustin Gautreaux" : (profile?.name ?? user.email ?? "");
 
   const { data: trainerSettings } = isTrainer
@@ -29,6 +32,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         gcalSyncEnabled={trainerSettings?.gcal_sync_enabled ?? false}
         gcalConnected={!!(trainerSettings?.google_refresh_token)}
         gcalStatus={gcalStatus}
+        isInClientMode={isInClientMode}
       />
     </div>
   );
