@@ -365,12 +365,12 @@ function workoutDotColor(label?: string) {
   return isCardioLabel(label) ? "#22c55e" : "var(--brand-primary)";
 }
 
+function toCT(d = new Date()) {
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+}
+
 // ─── Week Ring ────────────────────────────────────────────────────────────────────────────────────
 function WeekRing({
-  function toCT(d = new Date()) {
-    return d.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-  }
-
   allScheduled = [], weekOffset, onPrev, onNext, basePath = "",
 }: {
   allScheduled: ScheduledDay[];
