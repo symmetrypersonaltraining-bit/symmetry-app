@@ -317,7 +317,7 @@ export default function WorkoutLogger({
         <div style={{ fontSize: 56, marginBottom: 16 }}>🎉</div>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand-text)', marginBottom: 8 }}>Session Complete!</h1>
         <p style={{ color: 'var(--brand-text-secondary)', fontSize: 14, marginBottom: 32 }}>
-          {doneSets} sets logged · {program?.name ?? day.label}
+          {doneSets} sets logged · {isTrainerSession && clientName ? clientName : (program?.name ?? day.label)}
         </p>
         <Link
           href={isTrainerSession ? '/clients/' + clientId : '/home'}
@@ -368,7 +368,7 @@ export default function WorkoutLogger({
           ← Back
         </button>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand-text-secondary)' }}>
-          {program?.name ?? day.label}
+          {isTrainerSession && clientName ? clientName : (program?.name ?? day.label)}
         </span>
         <span style={{ fontSize: 12, color: 'var(--brand-text-secondary)' }}>
           {currentIdx + 1} / {allExercises.length}
