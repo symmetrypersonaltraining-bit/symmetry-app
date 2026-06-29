@@ -367,6 +367,10 @@ function workoutDotColor(label?: string) {
 
 // ─── Week Ring ────────────────────────────────────────────────────────────────────────────────────
 function WeekRing({
+  function toCT(d = new Date()) {
+    return d.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  }
+
   allScheduled = [], weekOffset, onPrev, onNext, basePath = "",
 }: {
   allScheduled: ScheduledDay[];
@@ -375,7 +379,7 @@ function WeekRing({
   const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const today = new Date();
   const todayDow = today.getDay();
-  const todayStr = today.toISOString().split("T")[0];
+  const todayStr = toCT(today);
 
   const displayWeekStart = new Date(today);
   displayWeekStart.setDate(today.getDate() - todayDow + weekOffset * 7);
@@ -385,7 +389,7 @@ function WeekRing({
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(displayWeekStart);
     d.setDate(displayWeekStart.getDate() + i);
-    const dateStr = d.toISOString().split("T")[0];
+    const dateStr = toCT(d);
     const workout = allScheduled.find(w => w.date === dateStr);
     return { dow: i, dateStr, workout, isToday: dateStr === todayStr };
   });
@@ -433,7 +437,7 @@ function WeekRing({
               {done ? (
                 <i className="ti ti-check text-xs" style={{ color: dotColor }} />
               ) : sched ? (
-                <i className={`ti ${isCardioLabel(workout?.label) ? "ti-run" : "ti-barbell"} text-xs`} style={{ color: "var(--brand-text-secondary)" }} />
+                <i className={`ti ${isCardioLabel(workout?.label) ? "ti-scale" : "ti-barbell"} text-xs`} style={{ color: "var(--brand-text-secondary)" }} />
               ) : null}
             </div>
           );
@@ -596,10 +600,10 @@ export default function ClientDashboard({
             <Link href={`${basePath}/log-bodyfat`}>
               <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)20" }}>
-                  <i className="ti ti-scale text-lg" style={{ color: "var(--brand-primary)" }} />
+                  <i className="ti ti-percentage text-lg" style={{ color: "var(--brand-primary)" }} />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Weigh In</p>
+                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Body Fat</p>
                   <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track weight</p>
                 </div>
               </div>
@@ -607,10 +611,10 @@ export default function ClientDashboard({
             <Link href={`${basePath}/log`}>
               <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#f59e0b20" }}>
-                  <i className="ti ti-run text-lg" style={{ color: "#f59e0b" }} />
+                  <i className="ti ti-scale text-lg" style={{ color: "#f59e0b" }} />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Cardio</p>
+                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Log Weight</p>
                   <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Log cardio</p>
                 </div>
               </div>
