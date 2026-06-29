@@ -437,7 +437,7 @@ function WeekRing({
               {done ? (
                 <i className="ti ti-check text-xs" style={{ color: dotColor }} />
               ) : sched ? (
-                <i className={`ti ${isCardioLabel(workout?.label) ? "ti-scale" : "ti-barbell"} text-xs`} style={{ color: "var(--brand-text-secondary)" }} />
+                <i className={`ti ${isCardioLabel(workout?.label) ? "ti-run" : "ti-barbell"} text-xs`} style={{ color: "var(--brand-text-secondary)" }} />
               ) : null}
             </div>
           );
@@ -615,7 +615,7 @@ export default function ClientDashboard({
                 </div>
                 <div>
                   <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Log Weight</p>
-                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Log cardio</p>
+                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track weight</p>
                 </div>
               </div>
             </Link>
