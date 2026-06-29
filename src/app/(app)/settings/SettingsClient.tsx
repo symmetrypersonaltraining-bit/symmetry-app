@@ -134,6 +134,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
       </section>
 
       {isTrainer && (
+        {isTrainer && !isInClientMode && (
         <section>
           <p className="section-header">Integrations</p>
           <div className="card p-4 space-y-5">
@@ -207,6 +208,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
 
           </div>
         </section>
+        )}
       )}
 
       <section>
