@@ -578,30 +578,55 @@ export default function ClientDashboard({
           </div>
         )}
 
-        {/* Quick links */}
-        <div className="grid grid-cols-2 gap-3">
-          <Link href={`${basePath}/nutrition`}>
-            <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#22c55e20" }}>
-                <i className="ti ti-salad text-lg" style={{ color: "#22c55e" }} />
+        {/* Quick Actions */}
+        <div>
+          <h2 className="text-base font-bold mb-2.5" style={{ color: "var(--brand-text)" }}>Quick Actions</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <Link href={`${basePath}/nutrition`}>
+              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#22c55e20" }}>
+                  <i className="ti ti-salad text-lg" style={{ color: "#22c55e" }} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Log Meal</p>
+                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Nutrition log</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Nutrition</p>
-                <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Log meals</p>
+            </Link>
+            <Link href={`${basePath}/log-bodyfat`}>
+              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)20" }}>
+                  <i className="ti ti-scale text-lg" style={{ color: "var(--brand-primary)" }} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Weigh In</p>
+                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track weight</p>
+                </div>
               </div>
-            </div>
-          </Link>
-          <Link href="/log">
-            <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#f59e0b20" }}>
-                <i className="ti ti-plus-circle text-lg" style={{ color: "#f59e0b" }} />
+            </Link>
+            <Link href={`${basePath}/log`}>
+              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#f59e0b20" }}>
+                  <i className="ti ti-run text-lg" style={{ color: "#f59e0b" }} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Cardio</p>
+                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Log cardio</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Log</p>
-                <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Cardio &amp; weight</p>
+            </Link>
+            <Link href={`${basePath}/progress`}>
+              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#a855f720" }}>
+                  <i className="ti ti-chart-line text-lg" style={{ color: "#a855f7" }} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Progress</p>
+                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>View metrics</p>
+                </div>
               </div>
-            </div>
-          </Link>
+            </Link>
+          </div>
         </div>
 
         {/* Metrics */}
