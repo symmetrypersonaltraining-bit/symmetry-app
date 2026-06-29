@@ -74,7 +74,7 @@ function centralToday(): string {
 function isoDaysAgo(base: string, n: number): string {
   const d = new Date(base + 'T00:00:00Z');
   d.setUTCDate(d.getUTCDate() - n);
-  return d.toISOString().split('T')[0];
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 }
 
 // âââ Animated SVG Sparkline âââââââââââââââââââââââââââââââââââââââââââââââââââ
