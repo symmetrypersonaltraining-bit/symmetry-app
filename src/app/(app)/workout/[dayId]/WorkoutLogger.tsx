@@ -53,6 +53,7 @@ interface Props {
   isTrainerSession?: boolean;
   existingLogId: string | null;
   existingSetLogs: ExistingSetLog[];
+  scheduledWorkoutId: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -155,11 +156,11 @@ function VideoLightbox({ url, name, onClose }: { url: string; name: string; onCl
 // ─── WorkoutLogger ────────────────────────────────────────────────────────────
 
 export default function WorkoutLogger({
-  day, phase, program, sections, clientId, clientName, isTrainerSession, existingLogId, existingSetLogs,
+  day, phase, program, sections, clientId, clientName, isTrainerSession, existingLogId, existingSetLogs, scheduledWorkoutId: scheduledWorkoutIdProp,
 }: Props) {
   const params = useParams();
   const router = useRouter();
-  const scheduledWorkoutId = params.dayId as string;
+  const scheduledWorkoutId = scheduledWorkoutIdProp;
   const supabase = createClient();
 
   const allExercises = sections.flatMap(sec =>
