@@ -287,7 +287,7 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
           const hasScheduled = cell.dateStr ? scheduledSet.has(cell.dateStr) : false;
           const hasPayment = cell.dateStr ? paymentSet.has(cell.dateStr) : false;
           return (
-            <div key={i} className={`border-r border-b border-gray-200 min-h-[64px] p-1.5 ${cell.dateStr ? "bg-white cursor-pointer active:opacity-75" : "bg-gray-50"}` onClick={() => { if (cell.dateStr) { setSelectedDate(cell.dateStr); setLogStep("choose"); } }}>
+            <div key={i} className={`border-r border-b border-gray-200 min-h-[64px] p-1.5 ${cell.dateStr ? "bg-white cursor-pointer active:opacity-75" : "bg-gray-50"}`} onClick={() => { if (cell.dateStr) { setSelectedDate(cell.dateStr); setLogStep("choose"); } }}>
               {cell.dateStr && (
                 <>
                   <span className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${isToday ? "bg-indigo-600 text-white" : "text-gray-700"}`}>
