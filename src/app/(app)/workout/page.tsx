@@ -1,45 +1,47 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import Link from "next/link";
+
+const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+
+async function isClientMode(): Promise<boolean> {
+  const cookieStore = await cookies();
+  return cookieStore.get("symmetry_client_mode")?.value === "1";
+}
 
 export default async function WorkoutPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
+  const isTrainer = user.email === TRAINER_EMAIL;
+  const inClientMode = isTrainer ? await isClientMode() : false;
+
+  // Central time today
+  const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 
   // Get client record
   let clientId: string | null = null;
   let clientName = "You";
-  if (isTrainer) {
-    // Trainer views their own workout by default
-    const { data } = await supabase
-      .from("clients")
-      .select("id, name")
-      .ilike("name", "%Dustin%")
-      .maybeSingle();
+  if (isTrainer && !inClientMode) {
+    const { data } = await supabase.from("clients").select("id, name").ilike("name", "%Dustin%").maybeSingle();
     clientId = data?.id || null;
     clientName = data?.name || "Dustin";
   } else {
-    const { data } = await supabase
-      .from("clients")
-      .select("id, name")
-      .eq("auth_user_id", user.id)
-      .maybeSingle();
-    clientId = data?.id || null;
-    clientName = data?.name || "You";
+    const { data } = await supabase.from("clients").select("id, name").eq("auth_user_id", user.id).maybeSingle();
+    if (!data && isTrainer) {
+      const { data: d2 } = await supabase.from("clients").select("id, name").eq("email", user.email!).maybeSingle();
+      clientId = d2?.id || null;
+      clientName = d2?.name || "Dustin";
+    } else {
+      clientId = data?.id || null;
+      clientName = data?.name || "You";
+    }
   }
 
-  // Get today's day of week (0=Sun, 1=Mon, ..., 6=Sat)
-  const today = new Date();
-
-  // Get active program assignment and find today's day
-  let todayDay: { id: string; label: string; phase_label: string; program_name: string } | null = null;
+  // Get active program phases/days
   let allPhases: { id: string; label: string; days: { id: string; label: string }[] }[] = [];
-
   if (clientId) {
     const { data: assignment } = await supabase
       .from("program_assignments")
@@ -47,72 +49,78 @@ export default async function WorkoutPage() {
       .eq("client_id", clientId)
       .eq("active", true)
       .maybeSingle();
-
     if (assignment) {
       const prog = (assignment as any).programs;
-      const phases = prog?.phases || [];
-      allPhases = phases
+      allPhases = (prog?.phases || [])
         .sort((a: any, b: any) => a.position - b.position)
         .map((ph: any) => ({
           id: ph.id,
           label: ph.label,
           days: (ph.days || []).sort((a: any, b: any) => a.position - b.position),
         }));
-
-      // Fallback: just show first day of first phase
-      if (!todayDay && allPhases.length > 0 && allPhases[0].days.length > 0) {
-        const ph = allPhases[0];
-        const d = ph.days[0];
-        todayDay = {
-          id: d.id,
-          label: d.label,
-          phase_label: ph.label,
-          program_name: prog.name,
-        };
-      }
     }
   }
 
+  // Look up today's scheduled workout (Central time)
+  let todayScheduled: { id: string; status: string; dayId: string; dayLabel: string; phaseLabel: string; programName: string } | null = null;
+  if (clientId) {
+    const { data: sw } = await supabase
+      .from("scheduled_workouts")
+      .select("id, status, days(id, label, phases(id, label, programs(name)))")
+      .eq("client_id", clientId)
+      .eq("scheduled_date", todayDate)
+      .maybeSingle();
+    if (sw) {
+      const d = (sw as any).days;
+      const ph = d?.phases;
+      const prog = ph?.programs;
+      todayScheduled = {
+        id: sw.id,
+        status: sw.status,
+        dayId: d?.id || "",
+        dayLabel: d?.label || "Workout",
+        phaseLabel: ph?.label || "",
+        programName: prog?.name || "",
+      };
+    }
+  }
+
+  const displayDate = new Date().toLocaleDateString("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "long", month: "long", day: "numeric",
+  });
+
   return (
     <>
-      {/* Header */}
       <div style={{ background: "var(--brand-primary)" }} className="px-4 py-4">
         <h1 className="text-white font-medium text-lg">Workout</h1>
-        <p className="text-white/60 text-sm">
-          {today.toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
+        <p className="text-white/60 text-sm">{displayDate}</p>
       </div>
 
       <div className="px-4 py-4">
-        {todayDay ? (
+        {todayScheduled ? (
           <>
-            {/* Today's workout card */}
-            <div className="card card-glow">
+            <div className="card card-glow mb-4">
               <p className="text-xs mb-1" style={{ color: "var(--brand-text-secondary)" }}>
-                Today · {todayDay.phase_label}
+                Today &middot; {todayScheduled.phaseLabel}
               </p>
-              <h2
-                className="text-lg font-medium mb-3"
-                style={{ color: "var(--brand-text)" }}
-              >
-                {todayDay.label}
+              <h2 className="text-lg font-medium mb-1" style={{ color: "var(--brand-text)" }}>
+                {todayScheduled.dayLabel}
               </h2>
               <p className="text-sm mb-4" style={{ color: "var(--brand-text-secondary)" }}>
-                {todayDay.program_name}
+                {todayScheduled.programName}
               </p>
-              <Link
-                href={`/workout/${todayDay.id}`}
-                className="btn btn-primary block text-center"
-              >
-                Start workout →
-              </Link>
+              {todayScheduled.status === "completed" ? (
+                <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "#22c55e" }}>
+                  <i className="ti ti-check" /> Completed
+                </div>
+              ) : (
+                <Link href={"/workout/" + todayScheduled.dayId} className="btn btn-primary block text-center">
+                  Start workout
+                </Link>
+              )}
             </div>
 
-            {/* All phases / days */}
             {allPhases.map((phase) => (
               <div key={phase.id} style={{ marginTop: "1.25rem" }}>
                 <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>{phase.label}</p>
@@ -132,16 +140,37 @@ export default async function WorkoutPage() {
               </div>
             ))}
           </>
+        ) : allPhases.length > 0 ? (
+          <>
+            <div className="card mb-4 text-center py-6">
+              <i className="ti ti-moon text-3xl block mb-2" style={{ color: "var(--brand-text-secondary)" }} />
+              <p className="font-medium mb-1" style={{ color: "var(--brand-text)" }}>Rest Day</p>
+              <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>No workout scheduled for today.</p>
+            </div>
+            {allPhases.map((phase) => (
+              <div key={phase.id} style={{ marginTop: "1rem" }}>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>{phase.label}</p>
+                <div className="space-y-2">
+                  {phase.days.map((day) => (
+                    <Link key={day.id} href={"/workout/" + day.id}
+                      className="flex items-center gap-3 rounded-2xl p-3.5"
+                      style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
+                        <i className="ti ti-barbell text-base" style={{ color: "white" }} />
+                      </div>
+                      <span className="text-sm font-medium flex-1" style={{ color: "var(--brand-text)" }}>{day.label}</span>
+                      <i className="ti ti-chevron-right text-sm" style={{ color: "var(--brand-text-secondary)" }} />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </>
         ) : (
           <div className="card text-center py-10">
-            <i
-              className="ti ti-barbell text-4xl block mb-3"
-              style={{ color: "var(--brand-border)" }}
-            />
+            <i className="ti ti-barbell text-4xl block mb-3" style={{ color: "var(--brand-border)" }} />
             <p className="font-medium mb-1">No program assigned</p>
-            <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
-              Contact your trainer to get started.
-            </p>
+            <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>Contact your trainer to get started.</p>
           </div>
         )}
       </div>
