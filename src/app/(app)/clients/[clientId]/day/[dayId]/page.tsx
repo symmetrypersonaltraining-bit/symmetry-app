@@ -102,6 +102,13 @@ export default async function WorkoutDayEditPage({
         </div>
         <h1 className="text-white text-xl font-bold">{d.label || "Workout Day"}</h1>
         <p className="text-white/60 text-xs mt-0.5">{d.phases?.programs?.name} \u00b7 {d.phases?.label}</p>
+            <Link
+              href={`/workout/${dayId}?forClient=${clientId}`}
+              className="mt-3 flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-bold text-white"
+              style={{ background: "rgba(255,255,255,0.2)", border: "2px solid rgba(255,255,255,0.35)" }}>
+              <i className="ti ti-player-play-filled text-base" />
+              Launch Session
+            </Link>
       </div>
       <div className="p-4">
         <WorkoutDayEditor
