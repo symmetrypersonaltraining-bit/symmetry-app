@@ -630,6 +630,18 @@ export default function ClientDashboard({
                 </div>
               </div>
             </Link>
+            <Link href={`${basePath}/messages`} className="col-span-2">
+              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#3b82f620" }}>
+                  <i className="ti ti-message-circle text-lg" style={{ color: "#3b82f6" }} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Message Trainer</p>
+                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Chat with Dustin</p>
+                </div>
+                <i className="ti ti-chevron-right text-xs" style={{ color: "var(--brand-text-secondary)" }} />
+              </div>
+            </Link>
           </div>
         </div>
 
