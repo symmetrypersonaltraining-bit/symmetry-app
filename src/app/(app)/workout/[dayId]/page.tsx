@@ -92,7 +92,7 @@ export default async function WorkoutDayPage({
     clientName = data?.name || null;
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
   const { data: existingLog } = await supabase
     .from("workout_logs")
     .select("id, completed, set_logs(*)")
