@@ -9,13 +9,15 @@ interface Props {
   userEmail: string;
   userName: string;
   isTrainer: boolean;
+  isInClientMode: boolean;
   userId: string;
   gcalSyncEnabled?: boolean;
   gcalConnected?: boolean;
   gcalStatus?: string | null;
 }
 
-export default function SettingsClient({ userEmail, userName, isTrainer, userId, gcalSyncEnabled, gcalConnected, gcalStatus }: Props) {
+export default function SettingsClient({ userEmail, userName, isTrainer,
+  isInClientMode, userId, gcalSyncEnabled, gcalConnected, gcalStatus }: Props) {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
