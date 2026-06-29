@@ -33,8 +33,8 @@ export default async function HomePage() {
     rangeStart.setMonth(rangeStart.getMonth() - 3);
     const rangeEnd = new Date(today);
     rangeEnd.setMonth(rangeEnd.getMonth() + 3);
-    const startStr = rangeStart.toISOString().split("T")[0];
-    const endStr = rangeEnd.toISOString().split("T")[0];
+    const startStr = rangeStart.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+    const endStr = rangeEnd.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 
     const { data: apptRows } = await supabase
       .from("appointments")
@@ -71,7 +71,7 @@ export default async function HomePage() {
       .from("scheduled_workouts")
       .select("id, client_id, scheduled_date, status, days(label), clients(id, name)")
       .gte("scheduled_date", new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().split("T")[0])
-      .lte("scheduled_date", workoutMapRange.toISOString().split("T")[0])
+      .lte("scheduled_date", workoutMapRange.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }))
       .order("scheduled_date");
 
     const workoutMap: Record<string, WE[]> = {};
@@ -94,8 +94,8 @@ export default async function HomePage() {
     const { data: remindersRaw } = await supabase
       .from("payment_reminders")
       .select("id, client_id, due_date, amount_due, billing_credits, notification_status, sms_sent_at, clients(id, name)")
-      .gte("due_date", today.toISOString().split("T")[0])
-      .lte("due_date", thirtyDays.toISOString().split("T")[0])
+      .gte("due_date", today.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }))
+      .lte("due_date", thirtyDays.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }))
       .in("notification_status", ["pending", "paused"])
       .order("due_date");
 
@@ -118,7 +118,59 @@ export default async function HomePage() {
             {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </p>
         </div>
-        <PendingRemindersPanel reminders={reminders} />
+        {/* Today's Sessions */}
+        {(() => {
+          const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+          const todaySessions = workoutMap[todayStr] || [];
+          const todayAppts = appointmentMap[todayStr] || [];
+          if (todaySessions.length === 0 && todayAppts.length === 0) return null;
+          return (
+            <div className="mb-4 rounded-2xl overflow-hidden" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+              <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--brand-border)", background: "var(--brand-primary)10" }}>
+                <i className="ti ti-calendar-event text-base" style={{ color: "var(--brand-primary)" }} />
+                <span className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>Today's Sessions</span>
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium ml-auto" style={{ background: "var(--brand-primary)20", color: "var(--brand-primary)" }}>
+                  {todaySessions.length + todayAppts.length} scheduled
+                </span>
+              </div>
+              <div className="divide-y" style={{ borderColor: "var(--brand-border)" }}>
+                {todaySessions.map((s: any) => (
+                  <a key={s.id} href={`/workout/${s.id}`}
+                    className="flex items-center gap-3 px-4 py-3 hover:opacity-80 transition-opacity">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: s.status === "completed" ? "#22c55e20" : "var(--brand-primary)20" }}>
+                      <i className={`ti ${s.status === "completed" ? "ti-check" : "ti-barbell"} text-sm`}
+                        style={{ color: s.status === "completed" ? "#22c55e" : "var(--brand-primary)" }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{s.clientName}</p>
+                      <p className="text-xs truncate" style={{ color: "var(--brand-text-secondary)" }}>{s.dayLabel}</p>
+                    </div>
+                    <span className="text-xs px-2 py-1 rounded-lg font-medium flex-shrink-0"
+                      style={{
+                        background: s.status === "completed" ? "#22c55e20" : "var(--brand-primary)20",
+                        color: s.status === "completed" ? "#22c55e" : "var(--brand-primary)"
+                      }}>
+                      {s.status === "completed" ? "Done" : "Start"}
+                    </span>
+                  </a>
+                ))}
+                {todayAppts.map((a: any) => (
+                  <div key={a.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#f59e0b20" }}>
+                      <i className="ti ti-clock text-sm" style={{ color: "#f59e0b" }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{a.clientName}</p>
+                      <p className="text-xs truncate" style={{ color: "var(--brand-text-secondary)" }}>{a.startTime} – {a.endTime} · {a.title}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+                <PendingRemindersPanel reminders={reminders} />
         <TrainerCalendar clients={clients || []} appointmentMap={appointmentMap} workoutMap={workoutMap} startDate="" />
       </div>
     );
@@ -152,7 +204,7 @@ export default async function HomePage() {
     );
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 
   const { data: todayWorkout } = await supabase
     .from("scheduled_workouts")
@@ -168,13 +220,13 @@ export default async function HomePage() {
     .from("scheduled_workouts")
     .select("id, scheduled_date, status, days(label)")
     .eq("client_id", clientRecord.id)
-    .gte("scheduled_date", sixtyDaysAgo.toISOString().split("T")[0])
+    .gte("scheduled_date", sixtyDaysAgo.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }))
     .lte("scheduled_date", today)
     .order("scheduled_date", { ascending: false });
 
   const thirtyAgo = new Date();
   thirtyAgo.setDate(thirtyAgo.getDate() - 30);
-  const thirtyStr = thirtyAgo.toISOString().split("T")[0];
+  const thirtyStr = thirtyAgo.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
   const recent30 = (recentScheduled || []).filter((w: any) => w.scheduled_date >= thirtyStr);
   const totalScheduled = recent30.length;
   const completedCount = recent30.filter((w: any) => w.status === "completed").length;
@@ -207,7 +259,7 @@ export default async function HomePage() {
   const todayDow = new Date().getDay();
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - todayDow);
-  const weekStartStr = weekStart.toISOString().split("T")[0];
+  const weekStartStr = weekStart.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
   const weekEndStr = new Date(weekStart.getTime() + 6 * 86400000).toISOString().split("T")[0];
   const weekWorkouts = (recentScheduled || [])
     .filter((w: any) => w.scheduled_date >= weekStartStr && w.scheduled_date <= weekEndStr)
