@@ -3,6 +3,7 @@
 import { useState, useMemo, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { updateGCalEvent, deleteGCalEvent } from "./scheduleActions";
+import { logCardioSession, logStrengthSession } from "./actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,7 +29,9 @@ interface Props {
   scheduledDows: number[];
   upcomingDays: Appointment[];
   isTrainer?: boolean;
-  paymentReminders?: { date: string; clientName: string; amount: number; status: string }[];
+  paymentReminders?: { date: string; clientName: string; amount: number; status: string }[
+  clientId?: string | null;
+  monthScheduledWorkouts?: { id: string; date: string; status: string; label: string }[];];
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -220,10 +223,18 @@ interface MonthViewProps {
   upcomingDays: Appointment[];
   paymentReminders: { date: string; clientName: string; amount: number; status: string }[];
   isTrainer: boolean;
+  clientId?: string | null;
+  monthScheduledWorkouts?: { id: string; date: string; status: string; label: string }[];
 }
 
-function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, upcomingDays, paymentReminders, isTrainer }: MonthViewProps) {
+function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, upcomingDays, paymentReminders, isTrainer, clientId = null, monthScheduledWorkouts = [] }: MonthViewProps) {
   const [showPayments, setShowPayments] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [logStep, setLogStep] = useState<"choose" | "cardio" | "strength">("choose");
+  const [cardioType, setCardioType] = useState("Run");
+  const [durationMin, setDurationMin] = useState("");
+  const [distanceMi, setDistanceMi] = useState("");
+  const [saving, setSaving] = useState(false);
   const pad = (n: number) => String(n).padStart(2, "0");
 
   const workoutSet = useMemo(() => new Set(workoutDates), [workoutDates]);
@@ -276,7 +287,7 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
           const hasScheduled = cell.dateStr ? scheduledSet.has(cell.dateStr) : false;
           const hasPayment = cell.dateStr ? paymentSet.has(cell.dateStr) : false;
           return (
-            <div key={i} className={`border-r border-b border-gray-200 min-h-[64px] p-1.5 ${cell.dateStr ? "bg-white" : "bg-gray-50"}`}>
+            <div key={i} className={`border-r border-b border-gray-200 min-h-[64px] p-1.5 ${cell.dateStr ? "bg-white cursor-pointer active:opacity-75" : "bg-gray-50"}` onClick={() => { if (cell.dateStr) { setSelectedDate(cell.dateStr); setLogStep("choose"); } }}>
               {cell.dateStr && (
                 <>
                   <span className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${isToday ? "bg-indigo-600 text-white" : "text-gray-700"}`}>
@@ -309,7 +320,76 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
           </div>
         </div>
       )}
-    </div>
+    
+
+      {selectedDate && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,0.5)"}} onClick={() => setSelectedDate(null)}>
+          <div className="w-full rounded-t-2xl p-6" style={{background:"#fff",maxWidth:480}} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div className="text-sm font-medium" style={{color:"#4E6080"}}>Log Session</div>
+                <div className="text-base font-semibold" style={{color:"#0D1B2E"}}>{new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}</div>
+              </div>
+              <button onClick={() => setSelectedDate(null)} className="w-8 h-8 flex items-center justify-center rounded-full" style={{background:"#F0F4F8"}}><i className="ti ti-x" style={{color:"#4E6080"}} /></button>
+            </div>
+            {logStep === "choose" && (
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setLogStep("cardio")} className="flex flex-col items-center gap-2 py-5 rounded-xl border-2" style={{background:"#FFF5F5",borderColor:"#FC8181"}}>
+                  <i className="ti ti-run text-3xl" style={{color:"#E53E3E"}} />
+                  <span className="text-sm font-semibold" style={{color:"#0D1B2E"}}>Cardio</span>
+                </button>
+                <button onClick={() => setLogStep("strength")} className="flex flex-col items-center gap-2 py-5 rounded-xl border-2" style={{background:"#EBF8FF",borderColor:"#63B3ED"}}>
+                  <i className="ti ti-barbell text-3xl" style={{color:"#0F4C81"}} />
+                  <span className="text-sm font-semibold" style={{color:"#0D1B2E"}}>Strength</span>
+                </button>
+              </div>
+            )}
+            {logStep === "cardio" && (
+              <div className="space-y-4">
+                <div>
+                  <div className="text-xs font-medium mb-2" style={{color:"#4E6080"}}>TYPE</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["Run","Walk","Bike","Row","Swim","Other"].map(t => (
+                      <button key={t} onClick={() => setCardioType(t)} className="py-2 rounded-lg text-sm font-medium" style={cardioType===t?{background:"#0F4C81",color:"white"}:{background:"#F0F4F8",color:"#4E6080"}}>{t}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-medium mb-1" style={{color:"#4E6080"}}>DURATION (minutes)</div>
+                  <input type="number" value={durationMin} onChange={e=>setDurationMin(e.target.value)} placeholder="30" className="w-full px-3 py-2 rounded-lg border text-sm" style={{borderColor:"#C8D8EC",background:"#F7FAFC"}} />
+                </div>
+                <div>
+                  <div className="text-xs font-medium mb-1" style={{color:"#4E6080"}}>DISTANCE miles (optional)</div>
+                  <input type="number" step="0.1" value={distanceMi} onChange={e=>setDistanceMi(e.target.value)} placeholder="3.1" className="w-full px-3 py-2 rounded-lg border text-sm" style={{borderColor:"#C8D8EC",background:"#F7FAFC"}} />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => setLogStep("choose")} className="flex-1 py-3 rounded-xl text-sm font-medium" style={{background:"#F0F4F8",color:"#4E6080"}}>Back</button>
+                  <button disabled={!durationMin || saving} onClick={async () => { if (!clientId || !durationMin) return; setSaving(true); try { await logCardioSession({clientId,logDate:selectedDate,cardioType,durationMinutes:Number(durationMin),distance:distanceMi?Number(distanceMi):undefined}); setSelectedDate(null); setDurationMin(""); setDistanceMi(""); } finally { setSaving(false); } }} className="flex-1 py-3 rounded-xl text-sm font-semibold" style={{background:durationMin&&!saving?"#0F4C81":"#C8D8EC",color:"white"}}>{saving?"Saving...":"Save"}</button>
+                </div>
+              </div>
+            )}
+            {logStep === "strength" && (() => {
+              const sw = monthScheduledWorkouts.find(w => w.date === selectedDate);
+              return (
+                <div className="space-y-4">
+                  {sw ? (
+                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{background:"#DDEEFF"}}>
+                      <i className="ti ti-calendar-check text-lg" style={{color:"#0F4C81"}} />
+                      <div><div className="text-sm font-medium" style={{color:"#0D1B2E"}}>{sw.label}</div><div className="text-xs" style={{color:"#4E6080"}}>Scheduled · mark complete</div></div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-center py-2" style={{color:"#4E6080"}}>No scheduled workout · log ad-hoc session</div>
+                  )}
+                  <div className="flex gap-2">
+                    <button onClick={() => setLogStep("choose")} className="flex-1 py-3 rounded-xl text-sm font-medium" style={{background:"#F0F4F8",color:"#4E6080"}}>Back</button>
+                    <button disabled={saving} onClick={async () => { if (!clientId) return; setSaving(true); try { await logStrengthSession({clientId,logDate:selectedDate,scheduledWorkoutId:sw?.id}); setSelectedDate(null); } finally { setSaving(false); } }} className="flex-1 py-3 rounded-xl text-sm font-semibold" style={{background:saving?"#C8D8EC":"#0F4C81",color:"white"}}>{saving?"Saving...":"Mark Complete"}</button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}</div>
   );
 }
 
@@ -424,7 +504,7 @@ function WeekGrid({ weekStart, todayStr, appointments, isTrainer, onClickAppt }:
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function ScheduleClient({
-  monthName, year, month, daysInMonth, firstDay, today, workoutDates, scheduledDows, upcomingDays, isTrainer = false, paymentReminders = [],
+  monthName, year, month, daysInMonth, firstDay, today, workoutDates, scheduledDows, upcomingDays, isTrainer = false, paymentReminders = [] clientId, monthScheduledWorkouts = [],,
 }: Props) {
   const router = useRouter();
 
@@ -491,7 +571,7 @@ export default function ScheduleClient({
             <WeekGrid weekStart={weekStart} todayStr={todayStr} appointments={weekAppts} isTrainer={isTrainer} onClickAppt={setEditingAppt} />
           ) : (
             <div className="p-4">
-              <MonthView year={year} month={month} daysInMonth={daysInMonth} firstDay={firstDay} today={today} workoutDates={workoutDates} upcomingDays={upcomingDays} paymentReminders={paymentReminders} isTrainer={isTrainer} />
+              <MonthView year={year} month={month} daysInMonth={daysInMonth} firstDay={firstDay} today={today} workoutDates={workoutDates} upcomingDays={upcomingDays} paymentReminders={paymentReminders} isTrainer={isTrainer clientId={clientId} monthScheduledWorkouts={monthScheduledWorkouts}} />
             </div>
           )}
         </div>
