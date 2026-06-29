@@ -29,6 +29,7 @@ interface WorkoutEv {
   date: string;
   dayLabel: string;
   status: string;
+  dayId?: string | null;
 }
 
 interface Props {
@@ -454,14 +455,22 @@ function SessionDetailPopup({ ev, clients, workoutMap, onClose, onSaved }: {
               </Link>
             );
           })()}
-          {isToday && ev.status === "scheduled" && ev.clientId && (
-            <Link href={`/clients/${ev.clientId}?tab=training`}
-              className="w-full py-2.5 rounded-xl font-bold text-sm text-center flex items-center justify-center gap-2"
-              style={{ background: "#E53935", color: "white" }}>
-              <i className="ti ti-player-play text-sm" />
-              Start Session
-            </Link>
-          )}
+          {ev.clientId && (() => {
+            const evDateStr = dayStr(parseAppt(ev.scheduledAt));
+            const clientWorkouts = (workoutMap[evDateStr] || []).filter(w => w.clientId === ev.clientId);
+            if (clientWorkouts.length === 0) return null;
+            const workout = clientWorkouts[0];
+            const isDoneWorkout = workout.status === "completed";
+            return (
+              <Link
+                href={`/workout/${workout.dayId || workout.id}?forClient=${ev.clientId}`}
+                className="w-full py-2.5 rounded-xl font-bold text-sm text-center flex items-center justify-center gap-2"
+                style={{ background: isDoneWorkout ? "#43A047" : "var(--brand-primary)", color: "white" }}>
+                <i className={`ti ${isDoneWorkout ? "ti-check" : "ti-player-play"} text-sm`} />
+                {isDoneWorkout ? "View Workout Log" : "Open Workout Logger"}
+              </Link>
+            );
+          })()}
           <div className="grid grid-cols-2 gap-2">
             {ev.status !== "completed" && (
               <button onClick={() => updateStatus("completed")} disabled={updating}
