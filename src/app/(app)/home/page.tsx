@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import TrainerCalendar from "./TrainerCalendar";
 import ClientDashboard from "./ClientDashboard";
+import TrainerHome from "./TrainerHome";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
 import PendingRemindersPanel from "@/components/PendingRemindersPanel";
 
@@ -124,50 +125,42 @@ export default async function HomePage() {
           const todaySessions = workoutMap[todayStr] || [];
           const todayAppts = appointmentMap[todayStr] || [];
           if (todaySessions.length === 0 && todayAppts.length === 0) return null;
+          // TrainerHome props
+          const trainerHomeSessions = todayAppts.map((appt: any) => {
+            const apptWorkouts = (todaySessions as any[]).filter((w: any) => w.clientId === appt.clientId);
+            return {
+              id: appt.id,
+              clientId: appt.clientId,
+              clientName: appt.clientName,
+              startTime: appt.scheduledAt
+                ? new Date(appt.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Chicago" })
+                : "",
+              endTime: appt.endsAt
+                ? new Date(appt.endsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Chicago" })
+                : "",
+              status: appt.status,
+              title: appt.title,
+              workouts: apptWorkouts.map((w: any) => ({
+                id: w.id,
+                label: w.dayLabel,
+                isCardio: /cardio|run|bike|swim|tread|ellip/i.test(w.dayLabel),
+              })),
+            };
+          });
+          const trainerCompletedCount = todayAppts.filter((a: any) => a.status === "completed").length;
+          const trainerScheduledCount = todayAppts.length;
+          const trainerNotifCount = reminders.length;
+          const trainerDateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" });
+          const trainerClients = (clients as Array<{ id: string; name: string }>);
           return (
-            <div className="mb-4 rounded-2xl overflow-hidden" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-              <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--brand-border)", background: "var(--brand-primary)10" }}>
-                <i className="ti ti-calendar-event text-base" style={{ color: "var(--brand-primary)" }} />
-                <span className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>Today's Sessions</span>
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium ml-auto" style={{ background: "var(--brand-primary)20", color: "var(--brand-primary)" }}>
-                  {todaySessions.length + todayAppts.length} scheduled
-                </span>
-              </div>
-              <div className="divide-y" style={{ borderColor: "var(--brand-border)" }}>
-                {todaySessions.map((s: any) => (
-                  <a key={s.id} href={`/workout/${s.id}?forClient=${s.clientId}`}
-                    className="flex items-center gap-3 px-4 py-3 hover:opacity-80 transition-opacity">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: s.status === "completed" ? "#22c55e20" : "var(--brand-primary)20" }}>
-                      <i className={`ti ${s.status === "completed" ? "ti-check" : "ti-barbell"} text-sm`}
-                        style={{ color: s.status === "completed" ? "#22c55e" : "var(--brand-primary)" }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{s.clientName}</p>
-                      <p className="text-xs truncate" style={{ color: "var(--brand-text-secondary)" }}>{s.dayLabel}</p>
-                    </div>
-                    <span className="text-xs px-2 py-1 rounded-lg font-medium flex-shrink-0"
-                      style={{
-                        background: s.status === "completed" ? "#22c55e20" : "var(--brand-primary)20",
-                        color: s.status === "completed" ? "#22c55e" : "var(--brand-primary)"
-                      }}>
-                      {s.status === "completed" ? "Done" : "Start"}
-                    </span>
-                  </a>
-                ))}
-                {todayAppts.map((a: any) => (
-                  <div key={a.id} className="flex items-center gap-3 px-4 py-3">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#f59e0b20" }}>
-                      <i className="ti ti-clock text-sm" style={{ color: "#f59e0b" }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{a.clientName}</p>
-                      <p className="text-xs truncate" style={{ color: "var(--brand-text-secondary)" }}>{a.startTime} – {a.endTime} · {a.title}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <TrainerHome
+                todaySessions={trainerHomeSessions}
+                completedCount={trainerCompletedCount}
+                scheduledCount={trainerScheduledCount}
+                clients={trainerClients}
+                notificationCount={trainerNotifCount}
+                dateLabel={trainerDateLabel}
+              />
           );
         })()}
                 <PendingRemindersPanel reminders={reminders} />
@@ -176,11 +169,11 @@ export default async function HomePage() {
     );
   }
 
-  // ── CLIENT DASHBOARD (client users + trainer in client-mode) ─────────────
+  // ââ CLIENT DASHBOARD (client users + trainer in client-mode) âââââââââââââ
   let clientRecord: { id: string; name: string } | null = null;
 
   if (isOwnTrainerView) {
-    // Trainer viewing their own client app — look up by email
+    // Trainer viewing their own client app â look up by email
     const { data } = await supabase
       .from("clients")
       .select("id, name")
