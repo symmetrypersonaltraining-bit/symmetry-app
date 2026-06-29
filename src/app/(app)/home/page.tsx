@@ -109,7 +109,39 @@ export default async function HomePage() {
       billingCredits: Number(r.billing_credits),
       notificationStatus: r.notification_status,
       smsSentAt: r.sms_sent_at,
-    }));
+    }))
+    // TrainerHome pre-computed (outer scope for SSR safety)
+    const todayStrCT = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+    const todaySessionsList = (workoutMap[todayStrCT] || []) as any[];
+    const todayApptsList = (appointmentMap[todayStrCT] || []) as any[];
+    const trainerHomeSessions = todayApptsList.map((appt: any) => {
+      const apptWorkouts = todaySessionsList.filter((w: any) => w.clientId === appt.clientId);
+      return {
+        id: appt.id,
+        clientId: appt.clientId,
+        clientName: appt.clientName,
+        startTime: appt.scheduledAt
+          ? new Date(appt.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Chicago" })
+          : "",
+        endTime: appt.endsAt
+          ? new Date(appt.endsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Chicago" })
+          : "",
+        status: appt.status,
+        title: appt.title,
+        workouts: apptWorkouts.map((w: any) => ({
+          id: w.id,
+          label: w.dayLabel || "Workout",
+          isCardio: /cardio|run|bike|swim|tread|ellip/i.test(w.dayLabel || ""),
+        })),
+      };
+    });
+    const trainerCompletedCount = todayApptsList.filter((a: any) => a.status === "completed").length;
+    const trainerScheduledCount = todayApptsList.length;
+    const trainerNotifCount = reminders.length;
+    const trainerDateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" });
+    const trainerClients = (clients || []) as Array<{ id: string; name: string }>;
+    const showTrainerHome = todaySessionsList.length > 0 || todayApptsList.length > 0;
+;
 
     return (
       <div className="p-4 lg:p-6">
@@ -120,60 +152,27 @@ export default async function HomePage() {
           </p>
         </div>
         {/* Today's Sessions */}
-        {(() => {
-          const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-          const todaySessions = workoutMap[todayStr] || [];
-          const todayAppts = appointmentMap[todayStr] || [];
-          if (todaySessions.length === 0 && todayAppts.length === 0) return null;
-          // TrainerHome props
-          const trainerHomeSessions = todayAppts.map((appt: any) => {
-            const apptWorkouts = (todaySessions as any[]).filter((w: any) => w.clientId === appt.clientId);
-            return {
-              id: appt.id,
-              clientId: appt.clientId,
-              clientName: appt.clientName,
-              startTime: appt.scheduledAt
-                ? new Date(appt.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Chicago" })
-                : "",
-              endTime: appt.endsAt
-                ? new Date(appt.endsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Chicago" })
-                : "",
-              status: appt.status,
-              title: appt.title,
-              workouts: apptWorkouts.map((w: any) => ({
-                id: w.id,
-                label: w.dayLabel,
-                isCardio: /cardio|run|bike|swim|tread|ellip/i.test(w.dayLabel),
-              })),
-            };
-          });
-          const trainerCompletedCount = todayAppts.filter((a: any) => a.status === "completed").length;
-          const trainerScheduledCount = todayAppts.length;
-          const trainerNotifCount = reminders.length;
-          const trainerDateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" });
-          const trainerClients = (clients as Array<{ id: string; name: string }>);
-          return (
-            <TrainerHome
-                todaySessions={trainerHomeSessions}
-                completedCount={trainerCompletedCount}
-                scheduledCount={trainerScheduledCount}
-                clients={trainerClients}
-                notificationCount={trainerNotifCount}
-                dateLabel={trainerDateLabel}
-              />
-          );
-        })()}
+        {showTrainerHome && (
+          <TrainerHome
+            todaySessions={trainerHomeSessions}
+            completedCount={trainerCompletedCount}
+            scheduledCount={trainerScheduledCount}
+            clients={trainerClients}
+            notificationCount={trainerNotifCount}
+            dateLabel={trainerDateLabel}
+          />
+        )}
                 <PendingRemindersPanel reminders={reminders} />
         <TrainerCalendar clients={clients || []} appointmentMap={appointmentMap} workoutMap={workoutMap} startDate="" />
       </div>
     );
   }
 
-  // ââ CLIENT DASHBOARD (client users + trainer in client-mode) âââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ CLIENT DASHBOARD (client users + trainer in client-mode) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   let clientRecord: { id: string; name: string } | null = null;
 
   if (isOwnTrainerView) {
-    // Trainer viewing their own client app â look up by email
+    // Trainer viewing their own client app Ã¢ÂÂ look up by email
     const { data } = await supabase
       .from("clients")
       .select("id, name")
