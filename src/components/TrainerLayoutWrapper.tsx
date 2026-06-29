@@ -19,17 +19,21 @@ const CLIENT_NAV = [
 
 export default function TrainerLayoutWrapper({ children }: Props) {
   const [clientMode, setClientMode] = useState(false);
+
   useLayoutEffect(() => {
     try {
+      // Read from localStorage (primary) or cookie (fallback)
       const saved = localStorage.getItem("symmetry_view_mode");
-      if (saved === "client") {
+      const cookieVal = document.cookie.split(';').find(c => c.trim().startsWith('symmetry_view_mode='))?.split('=')[1]?.trim();
+      const effective = saved || cookieVal;
+      if (effective === "client") {
         setClientMode(true);
-        if (pathname === "/" || pathname === "/home") router.replace("/client-preview");
-      } else if (saved === "trainer") {
+      } else if (effective === "trainer") {
         setClientMode(false);
       }
     } catch {}
   }, []);
+
   const router = useRouter();
   const pathname = usePathname();
 
@@ -37,6 +41,12 @@ export default function TrainerLayoutWrapper({ children }: Props) {
     const next = !clientMode;
     setClientMode(next);
     localStorage.setItem("symmetry_view_mode", next ? "client" : "trainer");
+    // Also sync the cookie so the server-side page.tsx reads the right value
+    if (next) {
+      document.cookie = "symmetry_view_mode=client; path=/; max-age=86400; SameSite=Lax";
+    } else {
+      document.cookie = "symmetry_view_mode=; path=/; max-age=0; SameSite=Lax";
+    }
     router.push(next ? "/client-preview" : "/home");
   }
 
@@ -48,7 +58,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
           <Logo size={28} color="white" className="flex-shrink-0" />
           <div className="flex-1">
             <span className="text-white font-semibold text-sm">Symmetry</span>
-            <span className="text-white/50 text-xs ml-2">Â· My Training</span>
+            <span className="text-white/50 text-xs ml-2">· My Training</span>
           </div>
           <button
             onClick={handleToggleMode}
@@ -66,7 +76,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
         <div className="fixed bottom-0 left-0 right-0 z-40 flex items-end"
           style={{ background: "var(--brand-surface)", borderTop: "1px solid var(--brand-border)", paddingBottom: "env(safe-area-inset-bottom)" }}>
           {CLIENT_NAV.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            const active = pathname === item.href;
             return (
               <Link key={item.href} href={item.href}
                 className="flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors"
@@ -100,8 +110,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
         <div className="lg:hidden h-14" />
         {children}
       </div>
-      
-    <AIAssistant />
+      <AIAssistant />
     </div>
   );
-          }
+}
