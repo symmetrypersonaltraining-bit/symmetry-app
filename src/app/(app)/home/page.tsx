@@ -214,7 +214,7 @@ export default async function HomePage() {
     .eq("client_id", clientRecord.id)
     .gte("scheduled_date", sixtyDaysAgo.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }))
     .lte("scheduled_date", new Date(Date.now() + 7*24*60*60*1000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }))
-    .order.order("scheduled_date", { ascending: false });
+    .order("scheduled_date", { ascending: false });
 
   const thirtyAgo = new Date();
   thirtyAgo.setDate(thirtyAgo.getDate() - 30);
