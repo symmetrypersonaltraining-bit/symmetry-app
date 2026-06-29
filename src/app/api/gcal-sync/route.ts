@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
     const { token } = await getValidAccessToken();
     const supabase = getAnonClient();
 
-    const { data: clients } = await supabase.from('clients').select('id, name');
+    const { data: clientRows } = await supabase.rpc('gcal_get_clients');
+    const clients = clientRows as Array<{id: string; name: string}> | null;
     if (!clients?.length) return NextResponse.json({ error: 'No clients found' }, { status: 500 });
 
     const clientMap = clients.map((c: any) => ({
