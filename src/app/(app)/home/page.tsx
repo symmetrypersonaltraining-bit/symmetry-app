@@ -282,7 +282,16 @@ export default async function HomePage() {
     .order("scheduled_date", { ascending: false })
     .limit(5);
 
-  const firstName = (clientRecord.name || "").split(" ")[0];
+  
+const { data: notifData } = await supabase
+  .from("client_notifications")
+  .select("id, type, title, body, amount_due, due_date")
+  .eq("client_id", clientRecord.id)
+  .is("dismissed_at", null)
+  .order("created_at", { ascending: false })
+  .limit(10);
+const notifications = (notifData || []) as any[];
+const firstName = (clientRecord.name || "").split(" ")[0];
 
   return (
     <>
@@ -297,7 +306,8 @@ export default async function HomePage() {
         streakDays={streakDays}
         weekWorkouts={weekWorkouts}
         allScheduled={allScheduled}
-        isOwnTrainerView={isOwnTrainerView}
+        notifications={notifications}
+      isOwnTrainerView={isOwnTrainerView}
       />
     </>
   );
