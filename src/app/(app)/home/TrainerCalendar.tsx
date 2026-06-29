@@ -446,7 +446,7 @@ function SessionDetailPopup({ ev, clients, workoutMap, onClose, onSaved }: {
             const isDoneWorkout = workout.status === "completed";
             return (
               <Link
-                href={`/workout/${workout.id}?forClient=${ev.clientId}`}
+                href={`/workout/${workout.dayId || workout.id}?forClient=${ev.clientId}`}
                 className="w-full py-2.5 rounded-xl font-bold text-sm text-center flex items-center justify-center gap-2"
                 style={{ background: isDoneWorkout ? "#43A047" : "var(--brand-primary)", color: "white" }}>
                 <i className={`ti ${isDoneWorkout ? "ti-check" : "ti-player-play"} text-sm`} />
@@ -646,7 +646,7 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
                         </Link>
                       ) : (
                         <Link
-                          href={`/workout/${w.id}?forClient=${w.clientId}`}
+                          href={`/workout/${w.dayId || w.id}?forClient=${w.clientId}`}
                           onClick={close}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"
                           style={{ background: "var(--brand-primary)", color: "#fff" }}>
