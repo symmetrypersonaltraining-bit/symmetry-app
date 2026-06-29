@@ -29,9 +29,9 @@ interface Props {
   scheduledDows: number[];
   upcomingDays: Appointment[];
   isTrainer?: boolean;
-  paymentReminders?: { date: string; clientName: string; amount: number; status: string }[
+  paymentReminders?: { date: string; clientName: string; amount: number; status: string }[];
   clientId?: string | null;
-  monthScheduledWorkouts?: { id: string; date: string; status: string; label: string }[];];
+  monthScheduledWorkouts?: { id: string; date: string; status: string; label: string }[];
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -504,7 +504,7 @@ function WeekGrid({ weekStart, todayStr, appointments, isTrainer, onClickAppt }:
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function ScheduleClient({
-  monthName, year, month, daysInMonth, firstDay, today, workoutDates, scheduledDows, upcomingDays, isTrainer = false, paymentReminders = [] clientId, monthScheduledWorkouts = [],,
+  monthName, year, month, daysInMonth, firstDay, today, workoutDates, scheduledDows, upcomingDays, isTrainer = false, paymentReminders = [], clientId, monthScheduledWorkouts = [],
 }: Props) {
   const router = useRouter();
 
@@ -571,7 +571,7 @@ export default function ScheduleClient({
             <WeekGrid weekStart={weekStart} todayStr={todayStr} appointments={weekAppts} isTrainer={isTrainer} onClickAppt={setEditingAppt} />
           ) : (
             <div className="p-4">
-              <MonthView year={year} month={month} daysInMonth={daysInMonth} firstDay={firstDay} today={today} workoutDates={workoutDates} upcomingDays={upcomingDays} paymentReminders={paymentReminders} isTrainer={isTrainer clientId={clientId} monthScheduledWorkouts={monthScheduledWorkouts}} />
+              <MonthView year={year} month={month} daysInMonth={daysInMonth} firstDay={firstDay} today={today} workoutDates={workoutDates} upcomingDays={upcomingDays} paymentReminders={paymentReminders} isTrainer={isTrainer} clientId={clientId} monthScheduledWorkouts={monthScheduledWorkouts} />
             </div>
           )}
         </div>
