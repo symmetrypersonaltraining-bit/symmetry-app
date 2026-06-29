@@ -1,0 +1,27 @@
+name: Syntax Check
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Check for syntax/parse errors only
+        run: |
+          TSC_OUT=$(npx tsc --noEmit --skipLibCheck 2>&1 || true)
+          SYNTAX=$(echo "$TSC_OUT" | grep "error TS1" || true)
+          if [ -n "$SYNTAX" ]; then
+            echo "SYNTAX ERRORS DETECTED - fix before pushing:"
+            echo "$SYNTAX"
+            exit 1
+          fi
+          echo "Syntax OK"
