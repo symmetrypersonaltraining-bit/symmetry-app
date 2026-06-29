@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import TrainerCalendar from "./TrainerCalendar";
 import ClientDashboard from "./ClientDashboard";
@@ -8,25 +9,27 @@ import PendingRemindersPanel from "@/components/PendingRemindersPanel";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
+async function isClientMode(): Promise<boolean> {
+  const cookieStore = await cookies();
+  return cookieStore.get("symmetry_client_mode")?.value === "1";
+}
+
 export default async function HomePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const isTrainer = (user?.email ?? "") === TRAINER_EMAIL;
+  const isInClientMode = isTrainer ? await isClientMode() : false;
 
   // ── TRAINER VIEW ──────────────────────────────────────────────────────────
-  // Always renders trainer UI at /home — no cookie/localStorage check needed
-  if (isTrainer) {
+  if (isTrainer && !isInClientMode) {
     const { data: clients } = await supabase
       .from("clients")
       .select("id, name")
       .order("name");
 
     const todayStrCT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-    const tomorrowDate = new Date();
-    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-    const tomorrowStrCT = tomorrowDate.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
     // Calendar range: 3 months back, 12 months forward (Central time)
     const rangeStart = new Date();
@@ -74,30 +77,57 @@ export default async function HomePage() {
       });
     }
 
-    // Today's sessions for the TrainerHome panel
+    // Today's scheduled workouts — provides day_id for Start button + completion status
+    const { data: todayWorkoutRows } = await supabase
+      .from("scheduled_workouts")
+      .select("id, client_id, status, day_id, days(id, label)")
+      .eq("scheduled_date", todayStrCT);
+
+    type ClientDay = { dayId: string; dayLabel: string; status: string };
+    const clientDayMap: Record<string, ClientDay> = {};
+    for (const w of todayWorkoutRows || []) {
+      const row = w as any;
+      if (row.client_id) {
+        clientDayMap[row.client_id] = {
+          dayId: row.days?.id || row.day_id,
+          dayLabel: row.days?.label || "Training",
+          status: row.status || "scheduled",
+        };
+      }
+    }
+
+    // Today's sessions for TrainerHome — merge appointments + scheduled_workouts
     const todayAppointments = appointmentMap[todayStrCT] || [];
-    const trainerHomeSessions = todayAppointments.map((appt: AE) => ({
-      id: appt.id,
-      clientId: appt.clientId,
-      clientName: appt.clientName,
-      startTime: appt.scheduledAt
-        ? new Date(appt.scheduledAt).toLocaleTimeString("en-US", {
-            hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Chicago",
-          })
-        : appt.startTime,
-      endTime: appt.endsAt
-        ? new Date(appt.endsAt).toLocaleTimeString("en-US", {
-            hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Chicago",
-          })
-        : appt.endTime,
-      status: appt.status,
-      title: appt.title,
-      workouts: [] as Array<{ id: string; label: string; isCardio: boolean }>,
-    }));
+    const trainerHomeSessions = todayAppointments.map((appt: AE) => {
+      const workout = clientDayMap[appt.clientId];
+      const sessionStatus = workout?.status === "completed" ? "completed"
+        : workout?.status === "cancelled_client" ? "cancelled_client"
+        : appt.status;
+      return {
+        id: appt.id,
+        clientId: appt.clientId,
+        clientName: appt.clientName,
+        startTime: appt.scheduledAt
+          ? new Date(appt.scheduledAt).toLocaleTimeString("en-US", {
+              hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Chicago",
+            })
+          : appt.startTime,
+        endTime: appt.endsAt
+          ? new Date(appt.endsAt).toLocaleTimeString("en-US", {
+              hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Chicago",
+            })
+          : appt.endTime,
+        status: sessionStatus,
+        title: appt.title,
+        workouts: workout
+          ? [{ id: workout.dayId, label: workout.dayLabel, isCardio: /cardio|run|bike|swim|tread|ellip/i.test(workout.dayLabel) }]
+          : [],
+      };
+    });
 
     const loggedTodayCount = trainerHomeSessions.filter((s) => s.status === "completed").length;
 
-    // Workout map (programmed workouts — separate calendar layer, do NOT touch these)
+    // Workout map (programmed workouts — separate calendar layer, do NOT modify)
     type WE = { id: string; clientId: string; clientName: string; date: string; dayLabel: string; status: string };
     const workoutRangeEnd = new Date();
     workoutRangeEnd.setMonth(workoutRangeEnd.getMonth() + 3);
@@ -172,10 +202,11 @@ export default async function HomePage() {
   }
 
   // ── CLIENT VIEW ───────────────────────────────────────────────────────────
+  // Trainer in client-preview mode (cookie set) or an actual client
   const { data: clientRecord } = await supabase
     .from("clients")
     .select("id, name")
-    .eq("auth_user_id", user.id)
+    .eq(isTrainer ? "email" : "auth_user_id", isTrainer ? TRAINER_EMAIL : user.id)
     .maybeSingle();
 
   if (!clientRecord) {
@@ -303,7 +334,7 @@ export default async function HomePage() {
         weekWorkouts={weekWorkouts}
         allScheduled={allScheduled}
         notifications={notifications}
-        isOwnTrainerView={false}
+        isOwnTrainerView={isTrainer}
       />
     </>
   );
