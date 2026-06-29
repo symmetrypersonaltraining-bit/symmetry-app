@@ -1,39 +1,36 @@
 import { createClient } from '@supabase/supabase-js';
 
-function getServiceClient() {
+// Use anon key + SECURITY DEFINER RPCs — service role key in Vercel is misconfigured
+function getAnonClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }
 
 export async function getValidAccessToken(): Promise<{ token: string; userId: string }> {
-  const supabase = getServiceClient();
+  const supabase = getAnonClient();
 
-  const { data: settings } = await supabase
-    .from('trainer_settings')
-    .select('user_id, google_access_token, google_token_expiry, google_refresh_token, gcal_sync_enabled')
-    .not('google_refresh_token', 'is', null)
-    .single();
+  const { data: rows, error: rpcErr } = await supabase.rpc('gcal_get_tokens');
+  const settings = Array.isArray(rows) ? rows[0] : null;
 
+  if (rpcErr) throw new Error('Failed to load tokens: ' + rpcErr.message);
   if (!settings?.google_refresh_token) {
     throw new Error('Google Calendar not connected. Go to Settings to connect.');
   }
-
   if (!settings.gcal_sync_enabled) {
     throw new Error('GCal sync is disabled.');
   }
 
   const expiry = settings.google_token_expiry ? new Date(settings.google_token_expiry) : null;
-  const now = new Date();
   const BUFFER_MS = 5 * 60 * 1000;
 
-  if (settings.google_access_token && expiry && expiry.getTime() - now.getTime() > BUFFER_MS) {
+  if (settings.google_access_token && expiry && expiry.getTime() - Date.now() > BUFFER_MS) {
     return { token: settings.google_access_token, userId: settings.user_id };
   }
 
-  // Refresh
+  // Refresh access token
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -44,16 +41,15 @@ export async function getValidAccessToken(): Promise<{ token: string; userId: st
       grant_type: 'refresh_token',
     }),
   });
-
   const data = await res.json();
   if (!data.access_token) throw new Error('Failed to refresh Google token: ' + JSON.stringify(data));
 
-  const newExpiry = new Date(Date.now() + (data.expires_in || 3600) * 1000);
-
-  await supabase.from('trainer_settings').update({
-    google_access_token: data.access_token,
-    google_token_expiry: newExpiry.toISOString(),
-  }).eq('user_id', settings.user_id);
+  const newExpiry = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString();
+  await supabase.rpc('gcal_update_access_token', {
+    p_user_id: settings.user_id,
+    p_access_token: data.access_token,
+    p_token_expiry: newExpiry,
+  });
 
   return { token: data.access_token, userId: settings.user_id };
 }
