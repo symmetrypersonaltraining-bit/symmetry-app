@@ -64,8 +64,8 @@ export async function POST(req: NextRequest) {
 
     // Date range: 6 weeks back, 6 weeks forward
     const now = new Date();
-    const timeMin = new Date(now.getTime() - 42 * 24 * 60 * 60 * 1000).toISOString();
-    const timeMax = new Date(now.getTime() + 42 * 24 * 60 * 60 * 1000).toISOString();
+    const timeMin = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const timeMax = new Date(now.getTime() + 730 * 24 * 60 * 60 * 1000).toISOString();
 
     // Fetch from GCal with pagination
     let allEvents: any[] = [];
