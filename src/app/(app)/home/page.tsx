@@ -115,7 +115,7 @@ export default async function HomePage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold gradient-text">Schedule</h1>
           <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
-            {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" })}
           </p>
         </div>
         {/* Today's Sessions */}
@@ -221,13 +221,13 @@ export default async function HomePage() {
     .select("id, scheduled_date, status, days(label)")
     .eq("client_id", clientRecord.id)
     .gte("scheduled_date", sixtyDaysAgo.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }))
-    .lte("scheduled_date", today)
-    .order("scheduled_date", { ascending: false });
+    .lte("scheduled_date", new Date(Date.now() + 7*24*60*60*1000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }))
+    .order.order("scheduled_date", { ascending: false });
 
   const thirtyAgo = new Date();
   thirtyAgo.setDate(thirtyAgo.getDate() - 30);
   const thirtyStr = thirtyAgo.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-  const recent30 = (recentScheduled || []).filter((w: any) => w.scheduled_date >= thirtyStr);
+  const recent30 = (recentScheduled || []).filter((w: any) => w.scheduled_date >= thirtyStr && w.scheduled_date <= today);
   const totalScheduled = recent30.length;
   const completedCount = recent30.filter((w: any) => w.status === "completed").length;
 
