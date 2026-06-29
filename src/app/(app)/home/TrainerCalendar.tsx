@@ -45,10 +45,11 @@ const CHIP_BLUE = "#1A73E8";
 const CHIP_ORANGE = "#F97316";
 const CHIP_TEXT = "#ffffff";
 const HOUR_PX = 64;
-const DAY_START = 5;
-const DAY_END = 22;
+const DAY_START = 6;
+const DAY_END = 21;
 const TOTAL_HOURS = DAY_END - DAY_START;
 const TIME_COL_W = 52;
+const MIN_DAY_W = 110;
 const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const DOW_FULL = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
@@ -785,118 +786,99 @@ function TimeGrid({
     onTimeClick(day, e);
   }
 
+  const minContentWidth = TIME_COL_W + days.length * MIN_DAY_W;
+
   return (
-    <div className="flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-      {/* Day headers */}
-      <div className="flex flex-shrink-0 border-b" style={{ borderColor: "var(--brand-border)", background: "var(--brand-surface)" }}>
-        <div style={{ width: TIME_COL_W, flexShrink: 0 }} />
-        {days.map(day => {
-          const ds = dayStr(day);
-          const isToday = ds === todayStr;
-          const dow = DOW[day.getDay()];
-          return (
-            <div key={ds} className="flex-1 flex flex-col items-center py-2 border-l cursor-pointer active:opacity-70"
-              style={{ borderColor: "var(--brand-border)" }}
-              onClick={() => onDayHeaderClick(day)}>
-              <span className="text-[10px] font-semibold uppercase"
-                style={{ color: isToday ? "#E53935" : "var(--brand-text-secondary)" }}>{dow}</span>
-              <span className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold mt-0.5"
-                style={{ background: isToday ? "#E53935" : "transparent", color: isToday ? "white" : "var(--brand-text)" }}>
-                {day.getDate()}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-
-
-      {/* Scrollable time grid */}
-      <div ref={scrollRef} className="overflow-y-auto" style={{ flex: 1 }}>
-        <div className="flex" style={{ minHeight: TOTAL_HOURS * HOUR_PX }}>
-          {/* Time labels */}
-          <div style={{ width: TIME_COL_W, flexShrink: 0, position: "relative" }}>
-            {Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => {
-              const h = DAY_START + i;
-              if (h > DAY_END) return null;
-              const label = h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
+    <div className="flex flex-col" style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+      {/* Single scroll container: handles both horizontal + vertical */}
+      <div ref={scrollRef} style={{ flex: 1, overflow: "auto" }}>
+        <div style={{ minWidth: minContentWidth }}>
+          {/* Day headers — sticky top */}
+          <div className="flex flex-shrink-0 sticky top-0 z-10 border-b"
+            style={{ borderColor: "var(--brand-border)", background: "var(--brand-surface)" }}>
+            <div style={{ width: TIME_COL_W, flexShrink: 0 }} />
+            {days.map(day => {
+              const ds = dayStr(day);
+              const isToday = ds === todayStr;
+              const dow = DOW[day.getDay()];
               return (
-                <div key={h} style={{ position: "absolute", top: i * HOUR_PX - 8, right: 8 }}>
-                  <span className="text-[10px]" style={{ color: "var(--brand-text-secondary)" }}>{label}</span>
+                <div key={ds}
+                  className="flex flex-col items-center py-2 border-l cursor-pointer active:opacity-70"
+                  style={{ width: MIN_DAY_W, flexShrink: 0, borderColor: "var(--brand-border)" }}
+                  onClick={() => onDayHeaderClick(day)}>
+                  <span className="text-[10px] font-semibold uppercase"
+                    style={{ color: isToday ? "#E53935" : "var(--brand-text-secondary)" }}>{dow}</span>
+                  <span className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold mt-0.5"
+                    style={{ background: isToday ? "#E53935" : "transparent", color: isToday ? "white" : "var(--brand-text)" }}>
+                    {day.getDate()}
+                  </span>
                 </div>
               );
             })}
           </div>
 
-          {/* Day columns */}
-          {days.map(day => {
-            const ds = dayStr(day);
-            const isToday = ds === todayStr;
-            const dayEvents = getDayEvents(day);
-            const laid = layoutEvents(dayEvents);
-
-            const nowMin = today.getHours() * 60 + today.getMinutes();
-            const nowTop = (nowMin - DAY_START * 60) / 60 * HOUR_PX;
-            const showNow = isToday && nowMin >= DAY_START * 60 && nowMin <= DAY_END * 60;
-
-            return (
-              <div key={ds} className="flex-1 relative border-l"
-                onDragOver={e => {
-                  if (e.dataTransfer.types.includes("apptid")) {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                    setApptDropTarget(ds);
-                  }
-                }}
-                onDragLeave={e => {
-                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setApptDropTarget(null);
-                }}
-                onDrop={async e => {
-                  e.preventDefault();
-                  const apptId = e.dataTransfer.getData("apptId");
-                  const apptTime = e.dataTransfer.getData("apptTime");
-                  const duration = parseInt(e.dataTransfer.getData("apptDuration") || "60");
-                  setApptDropTarget(null);
-                  if (apptId && onApptDrop) {
-                    const orig = parseAppt(apptTime);
-                    const timeStr = `${String(orig.getHours()).padStart(2, "0")}:${String(orig.getMinutes()).padStart(2, "0")}`;
-                    await onApptDrop(apptId, ds, timeStr, duration);
-                  }
-                }}
-                style={{
-                  borderColor: apptDropTarget === ds ? "var(--brand-primary)" : "var(--brand-border)",
-                  background: apptDropTarget === ds ? "rgba(14,165,233,0.06)" : isToday ? "rgba(229,57,53,0.02)" : "transparent",
-                  transition: "background 0.15s, border-color 0.15s",
-                }}
-                onClick={e => handleTimeGridClick(day, e)}>
-                {Array.from({ length: TOTAL_HOURS }, (_, i) => (
-                  <div key={i} style={{
-                    position: "absolute", top: i * HOUR_PX, left: 0, right: 0, height: 1,
-                    background: "var(--brand-border)", opacity: 0.5,
-                  }} />
-                ))}
-                {Array.from({ length: TOTAL_HOURS }, (_, i) => (
-                  <div key={`h${i}`} style={{
-                    position: "absolute", top: i * HOUR_PX + HOUR_PX / 2, left: 0, right: 0, height: 1,
-                    background: "var(--brand-border)", opacity: 0.25,
-                  }} />
-                ))}
-                {showNow && (
-                  <div style={{ position: "absolute", top: nowTop, left: 0, right: 0, zIndex: 3 }}>
-                    <div style={{ height: 2, background: "#E53935" }} />
-                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#E53935", position: "absolute", top: -4, left: -4 }} />
-                  </div>
-                )}
-                {laid.map(ev => (
-                  <EventBlock key={ev.id} ev={ev} clients={clients} onClick={onEventClick} isDraggable={!!onApptDrop} />
-                ))}
+          {/* Time grid body */}
+          <div className="flex" style={{ minHeight: TOTAL_HOURS * HOUR_PX }}>
+            {/* Time labels — sticky left */}
+            <div style={{ width: TIME_COL_W, flexShrink: 0, position: "sticky", left: 0, zIndex: 5, background: "var(--brand-surface)" }}>
+              <div style={{ position: "relative", height: TOTAL_HOURS * HOUR_PX }}>
+                {Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => {
+                  const h = DAY_START + i;
+                  if (h > DAY_END) return null;
+                  const label = h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
+                  return (
+                    <div key={h} style={{ position: "absolute", top: i * HOUR_PX - 8, right: 8 }}>
+                      <span className="text-[10px]" style={{ color: "var(--brand-text-secondary)" }}>{label}</span>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+
+            {/* Day columns */}
+            {days.map(day => {
+              const ds = dayStr(day);
+              const isToday = ds === todayStr;
+              const dayEvents = getDayEvents(day);
+              const laid = layoutEvents(dayEvents);
+
+              const nowMin = today.getHours() * 60 + today.getMinutes();
+              const nowTop = (nowMin - DAY_START * 60) / 60 * HOUR_PX;
+              const showNow = isToday && nowMin >= DAY_START * 60 && nowMin <= DAY_END * 60;
+
+              return (
+                <div key={ds} className="relative border-l"
+                  style={{ width: MIN_DAY_W, flexShrink: 0, borderColor: "var(--brand-border)", background: isToday ? "rgba(229,57,53,0.02)" : "transparent" }}
+                  onClick={e => handleTimeGridClick(day, e)}>
+                  {Array.from({ length: TOTAL_HOURS }, (_, i) => (
+                    <div key={i} style={{
+                      position: "absolute", top: i * HOUR_PX, left: 0, right: 0, height: 1,
+                      background: "var(--brand-border)", opacity: 0.5,
+                    }} />
+                  ))}
+                  {Array.from({ length: TOTAL_HOURS }, (_, i) => (
+                    <div key={`h${i}`} style={{
+                      position: "absolute", top: i * HOUR_PX + HOUR_PX / 2, left: 0, right: 0, height: 1,
+                      background: "var(--brand-border)", opacity: 0.25,
+                    }} />
+                  ))}
+                  {showNow && (
+                    <div style={{ position: "absolute", top: nowTop, left: 0, right: 0, zIndex: 3 }}>
+                      <div style={{ height: 2, background: "#E53935" }} />
+                      <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#E53935", position: "absolute", top: -4, left: -4 }} />
+                    </div>
+                  )}
+                  {laid.map(ev => (
+                    <EventBlock key={ev.id} ev={ev} clients={clients} onClick={onEventClick} />
+                  ))}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 
