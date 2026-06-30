@@ -37,7 +37,9 @@ interface ClientNotification {
 
 interface Props {
   firstName: string;
-  todayWorkout: { id: string; status: string; days: any } | null;
+  // todayWorkouts (array) is preferred. todayWorkout (single) kept for backwards compat.
+  todayWorkout?: { id: string; status: string; days: any } | null;
+  todayWorkouts?: Array<{ id: string; status: string; days: any }>;
   metrics: MetricPoint[];
   completedCount: number;
   totalScheduled: number;
@@ -122,7 +124,7 @@ function PaymentNotificationBanner({
   );
 }
 
-// ─── Sparkline (mini, for metric cards) ──────────────────────────────────────────────
+// ─── Sparkline (mini, for metric cards) ───────────────────────────────────────
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length < 2) {
     return (
@@ -163,7 +165,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
   );
 }
 
-// ─── Full Chart (modal) ────────────────────────────────────────────────────────────────────────────────────
+// ─── Full Chart (modal) ────────────────────────────────────────────────────────
 function FullChart({
   values, dates, color, label, unit,
 }: {
@@ -271,7 +273,7 @@ function FullChart({
   );
 }
 
-// ─── Metric Modal ─────────────────────────────────────────────────────────────────────────────
+// ─── Metric Modal ──────────────────────────────────────────────────────────────
 function MetricModal({
   metricKey, label, unit, color, icon, metrics, onClose, basePath = "",
 }: {
@@ -331,7 +333,7 @@ function MetricModal({
   );
 }
 
-// ─── Metric Card ────────────────────────────────────────────────────────────────────────────────
+// ─── Metric Card ───────────────────────────────────────────────────────────────
 function MetricCard({
   label, value, unit, values, color, icon, onClick,
 }: {
@@ -356,7 +358,7 @@ function MetricCard({
   );
 }
 
-// ─── helpers ──────────────────────────────────────────────────────────────────────────────────────
+// ─── helpers ───────────────────────────────────────────────────────────────────
 function isCardioLabel(label?: string) {
   return /cardio/i.test(label ?? "");
 }
@@ -369,7 +371,7 @@ function toCT(d = new Date()) {
   return d.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 }
 
-// ─── Week Ring ────────────────────────────────────────────────────────────────────────────────────
+// ─── Week Ring ─────────────────────────────────────────────────────────────────
 function WeekRing({
   allScheduled = [], weekOffset, onPrev, onNext, basePath = "",
 }: {
@@ -386,18 +388,46 @@ function WeekRing({
 
   const weekLabel = weekOffset === 0 ? "This Week" : weekOffset === -1 ? "Last Week" : `${Math.abs(weekOffset)} Weeks Ago`;
 
+  // FIX: use .filter() (not .find()) so days with both cardio + lifting return all workouts
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(displayWeekStart);
     d.setDate(displayWeekStart.getDate() + i);
     const dateStr = toCT(d);
-    const workout = allScheduled.find(w => w.date === dateStr);
-    return { dow: i, dateStr, workout, isToday: dateStr === todayStr };
+    const workouts = allScheduled.filter(w => w.date === dateStr);
+    const dateNum = d.getDate();
+    return { dow: i, dateStr, workouts, isToday: dateStr === todayStr, dateNum };
   });
 
-  const scheduled = weekDays.filter(d => d.workout).length;
-  const completed = weekDays.filter(d => d.workout?.completed).length;
+  // Count individual workouts, not just days
+  const scheduled = weekDays.reduce((acc, d) => acc + d.workouts.length, 0);
+  const completed = weekDays.reduce((acc, d) => acc + d.workouts.filter(w => w.completed).length, 0);
   const adherence = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0;
   const canGoNext = weekOffset < 0;
+
+  // Render a single workout circle
+  function renderCircle(w: ScheduledDay, size: "lg" | "sm", showTodayBorder = false) {
+    const done = w.completed;
+    const dotColor = workoutDotColor(w.label);
+    const dim = size === "lg" ? "w-8 h-8" : "w-6 h-6";
+    const iconSize = size === "lg" ? "text-xs" : "text-[9px]";
+    const border = showTodayBorder
+      ? "2px solid var(--brand-primary)"
+      : done
+      ? `1.5px solid ${dotColor}`
+      : "1px solid var(--brand-border)";
+    return (
+      <div
+        className={`${dim} rounded-full flex items-center justify-center transition-all`}
+        style={{ background: done ? `${dotColor}20` : "var(--brand-card)", border }}
+      >
+        {done ? (
+          <i className={`ti ti-check ${iconSize}`} style={{ color: dotColor }} />
+        ) : (
+          <i className={`ti ${isCardioLabel(w.label) ? "ti-run" : "ti-barbell"} ${iconSize}`} style={{ color: "var(--brand-text-secondary)" }} />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -417,34 +447,39 @@ function WeekRing({
           <i className="ti ti-chevron-right text-xs" style={{ color: "var(--brand-text-secondary)" }} />
         </button>
       </div>
-      <div className="flex gap-1.5 justify-center">
-        {weekDays.map(({ dow, dateStr, workout, isToday }) => {
-          const done = workout?.completed;
-          const sched = !!workout;
-          const dotColor = workoutDotColor(workout?.label);
-          const circle = (
-            <div className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
-              style={{
-                background: done ? `${dotColor}20` : sched ? "var(--brand-card)" : "transparent",
-                border: isToday
-                  ? "2px solid var(--brand-primary)"
-                  : done
-                  ? `1.5px solid ${dotColor}`
-                  : sched
-                  ? "1px solid var(--brand-border)"
-                  : "1px dashed var(--brand-border)",
-              }}>
-              {done ? (
-                <i className="ti ti-check text-xs" style={{ color: dotColor }} />
-              ) : sched ? (
-                <i className={`ti ${isCardioLabel(workout?.label) ? "ti-run" : "ti-barbell"} text-xs`} style={{ color: "var(--brand-text-secondary)" }} />
-              ) : null}
-            </div>
-          );
+      <div className="flex gap-1 justify-center">
+        {weekDays.map(({ dow, dateStr, workouts, isToday, dateNum }) => {
+          const dayColor = isToday ? "var(--brand-primary)" : "var(--brand-text-secondary)";
           return (
-            <div key={dow} className="flex flex-col items-center gap-1">
-              {workout?.id ? <Link href={`${basePath}/workout/${workout.id}`}>{circle}</Link> : circle}
-              <span className="text-xs" style={{ color: isToday ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>{DAYS[dow]}</span>
+            <div key={dow} className="flex flex-col items-center gap-0.5">
+              {workouts.length === 0 ? (
+                // Empty / rest day
+                <div className="w-8 h-8 rounded-full" style={{
+                  border: isToday ? "2px solid var(--brand-primary)" : "1px dashed var(--brand-border)",
+                }} />
+              ) : workouts.length === 1 ? (
+                // Single workout — same as before
+                workouts[0].id
+                  ? <Link href={`${basePath}/workout/${workouts[0].id}`}>{renderCircle(workouts[0], "lg", isToday)}</Link>
+                  : renderCircle(workouts[0], "lg", isToday)
+              ) : (
+                // Dual workout day — two stacked small icons, both clickable
+                <div
+                  className="flex flex-col items-center gap-0.5 rounded-xl px-0.5 py-0.5"
+                  style={{ border: isToday ? "2px solid var(--brand-primary)" : "1px solid var(--brand-border)", background: "var(--brand-surface)" }}
+                >
+                  {workouts.map((w, wi) => (
+                    w.id
+                      ? <Link key={w.id} href={`${basePath}/workout/${w.id}`}>{renderCircle(w, "sm")}</Link>
+                      : <span key={`${dateStr}-${wi}`}>{renderCircle(w, "sm")}</span>
+                  ))}
+                </div>
+              )}
+              {/* Day label + date number */}
+              <div className="flex flex-col items-center" style={{ lineHeight: 1.1 }}>
+                <span className="text-xs" style={{ color: dayColor }}>{DAYS[dow]}</span>
+                <span style={{ fontSize: "9px", color: dayColor }}>{dateNum}</span>
+              </div>
             </div>
           );
         })}
@@ -453,7 +488,7 @@ function WeekRing({
   );
 }
 
-// ─── Main Dashboard ───────────────────────────────────────────────────────────────────────────────────
+// ─── Main Dashboard ────────────────────────────────────────────────────────────
 type MetricKey = "weight" | "body_fat_pct" | "lean_mass" | "fat_mass";
 
 const METRIC_CONFIG: { key: MetricKey; label: string; unit: string; color: string; icon: string }[] = [
@@ -464,9 +499,19 @@ const METRIC_CONFIG: { key: MetricKey; label: string; unit: string; color: strin
 ];
 
 export default function ClientDashboard({
-  firstName, todayWorkout, metrics, completedCount, totalScheduled,
-  recentWorkouts, streakDays, weekWorkouts, allScheduled = [], basePath = "",
-  notifications = [], isOwnTrainerView = false,
+  firstName,
+  todayWorkout,
+  todayWorkouts: todayWorkoutsProp,
+  metrics,
+  completedCount,
+  totalScheduled,
+  recentWorkouts,
+  streakDays,
+  weekWorkouts,
+  allScheduled = [],
+  basePath = "",
+  notifications = [],
+  isOwnTrainerView = false,
 }: Props) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
@@ -486,8 +531,9 @@ export default function ClientDashboard({
     return arr.length > 0 ? arr[arr.length - 1].toFixed(1) : null;
   };
 
-  const twStr = todayWorkout?.days?.label || "Today's Workout";
-  const twDone = todayWorkout?.status === "completed";
+  // Derive unified array — prefer todayWorkouts prop, fall back to todayWorkout single for compat
+  const _todayWorkouts = todayWorkoutsProp ?? (todayWorkout ? [todayWorkout] : []);
+
   const isMilestone = streakDays > 0 && streakDays % 7 === 0;
 
   const scheduleSource: ScheduledDay[] = allScheduled.length > 0
@@ -551,16 +597,23 @@ export default function ClientDashboard({
           <WeekRing allScheduled={scheduleSource} weekOffset={weekOffset} onPrev={() => setWeekOffset(o => o - 1)} onNext={() => setWeekOffset(o => Math.min(0, o + 1))} basePath={basePath} />
         </div>
 
-        {/* Today's Workout */}
-        {todayWorkout ? (
-          <Link href={`${basePath}/workout/${todayWorkout.id}`}>
+        {/* Today's Workout — 0 workouts: rest day | 1 workout: single card | 2+: picker */}
+        {_todayWorkouts.length === 0 ? (
+          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+            <i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
+            <p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p>
+            <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program 💪</p>
+          </div>
+        ) : _todayWorkouts.length === 1 ? (
+          // Single workout — original branded card
+          <Link href={`${basePath}/workout/${_todayWorkouts[0].id}`}>
             <div className="rounded-2xl p-5 relative overflow-hidden cursor-pointer" style={{ background: "var(--brand-primary)" }}>
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ background: "white", transform: "translate(30%, -30%)" }} />
               <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full opacity-5" style={{ background: "white", transform: "translate(-30%, 30%)" }} />
               <div className="relative">
                 <p className="text-xs font-semibold text-white/70 mb-1 uppercase tracking-widest">Today&apos;s Workout</p>
-                <h2 className="text-xl font-bold text-white mb-3">{twStr}</h2>
-                {twDone ? (
+                <h2 className="text-xl font-bold text-white mb-3">{_todayWorkouts[0].days?.label || "Today's Workout"}</h2>
+                {_todayWorkouts[0].status === "completed" ? (
                   <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5">
                     <i className="ti ti-check text-sm text-white" />
                     <span className="text-xs text-white font-medium">Completed ✓</span>
@@ -575,10 +628,42 @@ export default function ClientDashboard({
             </div>
           </Link>
         ) : (
-          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-            <i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
-            <p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p>
-            <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program 💪</p>
+          // Multiple workouts today — branded header + individual clickable rows
+          <div className="rounded-2xl overflow-hidden" style={{ background: "var(--brand-primary)" }}>
+            <div className="px-5 pt-5 pb-2 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ background: "white", transform: "translate(30%, -30%)" }} />
+              <p className="text-xs font-semibold text-white/70 uppercase tracking-widest relative">Today&apos;s Workouts</p>
+            </div>
+            <div className="space-y-px pb-1 px-2">
+              {_todayWorkouts.map((tw) => {
+                const twLabel = (tw.days as any)?.label || "Workout";
+                const twIsCardio = isCardioLabel(twLabel);
+                const twDone = tw.status === "completed";
+                return (
+                  <Link key={tw.id} href={`${basePath}/workout/${tw.id}`}>
+                    <div className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: "rgba(0,0,0,0.2)" }}>
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.2)" }}>
+                        <i className={`ti ${twIsCardio ? "ti-run" : "ti-barbell"} text-sm text-white`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{twLabel}</p>
+                      </div>
+                      {twDone ? (
+                        <div className="inline-flex items-center gap-1 bg-white/20 rounded-full px-2 py-1 flex-shrink-0">
+                          <i className="ti ti-check text-xs text-white" />
+                          <span className="text-xs text-white/80">Done</span>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 flex-shrink-0" style={{ color: "var(--brand-primary)" }}>
+                          <i className="ti ti-player-play text-xs" />
+                          <span className="text-xs font-semibold">Start</span>
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         )}
 
