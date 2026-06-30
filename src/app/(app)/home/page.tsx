@@ -146,13 +146,12 @@ export default async function HomePage() {
       if (!workoutMap[dateKey]) workoutMap[dateKey] = [];
       workoutMap[dateKey].push({
         id: row.id,
-      dayId: row.day_id || null,
+        dayId: row.days?.id || row.day_id || null,
         clientId: row.clients?.id || row.client_id,
         clientName: row.clients?.name || "Unknown",
         date: dateKey,
         dayLabel: row.days?.label || "Workout",
         status: row.status || "scheduled",
-        dayId: row.days?.id || row.day_id || null,
       });
     }
 
@@ -226,12 +225,15 @@ export default async function HomePage() {
   thirtyAhead.setDate(thirtyAhead.getDate() + 30);
   const thirtyAheadStr = thirtyAhead.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
-  const { data: todayWorkout } = await supabase
+  // FIX: was .maybeSingle() — fails with error when client has 2 workouts today (cardio + lifting),
+  // causing null return and "Rest Day" to show incorrectly. Now returns all workouts as array.
+  const { data: todayWorkoutsRaw } = await supabase
     .from("scheduled_workouts")
     .select("id, status, days(label, phase_id, phases(label, programs(name)))")
     .eq("client_id", clientRecord.id)
     .eq("scheduled_date", today)
-    .maybeSingle();
+    .order("id");
+  const todayWorkouts = todayWorkoutsRaw || [];
 
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
@@ -327,7 +329,7 @@ export default async function HomePage() {
       <PwaInstallBanner />
       <ClientDashboard
         firstName={firstName}
-        todayWorkout={todayWorkout as any}
+        todayWorkouts={todayWorkouts as any[]}
         metrics={metrics as any[]}
         completedCount={completedCount}
         totalScheduled={totalScheduled}
