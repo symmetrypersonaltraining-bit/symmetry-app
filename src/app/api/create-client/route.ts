@@ -1,11 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { Resend } from "resend";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://symmetry-app-omega.vercel.app";
+
+function generateTempPassword(): string {
+  // 10-char: 2 uppercase + 2 digits + 6 lowercase â readable, no ambiguous chars
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghjkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const pick = (s: string) => s[Math.floor(Math.random() * s.length)];
+  const chars = [pick(upper), pick(upper), pick(digits), pick(digits),
+    ...Array.from({ length: 6 }, () => pick(lower))];
+  // Shuffle
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
 
 export async function POST(req: NextRequest) {
-  // Auth check — trainer only
+  // Auth check â trainer only
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || user.email !== TRAINER_EMAIL) {
@@ -36,18 +54,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "A client with that email already exists" }, { status: 409 });
   }
 
-  let authUserId: string | null = null;
+  let authUserId: string | undefined;
+  let tempPassword: string | undefined;
 
   if (send_invite) {
-    // Send Supabase auth invite — client gets an email to set their password
-    const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
-      data: { full_name: name },
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || "https://symmetry-app.vercel.app"}/set-password`,
+    // Create auth user with temp password (not magic link — enables login page redirect)
+    const admin = createAdminClient();
+    tempPassword = generateTempPassword();
+    const { data: newUser, error: createErr } = await admin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { full_name: name, email_verified: true },
     });
-    if (inviteErr) {
-      return NextResponse.json({ error: inviteErr.message }, { status: 500 });
+    if (createErr) {
+      return NextResponse.json({ error: createErr.message }, { status: 500 });
     }
-    authUserId = inviteData.user?.id || null;
+    authUserId = newUser.user?.id;
   }
 
   // Create the client record
@@ -76,6 +99,64 @@ export async function POST(req: NextRequest) {
 
   if (clientErr) {
     return NextResponse.json({ error: clientErr.message }, { status: 500 });
+  }
+
+  // If invited: create client_app_settings so login redirect works, then send email
+  if (send_invite && clientRow?.id) {
+    const admin = createAdminClient();
+    await admin
+      .from("client_app_settings")
+      .upsert(
+        { client_id: clientRow.id, password_is_temporary: true, first_login_completed: false },
+        { onConflict: "client_id" }
+      );
+
+  const resendKey = process.env.RESEND_API_KEY;
+  if (resendKey) {
+    const resend = new Resend(resendKey);
+    await resend.emails.send({
+      from: "Symmetry Personal Training <noreply@symmetrypersonaltraining.com>",
+      to: client.email,
+      subject: "You're invited to the Symmetry Training App",
+      html: `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; margin: 0; padding: 20px;">
+  <div style="max-width: 480px; margin: 0 auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #E53935, #b71c1c); padding: 32px 32px 24px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">SYMMETRY</h1>
+      <p style="color: rgba(255,255,255,0.8); margin: 4px 0 0; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">Personal Training</p>
+    </div>
+    <!-- Body -->
+    <div style="padding: 32px;">
+      <p style="color: #333; font-size: 16px; margin: 0 0 8px;">Hi ${firstName},</p>
+      <p style="color: #555; font-size: 15px; margin: 0 0 24px; line-height: 1.5;">
+        Dustin has set up your Symmetry Training App account. Your training, nutrition, and progress â all in one place.
+      </p>
+
+      <!-- App link -->
+      <div style="text-align: center; margin: 0 0 24px;">
+        <a href="${APP_URL}" style="display: inline-block; background: #E53935; color: white; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 700; font-size: 15px;">
+          Open Your App â
+        </a>
+      </div>
+
+      <!-- Credentials box -->
+      <div style="background: #f8f8f8; border-radius: 10px; padding: 20px; margin: 0 0 24px; border: 1px solid #eee;">
+        <p style="margin: 0 0 12px; font-size: 13px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">Login Credentials</p>
+        <p style="margin: 0 0 8px; font-size: 15px; color: #333;">
+          <strong>Email:</strong> ${client.email}
+        </p>
+        <p style="margin: 0; font-size: 15px; color: #333;">
+          <strong>Temporary Password:</strong>
+          <span style="font-family: monospace; background: #E5393515; color: #E53935; padding: 2px 8px; border-radius: 4px; font-size: 16px; font-weight: 700;">${tempPassword}</span>
+        </p>
+      </div>
+
+      <p style="color: #555; font-size: 14px; margin: 0 0 8px;">
+        You'll be asked to set your own password right away.
   }
 
   if (send_invite && authUserId && clientRow?.id) {
