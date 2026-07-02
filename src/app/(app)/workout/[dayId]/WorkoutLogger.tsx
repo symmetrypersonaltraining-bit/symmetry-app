@@ -757,8 +757,8 @@ export default function WorkoutLogger({
       await supabase.from("set_logs").upsert({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
         set_number: si + 1,
-        weight_lbs: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (s.weight ? parseFloat(s.weight) || 0 : null),
-        reps: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (s.reps ? parseInt(s.reps) || 0 : null),
+        weight_lbs: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (parseFloat(s.weight) || 0),
+        reps: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (parseInt(s.reps) || 0),
         duration_seconds: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.time ? Math.round((parseFloat(s.time) || 0) * 60) : null) : null,
         speed: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.speed ? parseFloat(s.speed) || 0 : null) : null,
         heart_rate: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
@@ -785,8 +785,8 @@ export default function WorkoutLogger({
       const rows = arr.map((s, i) => ({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
         set_number: i + 1,
-        weight_lbs: s.weight ? parseFloat(s.weight) || 0 : null,
-        reps: s.reps ? parseInt(s.reps) || 0 : null,
+        weight_lbs: parseFloat(s.weight) || 0,
+        reps: parseInt(s.reps) || 0,
         completed: true, logged_at: new Date().toISOString(),
       }));
       if (rows.length) {
