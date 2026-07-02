@@ -453,6 +453,53 @@ function SwapModal({ pe, onClose, onSwap }: { pe: PrescribedExercise; onClose: (
 }
 
 // \u2500\u2500\u2500 MAIN COMPONENT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function fmtSecs(total: number): string {
+  const m = Math.floor(total / 60);
+  const sec = Math.round(total % 60);
+  return sec ? `${m}:${String(sec).padStart(2, "0")}` : String(m);
+}
+
+function parseTimeToSecs(t: string): number | null {
+  if (!t) return null;
+  if (t.includes(":")) {
+    const [mm, ss] = t.split(":");
+    return (parseInt(mm) || 0) * 60 + (parseInt(ss) || 0);
+  }
+  return Math.round((parseFloat(t) || 0) * 60);
+}
+
+function TimePickerSheet({ initial, onSet, onClose }: { initial: number; onSet: (secs: number) => void; onClose: () => void }) {
+  const [m, setM] = useState(Math.min(59, Math.floor(initial / 60)));
+  const [sec, setSec] = useState(Math.round(initial % 60));
+  const mins = Array.from({ length: 60 }, (_, i) => i);
+  const secs = Array.from({ length: 60 }, (_, i) => i);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
+      <div className="w-full rounded-t-3xl p-5 pb-10" style={{ background: "var(--brand-surface)" }} onClick={e => e.stopPropagation()}>
+        <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
+        <p className="text-center text-xs uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Set Time</p>
+        <div className="relative flex items-center justify-center gap-4 mb-4" style={{ userSelect: "none" }}>
+          <div className="absolute left-0 right-0 pointer-events-none rounded-xl"
+            style={{ top: "50%", transform: "translateY(-50%)", height: 56, background: "var(--brand-primary)", opacity: 0.1, zIndex: 1 }} />
+          <div style={{ flex: 1 }}>
+            <p className="text-center text-xs uppercase tracking-widest mb-1" style={{ color: "var(--brand-text-secondary)" }}>MIN</p>
+            <WheelColumn values={mins} selected={m} onChange={setM} />
+          </div>
+          <div className="text-3xl font-bold" style={{ color: "var(--brand-text-secondary)", zIndex: 2 }}>:</div>
+          <div style={{ flex: 1 }}>
+            <p className="text-center text-xs uppercase tracking-widest mb-1" style={{ color: "var(--brand-text-secondary)" }}>SEC</p>
+            <WheelColumn values={secs} selected={sec} onChange={setSec} />
+          </div>
+        </div>
+        <button onClick={() => onSet(m * 60 + sec)}
+          className="w-full h-12 rounded-2xl font-bold text-white text-sm" style={{ background: "var(--brand-primary)" }}>
+          Set Time
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const BW_NAME_RE = /push[\s-]?up|pull[\s-]?up|chin[\s-]?up|\bdips?\b|plank|bird ?dog|dead ?bug|air squat|bodyweight|\bband\b|mini[- ]?band|stretch|foam roll|lacrosse ball|mobility|hollow hold|superman|inchworm|bear crawl|wall sit|dead hang/i;
 
 function defaultTrackedFields(pe: any): string[] {
@@ -506,7 +553,7 @@ export default function WorkoutLogger({
         const logs = existingSetLogs.filter(sl => sl.prescribed_exercise_id === pe.id);
         result[pe.id] = Array.from({ length: (pe.sets || 3) }, (_, i) => {
           const ex = logs.find(l => l.set_number === i + 1);
-          return { weight: ex?.weight_lbs?.toString() || "", reps: ex?.reps?.toString() || ((pe.volume_type === "reps" || pe.volume_type === "rep_range") && pe.volume_value ? (String(pe.volume_value).match(/\d+/)?.[0] || "") : ""), time: ex?.duration_seconds != null ? String(Math.round(ex.duration_seconds / 60)) : "", speed: ex?.speed != null ? String(ex.speed) : "", hr: ex?.heart_rate != null ? String(ex.heart_rate) : "", done: ex?.completed ?? false };
+          return { weight: ex?.weight_lbs?.toString() || "", reps: ex?.reps?.toString() || ((pe.volume_type === "reps" || pe.volume_type === "rep_range") && pe.volume_value ? (String(pe.volume_value).match(/\d+/)?.[0] || "") : ""), time: ex?.duration_seconds != null ? fmtSecs(ex.duration_seconds) : "", speed: ex?.speed != null ? String(ex.speed) : "", hr: ex?.heart_rate != null ? String(ex.heart_rate) : "", done: ex?.completed ?? false };
         });
       }
     }
@@ -519,6 +566,7 @@ export default function WorkoutLogger({
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const [activeExerciseIdx, setActiveExerciseIdx] = useState(0);
   const [workoutComplete, setWorkoutComplete] = useState(false);
+  const [timePick, setTimePick] = useState<{ peId: string; si: number } | null>(null);
   const [sessionMode, setSessionMode] = useState(false);
   const [restTimer, setRestTimer] = useState<number | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -769,7 +817,7 @@ export default function WorkoutLogger({
         set_number: si + 1,
         weight_lbs: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (parseFloat(s.weight) || 0),
         reps: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (parseInt(s.reps) || 0),
-        duration_seconds: s.time ? Math.round((parseFloat(s.time) || 0) * 60) : null,
+        duration_seconds: s.time ? parseTimeToSecs(s.time) : null,
         speed: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.speed ? parseFloat(s.speed) || 0 : null) : null,
         heart_rate: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
         completed: true, logged_at: new Date().toISOString(),
@@ -797,6 +845,7 @@ export default function WorkoutLogger({
         set_number: i + 1,
         weight_lbs: parseFloat(s.weight) || 0,
         reps: parseInt(s.reps) || 0,
+        duration_seconds: s.time ? parseTimeToSecs(s.time) : null,
         completed: true, logged_at: new Date().toISOString(),
       }));
       if (rows.length) {
@@ -934,6 +983,7 @@ export default function WorkoutLogger({
             onPrefill={(w, r) => prefillSets(currentExercise.id, w, r)} />
         )}
         {showTimer && <TimerWheel onClose={() => setShowTimer(false)} />}
+        {timePick && <TimePickerSheet initial={parseTimeToSecs(sets[timePick.peId]?.[timePick.si]?.time || "") || 0} onSet={(secs) => { updateSet(timePick.peId, timePick.si, "time", fmtSecs(secs)); setTimePick(null); }} onClose={() => setTimePick(null)} />}
         {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
 
         {/* Top bar */}
@@ -1082,9 +1132,9 @@ export default function WorkoutLogger({
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="numeric" />)}
-              {xFields.includes("time") && (<input type="text" value={setEntry.time}
-                onChange={e => updateSet(currentExercise.id, si, "time", e.target.value)}
-                disabled={setEntry.done} placeholder=""
+              {xFields.includes("time") && (<input type="text" value={setEntry.time} readOnly
+                onClick={() => { if (!setEntry.done) setTimePick({ peId: currentExercise.id, si }); }}
+                disabled={setEntry.done} placeholder="0:00"
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
@@ -1168,6 +1218,7 @@ export default function WorkoutLogger({
       )}
       {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
       {showTimer && <TimerWheel onClose={() => setShowTimer(false)} />}
+        {timePick && <TimePickerSheet initial={parseTimeToSecs(sets[timePick.peId]?.[timePick.si]?.time || "") || 0} onSet={(secs) => { updateSet(timePick.peId, timePick.si, "time", fmtSecs(secs)); setTimePick(null); }} onClose={() => setTimePick(null)} />}
       {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
 
       {isTrainerSession && clientName && (
@@ -1320,9 +1371,9 @@ export default function WorkoutLogger({
                           color: setEntry.done ? "#22c55e" : "var(--brand-text)",
                           border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
                         }} inputMode="numeric" />)}
-                      {sFields.includes("time") && (<input type="text" value={setEntry.time}
-                        onChange={e => updateSet(pe.id, si, "time", e.target.value)}
-                        disabled={setEntry.done} placeholder={'min'}
+                      {sFields.includes("time") && (<input type="text" value={setEntry.time} readOnly
+                        onClick={e => { e.stopPropagation(); if (!setEntry.done) setTimePick({ peId: pe.id, si }); }}
+                        disabled={setEntry.done} placeholder={'0:00'}
                         className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
