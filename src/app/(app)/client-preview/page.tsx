@@ -37,18 +37,22 @@ export default async function ClientPreviewPage() {
 
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+  const sixtyStr = sixtyDaysAgo.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const thirtyAhead = new Date();
+  thirtyAhead.setDate(thirtyAhead.getDate() + 30);
+  const thirtyAheadStr = thirtyAhead.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const { data: recentScheduled } = await supabase
     .from("scheduled_workouts")
-    .select("id, day_id, scheduled_date, status")
+    .select("id, day_id, scheduled_date, status, days(label)")
     .eq("client_id", clientRecord.id)
-    .gte("scheduled_date", sixtyDaysAgo.toISOString().split("T")[0])
-    .lte("scheduled_date", today)
+    .gte("scheduled_date", sixtyStr)
+    .lte("scheduled_date", thirtyAheadStr)
     .order("scheduled_date", { ascending: false });
 
   const thirtyAgo = new Date();
   thirtyAgo.setDate(thirtyAgo.getDate() - 30);
-  const thirtyStr = thirtyAgo.toISOString().split("T")[0];
-  const recent30 = (recentScheduled || []).filter((w: any) => w.scheduled_date >= thirtyStr);
+  const thirtyStr = thirtyAgo.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const recent30 = (recentScheduled || []).filter((w: any) => w.scheduled_date >= thirtyStr && w.scheduled_date <= today);
   const totalScheduled = recent30.length;
   const completedCount = recent30.filter((w: any) => w.status === "completed").length;
 
@@ -80,8 +84,8 @@ export default async function ClientPreviewPage() {
   const todayDow = new Date().getDay();
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - todayDow);
-  const weekStartStr = weekStart.toISOString().split("T")[0];
-  const weekEndStr = new Date(weekStart.getTime() + 6 * 86400000).toISOString().split("T")[0];
+  const weekStartStr = weekStart.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const weekEndStr = new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const weekWorkouts = (recentScheduled || [])
     .filter((w: any) => w.scheduled_date >= weekStartStr && w.scheduled_date <= weekEndStr)
     .map((w: any) => ({ date: w.scheduled_date, completed: w.status === "completed" }));
@@ -106,6 +110,7 @@ export default async function ClientPreviewPage() {
     id: (w.day_id || w.id) as string,
     date: w.scheduled_date as string,
     completed: w.status === "completed",
+    label: (w.days as any)?.label as string | undefined,
   }));
 
   const firstName = (clientRecord.name || "").split(" ")[0];
