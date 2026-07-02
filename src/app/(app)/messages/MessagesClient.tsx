@@ -200,7 +200,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                   <i className="ti ti-user text-xs" /> Profile
                 </Link>
               </div>
-              <div className="flex-1 min-h-0 overflow-hidden"><ThreadPanel /></div>
+              <div className="flex-1 min-h-0 overflow-hidden">{ThreadPanel()}</div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
@@ -233,7 +233,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
           <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Dustin Gautreaux · Trainer</p>
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-hidden"><ThreadPanel /></div>
+      <div className="flex-1 min-h-0 overflow-hidden">{ThreadPanel()}</div>
     </div>
   );
 }
