@@ -42,18 +42,18 @@ export default function TrainerLayoutWrapper({ children }: Props) {
     router.push(next ? "/client-preview" : "/home");
   }
 
-  // ── CLIENT MODE ────────────────────────────────────────────────────────────
+  // ââ CLIENT MODE ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   if (clientMode) {
     return (
       <div className="flex flex-col min-h-screen" style={{ background: "var(--brand-bg)" }}>
 
-        {/* Top bar — mirrors what a client would see on mobile */}
+        {/* Top bar â mirrors what a client would see on mobile */}
         <div className="flex items-center gap-3 px-4 pb-3 sticky top-0 z-40 shadow-sm"
           style={{ background: "var(--brand-primary)", paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
           <Logo size={28} color="white" className="flex-shrink-0" />
           <div className="flex-1">
             <span className="text-white font-semibold text-sm">Symmetry</span>
-            <span className="text-white/50 text-xs ml-2">· My Training</span>
+            <span className="text-white/50 text-xs ml-2">Â· My Training</span>
           </div>
           <button
             onClick={handleToggleMode}
@@ -85,12 +85,11 @@ export default function TrainerLayoutWrapper({ children }: Props) {
           })}
         </div>
 
-        <AIAssistant isTrainer={false} />
       </div>
     );
   }
 
-  // ── TRAINER MODE ──────────────────────────────────────────────────────────
+  // ââ TRAINER MODE ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   return (
     <div className="flex min-h-screen" style={{ background: "var(--brand-bg)" }}>
       <TrainerSidebar
