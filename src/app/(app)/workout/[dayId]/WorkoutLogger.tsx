@@ -453,6 +453,18 @@ function SwapModal({ pe, onClose, onSwap }: { pe: PrescribedExercise; onClose: (
 }
 
 // \u2500\u2500\u2500 MAIN COMPONENT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+const BW_NAME_RE = /push[\s-]?up|pull[\s-]?up|chin[\s-]?up|\bdips?\b|plank|bird ?dog|dead ?bug|air squat|bodyweight|\bband\b|mini[- ]?band|stretch|foam roll|lacrosse ball|mobility|hollow hold|superman|inchworm|bear crawl|wall sit|dead hang/i;
+
+function defaultTrackedFields(pe: any): string[] {
+  const raw = pe?.tracked_fields;
+  if (Array.isArray(raw) && raw.length > 0) {
+    return raw.map((f: string) => (f === "duration" ? "time" : f));
+  }
+  if (pe?.volume_type === "duration") return ["time"];
+  if (BW_NAME_RE.test(String(pe?.exercises?.name || ""))) return ["reps"];
+  return ["weight", "reps"];
+}
+
 function VideoModal({ url, onClose }: { url: string; onClose: () => void }) {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^&?#]+)/);
   const id = m ? m[1] : null;
@@ -757,7 +769,7 @@ export default function WorkoutLogger({
         set_number: si + 1,
         weight_lbs: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (parseFloat(s.weight) || 0),
         reps: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (parseInt(s.reps) || 0),
-        duration_seconds: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.time ? Math.round((parseFloat(s.time) || 0) * 60) : null) : null,
+        duration_seconds: s.time ? Math.round((parseFloat(s.time) || 0) * 60) : null,
         speed: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.speed ? parseFloat(s.speed) || 0 : null) : null,
         heart_rate: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
         completed: true, logged_at: new Date().toISOString(),
@@ -909,7 +921,7 @@ export default function WorkoutLogger({
   // \u2500\u2500\u2500 SESSION MODE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   if (sessionMode && currentExercise) {
     const peSets = sets[currentExercise.id] || [];
-    const xFields = fieldCfg[currentExercise.id] || (currentExercise as any).tracked_fields || ["weight", "reps"];
+    const xFields = fieldCfg[currentExercise.id] || defaultTrackedFields(currentExercise);
     const saveFields = async (nf: string[]) => { setFieldCfg(prev => ({ ...prev, [currentExercise.id]: nf })); try { await supabase.from("prescribed_exercises").update({ tracked_fields: nf }).eq("id", currentExercise.id); } catch {} };
 
     return (
@@ -1027,25 +1039,24 @@ export default function WorkoutLogger({
 
         {/* Sets */}
         <div className="flex-1 overflow-y-auto px-5">
-          {isTrainerSession && (
-            <div className="flex items-center gap-2 mb-1" style={{ flexWrap: "wrap" }}>
-              <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>Track:</span>
-              {["weight", "reps"].map((f) => {
-                const on = xFields.includes(f);
-                return (
-                  <button key={f} type="button" onClick={() => saveFields(on ? xFields.filter((x: string) => x !== f) : [...xFields, f])}
-                    className="px-2.5 py-1 rounded-full text-xs font-medium"
-                    style={{ background: on ? "var(--brand-primary)" : "rgba(255,255,255,0.08)", color: on ? "white" : "rgba(255,255,255,0.5)", border: "none" }}>
-                    {f === "weight" ? "Weight" : "Reps"}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <div className="flex items-center gap-2 mb-1" style={{ flexWrap: "wrap" }}>
+            <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>Track:</span>
+            {(["weight", "reps", "time"] as string[]).map((f) => {
+              const on = xFields.includes(f);
+              return (
+                <button key={f} type="button" onClick={() => saveFields(on ? xFields.filter((x: string) => x !== f) : [...xFields, f])}
+                  className="px-2.5 py-1 rounded-full text-xs font-medium"
+                  style={{ background: on ? "var(--brand-primary)" : "rgba(255,255,255,0.08)", color: on ? "white" : "rgba(255,255,255,0.5)", border: "none" }}>
+                  {f === "weight" ? "Weight" : f === "reps" ? "Reps" : "Time"}
+                </button>
+              );
+            })}
+          </div>
           <div className="flex gap-2 mb-2">
             <div className="w-8" />
             {xFields.includes("weight") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>WEIGHT (lb)</div>}
             {xFields.includes("reps") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>REPS</div>}
+            {xFields.includes("time") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>TIME (min)</div>}
             <div className="w-12" />
           </div>
           
@@ -1071,6 +1082,15 @@ export default function WorkoutLogger({
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="numeric" />)}
+              {xFields.includes("time") && (<input type="text" value={setEntry.time}
+                onChange={e => updateSet(currentExercise.id, si, "time", e.target.value)}
+                disabled={setEntry.done} placeholder=""
+                className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
+                style={{
+                  background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
+                  color: setEntry.done ? "#22c55e" : "white",
+                  border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
+                }} inputMode="decimal" />)}
               <button onClick={() => { if (setEntry.done) { updateSet(currentExercise.id, si, "done", false); } else { logSet(currentExercise.id, si); } }}
                 disabled={saving}
                 className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -1212,6 +1232,9 @@ export default function WorkoutLogger({
           const isActive = i === activeExerciseIdx;
           const allDone = doneCount === pe.sets;
           const cardio = isCardioEx(pe);
+          const sFields: string[] = cardio ? [] : (fieldCfg[pe.id] || defaultTrackedFields(pe));
+          const nCols = ["weight", "reps", "time"].filter(f => sFields.includes(f)).length;
+          const sGrid = nCols > 0 ? `28px repeat(${nCols}, 1fr) 40px` : "28px 1fr 40px";
           const cardioFields: string[] = fieldCfg[pe.id] || (((pe as any).tracked_fields && (pe as any).tracked_fields.some((f: string) => ["time","speed","hr"].includes(f))) ? (pe as any).tracked_fields : ["time", "speed", "hr"]);
           return (
             <div key={pe.id} className="rounded-2xl mb-3 overflow-hidden cursor-pointer"
@@ -1266,19 +1289,20 @@ export default function WorkoutLogger({
                       &ldquo;{pe.cue}&rdquo;
                     </p>
                   )}
-                  {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f]); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} disabled={setEntry.done} placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} disabled={setEntry.done} placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} disabled={setEntry.done} placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { updateSet(pe.id, si, "done", false); } else { logSet(pe.id, si); } }} disabled={saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="grid mb-2 mt-3" style={{ gridTemplateColumns: "28px 1fr 1fr 40px", gap: "8px" }}>
+                  {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f]); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} disabled={setEntry.done} placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} disabled={setEntry.done} placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} disabled={setEntry.done} placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { updateSet(pe.id, si, "done", false); } else { logSet(pe.id, si); } }} disabled={saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="flex items-center gap-1.5 mb-1 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["weight","Weight"],["reps","Reps"],["time","Time"]] as [string,string][]).map(([f, lab]) => { const on = sFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? sFields.filter((x: string) => x !== f) : [...sFields, f]); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div><div className="grid mb-2" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
                     <div />
-                    <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>LBS</div>
-                    <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>REPS</div>
+                    {sFields.includes("weight") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>LBS</div>}
+                    {sFields.includes("reps") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>REPS</div>}
+                    {sFields.includes("time") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>TIME (min)</div>}
                     <div />
                   </div>
                   {peSets.map((setEntry, si) => (
-                    <div key={si} className="grid mb-2 items-center" style={{ gridTemplateColumns: "28px 1fr 1fr 40px", gap: "8px" }}>
+                    <div key={si} className="grid mb-2 items-center" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
                       <div className="text-center text-xs font-bold"
                         style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>
                         {si + 1}
                       </div>
-                      <input type="text" value={setEntry.weight}
+                      {sFields.includes("weight") && (<input type="text" value={setEntry.weight}
                         onChange={e => updateSet(pe.id, si, "weight", e.target.value)}
                         disabled={setEntry.done} placeholder={'\u2014'}
                         className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
@@ -1286,8 +1310,8 @@ export default function WorkoutLogger({
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
                           color: setEntry.done ? "#22c55e" : "var(--brand-text)",
                           border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
-                        }} inputMode="decimal" />
-                      <input type="text" value={setEntry.reps}
+                        }} inputMode="decimal" />)}
+                      {sFields.includes("reps") && (<input type="text" value={setEntry.reps}
                         onChange={e => updateSet(pe.id, si, "reps", e.target.value)}
                         disabled={setEntry.done} placeholder={'\u2014'}
                         className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
@@ -1295,7 +1319,16 @@ export default function WorkoutLogger({
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
                           color: setEntry.done ? "#22c55e" : "var(--brand-text)",
                           border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
-                        }} inputMode="numeric" />
+                        }} inputMode="numeric" />)}
+                      {sFields.includes("time") && (<input type="text" value={setEntry.time}
+                        onChange={e => updateSet(pe.id, si, "time", e.target.value)}
+                        disabled={setEntry.done} placeholder={'min'}
+                        className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
+                        style={{
+                          background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
+                          color: setEntry.done ? "#22c55e" : "var(--brand-text)",
+                          border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
+                        }} inputMode="decimal" />)}
                       <button onClick={e => { e.stopPropagation(); if (setEntry.done) { updateSet(pe.id, si, "done", false); } else { logSet(pe.id, si); } }}
                         disabled={saving}
                         className="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
