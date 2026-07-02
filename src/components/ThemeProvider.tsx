@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export const THEMES = [
   { id: "pastel", label: "Soft Pastel", primary: "#7c9cf5", bg: "#f4f6fb" }, { id: "navy", label: "Navy Blue", primary: "#0F4C81", bg: "#EDF2F7" },
@@ -32,19 +33,53 @@ export function useTheme() {
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>("pastel");
+  const [clientId, setClientId] = useState<string | null>(null);
+
+  function applyTheme(t: ThemeId) {
+    setThemeState(t);
+    localStorage.setItem("symmetry_theme", t);
+    document.documentElement.setAttribute("data-theme", t);
+  }
 
   useEffect(() => {
+    // Instant paint from localStorage, then account-level theme from DB wins
     const stored = localStorage.getItem("symmetry_theme") as ThemeId | null;
     if (stored && THEMES.find((t) => t.id === stored)) {
       setThemeState(stored);
       document.documentElement.setAttribute("data-theme", stored);
     }
+    (async () => {
+      try {
+        const sb: any = createClient();
+        const { data: auth } = await sb.auth.getUser();
+        if (!auth?.user) return;
+        let { data: c } = await sb.from("clients").select("id").eq("auth_user_id", auth.user.id).maybeSingle();
+        if (!c && auth.user.email) {
+          const { data: c2 } = await sb.from("clients").select("id").eq("email", auth.user.email).maybeSingle();
+          c = c2;
+        }
+        if (!c?.id) return;
+        setClientId(c.id);
+        const { data: settings } = await sb.from("client_app_settings").select("theme").eq("client_id", c.id).maybeSingle();
+        const dbTheme = settings?.theme as ThemeId | undefined;
+        if (dbTheme && THEMES.find((t) => t.id === dbTheme)) {
+          applyTheme(dbTheme);
+        }
+      } catch {}
+    })();
   }, []);
 
   function setTheme(t: ThemeId) {
-    setThemeState(t);
-    localStorage.setItem("symmetry_theme", t);
-    document.documentElement.setAttribute("data-theme", t);
+    applyTheme(t);
+    // Persist to the account so it survives logout/login on any device
+    try {
+      if (clientId) {
+        const sb: any = createClient();
+        sb.from("client_app_settings")
+          .upsert({ client_id: clientId, theme: t }, { onConflict: "client_id" })
+          .then(() => {});
+      }
+    } catch {}
   }
 
   return (
