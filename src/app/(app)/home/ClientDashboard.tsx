@@ -386,7 +386,7 @@ function WeekRing({
   const displayWeekStart = new Date(today);
   displayWeekStart.setDate(today.getDate() - todayDow + weekOffset * 7);
 
-  const weekLabel = weekOffset === 0 ? "This Week" : weekOffset === -1 ? "Last Week" : `${Math.abs(weekOffset)} Weeks Ago`;
+  const weekLabel = weekOffset === 0 ? "This Week" : weekOffset === -1 ? "Last Week" : weekOffset === 1 ? "Next Week" : weekOffset > 1 ? `In ${weekOffset} Weeks` : `${Math.abs(weekOffset)} Weeks Ago`;
 
   // FIX: use .filter() (not .find()) so days with both cardio + lifting return all workouts
   const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -402,7 +402,7 @@ function WeekRing({
   const scheduled = weekDays.reduce((acc, d) => acc + d.workouts.length, 0);
   const completed = weekDays.reduce((acc, d) => acc + d.workouts.filter(w => w.completed).length, 0);
   const adherence = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0;
-  const canGoNext = weekOffset < 0;
+  const canGoNext = weekOffset < 4;
 
   // Render a single workout circle
   function renderCircle(w: ScheduledDay, size: "lg" | "sm", showTodayBorder = false) {
@@ -594,7 +594,7 @@ export default function ClientDashboard({
               View Schedule →
             </Link>
           </div>
-          <WeekRing allScheduled={scheduleSource} weekOffset={weekOffset} onPrev={() => setWeekOffset(o => o - 1)} onNext={() => setWeekOffset(o => Math.min(0, o + 1))} basePath={basePath} />
+          <WeekRing allScheduled={scheduleSource} weekOffset={weekOffset} onPrev={() => setWeekOffset(o => o - 1)} onNext={() => setWeekOffset(o => Math.min(4, o + 1))} basePath={basePath} />
         </div>
 
         {/* Today's Workout — 0 workouts: rest day | 1 workout: single card | 2+: picker */}
