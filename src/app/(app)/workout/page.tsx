@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import RescheduleCalendar, { type CalWorkout } from "@/components/RescheduleCalendar";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -86,6 +87,29 @@ export default async function WorkoutPage() {
     });
   }
 
+  // Calendar data: 30 days back to 90 days ahead
+  let calWorkouts: CalWorkout[] = [];
+  if (clientId) {
+    const back = new Date(); back.setDate(back.getDate() - 30);
+    const ahead = new Date(); ahead.setDate(ahead.getDate() + 90);
+    const backStr = back.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+    const aheadStr = ahead.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+    const { data: calRows } = await (supabase as any)
+      .from("scheduled_workouts")
+      .select("id, day_id, scheduled_date, status, days(label)")
+      .eq("client_id", clientId)
+      .gte("scheduled_date", backStr)
+      .lte("scheduled_date", aheadStr)
+      .order("scheduled_date");
+    calWorkouts = (calRows || []).map((w: any) => ({
+      id: w.id as string,
+      dayId: (w.day_id || w.id) as string,
+      date: w.scheduled_date as string,
+      label: ((w.days as any)?.label || "Workout") as string,
+      status: w.status as string,
+    }));
+  }
+
   const displayDate = new Date().toLocaleDateString("en-US", {
     timeZone: "America/Chicago",
     weekday: "long", month: "long", day: "numeric",
@@ -125,24 +149,10 @@ export default async function WorkoutPage() {
             </div>
             ))}
 
-            {allPhases.map((phase) => (
-              <div key={phase.id} style={{ marginTop: "1.25rem" }}>
-                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>{phase.label}</p>
-                <div className="space-y-2">
-                  {phase.days.map((day) => (
-                    <Link key={day.id} href={"/workout/" + day.id}
-                      className="flex items-center gap-3 rounded-2xl p-3.5"
-                      style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
-                        <i className="ti ti-barbell text-base" style={{ color: "white" }} />
-                      </div>
-                      <span className="text-sm font-medium flex-1" style={{ color: "var(--brand-text)" }}>{day.label}</span>
-                      <i className="ti ti-chevron-right text-sm" style={{ color: "var(--brand-text-secondary)" }} />
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))}
+            <div style={{ marginTop: "1.25rem" }}>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
+              <RescheduleCalendar workouts={calWorkouts} />
+            </div>
           </>
         ) : allPhases.length > 0 ? (
           <>
@@ -151,24 +161,10 @@ export default async function WorkoutPage() {
               <p className="font-medium mb-1" style={{ color: "var(--brand-text)" }}>Rest Day</p>
               <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>No workout scheduled for today.</p>
             </div>
-            {allPhases.map((phase) => (
-              <div key={phase.id} style={{ marginTop: "1rem" }}>
-                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>{phase.label}</p>
-                <div className="space-y-2">
-                  {phase.days.map((day) => (
-                    <Link key={day.id} href={"/workout/" + day.id}
-                      className="flex items-center gap-3 rounded-2xl p-3.5"
-                      style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
-                        <i className="ti ti-barbell text-base" style={{ color: "white" }} />
-                      </div>
-                      <span className="text-sm font-medium flex-1" style={{ color: "var(--brand-text)" }}>{day.label}</span>
-                      <i className="ti ti-chevron-right text-sm" style={{ color: "var(--brand-text-secondary)" }} />
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))}
+            <div style={{ marginTop: "1rem" }}>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
+              <RescheduleCalendar workouts={calWorkouts} />
+            </div>
           </>
         ) : (
           <div className="card text-center py-10">
