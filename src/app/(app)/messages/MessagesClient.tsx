@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { sendMessage, sendClientMessage } from "../home/messageActions";
+import { sendMessage, sendClientMessage, sendBroadcastMessage } from "../home/messageActions";
 
 interface Message {
   id: string;
@@ -54,6 +54,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
   const router = useRouter();
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [broadcastSent, setBroadcastSent] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -66,7 +67,10 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
     if (!trimmed || sending) return;
     setSending(true);
     try {
-      if (isTrainer && selectedClientId) {
+      if (isTrainer && selectedClientId === "broadcast") {
+        const n = await sendBroadcastMessage(trimmed);
+        setBroadcastSent(n);
+      } else if (isTrainer && selectedClientId) {
         await sendMessage(selectedClientId, trimmed);
       } else {
         await sendClientMessage(trimmed);
@@ -148,6 +152,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
 
   // Trainer two-panel layout
   if (isTrainer) {
+    const isBroadcast = selectedClientId === "broadcast";
     const selectedClient = clients.find(c => c.id === selectedClientId) || null;
     return (
       <div className="flex overflow-hidden" style={{ background: "var(--brand-bg)", height: "100dvh" }}>
@@ -157,6 +162,17 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
             <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{clients.length} client{clients.length !== 1 ? "s" : ""}</p>
           </div>
           <div className="flex-1 overflow-y-auto">
+            <Link href="/messages?client=broadcast"
+              className="flex items-center gap-3 px-4 py-3.5 border-b transition-colors"
+              style={{ borderColor: "var(--brand-border)", background: isBroadcast ? "color-mix(in srgb, var(--brand-primary) 10%, transparent)" : "transparent", borderLeft: isBroadcast ? "3px solid var(--brand-primary)" : "3px solid transparent" }}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
+                <i className="ti ti-speakerphone text-base" style={{ color: "white" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: isBroadcast ? "var(--brand-primary)" : "var(--brand-text)" }}>All Clients</p>
+                <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Send one message to everyone</p>
+              </div>
+            </Link>
             {clients.map(c => {
               const unread = unreadByClient[c.id] || 0;
               const isSel = c.id === selectedClientId;
@@ -183,7 +199,26 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
           </div>
         </div>
         <div className={"flex-1 flex flex-col min-w-0 overflow-hidden " + (!selectedClientId ? "hidden lg:flex" : "flex")}>
-          {selectedClient ? (
+          {isBroadcast ? (
+            <>
+              <div className="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--brand-border)" }}>
+                <Link href="/messages" className="lg:hidden w-8 h-8 flex items-center justify-center rounded-full" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+                  <i className="ti ti-arrow-left text-sm" style={{ color: "var(--brand-text)" }} />
+                </Link>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
+                  <i className="ti ti-speakerphone text-sm" style={{ color: "white" }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>All Clients</p>
+                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{clients.length} recipient{clients.length !== 1 ? "s" : ""}</p>
+                </div>
+              </div>
+              <div className="px-4 py-2 text-xs flex-shrink-0" style={{ background: "color-mix(in srgb, var(--brand-primary) 8%, transparent)", color: broadcastSent != null ? "#22c55e" : "var(--brand-text-secondary)" }}>
+                {broadcastSent != null ? `Sent to ${broadcastSent} client${broadcastSent === 1 ? "" : "s"} \u2713` : "Messages sent here go to every client as an individual message."}
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden">{ThreadPanel()}</div>
+            </>
+          ) : selectedClient ? (
             <>
               <div className="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--brand-border)" }}>
                 <Link href="/messages" className="lg:hidden w-8 h-8 flex items-center justify-center rounded-full" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>

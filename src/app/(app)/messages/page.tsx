@@ -26,7 +26,7 @@ export default async function MessagesPage(props: {
     const selectedClientId = searchParams.client || null;
 
     let thread: any[] = [];
-    if (selectedClientId) {
+    if (selectedClientId && selectedClientId !== "broadcast") {
       const { data: msgs } = await supabase
         .from("messages")
         .select("id, from_id, to_id, client_id, body, read_at, created_at")

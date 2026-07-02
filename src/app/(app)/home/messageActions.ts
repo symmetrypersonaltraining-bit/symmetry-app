@@ -56,3 +56,21 @@ export async function sendClientMessage(body: string): Promise<void> {
   });
   revalidatePath('/messages');
 }
+
+export async function sendBroadcastMessage(body: string): Promise<number> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || user.email !== 'symmetrypersonaltraining@gmail.com') return 0;
+  const { data: clients } = await supabase
+    .from('clients')
+    .select('id, auth_user_id')
+    .not('auth_user_id', 'is', null);
+  const rows = (clients || [])
+    .filter((c: any) => c.auth_user_id && c.auth_user_id !== user.id)
+    .map((c: any) => ({ from_id: user.id, to_id: c.auth_user_id, client_id: c.id, body }));
+  if (rows.length) {
+    await supabase.from('messages').insert(rows);
+  }
+  revalidatePath('/messages');
+  return rows.length;
+}
