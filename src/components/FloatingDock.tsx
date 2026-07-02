@@ -8,6 +8,7 @@ export default function FloatingDock() {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [isTrainer, setIsTrainer] = useState(false);
+  const [clientMode, setClientMode] = useState(false);
   const [open, setOpen] = useState(false);
   const [sentiment, setSentiment] = useState<"like" | "change" | null>(null);
   const [msg, setMsg] = useState("");
@@ -22,6 +23,16 @@ export default function FloatingDock() {
   useEffect(() => {
     try { const p = localStorage.getItem("symmetry_dock_pos"); if (p) setPos(JSON.parse(p)); } catch {}
     (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (data?.user?.email === TRAINER_EMAIL) setIsTrainer(true); } catch {} })();
+    const checkClientMode = () => {
+      try {
+        const cookieOn = document.cookie.includes("symmetry_client_mode=1");
+        const previewPath = window.location.pathname.startsWith("/client-preview");
+        setClientMode(cookieOn || previewPath);
+      } catch {}
+    };
+    checkClientMode();
+    const t = setInterval(checkClientMode, 2000);
+    return () => clearInterval(t);
   }, []);
 
   function clamp(x: number, y: number) {
@@ -90,7 +101,7 @@ export default function FloatingDock() {
     <>
       <div ref={dockRef} style={{ ...dockStyle, display: "flex", gap: 8, touchAction: dragging ? "none" : "auto", transform: dragging ? "scale(1.04)" : "none", transition: dragging ? "none" : "transform .15s ease" }}
         onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onMouseDown={onMouseDown}>
-        {isTrainer && (
+        {isTrainer && !clientMode && (
           <button aria-label="AI assistant" style={{ ...btn, fontSize: 13, fontWeight: 700 }}
             onClick={() => { if (d.current.moved) return; buzz(12); window.dispatchEvent(new CustomEvent("symmetry:open-ai")); }}>AI</button>
         )}
