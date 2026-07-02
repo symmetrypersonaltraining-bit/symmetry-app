@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
 interface MealPlan { id: string; version_number: number; meals: Meal[]; }
-interface AdherenceLog { id: string; meal_id: string | null; meal_position: number; adherence: string; off_plan_details: string | null; notes: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null; }
+interface AdherenceLog { id: string; meal_id: string | null; meal_position: number; adherence: string; off_plan_details: string | null; notes: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null; food_id?: string | null; servings?: number | null; macros_pending?: boolean | null; }
 interface MacroTarget { calories: number; protein: number; carbs: number; fats: number; }
 
 const ADHERENCE_OPTIONS = [
@@ -26,6 +26,323 @@ const FREE_SLOTS = [
   { position: 5, label: "Meal 5", timing: "Dinner" },
   { position: 6, label: "Meal 6", timing: "Evening Snack" },
 ];
+
+
+const CARD_STYLE: React.CSSProperties = { background: "var(--brand-surface)", border: "1px solid var(--brand-border)", boxShadow: "0 8px 26px rgba(20,30,55,0.08)" };
+
+interface Food { id: string; name: string; serving: string | null; protein: number | null; carbs: number | null; fats: number | null; verified: boolean | null; }
+interface RecentEntry { label: string; food_id: string | null; p: number; c: number; f: number; }
+
+function quickKcal(p: number, c: number, f: number) { return Math.round(4 * p + 4 * c + 9 * f); }
+
+function nextQuickPos(logs: AdherenceLog[]) {
+  const used = new Set(logs.map((l) => l.meal_position));
+  let p = 101;
+  while (used.has(p)) p++;
+  return p;
+}
+
+function MacroHeader({ macros, target }: { macros: { kcal: number; protein: number; carbs: number; fats: number }; target: MacroTarget | null }) {
+  const kcal = Math.round(macros.kcal);
+  const [shownKcal, setShownKcal] = useState(0);
+  const prevKcal = useRef(0);
+  useEffect(() => {
+    const start = prevKcal.current, end = kcal, t0 = performance.now(), dur = 700;
+    let raf = 0;
+    const tick = (t: number) => {
+      const x = Math.min((t - t0) / dur, 1);
+      const e = 1 - Math.pow(1 - x, 3);
+      setShownKcal(Math.round(start + (end - start) * e));
+      if (x < 1) raf = requestAnimationFrame(tick); else prevKcal.current = end;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [kcal]);
+  const tKcal = target?.calories || 0, tP = target?.protein || 0, tC = target?.carbs || 0, tF = target?.fats || 0;
+  const RING_C = 2 * Math.PI * 24;
+  const ARC_L = 163.4;
+  const pct = (v: number, t: number) => (t > 0 ? Math.min(v / t, 1) : 0);
+  function ring(label: string, value: number, tgt: number, color: string) {
+    return (
+      <div className="flex flex-col items-center gap-1" style={{ width: 66 }}>
+        <div className="relative" style={{ width: 58, height: 58 }}>
+          <svg width="58" height="58" style={{ transform: "rotate(-90deg)" }}>
+            <circle cx="29" cy="29" r="24" fill="none" stroke="var(--brand-border)" strokeWidth="7" />
+            <circle cx="29" cy="29" r="24" fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
+              strokeDasharray={String(RING_C)} strokeDashoffset={String(RING_C * (1 - pct(value, tgt)))}
+              style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)" }} />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center font-extrabold" style={{ color, fontSize: 13 }}>{Math.round(value)}</div>
+        </div>
+        <span className="font-bold tracking-wider" style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>{label}</span>
+        <span className="font-semibold" style={{ color: "var(--brand-text)", fontSize: 11 }}>{Math.round(value)} / {Math.round(tgt)}g</span>
+      </div>
+    );
+  }
+  return (
+    <div className="mx-4 mt-2 rounded-3xl p-4" style={CARD_STYLE}>
+      <style>{"@keyframes symFlick{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.18) rotate(-4deg)}}"}</style>
+      <div className="flex items-start justify-between">
+        {ring("PROTEIN", macros.protein, tP, "var(--brand-primary)")}
+        <div className="flex flex-col items-center flex-1" style={{ minWidth: 128 }}>
+          <div className="relative" style={{ height: 70, marginTop: -12, marginBottom: -14 }}>
+            <svg width="128" height="70" viewBox="0 0 128 70">
+              <path d="M 12 64 A 52 52 0 0 1 116 64" fill="none" stroke="var(--brand-border)" strokeWidth="9" strokeLinecap="round" />
+              <path d="M 12 64 A 52 52 0 0 1 116 64" fill="none" stroke="url(#symKcalGrad)" strokeWidth="9" strokeLinecap="round"
+                strokeDasharray={String(ARC_L)} strokeDashoffset={String(ARC_L * (1 - pct(macros.kcal, tKcal)))}
+                style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)" }} />
+              <defs>
+                <linearGradient id="symKcalGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="var(--brand-primary)" />
+                  <stop offset="55%" stopColor="#5ec9a3" />
+                  <stop offset="100%" stopColor="#f59e0b" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <span className="absolute" style={{ left: "50%", top: 14, transform: "translateX(-50%)", fontSize: 17, animation: "symFlick 1.6s ease-in-out infinite" }}>🔥</span>
+          </div>
+          <div className="font-extrabold leading-none relative" style={{ color: "var(--brand-text)", fontSize: 38, fontVariantNumeric: "tabular-nums", zIndex: 1 }}>{shownKcal.toLocaleString()}</div>
+          <div className="mt-1" style={{ color: "var(--brand-text-secondary)", fontSize: 11 }}>
+            of <b style={{ color: "var(--brand-text)" }}>{tKcal.toLocaleString()}</b> cal · <b style={{ color: "var(--brand-text)" }}>{Math.max(tKcal - kcal, 0).toLocaleString()}</b> left
+          </div>
+        </div>
+        {ring("CARBS", macros.carbs, tC, "#5ec9a3")}
+        {ring("FATS", macros.fats, tF, "#f59e0b")}
+      </div>
+    </div>
+  );
+}
+
+function QuickLog({ clientId, selectedDate, logs, setLogs }: { clientId: string; selectedDate: string; logs: AdherenceLog[]; setLogs: React.Dispatch<React.SetStateAction<AdherenceLog[]>> }) {
+  const supabase = createClient();
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<Food[]>([]);
+  const [picked, setPicked] = useState<Food | null>(null);
+  const [serv, setServ] = useState(1);
+  const [typed, setTyped] = useState("");
+  const [showPortions, setShowPortions] = useState(false);
+  const [portions, setPortions] = useState({ p: 0, c: 0, f: 0, v: 0 });
+  const [recents, setRecents] = useState<RecentEntry[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const photoRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let on = true;
+    (async () => {
+      const { data } = await supabase.from("meal_adherence_logs")
+        .select("food_id, servings, off_plan_details, est_protein, est_carbs, est_fats")
+        .eq("client_id", clientId).gte("meal_position", 101)
+        .order("id", { ascending: false }).limit(150);
+      if (!on || !data) return;
+      const rows = data as { food_id: string | null; off_plan_details: string | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null }[];
+      const foodIds = Array.from(new Set(rows.map((r) => r.food_id).filter(Boolean))) as string[];
+      const foodMap: Record<string, Food> = {};
+      if (foodIds.length > 0) {
+        const { data: fs } = await supabase.from("foods").select("*").in("id", foodIds);
+        for (const f of (fs as Food[]) || []) foodMap[f.id] = f;
+      }
+      const freq: Record<string, { n: number; e: RecentEntry }> = {};
+      for (const r of rows) {
+        const key = r.food_id || r.off_plan_details;
+        if (!key) continue;
+        let e: RecentEntry | null = null;
+        if (r.food_id && foodMap[r.food_id]) {
+          const f = foodMap[r.food_id];
+          e = { label: f.name, food_id: f.id, p: f.protein || 0, c: f.carbs || 0, f: f.fats || 0 };
+        } else if (!r.food_id && r.off_plan_details && (r.est_protein != null || r.est_carbs != null || r.est_fats != null)) {
+          e = { label: r.off_plan_details, food_id: null, p: r.est_protein || 0, c: r.est_carbs || 0, f: r.est_fats || 0 };
+        }
+        if (!e) continue;
+        if (!freq[key]) freq[key] = { n: 0, e };
+        freq[key].n++;
+      }
+      if (on) setRecents(Object.values(freq).sort((a, b) => b.n - a.n).slice(0, 6).map((x) => x.e));
+    })();
+    return () => { on = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
+
+  useEffect(() => {
+    if (q.trim().length < 2) { setResults([]); return; }
+    const t = setTimeout(async () => {
+      const { data } = await supabase.from("foods").select("*").ilike("name", "%" + q.trim() + "%").limit(8);
+      setResults((data as Food[]) || []);
+    }, 250);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
+
+  async function insertQuick(row: Record<string, unknown>) {
+    setBusy(true);
+    try {
+      const { data } = await supabase.from("meal_adherence_logs").insert({
+        client_id: clientId, log_date: selectedDate, meal_id: null,
+        meal_position: nextQuickPos(logs), adherence: "Off-plan", source: "client", ...row,
+      }).select().single();
+      if (data) setLogs((prev) => [...prev, data as AdherenceLog]);
+    } finally { setBusy(false); }
+  }
+
+  async function logRecent(r: RecentEntry) {
+    await insertQuick({ food_id: r.food_id, servings: r.food_id ? 1 : null, off_plan_details: r.label, est_protein: r.p, est_carbs: r.c, est_fats: r.f, est_kcal: quickKcal(r.p, r.c, r.f), macros_pending: false });
+  }
+  async function logPicked() {
+    if (!picked) return;
+    const p = (picked.protein || 0) * serv, c = (picked.carbs || 0) * serv, f = (picked.fats || 0) * serv;
+    await insertQuick({ food_id: picked.id, servings: serv, off_plan_details: picked.name, est_protein: p, est_carbs: c, est_fats: f, est_kcal: quickKcal(p, c, f), macros_pending: false });
+    setPicked(null); setServ(1); setQ(""); setResults([]);
+  }
+  async function logTyped() {
+    if (!typed.trim()) return;
+    await insertQuick({ off_plan_details: typed.trim(), macros_pending: true });
+    setTyped("");
+  }
+  async function logPortions() {
+    const p = portions.p * 25, c = portions.c * 25, f = portions.f * 12;
+    if (p + c + f === 0) return;
+    const label = (typed.trim() || "Portion-estimated meal") + (portions.v > 0 ? " + veg" : "");
+    await insertQuick({ off_plan_details: label, est_protein: p, est_carbs: c, est_fats: f, est_kcal: quickKcal(p, c, f), macros_pending: false });
+    setTyped(""); setPortions({ p: 0, c: 0, f: 0, v: 0 }); setShowPortions(false);
+  }
+  async function handleQuickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoBusy(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl.split(",")[1];
+        const res = await fetch("/api/analyze-meal-photo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageBase64: base64, mimeType: file.type || "image/jpeg" }) });
+        const json = await res.json();
+        if (!json.error) {
+          const p = json.protein_g || 0, c = json.carbs_g || 0, f = json.fats_g || 0;
+          await insertQuick({ off_plan_details: json.description || json.meal_name || "Photo meal", est_protein: p, est_carbs: c, est_fats: f, est_kcal: json.calories || quickKcal(p, c, f), macros_pending: false });
+        }
+      } finally { setPhotoBusy(false); if (photoRef.current) photoRef.current.value = ""; }
+    };
+    reader.readAsDataURL(file);
+  }
+  async function deleteQuick(id: string) {
+    await supabase.from("meal_adherence_logs").delete().eq("id", id);
+    setLogs((prev) => prev.filter((l) => l.id !== id));
+  }
+
+  const quickRows = logs.filter((l) => l.meal_position >= 101);
+
+  return (
+    <div className="px-4 mt-4 space-y-3 pb-6">
+      <div className="rounded-3xl p-4" style={CARD_STYLE}>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 flex items-center gap-2 rounded-2xl px-3 py-2.5" style={{ background: "var(--brand-bg)" }}>
+            <i className="ti ti-search" style={{ color: "var(--brand-text-secondary)" }} />
+            <input value={q} onChange={(e) => { setQ(e.target.value); setPicked(null); }} placeholder="Search foods..." className="w-full bg-transparent outline-none text-sm" style={{ color: "var(--brand-text)" }} />
+          </div>
+          <button onClick={() => photoRef.current?.click()} disabled={photoBusy} className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ border: "1px dashed var(--brand-border)", background: "var(--brand-surface)", color: "var(--brand-text-secondary)" }} aria-label="Photo (AI)">
+            <i className={photoBusy ? "ti ti-loader-2 animate-spin" : "ti ti-camera"} />
+          </button>
+          <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleQuickPhoto} />
+        </div>
+        {results.length > 0 && !picked && (
+          <div className="mt-2">
+            {results.map((f) => (
+              <button key={f.id} onClick={() => { setPicked(f); setServ(1); }} className="w-full flex items-center justify-between py-2.5 text-left" style={{ borderBottom: "1px solid var(--brand-border)" }}>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{f.name}{f.verified ? " ✓" : ""}</p>
+                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{f.serving || "1 serving"} · P{Math.round(f.protein || 0)} C{Math.round(f.carbs || 0)} F{Math.round(f.fats || 0)} · {quickKcal(f.protein || 0, f.carbs || 0, f.fats || 0)} cal</p>
+                </div>
+                <i className="ti ti-circle-plus" style={{ color: "var(--brand-primary)", fontSize: 20 }} />
+              </button>
+            ))}
+          </div>
+        )}
+        {picked && (
+          <div className="mt-3 rounded-2xl p-3" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+            <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>{picked.name}</p>
+            <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>{serv} × {picked.serving || "serving"} · P{Math.round((picked.protein || 0) * serv)} C{Math.round((picked.carbs || 0) * serv)} F{Math.round((picked.fats || 0) * serv)} · {quickKcal((picked.protein || 0) * serv, (picked.carbs || 0) * serv, (picked.fats || 0) * serv)} cal</p>
+            <div className="flex items-center justify-center gap-4 mb-2">
+              <button onClick={() => setServ(Math.max(0.5, serv - 0.5))} className="w-9 h-9 rounded-xl font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>-</button>
+              <span className="text-lg font-extrabold text-center" style={{ color: "var(--brand-text)", minWidth: 48 }}>{serv}</span>
+              <button onClick={() => setServ(serv + 0.5)} className="w-9 h-9 rounded-xl font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>+</button>
+            </div>
+            <button onClick={logPicked} disabled={busy} className="w-full py-2.5 rounded-full text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>{busy ? "Logging..." : "Log it"}</button>
+          </div>
+        )}
+      </div>
+
+      {recents.length > 0 && (
+        <div className="rounded-3xl p-4" style={CARD_STYLE}>
+          <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: "var(--brand-text-secondary)" }}>Recents — one tap to re-log</p>
+          <div className="grid grid-cols-2 gap-2">
+            {recents.map((r, i) => (
+              <button key={i} onClick={() => logRecent(r)} disabled={busy} className="rounded-2xl p-2.5 text-left" style={{ border: "1px solid var(--brand-border)", background: "var(--brand-surface)" }}>
+                <p className="text-xs font-bold truncate" style={{ color: "var(--brand-text)" }}>{r.label}</p>
+                <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>P{Math.round(r.p)} C{Math.round(r.c)} F{Math.round(r.f)} · {quickKcal(r.p, r.c, r.f)} cal</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-3xl p-4" style={CARD_STYLE}>
+        <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: "var(--brand-text-secondary)" }}>Type it</p>
+        <textarea value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="e.g. leftover jambalaya, big bowl" rows={2} className="w-full rounded-2xl p-3 text-sm outline-none resize-none" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} />
+        <div className="flex gap-2 mt-2">
+          <button onClick={() => setShowPortions(!showPortions)} className="flex-1 py-2.5 rounded-full text-xs font-bold" style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}>Portions ✋</button>
+          <button onClick={logTyped} disabled={busy || !typed.trim()} className="flex-1 py-2.5 rounded-full text-xs font-bold text-white" style={{ background: "var(--brand-primary)", opacity: typed.trim() ? 1 : 0.5 }}>Save — macros tonight</button>
+        </div>
+        {showPortions && (
+          <div className="mt-3 pt-3" style={{ borderTop: "1px dashed var(--brand-border)" }}>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { k: "p", icon: "✋", lab: "Palm protein", sub: "~25g P each" },
+                { k: "c", icon: "🤲", lab: "Cupped carbs", sub: "~25g C each" },
+                { k: "f", icon: "👍", lab: "Thumb fats", sub: "~12g F each" },
+                { k: "v", icon: "🥦", lab: "Veggies", sub: "free" },
+              ] as { k: "p" | "c" | "f" | "v"; icon: string; lab: string; sub: string }[]).map((cell) => (
+                <div key={cell.k} className="rounded-2xl p-2.5 flex items-center justify-between" style={{ border: "1px solid var(--brand-border)" }}>
+                  <div>
+                    <p className="font-bold" style={{ color: "var(--brand-text)", fontSize: 11 }}>{cell.icon} {cell.lab}</p>
+                    <p style={{ color: "var(--brand-text-secondary)", fontSize: 9 }}>{cell.sub}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setPortions({ ...portions, [cell.k]: Math.max(0, portions[cell.k] - 1) })} className="w-6 h-6 rounded-lg text-xs font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>-</button>
+                    <span className="text-sm font-bold text-center" style={{ color: "var(--brand-text)", minWidth: 14 }}>{portions[cell.k]}</span>
+                    <button onClick={() => setPortions({ ...portions, [cell.k]: portions[cell.k] + 1 })} className="w-6 h-6 rounded-lg text-xs font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>+</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-center mt-2" style={{ color: "var(--brand-text-secondary)", fontSize: 11 }}>Estimated: P{portions.p * 25} C{portions.c * 25} F{portions.f * 12} · {quickKcal(portions.p * 25, portions.c * 25, portions.f * 12)} cal</p>
+            <button onClick={logPortions} disabled={busy} className="w-full mt-2 py-2.5 rounded-full text-xs font-bold text-white" style={{ background: "var(--brand-primary)" }}>Log with portion estimate</button>
+          </div>
+        )}
+        <p className="text-center mt-2" style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>Save is instant — entries show a pending chip until macros are filled in tonight</p>
+      </div>
+
+      {quickRows.length > 0 && (
+        <div className="rounded-3xl p-4" style={CARD_STYLE}>
+          <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "var(--brand-text-secondary)" }}>Logged today</p>
+          {quickRows.map((l) => (
+            <div key={l.id} className="flex items-center justify-between py-2.5" style={{ borderBottom: "1px solid var(--brand-border)" }}>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{l.off_plan_details || "Quick entry"}</p>
+                <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+                  {l.macros_pending ? "macros tonight" : "P" + Math.round(l.est_protein || 0) + " C" + Math.round(l.est_carbs || 0) + " F" + Math.round(l.est_fats || 0) + " · " + Math.round(l.est_kcal || 0) + " cal"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {l.macros_pending ? <span className="font-extrabold px-2 py-0.5 rounded-full" style={{ background: "#fef3c7", color: "#b45309", fontSize: 9 }}>PENDING</span> : null}
+                <button onClick={() => deleteQuick(l.id)} aria-label="Delete entry" style={{ color: "var(--brand-text-secondary)" }}><i className="ti ti-trash" /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   clientId: string;
@@ -60,6 +377,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const [offPlanNotes, setOffPlanNotes] = useState("");
 
   const [selectedDate, setSelectedDate] = useState(today);
+  const [tab, setTab] = useState<"plan" | "quick">(mealPlan ? "plan" : "quick");
   function shiftDate(s: string, delta: number) { const [y,m,d]=s.split("-").map(Number); const dt=new Date(y, m-1, d); dt.setDate(dt.getDate()+delta); const mm=String(dt.getMonth()+1).padStart(2,"0"); const dd=String(dt.getDate()).padStart(2,"0"); return dt.getFullYear()+"-"+mm+"-"+dd; }
   function formatNutritionDate(s: string) { const [y,m,d]=s.split("-").map(Number); const dt=new Date(y, m-1, d); return dt.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}); }
   useEffect(() => {
@@ -249,6 +567,15 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         <button onClick={() => setSelectedDate(shiftDate(selectedDate, 1))} disabled={selectedDate >= today} aria-label="Next day" className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", opacity: selectedDate >= today ? 0.4 : 1 }}><i className="ti ti-chevron-right" /></button>
       </div>
 
+      {/* Shared animated macro header (both tabs) */}
+      <MacroHeader macros={currentMacros} target={macroTarget} />
+
+      {/* Segmented tabs */}
+      <div className="mx-4 mt-3 flex rounded-full p-1" style={{ background: "rgba(127,140,170,0.14)", border: "1px solid var(--brand-border)" }}>
+        <button onClick={() => setTab("plan")} className="flex-1 py-2.5 rounded-full text-sm font-bold transition-all" style={tab === "plan" ? { background: "var(--brand-surface)", color: "var(--brand-text)", boxShadow: "0 3px 10px rgba(20,30,55,0.10)" } : { background: "transparent", color: "var(--brand-text-secondary)" }}>My plan</button>
+        <button onClick={() => setTab("quick")} className="flex-1 py-2.5 rounded-full text-sm font-bold transition-all" style={tab === "quick" ? { background: "var(--brand-surface)", color: "var(--brand-text)", boxShadow: "0 3px 10px rgba(20,30,55,0.10)" } : { background: "transparent", color: "var(--brand-text-secondary)" }}>Quick log</button>
+      </div>
+
       {/* Hidden camera input */}
       <input ref={cameraRef} type="file" accept="image/*" capture="environment"
         className="hidden" onChange={handlePhotoCapture} />
@@ -339,29 +666,8 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       )}
 
       {/* === NO MEAL PLAN === */}
-      {!mealPlan && (
+      {tab === "plan" && !mealPlan && (
         <div className="px-4 mt-4">
-          {logs.length > 0 && (
-            <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-              <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--brand-text-secondary)" }}>Today&apos;s Macros</p>
-              <div className="grid grid-cols-4 gap-3">
-                {[
-                  { label: "Calories", value: Math.round(currentMacros.kcal),    target: macroTarget?.calories || 0, color: "#0EA5E9", unit: "cal" },
-                  { label: "Protein",  value: Math.round(currentMacros.protein), target: macroTarget?.protein  || 0, color: "#22c55e", unit: "g"   },
-                  { label: "Carbs",    value: Math.round(currentMacros.carbs),   target: macroTarget?.carbs    || 0, color: "#f59e0b", unit: "g"   },
-                  { label: "Fats",     value: Math.round(currentMacros.fats),    target: macroTarget?.fats     || 0, color: "#ef4444", unit: "g"   },
-                ].map(m => (
-                  <div key={m.label} className="rounded-xl p-3 flex flex-col items-center gap-1"
-                    style={{ background: `${m.color}10`, border: `1px solid ${m.color}30` }}>
-                    <span className="text-base font-bold" style={{ color: m.color }}>{m.value}</span>
-                    <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{m.unit}</span>
-                    <span className="text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>{m.label}</span>
-                    {m.target > 0 && <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>/ {m.target}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           {logs.length === 0 && (
             <div className="rounded-2xl p-5 mb-4 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               <i className="ti ti-salad text-3xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
@@ -418,55 +724,8 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       )}
 
       {/* === WITH MEAL PLAN === */}
-      {mealPlan && (
+      {tab === "plan" && mealPlan && (
         <>
-          {/* Calorie donut ring + macro stat cards */}
-          <div className="mx-4 mt-4 rounded-2xl p-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-            <div className="flex items-center gap-4">
-              {/* Big calorie donut */}
-              <div className="relative flex-shrink-0" style={{ width: 128, height: 128 }}>
-                <svg width="128" height="128" viewBox="0 0 128 128">
-                  <circle cx="64" cy="64" r={ringR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10"/>
-                  <circle cx="64" cy="64" r={ringR} fill="none" stroke="#0EA5E9" strokeWidth="10"
-                    strokeDasharray={`${ringCirc}`}
-                    strokeDashoffset={`${ringCirc * (1 - kcalPct)}`}
-                    strokeLinecap="round" transform="rotate(-90 64 64)"
-                    style={{ transition: "stroke-dashoffset 0.7s ease" }}/>
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-lg font-bold leading-tight" style={{ color: "var(--brand-text)" }}>
-                    {Math.round(currentMacros.kcal)}
-                  </span>
-                  <span className="text-xs leading-none" style={{ color: "var(--brand-text-secondary)" }}>
-                    {kcalTarget > 0 ? `/ ${kcalTarget}` : "cal"}
-                  </span>
-                  <span className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>kcal</span>
-                </div>
-              </div>
-
-              {/* 4 macro stat cards */}
-              <div className="flex-1 grid grid-cols-2 gap-2">
-                {[
-                  { label: "Protein",      value: Math.round(currentMacros.protein), target: macroTarget?.protein || 0, color: "#22c55e", unit: "g"     },
-                  { label: "Carbs",        value: Math.round(currentMacros.carbs),   target: macroTarget?.carbs   || 0, color: "#f59e0b", unit: "g"     },
-                  { label: "Fats",         value: Math.round(currentMacros.fats),    target: macroTarget?.fats    || 0, color: "#ef4444", unit: "g"     },
-                  { label: "Meals Logged", value: loggedCount,                       target: totalMeals,               color: "#0EA5E9", unit: "meals"  },
-                ].map(m => (
-                  <div key={m.label} className="rounded-xl p-2.5 flex flex-col"
-                    style={{ background: `${m.color}10`, border: `1px solid ${m.color}25` }}>
-                    <span className="text-sm font-bold leading-none" style={{ color: m.color }}>
-                      {m.value}
-                      {m.target > 0 && <span className="text-xs font-normal opacity-60">/{m.target}</span>}
-                      {m.label !== "Meals Logged" && (
-                        <span className="text-xs font-normal ml-0.5" style={{ color: "var(--brand-text-secondary)" }}>{m.unit}</span>
-                      )}
-                    </span>
-                    <span className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>{m.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
 
           {/* Meal cards */}
           <div className="px-4 mt-4 space-y-3">
@@ -653,6 +912,9 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
             </div>
           )}
         </>
+      )}
+      {tab === "quick" && (
+        <QuickLog clientId={clientId} selectedDate={selectedDate} logs={logs} setLogs={setLogs} />
       )}
     </div>
   );
