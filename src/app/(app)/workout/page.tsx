@@ -61,28 +61,29 @@ export default async function WorkoutPage() {
     }
   }
 
-  // Look up today's scheduled workout (Central time)
-  let todayScheduled: { id: string; status: string; dayId: string; dayLabel: string; phaseLabel: string; programName: string } | null = null;
+  // Look up ALL of today's scheduled workouts (Central time) — array, never maybeSingle
+  // (maybeSingle errors when a day has 2 workouts, which made this page show "Rest Day")
+  let todayScheduledList: { id: string; status: string; dayId: string; dayLabel: string; phaseLabel: string; programName: string }[] = [];
   if (clientId) {
-    const { data: sw } = await supabase
+    const { data: swList } = await (supabase as any)
       .from("scheduled_workouts")
       .select("id, status, days(id, label, phases(id, label, programs(name)))")
       .eq("client_id", clientId)
       .eq("scheduled_date", todayDate)
-      .maybeSingle();
-    if (sw) {
-      const d = (sw as any).days;
+      .order("id");
+    todayScheduledList = (swList || []).map((sw: any) => {
+      const d = sw.days;
       const ph = d?.phases;
       const prog = ph?.programs;
-      todayScheduled = {
-        id: sw.id,
-        status: sw.status,
-        dayId: d?.id || "",
-        dayLabel: d?.label || "Workout",
-        phaseLabel: ph?.label || "",
-        programName: prog?.name || "",
+      return {
+        id: sw.id as string,
+        status: sw.status as string,
+        dayId: (d?.id || "") as string,
+        dayLabel: (d?.label || "Workout") as string,
+        phaseLabel: (ph?.label || "") as string,
+        programName: (prog?.name || "") as string,
       };
-    }
+    });
   }
 
   const displayDate = new Date().toLocaleDateString("en-US", {
@@ -98,28 +99,31 @@ export default async function WorkoutPage() {
       </div>
 
       <div className="px-4 py-4">
-        {todayScheduled ? (
+        {todayScheduledList.length > 0 ? (
           <>
-            <div className="card card-glow mb-4">
+            {todayScheduledList.map((ts) => (
+            <div key={ts.id} className="card card-glow mb-4">
               <p className="text-xs mb-1" style={{ color: "var(--brand-text-secondary)" }}>
-                Today &middot; {todayScheduled.phaseLabel}
+                Today &middot; {ts.phaseLabel}
               </p>
               <h2 className="text-lg font-medium mb-1" style={{ color: "var(--brand-text)" }}>
-                {todayScheduled.dayLabel}
+                <i className={`ti ${/cardio/i.test(ts.dayLabel) ? "ti-run" : "ti-barbell"} mr-1.5`} style={{ color: "var(--brand-primary)" }} />
+                {ts.dayLabel}
               </h2>
               <p className="text-sm mb-4" style={{ color: "var(--brand-text-secondary)" }}>
-                {todayScheduled.programName}
+                {ts.programName}
               </p>
-              {todayScheduled.status === "completed" ? (
+              {ts.status === "completed" ? (
                 <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "#22c55e" }}>
                   <i className="ti ti-check" /> Completed
                 </div>
               ) : (
-                <Link href={"/workout/" + todayScheduled.dayId} className="btn btn-primary block text-center">
+                <Link href={"/workout/" + ts.dayId} className="btn btn-primary block text-center">
                   Start workout
                 </Link>
               )}
             </div>
+            ))}
 
             {allPhases.map((phase) => (
               <div key={phase.id} style={{ marginTop: "1.25rem" }}>
