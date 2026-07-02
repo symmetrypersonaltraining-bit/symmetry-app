@@ -500,7 +500,8 @@ function TimePickerSheet({ initial, onSet, onClose }: { initial: number; onSet: 
   );
 }
 
-const BW_NAME_RE = /push[\s-]?up|pull[\s-]?up|chin[\s-]?up|\bdips?\b|plank|bird ?dog|dead ?bug|air squat|bodyweight|\bband\b|mini[- ]?band|stretch|foam roll|lacrosse ball|mobility|hollow hold|superman|inchworm|bear crawl|wall sit|dead hang/i;
+const TIMED_NAME_RE = /plank|\bhold\b|stretch|foam roll|lacrosse ball|dead hang|wall sit|\bcarry\b|treadmill|\bbike\b|rower|elliptical|stair/i;
+const BW_NAME_RE = /push[\s-]?up|pull[\s-]?up|chin[\s-]?up|\bdips?\b|bird ?dog|dead ?bug|air squat|bodyweight|\bband\b|mini[- ]?band|mobility|superman|inchworm|bear crawl/i;
 
 function defaultTrackedFields(pe: any): string[] {
   const raw = pe?.tracked_fields;
@@ -508,7 +509,9 @@ function defaultTrackedFields(pe: any): string[] {
     return raw.map((f: string) => (f === "duration" ? "time" : f));
   }
   if (pe?.volume_type === "duration") return ["time"];
-  if (BW_NAME_RE.test(String(pe?.exercises?.name || ""))) return ["reps"];
+  const nm = String(pe?.exercises?.name || "");
+  if (TIMED_NAME_RE.test(nm)) return ["time"];
+  if (BW_NAME_RE.test(nm)) return ["reps"];
   return ["weight", "reps"];
 }
 
