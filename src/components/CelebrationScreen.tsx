@@ -5,7 +5,7 @@ import Link from "next/link";
 import CountUp from "@/components/CountUp";
 
 /**
- * CelebrationScreen — workout-complete celebration (5 rotating concepts,
+ * CelebrationScreen — workout-complete celebration (20 rotating concepts,
  * chosen per client+day). Fully self-contained and presentational: it
  * computes volume from the raw sets object with defensive guards and never
  * fetches or mutates data, so it is safe to overlay on the existing
@@ -109,7 +109,7 @@ export default function CelebrationScreen({
 
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const seed = hashStr(String(clientId || "") + today);
-  const variant = seed % 5;
+  const variant = seed % 20;
 
   const [tapIdx, setTapIdx] = useState(0);
   const [reroll, setReroll] = useState(0);
@@ -256,7 +256,7 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else {
+  } else if (variant === 4) {
     content = (
       <div style={bigCard}>
         <div style={{ fontSize: 12, fontWeight: 800, color: "var(--brand-text-secondary)", letterSpacing: 1, marginBottom: 8 }}>
@@ -279,6 +279,190 @@ export default function CelebrationScreen({
             </button>
           </>
         )}
+      </div>
+    );
+  } else if (variant === 5) {
+    content = (
+      <div style={{ ...bigCard, background: "#1c2440" }}>
+        <div style={{ background: "#e53935", color: "#fff", fontWeight: 900, fontSize: 11, letterSpacing: 2, padding: "6px 12px", borderRadius: 8, animation: "cs-blink 1.1s infinite" }}>⚠️ EMERGENCY ALERT ⚠️</div>
+        <div style={{ fontSize: 23, fontWeight: 900, color: "#fff", margin: "14px 0 8px" }}>SEVERE GAINS WARNING</div>
+        <div style={{ fontSize: 13, color: "#cdd6f4", lineHeight: 1.6 }}>
+          {"The National Gains Service has detected a Category " + Math.min(5, prCount + 3) + " workout in your area. Witnesses report " + vStr + " lbs being lifted repeatedly, on purpose. Seek protein immediately."}
+        </div>
+        <div style={{ fontSize: 11, color: "#8fa2d4", marginTop: 10 }}>Advisory in effect until the soreness subsides.</div>
+      </div>
+    );
+  } else if (variant === 6) {
+    content = (
+      <div style={{ ...bigCard, background: "#124a2c" }}>
+        <div style={{ fontSize: 40 }}>🎙️</div>
+        <div style={{ background: "#fff", borderRadius: 16, padding: 16, marginTop: 12, fontSize: 14, lineHeight: 1.55, fontStyle: "italic", color: "#1a2233" }}>
+          {"\"UNBELIEVABLE, folks! " + setCount + " sets" + (prCount > 0 ? " — " + prCount + " personal record" + (prCount > 1 ? "s" : "") + " —" : "") + " and the crowd is ON THEIR FEET! I have been calling workouts for 30 years and I have NEVER — I need a moment…\""}
+        </div>
+        <div style={{ fontSize: 11.5, color: "#a7e3c3", marginTop: 10 }}>{"— Partner announcer: \"He is crying again, Jim.\""}</div>
+      </div>
+    );
+  } else if (variant === 7) {
+    content = (
+      <div style={{ ...bigCard, background: "#2c421f" }}>
+        <div style={{ fontSize: 40 }}>🌿</div>
+        <div style={{ color: "#eef4dd", fontSize: 14, lineHeight: 1.65, fontStyle: "italic", marginTop: 12 }}>
+          {"…and here, in the fluorescent savanna, we observe " + firstName + " completing a " + setCount + "-set display. Note the determined grimace — behaviour seen only in apex lifters. Truly… remarkable."}
+        </div>
+        <div style={{ fontSize: 11, color: "#b7cf8f", marginTop: 10 }}>Narrated in a very soft British accent.</div>
+      </div>
+    );
+  } else if (variant === 8) {
+    content = (
+      <div style={{ ...bigCard, background: "#2a2f3e" }}>
+        <div style={{ background: "#fffef5", width: 230, padding: 16, fontFamily: "'Courier New', monospace", fontSize: 12, textAlign: "left", color: "#222", boxShadow: "0 10px 30px rgba(0,0,0,.4)" }}>
+          <div style={{ textAlign: "center", fontWeight: 700 }}>SYMMETRY FITNESS<br />★ OFFICIAL RECEIPT ★</div>
+          <hr style={{ borderStyle: "dashed", margin: "8px 0" }} />
+          {"SETS ......... x" + setCount}<br />
+          {"LBS MOVED .... " + vStr}<br />
+          {min > 0 ? "MINUTES ...... " + min : "SWEAT ........ PLENTY"}<br />
+          {"EXCUSES ...... 0.00"}<br />
+          {prCount > 0 ? "PRs .......... x" + prCount + " 🔥" : "EFFORT ....... MAXED"}
+          <hr style={{ borderStyle: "dashed", margin: "8px 0" }} />
+          <b>TOTAL: PAID IN FULL</b>
+          <div style={{ textAlign: "center", marginTop: 8 }}>NO REFUNDS.<br />GAINS FINAL SALE.</div>
+        </div>
+      </div>
+    );
+  } else if (variant === 9) {
+    content = (
+      <div style={{ ...bigCard, background: "#0a0a1a", fontFamily: "'Courier New', monospace" }}>
+        <div style={{ color: "#39ff88", fontSize: 20, fontWeight: 700, animation: "cs-blink 1s infinite" }}>★ NEW HIGH SCORE ★</div>
+        <div style={{ color: "#ffe14d", fontSize: 38, fontWeight: 900, margin: "12px 0" }}><CountUp end={volume} duration={1400} /></div>
+        <div style={{ color: "#77ddff", fontSize: 13, fontWeight: 700 }}>{"RANK #1 — " + firstName.toUpperCase()}</div>
+        <div style={{ color: "#889", fontSize: 11, marginTop: 12 }}>INSERT PROTEIN TO CONTINUE</div>
+      </div>
+    );
+  } else if (variant === 10) {
+    content = (
+      <div style={{ ...bigCard, background: "#3b2a1a" }}>
+        <div style={{ background: "#e8d5a9", border: "6px double #6b4a2a", padding: 16, color: "#4a3418", width: 240 }}>
+          <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: 3 }}>WANTED</div>
+          <div style={{ fontSize: 46, margin: "6px 0" }}>🏋️</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700 }}>FOR REPEATED CRIMES<br />AGAINST GRAVITY</div>
+          <div style={{ fontSize: 11, marginTop: 8, lineHeight: 1.5 }}>
+            {"Last seen moving " + vStr + " lbs that were minding their own business. Considered strong and extremely sore."}
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 900, marginTop: 8 }}>{prCount > 0 ? "REWARD: " + prCount + " PR" + (prCount > 1 ? "s" : "") : "REWARD: ETERNAL GLORY"}</div>
+        </div>
+      </div>
+    );
+  } else if (variant === 11) {
+    content = (
+      <div style={{ ...bigCard, background: "#16223f" }}>
+        <div style={{ background: "#fff", borderRadius: 14, width: 250, textAlign: "left", overflow: "hidden" }}>
+          <div style={{ background: "var(--brand-primary)", color: "#fff", padding: "10px 14px", fontWeight: 800, fontSize: 13 }}>SWOLE AIR ✈ FIRST CLASS</div>
+          <div style={{ padding: "12px 14px", fontSize: 12, color: "#1a2233", lineHeight: 1.7 }}>
+            <b style={{ fontSize: 14 }}>{firstName.toUpperCase() + " → GAINSVILLE"}</b><br />
+            {"FLIGHT: SWL-" + ((seed % 900) + 100) + " · SEAT: 1A"}<br />
+            {"BAGGAGE: " + vStr + " lbs (checked ✓)"}<br />
+            <b style={{ color: "#22c55e" }}>{"STATUS: LANDED" + (prCount > 0 ? " — " + prCount + " PR COLLECTED" : "")}</b>
+          </div>
+          <div style={{ borderTop: "2px dashed #ccd", padding: "8px 14px", fontSize: 10, color: "#889" }}>Your legs may feel like they are still in the air tomorrow.</div>
+        </div>
+      </div>
+    );
+  } else if (variant === 12) {
+    content = (
+      <div style={{ ...bigCard, background: "#2c1e4d" }}>
+        <div style={{ color: "#ffe14d", fontSize: 26, fontWeight: 900, textShadow: "0 0 18px rgba(255,184,0,.6)" }}>LEVEL UP!</div>
+        <div style={{ width: 210, height: 13, background: "#1a1230", borderRadius: 7, margin: "14px 0", overflow: "hidden" }}>
+          <div style={{ height: "100%", background: "linear-gradient(90deg,#7c9cf5,#5ec9a3)", animation: "cs-xp 1.6s ease-out forwards" }} />
+        </div>
+        <div style={{ color: "#e6dcff", fontSize: 13, lineHeight: 1.8 }}>
+          {"+" + vStr + " XP"}<br />
+          {"STRENGTH +2 · GRIT +3 · SORENESS +" + Math.max(7, setCount * 2)}<br />
+          <b style={{ color: "#ffe14d" }}>New ability unlocked:</b><br />
+          {"\"Walking Funny Tomorrow\""}
+        </div>
+      </div>
+    );
+  } else if (variant === 13) {
+    content = (
+      <div style={{ ...bigCard, background: "#4a3626" }}>
+        <div style={{ fontSize: 44 }}>🔨</div>
+        <div style={{ color: "#f5e6c8", fontSize: 22, fontWeight: 900, margin: "10px 0" }}>VERDICT: GUILTY</div>
+        <div style={{ color: "#e0cfa8", fontSize: 13, lineHeight: 1.6 }}>
+          {"On " + setCount + " counts of excessive effort" + (prCount > 0 ? " and " + prCount + " count" + (prCount > 1 ? "s" : "") + " of record-breaking" : "") + ", this court finds " + firstName + " GUILTY. Sentence: one (1) large meal and a suspiciously smug attitude."}
+        </div>
+        <div style={{ color: "#c9b485", fontSize: 11, marginTop: 8 }}>{"Court adjourned. Gravity\u2019s lawyer stormed out."}</div>
+      </div>
+    );
+  } else if (variant === 14) {
+    content = (
+      <div style={{ ...bigCard, background: "#060a14" }}>
+        <div style={{ fontSize: 36 }}>🚀</div>
+        <div style={{ fontFamily: "'Courier New', monospace", color: "#5ef2c5", fontSize: 12, textAlign: "left", background: "#0b1322", border: "1px solid #1d3050", borderRadius: 10, padding: 12, marginTop: 10, width: 240, lineHeight: 1.7 }}>
+          {"> MISSION: " + (dayLabel || "TODAY").toUpperCase()}<br />
+          {"> PAYLOAD: " + vStr + " LBS ... ✓"}<br />
+          {"> SETS DEPLOYED: " + setCount + " ... ✓"}<br />
+          {prCount > 0 ? "> PR BOOSTERS: " + prCount + " ... ✓" : "> ALL SYSTEMS ... NOMINAL"}<br />
+          <span style={{ color: "#ffe14d", animation: "cs-blink 1s infinite" }}>{"> STATUS: THE GAINS HAVE LANDED"}</span>
+        </div>
+        <div style={{ color: "#7d93c4", fontSize: 11, marginTop: 10 }}>{"\"Houston, we have no problem whatsoever.\""}</div>
+      </div>
+    );
+  } else if (variant === 15) {
+    content = (
+      <div style={{ ...bigCard, background: "#5c1238" }}>
+        <div style={{ color: "#ffe14d", fontSize: 22, fontWeight: 900, lineHeight: 1.2 }}>BUT WAIT —<br />THERE&rsquo;S MORE!</div>
+        <div style={{ color: "#ffd9ec", fontSize: 13.5, lineHeight: 1.6, marginTop: 12 }}>
+          {"You did not just finish a workout — you got " + vStr + " lbs of value ABSOLUTELY FREE! Act in the next 24 hours and we will throw in complimentary DOMS* at no extra charge!"}
+        </div>
+        <div style={{ color: "#ff9ecb", fontSize: 10, marginTop: 10 }}>*Delayed Onset Muscle Soreness. Cannot be returned. Operators are standing by (you cannot).</div>
+      </div>
+    );
+  } else if (variant === 16) {
+    content = (
+      <div style={{ ...bigCard, background: "#000", overflow: "hidden" }}>
+        <div style={{ animation: "cs-credits 11s linear infinite", color: "#fff", fontSize: 13, lineHeight: 2, textAlign: "center" }}>
+          <b style={{ fontSize: 18 }}>&ldquo;THE SESSION&rdquo;</b><br /><br />
+          STARRING<br /><b>{firstName}</b><br /><br />
+          VILLAIN<br /><b>Gravity</b> (defeated)<br /><br />
+          SUPPORTING CAST<br />{setCount + " Sets · " + vStr + " lbs"}<br /><br />
+          {prCount > 0 ? "STUNTS" : "SPECIAL EFFECTS"}<br />{prCount > 0 ? prCount + " Personal Record" + (prCount > 1 ? "s" : "") : "Pure Determination"}<br /><br />
+          NO EXCUSES WERE HARMED<br />IN THE MAKING OF THIS WORKOUT
+        </div>
+      </div>
+    );
+  } else if (variant === 17) {
+    content = (
+      <div style={{ ...bigCard, background: "#221a44" }}>
+        <div style={{ fontSize: 36 }}>🔮</div>
+        <div style={{ color: "#d9c9ff", fontSize: 17, fontWeight: 800, margin: "10px 0" }}>TODAY&rsquo;S GYM HOROSCOPE</div>
+        <div style={{ color: "#cbb8f5", fontSize: 13.5, lineHeight: 1.65, fontStyle: "italic" }}>
+          {"\"With " + vStr + " lbs in your gravitational field, Mercury is not the only thing in retrograde — so is your old max. Expect great fortune, big meals, and mild difficulty with stairs.\""}
+        </div>
+        <div style={{ color: "#8f7cc9", fontSize: 11, marginTop: 8 }}>{"Lucky number: " + setCount + ". Lucky element: Iron."}</div>
+      </div>
+    );
+  } else if (variant === 18) {
+    content = (
+      <div style={{ ...bigCard, background: "#5c3a20" }}>
+        <div style={{ fontSize: 40 }}>🍳</div>
+        <div style={{ color: "#ffe9cf", fontSize: 19, fontWeight: 900, margin: "10px 0" }}>*chef&rsquo;s kiss* MAGNIFIQUE!</div>
+        <div style={{ color: "#f5d9b8", fontSize: 13.5, lineHeight: 1.6 }}>
+          {"Today\u2019s special: muscles flamb\u00e9 — seared over " + setCount + " sets" + (min > 0 ? " for " + min + " minutes" : "") + (prCount > 0 ? ", finished with a reduction of " + prCount + " personal record" + (prCount > 1 ? "s" : "") : "") + ". The secret ingredient? You showed up."}
+        </div>
+        <div style={{ color: "#d9b183", fontSize: 11, marginTop: 8 }}>Pairs beautifully with an enormous dinner.</div>
+      </div>
+    );
+  } else {
+    content = (
+      <div style={{ ...bigCard, background: "#4d1233" }}>
+        <div style={{ color: "#ff8fc0", fontSize: 24, fontWeight: 900 }}>IT&rsquo;S A MATCH! 💘</div>
+        <div style={{ display: "flex", gap: 14, margin: "16px 0", justifyContent: "center" }}>
+          <div style={{ width: 80, height: 80, borderRadius: "50%", background: "var(--brand-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, border: "3px solid #fff" }}>💪</div>
+          <div style={{ width: 80, height: 80, borderRadius: "50%", background: "#5ec9a3", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, border: "3px solid #fff" }}>📈</div>
+        </div>
+        <div style={{ color: "#ffd3e8", fontSize: 13.5, lineHeight: 1.6 }}>
+          {firstName + " and Results have liked each other. Results says: \"I do not usually show up this fast, but " + setCount + " sets? I will make an exception.\""}
+        </div>
       </div>
     );
   }
@@ -327,4 +511,4 @@ const poster: React.CSSProperties = { background: "#f7ecd8", border: "6px double
 const fortuneCard: React.CSSProperties = { background: "#fff", border: "1px solid var(--brand-border)", borderRadius: 4, padding: "12px 16px", fontSize: 13, color: "var(--brand-text)", boxShadow: "0 8px 26px rgba(20,30,55,.08)", maxWidth: 280, lineHeight: 1.6 };
 const ghostBtn: React.CSSProperties = { marginTop: 14, border: "1px solid var(--brand-border)", background: "var(--brand-surface)", color: "var(--brand-text)", borderRadius: 999, padding: "10px 16px", fontSize: 12, fontWeight: 800, cursor: "pointer" };
 const doneBtn: React.CSSProperties = { textAlign: "center", background: "var(--brand-primary)", color: "#fff", borderRadius: 999, padding: "13px 0", fontSize: 14, fontWeight: 800, textDecoration: "none" };
-const CSS = "@keyframes cs-fall{to{transform:translateY(760px) rotate(720deg)}}@keyframes cs-stamp{from{transform:rotate(12deg) scale(3);opacity:0}to{transform:rotate(12deg) scale(1);opacity:.9}}";
+const CSS = "@keyframes cs-fall{to{transform:translateY(760px) rotate(720deg)}}@keyframes cs-blink{50%{opacity:.3}}@keyframes cs-xp{from{width:6%}to{width:85%}}@keyframes cs-credits{from{transform:translateY(100%)}to{transform:translateY(-100%)}}@keyframes cs-stamp{from{transform:rotate(12deg) scale(3);opacity:0}to{transform:rotate(12deg) scale(1);opacity:.9}}";
