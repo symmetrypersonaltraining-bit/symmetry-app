@@ -1,4 +1,5 @@
 "use client";
+import MessagesBell from "./MessagesBell";
 
 import Logo from "./Logo";
 import Link from "next/link";
@@ -31,7 +32,8 @@ export default function AppHeader({
             Personal Training
           </div>
         </div>
-        {/* User avatar / view label */}
+        <MessagesBell />
+          {/* User avatar / view label */}
         <div className="flex items-center gap-2">
           {isTrainer && (
             <span
