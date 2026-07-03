@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { sendMessage, sendClientMessage, sendBroadcastMessage } from "../home/messageActions";
+import { sendMessage, sendClientMessage, sendGroupMessage, sendBroadcastMessage } from "../home/messageActions";
 
 interface Message {
   id: string;
@@ -50,7 +50,7 @@ function getInitials(name: string) {
   return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
-export default function MessagesClient({ isTrainer, clients, selectedClientId, thread, currentUserId, unreadByClient }: Props) {
+export default function MessagesClient({ isTrainer, clients, selectedClientId, thread, currentUserId, unreadByClient, senderNames = {} }: Props) {
   const router = useRouter();
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -67,7 +67,9 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
     if (!trimmed || sending) return;
     setSending(true);
     try {
-      if (isTrainer && selectedClientId === "broadcast") {
+      if (selectedClientId === "group") {
+        await sendGroupMessage(trimmed);
+      } else if (isTrainer && selectedClientId === "broadcast") {
         const n = await sendBroadcastMessage(trimmed);
         setBroadcastSent(n);
       } else if (isTrainer && selectedClientId) {
@@ -120,7 +122,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                   <div key={m.id} className={"flex " + (isMe ? "justify-end" : "justify-start")}>
                     <div className="max-w-[78%] rounded-2xl px-4 py-2.5"
                       style={{ background: isMe ? "var(--brand-primary)" : "var(--brand-surface)", border: isMe ? "none" : "1px solid var(--brand-border)", borderBottomRightRadius: isMe ? 4 : 16, borderBottomLeftRadius: isMe ? 16 : 4 }}>
-                      <p className="text-sm leading-relaxed" style={{ color: isMe ? "white" : "var(--brand-text)" }}>{m.body}</p>
+                      <p className="text-sm leading-relaxed" style={{ color: isMe ? "white" : "var(--brand-text)" }}>{isGroup && !isMe && senderNames[m.from_id] ? senderNames[m.from_id] + ": " : ""}{m.body}</p>
                       <div className={"flex items-center gap-1 mt-1 " + (isMe ? "justify-end" : "justify-start")}>
                         <span className="text-[10px]" style={{ color: isMe ? "rgba(255,255,255,0.55)" : "var(--brand-text-secondary)" }}>{fmtTime(m.created_at)}</span>
                         {isMe && <span className="text-[10px]" style={{ color: m.read_at ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)" }}>{m.read_at ? "✓✓" : "✓"}</span>}
@@ -153,6 +155,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
   // Trainer two-panel layout
   if (isTrainer) {
     const isBroadcast = selectedClientId === "broadcast";
+  const isGroup = selectedClientId === "group";
     const selectedClient = clients.find(c => c.id === selectedClientId) || null;
     return (
       <div className="flex overflow-hidden" style={{ background: "var(--brand-bg)", height: "100dvh" }}>
@@ -171,6 +174,17 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold truncate" style={{ color: isBroadcast ? "var(--brand-primary)" : "var(--brand-text)" }}>All Clients</p>
                 <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Send one message to everyone</p>
+              </div>
+            </Link>
+<Link href="/messages?client=group"
+              className="flex items-center gap-3 px-4 py-3.5 border-b transition-colors"
+              style={{ borderColor: "var(--brand-border)", background: isGroup ? "color-mix(in srgb, var(--brand-primary) 10%, transparent)" : "transparent", borderLeft: isGroup ? "3px solid var(--brand-primary)" : "3px solid transparent" }}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
+                <i className="ti ti-speakerphone text-base" style={{ color: "white" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: isGroup ? "var(--brand-primary)" : "var(--brand-text)" }}>Group Chat</p>
+                <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Everyone can see and reply</p>
               </div>
             </Link>
             {clients.map(c => {
