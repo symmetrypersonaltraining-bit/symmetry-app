@@ -5,6 +5,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { dismissClientNotification } from "./notifActions";
 import HomeMacrosCard from "@/components/HomeMacrosCard";
+import CountUp from "@/components/CountUp";
 
 interface MetricPoint {
   metric_date: string;
@@ -266,7 +267,7 @@ function FullChart({
             style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
             <p className="text-xs mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>{s.label}</p>
             <p className="text-base font-bold" style={{ color: "var(--brand-text)" }}>
-              {s.val.toFixed(1)}<span className="text-xs font-normal ml-0.5">{unit}</span>
+              <CountUp end={s.val} decimals={1} duration={900} /><span className="text-xs font-normal ml-0.5">{unit}</span>
             </p>
           </div>
         ))}
