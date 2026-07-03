@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import MessagesClient from "./MessagesClient";
@@ -14,7 +15,9 @@ export default async function MessagesPage(props: {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = user.email === TRAINER_EMAIL;
+  const __cookieStore = await cookies();
+  const __isInClientMode = __cookieStore.get("symmetry_client_mode")?.value === "1";
+  const isTrainer = user.email === TRAINER_EMAIL && !__isInClientMode;
 
   if (searchParams.client === "group") {
     const { data: gmsgs } = await supabase.from("messages").select("*").eq("is_group", true).order("created_at", { ascending: true });
