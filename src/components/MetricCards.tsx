@@ -332,6 +332,17 @@ function ExpandedPanel({
 
       chartRef.current = new Chart(canvasRef.current!, {
         type: 'line',
+        plugins: [{
+          id: 'cwCrosshair',
+          afterDatasetsDraw(chart: any) {
+            const act = chart.tooltip && chart.tooltip.getActiveElements ? chart.tooltip.getActiveElements() : [];
+            if (!act || !act.length) return;
+            const x = act[0].element.x;
+            const area = chart.chartArea; const c2 = chart.ctx;
+            c2.save(); c2.beginPath(); c2.moveTo(x, area.top); c2.lineTo(x, area.bottom);
+            c2.lineWidth = 1; c2.strokeStyle = 'rgba(128,128,128,0.45)'; c2.setLineDash([4,4]); c2.stroke(); c2.restore();
+          },
+        }],
         data: {
           labels,
           datasets: [{
@@ -350,6 +361,8 @@ function ExpandedPanel({
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false, axis: 'x' },
+          hover: { mode: 'index', intersect: false },
           animation: { duration: 600 },
           plugins: {
             legend: { display: false },
