@@ -122,7 +122,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                   <div key={m.id} className={"flex " + (isMe ? "justify-end" : "justify-start")}>
                     <div className="max-w-[78%] rounded-2xl px-4 py-2.5"
                       style={{ background: isMe ? "var(--brand-primary)" : "var(--brand-surface)", border: isMe ? "none" : "1px solid var(--brand-border)", borderBottomRightRadius: isMe ? 4 : 16, borderBottomLeftRadius: isMe ? 16 : 4 }}>
-                      <p className="text-sm leading-relaxed" style={{ color: isMe ? "white" : "var(--brand-text)" }}>{isGroup && !isMe && senderNames[m.from_id] ? senderNames[m.from_id] + ": " : ""}{m.body}</p>
+                      <p className="text-sm leading-relaxed" style={{ color: isMe ? "white" : "var(--brand-text)" }}>{isGroup && !isMe && senderNames[m.from_id] ? senderNames[m.from_id] + ": " : ""}{m.body.split("\n").map((ln, li) => (<span key={li}>{li > 0 ? <br /> : null}{ln}</span>))}</p>
                       <div className={"flex items-center gap-1 mt-1 " + (isMe ? "justify-end" : "justify-start")}>
                         <span className="text-[10px]" style={{ color: isMe ? "rgba(255,255,255,0.55)" : "var(--brand-text-secondary)" }}>{fmtTime(m.created_at)}</span>
                         {isMe && <span className="text-[10px]" style={{ color: m.read_at ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)" }}>{m.read_at ? "✓✓" : "✓"}</span>}
@@ -137,10 +137,10 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
         <div ref={bottomRef} />
       </div>
       <div className="border-t p-3 flex items-center gap-2" style={{ borderColor: "var(--brand-border)", background: "var(--brand-bg)" }}>
-        <input ref={inputRef} type="text" value={body} onChange={e => setBody(e.target.value)}
+        <textarea ref={inputRef as any} rows={2} onInput={(e) => { const t = e.currentTarget as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160) + "px"; }} type="text" value={body} onChange={e => setBody(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           placeholder="Message..." className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
-          style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} />
+          style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} ></textarea>
         <button onClick={handleSend} disabled={!body.trim() || sending}
           className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
           style={{ background: body.trim() && !sending ? "var(--brand-primary)" : "var(--brand-surface)", border: "1px solid var(--brand-border)", opacity: !body.trim() || sending ? 0.6 : 1 }}>
