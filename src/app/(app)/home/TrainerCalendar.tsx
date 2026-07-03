@@ -1582,7 +1582,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
       {/* Google Calendar-style FAB */}
       <button
         onClick={() => setAddModal({ date: today, timeStr: "09:00" })}
-        className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+        className="mt-4 mx-auto w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
         style={{ background: "#E53935", boxShadow: "0 4px 16px rgba(229,57,53,0.4)" }}
         title="Add session"
       >
