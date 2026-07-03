@@ -243,7 +243,7 @@ export default function ReminderEditor() {
             {calc.warnings.map((w) => (
               <div key={w} className="text-xs" style={{ color: "#f59e0b" }}>{"⚠️ " + w}</div>
             ))}
-            {!sent && blocked && (
+            {!sent && Math.abs((parseFloat(e.amount) || 0) - calc.expected) > 0.009 && (
               <div className="flex gap-2">
                 <button onClick={() => setEdit(r.id, { amount: String(calc.expected) })}
                   className="text-xs font-bold px-3 py-2 rounded-xl"
