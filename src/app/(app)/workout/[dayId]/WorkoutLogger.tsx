@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
+import OffPlanBanner from "@/components/OffPlanBanner";
 
 interface Exercise {
   id: string;
@@ -1268,6 +1269,8 @@ export default function WorkoutLogger({
           <span className="text-white/70 text-xs font-medium">{progressPct}%</span>
         </div>
       </div>
+
+      {clientId && <OffPlanBanner clientId={clientId} dayId={day.id} />}
 
       <div className="px-4 -mt-2 pb-8">
         {/* Section tabs */}
