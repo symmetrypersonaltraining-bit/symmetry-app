@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import PaymentsClient from "./PaymentsClient";
+import ReminderEditor from "@/components/ReminderEditor";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -73,5 +74,10 @@ export default async function PaymentsPage() {
     };
   });
 
-  return <PaymentsClient clients={clients} />;
+  return (
+    <>
+      <ReminderEditor />
+      <PaymentsClient clients={clients} />
+    </>
+  );
 }
