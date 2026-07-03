@@ -69,12 +69,13 @@ export async function POST(req: NextRequest) {
     for (const event of allEvents) {
       const colorId = event.colorId || null;
       const summary = event.summary || '';
-      if (colorId !== null && colorId !== COLOR_CANCELLED && colorId !== COLOR_PAYMENT) continue;
+      const isPayment = colorId === COLOR_PAYMENT || /\$\s?\d/.test(summary);
+      if (!isPayment && colorId !== null && colorId !== COLOR_CANCELLED) continue;
 
       const clientId = matchClient(summary);
       if (!clientId) continue;
 
-      if (colorId === COLOR_PAYMENT) {
+      if (isPayment) {
         const payDate = event.start?.date || event.start?.dateTime?.split('T')[0];
         if (!payDate) continue;
         paymentBatch.push({ client_id: clientId, title: summary, payment_date: payDate, google_event_id: event.id, source: 'gcal_sync' });
