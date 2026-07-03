@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useTheme, THEMES } from "@/components/ThemeProvider";
+import { AvatarSelf } from "@/components/Avatar";
 
 interface Props {
   userEmail: string;
@@ -84,9 +85,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
         <p className="section-header">Profile</p>
         <div className="card p-4 space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="client-avatar flex-shrink-0" style={{ width: 48, height: 48, borderRadius: 14, background: "var(--brand-primary)", fontSize: 18 }}>
-              {userName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
-            </div>
+            <AvatarSelf name={userName} size={48} radius={14} />
             <div className="min-w-0 flex-1">
               <p className="font-semibold truncate" style={{ color: "var(--brand-text)" }}>{userName || "—"}</p>
               <p className="text-sm truncate" style={{ color: "var(--brand-text-secondary)" }}>{userEmail}</p>
