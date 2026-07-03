@@ -106,20 +106,12 @@ export default async function MessagesPage(props: {
     .eq("client_id", clientRecord.id)
     .order("created_at", { ascending: true });
 
-  const { data: trainerSettings } = await supabase
-    .from("trainer_settings")
-    .select("user_id")
-    .limit(1)
-    .maybeSingle();
-
-  if (trainerSettings?.user_id) {
-    await supabase
+  await supabase
       .from("messages")
       .update({ read_at: new Date().toISOString() })
       .eq("client_id", clientRecord.id)
-      .eq("from_id", trainerSettings.user_id)
+      .eq("to_id", user.id)
       .is("read_at", null);
-  }
 
   return (
     <MessagesClient
