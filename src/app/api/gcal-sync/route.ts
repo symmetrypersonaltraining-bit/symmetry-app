@@ -75,6 +75,10 @@ export async function POST(req: NextRequest) {
       const clientId = matchClient(summary);
       if (!clientId) continue;
 
+      // Business rules: Steph's paycheck is NEVER a client payment; Gerard and Dustin are never billed.
+      const PAYMENT_EXCLUDED_CLIENTS = ['d970da5e-9c46-45c4-be9c-e27e1893b575', '69021074-1708-4d73-9245-918862048709'];
+      if (isPayment && (/paycheck/i.test(summary) || PAYMENT_EXCLUDED_CLIENTS.includes(clientId))) continue;
+
       if (isPayment) {
         const payDate = event.start?.date || event.start?.dateTime?.split('T')[0];
         if (!payDate) continue;
