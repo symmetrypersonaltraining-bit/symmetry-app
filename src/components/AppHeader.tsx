@@ -1,5 +1,6 @@
 "use client";
 import MessagesBell from "./MessagesBell";
+import HeaderAssist from "./HeaderAssist";
 
 import Logo from "./Logo";
 import Link from "next/link";
@@ -32,6 +33,7 @@ export default function AppHeader({
             Personal Training
           </div>
         </div>
+        <HeaderAssist />
         <MessagesBell />
           {/* User avatar / view label */}
         <div className="flex items-center gap-2">
