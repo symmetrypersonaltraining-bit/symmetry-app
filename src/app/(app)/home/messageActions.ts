@@ -77,3 +77,11 @@ export async function sendBroadcastMessage(body: string): Promise<number> {
   }
   return rows.length;
 }
+
+export async function sendGroupMessage(body: string): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, is_group: true });
+  revalidatePath("/messages");
+}
