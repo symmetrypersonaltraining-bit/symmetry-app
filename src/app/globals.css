@@ -1004,3 +1004,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 }
 input, textarea, select{ border-radius:12px; transition:border-color .15s ease, box-shadow .15s ease; }
 /* ===== end REDESIGN-POLISH-V2 ===== */
+
+/* ============ Visual polish utilities (Cowork) ============ */
+@keyframes cw-fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes cw-shimmer { to { background-position: -200% 0; } }
+@keyframes cw-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes cw-pop { 0% { transform: scale(1); } 40% { transform: scale(1.3); } 100% { transform: scale(1); } }
+
+/* Staggered entrance: add class to a container; direct children fade+rise in sequence */
+.cw-reveal > * { animation: cw-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.cw-reveal > *:nth-child(1) { animation-delay: 0s; }
+.cw-reveal > *:nth-child(2) { animation-delay: 0.06s; }
+.cw-reveal > *:nth-child(3) { animation-delay: 0.12s; }
+.cw-reveal > *:nth-child(4) { animation-delay: 0.18s; }
+.cw-reveal > *:nth-child(5) { animation-delay: 0.24s; }
+.cw-reveal > *:nth-child(6) { animation-delay: 0.3s; }
+.cw-reveal > *:nth-child(7) { animation-delay: 0.36s; }
+.cw-reveal > *:nth-child(8) { animation-delay: 0.42s; }
+
+/* Shimmer skeleton placeholder */
+.cw-skeleton { background: linear-gradient(100deg, var(--brand-card, #eef2fb) 30%, rgba(255,255,255,0.65) 50%, var(--brand-card, #eef2fb) 70%); background-size: 200% 100%; animation: cw-shimmer 1.3s linear infinite; border-radius: 10px; }
+
+/* Opt-in press feedback for tappable elements */
+.cw-press { transition: transform 0.08s ease; }
+.cw-press:active { transform: scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cw-reveal > *, .cw-skeleton { animation: none !important; }
+}
