@@ -10,7 +10,7 @@ const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
  * Self-contained: detects trainer + client-mode itself, writes feedback to
  * app_feedback, opens the AI panel via the existing "symmetry:open-ai" event.
  */
-export default function HeaderAssist() {
+export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
   const [isTrainer, setIsTrainer] = useState(false);
   const [clientMode, setClientMode] = useState(false);
   const [open, setOpen] = useState(false);
@@ -64,7 +64,7 @@ export default function HeaderAssist() {
     } catch {} finally { setSending(false); }
   }
 
-  const hBtn: CSSProperties = { width: 34, height: 34, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.12)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
+  const hBtn: CSSProperties = { width: 34, height: 34, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.3)", background: solid ? "var(--brand-primary)" : "rgba(255,255,255,0.12)", boxShadow: solid ? "0 4px 14px rgba(20,30,55,.3)" : "none", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
 
   return (
     <>
