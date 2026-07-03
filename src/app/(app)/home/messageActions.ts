@@ -41,16 +41,12 @@ export async function sendClientMessage(body: string): Promise<void> {
     .maybeSingle();
   if (!clientRecord) return;
 
-  const { data: trainerSettings } = await supabase
-    .from('trainer_settings')
-    .select('user_id')
-    .limit(1)
-    .maybeSingle();
-  if (!trainerSettings?.user_id) return;
+  const { data: trainerId } = await supabase.rpc("trainer_user_id");
+  if (!trainerId) return;
 
   await supabase.from('messages').insert({
     from_id: user.id,
-    to_id: trainerSettings.user_id,
+    to_id: (trainerId as string),
     client_id: clientRecord.id,
     body,
   });
