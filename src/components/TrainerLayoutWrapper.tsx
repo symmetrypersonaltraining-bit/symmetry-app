@@ -6,6 +6,7 @@ import Link from "next/link";
 import TrainerSidebar from "./TrainerSidebar";
 import AIAssistant from "./AIAssistant";
 import Logo from "./Logo";
+import HeaderAssist from "./HeaderAssist";
 
 interface Props {
   children: React.ReactNode;
@@ -54,7 +55,8 @@ export default function TrainerLayoutWrapper({ children }: Props) {
             <span className="text-white font-semibold text-sm">Symmetry</span>
             <span className="text-white/50 text-xs ml-2">· My Training</span>
           </div>
-          <button
+          <HeaderAssist />
+        <button
             onClick={handleToggleMode}
             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg"
             style={{ background: "rgba(255,255,255,0.15)", color: "white" }}>
@@ -100,6 +102,9 @@ export default function TrainerLayoutWrapper({ children }: Props) {
       <div className="flex-1 min-w-0 overflow-y-auto">
         <div className="lg:hidden h-14" />
         {children}
+      </div>
+      <div style={{ position: "fixed", top: 10, right: 14, zIndex: 950 }}>
+        <HeaderAssist solid />
       </div>
       <AIAssistant />
     </div>
