@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import NewClientModal from "./NewClientModal";
+import { createClient } from "@/lib/supabase/client";
+import ClientStatusDot from "@/components/ClientStatusDot";
 
 const AVATAR_COLORS = [
   { bg: "#DDEEFF", text: "var(--brand-primary)" },
@@ -31,6 +33,43 @@ interface Props {
 export default function ClientsListClient({ clients }: Props) {
   const [search, setSearch] = useState("");
   const [showNewClient, setShowNewClient] = useState(false);
+
+  const [statusMap, setStatusMap] = useState<Record<string, "green" | "amber" | "red">>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+        const since = new Date(todayStr + "T00:00:00");
+        since.setDate(since.getDate() - 21);
+        const sinceStr = since.toLocaleDateString("en-CA");
+        const [w, m] = await Promise.all([
+          supabase.from("workout_logs").select("client_id, log_date").gte("log_date", sinceStr),
+          supabase.from("meal_adherence_logs").select("client_id, log_date").gte("log_date", sinceStr),
+        ]);
+        const rows = [...(w.data || []), ...(m.data || [])] as { client_id: string; log_date: string }[];
+        const latest: Record<string, string> = {};
+        for (const row of rows) {
+          if (!row || !row.client_id || !row.log_date) continue;
+          if (!latest[row.client_id] || row.log_date > latest[row.client_id]) latest[row.client_id] = row.log_date;
+        }
+        const today = new Date(todayStr + "T00:00:00").getTime();
+        const map: Record<string, "green" | "amber" | "red"> = {};
+        for (const cid of Object.keys(latest)) {
+          const days = Math.round((today - new Date(latest[cid] + "T00:00:00").getTime()) / 86400000);
+          map[cid] = days <= 2 ? "green" : days <= 4 ? "amber" : "red";
+        }
+        if (!cancelled) setStatusMap(map);
+      } catch {
+        /* non-fatal: activity dots simply not shown if fetch fails */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = clients.filter(
     (c) =>
@@ -136,6 +175,10 @@ export default function ClientsListClient({ clients }: Props) {
                     {client.activeProgram || "No active program"}
                   </div>
                 </div>
+
+                {client.hasAppAccess && statusMap[client.id] && (
+                  <ClientStatusDot status={statusMap[client.id]} />
+                )}
 
                 {/* Chevron */}
                 <i
