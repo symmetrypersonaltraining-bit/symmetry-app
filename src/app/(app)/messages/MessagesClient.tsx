@@ -200,7 +200,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                     {getInitials(c.name)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: isSel ? "var(--brand-primary)" : "var(--brand-text)" }}>{c.name}</p>
+                    <p className="text-sm font-semibold truncate" style={{ color: isSel ? "var(--brand-primary)" : "var(--brand-text)" }}>{c.name}</p>{unread > 0 ? <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 999, background: "#ef4444", marginLeft: 6, verticalAlign: "middle", animation: "cw-pulse 1.2s ease-in-out infinite" }} /> : null}
                     {unread > 0 && <p className="text-xs" style={{ color: "var(--brand-primary)" }}>{unread} unread</p>}
                   </div>
                   {unread > 0 && (
