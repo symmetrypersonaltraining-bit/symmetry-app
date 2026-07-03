@@ -48,6 +48,7 @@ export default function ReminderEditor() {
         .from("payment_reminders")
         .select("id, client_id, due_date, amount_due, billing_credits, sms_message, notification_status")
         .in("notification_status", ["pending", "sent"])
+        .lte("due_date", new Date(Date.now() + 7 * 86400000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
         .order("due_date");
       const { data: clients } = await sup
         .from("clients")
