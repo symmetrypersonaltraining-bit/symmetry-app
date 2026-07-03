@@ -26,6 +26,10 @@ export default async function MessagesPage(props: {
     const selectedClientId = searchParams.client || null;
 
     let thread: any[] = [];
+  if (selectedClientId === "all") {
+    const { data: __bmsgs } = await supabase.from("messages").select("*").eq("from_id", user.id).eq("is_broadcast", true).order("created_at", { ascending: true });
+    thread = __bmsgs || [];
+  }
     if (selectedClientId && selectedClientId !== "broadcast") {
       const { data: msgs } = await supabase
         .from("messages")
