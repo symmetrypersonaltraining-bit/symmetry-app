@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import OffPlanBanner from "@/components/OffPlanBanner";
 import CelebrationScreen from "@/components/CelebrationScreen";
+import SetFeedback from "@/components/SetFeedback";
 
 interface Exercise {
   id: string;
@@ -993,6 +994,8 @@ export default function WorkoutLogger({
 
     return (
       <div className="fixed inset-0 flex flex-col z-[100]" style={{ background: "var(--session-bg)" }}>
+        {/* Set-pop + PR-glow overlay (pointer-events:none, cannot block logging). Revert = remove this line. */}
+        <SetFeedback sets={sets} prevByPe={prevByPe} />
         {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
         {videoUrl && <VideoModal url={videoUrl} onClose={() => setVideoUrl(null)} />}
         {historyExercise && (
