@@ -18,7 +18,9 @@ export default function MessagesBell({ variant = "icon" }: { variant?: "icon" | 
         .from("messages")
         .select("id", { count: "exact", head: true })
         .eq("to_id", user.id)
-        .is("read_at", null);
+        .is("read_at", null)
+        .eq("is_broadcast", false)
+        .eq("is_group", false);
       if (on) setCount(c || 0);
     }
     load();
