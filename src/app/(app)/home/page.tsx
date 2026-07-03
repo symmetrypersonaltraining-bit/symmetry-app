@@ -6,6 +6,7 @@ import ClientDashboard from "./ClientDashboard";
 import TrainerHome from "./TrainerHome";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
 import PendingRemindersPanel from "@/components/PendingRemindersPanel";
+import SlackerGate from "@/components/SlackerScreen";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -327,6 +328,7 @@ export default async function HomePage() {
   return (
     <>
       <PwaInstallBanner />
+      <SlackerGate clientId={clientRecord.id} />
       <ClientDashboard
         firstName={firstName}
         todayWorkouts={todayWorkouts as any[]}
