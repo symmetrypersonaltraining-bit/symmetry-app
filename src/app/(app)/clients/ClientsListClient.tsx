@@ -37,7 +37,9 @@ export default function ClientsListClient({ clients }: Props) {
     let off = false;
     (async () => {
       try {
-        const { data } = await supabase.from("clients").select("id, avatar_url").not("avatar_url", "is", null);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sb = createClient() as any;
+        const { data } = await sb.from("clients").select("id, avatar_url").not("avatar_url", "is", null);
         if (!off && data) {
           const m: Record<string, string> = {};
           for (const r of data) if (r.avatar_url) m[r.id as string] = r.avatar_url as string;
