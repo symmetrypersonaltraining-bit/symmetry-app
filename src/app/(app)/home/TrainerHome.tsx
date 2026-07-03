@@ -1,4 +1,5 @@
 "use client";
+import MessagesBell from "@/components/MessagesBell";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -156,6 +157,7 @@ export default function TrainerHome({
       )}
 
       <div className="p-4 pb-24 space-y-4 max-w-lg mx-auto cw-reveal">
+      <MessagesBell variant="banner" />
 
         {/* Header */}
         <div className="pt-2">
