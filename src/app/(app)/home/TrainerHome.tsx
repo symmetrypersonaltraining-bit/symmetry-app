@@ -155,7 +155,7 @@ export default function TrainerHome({
         />
       )}
 
-      <div className="p-4 pb-24 space-y-4 max-w-lg mx-auto">
+      <div className="p-4 pb-24 space-y-4 max-w-lg mx-auto cw-reveal">
 
         {/* Header */}
         <div className="pt-2">
