@@ -1067,7 +1067,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                           )}
 
                           {/* Send button */}
-                          {!isPaid && !isDisabled && c.notificationStatus !== "cancelled" && (
+                          {false && /* hidden 7/3 per Dustin — superseded by ReminderEditor lifecycle */ !isPaid && !isDisabled && c.notificationStatus !== "cancelled" && (
                             <button
                               onClick={() => setConfirmClient(c)}
                               disabled={isUpdating}
@@ -1085,7 +1085,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
                       )}
 
                       {/* Mark Paid */}
-                      {!isPaid && c.hasReminder && !isDisabled && c.notificationStatus !== "cancelled" && (
+                      {false && /* hidden 7/3 per Dustin — superseded by ReminderEditor lifecycle */ !isPaid && c.hasReminder && !isDisabled && c.notificationStatus !== "cancelled" && (
                         <button
                           onClick={() => handleMarkPaid(c)}
                           disabled={isUpdating}
