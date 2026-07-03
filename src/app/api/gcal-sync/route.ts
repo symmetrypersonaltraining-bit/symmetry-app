@@ -113,7 +113,8 @@ export async function POST(req: NextRequest) {
 
     await supabase.rpc('gcal_generate_payment_notifications');
 
-    return NextResponse.json({ ok: true, synced, payments, total: allEvents.length, errors: errors.slice(0, 10) });
+    const dollarEvents = allEvents.filter((e: any) => /\$\s?\d/.test(e.summary || ''));
+    return NextResponse.json({ ok: true, synced, payments, total: allEvents.length, dollar_events: dollarEvents.length, dollar_samples: dollarEvents.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | start:' + JSON.stringify(e.start || {})), errors: errors.slice(0, 10) });
   } catch (e: any) {
     const msg = e.message || String(e);
     if (msg.includes('disabled') || msg.includes('not connected')) {
