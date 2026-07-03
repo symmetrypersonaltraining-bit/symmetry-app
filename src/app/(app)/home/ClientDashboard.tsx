@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { dismissClientNotification } from "./notifActions";
+import HomeMacrosCard from "@/components/HomeMacrosCard";
 
 interface MetricPoint {
   metric_date: string;
@@ -666,6 +667,9 @@ export default function ClientDashboard({
             </div>
           </div>
         )}
+
+        {/* Daily nutrition rings */}
+        <HomeMacrosCard />
 
         {/* Quick Actions */}
         <div>
