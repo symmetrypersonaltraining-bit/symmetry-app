@@ -5,6 +5,7 @@
 // (sets client_ack_at). Never shows for clients without reminder rows.
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import PayLinksRow from "./PayLinksRow";
 
 interface Due { id: string; due: string; amount: number; note: string | null; acked: boolean; }
 
@@ -51,7 +52,8 @@ export default function PaymentDueBanner() {
   return (
     <div className="space-y-2">
       {open.map((d) => (
-        <button key={d.id} onClick={() => ack(d.id)} className="block w-full text-left rounded-3xl p-3"
+        <div key={d.id}>
+          <button onClick={() => ack(d.id)} className="block w-full text-left rounded-3xl p-3"
           style={{ background: "#7c9cf518", border: "1px solid var(--brand-primary)" }}>
           <div className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>
             {"💳 Payment due " + d.due.slice(5).replace("-", "/") + ": $" + d.amount}
@@ -60,6 +62,8 @@ export default function PaymentDueBanner() {
             {d.note || "Tap to dismiss — thank you!"}
           </div>
         </button>
+          <PayLinksRow amount={d.amount} />
+        </div>
       ))}
     </div>
   );
