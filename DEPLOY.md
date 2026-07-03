@@ -133,3 +133,5 @@ This will allow you to schedule client sessions in the app and have them sync to
 - Client session reminders pushed to your phone calendar
 
 Ready to build when you are — just say "add Google Calendar."
+
+<!-- deploy retrigger 2026-07-03 (webhook missed e2ecc08b) -->
