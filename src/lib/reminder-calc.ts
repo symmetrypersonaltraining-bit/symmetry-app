@@ -15,6 +15,7 @@ export interface ReminderCalcInput {
   cancelledHalf: number; // cancelled_half (vacation) appointments in cycle
   manualCredits: number; // extra credits Dustin typed in the editor
   lastPaymentAmount: number | null;
+  lastCycleApprovedOn?: string | null; // CT date the PREVIOUS round was approved - anchors the look-back so post-approval cancels are never missed
   draftAmount: number; // current amount_due on the reminder row
   override: boolean; // Dustin explicitly accepted a non-calculated amount
 }
@@ -74,5 +75,6 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
     else blocking.push(msg);
   }
 
-  return { cycleStart: previousDueDate(i.dueDate, i.cadence), autoCredits, totalCredits, expected, blocking, warnings };
+  const cycleStart = i.lastCycleApprovedOn && i.lastCycleApprovedOn < i.dueDate ? i.lastCycleApprovedOn : previousDueDate(i.dueDate, i.cadence);
+  return { cycleStart, autoCredits, totalCredits, expected, blocking, warnings };
 }

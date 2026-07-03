@@ -23,6 +23,7 @@ interface Rem {
   lastPay: number | null;
   cancelledFull: number;
   cancelledHalf: number;
+  lastApprovedOn: string | null;
 }
 
 interface Edit {
@@ -56,6 +57,10 @@ export default function ReminderEditor() {
         .select("client_id, amount, payment_date, cadence")
         .order("payment_date", { ascending: false })
         .limit(400);
+      const { data: appr } = await sup
+        .from("payment_reminders")
+        .select("client_id, approved_at, due_date")
+        .not("approved_at", "is", null);
       const { data: cancels } = await sup
         .from("appointments")
         .select("client_id, scheduled_at, status")
@@ -75,7 +80,13 @@ export default function ReminderEditor() {
       const out: Rem[] = (rems || []).map((r: any) => {
         const c = byClient[r.client_id] || {};
         const cad = cadenceOf(r.client_id);
-        const start = previousDueDate(r.due_date, cad);
+        const la = (appr || [])
+          .filter((a: any) => a.client_id === r.client_id && a.due_date < r.due_date && a.approved_at)
+          .map((a: any) => new Date(a.approved_at).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
+          .sort()
+          .pop() || null;
+        const baseStart = previousDueDate(r.due_date, cad);
+        const start = la && la < r.due_date ? la : baseStart;
         let full = 0, half = 0;
         (cancels || []).forEach((a: any) => {
           if (a.client_id !== r.client_id) return;
@@ -91,6 +102,7 @@ export default function ReminderEditor() {
           name: c.name || "?", fee: c.current_fees == null ? null : Number(c.current_fees),
           sessionRate: c.session_rate == null ? null : Number(c.session_rate),
           cadence: cad, lastPay: lastPayOf(r.client_id), cancelledFull: full, cancelledHalf: half,
+          lastApprovedOn: la,
         };
       });
       setRows(out);
@@ -120,6 +132,7 @@ export default function ReminderEditor() {
         fee: r.fee, sessionRate: r.sessionRate, cadence: r.cadence, dueDate: e.due,
         cancelledFull: r.cancelledFull, cancelledHalf: r.cancelledHalf,
         manualCredits: parseFloat(e.manual) || 0, lastPaymentAmount: r.lastPay,
+        lastCycleApprovedOn: r.lastApprovedOn,
         draftAmount: parseFloat(e.amount) || 0, override: e.override,
       });
       const patch: any = {
@@ -173,6 +186,7 @@ export default function ReminderEditor() {
           fee: r.fee, sessionRate: r.sessionRate, cadence: r.cadence, dueDate: e.due,
           cancelledFull: r.cancelledFull, cancelledHalf: r.cancelledHalf,
           manualCredits: parseFloat(e.manual) || 0, lastPaymentAmount: r.lastPay,
+        lastCycleApprovedOn: r.lastApprovedOn,
           draftAmount: parseFloat(e.amount) || 0, override: e.override,
         });
         const blocked = calc.blocking.length > 0;
