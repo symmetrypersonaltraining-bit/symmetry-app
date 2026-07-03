@@ -5,6 +5,7 @@ import Link from "next/link";
 import NewClientModal from "./NewClientModal";
 import { createClient } from "@/lib/supabase/client";
 import ClientStatusDot from "@/components/ClientStatusDot";
+import Avatar from "@/components/Avatar";
 
 const AVATAR_COLORS = [
   { bg: "#DDEEFF", text: "var(--brand-primary)" },
@@ -31,6 +32,24 @@ interface Props {
 }
 
 export default function ClientsListClient({ clients }: Props) {
+  const [avatarMap, setAvatarMap] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let off = false;
+    (async () => {
+      try {
+        const { data } = await supabase.from("clients").select("id, avatar_url").not("avatar_url", "is", null);
+        if (!off && data) {
+          const m: Record<string, string> = {};
+          for (const r of data) if (r.avatar_url) m[r.id as string] = r.avatar_url as string;
+          setAvatarMap(m);
+        }
+      } catch {
+        /* no avatars — initials stay */
+      }
+    })();
+    return () => { off = true; };
+  }, []);
+
   const [search, setSearch] = useState("");
   const [showNewClient, setShowNewClient] = useState(false);
 
@@ -148,12 +167,11 @@ export default function ClientsListClient({ clients }: Props) {
                 }}
               >
                 {/* Avatar */}
-                <div
-                  className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
-                  style={{ background: color.bg, color: color.text }}
-                >
-                  {initials}
-                </div>
+                {avatarMap[client.id] ? (
+                <Avatar name={client.name} url={avatarMap[client.id]} size={44} />
+              ) : (
+                <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0" style={{ background: color.bg, color: color.text }}>{initials}</div>
+              )}
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">

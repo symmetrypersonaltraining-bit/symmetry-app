@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "./Logo";
+import { useMyClientRow } from "@/components/Avatar";
 
 interface SidebarItem {
   href?: string;
@@ -49,6 +50,7 @@ export default function TrainerSidebar({
   userName = "Dustin",
   userInitials = "DG",
 }: Props) {
+  const { avatarUrl: myAvatarUrl } = useMyClientRow();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -181,10 +183,15 @@ export default function TrainerSidebar({
         )}
         <Link href="/profile" className="flex items-center gap-3 px-3 py-2 rounded-lg"
           style={{ background: isActive("/profile") ? "rgba(255,255,255,0.15)" : "transparent" }}>
+          {myAvatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={myAvatarUrl} alt={userName} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+        ) : (
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
             style={{ background: "rgba(255,255,255,0.2)", color: "white" }}>
             {userInitials}
           </div>
+        )}
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-white truncate">{userName}</div>
