@@ -8,6 +8,7 @@ import HomeMacrosCard from "@/components/HomeMacrosCard";
 import CountUp from "@/components/CountUp";
 import MilestoneToast from "@/components/MilestoneToast";
 import PrankInvoice from "@/components/PrankInvoice";
+import PaymentDueBanner from "@/components/PaymentDueBanner";
 
 interface MetricPoint {
   metric_date: string;
@@ -570,6 +571,7 @@ export default function ClientDashboard({
       <div className="p-4 pb-28 space-y-4 max-w-lg mx-auto cw-reveal">
       <MessagesBell variant="banner" />
         <PrankInvoice />
+        <PaymentDueBanner />
       {isMilestone && streakDays > 0 && (
         <MilestoneToast emoji="🎉" message={`${streakDays}-day streak — keep it going!`} once={`streak-${streakDays}`} />
       )}
