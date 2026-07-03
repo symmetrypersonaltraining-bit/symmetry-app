@@ -436,39 +436,17 @@ export default function TrainerHome({
           </div>
         </Link>
 
-        {/* Messages Card — placeholder */}
-        <div
-          className="rounded-2xl p-4 flex items-center gap-4"
-          style={{
-            background: "var(--brand-surface)",
-            border: "1px solid var(--brand-border)",
-            opacity: 0.6,
-          }}
-        >
-          <div
-            className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "var(--brand-card)" }}
-          >
-            <i
-              className="ti ti-message-2 text-xl"
-              style={{ color: "var(--brand-text-secondary)" }}
-            />
+        {/* Messages Card */}
+        <Link href="/messages" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "var(--brand-surface)", border: "1px solid var(--brand-border)", borderRadius: 16, padding: 14 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: "var(--brand-primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <i className="ti ti-message-circle" style={{ color: "#fff", fontSize: 20 }} />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>
-              Messages
-            </p>
-            <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-              Coming soon
-            </p>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontWeight: 800, color: "var(--brand-text)", fontSize: 14 }}>Messages</p>
+            <p style={{ color: "var(--brand-text-secondary)", fontSize: 12 }}>Client & group chat</p>
           </div>
-          <span
-            className="text-xs px-2 py-1 rounded-lg font-medium"
-            style={{ background: "var(--brand-border)", color: "var(--brand-text-secondary)" }}
-          >
-            Soon
-          </span>
-        </div>
+          <i className="ti ti-chevron-right" style={{ color: "var(--brand-text-secondary)", fontSize: 18 }} />
+        </Link>
 
       </div>
     </>
