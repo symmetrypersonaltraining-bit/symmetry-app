@@ -1,4 +1,5 @@
 "use client";
+import MessagesBell from "@/components/MessagesBell";
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -564,6 +565,7 @@ export default function ClientDashboard({
       )}
 
       <div className="p-4 pb-28 space-y-4 max-w-lg mx-auto cw-reveal">
+      <MessagesBell variant="banner" />
         {/* Header */}
         <div className="flex items-start justify-between pt-2">
           <div>
