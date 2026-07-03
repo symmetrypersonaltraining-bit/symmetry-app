@@ -268,22 +268,21 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
     );
   }
 
-  // Client single-thread layout
+  // Client single-thread layout (with Coach / Group Chat toggle + composer)
+  const clientTitle = isGroup ? "Group Chat" : "Symmetry Personal Training";
+  const pill = (active) => ({ flex: 1, textAlign: "center", padding: "8px 0", borderRadius: 999, textDecoration: "none", fontSize: 13, fontWeight: active ? 800 : 600, background: active ? "var(--brand-primary)" : "var(--brand-surface)", color: active ? "#fff" : "var(--brand-text)", border: "1px solid var(--brand-border)" });
   return (
-    <div className="flex flex-col" style={{ background: "var(--brand-bg)", height: "calc(100dvh - 80px)" }}>
-      <div className="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--brand-border)" }}>
-        <Link href="/home" className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-          <i className="ti ti-arrow-left text-sm" style={{ color: "var(--brand-text)" }} />
-        </Link>
-        <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
-          <span className="text-sm font-bold text-white">DG</span>
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Symmetry Personal Training</p>
-          <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Dustin Gautreaux · Trainer</p>
-        </div>
+    <div style={{ background: "var(--brand-bg)", height: "100%", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--brand-border)" }}>
+        <Link href="/messages" style={pill(!isGroup) as any}>Coach</Link>
+        <Link href="/messages?client=group" style={pill(isGroup) as any}>Group Chat</Link>
       </div>
-      <div className="flex-1 min-h-0 overflow-hidden">{ThreadPanel()}</div>
+      <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--brand-border)", fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>{clientTitle}</div>
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>{ThreadPanel()}</div>
+      <div style={{ display: "flex", gap: 8, padding: 10, borderTop: "1px solid var(--brand-border)" }}>
+        <textarea ref={inputRef as any} rows={1} value={body} onChange={(e) => setBody(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} onInput={(e) => { const t = e.currentTarget as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 140) + "px"; }} placeholder={isGroup ? "Message the group..." : "Message your coach..."} style={{ flex: 1, resize: "none", borderRadius: 16, border: "1px solid var(--brand-border)", padding: "10px 12px", fontSize: 14, background: "var(--brand-surface)", color: "var(--brand-text)", fontFamily: "inherit" }} />
+        <button onClick={handleSend} disabled={sending || !body.trim()} style={{ border: "none", borderRadius: 999, padding: "0 18px", fontWeight: 800, fontSize: 14, background: "var(--brand-primary)", color: "#fff", cursor: "pointer", opacity: sending || !body.trim() ? 0.5 : 1 }}>Send</button>
+      </div>
     </div>
   );
 }
