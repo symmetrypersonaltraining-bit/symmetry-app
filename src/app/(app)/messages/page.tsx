@@ -16,6 +16,24 @@ export default async function MessagesPage(props: {
 
   const isTrainer = user.email === TRAINER_EMAIL;
 
+  if (searchParams.client === "group") {
+    const { data: gmsgs } = await supabase.from("messages").select("*").eq("is_group", true).order("created_at", { ascending: true });
+    const { data: allClients } = await supabase.from("clients").select("*").not("auth_user_id", "is", null).order("name");
+    const senderNames: Record<string, string> = {};
+    for (const cc of (allClients || []) as any[]) { if (cc.auth_user_id) senderNames[cc.auth_user_id] = String(cc.name || "").trim().split(" ")[0]; }
+    return (
+      <MessagesClient
+        isTrainer={isTrainer}
+        clients={isTrainer ? ((allClients || []) as any[]) : []}
+        selectedClientId="group"
+        thread={(gmsgs || []) as any[]}
+        currentUserId={user.id}
+        unreadByClient={{}}
+        senderNames={senderNames}
+      />
+    );
+  }
+
   if (isTrainer) {
     const { data: clients } = await supabase
       .from("clients")
