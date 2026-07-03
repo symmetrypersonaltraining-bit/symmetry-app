@@ -234,6 +234,22 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">{ThreadPanel()}</div>
             </>
+          ) : isGroup ? (
+            <>
+              <div className="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--brand-border)" }}>
+                <Link href="/messages" className="lg:hidden w-8 h-8 flex items-center justify-center rounded-full" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+                  <i className="ti ti-arrow-left text-sm" style={{ color: "var(--brand-text)" }} />
+                </Link>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)" }}>
+                  <i className="ti ti-users-group text-sm" style={{ color: "white" }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Group Chat</p>
+                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Everyone can see and reply</p>
+                </div>
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden">{ThreadPanel()}</div>
+            </>
           ) : selectedClient ? (
             <>
               <div className="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--brand-border)" }}>
