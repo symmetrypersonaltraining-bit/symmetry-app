@@ -6,6 +6,7 @@ import Link from "next/link";
 import { dismissClientNotification } from "./notifActions";
 import HomeMacrosCard from "@/components/HomeMacrosCard";
 import CountUp from "@/components/CountUp";
+import MilestoneToast from "@/components/MilestoneToast";
 
 interface MetricPoint {
   metric_date: string;
@@ -567,6 +568,9 @@ export default function ClientDashboard({
 
       <div className="p-4 pb-28 space-y-4 max-w-lg mx-auto cw-reveal">
       <MessagesBell variant="banner" />
+      {isMilestone && streakDays > 0 && (
+        <MilestoneToast emoji="🎉" message={`${streakDays}-day streak — keep it going!`} once={`streak-${streakDays}`} />
+      )}
         {/* Header */}
         <div className="flex items-start justify-between pt-2">
           <div>
@@ -576,9 +580,9 @@ export default function ClientDashboard({
           {streakDays > 0 && (
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${isMilestone ? "animate-pulse" : ""}`}
               style={{ background: isMilestone ? "#f59e0b20" : "var(--brand-surface)", border: `1px solid ${isMilestone ? "#f59e0b" : "var(--brand-border)"}` }}>
-              <span className="text-base">{isMilestone ? "🎉" : "🔥"}</span>
+              <span className="text-base" style={{ display: "inline-block", animation: "cw-flame-flicker 1.4s ease-in-out infinite" }}>{isMilestone ? "🎉" : "🔥"}</span>
               <div>
-                <span className="text-sm font-bold" style={{ color: isMilestone ? "#f59e0b" : "var(--brand-text)" }}>{streakDays}</span>
+                <span className="text-sm font-bold" style={{ color: isMilestone ? "#f59e0b" : "var(--brand-text)" }}><CountUp end={streakDays} duration={800} /></span>
                 <span className="text-xs ml-0.5" style={{ color: "var(--brand-text-secondary)" }}>day{streakDays !== 1 ? "s" : ""}</span>
               </div>
             </div>
