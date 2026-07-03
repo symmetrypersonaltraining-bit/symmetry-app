@@ -609,59 +609,10 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
         {/* Content */}
         <div className="overflow-y-auto flex-1 px-5 py-3 space-y-2">
 
-          {/* Programmed Workouts â launch buttons for trainer */}
-          {workouts.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>
-                Workouts
-              </p>
-              <div className="space-y-1.5">
-                {workouts.map(w => {
-                  const isDone = w.status === "completed";
-                  const statusColor = isDone ? "#43A047" : "var(--brand-primary)";
-                  return (
-                    <div key={w.id}
-                      className="flex items-center gap-3 rounded-xl px-3 py-2.5"
-                      style={{ background: "var(--brand-bg)", border: `1px solid ${statusColor}30` }}>
-                      <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ background: statusColor }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>
-                          {w.clientName}
-                        </p>
-                        <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{w.dayLabel}</p>
-                      </div>
-                      {isDone ? (
-                        <Link
-                          href={`/clients/${w.clientId}`}
-                          onClick={close}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1"
-                          style={{ background: "#43A04720", color: "#43A047", border: "1px solid #43A04740" }}>
-                          <i className="ti ti-check text-xs" /> Done
-                        </Link>
-                      ) : (
-                        <Link
-                          href={`/workout/${w.dayId || w.id}?forClient=${w.clientId}`}
-                          onClick={close}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"
-                          style={{ background: "var(--brand-primary)", color: "#fff" }}>
-                          <i className="ti ti-player-play text-xs" /> Launch
-                        </Link>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Appointment Sessions */}
           {sorted.length > 0 ? (
             <div>
-              {workouts.length > 0 && (
-                <p className="text-xs font-semibold uppercase tracking-widest mb-1.5 mt-2" style={{ color: "var(--brand-text-secondary)" }}>
-                  Appointments
-                </p>
-              )}
               <div className="space-y-1.5">
                 {sorted.map(ev => {
                   const color = chipColor(ev.status);
@@ -710,12 +661,12 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
                 })}
               </div>
             </div>
-          ) : workouts.length === 0 ? (
+          ) : (
             <div className="py-8 text-center">
               <i className="ti ti-calendar-off text-3xl mb-2" style={{ color: "var(--brand-text-secondary)" }} />
               <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>No sessions scheduled</p>
             </div>
-          ) : null}
+          )}
         </div>
 
         {/* Footer */}
