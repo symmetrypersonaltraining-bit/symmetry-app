@@ -92,6 +92,10 @@ export default function FloatingDock() {
     } catch {} finally { setSending(false); }
   }
 
+  // RETIRED 2026-07-03: dock replaced by HeaderAssist (header corner). To restore, delete the next two lines.
+  const RETIRED = true;
+  if (RETIRED) return null;
+
   const dockStyle: CSSProperties = pos
     ? { position: "fixed", left: pos.x, top: pos.y, zIndex: 1000 }
     : { position: "fixed", right: 14, bottom: 18, zIndex: 1000 };
