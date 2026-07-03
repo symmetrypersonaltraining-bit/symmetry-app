@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import ScheduleClient from "./ScheduleClient";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -26,6 +27,13 @@ export default async function SchedulePage() {
   if (!user) redirect("/login");
 
   const isTrainer = user.email === TRAINER_EMAIL;
+
+  // Trainer in trainer-mode: the Schedule tab must show the trainer schedule
+  // (the appointments calendar on /home), NOT the personal client program.
+  // Client-preview mode and real clients fall through to ScheduleClient.
+  const cookieStore = await cookies();
+  const isClientMode = cookieStore.get("symmetry_client_mode")?.value === "1";
+  if (isTrainer && !isClientMode) redirect("/home");
 
   let clientId: string | null = null;
   if (isTrainer) {
