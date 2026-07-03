@@ -26,6 +26,7 @@ export default function PaymentDueBanner() {
           .select("id, due_date, amount_due, sms_message, client_ack_at")
           .eq("client_id", cid)
           .eq("notification_status", "sent")
+          .lte("due_date", new Date(Date.now() + 7 * 86400000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
           .order("due_date");
         setDues((rems || []).map((r: any) => ({
           id: r.id, due: r.due_date, amount: Number(r.amount_due), note: r.sms_message, acked: !!r.client_ack_at,
