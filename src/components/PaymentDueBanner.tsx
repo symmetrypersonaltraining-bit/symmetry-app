@@ -40,7 +40,7 @@ export default function PaymentDueBanner() {
     setDues((p) => p.map((d) => (d.id === id ? { ...d, acked: true } : d)));
     try {
       const sup = createClient() as any;
-      await sup.from("payment_reminders").update({ client_ack_at: new Date().toISOString() }).eq("id", id);
+      await sup.rpc("ack_payment_reminder", { reminder_id: id });
     } catch {}
   };
 
