@@ -55,6 +55,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [broadcastSent, setBroadcastSent] = useState<number | null>(null);
+  const [readClients, setReadClients] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -189,10 +190,10 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
               </div>
             </Link>
             {clients.map(c => {
-              const unread = unreadByClient[c.id] || 0;
+              const unread = readClients.has(c.id) ? 0 : (unreadByClient[c.id] || 0);
               const isSel = c.id === selectedClientId;
               return (
-                <Link key={c.id} href={"/messages?client=" + c.id}
+                <Link key={c.id} onClick={() => setReadClients((prev) => new Set(prev).add(c.id))} href={"/messages?client=" + c.id}
                   className="flex items-center gap-3 px-4 py-3.5 border-b transition-colors"
                   style={{ borderColor: "var(--brand-border)", background: isSel ? "color-mix(in srgb, var(--brand-primary) 10%, transparent)" : "transparent", borderLeft: isSel ? "3px solid var(--brand-primary)" : "3px solid transparent" }}>
                   <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
