@@ -20,15 +20,15 @@ export default function Logo({
 }: LogoProps) {
   return (
     <div
-      className={`relative flex-shrink-0 rounded-full overflow-hidden ring-2 ring-white/30 ${className}`}
-      style={{ width: size, height: size, background: 'rgba(255,255,255,0.08)' }}
+      className={`relative flex-shrink-0 rounded-full overflow-hidden ${className}`}
+      style={{ width: size, height: size }}
     >
       <Image
         src={LOGO_URL}
         alt="Symmetry Personal Training"
         width={size}
         height={size}
-        className="w-full h-full object-cover"
+        className="w-full h-full object-cover scale-[1.38]"
         unoptimized
         priority
         onError={(e) => {
