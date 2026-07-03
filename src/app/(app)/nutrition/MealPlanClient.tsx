@@ -63,6 +63,7 @@ function MacroHeader({ macros, target }: { macros: { kcal: number; protein: numb
   const ARC_L = 163.4;
   const pct = (v: number, t: number) => (t > 0 ? Math.min(v / t, 1) : 0);
   function ring(label: string, value: number, tgt: number, color: string) {
+    const hit = tgt > 0 && value >= tgt;
     return (
       <div className="flex flex-col items-center gap-1" style={{ width: 66 }}>
         <div className="relative" style={{ width: 58, height: 58 }}>
@@ -70,8 +71,11 @@ function MacroHeader({ macros, target }: { macros: { kcal: number; protein: numb
             <circle cx="29" cy="29" r="24" fill="none" stroke="var(--brand-border)" strokeWidth="7" />
             <circle cx="29" cy="29" r="24" fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
               strokeDasharray={String(RING_C)} strokeDashoffset={String(RING_C * (1 - pct(value, tgt)))}
-              style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)" }} />
+              style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)", animation: hit ? "cw-ring-pulse 0.7s ease 0.9s" : undefined }} />
           </svg>
+          {hit && (
+            <span aria-hidden style={{ position: "absolute", top: -2, right: -2, width: 18, height: 18, borderRadius: "50%", background: "#22c55e", color: "#fff", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", animation: "cw-tick-in 0.3s ease 1.3s both" }}>✓</span>
+          )}
           <div className="absolute inset-0 flex items-center justify-center font-extrabold" style={{ color, fontSize: 13 }}>{Math.round(value)}</div>
         </div>
         <span className="font-bold tracking-wider" style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>{label}</span>
