@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import OffPlanBanner from "@/components/OffPlanBanner";
+import CelebrationScreen from "@/components/CelebrationScreen";
 
 interface Exercise {
   id: string;
@@ -950,6 +951,15 @@ export default function WorkoutLogger({
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
         style={{ background: "var(--brand-bg)" }}>
+        {/* Celebration overlay (visual-polish): covers this screen; original stays mounted behind it. Revert = remove this block. */}
+        <CelebrationScreen
+          sets={sets}
+          doneSets={doneSets}
+          clientId={clientId}
+          clientName={clientName}
+          dayLabel={day.label}
+          doneHref={isTrainerSession ? "/clients/" + clientId : "/home"}
+        />
         <div className="relative mb-6" style={{ width: 120, height: 120 }}>
           <style>{"@keyframes symL{from{transform:translateX(-16px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes symR{from{transform:translateX(16px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes symChk{to{stroke-dashoffset:0}}"}</style>
           <svg width="120" height="120" viewBox="0 0 120 120">
