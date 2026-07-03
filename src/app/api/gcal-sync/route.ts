@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       const s = (summary || '').toLowerCase();
       const full = clientMap.find(c => c.name.length > 0 && s.includes(c.name));
       if (full) return full.id;
-      const first = clientMap.find(c => c.first.length > 2 && s.includes(c.first));
+      const first = clientMap.find(c => c.first.length > 2 && new RegExp('\\b' + c.first + '\\b').test(s));
       if (first) return first.id;
       return null;
     }
