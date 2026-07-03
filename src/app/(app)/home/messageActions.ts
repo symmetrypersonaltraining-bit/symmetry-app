@@ -72,5 +72,8 @@ export async function sendBroadcastMessage(body: string): Promise<number> {
     await supabase.from('messages').insert(rows);
   }
   revalidatePath('/messages');
+  if (rows.length) {
+    await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, is_broadcast: true });
+  }
   return rows.length;
 }
