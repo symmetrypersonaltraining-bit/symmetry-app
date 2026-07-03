@@ -114,7 +114,9 @@ export async function POST(req: NextRequest) {
     await supabase.rpc('gcal_generate_payment_notifications');
 
     const dollarEvents = allEvents.filter((e: any) => /\$\s?\d/.test(e.summary || ''));
-    return NextResponse.json({ ok: true, synced, payments, total: allEvents.length, dollar_events: dollarEvents.length, dollar_samples: dollarEvents.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | start:' + JSON.stringify(e.start || {})), errors: errors.slice(0, 10) });
+    const clientDollar = dollarEvents.filter((e: any) => matchClient(e.summary || ''));
+    const laurenEvents = allEvents.filter((e: any) => (e.summary || '').toLowerCase().includes('lauren')).slice(0, 4);
+    return NextResponse.json({ ok: true, synced, payments, total: allEvents.length, dollar_events: dollarEvents.length, client_dollar: clientDollar.length, client_dollar_samples: clientDollar.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), lauren_samples: laurenEvents.map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), dollar_samples: dollarEvents.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | start:' + JSON.stringify(e.start || {})), errors: errors.slice(0, 10) });
   } catch (e: any) {
     const msg = e.message || String(e);
     if (msg.includes('disabled') || msg.includes('not connected')) {
