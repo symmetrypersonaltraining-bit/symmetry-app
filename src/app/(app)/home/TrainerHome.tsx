@@ -4,6 +4,7 @@ import MessagesBell from "@/components/MessagesBell";
 import { useState } from "react";
 import Link from "next/link";
 import PaymentCheckBanner from "@/components/PaymentCheckBanner";
+import CountUp from "@/components/CountUp";
 
 interface TodaySession {
   id: string;
@@ -202,7 +203,7 @@ export default function TrainerHome({
           {todaySessions.length === 0 ? (
             <div className="px-4 py-8 text-center">
               <i
-                className="ti ti-calendar-off text-2xl mb-2 block"
+                className="ti ti-calendar-off text-4xl mb-2 block cw-float"
                 style={{ color: "var(--brand-text-secondary)" }}
               />
               <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
@@ -322,7 +323,7 @@ export default function TrainerHome({
             </div>
             <div className="flex items-end gap-1 mb-1">
               <span className="text-3xl font-bold" style={{ color: "var(--brand-text)" }}>
-                {completedCount}
+                <CountUp end={completedCount} />
               </span>
               <span
                 className="text-lg font-medium pb-0.5"
