@@ -575,9 +575,10 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       <MacroHeader macros={currentMacros} target={macroTarget} />
 
       {/* Segmented tabs */}
-      <div className="mx-4 mt-3 flex rounded-full p-1" style={{ background: "rgba(127,140,170,0.14)", border: "1px solid var(--brand-border)" }}>
-        <button onClick={() => setTab("plan")} className="flex-1 py-2.5 rounded-full text-sm font-bold transition-all" style={tab === "plan" ? { background: "var(--brand-surface)", color: "var(--brand-text)", boxShadow: "0 3px 10px rgba(20,30,55,0.10)" } : { background: "transparent", color: "var(--brand-text-secondary)" }}>My plan</button>
-        <button onClick={() => setTab("quick")} className="flex-1 py-2.5 rounded-full text-sm font-bold transition-all" style={tab === "quick" ? { background: "var(--brand-surface)", color: "var(--brand-text)", boxShadow: "0 3px 10px rgba(20,30,55,0.10)" } : { background: "transparent", color: "var(--brand-text-secondary)" }}>Quick log</button>
+      <div className="mx-4 mt-3 flex rounded-full p-1 relative" style={{ background: "rgba(127,140,170,0.14)", border: "1px solid var(--brand-border)" }}>
+        <div aria-hidden className="absolute top-1 bottom-1 rounded-full transition-transform duration-300 ease-out" style={{ left: 4, width: "calc(50% - 4px)", background: "var(--brand-surface)", boxShadow: "0 3px 10px rgba(20,30,55,0.10)", transform: tab === "plan" ? "translateX(0)" : "translateX(100%)" }} />
+        <button onClick={() => setTab("plan")} className="flex-1 py-2.5 rounded-full text-sm font-bold transition-all relative z-10" style={tab === "plan" ? { color: "var(--brand-text)" } : { color: "var(--brand-text-secondary)" }}>My plan</button>
+        <button onClick={() => setTab("quick")} className="flex-1 py-2.5 rounded-full text-sm font-bold transition-all relative z-10" style={tab === "quick" ? { color: "var(--brand-text)" } : { color: "var(--brand-text-secondary)" }}>Quick log</button>
       </div>
 
       {/* Hidden camera input */}
