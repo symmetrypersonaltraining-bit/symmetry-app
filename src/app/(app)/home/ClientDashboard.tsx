@@ -613,7 +613,7 @@ export default function ClientDashboard({
         {/* Today's Workout — 0 workouts: rest day | 1 workout: single card | 2+: picker */}
         {_todayWorkouts.length === 0 ? (
           <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-            <i className="ti ti-moon text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
+            <i className="ti ti-moon text-4xl mb-2 block cw-float" style={{ color: "var(--brand-text-secondary)" }} />
             <p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p>
             <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program 💪</p>
           </div>
