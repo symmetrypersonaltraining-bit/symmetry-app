@@ -1091,3 +1091,8 @@ input, textarea, select{ border-radius:12px; transition:border-color .15s ease, 
   --brand-border: #e0eaef;
   --brand-sidebar: #0f4c81;
 }
+
+/* Card hover-lift + shine (additive utility) */
+.cw-lift { transition: transform .18s ease, box-shadow .18s ease; }
+.cw-lift:hover, .cw-lift:active { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(20,30,55,0.12); }
+@media (prefers-reduced-motion: reduce){ .cw-lift, .cw-lift:hover, .cw-lift:active { transform:none; transition:none; } }

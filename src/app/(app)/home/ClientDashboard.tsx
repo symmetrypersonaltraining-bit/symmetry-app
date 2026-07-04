@@ -619,7 +619,7 @@ export default function ClientDashboard({
         ) : _todayWorkouts.length === 1 ? (
           // Single workout — original branded card
           <Link href={`${basePath}/workout/${_todayWorkouts[0].id}`}>
-            <div className="rounded-2xl p-5 relative overflow-hidden cursor-pointer" style={{ background: "var(--brand-primary)" }}>
+            <div className="rounded-2xl p-5 relative overflow-hidden cursor-pointer cw-lift" style={{ background: "var(--brand-primary)" }}>
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ background: "white", transform: "translate(30%, -30%)" }} />
               <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full opacity-5" style={{ background: "white", transform: "translate(-30%, 30%)" }} />
               <div className="relative">
@@ -687,7 +687,7 @@ export default function ClientDashboard({
           <h2 className="text-base font-bold mb-2.5" style={{ color: "var(--brand-text)" }}>Quick Actions</h2>
           <div className="grid grid-cols-2 gap-3">
             <Link href={`${basePath}/nutrition`}>
-              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer cw-lift" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#22c55e20" }}>
                   <i className="ti ti-salad text-lg" style={{ color: "#22c55e" }} />
                 </div>
@@ -698,7 +698,7 @@ export default function ClientDashboard({
               </div>
             </Link>
             <Link href={`${basePath}/log-bodyfat`}>
-              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer cw-lift" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)20" }}>
                   <i className="ti ti-percentage text-lg" style={{ color: "var(--brand-primary)" }} />
                 </div>
@@ -709,7 +709,7 @@ export default function ClientDashboard({
               </div>
             </Link>
             <Link href={`${basePath}/log`}>
-              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer cw-lift" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#f59e0b20" }}>
                   <i className="ti ti-scale text-lg" style={{ color: "#f59e0b" }} />
                 </div>
@@ -720,7 +720,7 @@ export default function ClientDashboard({
               </div>
             </Link>
             <Link href={`${basePath}/progress`}>
-              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer cw-lift" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#a855f720" }}>
                   <i className="ti ti-chart-line text-lg" style={{ color: "#a855f7" }} />
                 </div>
@@ -731,7 +731,7 @@ export default function ClientDashboard({
               </div>
             </Link>
             <Link href={`${basePath}/messages`} className="col-span-2">
-              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer cw-lift" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#3b82f620" }}>
                   <i className="ti ti-message-circle text-lg" style={{ color: "#3b82f6" }} />
                 </div>
