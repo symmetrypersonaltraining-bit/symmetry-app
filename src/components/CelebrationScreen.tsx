@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Confetti from "./Confetti";
 import Link from "next/link";
 import CountUp from "@/components/CountUp";
 
@@ -469,6 +470,7 @@ export default function CelebrationScreen({
 
   return (
     <div style={overlay}>
+      <Confetti />
       <style>{CSS}</style>
       <div style={{ fontSize: 12, fontWeight: 800, color: "var(--brand-primary)", letterSpacing: 1.5 }}>
         ✓ WORKOUT COMPLETE
