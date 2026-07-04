@@ -14,13 +14,15 @@ export default function MessagesBell({ variant = "icon" }: { variant?: "icon" | 
       const { data } = await supabase.auth.getUser();
       const user = data?.user;
       if (!user) return;
-      const { count: c } = await supabase
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("to_id", user.id)
-        .is("read_at", null)
-        .eq("is_broadcast", false)
-        .eq("is_group", false);
+      const __isClientMode = typeof document !== "undefined" && document.cookie.split("; ").some((x) => x === "symmetry_client_mode=1");
+      let __scopeId = null;
+      if (__isClientMode) {
+        const { data: __myClient } = await supabase.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
+        __scopeId = __myClient ? __myClient.id : null;
+      }
+      let __q = supabase.from("messages").select("id", { count: "exact", head: true }).eq("to_id", user.id).is("read_at", null).eq("is_broadcast", false).eq("is_group", false);
+      if (__scopeId) __q = __q.eq("client_id", __scopeId);
+      const { count: c } = await __q;
       if (on) setCount(c || 0);
     }
     load();
