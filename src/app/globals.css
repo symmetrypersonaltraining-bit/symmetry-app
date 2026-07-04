@@ -1096,3 +1096,8 @@ input, textarea, select{ border-radius:12px; transition:border-color .15s ease, 
 .cw-lift { transition: transform .18s ease, box-shadow .18s ease; }
 .cw-lift:hover, .cw-lift:active { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(20,30,55,0.12); }
 @media (prefers-reduced-motion: reduce){ .cw-lift, .cw-lift:hover, .cw-lift:active { transform:none; transition:none; } }
+
+/* Branded logo loader (additive) */
+@keyframes cw-brand-breathe { 0%,100%{ transform:scale(.9); opacity:.55 } 50%{ transform:scale(1.05); opacity:1 } }
+.cw-brand-loader { animation: cw-brand-breathe 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce){ .cw-brand-loader{ animation:none; opacity:.85 } }

@@ -1,3 +1,5 @@
+import Logo from "@/components/Logo";
+
 /**
  * Route-level loading skeleton for the (app) segment. Renders shimmering
  * placeholders (`.cw-skeleton`, defined in globals.css) while the server
@@ -28,6 +30,9 @@ export default function Loading() {
         gap: 14,
       }}
     >
+      <div style={{ display: "flex", justifyContent: "center", paddingBottom: 4 }}>
+        <div className="cw-brand-loader"><Logo size={48} /></div>
+      </div>
       <div className="cw-skeleton" style={{ height: 16, width: "40%" }} />
       <div className="cw-skeleton" style={{ height: 30, width: "65%" }} />
 
