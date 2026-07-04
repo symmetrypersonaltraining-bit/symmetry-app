@@ -18,6 +18,11 @@ export const THEMES = [
     { id: "plumdusk", label: "Plum Dusk", primary: "#5E3A87", bg: "#F6F2F8" },
     { id: "carbonneon", label: "Carbon Neon", primary: "#00C2A8", bg: "#14161C" },
   { id: "midnight", label: "Midnight", primary: "#58A6FF", bg: "#0D1117" },
+  { id: "sunsetcoral", label: "Sunset Coral", primary: "#ff6b6b", bg: "#fff6f3" },
+  { id: "aurora", label: "Aurora", primary: "#3aa8c1", bg: "#f3f7fb" },
+  { id: "citrus", label: "Citrus Punch", primary: "#5bbf3a", bg: "#fbfdf3" },
+  { id: "berrynoir", label: "Berry Noir", primary: "#b5379a", bg: "#f7f4fb" },
+  { id: "oceandusk", label: "Ocean Dusk", primary: "#1f7a8c", bg: "#f2f6f8" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];
