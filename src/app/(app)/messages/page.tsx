@@ -44,7 +44,20 @@ export default async function MessagesPage(props: {
       .not("auth_user_id", "is", null)
       .order("name");
 
-    const selectedClientId = searchParams.client || null;
+    let selectedClientId = searchParams.client || null;
+  if (!selectedClientId) {
+    const { data: __latestUnread } = await supabase
+      .from("messages")
+      .select("client_id")
+      .eq("to_id", user.id)
+      .is("read_at", null)
+      .eq("is_broadcast", false)
+      .eq("is_group", false)
+      .not("client_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (__latestUnread && __latestUnread[0] && __latestUnread[0].client_id) selectedClientId = __latestUnread[0].client_id;
+  }
 
     let thread: any[] = [];
   if (selectedClientId === "broadcast") {
