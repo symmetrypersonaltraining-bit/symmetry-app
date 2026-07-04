@@ -9,6 +9,7 @@ import CountUp from "@/components/CountUp";
 import MilestoneToast from "@/components/MilestoneToast";
 import PrankInvoice from "@/components/PrankInvoice";
 import PaymentDueBanner from "@/components/PaymentDueBanner";
+import MilestoneBadges from "@/components/MilestoneBadges";
 
 interface MetricPoint {
   metric_date: string;
@@ -682,6 +683,7 @@ export default function ClientDashboard({
         {/* Daily nutrition rings */}
         <HomeMacrosCard />
 
+        <MilestoneBadges />
         {/* Quick Actions */}
         <div>
           <h2 className="text-base font-bold mb-2.5" style={{ color: "var(--brand-text)" }}>Quick Actions</h2>

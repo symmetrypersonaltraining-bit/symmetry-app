@@ -1101,3 +1101,9 @@ input, textarea, select{ border-radius:12px; transition:border-color .15s ease, 
 @keyframes cw-brand-breathe { 0%,100%{ transform:scale(.9); opacity:.55 } 50%{ transform:scale(1.05); opacity:1 } }
 .cw-brand-loader { animation: cw-brand-breathe 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce){ .cw-brand-loader{ animation:none; opacity:.85 } }
+
+/* Confetti (additive, used by milestone badges + celebrations) */
+@keyframes cw-confetti-fall {
+  0% { transform: translate(0,0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--cx), var(--cy)) rotate(var(--cr)); opacity: 0; }
+}
