@@ -1112,3 +1112,11 @@ input, textarea, select{ border-radius:12px; transition:border-color .15s ease, 
 @keyframes cw-float { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-6px) } }
 .cw-float { animation: cw-float 3s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce){ .cw-float{ animation:none } }
+
+/* Chip pop (payment READY/BLOCKED/AWAITING state changes) */
+@keyframes cw-pop { 0%{ transform: scale(.7); opacity:.4 } 60%{ transform: scale(1.12) } 100%{ transform: scale(1); opacity:1 } }
+.cw-pop { animation: cw-pop .45s cubic-bezier(.2,1.5,.4,1); display: inline-block; }
+/* Global button press micro-interaction */
+button { transition: transform .1s ease; }
+button:active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce){ .cw-pop{ animation:none } button, button:active{ transform:none; transition:none } }

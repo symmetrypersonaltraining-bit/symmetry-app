@@ -197,7 +197,7 @@ export default function ReminderEditor() {
             style={{ background: "var(--brand-surface)", border: "1px solid " + (blocked ? "#ef4444" : "var(--brand-border)"), boxShadow: "0 8px 26px rgba(20,30,55,0.08)" }}>
             <div className="flex justify-between items-center">
               <div className="font-semibold" style={{ color: "var(--brand-text)" }}>{r.name}</div>
-              <span className="text-xs font-bold px-2 py-1 rounded-full"
+              <span key={sent ? "sent" : blocked ? "blk" : "rdy"} className="text-xs font-bold px-2 py-1 rounded-full cw-pop"
                 style={{ background: sent ? "#f59e0b22" : blocked ? "#ef444422" : "#22c55e22", color: sent ? "#f59e0b" : blocked ? "#ef4444" : "#22c55e" }}>
                 {sent ? "AWAITING PAYMENT" : blocked ? "BLOCKED" : "READY"}
               </span>
