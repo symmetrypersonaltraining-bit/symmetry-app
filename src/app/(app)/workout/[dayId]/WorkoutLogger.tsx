@@ -881,7 +881,38 @@ export default function WorkoutLogger({
       }).eq("id", logId);
       try {
         const __today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-        await supabase.from("scheduled_workouts").update({ status: "completed", workout_log_id: logId }).eq("client_id", clientId).eq("day_id", day.id).eq("scheduled_date", __today);
+        // Mark the scheduled workout complete. Prefer today's instance; if the
+        // workout was scheduled for a prior day and never moved, fall back to the
+        // most recent still-scheduled instance on/before today so make-up logs
+        // still show as completed on the schedule.
+        const { data: __todayRow } = await (supabase as any)
+          .from("scheduled_workouts")
+          .select("id")
+          .eq("client_id", clientId)
+          .eq("day_id", day.id)
+          .eq("scheduled_date", __today)
+          .order("id")
+          .limit(1);
+        let __swId: string | null =
+          __todayRow && __todayRow.length ? __todayRow[0].id : null;
+        if (!__swId) {
+          const { data: __pastRows } = await (supabase as any)
+            .from("scheduled_workouts")
+            .select("id")
+            .eq("client_id", clientId)
+            .eq("day_id", day.id)
+            .eq("status", "scheduled")
+            .lte("scheduled_date", __today)
+            .order("scheduled_date", { ascending: false })
+            .limit(1);
+          if (__pastRows && __pastRows.length) __swId = __pastRows[0].id;
+        }
+        if (__swId) {
+          await (supabase as any)
+            .from("scheduled_workouts")
+            .update({ status: "completed", workout_log_id: logId })
+            .eq("id", __swId);
+        }
       } catch {}
       setWorkoutComplete(true);
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
