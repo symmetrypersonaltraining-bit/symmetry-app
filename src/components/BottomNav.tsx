@@ -34,10 +34,13 @@ export default function BottomNav() {
           <Link
             key={item.href}
             href={item.href}
-            className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors"
+            className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors relative"
           >
+            {active && (
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 h-1 w-8 rounded-full transition-all" style={{ background: "var(--brand-primary)" }} />
+            )}
             <i
-              className={`ti ${item.icon} text-xl`}
+              className={`ti ${item.icon} text-xl transition-transform duration-300 ${active ? "scale-110 -translate-y-0.5" : ""}`}
               style={{ color: active ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}
             />
             <span
