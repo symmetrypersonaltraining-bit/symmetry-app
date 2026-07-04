@@ -18,6 +18,7 @@ const CLIENT_NAV = [
   { href: "/client-preview/nutrition",  label: "Nutrition", icon: "ti-salad" },
   { href: "/client-preview/progress",   label: "Progress",  icon: "ti-chart-line" },
   { href: "/workout",                   label: "Workout",   icon: "ti-barbell" },
+  { href: "/settings", label: "Settings", icon: "ti-settings" },
 ];
 
 export default function TrainerLayoutWrapper({ children }: Props) {
