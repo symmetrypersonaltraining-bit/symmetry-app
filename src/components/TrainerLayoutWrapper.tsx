@@ -103,7 +103,8 @@ export default function TrainerLayoutWrapper({ children }: Props) {
         <div className="lg:hidden h-14" />
         {children}
       </div>
-      <div style={{ position: "fixed", top: 10, right: 14, zIndex: 950 }}>
+      <div style={{ position: "fixed", top: 10, right: 14, zIndex: 950, display: "flex", alignItems: "center", gap: 8 }}>
+        <button onClick={handleToggleMode} aria-label="Switch to client view" className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: "var(--brand-primary)", color: "white", border: "none", cursor: "pointer" }}><i className="ti ti-user text-sm" /> Client View</button>
         <HeaderAssist solid />
       </div>
       <AIAssistant />
