@@ -30,6 +30,7 @@ export default function SetFeedback({
   const [popTick, setPopTick] = useState(0);
   const [popOn, setPopOn] = useState(false);
   const [pr, setPr] = useState<string | null>(null);
+  const [prog, setProg] = useState({ done: 0, total: 0 });
 
   const prevDone = useRef<number | null>(null);
   const prSeen = useRef<Set<string>>(new Set());
@@ -106,6 +107,18 @@ export default function SetFeedback({
     return () => clearTimeout(t);
   }, [pr]);
 
+  useEffect(() => {
+    try {
+      const groups = sets && typeof sets === "object" ? Object.entries(sets as Record<string, unknown>) : [];
+      let d = 0, t = 0;
+      for (const entry of groups) {
+        const arr = entry[1];
+        if (Array.isArray(arr)) { t += arr.length; for (const s of arr as SetRow[]) if (s && s.done) d++; }
+      }
+      setProg({ done: d, total: t });
+    } catch {}
+  }, [sets]);
+
   return (
     <div style={wrap}>
       <style>{CSS}</style>
@@ -116,6 +129,11 @@ export default function SetFeedback({
         </div>
       )}
       {pr && <div style={prToast}>🏆 NEW PR · {pr}</div>}
+      {prog.total > 0 && (
+        <div style={progWrap}>
+          <div style={{ ...progFill, width: `${Math.round((prog.done / prog.total) * 100)}%` }} />
+        </div>
+      )}
     </div>
   );
 }
@@ -164,3 +182,18 @@ const prToast: React.CSSProperties = {
 };
 const CSS =
   "@keyframes cw-setpop{0%{transform:translate(-50%,-50%) scale(.4);opacity:0}40%{transform:translate(-50%,-50%) scale(1.25);opacity:1}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}@keyframes cw-burst{0%{transform:scale(1);opacity:.8}100%{transform:scale(2.4);opacity:0}}@keyframes cw-prin{from{transform:translateX(-50%) translateY(-12px) scale(.8);opacity:0}to{transform:translateX(-50%) translateY(0) scale(1);opacity:1}}";
+
+
+const progWrap: React.CSSProperties = {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  height: 4,
+  background: "rgba(127,140,170,0.18)",
+};
+const progFill: React.CSSProperties = {
+  height: "100%",
+  background: "linear-gradient(90deg, var(--brand-primary), var(--brand-accent))",
+  transition: "width .4s ease",
+};
