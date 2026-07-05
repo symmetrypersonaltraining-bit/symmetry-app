@@ -10,6 +10,7 @@ import MilestoneToast from "@/components/MilestoneToast";
 import PrankInvoice from "@/components/PrankInvoice";
 import PaymentDueBanner from "@/components/PaymentDueBanner";
 import MilestoneBadges from "@/components/MilestoneBadges";
+import WorkoutDaySheet from "@/components/WorkoutDaySheet";
 
 interface MetricPoint {
   metric_date: string;
@@ -390,6 +391,12 @@ function WeekRing({
   const todayDow = today.getDay();
   const todayStr = toCT(today);
 
+  const [sheetDate, setSheetDate] = useState<string | null>(null);
+  const [movedOverrides, setMovedOverrides] = useState<Record<string, string>>({});
+  const effectiveScheduled = Object.keys(movedOverrides).length
+    ? allScheduled.map((w) => (movedOverrides[w.id] ? { ...w, date: movedOverrides[w.id] } : w))
+    : allScheduled;
+
   const displayWeekStart = new Date(today);
   displayWeekStart.setDate(today.getDate() - todayDow + weekOffset * 7);
 
@@ -400,7 +407,7 @@ function WeekRing({
     const d = new Date(displayWeekStart);
     d.setDate(displayWeekStart.getDate() + i);
     const dateStr = toCT(d);
-    const workouts = allScheduled.filter(w => w.date === dateStr);
+    const workouts = effectiveScheduled.filter(w => w.date === dateStr);
     const dateNum = d.getDate();
     return { dow: i, dateStr, workouts, isToday: dateStr === todayStr, dateNum };
   });
@@ -464,23 +471,27 @@ function WeekRing({
                 <div className="w-8 h-8 rounded-full" style={{
                   border: isToday ? "2px solid var(--brand-primary)" : "1px dashed var(--brand-border)",
                 }} />
-              ) : workouts.length === 1 ? (
-                // Single workout — same as before
-                workouts[0].id
-                  ? <Link href={`${basePath}/workout/${workouts[0].id}`}>{renderCircle(workouts[0], "lg", isToday)}</Link>
-                  : renderCircle(workouts[0], "lg", isToday)
               ) : (
-                // Dual workout day — two stacked small icons, both clickable
-                <div
-                  className="flex flex-col items-center gap-0.5 rounded-xl px-0.5 py-0.5"
-                  style={{ border: isToday ? "2px solid var(--brand-primary)" : "1px solid var(--brand-border)", background: "var(--brand-surface)" }}
+                // Tap the day to open the workout sheet (Start / Log / Move)
+                <button
+                  type="button"
+                  onClick={() => setSheetDate(dateStr)}
+                  style={{ background: "none", border: "none", padding: 0, margin: 0, cursor: "pointer" }}
+                  aria-label={`View ${DAYS[dow]} ${dateNum} workouts`}
                 >
-                  {workouts.map((w, wi) => (
-                    w.id
-                      ? <Link key={w.id} href={`${basePath}/workout/${w.id}`}>{renderCircle(w, "sm")}</Link>
-                      : <span key={`${dateStr}-${wi}`}>{renderCircle(w, "sm")}</span>
-                  ))}
-                </div>
+                  {workouts.length === 1 ? (
+                    renderCircle(workouts[0], "lg", isToday)
+                  ) : (
+                    <div
+                      className="flex flex-col items-center gap-0.5 rounded-xl px-0.5 py-0.5"
+                      style={{ border: isToday ? "2px solid var(--brand-primary)" : "1px solid var(--brand-border)", background: "var(--brand-surface)" }}
+                    >
+                      {workouts.map((w, wi) => (
+                        <span key={w.id || `${dateStr}-${wi}`}>{renderCircle(w, "sm")}</span>
+                      ))}
+                    </div>
+                  )}
+                </button>
               )}
               {/* Day label + date number */}
               <div className="flex flex-col items-center" style={{ lineHeight: 1.1 }}>
@@ -491,6 +502,24 @@ function WeekRing({
           );
         })}
       </div>
+      {sheetDate && (
+        <WorkoutDaySheet
+          date={sheetDate}
+          workouts={effectiveScheduled
+            .filter((w) => w.date === sheetDate)
+            .map((w) => ({
+              id: w.id,
+              dayId: w.id,
+              date: w.date,
+              label: (typeof w.label === "string" ? w.label : ((w.label as any) && (w.label as any).label)) || "Workout",
+              status: w.completed ? "completed" : "scheduled",
+            }))}
+          basePath={basePath}
+          today={todayStr}
+          onClose={() => setSheetDate(null)}
+          onMoved={(id, newDate) => setMovedOverrides((m) => ({ ...m, [id]: newDate }))}
+        />
+      )}
     </div>
   );
 }
