@@ -451,7 +451,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
             const isToday = ds === todayStr;
             const dws = workoutMap[ds] || [];
             return (
-              <div key={ds} style={{ background: "var(--brand-surface)", minHeight: 72, padding: "4px 3px" }}>
+              <div key={ds} onClick={() => { if (dws.length) setSheetDate(ds); }} style={{ background: "var(--brand-surface)", minHeight: 72, padding: "4px 3px", cursor: dws.length ? "pointer" : "default" }}>
                 <div className="flex justify-center mb-1">
                   <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold"
                     style={{ background: isToday ? "#E53935" : "transparent", color: isToday ? "white" : "var(--brand-text-secondary)" }}>
@@ -537,6 +537,17 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
         );
       })}
       <CalendarLegend />
+      {sheetDate && (
+        <WorkoutDaySheet
+          date={sheetDate}
+          workouts={workouts.filter((w) => (movedMap[w.id] || w.scheduled_date) === sheetDate).map((w) => { const dd: any = w.days; return { id: w.id, dayId: ((dd && typeof dd === "object" ? dd.id : dd) || w.day_id || "") as string, date: sheetDate as string, label: ((dd && typeof dd === "object") ? dd.label : (dd || "Workout")) as string, status: w.status }; })}
+          basePath=""
+          forClient={clientId}
+          today={todayStr}
+          onClose={() => setSheetDate(null)}
+          onMoved={(id, newDate) => setMovedMap((m) => ({ ...m, [id]: newDate }))}
+        />
+      )}
     </div>
   );
 }
