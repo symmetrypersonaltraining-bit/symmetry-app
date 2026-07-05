@@ -1262,7 +1262,7 @@ export default function WorkoutLogger({
 
   // \u2500\u2500\u2500 STANDARD VIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   return (
-    <div style={{ background: "var(--brand-bg)", minHeight: "100vh" }}>
+    <div style={{ background: "var(--brand-bg)", minHeight: "100vh", paddingBottom: 96 }}>
       {historyExercise && (
         <ExerciseHistory exerciseId={historyExercise.id} exerciseName={historyExercise.name}
           onClose={() => setHistoryExercise(null)}
@@ -1484,6 +1484,26 @@ export default function WorkoutLogger({
           {saving ? "Saving\u2026" : progressPct === 100 ? "\ud83c\udfc6 Complete Workout" : `${progressPct}% \u2014 keep going!`}
         </button>
       </div>
+      {!sessionMode && (
+        <>
+          <style>{`@keyframes ssbpulse{0%,100%{transform:scale(1);box-shadow:0 8px 22px rgba(124,156,245,.45)}50%{transform:scale(1.03);box-shadow:0 13px 32px rgba(124,156,245,.72)}}`}</style>
+          <button
+            onClick={() => setSessionMode(true)}
+            aria-label="Start session and log"
+            style={{
+              position: "fixed", left: 12, right: 12, maxWidth: 520, margin: "0 auto",
+              bottom: "calc(64px + env(safe-area-inset-bottom, 0px))", zIndex: 40,
+              border: "none", borderRadius: 16, cursor: "pointer", padding: 15,
+              fontSize: 16, fontWeight: 800, color: "#fff",
+              background: isTrainerSession ? "#6366f1" : "var(--brand-primary)",
+              animation: "ssbpulse 1.6s ease-in-out infinite",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            }}
+          >
+            {isTrainerSession ? `▶ Start ${clientName || "Client"}'s Session` : "▶ Start Session & Log"}
+          </button>
+        </>
+      )}
     </div>
   );
 }
