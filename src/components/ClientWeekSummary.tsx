@@ -120,10 +120,6 @@ export default function ClientWeekSummary() {
   if (!s) return null;
 
   function dismissBrief() {
-    try {
-      const g = document.querySelector("[data-week-brief]");
-      if (g) g.remove();
-    } catch { /* ignore */ }
     setShowBrief(false);
   }
 
@@ -170,7 +166,7 @@ export default function ClientWeekSummary() {
 
       {/* C1 — once-weekly full-screen briefing */}
       {showBrief && (
-        <div data-week-brief style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--brand-bg)", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--brand-bg)", display: "flex", flexDirection: "column", overflowY: "auto" }}>
           <div style={{ background: "linear-gradient(135deg,#7c9cf5,#8b6ff0)", color: "#fff", padding: "20px 18px 18px" }}>
             <div style={{ fontSize: 12, opacity: 0.9, fontWeight: 600 }}>{fmtRange(s.lastWkStart, s.lastWkEnd).toUpperCase()}</div>
             <div style={{ fontSize: 23, fontWeight: 800, marginTop: 2 }}>Your week in review 💪</div>

@@ -10,6 +10,7 @@ import MilestoneToast from "@/components/MilestoneToast";
 import PrankInvoice from "@/components/PrankInvoice";
 import PaymentDueBanner from "@/components/PaymentDueBanner";
 import MilestoneBadges from "@/components/MilestoneBadges";
+import ClientWeekSummary from "@/components/ClientWeekSummary";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
 
 interface MetricPoint {
@@ -710,6 +711,7 @@ export default function ClientDashboard({
         )}
 
         {/* Daily nutrition rings */}
+        <ClientWeekSummary />
         <HomeMacrosCard />
 
         <MilestoneBadges />
