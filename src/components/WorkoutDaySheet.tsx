@@ -130,7 +130,8 @@ export default function WorkoutDaySheet({
           padding: "14px 14px 20px",
           maxWidth: 520,
           margin: "0 auto",
-          maxHeight: "80vh",
+          maxHeight: "85vh",
+          WebkitOverflowScrolling: "touch",
           overflowY: "auto",
         }}
       >
@@ -138,11 +139,11 @@ export default function WorkoutDaySheet({
 
         {!moving ? (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 2, background: "var(--brand-surface)", paddingTop: 2, paddingBottom: 10 }}>
               <span style={{ fontWeight: 800, fontSize: 15, color: "var(--brand-text)" }}>
                 {pretty(date)}{isToday ? " · Today" : ""}
               </span>
-              <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, color: "var(--brand-text-secondary)", cursor: "pointer" }}>×</button>
+              <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", fontSize: 24, lineHeight: 1, padding: "0 4px", color: "var(--brand-text-secondary)", cursor: "pointer" }}>×</button>
             </div>
             {workouts.length === 0 ? (
               <div style={{ color: "var(--brand-text-secondary)", fontStyle: "italic", padding: "8px 2px 4px", fontSize: 13 }}>
