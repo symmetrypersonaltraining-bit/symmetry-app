@@ -115,9 +115,9 @@ export default function LogBodyFatPage() {
       sites: vals, sum_mm: sum, body_density: Number(D.toFixed(4)),
       body_fat_pct: Number(bf.toFixed(1)), age: ageN, sex: male ? "male" : "female",
     });
-    const __r2 = await supabase.from("metrics").insert({
+    const __r2 = await supabase.from("metrics").upsert({
       client_id: clientId, metric_date: today, body_fat_pct: Number(bf.toFixed(1)), source: "caliper",
-    });
+    }, { onConflict: "client_id,metric_date" });
     if (__r1.error || __r2.error) { alert("Save failed: " + (__r1.error ? __r1.error.message : "ok") + " | " + (__r2.error ? __r2.error.message : "ok")); setSaving(false); return; }
     setDone(true);
     setSaving(false);
