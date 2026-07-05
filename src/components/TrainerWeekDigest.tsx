@@ -90,7 +90,7 @@ export default function TrainerWeekDigest() {
         const foodWindow = addDays(today, -180);
 
         const [clientsRes, swThis, wlogs, mealsWeek, foodEver] = await Promise.all([
-          supabase.from("clients").select("id, name, weekly_focus"),
+          supabase.from("clients").select("id, name, weekly_focus, digest_snoozed_until"),
           supabase.from("scheduled_workouts").select("client_id").gte("scheduled_date", thisWk).lte("scheduled_date", thisWkEnd),
           supabase.from("workout_logs").select("client_id, log_date, completed, status").gte("log_date", recent),
           supabase.from("meal_adherence_logs").select("client_id, adherence, log_date").gte("log_date", thisWk).lte("log_date", today),
@@ -118,6 +118,7 @@ export default function TrainerWeekDigest() {
         const out: Row[] = [];
         for (const c of clients) {
           if (/dustin/i.test(c.name || "")) continue;
+          if (c.digest_snoozed_until && c.digest_snoozed_until >= today) continue;
           const total = thisTotal[c.id] || 0;
           const done = weekDone[c.id] ? weekDone[c.id].size : 0;
           const ll = lastLog[c.id];
@@ -162,6 +163,15 @@ export default function TrainerWeekDigest() {
     } catch { /* ignore */ }
     finally { setSaving(false); }
   }
+  async function dismissClient(id: string) {
+    const until = addDays(todayCT(), 7);
+    setRows((rs) => (rs ? rs.filter((r) => r.id !== id) : rs));
+    if (editing === id) { setEditing(null); setDraft(""); }
+    try {
+      const supabase: any = createClient();
+      await supabase.from("clients").update({ digest_snoozed_until: until }).eq("id", id);
+    } catch { /* ignore */ }
+  }
   function dismissPop() {
     try { localStorage.setItem("symmetry_trainerdigest_v1_" + weekStartOf(todayCT()), "1"); } catch { /* ignore */ }
     setShowPop(false);
@@ -182,7 +192,10 @@ export default function TrainerWeekDigest() {
               <div style={{ fontWeight: 700, fontSize: 13, color: "var(--brand-text)" }}>{r.name}</div>
               <div style={{ fontSize: 11, color: dotColor(r.risk) }}>{r.status}</div>
             </div>
-            <button onClick={() => { setEditing(editing === r.id ? null : r.id); setDraft(r.focus || ""); }} style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-primary)", background: "none", border: "1px dashed var(--brand-primary)", borderRadius: 9, padding: "4px 8px", cursor: "pointer", flex: "0 0 auto" }}>{r.focus ? "Focus ✎" : "+ focus"}</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "0 0 auto" }}>
+              <button onClick={() => { setEditing(editing === r.id ? null : r.id); setDraft(r.focus || ""); }} style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-primary)", background: "none", border: "1px dashed var(--brand-primary)", borderRadius: 9, padding: "4px 8px", cursor: "pointer" }}>{r.focus ? "Focus ✎" : "+ focus"}</button>
+              <button onClick={() => dismissClient(r.id)} title="Dismiss — temporarily out (hides from Week ahead for a week)" style={{ fontSize: 14, fontWeight: 700, lineHeight: 1, color: "var(--brand-text-secondary)", background: "none", border: "1px solid var(--brand-border)", borderRadius: 999, width: 24, height: 24, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+            </div>
           </div>
           {r.focus && editing !== r.id && (
             <div style={{ marginLeft: 54, marginTop: 6, fontSize: 12, color: "var(--brand-text-secondary)", fontStyle: "italic" }}>“{r.focus}”</div>
