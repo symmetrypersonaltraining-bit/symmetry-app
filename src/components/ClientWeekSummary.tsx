@@ -107,10 +107,10 @@ export default function ClientWeekSummary() {
 
         const hasActivity = total > 0 || meals.length > 0 || streak > 0 || thisWeekCount > 0;
         try {
-          const key = "symmetry_weekbrief_v1_" + clientId + "_" + thisWk;
+          const key = "symmetry_weekbrief_v1_" + clientId + "_" + today;
           let isPreview = false;
           try { isPreview = !!new URLSearchParams(window.location.search).get("forClient"); } catch { isPreview = false; }
-          if (hasActivity && !isPreview && !localStorage.getItem(key)) setShowBrief(true);
+          if (hasActivity && !isPreview && !localStorage.getItem(key)) { try { localStorage.setItem(key, "1"); } catch { /* ignore */ } setShowBrief(true); }
         } catch { /* ignore */ }
       } catch { /* fail silent -> render nothing */ }
     })();
