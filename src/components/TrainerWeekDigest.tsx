@@ -15,6 +15,9 @@ function addDays(dateStr: string, n: number): string {
   const p = (x: number) => String(x).padStart(2, "0");
   return dt.getFullYear() + "-" + p(dt.getMonth() + 1) + "-" + p(dt.getDate());
 }
+function daysBetween(a: string, b: string): number {
+  return Math.round((new Date(b + "T00:00:00").getTime() - new Date(a + "T00:00:00").getTime()) / 86400000);
+}
 function weekStartOf(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
@@ -33,12 +36,44 @@ function initials(name: string): string {
 
 interface Row {
   id: string; name: string; done: number; total: number; nutPct: number | null;
-  daysSinceLog: number; thisWeekCount: number; focus: string | null; risk: "r" | "a" | "g"; status: string;
+  daysSinceLog: number; everLogsFood: boolean; foodThisWeek: boolean;
+  focus: string | null; risk: "r" | "a" | "g"; status: string;
+}
+
+// Generate up to 3 tailored focus suggestions from a client's actual gaps.
+// Food suggestions ONLY for clients who actually log food (never for never-loggers).
+function suggestFocus(r: Row): string[] {
+  const s: string[] = [];
+  const total = r.total || 0;
+  if (r.daysSinceLog >= 6) {
+    s.push("Let's get you back in the app — open it daily and log a workout so we stay on track.");
+    s.push("First priority this week: get in and log a session. Consistency is where results come from.");
+  } else if (r.daysSinceLog >= 3) {
+    s.push("Get back to daily check-ins — log each workout as you finish it this week.");
+    s.push("Stay consistent this week: hit your scheduled sessions and log every one.");
+  } else if (total > 0 && r.done < total) {
+    s.push("Great start — finish out all " + total + " sessions this week and log each one.");
+    s.push("Keep the momentum going and log every workout so we can track your progress.");
+  } else {
+    s.push("Strong consistency — keep showing up and logging everything this week.");
+    s.push("Dial in your form and log your sets so we can push your weights next week.");
+  }
+  if (r.everLogsFood) {
+    if (!r.foodThisWeek) s.push("You've logged meals before — get back to it this week so we can fine-tune your nutrition.");
+    else if (r.nutPct != null && r.nutPct < 70) s.push("Tighten up the nutrition this week — aim to stay on-plan with your meals.");
+    else s.push("Keep logging your meals — that nutrition consistency is paying off.");
+  }
+  s.push("Check the app daily this week — messages, group chat, and your workouts are all in there.");
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const x of s) { if (!seen.has(x)) { seen.add(x); out.push(x); } if (out.length === 3) break; }
+  return out;
 }
 
 export default function TrainerWeekDigest() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [showPop, setShowPop] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
@@ -50,54 +85,57 @@ export default function TrainerWeekDigest() {
         const supabase: any = createClient();
         const today = todayCT();
         const thisWk = weekStartOf(today);
-        const lastWkStart = addDays(thisWk, -7);
-        const lastWkEnd = addDays(thisWk, -1);
         const thisWkEnd = addDays(thisWk, 6);
         const recent = addDays(today, -14);
+        const foodWindow = addDays(today, -180);
 
-        const [clientsRes, swLast, swThis, wlogs, meals] = await Promise.all([
+        const [clientsRes, swThis, wlogs, mealsWeek, foodEver] = await Promise.all([
           supabase.from("clients").select("id, name, weekly_focus"),
-          supabase.from("scheduled_workouts").select("client_id, status").gte("scheduled_date", lastWkStart).lte("scheduled_date", lastWkEnd),
           supabase.from("scheduled_workouts").select("client_id").gte("scheduled_date", thisWk).lte("scheduled_date", thisWkEnd),
           supabase.from("workout_logs").select("client_id, log_date, completed, status").gte("log_date", recent),
-          supabase.from("meal_adherence_logs").select("client_id, adherence, log_date").gte("log_date", lastWkStart).lte("log_date", lastWkEnd),
+          supabase.from("meal_adherence_logs").select("client_id, adherence, log_date").gte("log_date", thisWk).lte("log_date", today),
+          supabase.from("meal_adherence_logs").select("client_id").gte("log_date", foodWindow).limit(10000),
         ]);
 
         const clients = clientsRes.data || [];
-        const lastByC: Record<string, { t: number; d: number }> = {};
-        const thisByC: Record<string, number> = {};
+        const thisTotal: Record<string, number> = {};
         const lastLog: Record<string, string> = {};
-        const mealsByC: Record<string, { on: number; tot: number }> = {};
-
-        for (const w of (swLast.data || [])) { const k = w.client_id; (lastByC[k] = lastByC[k] || { t: 0, d: 0 }); lastByC[k].t++; if (w.status === "completed") lastByC[k].d++; }
-        for (const w of (swThis.data || [])) { thisByC[w.client_id] = (thisByC[w.client_id] || 0) + 1; }
         const weekDone: Record<string, Set<string>> = {};
-        for (const l of (wlogs.data || [])) { if (l.completed || l.status === "completed") { const c = lastLog[l.client_id]; if (!c || l.log_date > c) lastLog[l.client_id] = l.log_date; if (l.log_date >= lastWkStart && l.log_date <= lastWkEnd) { (weekDone[l.client_id] = weekDone[l.client_id] || new Set<string>()).add(l.log_date); } } }
-        for (const m of (meals.data || [])) { const c = lastLog[m.client_id]; if (!c || m.log_date > c) lastLog[m.client_id] = m.log_date; const k = m.client_id; (mealsByC[k] = mealsByC[k] || { on: 0, tot: 0 }); mealsByC[k].tot++; const a = (m.adherence || "").toLowerCase(); if (a === "full" || a === "partial" || a === "on-plan" || a === "on plan") mealsByC[k].on++; }
+        const mealsByC: Record<string, { on: number; tot: number }> = {};
+        const foodEverSet = new Set<string>();
+
+        for (const w of (swThis.data || [])) { thisTotal[w.client_id] = (thisTotal[w.client_id] || 0) + 1; }
+        for (const l of (wlogs.data || [])) {
+          if (l.completed || l.status === "completed") {
+            const c = lastLog[l.client_id];
+            if (!c || l.log_date > c) lastLog[l.client_id] = l.log_date;
+            if (l.log_date >= thisWk && l.log_date <= today) (weekDone[l.client_id] = weekDone[l.client_id] || new Set<string>()).add(l.log_date);
+          }
+        }
+        for (const m of (mealsWeek.data || [])) { const k = m.client_id; (mealsByC[k] = mealsByC[k] || { on: 0, tot: 0 }); mealsByC[k].tot++; const a = (m.adherence || "").toLowerCase(); if (a === "full" || a === "partial" || a === "on-plan" || a === "on plan") mealsByC[k].on++; }
+        for (const f of (foodEver.data || [])) foodEverSet.add(f.client_id);
 
         const out: Row[] = [];
         for (const c of clients) {
           if (/dustin/i.test(c.name || "")) continue;
-          const lw = lastByC[c.id] || { t: 0, d: 0 };
-          const total = lw.t;
+          const total = thisTotal[c.id] || 0;
           const done = weekDone[c.id] ? weekDone[c.id].size : 0;
-          const twc = thisByC[c.id] || 0;
           const ll = lastLog[c.id];
-          const daysSinceLog = ll ? Math.round((new Date(today + "T00:00:00").getTime() - new Date(ll + "T00:00:00").getTime()) / 86400000) : 999;
+          const daysSinceLog = ll ? daysBetween(ll, today) : 999;
           const mb = mealsByC[c.id];
           const nutPct = mb && mb.tot ? Math.round((mb.on / mb.tot) * 100) : null;
-          if (total === 0 && twc === 0 && daysSinceLog > 13) continue;
+          if (total === 0 && done === 0 && daysSinceLog > 13) continue;
           let risk: "r" | "a" | "g" = "g";
           if (daysSinceLog >= 6) risk = "r";
           else if (daysSinceLog >= 3 || (nutPct != null && nutPct < 60)) risk = "a";
           let status: string;
-          if (risk === "r") status = done + "/" + (total || 0) + " workouts · " + (daysSinceLog > 13 ? "no recent logs" : "no logs in " + daysSinceLog + "d");
-          else if (risk === "a") status = done + "/" + (total || 0) + " workouts" + (nutPct != null ? " · nutrition " + nutPct + "%" : "");
-          else status = done + "/" + (total || 0) + (nutPct != null ? " · " + nutPct + "%" : "") + " · on track";
-          out.push({ id: c.id, name: c.name, done, total, nutPct, daysSinceLog, thisWeekCount: twc, focus: c.weekly_focus || null, risk, status });
+          if (risk === "r") status = "no logs in " + (daysSinceLog > 13 ? "14+" : daysSinceLog) + "d — reach out";
+          else if (risk === "a") status = "quiet " + daysSinceLog + "d" + (nutPct != null ? " · nutrition " + nutPct + "%" : "");
+          else status = (done > 0 ? done + "/" + (total || 0) + " this wk · " : "") + "on track";
+          out.push({ id: c.id, name: c.name, done, total, nutPct, daysSinceLog, everLogsFood: foodEverSet.has(c.id), foodThisWeek: !!mb, focus: c.weekly_focus || null, risk, status });
         }
         const order: Record<string, number> = { r: 0, a: 1, g: 2 };
-        out.sort((a, b) => (order[a.risk] - order[b.risk]) || a.name.localeCompare(b.name));
+        out.sort((a, b) => (order[a.risk] - order[b.risk]) || b.daysSinceLog - a.daysSinceLog || a.name.localeCompare(b.name));
         if (!on) return;
         setRows(out);
         try {
@@ -133,10 +171,9 @@ export default function TrainerWeekDigest() {
   const activeCount = rows.length;
   const needCount = rows.filter((r) => r.risk === "r").length;
 
-  // Called as a FUNCTION (not a nested component) so the focus textarea never remounts.
-  const renderRoster = () => (
+  const renderRoster = (list: Row[]) => (
     <div>
-      {rows.map((r) => (
+      {list.map((r) => (
         <div key={r.id} style={{ borderBottom: "1px solid var(--brand-border)", padding: "10px 0" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ width: 10, height: 10, borderRadius: 999, background: dotColor(r.risk), flex: "0 0 auto" }} />
@@ -152,7 +189,13 @@ export default function TrainerWeekDigest() {
           )}
           {editing === r.id && (
             <div style={{ marginLeft: 54, marginTop: 8 }}>
-              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder="This week's focus for this client…" style={{ width: "100%", fontSize: 12.5, padding: 8, borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-bg)", color: "var(--brand-text)", resize: "vertical" }} />
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-text-secondary)", marginBottom: 5 }}>Suggested — tap to use, then tweak:</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                {suggestFocus(r).map((sug, i) => (
+                  <button key={i} onClick={() => setDraft(sug)} style={{ textAlign: "left", fontSize: 12, lineHeight: 1.4, color: "var(--brand-text)", background: "var(--brand-bg)", border: "1px solid var(--brand-border)", borderRadius: 10, padding: "8px 10px", cursor: "pointer" }}>{sug}</button>
+                ))}
+              </div>
+              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder="Pick one above or write your own…" style={{ width: "100%", fontSize: 12.5, padding: 8, borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-bg)", color: "var(--brand-text)", resize: "vertical" }} />
               <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                 <button onClick={() => saveFocus(r.id)} disabled={saving} style={{ fontSize: 12, fontWeight: 700, color: "#fff", background: "var(--brand-primary)", border: "none", borderRadius: 9, padding: "5px 12px", cursor: "pointer" }}>{saving ? "Saving…" : "Save"}</button>
                 <button onClick={() => { setEditing(null); setDraft(""); }} style={{ fontSize: 12, fontWeight: 700, color: "var(--brand-text-secondary)", background: "none", border: "none", cursor: "pointer" }}>Cancel</button>
@@ -171,7 +214,12 @@ export default function TrainerWeekDigest() {
           <div style={{ fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>📋 Week ahead</div>
           <div style={{ fontSize: 11, color: "var(--brand-text-secondary)" }}>{activeCount} active · {needCount} need a check-in</div>
         </div>
-        {renderRoster()}
+        {renderRoster(expanded ? rows : rows.slice(0, 3))}
+        {rows.length > 3 && (
+          <button onClick={() => setExpanded((v) => !v)} style={{ width: "100%", textAlign: "center", marginTop: 8, fontSize: 12, fontWeight: 700, color: "var(--brand-primary)", background: "none", border: "none", cursor: "pointer" }}>
+            {expanded ? "Show less ▴" : "Show all " + rows.length + " ▾"}
+          </button>
+        )}
       </div>
 
       {showPop && (
@@ -185,7 +233,7 @@ export default function TrainerWeekDigest() {
             <button onClick={dismissPop} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", fontSize: 20, width: 32, height: 32, borderRadius: 999, cursor: "pointer", flex: "0 0 auto" }}>×</button>
           </div>
           <div style={{ padding: "6px 16px 16px", flex: 1 }}>
-            {renderRoster()}
+            {renderRoster(rows)}
             <button onClick={dismissPop} style={{ display: "block", width: "100%", textAlign: "center", background: "var(--brand-primary)", color: "#fff", fontWeight: 800, padding: 14, borderRadius: 15, fontSize: 15, border: "none", cursor: "pointer", marginTop: 14 }}>Start the week →</button>
           </div>
         </div>
