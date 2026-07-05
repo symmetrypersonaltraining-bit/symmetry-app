@@ -6,6 +6,7 @@ import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import AssignProgramModal from "./AssignProgramModal";
 import MetricCards from "@/components/MetricCards";
+import PrivateProfilePanel from "@/components/PrivateProfilePanel";
 
 interface MetricPoint {
   metric_date: string;
@@ -309,6 +310,7 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
           ))}
         </div>
       </div>
+      <PrivateProfilePanel clientId={clientId} />
     </div>
   );
 }
