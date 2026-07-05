@@ -4,6 +4,7 @@ import MessagesBell from "@/components/MessagesBell";
 import { useState } from "react";
 import Link from "next/link";
 import PaymentCheckBanner from "@/components/PaymentCheckBanner";
+import TrainerWeekDigest from "@/components/TrainerWeekDigest";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
 
@@ -174,6 +175,8 @@ export default function TrainerHome({
             {dateLabel}
           </p>
         </div>
+
+        <TrainerWeekDigest />
 
         {/* Today's Client Sessions — scrollable list */}
         <div
