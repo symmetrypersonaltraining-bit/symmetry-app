@@ -7,6 +7,7 @@ import Link from "next/link";
 import AssignProgramModal from "./AssignProgramModal";
 import MetricCards from "@/components/MetricCards";
 import PrivateProfilePanel from "@/components/PrivateProfilePanel";
+import WorkoutDaySheet from "@/components/WorkoutDaySheet";
 
 interface MetricPoint {
   metric_date: string;
@@ -321,6 +322,8 @@ type ViewMode = "1w" | "2w" | "4w";
 function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; clientId: string }) {
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
+  const [sheetDate, setSheetDate] = useState<string | null>(null);
+  const [movedMap, setMovedMap] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("1w");
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [weekAnchor, setWeekAnchor] = useState(() => {
@@ -335,11 +338,12 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
   const workoutMap = useMemo(() => {
     const map: Record<string, WorkoutEntry[]> = {};
     for (const w of workouts) {
-      if (!map[w.scheduled_date]) map[w.scheduled_date] = [];
-      map[w.scheduled_date].push(w);
+      const d = movedMap[w.id] || w.scheduled_date;
+      if (!map[d]) map[d] = [];
+      map[d].push(w);
     }
     return map;
-  }, [workouts]);
+  }, [workouts, movedMap]);
 
   const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -381,14 +385,15 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
     headerLabel = `${startLabel} \u2013 ${endLabel}`;
   }
 
-  function WorkoutChip({ w, compact }: { w: WorkoutEntry; compact?: boolean }) {
+  function WorkoutChip({ w, compact }: { w: WorkoutEntry; compact: boolean }) {
     const done = w.status === "completed";
-    const dayId = w.days?.id || w.day_id;
-    if (!dayId) return null;
+    const dd: any = w.days;
+    const label = (dd && typeof dd === "object") ? dd.label : (dd || "Workout");
+    const openDate = movedMap[w.id] || w.scheduled_date;
     return (
-      <Link
-        href={`/workout/${dayId}?forClient=${clientId}`}
-        className="block rounded px-1.5 truncate"
+      <button
+        onClick={() => setSheetDate(openDate)}
+        className="block w-full text-left rounded px-1.5 truncate"
         style={{
           background: done ? "#22c55e20" : "var(--brand-primary)20",
           color: done ? "#16a34a" : "var(--brand-primary)",
@@ -396,9 +401,10 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
           fontSize: compact ? 9 : 11,
           lineHeight: compact ? "16px" : "20px",
           fontWeight: 500,
+          cursor: "pointer",
         }}>
-        {w.days?.label || "Workout"}
-      </Link>
+        {label}
+      </button>
     );
   }
 
@@ -463,6 +469,17 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
           })}
         </div>
         <CalendarLegend />
+      {sheetDate && (
+        <WorkoutDaySheet
+          date={sheetDate}
+          workouts={workouts.filter((w) => (movedMap[w.id] || w.scheduled_date) === sheetDate).map((w) => { const dd: any = w.days; return { id: w.id, dayId: ((dd && typeof dd === "object" ? dd.id : dd) || w.day_id || "") as string, date: sheetDate as string, label: ((dd && typeof dd === "object") ? dd.label : (dd || "Workout")) as string, status: w.status }; })}
+          basePath=""
+          forClient={clientId}
+          today={todayStr}
+          onClose={() => setSheetDate(null)}
+          onMoved={(id, newDate) => setMovedMap((m) => ({ ...m, [id]: newDate }))}
+        />
+      )}
       </div>
     );
   }

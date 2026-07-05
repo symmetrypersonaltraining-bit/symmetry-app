@@ -45,12 +45,14 @@ export default function WorkoutDaySheet({
   date,
   workouts,
   basePath = "",
+  forClient = "",
   today,
   onClose,
   onMoved,
 }: {
   date: string | null;
   workouts: DaySheetWorkout[];
+  forClient?: string;
   basePath?: string;
   today: string;
   onClose: () => void;
@@ -179,7 +181,7 @@ export default function WorkoutDaySheet({
                     </div>
                     <div style={{ display: "flex", gap: 7, marginTop: 10 }}>
                       <Link
-                        href={`${basePath}/workout/${w.dayId}`}
+                        href={`${basePath}/workout/${w.dayId}${forClient ? "?forClient=" + forClient : ""}`}
                         style={{
                           flex: 1, textAlign: "center", fontWeight: 700, fontSize: 12.5, padding: 9,
                           borderRadius: 10, textDecoration: "none",
