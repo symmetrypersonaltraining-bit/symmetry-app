@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
@@ -112,7 +113,8 @@ export default function WorkoutDaySheet({
 
   const isToday = date === today;
 
-  return (
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <>
       <div
         onClick={onClose}
@@ -269,6 +271,7 @@ export default function WorkoutDaySheet({
           </>
         )}
       </div>
-    </>
+    </>,
+    document.body
   );
 }

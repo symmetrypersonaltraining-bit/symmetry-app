@@ -516,7 +516,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
                 const dws = workoutMap[ds] || [];
                 const minH = viewMode === "1w" ? 140 : 100;
                 return (
-                  <div key={ds} style={{ background: "var(--brand-surface)", minHeight: minH, padding: "6px 4px" }}>
+                  <div key={ds} onClick={() => { if (dws.length) setSheetDate(ds); }} style={{ background: "var(--brand-surface)", minHeight: minH, padding: "6px 4px", cursor: dws.length ? "pointer" : "default" }}>
                     <div className="flex justify-center mb-2">
                       <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
                         style={{ background: isToday ? "#E53935" : "transparent", color: isToday ? "white" : "var(--brand-text)" }}>
