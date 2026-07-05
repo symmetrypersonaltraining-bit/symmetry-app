@@ -71,14 +71,16 @@ export default function TrainerWeekDigest() {
 
         for (const w of (swLast.data || [])) { const k = w.client_id; (lastByC[k] = lastByC[k] || { t: 0, d: 0 }); lastByC[k].t++; if (w.status === "completed") lastByC[k].d++; }
         for (const w of (swThis.data || [])) { thisByC[w.client_id] = (thisByC[w.client_id] || 0) + 1; }
-        for (const l of (wlogs.data || [])) { if (l.completed || l.status === "completed") { const c = lastLog[l.client_id]; if (!c || l.log_date > c) lastLog[l.client_id] = l.log_date; } }
+        const weekDone: Record<string, Set<string>> = {};
+        for (const l of (wlogs.data || [])) { if (l.completed || l.status === "completed") { const c = lastLog[l.client_id]; if (!c || l.log_date > c) lastLog[l.client_id] = l.log_date; if (l.log_date >= lastWkStart && l.log_date <= lastWkEnd) { (weekDone[l.client_id] = weekDone[l.client_id] || new Set<string>()).add(l.log_date); } } }
         for (const m of (meals.data || [])) { const c = lastLog[m.client_id]; if (!c || m.log_date > c) lastLog[m.client_id] = m.log_date; const k = m.client_id; (mealsByC[k] = mealsByC[k] || { on: 0, tot: 0 }); mealsByC[k].tot++; const a = (m.adherence || "").toLowerCase(); if (a === "full" || a === "partial" || a === "on-plan" || a === "on plan") mealsByC[k].on++; }
 
         const out: Row[] = [];
         for (const c of clients) {
           if (/dustin/i.test(c.name || "")) continue;
           const lw = lastByC[c.id] || { t: 0, d: 0 };
-          const total = lw.t, done = lw.d;
+          const total = lw.t;
+          const done = weekDone[c.id] ? weekDone[c.id].size : 0;
           const twc = thisByC[c.id] || 0;
           const ll = lastLog[c.id];
           const daysSinceLog = ll ? Math.round((new Date(today + "T00:00:00").getTime() - new Date(ll + "T00:00:00").getTime()) / 86400000) : 999;
@@ -86,8 +88,8 @@ export default function TrainerWeekDigest() {
           const nutPct = mb && mb.tot ? Math.round((mb.on / mb.tot) * 100) : null;
           if (total === 0 && twc === 0 && daysSinceLog > 13) continue;
           let risk: "r" | "a" | "g" = "g";
-          if (daysSinceLog >= 5 || (total > 0 && done === 0)) risk = "r";
-          else if ((total > 0 && done < Math.ceil(total * 0.6)) || (nutPct != null && nutPct < 70) || daysSinceLog >= 3) risk = "a";
+          if (daysSinceLog >= 6) risk = "r";
+          else if (daysSinceLog >= 3 || (nutPct != null && nutPct < 60)) risk = "a";
           let status: string;
           if (risk === "r") status = done + "/" + (total || 0) + " workouts · " + (daysSinceLog > 13 ? "no recent logs" : "no logs in " + daysSinceLog + "d");
           else if (risk === "a") status = done + "/" + (total || 0) + " workouts" + (nutPct != null ? " · nutrition " + nutPct + "%" : "");
