@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
+import AddWorkoutButton from "@/components/AddWorkoutButton";
 import Link from "next/link";
 import RescheduleCalendar, { type CalWorkout } from "@/components/RescheduleCalendar";
 import ScheduleWeekBar from "@/components/ScheduleWeekBar";
@@ -122,6 +123,7 @@ export default async function WorkoutPage() {
         <h1 className="text-white font-medium text-lg">Workout</h1>
         <p className="text-white/60 text-sm">{displayDate}</p>
       </div>
+      <div className="px-4 pt-3"><AddWorkoutButton /></div>
 
       <div className="px-4 py-4">
         {todayScheduledList.length > 0 ? (
