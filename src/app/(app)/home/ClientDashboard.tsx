@@ -1,5 +1,6 @@
 "use client";
 import MessagesBell from "@/components/MessagesBell";
+import AddWorkoutButton from "@/components/AddWorkoutButton";
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -629,6 +630,8 @@ export default function ClientDashboard({
           <PaymentNotificationBanner notifications={notifications} />
         )}
 
+        {/* Add workout (client can add an extra workout to today) */}
+        <div style={{ marginBottom: 12 }}><AddWorkoutButton /></div>
         {/* Week overview */}
         <div className="metric-card">
           <div className="flex items-center justify-between mb-1">
