@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import MealPlanClient from "../../nutrition/MealPlanClient";
+import NutritionAverages from "@/components/NutritionAverages";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -65,6 +66,7 @@ export default async function ClientPreviewNutritionPage() {
         <h1 className="text-white font-semibold text-lg">Nutrition</h1>
         <p className="text-white/60 text-sm">{clientName}</p>
       </div>
+      <NutritionAverages clientId={clientId} today={today} />
       <MealPlanClient
         clientId={clientId}
         clientName={clientName}
