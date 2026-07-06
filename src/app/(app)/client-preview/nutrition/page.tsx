@@ -34,6 +34,7 @@ export default async function ClientPreviewNutritionPage() {
       .select("id, version_number, meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, protein, carbs, fats, position))")
       .eq("client_id", clientId)
       .eq("status", "live")
+      .lte("effective_date", today)
       .order("effective_date", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -46,6 +47,7 @@ export default async function ClientPreviewNutritionPage() {
       .from("macro_targets")
       .select("*")
       .eq("client_id", clientId)
+      .lte("effective_date", today)
       .order("effective_date", { ascending: false })
       .limit(1)
       .maybeSingle(),

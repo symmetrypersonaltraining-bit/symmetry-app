@@ -38,8 +38,8 @@ export default function HomeMacrosCard() {
       if (!clientId || !on) return;
       const [logsRes, mtRes, mpRes] = await Promise.all([
         supabase.from("meal_adherence_logs").select("*").eq("client_id", clientId).eq("log_date", today),
-        supabase.from("macro_targets").select("*").eq("client_id", clientId).order("effective_date", { ascending: false }).limit(1),
-        supabase.from("meal_plans").select("id, meals(id, meal_items(protein, carbs, fats))").eq("client_id", clientId).eq("status", "live").order("effective_date", { ascending: false }).limit(1),
+        supabase.from("macro_targets").select("*").eq("client_id", clientId).lte("effective_date", today).order("effective_date", { ascending: false }).limit(1),
+        supabase.from("meal_plans").select("id, meals(id, meal_items(protein, carbs, fats))").eq("client_id", clientId).eq("status", "live").lte("effective_date", today).order("effective_date", { ascending: false }).limit(1),
       ]);
       if (!on) return;
       const logs = (logsRes.data || []) as { adherence: string; meal_id: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null }[];
