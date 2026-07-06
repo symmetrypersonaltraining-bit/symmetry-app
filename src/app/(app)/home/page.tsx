@@ -89,11 +89,17 @@ export default async function HomePage() {
     for (const w of todayWorkoutRows || []) {
       const row = w as any;
       if (row.client_id) {
-        clientDayMap[row.client_id] = {
-          dayId: row.days?.id || row.day_id,
-          dayLabel: row.days?.label || "Training",
-          status: row.status || "scheduled",
-        };
+        const label = (row.days?.label || "Training") as string;
+        const isCardio = /cardio/i.test(label);
+        const existing = clientDayMap[row.client_id];
+        // Trainer session = the supervised training day; a client’s cardio must not overwrite it.
+        if (!existing || (/cardio/i.test(existing.dayLabel) && !isCardio)) {
+          clientDayMap[row.client_id] = {
+            dayId: row.days?.id || row.day_id,
+            dayLabel: label,
+            status: row.status || "scheduled",
+          };
+        }
       }
     }
 
