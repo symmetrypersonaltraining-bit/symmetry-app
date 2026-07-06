@@ -362,6 +362,61 @@ interface Props {
 export default function MealPlanClient({ clientId, clientName, mealPlan, todayLogs, macroTarget, weekLogs, today, isTrainer }: Props) {
   const supabase = createClient();
   const [logs, setLogs] = useState<AdherenceLog[]>(todayLogs);
+
+  const MACRO_RANGES = [
+    { key: "1d", label: "1D", days: 1 },
+    { key: "1w", label: "1W", days: 7 },
+    { key: "2w", label: "2W", days: 14 },
+    { key: "4w", label: "4W", days: 28 },
+    { key: "8w", label: "8W", days: 56 },
+  ];
+  const [macroRange, setMacroRange] = useState<string>("1d");
+  const [rangeAvg, setRangeAvg] = useState<{ kcal: number; protein: number; carbs: number; fats: number; loggedDays: number; totalDays: number } | null>(null);
+  useEffect(() => {
+    if (macroRange === "1d") { setRangeAvg(null); return; }
+    const rangeDef = MACRO_RANGES.find((r) => r.key === macroRange);
+    const days = rangeDef ? rangeDef.days : 1;
+    const [ey, em, ed] = today.split("-").map(Number);
+    const startDate = new Date(Date.UTC(ey, em - 1, ed));
+    startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
+    const startStr = startDate.toISOString().slice(0, 10);
+    let cancelled = false;
+    (async () => {
+      const { data: rLogs } = await supabase
+        .from("meal_adherence_logs")
+        .select("log_date, meal_id, adherence, est_kcal, est_protein, est_carbs, est_fats")
+        .eq("client_id", clientId).gte("log_date", startStr).lte("log_date", today);
+      const logsArr = (rLogs as any[]) || [];
+      const mealIds = Array.from(new Set(logsArr.map((l) => l.meal_id).filter(Boolean)));
+      const itemsByMeal: Record<string, { protein: number; carbs: number; fats: number }> = {};
+      if (mealIds.length) {
+        const { data: items } = await supabase.from("meal_items").select("meal_id, protein, carbs, fats").in("meal_id", mealIds);
+        for (const it of ((items as any[]) || [])) {
+          const k = it.meal_id;
+          if (!itemsByMeal[k]) itemsByMeal[k] = { protein: 0, carbs: 0, fats: 0 };
+          itemsByMeal[k].protein += Number(it.protein) || 0;
+          itemsByMeal[k].carbs += Number(it.carbs) || 0;
+          itemsByMeal[k].fats += Number(it.fats) || 0;
+        }
+      }
+      const dayset = new Set<string>();
+      let kcal = 0, protein = 0, carbs = 0, fats = 0;
+      for (const log of logsArr) {
+        dayset.add(log.log_date);
+        const opt = ADHERENCE_OPTIONS.find((o) => o.key === log.adherence);
+        if (log.adherence === "Off-plan") {
+          kcal += log.est_kcal || 0; protein += log.est_protein || 0; carbs += log.est_carbs || 0; fats += log.est_fats || 0;
+        } else if (opt && itemsByMeal[log.meal_id]) {
+          const m = itemsByMeal[log.meal_id];
+          protein += m.protein * opt.pct; carbs += m.carbs * opt.pct; fats += m.fats * opt.pct;
+          kcal += (m.protein * 4 + m.carbs * 4 + m.fats * 9) * opt.pct;
+        }
+      }
+      const denom = dayset.size || 1;
+      if (!cancelled) setRangeAvg({ kcal: kcal / denom, protein: protein / denom, carbs: carbs / denom, fats: fats / denom, loggedDays: dayset.size, totalDays: days });
+    })();
+    return () => { cancelled = true; };
+  }, [macroRange, clientId, today]);
   const [saving, setSaving] = useState<string | null>(null);
 
   const [notesMap, setNotesMap] = useState<Record<number, string>>(() => {
@@ -572,7 +627,15 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       </div>
 
       {/* Shared animated macro header (both tabs) */}
-      <MacroHeader macros={currentMacros} target={macroTarget} />
+      <div style={{ display: "flex", gap: 4, margin: "0 16px 8px" }}>
+        {MACRO_RANGES.map((r) => (
+          <button key={r.key} onClick={() => setMacroRange(r.key)} style={{ flex: 1, padding: "6px 4px", borderRadius: 999, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, background: macroRange === r.key ? "var(--brand-primary)" : "rgba(127,140,170,0.14)", color: macroRange === r.key ? "#fff" : "var(--brand-text)" }}>{r.label}</button>
+        ))}
+      </div>
+      {macroRange !== "1d" && rangeAvg && (
+        <div style={{ textAlign: "center", fontSize: 11, opacity: 0.6, marginBottom: 4 }}>avg / day · logged {rangeAvg.loggedDays} of {rangeAvg.totalDays} days</div>
+      )}
+      <MacroHeader macros={macroRange !== "1d" && rangeAvg ? rangeAvg : currentMacros} target={macroTarget} />
 
       {/* Segmented tabs */}
       <div className="mx-4 mt-3 flex rounded-full p-1 relative" style={{ background: "rgba(127,140,170,0.14)", border: "1px solid var(--brand-border)" }}>
