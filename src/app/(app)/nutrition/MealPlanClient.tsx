@@ -406,7 +406,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         const opt = ADHERENCE_OPTIONS.find((o) => o.key === log.adherence);
         if (log.adherence === "Off-plan") {
           kcal += log.est_kcal || 0; protein += log.est_protein || 0; carbs += log.est_carbs || 0; fats += log.est_fats || 0;
-        } else if (opt && itemsByMeal[log.meal_id]) {
+        } else if (opt && opt.pct !== null && itemsByMeal[log.meal_id]) {
           const m = itemsByMeal[log.meal_id];
           protein += m.protein * opt.pct; carbs += m.carbs * opt.pct; fats += m.fats * opt.pct;
           kcal += (m.protein * 4 + m.carbs * 4 + m.fats * 9) * opt.pct;
