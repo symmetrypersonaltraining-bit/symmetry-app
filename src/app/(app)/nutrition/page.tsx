@@ -1,3 +1,4 @@
+import NutritionAverages from "@/components/NutritionAverages";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
@@ -145,6 +146,7 @@ export default async function NutritionPage({
           </div>
         </div>
       )}
+      <NutritionAverages clientId={clientId!} today={today} />
       <MealPlanClient
         clientId={clientId!}
         clientName={clientName}
