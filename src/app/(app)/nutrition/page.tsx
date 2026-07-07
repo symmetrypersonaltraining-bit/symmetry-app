@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import MealPlanClient from "./MealPlanClient";
+import NutritionAverages from "@/components/NutritionAverages";
 import ClientSelector from "@/components/ClientSelector";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -145,6 +146,7 @@ export default async function NutritionPage({
           </div>
         </div>
       )}
+      <>
       <MealPlanClient
         clientId={clientId!}
         clientName={clientName}
@@ -155,6 +157,12 @@ export default async function NutritionPage({
         today={today}
         isTrainer={isTrainer}
       />
+      {isTrainer && (
+        <div className="mt-4">
+          <NutritionAverages clientId={clientId!} today={today} />
+        </div>
+      )}
+      </>
     </>
   );
 }
