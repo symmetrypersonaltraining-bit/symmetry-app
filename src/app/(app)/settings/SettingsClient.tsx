@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useTheme, THEMES } from "@/components/ThemeProvider";
 import { AvatarSelf } from "@/components/Avatar";
+import PaymentsSettingsCard from "@/components/PaymentsSettingsCard";
 
 interface Props {
   userEmail: string;
@@ -94,6 +95,8 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
           </div>
         </div>
       </section>
+
+        <PaymentsSettingsCard />
 
       <section>
         <p className="section-header">Security</p>
