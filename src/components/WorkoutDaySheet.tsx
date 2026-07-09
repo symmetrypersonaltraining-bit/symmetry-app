@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export type DaySheetWorkout = { id: string; dayId: string; date: string; label: string; status: string };
@@ -59,6 +60,7 @@ export default function WorkoutDaySheet({
   onClose: () => void;
   onMoved?: (id: string, newDate: string) => void;
 }) {
+  const router = useRouter();
   const [moving, setMoving] = useState<DaySheetWorkout | null>(null);
   const [sel, setSel] = useState<string>(today);
   const [saving, setSaving] = useState(false);
@@ -104,6 +106,10 @@ export default function WorkoutDaySheet({
       if (onMoved) onMoved(moving.id, target);
       setMoving(null);
       onClose();
+      // Re-fetch every server-rendered calendar on this screen so the move
+      // reflects everywhere at once (home ring, week bar, month grid, trainer
+      // profile). Cross-device live sync is handled by RealtimeScheduleSync.
+      router.refresh();
     } catch {
       setNotice("Couldn't move that workout. Try again.");
     } finally {
