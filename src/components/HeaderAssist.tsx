@@ -19,6 +19,7 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [listening, setListening] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
 
   const buzz = (m: number | number[]) => { try { (navigator as any).vibrate && (navigator as any).vibrate(m as any); } catch {} };
 
@@ -58,8 +59,17 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
       let source = "app";
       try { const m = localStorage.getItem("symmetry_view_mode"); if (m) source = m + "-app"; } catch {}
       const tag = sentiment === "like" ? "[LIKE] " : sentiment === "change" ? "[CHANGE] " : "";
-      await sb.from("app_feedback").insert({ source, client_context: typeof window !== "undefined" ? window.location.pathname : null, transcript: tag + msg.trim(), status: "new" });
-      setDone(true); setMsg(""); setSentiment(null);
+      let photo_url: string | null = null;
+      if (file) {
+        try {
+          const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+          const path = `fb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+          const up = await sb.storage.from("feedback").upload(path, file, { upsert: false, contentType: file.type });
+          if (!up.error) { const { data: pub } = sb.storage.from("feedback").getPublicUrl(path); photo_url = pub?.publicUrl || null; }
+        } catch {}
+      }
+      await sb.from("app_feedback").insert({ source, client_context: typeof window !== "undefined" ? window.location.pathname : null, transcript: tag + msg.trim(), status: "new", photo_url });
+      setDone(true); setMsg(""); setSentiment(null); setFile(null);
       setTimeout(() => { setDone(false); setOpen(false); }, 1700);
     } catch {} finally { setSending(false); }
   }
@@ -90,6 +100,13 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
               </div>
               <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={3} placeholder="What do you like, or what should change?" style={{ width: "100%", resize: "vertical", borderRadius: 11, padding: "9px 10px", fontSize: 14, background: "var(--brand-surface, rgba(0,0,0,.25))", color: "inherit", border: "1px solid var(--brand-border, rgba(255,255,255,.15))", boxSizing: "border-box" }} />
               <button type="button" onClick={startVoice} style={{ marginTop: 8, width: "100%", padding: "9px 0", borderRadius: 11, border: "1px solid var(--brand-border, rgba(255,255,255,.15))", background: listening ? "var(--brand-primary)" : "transparent", color: listening ? "#fff" : "inherit", fontWeight: 600, cursor: "pointer" }}>{listening ? "Listening, tap to stop" : "Dictate with voice"}</button>
+              <label style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "9px 10px", borderRadius: 11, border: "1px solid var(--brand-border, rgba(255,255,255,.15))", cursor: "pointer", fontSize: 13, boxSizing: "border-box" }}>
+                <span style={{ fontWeight: 600 }}>{file ? "🖼️ " + file.name.slice(0, 22) : "📎 Attach image"}</span>
+                <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)} style={{ display: "none" }} />
+              </label>
+              {file && (
+                <button type="button" onClick={() => setFile(null)} style={{ marginTop: 6, width: "100%", padding: "7px 0", borderRadius: 10, border: "none", background: "transparent", color: "var(--brand-text-secondary, #aab)", fontSize: 12, cursor: "pointer" }}>Remove image</button>
+              )}
               <button onClick={submit} disabled={sending} style={{ marginTop: 10, width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--brand-primary)", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", opacity: sending ? 0.6 : 1 }}>{sending ? "Sending..." : "Send to Coach Claude"}</button>
             </>
           )}
