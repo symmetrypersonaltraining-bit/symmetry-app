@@ -1,8 +1,7 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import WorkoutDaySheet from "./WorkoutDaySheet";
 
 export interface BoardWorkout {
   id: string;
@@ -16,6 +15,7 @@ const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const LOCKED_START = "2026-08-03";
 const LOCKED_END = "2026-08-09";
+const HOLD_MS = 250;
 
 function todayCT(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
@@ -43,19 +43,16 @@ const TYPE_COLOR: Record<string, string> = { wk: "var(--brand-primary)", mob: "#
 const isLockedDate = (d: string) => d >= LOCKED_START && d <= LOCKED_END;
 
 /**
- * ScheduleBoard — compact, scrollable schedule board (redesign from
- * schedule-redesign-mockup.html). Dense rows so ~5-7 days are visible at once on
- * mobile. Each day lists its workouts as full-name, color-coded tiles.
- * Reschedule two ways: (1) DRAG a tile by its ⠿ grip onto another day, or
- * (2) tap the day → WorkoutDaySheet (Start / Log / Move date-picker). Both honor
- * the guardrails (block before today, Peak Week Aug 3-9 locked, never move
- * completed). A move updates scheduled_workouts + router.refresh() so every
- * calendar reflects it (realtime handles other devices). Additive/isolated.
+ * ScheduleBoard — compact scrollable schedule board. ~5-7 days visible on mobile.
+ * Reschedule two ways: (1) PRESS-AND-HOLD a workout tile (~250ms) then drag it
+ * onto another day — the target day highlights; release to drop. (2) tap the
+ * "Move" button on a tile to pick a date. Both honor guardrails (block before
+ * today, Peak Week Aug 3-9 locked, never move completed). A move updates
+ * scheduled_workouts + router.refresh() so every calendar reflects it (realtime
+ * covers other devices). Additive/isolated.
  */
 export default function ScheduleBoard({
   workouts: initial,
-  basePath = "",
-  forClient = "",
   daysBack = 2,
   daysAhead = 20,
 }: {
@@ -68,12 +65,12 @@ export default function ScheduleBoard({
   const router = useRouter();
   const today = todayCT();
   const [workouts, setWorkouts] = useState<BoardWorkout[]>(initial);
-  const [sheetDate, setSheetDate] = useState<string | null>(null);
   const [overDate, setOverDate] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [movePick, setMovePick] = useState<{ id: string; label: string } | null>(null);
+  const [pickDate, setPickDate] = useState<string>(today);
 
   const dragRef = useRef<any>(null);
-  const justDragged = useRef(false);
 
   const byDate = useMemo(() => {
     const map: Record<string, BoardWorkout[]> = {};
@@ -98,7 +95,6 @@ export default function ScheduleBoard({
     if (!w || w.date === toDate) return;
     if (toDate < today) { flash("Can't move a workout into the past."); return; }
     if (isLockedDate(toDate) || isLockedDate(w.date)) { flash("Peak Week workouts are locked."); return; }
-    // optimistic
     setWorkouts((prev) => prev.map((x) => (x.id === id ? { ...x, date: toDate } : x)));
     try {
       const supabase: any = createClient();
@@ -107,32 +103,62 @@ export default function ScheduleBoard({
       flash("Moved ✓");
       router.refresh();
     } catch {
-      // revert on failure
       setWorkouts((prev) => prev.map((x) => (x.id === id ? { ...x, date: w.date } : x)));
       flash("Couldn't move that workout. Try again.");
     }
   }
 
-  // ── grip drag ──────────────────────────────────────────────
-  function onGripDown(e: React.PointerEvent, w: BoardWorkout) {
-    e.stopPropagation();
-    e.preventDefault();
-    try { (e.currentTarget as any).setPointerCapture(e.pointerId); } catch { /* noop */ }
-    dragRef.current = { id: w.id, label: w.label, startX: e.clientX, startY: e.clientY, active: false, ghost: null, pid: e.pointerId };
+  // ── press-hold-drag ────────────────────────────────────────
+  function preventScroll(e: Event) { try { e.preventDefault(); } catch { /* noop */ } }
+
+  function cleanupDrag() {
+    const d = dragRef.current;
+    if (d) {
+      if (d.timer) { clearTimeout(d.timer); }
+      if (d.ghost) { try { d.ghost.remove(); } catch { /* noop */ } }
+      try { document.removeEventListener("touchmove", preventScroll); } catch { /* noop */ }
+      try { d.tileEl && d.tileEl.releasePointerCapture && d.tileEl.releasePointerCapture(d.pid); } catch { /* noop */ }
+    }
+    dragRef.current = null;
+    setOverDate(null);
   }
-  function onGripMove(e: React.PointerEvent) {
+
+  function activateDrag() {
+    const d = dragRef.current;
+    if (!d || d.active) return;
+    d.active = true;
+    const g = document.createElement("div");
+    g.textContent = d.label;
+    g.style.cssText = "position:fixed;z-index:9999;pointer-events:none;background:var(--brand-primary);color:#fff;font-weight:700;font-size:12.5px;padding:8px 12px;border-radius:10px;box-shadow:0 8px 22px rgba(20,30,55,.28);max-width:70vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transform:rotate(-1.5deg)";
+    g.style.left = d.lastX - 40 + "px";
+    g.style.top = d.lastY - 44 + "px";
+    document.body.appendChild(g);
+    d.ghost = g;
+    try { d.tileEl.setPointerCapture(d.pid); } catch { /* noop */ }
+    document.addEventListener("touchmove", preventScroll, { passive: false } as any);
+    try { (navigator as any).vibrate && (navigator as any).vibrate(14); } catch { /* noop */ }
+  }
+
+  function onTileDown(e: React.PointerEvent, w: BoardWorkout) {
+    if (e.button != null && e.button !== 0) return;
+    dragRef.current = {
+      id: w.id, label: w.label, startX: e.clientX, startY: e.clientY,
+      lastX: e.clientX, lastY: e.clientY, active: false, ghost: null,
+      pid: e.pointerId, tileEl: e.currentTarget,
+      timer: window.setTimeout(activateDrag, HOLD_MS),
+    };
+  }
+  function onTileMove(e: React.PointerEvent) {
     const d = dragRef.current;
     if (!d) return;
+    d.lastX = e.clientX; d.lastY = e.clientY;
     if (!d.active) {
-      if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;
-      // activate: build ghost
-      const g = document.createElement("div");
-      g.textContent = d.label;
-      g.style.cssText = "position:fixed;z-index:9999;pointer-events:none;background:var(--brand-primary);color:#fff;font-weight:700;font-size:12.5px;padding:8px 12px;border-radius:10px;box-shadow:0 8px 22px rgba(20,30,55,.28);max-width:70vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transform:rotate(-1.5deg)";
-      document.body.appendChild(g);
-      d.ghost = g;
-      d.active = true;
-      try { (navigator as any).vibrate && (navigator as any).vibrate(12); } catch { /* noop */ }
+      // moved before hold fired → it's a scroll, cancel the pickup
+      if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > 10) {
+        clearTimeout(d.timer);
+        dragRef.current = null;
+      }
+      return;
     }
     if (d.ghost) { d.ghost.style.left = e.clientX - 40 + "px"; d.ghost.style.top = e.clientY - 44 + "px"; }
     const under = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
@@ -140,20 +166,24 @@ export default function ScheduleBoard({
     const dt = dayEl ? (dayEl as HTMLElement).getAttribute("data-board-date") : null;
     setOverDate(dt && !isLockedDate(dt) && dt >= today ? dt : null);
   }
-  function onGripUp(e: React.PointerEvent) {
+  function onTileUp(e: React.PointerEvent) {
     const d = dragRef.current;
     if (!d) return;
     if (d.active) {
       const under = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
       const dayEl = under && under.closest ? under.closest("[data-board-date]") : null;
       const dt = dayEl ? (dayEl as HTMLElement).getAttribute("data-board-date") : null;
-      if (d.ghost) { try { d.ghost.remove(); } catch { /* noop */ } }
-      justDragged.current = true;
-      window.setTimeout(() => { justDragged.current = false; }, 250);
       moveWorkout(d.id, dt);
     }
-    setOverDate(null);
-    dragRef.current = null;
+    cleanupDrag();
+  }
+
+  useEffect(() => () => cleanupDrag(), []); // safety on unmount
+
+  function openMove(w: BoardWorkout) {
+    setMovePick({ id: w.id, label: w.label });
+    const w0 = workouts.find((x) => x.id === w.id);
+    setPickDate(w0 && w0.date >= today ? w0.date : today);
   }
 
   return (
@@ -170,14 +200,12 @@ export default function ScheduleBoard({
             <div
               key={k}
               data-board-date={k}
-              onClick={() => { if (!justDragged.current && items.length > 0) setSheetDate(k); }}
               style={{
                 border: isOver ? "1.5px solid var(--brand-primary)" : isToday ? "1px solid var(--brand-primary)" : "1px solid var(--brand-border)",
                 borderRadius: 11,
                 marginBottom: 6,
                 background: isOver ? "color-mix(in srgb, var(--brand-primary) 10%, var(--brand-surface))" : "var(--brand-surface)",
                 opacity: locked && !isOver ? 0.7 : 1,
-                cursor: items.length > 0 ? "pointer" : "default",
                 overflow: "hidden",
               }}
             >
@@ -204,10 +232,14 @@ export default function ScheduleBoard({
                   {items.map((w) => {
                     const t = typeOf(w.label);
                     const done = w.status === "completed";
-                    const draggable = !done && !locked;
+                    const movable = !done && !locked;
                     return (
                       <div
                         key={w.id}
+                        onPointerDown={movable ? (e) => onTileDown(e, w) : undefined}
+                        onPointerMove={movable ? onTileMove : undefined}
+                        onPointerUp={movable ? onTileUp : undefined}
+                        onPointerCancel={movable ? () => cleanupDrag() : undefined}
                         style={{
                           display: "flex",
                           alignItems: "center",
@@ -217,31 +249,31 @@ export default function ScheduleBoard({
                           borderLeft: `4px solid ${TYPE_COLOR[t]}`,
                           borderRadius: 8,
                           padding: "6px 8px",
-                        }}
+                          cursor: movable ? "grab" : "default",
+                          userSelect: "none",
+                          WebkitUserSelect: "none",
+                          WebkitTouchCallout: "none",
+                        } as any}
                       >
-                        {draggable ? (
-                          <span
-                            onPointerDown={(e) => onGripDown(e, w)}
-                            onPointerMove={onGripMove}
-                            onPointerUp={onGripUp}
-                            onPointerCancel={onGripUp}
-                            onClick={(e) => e.stopPropagation()}
-                            title="Drag to another day"
-                            style={{ touchAction: "none", cursor: "grab", color: "var(--brand-text-secondary)", fontSize: 16, lineHeight: 1, letterSpacing: "-2px", padding: "2px 4px", margin: "-2px 0", userSelect: "none" }}
-                          >
-                            ⠿
-                          </span>
+                        {movable ? (
+                          <span title="Press & hold, then drag" style={{ color: "var(--brand-text-secondary)", fontSize: 16, lineHeight: 1, letterSpacing: "-2px" }}>⠿</span>
                         ) : (
-                          <span style={{ width: 12 }} />
+                          <span style={{ width: 10 }} />
                         )}
                         <span style={{ fontSize: 13.5 }}>{t === "car" ? "🏃" : t === "mob" ? "🧘" : "🏋️"}</span>
                         <span style={{ flex: 1, fontWeight: 600, fontSize: 12.5, color: "var(--brand-text)", lineHeight: 1.2, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {w.label}
                           {done ? <span style={{ color: "#22c55e" }}> ✓</span> : null}
                         </span>
-                        <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", padding: "2px 6px", borderRadius: 999, color: TYPE_COLOR[t], background: `color-mix(in srgb, ${TYPE_COLOR[t]} 16%, transparent)`, flexShrink: 0 }}>
-                          {t === "car" ? "Cardio" : t === "mob" ? "Mobility" : "Workout"}
-                        </span>
+                        {movable ? (
+                          <button
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); openMove(w); }}
+                            style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, padding: "4px 9px", borderRadius: 8, border: "1px solid var(--brand-border)", background: "var(--brand-surface)", color: "var(--brand-primary)", cursor: "pointer" }}
+                          >
+                            Move
+                          </button>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -255,19 +287,35 @@ export default function ScheduleBoard({
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><i style={{ width: 8, height: 8, borderRadius: 2, background: TYPE_COLOR.wk, display: "inline-block" }} />Workout</span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><i style={{ width: 8, height: 8, borderRadius: 2, background: TYPE_COLOR.mob, display: "inline-block" }} />Mobility</span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><i style={{ width: 8, height: 8, borderRadius: 2, background: TYPE_COLOR.car, display: "inline-block" }} />Cardio</span>
-        <span>Drag ⠿ to move · tap a day for options</span>
+        <span>Press &amp; hold a workout to drag · or tap Move</span>
       </div>
       {notice ? <div style={{ fontSize: 11.5, color: "var(--brand-primary)", marginTop: 4, fontWeight: 600 }}>{notice}</div> : null}
-      {sheetDate && (
-        <WorkoutDaySheet
-          date={sheetDate}
-          workouts={(byDate[sheetDate] || []).map((w) => ({ id: w.id, dayId: w.dayId, date: w.date, label: w.label, status: w.status }))}
-          basePath={basePath}
-          forClient={forClient}
-          today={today}
-          onClose={() => setSheetDate(null)}
-          onMoved={(id, newDate) => setWorkouts((prev) => prev.map((w) => (w.id === id ? { ...w, date: newDate } : w)))}
-        />
+
+      {movePick && (
+        <>
+          <div onClick={() => setMovePick(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,20,35,0.34)", zIndex: 60 }} />
+          <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 61, background: "var(--brand-surface)", borderTopLeftRadius: 20, borderTopRightRadius: 20, boxShadow: "0 -10px 30px rgba(20,30,55,0.18)", padding: "16px 16px 24px", maxWidth: 520, margin: "0 auto" }}>
+            <div style={{ fontWeight: 800, fontSize: 15, color: "var(--brand-text)", marginBottom: 2 }}>Move workout</div>
+            <div style={{ fontSize: 12.5, color: "var(--brand-text-secondary)", marginBottom: 12 }}>{movePick.label}</div>
+            <input
+              type="date"
+              value={pickDate}
+              min={today}
+              onChange={(e) => setPickDate(e.target.value)}
+              style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-bg)", color: "var(--brand-text)", fontSize: 15, fontFamily: "inherit" }}
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <button onClick={() => setMovePick(null)} style={{ flex: "0 0 auto", background: "transparent", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)", borderRadius: 12, padding: "12px 16px", fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+              <button
+                onClick={() => { if (pickDate) { moveWorkout(movePick.id, pickDate); setMovePick(null); } }}
+                disabled={isLockedDate(pickDate) || pickDate < today}
+                style={{ flex: 1, background: "var(--brand-primary)", color: "#fff", border: "none", borderRadius: 12, padding: 12, fontWeight: 800, fontSize: 14, cursor: "pointer", opacity: isLockedDate(pickDate) || pickDate < today ? 0.6 : 1 }}
+              >
+                Move here
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
