@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { sendMessage, sendClientMessage, sendGroupMessage, sendBroadcastMessage } from "../home/messageActions";
+import { sendMessage, sendClientMessage, sendGroupMessage, sendBroadcastMessage, deleteMessage, deleteThread } from "../home/messageActions";
 
 interface Message {
   id: string;
@@ -60,10 +60,24 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
   const [readClients, setReadClients] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [confirmDelThread, setConfirmDelThread] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "instant" });
   }, [thread]);
+
+  const handleDeleteMessage = useCallback(async (id: string) => {
+    setDeletingId(id);
+    try { await deleteMessage(id); router.refresh(); } catch { setDeletingId(null); }
+  }, [router]);
+
+  const handleDeleteThread = useCallback(async () => {
+    if (!selectedClientId || selectedClientId === "group" || selectedClientId === "broadcast") return;
+    if (!confirmDelThread) { setConfirmDelThread(true); setTimeout(() => setConfirmDelThread(false), 3500); return; }
+    setConfirmDelThread(false);
+    try { await deleteThread(selectedClientId); router.push("/messages"); router.refresh(); } catch {}
+  }, [confirmDelThread, selectedClientId, router]);
 
   const handleSend = useCallback(async () => {
     const trimmed = body.trim();
@@ -127,9 +141,10 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                     <div className="max-w-[78%] rounded-2xl px-4 py-2.5"
                       style={{ background: isMe ? "var(--brand-primary)" : "var(--brand-surface)", border: isMe ? "none" : "1px solid var(--brand-border)", borderBottomRightRadius: isMe ? 4 : 16, borderBottomLeftRadius: isMe ? 16 : 4 }}>
                       <p className="text-sm leading-relaxed" style={{ color: isMe ? "white" : "var(--brand-text)" }}>{isGroup && !isMe && senderNames[m.from_id] ? senderNames[m.from_id] + ": " : ""}{m.body.split("\n").map((ln, li) => (<span key={li}>{li > 0 ? <br /> : null}{ln}</span>))}</p>
-                      <div className={"flex items-center gap-1 mt-1 " + (isMe ? "justify-end" : "justify-start")}>
+                      <div className={"flex items-center gap-1.5 mt-1 " + (isMe ? "justify-end" : "justify-start")}>
                         <span className="text-[10px]" style={{ color: isMe ? "rgba(255,255,255,0.55)" : "var(--brand-text-secondary)" }}>{fmtTime(m.created_at)}</span>
                         {isMe && <span className="text-[10px]" style={{ color: m.read_at ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)" }}>{m.read_at ? "✓✓" : "✓"}</span>}
+                        <button onClick={() => handleDeleteMessage(m.id)} disabled={deletingId === m.id} title="Delete message" aria-label="Delete message" className="text-[10px] leading-none" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, opacity: deletingId === m.id ? 0.4 : 0.55, color: isMe ? "rgba(255,255,255,0.8)" : "var(--brand-text-secondary)" }}><i className="ti ti-trash" /></button>
                       </div>
                     </div>
                   </div>
@@ -287,6 +302,9 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                 <Link href={"/clients/" + selectedClient.id} className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}>
                   <i className="ti ti-user text-xs" /> Profile
                 </Link>
+                <button onClick={handleDeleteThread} title="Delete this conversation" className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg" style={{ background: confirmDelThread ? "#ef4444" : "var(--brand-surface)", border: "1px solid " + (confirmDelThread ? "#ef4444" : "var(--brand-border)"), color: confirmDelThread ? "#fff" : "var(--brand-text-secondary)" }}>
+                  <i className="ti ti-trash text-xs" /> {confirmDelThread ? "Tap to confirm" : "Delete"}
+                </button>
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">{ThreadPanel()}</div>
             </>

@@ -20,7 +20,7 @@ export default async function MessagesPage(props: {
   const isTrainer = user.email === TRAINER_EMAIL && !__isInClientMode;
 
   if (searchParams.client === "group") {
-    const { data: gmsgs } = await supabase.from("messages").select("*").eq("is_group", true).order("created_at", { ascending: true });
+    const { data: gmsgs } = await supabase.from("messages").select("*").eq("is_group", true).is("deleted_at", null).order("created_at", { ascending: true });
     const { data: allClients } = await supabase.from("clients").select("*").not("auth_user_id", "is", null).order("name");
     const senderNames: Record<string, string> = {};
     for (const cc of (allClients || []) as any[]) { if (cc.auth_user_id) senderNames[cc.auth_user_id] = String(cc.name || "").trim().split(" ")[0]; }
@@ -54,6 +54,7 @@ export default async function MessagesPage(props: {
       .eq("is_broadcast", false)
       .eq("is_group", false)
       .not("client_id", "is", null)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(1);
     if (__latestUnread && __latestUnread[0] && __latestUnread[0].client_id) selectedClientId = __latestUnread[0].client_id;
@@ -61,7 +62,7 @@ export default async function MessagesPage(props: {
 
     let thread: any[] = [];
   if (selectedClientId === "broadcast") {
-    const { data: __bmsgs } = await supabase.from("messages").select("*").eq("from_id", user.id).eq("is_broadcast", true).order("created_at", { ascending: true });
+    const { data: __bmsgs } = await supabase.from("messages").select("*").eq("from_id", user.id).eq("is_broadcast", true).is("deleted_at", null).order("created_at", { ascending: true });
     thread = __bmsgs || [];
   }
     if (selectedClientId && selectedClientId !== "broadcast") {
@@ -69,6 +70,7 @@ export default async function MessagesPage(props: {
         .from("messages")
         .select("id, from_id, to_id, client_id, body, read_at, created_at")
         .eq("client_id", selectedClientId)
+        .is("deleted_at", null)
         .order("created_at", { ascending: true });
       thread = msgs || [];
 
@@ -84,7 +86,8 @@ export default async function MessagesPage(props: {
       .from("messages")
       .select("client_id")
       .eq("to_id", user.id)
-      .is("read_at", null);
+      .is("read_at", null)
+      .is("deleted_at", null);
 
     const unreadByClient: Record<string, number> = {};
     (unreadData || []).forEach((m: any) => {
@@ -99,6 +102,7 @@ export default async function MessagesPage(props: {
       .select("client_id, body, from_id, created_at")
       .eq("is_group", false)
       .not("client_id", "is", null)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(500);
     const lastByClient: Record<string, { body: string; from_id: string; created_at: string }> = {};
@@ -133,6 +137,7 @@ export default async function MessagesPage(props: {
     .from("messages")
     .select("id, from_id, to_id, client_id, body, read_at, created_at")
     .eq("client_id", clientRecord.id)
+    .is("deleted_at", null)
     .order("created_at", { ascending: true });
 
   await supabase

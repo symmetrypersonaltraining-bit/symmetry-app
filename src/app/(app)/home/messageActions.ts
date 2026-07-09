@@ -81,3 +81,25 @@ export async function sendGroupMessage(body: string): Promise<void> {
   await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, is_group: true });
   revalidatePath("/messages");
 }
+
+// Soft-delete: sets deleted_at so a message/thread disappears from every view
+// but the row is preserved (reversible by clearing deleted_at). Never a hard delete.
+export async function deleteMessage(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("messages").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+  revalidatePath("/messages");
+}
+
+export async function deleteThread(clientId: string): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !clientId) return;
+  await supabase
+    .from("messages")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("client_id", clientId)
+    .is("deleted_at", null);
+  revalidatePath("/messages");
+}
