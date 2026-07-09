@@ -55,7 +55,7 @@ export default function ScheduleBoard({
   workouts: initial,
   basePath = "",
   forClient = "",
-  daysBack = 2,
+  daysBack = 7,
   daysAhead = 20,
 }: {
   workouts: BoardWorkout[];

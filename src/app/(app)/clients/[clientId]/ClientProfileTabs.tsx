@@ -8,6 +8,7 @@ import AssignProgramModal from "./AssignProgramModal";
 import MetricCards from "@/components/MetricCards";
 import PrivateProfilePanel from "@/components/PrivateProfilePanel";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
+import ScheduleBoard from "@/components/ScheduleBoard";
 
 interface MetricPoint {
   metric_date: string;
@@ -931,7 +932,19 @@ export default function ClientProfileTabs({ client, metrics, allWorkouts, client
           <OverviewTab client={client} allWorkouts={allWorkouts} metrics={metrics} clientId={clientId}
             programs={programs} currentProgramId={currentProgramId} onAssignProgram={() => setShowAssignModal(true)} />
         )}
-        {tab === "training" && <TrainingCalendar workouts={allWorkouts} clientId={clientId} />}
+        {tab === "training" && (
+          <>
+            <TrainingCalendar workouts={allWorkouts} clientId={clientId} />
+            <div className="px-4 pb-6">
+              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>Quick schedule — find, launch, move or remove</p>
+              <ScheduleBoard
+                workouts={allWorkouts.map((w) => { const dd: any = w.days; return { id: w.id, dayId: ((dd && typeof dd === "object" ? dd.id : dd) || w.day_id || w.id) as string, date: w.scheduled_date, label: ((dd && typeof dd === "object") ? dd.label : (dd || "Workout")) as string, status: w.status }; })}
+                basePath=""
+                forClient={clientId}
+              />
+            </div>
+          </>
+        )}
         {tab === "metrics" && <MetricCards clientId={clientId} />}
         {tab === "info" && (
           <InfoTab client={client} programs={programs} currentProgramId={currentProgramId}
