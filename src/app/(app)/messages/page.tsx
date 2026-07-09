@@ -93,6 +93,21 @@ export default async function MessagesPage(props: {
       }
     });
 
+    // Inbox preview: last message per client (for snippet + most-recent sort). Additive.
+    const { data: __recentMsgs } = await supabase
+      .from("messages")
+      .select("client_id, body, from_id, created_at")
+      .eq("is_group", false)
+      .not("client_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    const lastByClient: Record<string, { body: string; from_id: string; created_at: string }> = {};
+    (__recentMsgs || []).forEach((m: any) => {
+      if (m.client_id && !lastByClient[m.client_id]) {
+        lastByClient[m.client_id] = { body: m.body || "", from_id: m.from_id, created_at: m.created_at };
+      }
+    });
+
     return (
       <MessagesClient
         isTrainer={true}
@@ -101,6 +116,7 @@ export default async function MessagesPage(props: {
         thread={thread}
         currentUserId={user.id}
         unreadByClient={unreadByClient}
+        lastByClient={lastByClient}
       />
     );
   }

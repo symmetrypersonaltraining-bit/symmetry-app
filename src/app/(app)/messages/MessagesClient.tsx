@@ -28,6 +28,8 @@ interface Props {
   thread: Message[];
   currentUserId: string;
   unreadByClient: Record<string, number>;
+  senderNames?: Record<string, string>;
+  lastByClient?: Record<string, { body: string; from_id: string; created_at: string }>;
 }
 
 function fmtTime(ts: string | null) {
@@ -50,7 +52,7 @@ function getInitials(name: string) {
   return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
-export default function MessagesClient({ isTrainer, clients, selectedClientId, thread, currentUserId, unreadByClient, senderNames = {} }: Props) {
+export default function MessagesClient({ isTrainer, clients, selectedClientId, thread, currentUserId, unreadByClient, senderNames = {}, lastByClient = {} }: Props) {
   const router = useRouter();
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -159,6 +161,14 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
     const isBroadcast = selectedClientId === "broadcast";
   const isGroup = selectedClientId === "group";
     const selectedClient = clients.find(c => c.id === selectedClientId) || null;
+    const sortedClients = [...clients].sort((a, b) => {
+      const ta = lastByClient[a.id]?.created_at || "";
+      const tb = lastByClient[b.id]?.created_at || "";
+      if (ta && tb) return tb.localeCompare(ta);
+      if (ta) return -1;
+      if (tb) return 1;
+      return a.name.localeCompare(b.name);
+    });
     return (
       <div className="flex overflow-hidden" style={{ background: "var(--brand-bg)", height: "100dvh" }}>
         <div className={"flex flex-col border-r flex-shrink-0 w-full lg:w-72 xl:w-80 " + (selectedClientId ? "hidden lg:flex" : "flex")} style={{ borderColor: "var(--brand-border)" }}>
@@ -189,9 +199,10 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                 <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Everyone can see and reply</p>
               </div>
             </Link>
-            {clients.map(c => {
+            {sortedClients.map(c => {
               const unread = readClients.has(c.id) ? 0 : (unreadByClient[c.id] || 0);
               const isSel = c.id === selectedClientId;
+              const last = lastByClient[c.id];
               return (
                 <Link key={c.id} onClick={() => setReadClients((prev) => new Set(prev).add(c.id))} href={"/messages?client=" + c.id}
                   className="flex items-center gap-3 px-4 py-3.5 border-b transition-colors"
@@ -201,14 +212,24 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                     {getInitials(c.name)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: isSel ? "var(--brand-primary)" : "var(--brand-text)" }}>{c.name}</p>{unread > 0 ? <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 999, background: "#ef4444", marginLeft: 6, verticalAlign: "middle", animation: "cw-pulse 1.2s ease-in-out infinite" }} /> : null}
-                    {unread > 0 && <p className="text-xs" style={{ color: "var(--brand-primary)" }}>{unread} unread</p>}
-                  </div>
-                  {unread > 0 && (
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold" style={{ background: "var(--brand-primary)", color: "white" }}>
-                      {unread > 9 ? "9+" : unread}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold truncate flex items-center min-w-0" style={{ color: isSel ? "var(--brand-primary)" : "var(--brand-text)" }}>
+                        <span className="truncate">{c.name}</span>
+                        {unread > 0 ? <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 999, background: "#ef4444", marginLeft: 6, flexShrink: 0, animation: "cw-pulse 1.2s ease-in-out infinite" }} /> : null}
+                      </p>
+                      {last && <span className="text-[10px] flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }}>{fmtDay(last.created_at)}</span>}
                     </div>
-                  )}
+                    <div className="flex items-center justify-between gap-2 mt-0.5">
+                      <p className="text-xs truncate" style={{ color: unread > 0 ? "var(--brand-text)" : "var(--brand-text-secondary)", fontWeight: unread > 0 ? 600 : 400 }}>
+                        {last ? (last.from_id === currentUserId ? "You: " : "") + last.body.replace(/\n/g, " ") : "No messages yet"}
+                      </p>
+                      {unread > 0 && (
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{ background: "var(--brand-primary)", color: "white" }}>
+                          {unread > 9 ? "9+" : unread}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </Link>
               );
             })}
