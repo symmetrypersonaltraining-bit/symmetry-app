@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import TrainerLayoutWrapper from "@/components/TrainerLayoutWrapper";
 import BottomNav from "@/components/BottomNav";
 import HeaderAssist from "@/components/HeaderAssist";
+import RealtimeScheduleSync from "@/components/RealtimeScheduleSync";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -22,11 +23,17 @@ export default async function AppLayout({
   const isTrainer = email === TRAINER_EMAIL;
 
   if (isTrainer) {
-    return <TrainerLayoutWrapper>{children}</TrainerLayoutWrapper>;
+    return (
+      <>
+        <RealtimeScheduleSync />
+        <TrainerLayoutWrapper>{children}</TrainerLayoutWrapper>
+      </>
+    );
   }
 
   return (
     <div className="min-h-screen" style={{ background: "var(--brand-bg)" }}>
+      <RealtimeScheduleSync />
       <div className="pb-20">{children}</div>
       <div style={{ position: "fixed", top: 10, right: 14, zIndex: 950 }}>
         <HeaderAssist solid />
