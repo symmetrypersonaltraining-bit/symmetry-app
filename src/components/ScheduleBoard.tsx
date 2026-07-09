@@ -113,6 +113,24 @@ export default function ScheduleBoard({
     }
   }
 
+  // Soft-remove: sets deleted_at so the workout disappears from every schedule
+  // (all reads filter deleted_at IS NULL) but the row is preserved (reversible).
+  async function removeWorkout(w: BoardWorkout) {
+    if (isLockedDate(w.date)) { flash("Peak Week workouts are locked."); return; }
+    if (typeof window !== "undefined" && !window.confirm(`Remove "${w.label}" from ${shortLabel(w.date)}? You can re-add it later.`)) return;
+    setWorkouts((prev) => prev.filter((x) => x.id !== w.id));
+    try {
+      const supabase: any = createClient();
+      const { error } = await supabase.from("scheduled_workouts").update({ deleted_at: new Date().toISOString() }).eq("id", w.id);
+      if (error) throw error;
+      flash("Removed");
+      router.refresh();
+    } catch {
+      setWorkouts((prev) => [...prev, w]);
+      flash("Couldn't remove. Try again.");
+    }
+  }
+
   // ── press-hold-drag ────────────────────────────────────────
   function cleanupDrag() {
     const d = dragRef.current;
@@ -319,6 +337,12 @@ export default function ScheduleBoard({
                 Move here
               </button>
             </div>
+            <button
+              onClick={() => { const w = workouts.find((x) => x.id === movePick.id); setMovePick(null); if (w) removeWorkout(w); }}
+              style={{ marginTop: 12, width: "100%", background: "transparent", border: "none", color: "#ef4444", fontWeight: 700, fontSize: 13, cursor: "pointer", padding: "6px 0" }}
+            >
+              🗑 Remove from schedule
+            </button>
           </div>
         </>
       )}
