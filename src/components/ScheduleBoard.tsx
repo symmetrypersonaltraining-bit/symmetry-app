@@ -71,6 +71,11 @@ export default function ScheduleBoard({
   const [pickDate, setPickDate] = useState<string>(today);
 
   const dragRef = useRef<any>(null);
+  const activeRef = useRef(false);
+  // Stable listener reference (created once) that only blocks scroll WHILE a drag is
+  // active. Stable ref => removeEventListener matches; activeRef guard => a leaked
+  // listener can never freeze page scrolling.
+  const preventScrollRef = useRef((e: Event) => { if (activeRef.current) { try { e.preventDefault(); } catch { /* noop */ } } });
 
   const byDate = useMemo(() => {
     const map: Record<string, BoardWorkout[]> = {};
@@ -109,16 +114,15 @@ export default function ScheduleBoard({
   }
 
   // ── press-hold-drag ────────────────────────────────────────
-  function preventScroll(e: Event) { try { e.preventDefault(); } catch { /* noop */ } }
-
   function cleanupDrag() {
     const d = dragRef.current;
     if (d) {
       if (d.timer) { clearTimeout(d.timer); }
       if (d.ghost) { try { d.ghost.remove(); } catch { /* noop */ } }
-      try { document.removeEventListener("touchmove", preventScroll); } catch { /* noop */ }
       try { d.tileEl && d.tileEl.releasePointerCapture && d.tileEl.releasePointerCapture(d.pid); } catch { /* noop */ }
     }
+    activeRef.current = false;
+    try { document.removeEventListener("touchmove", preventScrollRef.current); } catch { /* noop */ }
     dragRef.current = null;
     setOverDate(null);
   }
@@ -135,7 +139,8 @@ export default function ScheduleBoard({
     document.body.appendChild(g);
     d.ghost = g;
     try { d.tileEl.setPointerCapture(d.pid); } catch { /* noop */ }
-    document.addEventListener("touchmove", preventScroll, { passive: false } as any);
+    activeRef.current = true;
+    document.addEventListener("touchmove", preventScrollRef.current, { passive: false } as any);
     try { (navigator as any).vibrate && (navigator as any).vibrate(14); } catch { /* noop */ }
   }
 
