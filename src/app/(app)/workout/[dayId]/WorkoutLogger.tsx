@@ -6,6 +6,7 @@ import Link from "next/link";
 import OffPlanBanner from "@/components/OffPlanBanner";
 import CelebrationScreen from "@/components/CelebrationScreen";
 import SetFeedback from "@/components/SetFeedback";
+import WakeLock from "@/components/WakeLock";
 
 interface Exercise {
   id: string;
@@ -1027,6 +1028,8 @@ export default function WorkoutLogger({
       <div className="fixed inset-0 flex flex-col z-[100]" style={{ background: "var(--session-bg)" }}>
         {/* Set-pop + PR-glow overlay (pointer-events:none, cannot block logging). Revert = remove this line. */}
         <SetFeedback sets={sets} prevByPe={prevByPe} />
+        {/* Keep the phone screen awake during an active session. Isolated; no-ops where unsupported. Revert = remove this line. */}
+        <WakeLock active={sessionMode} />
         {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
         {videoUrl && <VideoModal url={videoUrl} onClose={() => setVideoUrl(null)} />}
         {historyExercise && (
