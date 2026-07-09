@@ -53,6 +53,8 @@ const isLockedDate = (d: string) => d >= LOCKED_START && d <= LOCKED_END;
  */
 export default function ScheduleBoard({
   workouts: initial,
+  basePath = "",
+  forClient = "",
   daysBack = 2,
   daysAhead = 20,
 }: {
@@ -203,6 +205,10 @@ export default function ScheduleBoard({
 
   useEffect(() => () => cleanupDrag(), []); // safety on unmount
 
+  function launchWorkout(w: BoardWorkout) {
+    router.push(`${basePath}/workout/${w.dayId}${forClient ? "?forClient=" + forClient : ""}`);
+  }
+
   function openMove(w: BoardWorkout) {
     setMovePick({ id: w.id, label: w.label });
     const w0 = workouts.find((x) => x.id === w.id);
@@ -288,6 +294,13 @@ export default function ScheduleBoard({
                           {w.label}
                           {done ? <span style={{ color: "#22c55e" }}> ✓</span> : null}
                         </span>
+                        <button
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => { e.stopPropagation(); launchWorkout(w); }}
+                          style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, padding: "4px 9px", borderRadius: 8, border: "none", background: "var(--brand-primary)", color: "#fff", cursor: "pointer" }}
+                        >
+                          {done ? "View" : "▶ Start"}
+                        </button>
                         {movable ? (
                           <button
                             onPointerDown={(e) => e.stopPropagation()}
@@ -295,6 +308,17 @@ export default function ScheduleBoard({
                             style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, padding: "4px 9px", borderRadius: 8, border: "1px solid var(--brand-border)", background: "var(--brand-surface)", color: "var(--brand-primary)", cursor: "pointer" }}
                           >
                             Move
+                          </button>
+                        ) : null}
+                        {movable ? (
+                          <button
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); removeWorkout(w); }}
+                            title="Remove from schedule"
+                            aria-label="Remove from schedule"
+                            style={{ flexShrink: 0, fontSize: 13, padding: "4px 6px", borderRadius: 8, border: "1px solid var(--brand-border)", background: "var(--brand-surface)", color: "#ef4444", cursor: "pointer", lineHeight: 1 }}
+                          >
+                            <i className="ti ti-trash" />
                           </button>
                         ) : null}
                       </div>
