@@ -1,8 +1,9 @@
 "use client";
 
 // Client-home payment notification. Shows when the trainer has APPROVED
-// ("sent") a reminder for this client. Persists until the client taps it
-// (sets client_ack_at). Never shows for clients without reminder rows.
+// ("sent") a reminder for this client. Persists on the client's home page
+// until they explicitly tap "I've paid this" (sets client_ack_at) — it does
+// NOT dismiss on a stray tap. Never shows for clients without reminder rows.
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import PayLinksRow from "./PayLinksRow";
@@ -52,15 +53,19 @@ export default function PaymentDueBanner() {
   return (
     <div className="space-y-2">
       {open.map((d) => (
-        <div key={d.id} style={{ display: "flex", flexDirection: "column", gap: 8 }}><button onClick={() => ack(d.id)} className="block w-full text-left rounded-3xl p-3"
-          style={{ background: "#7c9cf518", border: "1px solid var(--brand-primary)" }}>
+        <div key={d.id} className="rounded-3xl p-3" style={{ background: "#7c9cf518", border: "1px solid var(--brand-primary)" }}>
           <div className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>
             {"💳 Payment due " + d.due.slice(5).replace("-", "/") + ": $" + d.amount}
           </div>
           <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-            {d.note || "Tap to dismiss — thank you!"}
+            {d.note || "This stays here until you mark it paid."}
           </div>
-        </button><PayLinksRow amount={d.amount} /></div>
+          <PayLinksRow amount={d.amount} />
+          <button onClick={() => ack(d.id)} className="mt-2 w-full rounded-xl py-2 text-sm font-bold"
+            style={{ background: "var(--brand-primary)", color: "#fff", border: "none", cursor: "pointer" }}>
+            ✓ I've paid this
+          </button>
+        </div>
       ))}
     </div>
   );

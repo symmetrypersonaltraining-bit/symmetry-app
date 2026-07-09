@@ -3,7 +3,6 @@ import MessagesBell from "@/components/MessagesBell";
 
 import { useState } from "react";
 import Link from "next/link";
-import PaymentCheckBanner from "@/components/PaymentCheckBanner";
 import TrainerWeekDigest from "@/components/TrainerWeekDigest";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
@@ -162,7 +161,7 @@ export default function TrainerHome({
 
       <div className="p-4 pb-24 space-y-4 max-w-lg mx-auto cw-reveal">
       <MessagesBell variant="banner" />
-        <PaymentCheckBanner />
+      {/* Payment notifications moved OFF the trainer home into the Payments section (Dustin 7/9). */}
       <GcalSyncButton />
 
         {/* Header */}
