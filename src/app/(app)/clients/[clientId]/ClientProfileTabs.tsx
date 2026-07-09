@@ -84,7 +84,7 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
   currentProgramId?: string;
   onAssignProgram: () => void;
 }) {
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
   const last7Start = new Date(); last7Start.setDate(last7Start.getDate() - 7);
   const last7Str = last7Start.toISOString().split("T")[0];
@@ -321,7 +321,7 @@ type ViewMode = "1w" | "2w" | "4w";
 
 function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; clientId: string }) {
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+  const todayStr = today.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const [sheetDate, setSheetDate] = useState<string | null>(null);
   const [movedMap, setMovedMap] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("1w");
