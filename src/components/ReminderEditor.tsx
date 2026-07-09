@@ -203,7 +203,7 @@ export default function ReminderEditor() {
               </span>
             </div>
             <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-              {"Fee $" + (r.fee ?? "?") + (r.cadence ? " / " + r.cadence : "") + " · rate $" + (r.sessionRate ?? "?") + "/session · cycle from " + calc.cycleStart}
+              {"Fee $" + (r.fee ?? "?") + (r.cadence ? " / " + r.cadence : "") + " · rate $" + (r.sessionRate ?? "?") + "/session · billing cycle " + calc.cycleStart + " → " + r.due_date}
             </div>
             <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
               {"Cancelled in cycle: " + r.cancelledFull + " full, " + r.cancelledHalf + " half → auto credit $" + calc.autoCredits + " · calculated: $" + calc.expected}
