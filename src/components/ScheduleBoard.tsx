@@ -139,6 +139,27 @@ export default function ScheduleBoard({
     }
   }
 
+  // Swap: exchange the dates of two workouts on different days (switches both at once).
+  async function swapWorkout(aId: string, b: BoardWorkout) {
+    const a = workouts.find((x) => x.id === aId);
+    if (!a || !b || a.id === b.id || a.date === b.date) return;
+    if (isLockedDate(a.date) || isLockedDate(b.date)) { flash("Peak Week workouts are locked."); return; }
+    const aDate = a.date, bDate = b.date;
+    setWorkouts((prev) => prev.map((x) => (x.id === a.id ? { ...x, date: bDate } : x.id === b.id ? { ...x, date: aDate } : x)));
+    try {
+      const supabase: any = createClient();
+      const r1 = await supabase.from("scheduled_workouts").update({ scheduled_date: bDate }).eq("id", a.id);
+      if (r1.error) throw r1.error;
+      const r2 = await supabase.from("scheduled_workouts").update({ scheduled_date: aDate }).eq("id", b.id);
+      if (r2.error) { await supabase.from("scheduled_workouts").update({ scheduled_date: aDate }).eq("id", a.id); throw r2.error; }
+      flash("Swapped ✓");
+      router.refresh();
+    } catch {
+      setWorkouts((prev) => prev.map((x) => (x.id === a.id ? { ...x, date: aDate } : x.id === b.id ? { ...x, date: bDate } : x)));
+      flash("Couldn't swap. Try again.");
+    }
+  }
+
   // ── press-hold-drag ────────────────────────────────────────
   function cleanupDrag() {
     const d = dragRef.current;
@@ -375,6 +396,25 @@ export default function ScheduleBoard({
                 Move here
               </button>
             </div>
+            {(() => {
+              const a = workouts.find((x) => x.id === movePick.id);
+              const cands = workouts.filter((x) => a && x.id !== a.id && x.date !== a.date && x.date >= today && !isLockedDate(x.date) && x.status !== "completed").sort((p, q) => p.date.localeCompare(q.date));
+              if (cands.length === 0) return null;
+              return (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--brand-text-secondary)", marginBottom: 6 }}>Or swap with another day:</div>
+                  <div style={{ maxHeight: 150, overflowY: "auto" }}>
+                    {cands.map((x) => (
+                      <button key={x.id} onClick={() => { swapWorkout(movePick.id, x); setMovePick(null); }}
+                        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "9px 10px", marginBottom: 5, borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-bg)", cursor: "pointer", textAlign: "left" }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--brand-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{x.label}</span>
+                        <span style={{ fontSize: 11, color: "var(--brand-primary)", flexShrink: 0, fontWeight: 700 }}>⇄ {shortLabel(x.date)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             <button
               onClick={() => { const w = workouts.find((x) => x.id === movePick.id); setMovePick(null); if (w) removeWorkout(w); }}
               style={{ marginTop: 12, width: "100%", background: "transparent", border: "none", color: "#ef4444", fontWeight: 700, fontSize: 13, cursor: "pointer", padding: "6px 0" }}
