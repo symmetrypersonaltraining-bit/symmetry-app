@@ -101,6 +101,7 @@ export default async function MessagesPage(props: {
       .from("messages")
       .select("client_id, body, from_id, created_at")
       .eq("is_group", false)
+      .eq("is_broadcast", false)
       .not("client_id", "is", null)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })

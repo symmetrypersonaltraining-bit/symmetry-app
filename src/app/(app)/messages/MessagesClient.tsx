@@ -79,6 +79,11 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
     try { await deleteThread(selectedClientId); router.push("/messages"); router.refresh(); } catch {}
   }, [confirmDelThread, selectedClientId, router]);
 
+  const handleDeleteThreadFor = useCallback(async (clientId: string, name: string) => {
+    if (typeof window !== "undefined" && !window.confirm(`Delete the entire conversation with ${name}?`)) return;
+    try { await deleteThread(clientId); router.refresh(); } catch {}
+  }, [router]);
+
   const handleSend = useCallback(async () => {
     const trimmed = body.trim();
     if (!trimmed || sending) return;
@@ -226,9 +231,10 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
               const isSel = c.id === selectedClientId;
               const last = lastByClient[c.id];
               return (
-                <Link key={c.id} onClick={() => setReadClients((prev) => new Set(prev).add(c.id))} href={"/messages?client=" + c.id}
-                  className="flex items-center gap-3 px-4 py-3.5 border-b transition-colors"
-                  style={{ borderColor: "var(--brand-border)", background: isSel ? "color-mix(in srgb, var(--brand-primary) 10%, transparent)" : "transparent", borderLeft: isSel ? "3px solid var(--brand-primary)" : "3px solid transparent" }}>
+                <div key={c.id} className="relative border-b" style={{ borderColor: "var(--brand-border)" }}>
+                <Link onClick={() => setReadClients((prev) => new Set(prev).add(c.id))} href={"/messages?client=" + c.id}
+                  className="flex items-center gap-3 px-4 py-3.5 pr-11 transition-colors"
+                  style={{ background: isSel ? "color-mix(in srgb, var(--brand-primary) 10%, transparent)" : "transparent", borderLeft: isSel ? "3px solid var(--brand-primary)" : "3px solid transparent" }}>
                   <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
                     style={{ background: isSel ? "var(--brand-primary)" : "color-mix(in srgb, var(--brand-primary) 20%, transparent)", color: isSel ? "white" : "var(--brand-primary)" }}>
                     {getInitials(c.name)}
@@ -253,6 +259,10 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                     </div>
                   </div>
                 </Link>
+                <button onClick={() => handleDeleteThreadFor(c.id, c.name)} title="Delete conversation" aria-label="Delete conversation" className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg" style={{ color: "var(--brand-text-secondary)", background: "transparent" }}>
+                  <i className="ti ti-trash text-sm" />
+                </button>
+                </div>
               );
             })}
           </div>

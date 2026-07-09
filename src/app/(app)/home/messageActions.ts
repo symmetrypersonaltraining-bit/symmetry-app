@@ -63,7 +63,7 @@ export async function sendBroadcastMessage(body: string): Promise<number> {
     .not('auth_user_id', 'is', null);
   const rows = (clients || [])
     .filter((c: any) => c.auth_user_id && c.auth_user_id !== user.id)
-    .map((c: any) => ({ from_id: user.id, to_id: c.auth_user_id, client_id: c.id, body }));
+    .map((c: any) => ({ from_id: user.id, to_id: c.auth_user_id, client_id: c.id, body, is_broadcast: true }));
   if (rows.length) {
     await supabase.from('messages').insert(rows);
   }
