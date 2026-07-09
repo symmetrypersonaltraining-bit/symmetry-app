@@ -71,6 +71,7 @@ export default async function WorkoutPage() {
     const { data: swList } = await (supabase as any)
       .from("scheduled_workouts")
       .select("id, status, days(id, label, phases(id, label, programs(name)))")
+      .is("deleted_at", null)
       .eq("client_id", clientId)
       .eq("scheduled_date", todayDate)
       .order("id");
@@ -99,6 +100,7 @@ export default async function WorkoutPage() {
     const { data: calRows } = await (supabase as any)
       .from("scheduled_workouts")
       .select("id, day_id, scheduled_date, status, days(label)")
+      .is("deleted_at", null)
       .eq("client_id", clientId)
       .gte("scheduled_date", backStr)
       .lte("scheduled_date", aheadStr)

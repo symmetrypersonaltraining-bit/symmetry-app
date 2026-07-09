@@ -91,7 +91,7 @@ export default function TrainerWeekDigest() {
 
         const [clientsRes, swThis, wlogs, mealsWeek, foodEver] = await Promise.all([
           supabase.from("clients").select("id, name, weekly_focus, digest_snoozed_until"),
-          supabase.from("scheduled_workouts").select("client_id").gte("scheduled_date", thisWk).lte("scheduled_date", thisWkEnd),
+          supabase.from("scheduled_workouts").select("client_id").is("deleted_at", null).gte("scheduled_date", thisWk).lte("scheduled_date", thisWkEnd),
           supabase.from("workout_logs").select("client_id, log_date, completed, status").gte("log_date", recent),
           supabase.from("meal_adherence_logs").select("client_id, adherence, log_date").gte("log_date", thisWk).lte("log_date", today),
           supabase.from("meal_adherence_logs").select("client_id").gte("log_date", foodWindow).limit(10000),

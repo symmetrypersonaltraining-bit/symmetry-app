@@ -33,6 +33,7 @@ export default async function ClientProfilePage({
   const { data: allWorkoutsRaw } = await (supabase as any)
     .from("scheduled_workouts")
     .select("id, scheduled_date, status, day_id, days(id, label, position)")
+    .is("deleted_at", null)
     .eq("client_id", clientId)
     .gte("scheduled_date", rangeStart.toISOString().split("T")[0])
     .lte("scheduled_date", rangeEnd.toISOString().split("T")[0])
@@ -61,6 +62,7 @@ export default async function ClientProfilePage({
   const { count: completedTotal } = await supabase
     .from("scheduled_workouts")
     .select("id", { count: "exact", head: true })
+    .is("deleted_at", null)
     .eq("client_id", clientId)
     .eq("status", "completed");
 

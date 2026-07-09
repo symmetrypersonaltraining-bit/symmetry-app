@@ -75,6 +75,7 @@ export default async function SchedulePage() {
     const { data: monthWorkouts } = await supabase
       .from("scheduled_workouts")
       .select("id, scheduled_date, status, days(id, label)")
+      .is("deleted_at", null)
       .eq("client_id", clientId)
       .gte("scheduled_date", monthStart)
       .lte("scheduled_date", monthEnd);
@@ -93,6 +94,7 @@ export default async function SchedulePage() {
     const { data: upcoming } = await supabase
       .from("scheduled_workouts")
       .select("id, day_id, scheduled_date, status, days(id, label)")
+      .is("deleted_at", null)
       .eq("client_id", clientId)
       .gte("scheduled_date", todayStr)
       .lte("scheduled_date", futureEndStr)

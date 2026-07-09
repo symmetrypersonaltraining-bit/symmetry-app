@@ -82,6 +82,7 @@ export default async function HomePage() {
     const { data: todayWorkoutRows } = await supabase
       .from("scheduled_workouts")
       .select("id, client_id, status, day_id, days(id, label)")
+      .is("deleted_at", null)
       .eq("scheduled_date", todayStrCT);
 
     type ClientDay = { dayId: string; dayLabel: string; status: string };
@@ -141,6 +142,7 @@ export default async function HomePage() {
     const { data: workoutRows } = await supabase
       .from("scheduled_workouts")
       .select("id, day_id, client_id, scheduled_date, status, days(id, label), clients(id, name)")
+      .is("deleted_at", null)
       .gte("scheduled_date", new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
         .toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
       .lte("scheduled_date", workoutRangeEnd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
@@ -237,6 +239,7 @@ export default async function HomePage() {
   const { data: todayWorkoutsRaw } = await supabase
     .from("scheduled_workouts")
     .select("id, status, days(label, phase_id, phases(label, programs(name)))")
+    .is("deleted_at", null)
     .eq("client_id", clientRecord.id)
     .eq("scheduled_date", today)
     .order("id");
@@ -248,6 +251,7 @@ export default async function HomePage() {
   const { data: recentScheduled } = await supabase
     .from("scheduled_workouts")
     .select("id, scheduled_date, status, days(label)")
+    .is("deleted_at", null)
     .eq("client_id", clientRecord.id)
     .gte("scheduled_date", sixtyStr)
     .lte("scheduled_date", thirtyAheadStr)
@@ -315,6 +319,7 @@ export default async function HomePage() {
   const { data: recentWorkouts } = await supabase
     .from("scheduled_workouts")
     .select("id, scheduled_date, status, days(label)")
+    .is("deleted_at", null)
     .eq("client_id", clientRecord.id)
     .eq("status", "completed")
     .order("scheduled_date", { ascending: false })

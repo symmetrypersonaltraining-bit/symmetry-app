@@ -31,6 +31,7 @@ export default async function ClientPreviewPage() {
   const { data: todayWorkout } = await supabase
     .from("scheduled_workouts")
     .select("id, day_id, status, days(id, label, phase_id, phases(label, programs(name)))")
+    .is("deleted_at", null)
     .eq("client_id", clientRecord.id)
     .eq("scheduled_date", today)
     .order("position");
@@ -44,6 +45,7 @@ export default async function ClientPreviewPage() {
   const { data: recentScheduled } = await supabase
     .from("scheduled_workouts")
     .select("id, day_id, scheduled_date, status, days(label)")
+    .is("deleted_at", null)
     .eq("client_id", clientRecord.id)
     .gte("scheduled_date", sixtyStr)
     .lte("scheduled_date", thirtyAheadStr)
@@ -101,6 +103,7 @@ export default async function ClientPreviewPage() {
   const { data: recentWorkouts } = await supabase
     .from("scheduled_workouts")
     .select("id, day_id, scheduled_date, status, days(id, label)")
+    .is("deleted_at", null)
     .eq("client_id", clientRecord.id)
     .eq("status", "completed")
     .order("scheduled_date", { ascending: false })

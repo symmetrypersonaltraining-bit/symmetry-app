@@ -1073,6 +1073,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
     supabase
       .from("scheduled_workouts")
       .select("id, scheduled_date, status, day_id, days(id, label, phases(label, programs(name)))")
+      .is("deleted_at", null)
       .eq("client_id", selectedClientId)
       .gte("scheduled_date", dayStr(rangeStart))
       .lte("scheduled_date", dayStr(rangeEnd))

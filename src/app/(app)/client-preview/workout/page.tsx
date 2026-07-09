@@ -30,6 +30,7 @@ export default async function ClientPreviewWorkoutPage() {
   const { data: todayWorkout } = await supabase
     .from("scheduled_workouts")
     .select("id, day_id")
+    .is("deleted_at", null)
     .eq("client_id", clientRecord.id)
     .eq("scheduled_date", today)
     .maybeSingle();
@@ -42,6 +43,7 @@ export default async function ClientPreviewWorkoutPage() {
   const { data: recentWorkout } = await supabase
     .from("scheduled_workouts")
     .select("id, day_id, scheduled_date")
+    .is("deleted_at", null)
     .eq("client_id", clientRecord.id)
     .lte("scheduled_date", today)
     .order("scheduled_date", { ascending: false })
