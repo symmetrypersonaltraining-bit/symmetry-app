@@ -71,6 +71,7 @@ export default function ScheduleBoard({
   const [notice, setNotice] = useState<string | null>(null);
   const [movePick, setMovePick] = useState<{ id: string; label: string } | null>(null);
   const [pickDate, setPickDate] = useState<string>(today);
+  const [showPast, setShowPast] = useState(false);
 
   const dragRef = useRef<any>(null);
   const activeRef = useRef(false);
@@ -85,11 +86,16 @@ export default function ScheduleBoard({
     return map;
   }, [workouts]);
 
-  const days = useMemo(() => {
+  const upcomingDays = useMemo(() => {
     const out: string[] = [];
-    for (let i = -daysBack; i <= daysAhead; i++) out.push(addDays(today, i));
+    for (let i = 0; i <= daysAhead; i++) out.push(addDays(today, i));
     return out;
-  }, [today, daysBack, daysAhead]);
+  }, [today, daysAhead]);
+  const pastDays = useMemo(() => {
+    const out: string[] = [];
+    for (let i = -daysBack; i <= -1; i++) out.push(addDays(today, i));
+    return out;
+  }, [today, daysBack]);
 
   function flash(msg: string) {
     setNotice(msg);
@@ -217,8 +223,16 @@ export default function ScheduleBoard({
 
   return (
     <div style={{ marginBottom: 12 }}>
+      {pastDays.length > 0 && (
+        <button
+          onClick={() => setShowPast((s) => !s)}
+          style={{ width: "100%", marginBottom: 6, padding: "6px 10px", borderRadius: 10, border: "1px dashed var(--brand-border)", background: "transparent", color: "var(--brand-text-secondary)", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}
+        >
+          {showPast ? "▴ Hide past workouts" : "▾ Show past workouts (" + pastDays.length + " days)"}
+        </button>
+      )}
       <div>
-        {days.map((k) => {
+        {[...(showPast ? pastDays : []), ...upcomingDays].map((k) => {
           const isToday = k === today;
           const isPast = k < today;
           const locked = isPast || isLockedDate(k);
