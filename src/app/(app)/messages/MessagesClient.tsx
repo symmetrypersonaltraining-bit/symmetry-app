@@ -114,6 +114,12 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
   });
 
   const isGroup = selectedClientId === "group";
+  const nameForFrom = (m: Message) => {
+    if (m.from_id === currentUserId) return "You";
+    if (isGroup) return senderNames[m.from_id] || "Member";
+    if (isTrainer) { const c = clients.find(x => x.id === selectedClientId); return c ? c.name : "Client"; }
+    return "Coach";
+  };
   const ThreadPanel = () => (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -140,11 +146,12 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                   <div key={m.id} className={"flex " + (isMe ? "justify-end" : "justify-start")}>
                     <div className="max-w-[78%] rounded-2xl px-4 py-2.5"
                       style={{ background: isMe ? "var(--brand-primary)" : "var(--brand-surface)", border: isMe ? "none" : "1px solid var(--brand-border)", borderBottomRightRadius: isMe ? 4 : 16, borderBottomLeftRadius: isMe ? 16 : 4 }}>
-                      <p className="text-sm leading-relaxed" style={{ color: isMe ? "white" : "var(--brand-text)" }}>{isGroup && !isMe && senderNames[m.from_id] ? senderNames[m.from_id] + ": " : ""}{m.body.split("\n").map((ln, li) => (<span key={li}>{li > 0 ? <br /> : null}{ln}</span>))}</p>
-                      <div className={"flex items-center gap-1.5 mt-1 " + (isMe ? "justify-end" : "justify-start")}>
+                      <p className="text-[11px] font-bold mb-0.5" style={{ color: isMe ? "rgba(255,255,255,0.85)" : "var(--brand-primary)" }}>{nameForFrom(m)}</p>
+                      <p className="text-sm leading-relaxed" style={{ color: isMe ? "white" : "var(--brand-text)" }}>{m.body.split("\n").map((ln, li) => (<span key={li}>{li > 0 ? <br /> : null}{ln}</span>))}</p>
+                      <div className={"flex items-center gap-2 mt-1 " + (isMe ? "justify-end" : "justify-start")}>
                         <span className="text-[10px]" style={{ color: isMe ? "rgba(255,255,255,0.55)" : "var(--brand-text-secondary)" }}>{fmtTime(m.created_at)}</span>
                         {isMe && <span className="text-[10px]" style={{ color: m.read_at ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)" }}>{m.read_at ? "✓✓" : "✓"}</span>}
-                        <button onClick={() => handleDeleteMessage(m.id)} disabled={deletingId === m.id} title="Delete message" aria-label="Delete message" className="text-[10px] leading-none" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, opacity: deletingId === m.id ? 0.4 : 0.55, color: isMe ? "rgba(255,255,255,0.8)" : "var(--brand-text-secondary)" }}><i className="ti ti-trash" /></button>
+                        <button onClick={() => handleDeleteMessage(m.id)} disabled={deletingId === m.id} title="Delete message" aria-label="Delete message" className="text-xs leading-none" style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 4px", opacity: deletingId === m.id ? 0.4 : 0.75, color: isMe ? "rgba(255,255,255,0.9)" : "var(--brand-text-secondary)" }}><i className="ti ti-trash" /></button>
                       </div>
                     </div>
                   </div>
