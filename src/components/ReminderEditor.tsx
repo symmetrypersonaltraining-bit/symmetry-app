@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { calcReminder, nextDueDate, previousDueDate, Cadence } from "@/lib/reminder-calc";
+import { calcReminder, nextDueDate, previousDueDate, reminderSendDate, Cadence } from "@/lib/reminder-calc";
 
 interface Rem {
   id: string;
@@ -86,13 +86,17 @@ export default function ReminderEditor() {
           .map((a: any) => new Date(a.approved_at).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
           .sort()
           .pop() || null;
-        const baseStart = previousDueDate(r.due_date, cad);
+        // Send-anchored cycle: window closes 7 days before due, so cancels in the
+        // final week roll to the next cycle. Start = previous cycle's send date
+        // (or the prior approval date if later); end = this cycle's send date.
+        const baseStart = reminderSendDate(previousDueDate(r.due_date, cad));
         const start = la && la < r.due_date ? la : baseStart;
+        const end = reminderSendDate(r.due_date);
         let full = 0, half = 0;
         (cancels || []).forEach((a: any) => {
           if (a.client_id !== r.client_id) return;
           const d = new Date(a.scheduled_at).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-          if (d > start && d <= r.due_date) {
+          if (d > start && d <= end) {
             if (a.status === "cancelled_half") half += 1; else full += 1;
           }
         });
@@ -203,7 +207,7 @@ export default function ReminderEditor() {
               </span>
             </div>
             <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-              {"Fee $" + (r.fee ?? "?") + (r.cadence ? " / " + r.cadence : "") + " · rate $" + (r.sessionRate ?? "?") + "/session · billing cycle " + calc.cycleStart + " → " + r.due_date}
+              {"Fee $" + (r.fee ?? "?") + (r.cadence ? " / " + r.cadence : "") + " · rate $" + (r.sessionRate ?? "?") + "/session · billing cycle " + calc.cycleStart + " → " + calc.cycleEnd + " (reminder sends " + calc.cycleEnd + ") · due " + r.due_date}
             </div>
             <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
               {"Cancelled in cycle: " + r.cancelledFull + " full, " + r.cancelledHalf + " half → auto credit $" + calc.autoCredits + " · calculated: $" + calc.expected}

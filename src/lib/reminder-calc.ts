@@ -21,7 +21,8 @@ export interface ReminderCalcInput {
 }
 
 export interface ReminderCalcResult {
-  cycleStart: string; // previous due date (start of look-back window)
+  cycleStart: string; // start of the look-back window (previous cycle's send date)
+  cycleEnd: string;   // send date for THIS cycle = due date minus 7 days (window close)
   autoCredits: number;
   totalCredits: number;
   expected: number;
@@ -46,6 +47,21 @@ export function nextDueDate(dueDate: string, cadence: Cadence | null): string {
   else if (cadence === "biweekly") dt.setUTCDate(dt.getUTCDate() + 14);
   else if (cadence === "quarterly") dt.setUTCMonth(dt.getUTCMonth() + 3);
   else dt.setUTCMonth(dt.getUTCMonth() + 1);
+  return dt.toISOString().slice(0, 10);
+}
+
+// Send-anchored billing cycle (Dustin, 2026-07-09, LIVE):
+// The reminder is prepared 7 days before the due date, and the billing cycle
+// CLOSES on that send date rather than on the due date. A cancel that lands in
+// the final 7 days (between send and due) therefore rolls onto the NEXT cycle
+// instead of retroactively changing an amount that was already locked in.
+// The lead is a fixed 7 days for every cadence (it is the reminder window, not
+// the billing period), so this helper ignores cadence.
+export const REMINDER_SEND_LEAD_DAYS = 7;
+export function reminderSendDate(dueDate: string): string {
+  const parts = dueDate.split("-").map(Number);
+  const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+  dt.setUTCDate(dt.getUTCDate() - REMINDER_SEND_LEAD_DAYS);
   return dt.toISOString().slice(0, 10);
 }
 
@@ -75,6 +91,10 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
     else blocking.push(msg);
   }
 
-  const cycleStart = i.lastCycleApprovedOn && i.lastCycleApprovedOn < i.dueDate ? i.lastCycleApprovedOn : previousDueDate(i.dueDate, i.cadence);
-  return { cycleStart, autoCredits, totalCredits, expected, blocking, warnings };
+  // Window closes 7 days before due (send-anchored). Start of the look-back is
+  // the previous cycle's send date, unless the prior reminder was approved later.
+  const baseStart = reminderSendDate(previousDueDate(i.dueDate, i.cadence));
+  const cycleStart = i.lastCycleApprovedOn && i.lastCycleApprovedOn < i.dueDate ? i.lastCycleApprovedOn : baseStart;
+  const cycleEnd = reminderSendDate(i.dueDate);
+  return { cycleStart, cycleEnd, autoCredits, totalCredits, expected, blocking, warnings };
 }
