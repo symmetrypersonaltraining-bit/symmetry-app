@@ -58,10 +58,20 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
     if (!typed.trim()) return;
     setBusy(true);
     try {
+      const today = CT_TODAY();
       const { data } = await supabase.from("offplan_workout_logs").insert({
-        client_id: clientId, log_date: CT_TODAY(), description: typed.trim(), details: details.trim() || null,
+        client_id: clientId, log_date: today, description: typed.trim(), details: details.trim() || null,
       }).select().single();
       if (data) setPendingRows((prev) => [...prev, data as OffPlanRow]);
+      // Replace the scheduled workout for today: mark the original as 'skipped' so it's
+      // not left sitting as an unlogged/pending workout (mirrors the library-swap flow).
+      // Only touches today's still-'scheduled' instance for this day; reversible.
+      try {
+        await (supabase as any).from("scheduled_workouts")
+          .update({ status: "skipped" })
+          .eq("client_id", clientId).eq("day_id", dayId)
+          .eq("scheduled_date", today).eq("status", "scheduled");
+      } catch { /* off-plan log still saved even if this fails */ }
       setTyped(""); setDetails(""); setMode("closed");
     } finally { setBusy(false); }
   }
