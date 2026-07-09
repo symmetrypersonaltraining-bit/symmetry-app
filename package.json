@@ -10,8 +10,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
-    "@capacitor/android": "^6.2.1",
-    "@capacitor/core": "^6.2.1",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.4",
     "chart.js": "^4.5.1",
@@ -23,7 +21,6 @@
     "twilio": "^5.7.0"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.2.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
