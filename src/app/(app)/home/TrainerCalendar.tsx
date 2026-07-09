@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { setGCalEventColor } from "@/app/(app)/schedule/scheduleActions";
 
 // ---- Types ----
 type ViewMode = "week" | "month" | "day" | "agenda";
@@ -368,6 +369,11 @@ function SessionDetailPopup({ ev, clients, workoutMap, onClose, onSaved }: {
         await supabase.from("billing_adjustments").insert({ client_id: ev.clientId, appointment_id: ev.id, amount: credit, reason: "Cancelled session \u2014 half-price credit", apply_to_month: new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split("T")[0], applied: false });
       }
     }
+    // Two-way sync: push the cancel to Google Calendar (orange), or clear it on un-cancel.
+    try {
+      if (status === "cancelled") await setGCalEventColor({ appointmentId: ev.id, colorId: "6" });
+      else if (status === "completed" || status === "scheduled") await setGCalEventColor({ appointmentId: ev.id, colorId: null });
+    } catch { /* never block the status change on a calendar hiccup */ }
     setUpdating(false);
     onSaved();
     onClose();
@@ -678,6 +684,8 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
               const ids = Array.from(selectedIds);
               const { data: appts } = await supabase.from("appointments").select("id,client_id,scheduled_at").in("id", ids);
               await supabase.from("appointments").update({ status: "cancelled" }).in("id", ids);
+              // Two-way sync: push each cancel to Google Calendar (orange).
+              for (const id of ids) { try { await setGCalEventColor({ appointmentId: id, colorId: "6" }); } catch {} }
               for (const appt of appts ?? []) {
                 const { data: cl } = await supabase.from("clients").select("current_fees,training_frequency").eq("id", appt.client_id).single();
                 if (cl?.current_fees && cl?.training_frequency) {

@@ -6,7 +6,8 @@ import { getValidAccessToken, gcalFetch } from '@/lib/gcal';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const COLOR_CANCELLED = '6';
+const COLOR_CANCELLED = '6';   // orange = full cancel (cancelled_client)
+const COLOR_HALF = '3';        // grape/purple = half / vacation credit (cancelled_half) — ready, unused until Dustin uses it
 const COLOR_PAYMENT = '11';
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
       const colorId = event.colorId || null;
       const summary = event.summary || '';
       const isPayment = colorId === COLOR_PAYMENT || /\$\s?\d/.test(summary);
-      if (!isPayment && colorId !== null && colorId !== COLOR_CANCELLED) continue;
+      if (!isPayment && colorId !== null && colorId !== COLOR_CANCELLED && colorId !== COLOR_HALF) continue;
 
       const clientId = matchClient(summary);
       if (!clientId) continue;
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
         client_id: clientId,
         scheduled_at: event.start.dateTime,
         ends_at: event.end?.dateTime || '',
-        status: colorId === COLOR_CANCELLED ? 'cancelled_client' : 'scheduled',
+        status: colorId === COLOR_CANCELLED ? 'cancelled_client' : (colorId === COLOR_HALF ? 'cancelled_half' : 'scheduled'),
         gcal_event_id: event.id,
         gcal_recurring_id: event.recurringEventId || '',
         title: summary,

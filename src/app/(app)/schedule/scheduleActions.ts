@@ -45,6 +45,34 @@ export async function updateGCalEvent(params: {
   }
 }
 
+// Two-way cancel sync (Dustin, 2026-07-09): reflect an in-app cancel onto the
+// linked Google Calendar event by setting its color. '6' = orange (full cancel),
+// '3' = grape/purple (half / vacation credit), null = clear back to default.
+// Safe no-op for app-only sessions that have no gcal_event_id.
+export async function setGCalEventColor(params: {
+  appointmentId: string;
+  colorId: string | null;
+}): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data: appt } = await supabase
+      .from('appointments')
+      .select('gcal_event_id')
+      .eq('id', params.appointmentId)
+      .maybeSingle();
+    const eventId = (appt as { gcal_event_id?: string } | null)?.gcal_event_id;
+    if (!eventId) return { success: true, skipped: true };
+    const { token } = await getValidAccessToken();
+    await gcalFetch(token, `/calendars/primary/events/${eventId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ colorId: params.colorId }),
+    });
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function deleteGCalEvent(params: {
   appointmentId: string;
   gcalEventId: string;
