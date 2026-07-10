@@ -577,6 +577,7 @@ export default function WorkoutLogger({
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const [activeExerciseIdx, setActiveExerciseIdx] = useState(0);
   const [workoutComplete, setWorkoutComplete] = useState(false);
+  const [sessionCancelled, setSessionCancelled] = useState(false);
   const [timePick, setTimePick] = useState<{ peId: string; si: number } | null>(null);
   const [sessionMode, setSessionMode] = useState(false);
   const [restTimer, setRestTimer] = useState<number | null>(null);
@@ -617,14 +618,14 @@ export default function WorkoutLogger({
   useEffect(() => {
     if (!__hydrated.current) return;
     try {
-      if (workoutComplete) { window.localStorage.removeItem(__draftKey); return; }
+      if (workoutComplete || sessionCancelled) { window.localStorage.removeItem(__draftKey); return; }
       window.localStorage.setItem(__draftKey, JSON.stringify(__snapshot()));
     } catch (e) {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sets, activeSectionIdx, activeExerciseIdx, sessionMode, sessionNote, workoutLogId, workoutComplete]);
+  }, [sets, activeSectionIdx, activeExerciseIdx, sessionMode, sessionNote, workoutLogId, workoutComplete, sessionCancelled]);
   useEffect(() => {
     const flush = () => {
-      if (!__hydrated.current || workoutComplete) return;
+      if (!__hydrated.current || workoutComplete || sessionCancelled) return;
       try { window.localStorage.setItem(__draftKey, JSON.stringify(__snapshot())); } catch (e) {}
     };
     const onVis = () => { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') flush(); };
@@ -641,7 +642,7 @@ export default function WorkoutLogger({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sets, activeSectionIdx, activeExerciseIdx, sessionMode, sessionNote, workoutLogId, workoutComplete]);
+  }, [sets, activeSectionIdx, activeExerciseIdx, sessionMode, sessionNote, workoutLogId, workoutComplete, sessionCancelled]);
   // --- end auto-save ---
 
   // Hardware/browser BACK while in the focused logger: exit session mode back to the
@@ -1067,7 +1068,7 @@ export default function WorkoutLogger({
         {/* Top bar */}
         <div className="flex items-center justify-between px-3 pt-2 pb-2 flex-shrink-0 gap-2">
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            <button onClick={() => setSessionMode(false)}
+            <button onClick={() => { try { window.localStorage.removeItem(__draftKey); } catch (e) {} setSessionCancelled(true); setSessionMode(false); }}
               className="flex items-center gap-1 px-2.5 h-9 rounded-full"
               style={{ background: "rgba(255,90,90,0.16)", border: "1px solid rgba(255,90,90,0.4)" }}>
               <i className="ti ti-x text-sm" style={{ color: "#ff8a8a" }} />
@@ -1358,7 +1359,7 @@ export default function WorkoutLogger({
               style={{ background: "rgba(255,255,255,0.15)" }}>
               <i className="ti ti-clock text-white text-base" />
             </button>
-            <button onClick={() => setSessionMode(true)}
+            <button onClick={() => { setSessionCancelled(false); setSessionMode(true); }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
               style={{ background: "rgba(255,255,255,0.2)", color: "white" }}>
               <i className="ti ti-maximize text-sm" /> Session
@@ -1548,7 +1549,7 @@ export default function WorkoutLogger({
         <>
           <style>{`@keyframes ssbbounce{0%,100%{transform:translateY(0);box-shadow:0 8px 22px rgba(124,156,245,.45)}18%{transform:translateY(-13px);box-shadow:0 22px 38px rgba(124,156,245,.7)}36%{transform:translateY(0);box-shadow:0 8px 22px rgba(124,156,245,.45)}54%{transform:translateY(-6px)}72%{transform:translateY(0)}}`}</style>
           <button
-            onClick={() => setSessionMode(true)}
+            onClick={() => { setSessionCancelled(false); setSessionMode(true); }}
             aria-label="Start session and log"
             style={{
               position: "fixed", left: 12, right: 12, maxWidth: 520, margin: "0 auto",
