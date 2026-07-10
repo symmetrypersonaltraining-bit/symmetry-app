@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import AddWorkoutButton from "@/components/AddWorkoutButton";
 import Link from "next/link";
-import RescheduleCalendar, { type CalWorkout } from "@/components/RescheduleCalendar";
+import { type CalWorkout } from "@/components/RescheduleCalendar";
+import ScheduleWeekBar from "@/components/ScheduleWeekBar";
 import ScheduleBoard from "@/components/ScheduleBoard";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -156,8 +157,8 @@ export default async function WorkoutPage() {
 
             <div style={{ marginTop: "1.25rem" }}>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
+              <ScheduleWeekBar workouts={calWorkouts} />
               <ScheduleBoard workouts={calWorkouts} />
-              <RescheduleCalendar workouts={calWorkouts} />
             </div>
           </>
         ) : allPhases.length > 0 ? (
@@ -169,8 +170,8 @@ export default async function WorkoutPage() {
             </div>
             <div style={{ marginTop: "1rem" }}>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
+              <ScheduleWeekBar workouts={calWorkouts} />
               <ScheduleBoard workouts={calWorkouts} />
-              <RescheduleCalendar workouts={calWorkouts} />
             </div>
           </>
         ) : (
