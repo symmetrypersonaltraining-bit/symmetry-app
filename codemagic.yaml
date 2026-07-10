@@ -17,12 +17,18 @@ workflows:
         script: npx cap add android || npx cap sync android
       - name: Sync Capacitor into Android
         script: npx cap sync android
+      - name: Generate app icon and splash
+        script: |
+          python3 -m pip install --quiet --user pillow numpy || pip3 install --quiet pillow numpy
+          python3 resources/generate_icons.py
+          npx @capacitor/assets@3.0.5 generate --android
       - name: Build debug APK
         script: |
           cd android
           ./gradlew assembleDebug
     artifacts:
       - android/app/build/outputs/**/*.apk
+      - assets/icon-only.png
     publishing:
       email:
         recipients:
