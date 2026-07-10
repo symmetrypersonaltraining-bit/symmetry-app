@@ -643,6 +643,16 @@ export default function WorkoutLogger({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sets, activeSectionIdx, activeExerciseIdx, sessionMode, sessionNote, workoutLogId, workoutComplete]);
   // --- end auto-save ---
+
+  // Hardware/browser BACK while in the focused logger: exit session mode back to the
+  // overview instead of leaving the page or the app. Additive; only active during sessionMode.
+  useEffect(() => {
+    if (!sessionMode) return;
+    try { window.history.pushState({ __wl: 1 }, ""); } catch { /* noop */ }
+    const onPop = () => { setSessionMode(false); };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [sessionMode]);
   const recognitionRef = useRef<any>(null);
 
   const allFlat = localSections.flatMap(s => s.prescribed_exercises);
@@ -1038,7 +1048,7 @@ export default function WorkoutLogger({
     const saveFields = async (nf: string[]) => { setFieldCfg(prev => ({ ...prev, [currentExercise.id]: nf })); try { await supabase.from("prescribed_exercises").update({ tracked_fields: nf }).eq("id", currentExercise.id); } catch {} };
 
     return (
-      <div className="fixed inset-0 flex flex-col z-[100]" style={{ background: "var(--session-bg)" }}>
+      <div className="fixed inset-0 flex flex-col z-[999]" style={{ background: "var(--session-bg)" }}>
         {/* Set-pop + PR-glow overlay (pointer-events:none, cannot block logging). Revert = remove this line. */}
         <SetFeedback sets={sets} prevByPe={prevByPe} />
         {/* Keep the phone screen awake during an active session. Isolated; no-ops where unsupported. Revert = remove this line. */}
@@ -1055,18 +1065,26 @@ export default function WorkoutLogger({
         {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
 
         {/* Top bar */}
-        <div className="flex items-center justify-between px-4 pt-2 pb-2 flex-shrink-0">
-          <button onClick={() => setSessionMode(false)}
-            className="w-9 h-9 rounded-full flex items-center justify-center"
-            style={{ background: "rgba(255,255,255,0.08)" }}>
-            <i className="ti ti-minimize text-white text-base" />
-          </button>
-          <div className="text-center">
-            <p className="text-white/40 text-xs">{day.label}</p>
+        <div className="flex items-center justify-between px-3 pt-2 pb-2 flex-shrink-0 gap-2">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button onClick={() => setSessionMode(false)}
+              className="flex items-center gap-1 px-2.5 h-9 rounded-full"
+              style={{ background: "rgba(255,90,90,0.16)", border: "1px solid rgba(255,90,90,0.4)" }}>
+              <i className="ti ti-x text-sm" style={{ color: "#ff8a8a" }} />
+              <span className="text-xs font-bold" style={{ color: "#ff8a8a" }}>Cancel</span>
+            </button>
+            <Link href={isTrainerSession && clientId ? `/clients/${clientId}` : "/home"}
+              className="w-9 h-9 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(255,255,255,0.08)" }} aria-label="Exit to previous screen">
+              <i className="ti ti-arrow-left text-base text-white/70" />
+            </Link>
+          </div>
+          <div className="text-center min-w-0 flex-1">
+            <p className="text-white/40 text-xs truncate">{day.label}</p>
             <p className="text-white/60 text-xs">{globalIdx + 1} / {totalExercises}</p>
           </div>
           <button onClick={() => setShowTimer(true)}
-            className="flex items-center gap-1.5 px-3 h-9 rounded-full"
+            className="flex items-center gap-1.5 px-2.5 h-9 rounded-full flex-shrink-0"
             style={{ background: "rgba(96,165,250,0.16)", border: "1px solid rgba(96,165,250,0.4)" }}>
             <i className="ti ti-clock text-base" style={{ color: "#8ec2ff" }} />
             <span className="text-xs font-bold" style={{ color: "#8ec2ff" }}>Timer</span>
