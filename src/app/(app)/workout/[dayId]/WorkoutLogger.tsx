@@ -595,11 +595,36 @@ export default function WorkoutLogger({
 
   // --- Auto-save / resume draft: persists logged sets so leaving the browser never loses progress ---
   const __draftKey = `symmetry_wl_${clientId || 'me'}_${day?.id || 'day'}_${isTrainerSession ? 't' : 'c'}`;
+  // The same physical workout (same client + day) can be entered two ways — a trainer
+  // opening their own profile directly vs. resuming via the "in progress" dock (which adds
+  // ?forClient=…). Those two paths compute a different t/c suffix, so a draft saved under one
+  // could never be found (or cancelled) under the other. Always operate on BOTH suffixes.
+  const __draftKeys = () => {
+    const id = clientId || 'me';
+    const d = day?.id || 'day';
+    return [`symmetry_wl_${id}_${d}_t`, `symmetry_wl_${id}_${d}_c`];
+  };
+  const __clearDraft = () => {
+    try { for (const k of __draftKeys()) window.localStorage.removeItem(k); } catch (e) {}
+  };
   const __hydrated = useRef(false);
   const __snapshot = () => ({ sets, activeSectionIdx, activeExerciseIdx, sessionMode, sessionNote, workoutLogId, savedAt: Date.now() });
   useEffect(() => {
     try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(__draftKey) : null;
+      let raw = typeof window !== 'undefined' ? window.localStorage.getItem(__draftKey) : null;
+      // If nothing under the exact key, adopt a live draft saved under the sibling suffix
+      // (from the other entry path) and migrate it here so there's only ever one copy.
+      if (!raw && typeof window !== 'undefined') {
+        for (const k of __draftKeys()) {
+          if (k === __draftKey) continue;
+          const r2 = window.localStorage.getItem(k);
+          if (!r2) continue;
+          try {
+            const d2 = JSON.parse(r2);
+            if (d2 && d2.sessionMode === true) { raw = r2; window.localStorage.removeItem(k); break; }
+          } catch (e2) {}
+        }
+      }
       if (raw) {
         const d = JSON.parse(raw);
         if (d && typeof d === 'object') {
@@ -618,7 +643,7 @@ export default function WorkoutLogger({
   useEffect(() => {
     if (!__hydrated.current) return;
     try {
-      if (workoutComplete || sessionCancelled) { window.localStorage.removeItem(__draftKey); return; }
+      if (workoutComplete || sessionCancelled) { __clearDraft(); return; }
       window.localStorage.setItem(__draftKey, JSON.stringify(__snapshot()));
     } catch (e) {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1068,7 +1093,7 @@ export default function WorkoutLogger({
         {/* Top bar */}
         <div className="flex items-center justify-between px-3 pt-2 pb-2 flex-shrink-0 gap-2">
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            <button onClick={() => { try { window.localStorage.removeItem(__draftKey); } catch (e) {} setSessionCancelled(true); setSessionMode(false); }}
+            <button onClick={() => { __clearDraft(); setSessionCancelled(true); setSessionMode(false); }}
               className="flex items-center gap-1 px-2.5 h-9 rounded-full"
               style={{ background: "rgba(255,90,90,0.16)", border: "1px solid rgba(255,90,90,0.4)" }}>
               <i className="ti ti-x text-sm" style={{ color: "#ff8a8a" }} />
