@@ -1110,13 +1110,13 @@ export default function WorkoutLogger({
                 className="w-10 h-10 rounded-xl flex items-center justify-center"
                 style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
                 title="View history">
-                <i className="ti ti-chart-bar text-white/50 text-base" />
+                <i className="ti ti-chart-bar text-base" style={{ color: "#7fa8ff" }} />
               </button>
               <button onClick={() => setSwapTargetPe(currentExercise)}
                 className="w-10 h-10 rounded-xl flex items-center justify-center"
                 style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
                 title="Swap exercise">
-                <i className="ti ti-switch-horizontal text-white/50 text-base" />
+                <i className="ti ti-switch-horizontal text-base" style={{ color: "#e0a83e" }} />
               </button>
             </div>
           </div>
@@ -1376,7 +1376,7 @@ export default function WorkoutLogger({
                       <button onClick={e => { e.stopPropagation(); setSwapTargetPe(pe); }}
                         className="w-8 h-8 rounded-lg flex items-center justify-center"
                         style={{ background: "var(--brand-card)" }} title="Swap exercise">
-                        <i className="ti ti-switch-horizontal text-sm" style={{ color: "var(--brand-text-secondary)" }} />
+                        <i className="ti ti-switch-horizontal text-sm" style={{ color: "#d9962b" }} />
                       </button>
                       <div className="text-xs font-medium px-2 py-1 rounded-full"
                         style={{
