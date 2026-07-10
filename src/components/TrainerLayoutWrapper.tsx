@@ -72,6 +72,8 @@ export default function TrainerLayoutWrapper({ children }: Props) {
           {children}
         </div>
 
+        <SessionDock />
+
         {/* Client bottom nav */}
         <div className="fixed bottom-0 left-0 right-0 z-40 flex items-end"
           style={{ background: "var(--brand-surface)", borderTop: "1px solid var(--brand-border)", paddingBottom: "env(safe-area-inset-bottom)" }}>
