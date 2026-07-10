@@ -1066,9 +1066,10 @@ export default function WorkoutLogger({
             <p className="text-white/60 text-xs">{globalIdx + 1} / {totalExercises}</p>
           </div>
           <button onClick={() => setShowTimer(true)}
-            className="w-9 h-9 rounded-full flex items-center justify-center"
-            style={{ background: "rgba(255,255,255,0.08)" }}>
-            <i className="ti ti-clock text-white/60 text-base" />
+            className="flex items-center gap-1.5 px-3 h-9 rounded-full"
+            style={{ background: "rgba(96,165,250,0.16)", border: "1px solid rgba(96,165,250,0.4)" }}>
+            <i className="ti ti-clock text-base" style={{ color: "#8ec2ff" }} />
+            <span className="text-xs font-bold" style={{ color: "#8ec2ff" }}>Timer</span>
           </button>
         </div>
 
