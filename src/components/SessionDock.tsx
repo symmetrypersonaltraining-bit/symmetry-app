@@ -4,15 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 // Global "Now training" dock. Reads the workout auto-save draft that WorkoutLogger
-// writes to localStorage (key: symmetry_wl_{clientId}_{dayId}_t for trainer sessions).
-// Shows only when a trainer session is LIVE (sessionMode:true) and you've navigated
-// AWAY from the logger — tap to jump back in. Fully additive: renders null when there
-// is no active session. Trainer-only (mounted in TrainerLayoutWrapper).
+// writes to localStorage (key: symmetry_wl_{clientId}_{dayId}_{t|c}). Shows only when
+// a session is LIVE (sessionMode:true) and you've navigated AWAY from the logger —
+// tap to jump back in. Fully additive: renders null when there is no active session.
+// Mounted in both the trainer layout and the client layout.
 type Active = { clientId: string; dayId: string; savedAt: number };
 
 function parseKey(k: string): { clientId: string; dayId: string } | null {
-  // symmetry_wl_{clientId}_{dayId}_t  — clientId & dayId are UUIDs (no underscores)
-  const m = /^symmetry_wl_(.+)_(.+)_t$/.exec(k);
+  // symmetry_wl_{clientId}_{dayId}_{t|c}  — clientId & dayId are UUIDs (or "me"); no underscores
+  const m = /^symmetry_wl_(.+)_(.+)_[tc]$/.exec(k);
   if (!m) return null;
   return { clientId: m[1], dayId: m[2] };
 }
@@ -31,7 +31,7 @@ export default function SessionDock() {
         let best: Active | null = null;
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
-          if (!k || !/^symmetry_wl_.+_t$/.test(k)) continue;
+          if (!k || !/^symmetry_wl_.+_[tc]$/.test(k)) continue;
           const parsed = parseKey(k);
           if (!parsed) continue;
           const raw = localStorage.getItem(k);
@@ -65,7 +65,7 @@ export default function SessionDock() {
       aria-label="Resume workout in progress"
       style={{
         position: "fixed", left: 10, right: 10,
-        bottom: "calc(14px + env(safe-area-inset-bottom))",
+        bottom: "calc(76px + env(safe-area-inset-bottom))",
         zIndex: 900, cursor: "pointer",
         maxWidth: 560, margin: "0 auto",
         background: "linear-gradient(135deg,#17294d,#20386b)",
@@ -76,8 +76,8 @@ export default function SessionDock() {
     >
       <div style={{ width: 36, height: 36, borderRadius: 10, background: "#0f1f3d", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, border: "1px solid #e0a83e", flexShrink: 0 }}>🏋️</div>
       <div style={{ flex: 1, minWidth: 0, color: "#fff" }}>
-        <div style={{ fontSize: 10, fontWeight: 800, color: "#e0a83e", letterSpacing: "0.04em" }}>● NOW TRAINING</div>
-        <div style={{ fontSize: 13, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Workout in progress — tap to resume</div>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#e0a83e", letterSpacing: "0.04em" }}>● WORKOUT IN PROGRESS</div>
+        <div style={{ fontSize: 13, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Tap to resume your session</div>
       </div>
       <div style={{ fontSize: 22, color: "#e0a83e", fontWeight: 800, flexShrink: 0 }}>⌃</div>
     </div>

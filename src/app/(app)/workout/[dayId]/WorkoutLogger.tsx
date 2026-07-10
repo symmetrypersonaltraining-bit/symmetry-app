@@ -1295,21 +1295,27 @@ export default function WorkoutLogger({
             )}
           </div>
         </div>
-        {isTrainerSession && (
-          <div className="flex-shrink-0 flex" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0c1626", paddingBottom: "env(safe-area-inset-bottom)" }}>
-            {[
-              { href: "/home", icon: "ti-home", label: "Home" },
-              { href: clientId ? `/nutrition?clientId=${clientId}` : "/nutrition", icon: "ti-salad", label: "Nutrition" },
-              { href: clientId ? `/progress?clientId=${clientId}` : "/progress", icon: "ti-chart-line", label: "Progress" },
-              { href: clientId ? `/clients/${clientId}` : "/clients", icon: "ti-user", label: clientName ? clientName.split(" ")[0] : "Client" },
-            ].map((tab) => (
-              <Link key={tab.href} href={tab.href} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5" style={{ color: "rgba(255,255,255,0.6)" }}>
-                <i className={`ti ${tab.icon} text-lg`} />
-                <span style={{ fontSize: 10, fontWeight: 600 }}>{tab.label}</span>
-              </Link>
-            ))}
-          </div>
-        )}
+        <div className="flex-shrink-0 flex" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0c1626", paddingBottom: "env(safe-area-inset-bottom)" }}>
+          {(isTrainerSession
+            ? [
+                { href: "/home", icon: "ti-home", label: "Home" },
+                { href: clientId ? `/nutrition?clientId=${clientId}` : "/nutrition", icon: "ti-salad", label: "Nutrition" },
+                { href: clientId ? `/progress?clientId=${clientId}` : "/progress", icon: "ti-chart-line", label: "Progress" },
+                { href: clientId ? `/clients/${clientId}` : "/clients", icon: "ti-user", label: clientName ? clientName.split(" ")[0] : "Client" },
+              ]
+            : [
+                { href: "/home", icon: "ti-home", label: "Home" },
+                { href: "/nutrition", icon: "ti-salad", label: "Nutrition" },
+                { href: "/progress", icon: "ti-chart-line", label: "Progress" },
+                { href: "/settings", icon: "ti-settings", label: "Settings" },
+              ]
+          ).map((tab) => (
+            <Link key={tab.href} href={tab.href} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5" style={{ color: "rgba(255,255,255,0.6)" }}>
+              <i className={`ti ${tab.icon} text-lg`} />
+              <span style={{ fontSize: 10, fontWeight: 600 }}>{tab.label}</span>
+            </Link>
+          ))}
+        </div>
       </div>
     );
   }
