@@ -12,7 +12,7 @@ interface LogoProps {
 // Falls back to /logo.png if not yet uploaded to storage
 const LOGO_URL =
   process.env.NEXT_PUBLIC_LOGO_URL ||
-  'https://mkfiginpiesospsnktea.supabase.co/storage/v1/object/public/assets/Transparent%20White.png';
+  '/symmetry-corrective-logo.png';
 
 export default function Logo({
   size = 40,
@@ -25,10 +25,10 @@ export default function Logo({
     >
       <Image
         src={LOGO_URL}
-        alt="Symmetry Personal Training"
+        alt="Symmetry Corrective"
         width={size}
         height={size}
-        className="w-full h-full object-cover scale-[1.38]"
+        className="w-full h-full object-contain"
         unoptimized
         priority
         onError={(e) => {
