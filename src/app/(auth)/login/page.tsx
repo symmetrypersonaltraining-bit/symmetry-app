@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
@@ -15,6 +15,18 @@ export default function LoginPage() {
 
   const router = useRouter();
   const supabase = createClient();
+
+  // Native app (Capacitor) detection: password login works in the WebView,
+  // but magic-link opens the external browser and never signs the app in.
+  // So inside the native app we hide the magic-link option and use password only.
+  const [isNativeApp, setIsNativeApp] = useState(false);
+  useEffect(() => {
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean; isNative?: boolean } }).Capacitor;
+    if (cap && (cap.isNativePlatform ? cap.isNativePlatform() : cap.isNative)) {
+      setIsNativeApp(true);
+      setMode("password");
+    }
+  }, []);
 
   async function handlePasswordLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -133,7 +145,8 @@ export default function LoginPage() {
               Sign in
             </h2>
 
-            {/* Toggle */}
+            {/* Toggle (hidden in the native app - password only there) */}
+            {!isNativeApp && (
             <div
               className="flex rounded-lg p-1 mb-6"
               style={{ background: "#DDEEFF" }}
@@ -161,6 +174,7 @@ export default function LoginPage() {
                 Magic link
               </button>
             </div>
+            )}
 
             <form
               onSubmit={mode === "password" ? handlePasswordLogin : handleMagicLink}
