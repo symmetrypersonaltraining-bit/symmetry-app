@@ -872,6 +872,19 @@ export default function WorkoutLogger({
     finally { setSaving(false); }
   }
 
+  function addSetRow(peId: string) {
+    setSets(prev => ({ ...prev, [peId]: [...(prev[peId] || []), { weight: "", reps: "", time: "", speed: "", hr: "", done: false }] }));
+    if (navigator.vibrate) navigator.vibrate(20);
+  }
+  function removeSetRow(peId: string) {
+    setSets(prev => {
+      const arr = prev[peId] || [];
+      if (arr.length <= 1) return prev;
+      return { ...prev, [peId]: arr.slice(0, -1) };
+    });
+    if (navigator.vibrate) navigator.vibrate(20);
+  }
+
   async function completeWorkout() {
     setSaving(true);
     try {
@@ -1204,6 +1217,10 @@ export default function WorkoutLogger({
               </button>
             </div>
           ))}
+        <div className="flex gap-2 mb-3">
+          <button type="button" onClick={() => addSetRow(currentExercise.id)} className="flex-1 py-2 rounded-xl text-xs font-semibold" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.85)", border: "1px dashed rgba(255,255,255,0.22)" }}>&#65291; Add set</button>
+          <button type="button" onClick={() => removeSetRow(currentExercise.id)} className="flex-1 py-2 rounded-xl text-xs font-semibold" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.85)", border: "1px dashed rgba(255,255,255,0.22)" }}>&#8722; Remove set</button>
+        </div>
         <button type="button" onClick={logAllCurrentSets} className="w-full mb-3 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "var(--brand-primary)" }}>Check all sets complete</button></div>
 
         {/* Bottom controls */}
