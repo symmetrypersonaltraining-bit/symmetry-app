@@ -1489,7 +1489,7 @@ export default function WorkoutLogger({
       </div>
       {!sessionMode && (
         <>
-          <style>{`@keyframes ssbpulse{0%,100%{transform:scale(1);box-shadow:0 8px 22px rgba(124,156,245,.45)}50%{transform:scale(1.03);box-shadow:0 13px 32px rgba(124,156,245,.72)}}`}</style>
+          <style>{`@keyframes ssbbounce{0%,100%{transform:translateY(0);box-shadow:0 8px 22px rgba(124,156,245,.45)}18%{transform:translateY(-13px);box-shadow:0 22px 38px rgba(124,156,245,.7)}36%{transform:translateY(0);box-shadow:0 8px 22px rgba(124,156,245,.45)}54%{transform:translateY(-6px)}72%{transform:translateY(0)}}`}</style>
           <button
             onClick={() => setSessionMode(true)}
             aria-label="Start session and log"
@@ -1499,7 +1499,7 @@ export default function WorkoutLogger({
               border: "none", borderRadius: 16, cursor: "pointer", padding: 15,
               fontSize: 16, fontWeight: 800, color: "#fff",
               background: isTrainerSession ? "#6366f1" : "var(--brand-primary)",
-              animation: "ssbpulse 1.6s ease-in-out infinite",
+              animation: "ssbbounce 1.5s ease-in-out infinite",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}
           >
