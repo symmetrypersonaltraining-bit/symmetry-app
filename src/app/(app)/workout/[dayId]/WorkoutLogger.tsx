@@ -642,19 +642,32 @@ export default function WorkoutLogger({
     return () => { vp.removeEventListener("resize", onVV); vp.removeEventListener("scroll", onVV); };
   }, [sessionMode]);
   const focusedInputRef = useRef<HTMLInputElement | null>(null);
+  // `typing` = a set input is focused. Drives the keyboard-safe layout WITHOUT relying on
+  // visualViewport/keyboard detection (which some iOS webviews don't report): when typing we
+  // collapse the header + bottom chrome and pull the focused box to the top of the screen,
+  // so it always clears the keyboard. Isolated; revert = remove `typing` usage.
+  const [typing, setTyping] = useState(false);
   const focusScroll = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     const el = e.currentTarget;
     focusedInputRef.current = el;
-    setTimeout(() => { try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (_e) {} }, 130);
+    setTyping(true);
+    setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 130);
+    setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 350);
   }, []);
-  // When the keyboard opens (kbVV becomes set) the layout settles a beat later; re-center the
-  // focused input so it clears the keyboard even for lower set rows. Isolated; revert = remove.
+  const focusBlur = useCallback(() => {
+    setTimeout(() => {
+      const a = document.activeElement as HTMLElement | null;
+      if (!a || a.tagName !== "INPUT") setTyping(false);
+    }, 120);
+  }, []);
+  // After the layout settles (kbVV toggles OR typing begins), pull the focused input to the top
+  // of the scroll area so it clears the keyboard even for lower set rows.
   useEffect(() => {
-    if (!kbVV || !focusedInputRef.current) return;
+    if ((!kbVV && !typing) || !focusedInputRef.current) return;
     const el = focusedInputRef.current;
-    const t = setTimeout(() => { try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (_e) {} }, 80);
+    const t = setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 90);
     return () => clearTimeout(t);
-  }, [kbVV]);
+  }, [kbVV, typing]);
   // TEMP: owner-only keyboard diagnostic HUD gate. Only the account owner renders it; clients never do.
   const [kbDebug, setKbDebug] = useState(false);
   useEffect(() => {
@@ -1197,7 +1210,7 @@ export default function WorkoutLogger({
         </div>
 
         {/* Exercise header */}
-        <div className="px-5 mb-4 flex-shrink-0" style={{ display: kbVV ? "none" : undefined }}>
+        <div className="px-5 mb-4 flex-shrink-0" style={{ display: (kbVV || typing) ? "none" : undefined }}>
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "var(--brand-primary)" }}>
@@ -1300,7 +1313,7 @@ export default function WorkoutLogger({
             <div key={si} className="flex items-center gap-1.5 mb-1">
               <div className="w-8 text-center text-sm font-bold"
                 style={{ color: setEntry.done ? "#22c55e" : "rgba(255,255,255,0.25)" }}>S{si + 1}</div>
-              {xFields.includes("weight") && (<input type="text" value={setEntry.weight} onFocus={focusScroll}
+              {xFields.includes("weight") && (<input type="text" value={setEntry.weight} onFocus={focusScroll} onBlur={focusBlur}
                 onChange={e => updateSet(currentExercise.id, si, "weight", e.target.value)}
                 disabled={setEntry.done} placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
@@ -1309,7 +1322,7 @@ export default function WorkoutLogger({
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="decimal" />)}
-              {xFields.includes("reps") && (<input type="text" value={setEntry.reps} onFocus={focusScroll}
+              {xFields.includes("reps") && (<input type="text" value={setEntry.reps} onFocus={focusScroll} onBlur={focusBlur}
                 onChange={e => updateSet(currentExercise.id, si, "reps", e.target.value)}
                 disabled={setEntry.done} placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
@@ -1342,7 +1355,7 @@ export default function WorkoutLogger({
         <button type="button" onClick={logAllCurrentSets} className="w-full mb-3 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "var(--brand-primary)" }}>Check all sets complete</button></div>
 
         {/* Bottom controls */}
-        <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", display: kbVV ? "none" : undefined }}>
+        <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", display: (kbVV || typing) ? "none" : undefined }}>
           
           {/* Trainer AI note */}
           {isTrainerSession && (
@@ -1394,7 +1407,7 @@ export default function WorkoutLogger({
             )}
           </div>
         </div>
-        <div className="flex-shrink-0 flex" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0c1626", paddingBottom: "env(safe-area-inset-bottom)", display: kbVV ? "none" : undefined }}>
+        <div className="flex-shrink-0 flex" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0c1626", paddingBottom: "env(safe-area-inset-bottom)", display: (kbVV || typing) ? "none" : undefined }}>
           {(isTrainerSession
             ? [
                 { href: "/home", icon: "ti-home", label: "Home" },
