@@ -641,10 +641,20 @@ export default function WorkoutLogger({
     vp.addEventListener("scroll", onVV);
     return () => { vp.removeEventListener("resize", onVV); vp.removeEventListener("scroll", onVV); };
   }, [sessionMode]);
+  const focusedInputRef = useRef<HTMLInputElement | null>(null);
   const focusScroll = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     const el = e.currentTarget;
+    focusedInputRef.current = el;
     setTimeout(() => { try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (_e) {} }, 130);
   }, []);
+  // When the keyboard opens (kbVV becomes set) the layout settles a beat later; re-center the
+  // focused input so it clears the keyboard even for lower set rows. Isolated; revert = remove.
+  useEffect(() => {
+    if (!kbVV || !focusedInputRef.current) return;
+    const el = focusedInputRef.current;
+    const t = setTimeout(() => { try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (_e) {} }, 80);
+    return () => clearTimeout(t);
+  }, [kbVV]);
   // TEMP: owner-only keyboard diagnostic HUD gate. Only the account owner renders it; clients never do.
   const [kbDebug, setKbDebug] = useState(false);
   useEffect(() => {
@@ -1187,7 +1197,7 @@ export default function WorkoutLogger({
         </div>
 
         {/* Exercise header */}
-        <div className="px-5 mb-4 flex-shrink-0">
+        <div className="px-5 mb-4 flex-shrink-0" style={{ display: kbVV ? "none" : undefined }}>
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "var(--brand-primary)" }}>
