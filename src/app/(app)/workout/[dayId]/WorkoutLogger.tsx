@@ -593,6 +593,28 @@ export default function WorkoutLogger({
   const [localSections, setLocalSections] = useState<Section[]>(sections);
   const [swapTargetPe, setSwapTargetPe] = useState<PrescribedExercise | null>(null);
 
+  // --- Keyboard-aware session logger: when the on-screen keyboard opens the visual viewport
+  // shrinks but a position:fixed overlay does not, so the active input + bottom bars end up
+  // behind the keyboard. Bind the fixed logger to the visual viewport and center the focused
+  // input above it. Isolated; no-ops on desktop / where unsupported. Revert = remove this block. ---
+  const [kbVV, setKbVV] = useState<{ top: number; height: number } | null>(null);
+  useEffect(() => {
+    const vp = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vp || !sessionMode) { setKbVV(null); return; }
+    const onVV = () => {
+      const covered = window.innerHeight - vp.height;
+      setKbVV(covered > 120 ? { top: vp.offsetTop, height: vp.height } : null);
+    };
+    onVV();
+    vp.addEventListener("resize", onVV);
+    vp.addEventListener("scroll", onVV);
+    return () => { vp.removeEventListener("resize", onVV); vp.removeEventListener("scroll", onVV); };
+  }, [sessionMode]);
+  const focusScroll = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    const el = e.currentTarget;
+    setTimeout(() => { try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (_e) {} }, 130);
+  }, []);
+
   // --- Auto-save / resume draft: persists logged sets so leaving the browser never loses progress ---
   const __draftKey = `symmetry_wl_${clientId || 'me'}_${day?.id || 'day'}_${isTrainerSession ? 't' : 'c'}`;
   // The same physical workout (same client + day) can be entered two ways — a trainer
@@ -1074,7 +1096,7 @@ export default function WorkoutLogger({
     const saveFields = async (nf: string[]) => { setFieldCfg(prev => ({ ...prev, [currentExercise.id]: nf })); try { await supabase.from("prescribed_exercises").update({ tracked_fields: nf }).eq("id", currentExercise.id); } catch {} };
 
     return (
-      <div className="fixed inset-0 flex flex-col z-[999]" style={{ background: "var(--session-bg)" }}>
+      <div className="fixed inset-0 flex flex-col z-[999]" style={{ background: "var(--session-bg)", ...(kbVV ? { top: kbVV.top, height: kbVV.height, bottom: "auto" } : {}) }}>
         {/* Set-pop + PR-glow overlay (pointer-events:none, cannot block logging). Revert = remove this line. */}
         <SetFeedback sets={sets} prevByPe={prevByPe} />
         {/* Keep the phone screen awake during an active session. Isolated; no-ops where unsupported. Revert = remove this line. */}
@@ -1227,7 +1249,7 @@ export default function WorkoutLogger({
             <div key={si} className="flex items-center gap-1.5 mb-1">
               <div className="w-8 text-center text-sm font-bold"
                 style={{ color: setEntry.done ? "#22c55e" : "rgba(255,255,255,0.25)" }}>S{si + 1}</div>
-              {xFields.includes("weight") && (<input type="text" value={setEntry.weight}
+              {xFields.includes("weight") && (<input type="text" value={setEntry.weight} onFocus={focusScroll}
                 onChange={e => updateSet(currentExercise.id, si, "weight", e.target.value)}
                 disabled={setEntry.done} placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
@@ -1236,7 +1258,7 @@ export default function WorkoutLogger({
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="decimal" />)}
-              {xFields.includes("reps") && (<input type="text" value={setEntry.reps}
+              {xFields.includes("reps") && (<input type="text" value={setEntry.reps} onFocus={focusScroll}
                 onChange={e => updateSet(currentExercise.id, si, "reps", e.target.value)}
                 disabled={setEntry.done} placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
