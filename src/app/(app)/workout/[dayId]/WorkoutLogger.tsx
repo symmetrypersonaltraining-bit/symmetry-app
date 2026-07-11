@@ -551,6 +551,37 @@ function VideoModal({ url, onClose }: { url: string; onClose: () => void }) {
   );
 }
 
+// --- TEMP owner-only keyboard diagnostic HUD. Renders live viewport/input geometry so the
+// real cause of the on-screen-keyboard overlap can be confirmed on the actual device.
+// Owner-gated (only the account owner sees it); clients never do. Remove once cause is confirmed. ---
+function KbDebugHud() {
+  const [txt, setTxt] = useState("kb-hud…");
+  useEffect(() => {
+    const read = () => {
+      const vv = typeof window !== "undefined" ? window.visualViewport : null;
+      const ae = document.activeElement as HTMLElement | null;
+      const aeR = ae && ae.getBoundingClientRect ? ae.getBoundingClientRect() : null;
+      const co = document.querySelector("[data-session-root]");
+      const coR = co ? co.getBoundingClientRect() : null;
+      const r = (n: number) => Math.round(n);
+      setTxt(
+        `iH ${r(window.innerHeight)}  vvH ${vv ? r(vv.height) : "-"}  vvTop ${vv ? r(vv.offsetTop) : "-"}  scrollY ${r(window.scrollY)}\n` +
+        `covered ${vv ? r(window.innerHeight - vv.height) : "-"}  container ${coR ? r(coR.top) + "→" + r(coR.bottom) : "-"}\n` +
+        `focus ${ae ? ae.tagName + (ae.getAttribute("inputmode") ? "/" + ae.getAttribute("inputmode") : "") : "-"}  rect ${aeR ? r(aeR.top) + "→" + r(aeR.bottom) : "-"}`
+      );
+    };
+    read();
+    const id = setInterval(read, 200);
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (vv) { vv.addEventListener("resize", read); vv.addEventListener("scroll", read); }
+    window.addEventListener("focusin", read);
+    return () => { clearInterval(id); if (vv) { vv.removeEventListener("resize", read); vv.removeEventListener("scroll", read); } window.removeEventListener("focusin", read); };
+  }, []);
+  return (
+    <div style={{ position: "fixed", top: 0, left: 0, zIndex: 2147483647, background: "rgba(0,0,0,0.85)", color: "#39ff14", font: "10px/1.3 monospace", padding: "3px 6px", whiteSpace: "pre", pointerEvents: "none", maxWidth: "78vw", borderBottomRightRadius: 6 }}>{txt}</div>
+  );
+}
+
 export default function WorkoutLogger({
   day, phase, program, sections, clientId, clientName, isTrainerSession,
   existingLogId, existingSetLogs,
@@ -613,6 +644,15 @@ export default function WorkoutLogger({
   const focusScroll = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     const el = e.currentTarget;
     setTimeout(() => { try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (_e) {} }, 130);
+  }, []);
+  // TEMP: owner-only keyboard diagnostic HUD gate. Only the account owner renders it; clients never do.
+  const [kbDebug, setKbDebug] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (alive && data && data.user && data.user.email === "symmetrypersonaltraining@gmail.com") setKbDebug(true);
+    }).catch(() => {});
+    return () => { alive = false; };
   }, []);
 
   // --- Auto-save / resume draft: persists logged sets so leaving the browser never loses progress ---
@@ -1096,9 +1136,10 @@ export default function WorkoutLogger({
     const saveFields = async (nf: string[]) => { setFieldCfg(prev => ({ ...prev, [currentExercise.id]: nf })); try { await supabase.from("prescribed_exercises").update({ tracked_fields: nf }).eq("id", currentExercise.id); } catch {} };
 
     return (
-      <div className="fixed inset-0 flex flex-col z-[999]" style={{ background: "var(--session-bg)", ...(kbVV ? { top: kbVV.top, height: kbVV.height, bottom: "auto" } : {}) }}>
+      <div data-session-root className="fixed inset-0 flex flex-col z-[999]" style={{ background: "var(--session-bg)", ...(kbVV ? { top: kbVV.top, height: kbVV.height, bottom: "auto" } : {}) }}>
         {/* Set-pop + PR-glow overlay (pointer-events:none, cannot block logging). Revert = remove this line. */}
         <SetFeedback sets={sets} prevByPe={prevByPe} />
+        {kbDebug && <KbDebugHud />}
         {/* Keep the phone screen awake during an active session. Isolated; no-ops where unsupported. Revert = remove this line. */}
         <WakeLock active={sessionMode} />
         {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
