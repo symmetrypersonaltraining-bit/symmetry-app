@@ -84,7 +84,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
       <button onClick={openSheet} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 16px", borderRadius: 999, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700, background: "var(--brand-primary, #7c9cf5)", color: "#fff" }}>{label}</button>
       {open && (
         <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--brand-surface, #ffffff)", color: "var(--brand-text, #1c2440)", width: "100%", maxWidth: 480, borderRadius: "20px 20px 0 0", padding: 16, maxHeight: "80vh", overflowY: "auto" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--brand-surface, #ffffff)", color: "var(--brand-text, #1c2440)", width: "100%", maxWidth: 480, borderRadius: "20px 20px 0 0", padding: 16, paddingBottom: "calc(16px + env(safe-area-inset-bottom))", maxHeight: "85vh", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 800 }}>Add a workout</div>
               <button onClick={() => setOpen(false)} style={{ border: "none", background: "transparent", fontSize: 13, cursor: "pointer", color: "inherit", opacity: 0.6 }}>Close</button>
