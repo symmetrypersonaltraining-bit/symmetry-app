@@ -448,12 +448,20 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const [photoResult,  setPhotoResult]  = useState<string | null>(null);
   const [offPlanNotes, setOffPlanNotes] = useState("");
 
-  const [selectedDate, setSelectedDate] = useState(today);
+  // Restore the last viewed date so navigating away + Back doesn't reset to today.
+  const [selectedDate, setSelectedDate] = useState(() => {
+    try {
+      if (typeof window === "undefined") return today;
+      const saved = sessionStorage.getItem("sym:nutrition:date:" + clientId);
+      return saved && /^\d{4}-\d{2}-\d{2}$/.test(saved) ? saved : today;
+    } catch { return today; }
+  });
   const [tab, setTab] = useState<"plan" | "quick">(mealPlan ? "plan" : "quick");
   function shiftDate(s: string, delta: number) { const [y,m,d]=s.split("-").map(Number); const dt=new Date(y, m-1, d); dt.setDate(dt.getDate()+delta); const mm=String(dt.getMonth()+1).padStart(2,"0"); const dd=String(dt.getDate()).padStart(2,"0"); return dt.getFullYear()+"-"+mm+"-"+dd; }
   function formatNutritionDate(s: string) { const [y,m,d]=s.split("-").map(Number); const dt=new Date(y, m-1, d); return dt.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}); }
   useEffect(() => {
     let active = true;
+    try { sessionStorage.setItem("sym:nutrition:date:" + clientId, selectedDate); } catch { /* noop */ }
     (async () => {
       const { data } = await supabase.from("meal_adherence_logs").select("*").eq("client_id", clientId).eq("log_date", selectedDate);
       if (!active) return;
