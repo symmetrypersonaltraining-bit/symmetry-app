@@ -44,7 +44,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
         }
       }
     }
-    const shared = await supabase.from("days").select("id, label").eq("swappable", true).order("label");
+    const shared = await supabase.from("days").select("id, label").order("label").limit(400); // full library (Dustin 7/13)
     for (const s of ((shared.data as LibDay[]) || [])) if (!days.find((d) => d.id === s.id)) days.push(s);
     setLib(days);
     setLoading(false);

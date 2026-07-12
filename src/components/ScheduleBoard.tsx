@@ -74,6 +74,20 @@ export default function ScheduleBoard({
   const [movePick, setMovePick] = useState<{ id: string; label: string } | null>(null);
   const [pickDate, setPickDate] = useState<string>(today);
   const [showPast, setShowPast] = useState(false);
+  // Full workout library for swap-in (Dustin 7/13: clients can move/add/swap from full library)
+  const [libDays, setLibDays] = useState<{ id: string; label: string }[] | null>(null);
+  const [libQ, setLibQ] = useState("");
+  useEffect(() => {
+    if (!movePick || libDays) return;
+    (async () => {
+      try {
+        const supabase: any = createClient();
+        const { data } = await supabase.from("days").select("id, label").order("label").limit(400);
+        setLibDays((data as { id: string; label: string }[]) || []);
+      } catch { setLibDays([]); }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movePick]);
 
   const dragRef = useRef<any>(null);
   const activeRef = useRef(false);
@@ -120,6 +134,27 @@ export default function ScheduleBoard({
     } catch {
       setWorkouts((prev) => prev.map((x) => (x.id === id ? { ...x, date: w.date } : x)));
       flash("Couldn't move that workout. Try again.");
+    }
+  }
+
+  // Replace a scheduled workout with a different day from the full library.
+  // Only day_id changes; date/position/history untouched. Completed + Peak Week locked.
+  async function replaceWorkout(id: string, day: { id: string; label: string }) {
+    const w = workouts.find((x) => x.id === id);
+    if (!w) return;
+    if (isLockedDate(w.date)) { flash("Peak Week workouts are locked."); return; }
+    if (w.status === "completed") { flash("Can't replace a completed workout."); return; }
+    const prevLabel = w.label; const prevDayId = w.dayId;
+    setWorkouts((p) => p.map((x) => (x.id === id ? { ...x, label: day.label, dayId: day.id } : x)));
+    try {
+      const supabase: any = createClient();
+      const { error } = await supabase.from("scheduled_workouts").update({ day_id: day.id }).eq("id", id);
+      if (error) throw error;
+      flash("Swapped in ✓");
+      router.refresh();
+    } catch {
+      setWorkouts((p) => p.map((x) => (x.id === id ? { ...x, label: prevLabel, dayId: prevDayId } : x)));
+      flash("Couldn't swap that workout. Try again.");
     }
   }
 
@@ -448,6 +483,22 @@ export default function ScheduleBoard({
                 </div>
               );
             })()}
+            {libDays && libDays.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--brand-text-secondary)", marginBottom: 6 }}>Or swap in a workout from the library:</div>
+                <input value={libQ} onChange={(e) => setLibQ(e.target.value)} placeholder="Search library..."
+                  style={{ width: "100%", padding: "9px 10px", borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-bg)", color: "var(--brand-text)", fontSize: 12.5, marginBottom: 6, fontFamily: "inherit", boxSizing: "border-box" }} />
+                <div style={{ maxHeight: 150, overflowY: "auto" }}>
+                  {libDays.filter((d) => !libQ.trim() || d.label.toLowerCase().includes(libQ.trim().toLowerCase())).slice(0, 40).map((d) => (
+                    <button key={d.id} onClick={() => { replaceWorkout(movePick.id, d); setMovePick(null); }}
+                      style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "9px 10px", marginBottom: 5, borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-bg)", cursor: "pointer", textAlign: "left" }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--brand-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{d.label}</span>
+                      <span style={{ fontSize: 11, color: "var(--brand-primary)", flexShrink: 0, fontWeight: 700 }}>swap in</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <button
               onClick={() => { const w = workouts.find((x) => x.id === movePick.id); setMovePick(null); if (w) removeWorkout(w); }}
               style={{ marginTop: 12, width: "100%", background: "transparent", border: "none", color: "#ef4444", fontWeight: 700, fontSize: 13, cursor: "pointer", padding: "6px 0" }}
