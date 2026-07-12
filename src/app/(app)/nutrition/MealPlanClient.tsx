@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import PlanRangeView from "./PlanRangeView";
 
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
@@ -461,6 +462,16 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     } catch { return today; }
   });
   const [tab, setTab] = useState<"plan" | "quick">(mealPlan ? "plan" : "quick");
+  // Forward plan-range view (Day / 1wk / 4wks / 8wks / Custom) — restored across Back navigation.
+  const [planRange, setPlanRange] = useState<"day" | "1w" | "4w" | "8w" | "custom">(() => {
+    try {
+      if (typeof window === "undefined") return "day";
+      const saved = sessionStorage.getItem("sym:nutrition:range:" + clientId);
+      return saved === "1w" || saved === "4w" || saved === "8w" ? (saved as "1w" | "4w" | "8w") : "day";
+    } catch { return "day"; }
+  });
+  const [customEnd, setCustomEnd] = useState<string>("");
+  useEffect(() => { try { sessionStorage.setItem("sym:nutrition:range:" + clientId, planRange); } catch { /* noop */ } }, [planRange, clientId]);
   function shiftDate(s: string, delta: number) { const [y,m,d]=s.split("-").map(Number); const dt=new Date(y, m-1, d); dt.setDate(dt.getDate()+delta); const mm=String(dt.getMonth()+1).padStart(2,"0"); const dd=String(dt.getDate()).padStart(2,"0"); return dt.getFullYear()+"-"+mm+"-"+dd; }
   function formatNutritionDate(s: string) { const [y,m,d]=s.split("-").map(Number); const dt=new Date(y, m-1, d); return dt.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}); }
   useEffect(() => {
@@ -910,9 +921,32 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       {/* === WITH MEAL PLAN === */}
       {tab === "plan" && mealPlan && (
         <>
+          {/* Plan range selector — view the plan forward across 1/4/8 weeks or a custom window */}
+          <div style={{ display: "flex", gap: 4, margin: "12px 16px 0" }}>
+            {([["day", "Day"], ["1w", "1 wk"], ["4w", "4 wks"], ["8w", "8 wks"], ["custom", "Custom"]] as [string, string][]).map(([k, lab]) => (
+              <button key={k} onClick={() => setPlanRange(k as "day" | "1w" | "4w" | "8w" | "custom")}
+                style={{ flex: 1, padding: "6px 4px", borderRadius: 999, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, background: planRange === k ? "var(--brand-primary)" : "rgba(127,140,170,0.14)", color: planRange === k ? "#fff" : "var(--brand-text)" }}>
+                {lab}
+              </button>
+            ))}
+          </div>
+          {planRange === "custom" && (
+            <div style={{ display: "flex", gap: 8, margin: "8px 16px 0", alignItems: "center" }}>
+              <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Through:</span>
+              <input type="date" value={customEnd} min={selectedDate} onChange={e => setCustomEnd(e.target.value)}
+                className="text-sm px-2 py-1.5 rounded-xl outline-none"
+                style={{ background: "var(--brand-surface)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
+            </div>
+          )}
+          {planRange !== "day" && (planRange !== "custom" || customEnd >= selectedDate) && (
+            <PlanRangeView clientId={clientId} startDate={selectedDate}
+              days={planRange === "1w" ? 7 : planRange === "4w" ? 28 : planRange === "8w" ? 56
+                : Math.max(1, Math.min(120, Math.round((new Date(customEnd + "T12:00:00").getTime() - new Date(selectedDate + "T12:00:00").getTime()) / 86400000) + 1))}
+              basePlan={mealPlan as never} baseTarget={macroTarget as never} />
+          )}
 
           {/* Meal cards */}
-          <div className="px-4 mt-4 space-y-3">
+          <div className="px-4 mt-4 space-y-3" style={{ display: planRange === "day" ? undefined : "none" }}>
             {sortedMeals.map(meal => {
               const mealLog  = logs.find(l => l.meal_id === meal.id);
               const macros   = getMealMacros(meal);
@@ -1086,7 +1120,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
           </div>
 
           {/* 7-day summary */}
-          {weekLogs.length > 0 && (
+          {planRange === "day" && weekLogs.length > 0 && (
             <div className="mx-4 mt-4 rounded-2xl p-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--brand-text-secondary)" }}>This Week</p>
               <div className="flex gap-2 flex-wrap">
