@@ -7,6 +7,7 @@ import Link from "next/link";
 import AssignProgramModal from "./AssignProgramModal";
 import MetricCards from "@/components/MetricCards";
 import PrivateProfilePanel from "@/components/PrivateProfilePanel";
+import AssessmentPanel from "@/components/AssessmentPanel";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
 import ScheduleBoard from "@/components/ScheduleBoard";
 
@@ -780,6 +781,8 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
 
   return (
     <div className="space-y-4">
+      {/* Latest movement assessment (read-only, self-contained) */}
+      <AssessmentPanel clientId={clientId} />
       {saveMsg && (
         <div className="rounded-xl px-4 py-2.5 text-sm font-medium"
           style={{ background: saveMsg === "saved" ? "#22c55e20" : "#ef444420", color: saveMsg === "saved" ? "#16a34a" : "#dc2626", border: `1px solid ${saveMsg === "saved" ? "#22c55e40" : "#ef444440"}` }}>
