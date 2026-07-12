@@ -178,9 +178,40 @@ export default function ScheduleBoard({
     const d = dragRef.current;
     if (!d || d.active) return;
     d.active = true;
-    const g = document.createElement("div");
-    g.textContent = d.label;
-    g.style.cssText = "position:fixed;z-index:9999;pointer-events:none;background:var(--brand-primary);color:#fff;font-weight:700;font-size:12.5px;padding:8px 12px;border-radius:10px;box-shadow:0 8px 22px rgba(20,30,55,.28);max-width:70vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transform:rotate(-1.5deg)";
+    // Drag preview = a clone of the FULL workout card (enlarged) so it's clear
+    // what's being moved, not just the name. Falls back to a text pill if the
+    // clone ever fails (crash-safe).
+    let g: HTMLElement;
+    try {
+      const src = d.tileEl as HTMLElement;
+      const w = src.getBoundingClientRect().width;
+      g = src.cloneNode(true) as HTMLElement;
+      g.querySelectorAll("button").forEach((b) => { (b as HTMLElement).style.pointerEvents = "none"; });
+      g.style.width = w + "px";
+      g.style.margin = "0";
+      g.style.background = "var(--brand-surface)";
+      g.style.opacity = "0.97";
+      g.style.transform = "scale(1.08) rotate(-1.5deg)";
+      g.style.transformOrigin = "top left";
+    } catch {
+      g = document.createElement("div");
+      g.textContent = d.label;
+      g.style.background = "var(--brand-primary)";
+      g.style.color = "#fff";
+      g.style.fontWeight = "700";
+      g.style.fontSize = "12.5px";
+      g.style.padding = "8px 12px";
+      g.style.maxWidth = "70vw";
+      g.style.whiteSpace = "nowrap";
+      g.style.overflow = "hidden";
+      g.style.textOverflow = "ellipsis";
+      g.style.transform = "rotate(-1.5deg)";
+    }
+    g.style.position = "fixed";
+    g.style.zIndex = "9999";
+    g.style.pointerEvents = "none";
+    g.style.borderRadius = "10px";
+    g.style.boxShadow = "0 14px 34px rgba(20,30,55,.34)";
     g.style.left = d.lastX - 40 + "px";
     g.style.top = d.lastY - 44 + "px";
     document.body.appendChild(g);
