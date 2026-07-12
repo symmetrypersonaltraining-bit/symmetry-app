@@ -36,7 +36,8 @@ export default async function AppLayout({
     <div className="min-h-screen" style={{ background: "var(--brand-bg)" }}>
       <RealtimeScheduleSync />
       <div className="pb-20">{children}</div>
-      <div style={{ position: "fixed", top: 10, right: 14, zIndex: 950 }}>
+      {/* Docked assist/feedback: z below every sheet, dock and nav (>=50) so it never covers them */}
+      <div style={{ position: "fixed", top: 10, right: 14, zIndex: 30 }}>
         <HeaderAssist solid />
       </div>
       <SessionDock />
