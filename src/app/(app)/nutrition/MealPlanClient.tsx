@@ -180,10 +180,23 @@ function QuickLog({ clientId, selectedDate, logs, setLogs }: { clientId: string;
   async function insertQuick(row: Record<string, unknown>) {
     setBusy(true);
     try {
-      const { data } = await supabase.from("meal_adherence_logs").insert({
+      const payload: Record<string, unknown> = {
         client_id: clientId, log_date: selectedDate, meal_id: null,
         meal_position: nextQuickPos(logs), adherence: "Off-plan", source: "client", ...row,
-      }).select().single();
+      };
+      // Also persist a structured off_plan_macros JSONB (with a description) so the
+      // nightly rollup / Claude can read what was eaten, not just the est_* fields.
+      if (payload.est_kcal != null && payload.off_plan_macros == null) {
+        payload.off_plan_macros = {
+          kcal: Number(payload.est_kcal) || 0,
+          protein: Number(payload.est_protein) || 0,
+          carbs: Number(payload.est_carbs) || 0,
+          fats: Number(payload.est_fats) || 0,
+          description: (payload.off_plan_details as string) || "Off-plan meal",
+          estimated: true,
+        };
+      }
+      const { data } = await supabase.from("meal_adherence_logs").insert(payload).select().single();
       if (data) setLogs((prev) => [...prev, data as AdherenceLog]);
     } finally { setBusy(false); }
   }
@@ -572,14 +585,22 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     const key = offPlanModal.mealId || `pos-${offPlanModal.position}`;
     setSaving(key);
     try {
+      const kc = offPlanKcal ? parseFloat(offPlanKcal) : null;
+      const pr = offPlanP ? parseFloat(offPlanP) : null;
+      const cb = offPlanC ? parseFloat(offPlanC) : null;
+      const ft = offPlanF ? parseFloat(offPlanF) : null;
       const { data } = await supabase.from("meal_adherence_logs").upsert({
         client_id: clientId, log_date: selectedDate, meal_id: offPlanModal.mealId,
         meal_position: offPlanModal.position, adherence: "Off-plan",
         off_plan_details: offPlanDetails || null,
-        est_kcal:    offPlanKcal ? parseFloat(offPlanKcal) : null,
-        est_protein: offPlanP    ? parseFloat(offPlanP)    : null,
-        est_carbs:   offPlanC    ? parseFloat(offPlanC)    : null,
-        est_fats:    offPlanF    ? parseFloat(offPlanF)    : null,
+        est_kcal:    kc,
+        est_protein: pr,
+        est_carbs:   cb,
+        est_fats:    ft,
+        // Structured JSONB (with description) for the nightly rollup / Claude.
+        off_plan_macros: kc != null
+          ? { kcal: kc, protein: pr || 0, carbs: cb || 0, fats: ft || 0, description: offPlanDetails || "Off-plan meal", estimated: true }
+          : null,
         notes: notesMap[offPlanModal.position] || null,
         source: "client",
         photo_url: null,
