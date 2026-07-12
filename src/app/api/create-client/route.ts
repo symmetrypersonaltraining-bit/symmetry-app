@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
       const firstName = name.split(" ")[0];
       const resend = new Resend(resendKey);
       await resend.emails.send({
-        from: "Symmetry Personal Training <noreply@symmetrypersonaltraining.com>",
+        from: "Symmetry Corrective <noreply@symmetrypersonaltraining.com>",
         to: email,
         subject: "You're invited to the Symmetry Training App",
         html: `
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
     <!-- Header -->
     <div style="background: linear-gradient(135deg, #E53935, #b71c1c); padding: 32px 32px 24px; text-align: center;">
       <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">SYMMETRY</h1>
-      <p style="color: rgba(255,255,255,0.8); margin: 4px 0 0; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">Personal Training</p>
+      <p style="color: rgba(255,255,255,0.8); margin: 4px 0 0; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">Corrective</p>
     </div>
     <!-- Body -->
     <div style="padding: 32px;">
@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
     </div>
     <!-- Footer -->
     <div style="background: #f8f8f8; padding: 16px 32px; text-align: center; border-top: 1px solid #eee;">
-      <p style="margin: 0; font-size: 12px; color: #999;">Symmetry Personal Training · Sevens Gym</p>
+      <p style="margin: 0; font-size: 12px; color: #999;">Symmetry Corrective · Sevens Gym</p>
     </div>
   </div>
 </body>

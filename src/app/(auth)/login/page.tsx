@@ -103,7 +103,7 @@ export default function LoginPage() {
           Symmetry
         </h1>
         <p className="text-white/60 text-sm tracking-widest mt-1 uppercase">
-          Personal Training
+          Corrective
         </p>
       </div>
 

@@ -342,7 +342,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
   }
 
   // Client single-thread layout (with Coach / Group Chat toggle + composer)
-  const clientTitle = isGroup ? "Group Chat" : "Symmetry Personal Training";
+  const clientTitle = isGroup ? "Group Chat" : "Symmetry Corrective";
   const pill = (active) => ({ flex: 1, textAlign: "center", padding: "8px 0", borderRadius: 999, textDecoration: "none", fontSize: 13, fontWeight: active ? 800 : 600, background: active ? "var(--brand-primary)" : "var(--brand-surface)", color: active ? "#fff" : "var(--brand-text)", border: "1px solid var(--brand-border)" });
   return (
     <div style={{ background: "var(--brand-bg)", height: "100%", display: "flex", flexDirection: "column" }}>

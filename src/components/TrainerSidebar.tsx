@@ -88,7 +88,7 @@ export default function TrainerSidebar({
           {!collapsed && (
             <div className="min-w-0">
               <div className="text-white font-semibold text-sm leading-tight">Symmetry</div>
-              <div className="text-white/60 text-[10px] tracking-widest uppercase">Personal Training</div>
+              <div className="text-white/60 text-[10px] tracking-widest uppercase">Corrective</div>
             </div>
           )}
         </Link>

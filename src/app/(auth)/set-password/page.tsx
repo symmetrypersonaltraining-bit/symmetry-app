@@ -100,7 +100,7 @@ export default function SetPasswordPage() {
       <div className="flex flex-col items-center pt-16 pb-10 px-6">
         <Logo size={72} color="white" />
         <h1 className="text-2xl font-medium text-white mt-4 tracking-wide">Symmetry</h1>
-        <p className="text-white/60 text-sm tracking-widest mt-1 uppercase">Personal Training</p>
+        <p className="text-white/60 text-sm tracking-widest mt-1 uppercase">Corrective</p>
       </div>
 
       {/* Card */}

@@ -303,7 +303,7 @@ function HrMemo({ daysOut, onDismiss }: ScreenProps) {
         }}
       >
         <div style={{ textAlign: "center", borderBottom: "2px solid #222", paddingBottom: 14, marginBottom: 18 }}>
-          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 3, textTransform: "uppercase", color: "#222" }}>Symmetry Personal Training</div>
+          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 3, textTransform: "uppercase", color: "#222" }}>Symmetry Corrective</div>
           <div style={{ fontSize: 9, color: "#888", letterSpacing: 2, textTransform: "uppercase", marginTop: 2 }}>Princeton, TX · Internal Memorandum</div>
         </div>
         <div style={{ fontSize: 10, color: "#555", marginBottom: 14, lineHeight: 2 }}>

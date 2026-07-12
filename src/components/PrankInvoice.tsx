@@ -89,7 +89,7 @@ export default function PrankInvoice() {
           <div style={{ textAlign: "center", fontSize: 40, animation: "prankPulse 0.5s infinite" }}>{SIREN + SIREN + SIREN}</div>
           <div style={{ textAlign: "center", fontWeight: 900, fontSize: 26, color: "#ef4444", letterSpacing: 1 }}>FINAL NOTICE</div>
           <div style={{ textAlign: "center", fontWeight: 700, fontSize: 13, color: "#b91c1c" }}>(this is also the first notice)</div>
-          <div style={{ textAlign: "center", margin: "10px 0", fontSize: 15, fontWeight: 600 }}>SYMMETRY PERSONAL TRAINING {"—"} COLLECTIONS DIVISION{"™"}</div>
+          <div style={{ textAlign: "center", margin: "10px 0", fontSize: 15, fontWeight: 600 }}>SYMMETRY CORRECTIVE {"—"} COLLECTIONS DIVISION{"™"}</div>
           <div style={{ borderTop: "2px dashed #ddd", margin: "10px 0" }} />
           {LINES[who].map((row) => (
             <div key={row[0]} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, padding: "4px 0" }}>

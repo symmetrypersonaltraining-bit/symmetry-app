@@ -78,7 +78,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest"
               style={{ color: "var(--brand-primary)" }}>Symmetry</p>
-            <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Personal Training</p>
+            <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Corrective</p>
           </div>
         </div>
 

@@ -6,7 +6,7 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export async function POST(req: NextRequest) {
   const data = await req.json();
   
-  const prompt = `You are Dustin Gautreaux's AI programming assistant for Symmetry Personal Training. Based on this client assessment, recommend a starting program and write a brief assessment summary.
+  const prompt = `You are Dustin Gautreaux's AI programming assistant for Symmetry Corrective. Based on this client assessment, recommend a starting program and write a brief assessment summary.
 
 PROGRAMMING PHILOSOPHY (NASM Corrective, internal only - never use this language with clients):
 - Movement assessment drives corrective backbone

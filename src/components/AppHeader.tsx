@@ -30,7 +30,7 @@ export default function AppHeader({
         <div className="flex-1">
           <div className="text-white font-medium text-base">Symmetry</div>
           <div className="text-white/60 text-xs tracking-widest uppercase">
-            Personal Training
+            Corrective
           </div>
         </div>
         <HeaderAssist />

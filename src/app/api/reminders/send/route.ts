@@ -12,7 +12,7 @@ async function sendEmail(to: string, subject: string, html: string) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "Symmetry Personal Training <onboarding@resend.dev>",
+      from: "Symmetry Corrective <onboarding@resend.dev>",
       to: [to],
       subject,
       html,
@@ -26,13 +26,13 @@ function reminderEmailHtml(clientName: string, amountDue: number, dueDate: strin
   return `
 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:24px">
   <div style="background:#0F4C81;border-radius:12px 12px 0 0;padding:24px;text-align:center">
-    <h1 style="color:#fff;margin:0;font-size:22px;font-weight:700">Symmetry Personal Training</h1>
+    <h1 style="color:#fff;margin:0;font-size:22px;font-weight:700">Symmetry Corrective</h1>
     <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:14px">Payment Reminder</p>
   </div>
   <div style="background:#fff;border:1px solid #C8D8EC;border-top:none;border-radius:0 0 12px 12px;padding:24px">
     <p style="color:#0D1B2E;font-size:16px;margin:0 0 16px">Hi ${clientName},</p>
     <p style="color:#4E6080;font-size:15px;margin:0 0 20px">
-      This is a friendly reminder that a payment is due from your Symmetry Personal Training account.
+      This is a friendly reminder that a payment is due from your Symmetry Corrective account.
     </p>
     <div style="background:#EDF2F7;border-radius:8px;padding:16px;margin:0 0 20px">
       <div style="display:flex;justify-content:space-between;margin-bottom:8px">
@@ -50,7 +50,7 @@ function reminderEmailHtml(clientName: string, amountDue: number, dueDate: strin
     </p>
   </div>
   <p style="color:#4E6080;font-size:12px;text-align:center;margin:16px 0 0">
-    © ${new Date().getFullYear()} Symmetry Personal Training
+    © ${new Date().getFullYear()} Symmetry Corrective
   </p>
 </div>`;
 }

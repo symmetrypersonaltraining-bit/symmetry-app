@@ -113,7 +113,7 @@ export default async function ProfilePage() {
 
         {/* Version */}
         <p className="text-center text-xs mt-6 mb-4" style={{ color: "#C8D8EC" }}>
-          Symmetry Personal Training \u00b7 v0.1.0
+          Symmetry Corrective \u00b7 v0.1.0
         </p>
       </div>
     </>

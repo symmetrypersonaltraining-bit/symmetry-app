@@ -9,7 +9,7 @@ import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "Symmetry Personal Training",
+  title: "Symmetry Corrective",
   description: "Train smarter. Move better. Live stronger.",
   manifest: "/manifest.json",
   appleWebApp: {
