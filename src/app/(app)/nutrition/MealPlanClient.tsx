@@ -763,9 +763,9 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
       {/* Off-Plan Modal */}
       {offPlanModal && (
-        <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
+        <div className="fixed inset-0 z-[1100] flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
           onClick={() => setOffPlanModal(null)}>
-          <div className="w-full rounded-t-3xl p-5 pb-10" style={{ background: "var(--brand-surface)" }}
+          <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)", maxHeight: "85vh", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: "calc(28px + env(safe-area-inset-bottom))" }}
             onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
             <div className="flex items-center justify-between mb-1">
@@ -830,9 +830,9 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
       {/* Adjust-amounts sheet (per-day override; the trainer's plan is never edited) */}
       {amountsModal && (
-        <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
+        <div className="fixed inset-0 z-[1100] flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
           onClick={() => setAmountsModal(null)}>
-          <div className="w-full rounded-t-3xl p-5 pb-10" style={{ background: "var(--brand-surface)" }}
+          <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)", maxHeight: "85vh", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: "calc(28px + env(safe-area-inset-bottom))" }}
             onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
             <div className="flex items-center justify-between mb-1">
