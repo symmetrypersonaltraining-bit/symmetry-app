@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
-// âââ Types ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface MetricCardsProps {
   clientId: string;
@@ -65,7 +65,7 @@ const RANGES = [
   { label: '8w',  days: 56 },
 ];
 
-// âââ Date helpers (America/Chicago) âââââââââââââââââââââââââââââââââââââââââââ
+// ─── Date helpers (America/Chicago) ───────────────────────────────────────────
 
 function centralToday(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
@@ -77,7 +77,7 @@ function isoDaysAgo(base: string, n: number): string {
   return d.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 }
 
-// âââ Animated SVG Sparkline âââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Animated SVG Sparkline ───────────────────────────────────────────────────
 
 function Sparkline({ data, color }: { data: number[]; color: string }) {
   const pathRef = useRef<SVGPathElement>(null);
@@ -162,7 +162,7 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-// âââ Expanded Panel with Chart.js âââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Expanded Panel with Chart.js ─────────────────────────────────────────────
 
 function MacroLine({ values, color, index, width, height }: { values: number[]; color: string; index: number; width: number; height: number }) {
   const pathRef = useRef<SVGPathElement>(null);
@@ -220,7 +220,7 @@ function RingGauge({ value, goal, color, label, unit }: { value: number; goal: n
   const R = 30;
   const CIRC = 2 * Math.PI * R;
   const pct = goal > 0 ? Math.min(1, value / goal) : 0;
-  const pctLabel = goal > 0 ? Math.round((value / goal) * 100) + '%' : 'â';
+  const pctLabel = goal > 0 ? Math.round((value / goal) * 100) + '%' : '—';
   const offset = mounted ? CIRC * (1 - pct) : CIRC;
   return (
     <div style={{ textAlign: 'center', flex: 1, minWidth: 68 }}>
@@ -260,9 +260,9 @@ function MacrosCard({ data, onClose, targets }: { data: DailyMacro[]; onClose: (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
         <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--brand-text)' }}>Calories &amp; Macros</span>
         <span style={{ fontSize: 11, color: 'var(--brand-text-secondary)' }}>
-          {hasData ? (data.length + ' day' + (data.length === 1 ? '' : 's') + ' logged Â· daily avg') : 'No nutrition logged this range'}
+          {hasData ? (data.length + ' day' + (data.length === 1 ? '' : 's') + ' logged · daily avg') : 'No nutrition logged this range'}
         </span>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--brand-text-secondary)', lineHeight: 1, padding: 4 }}>â</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--brand-text-secondary)', lineHeight: 1, padding: 4 }}>✕</button>
       </div>
 
       <div style={{ display: 'flex', gap: 6, justifyContent: 'space-around' }}>
@@ -436,7 +436,7 @@ function ExpandedPanel({
           )}
         </div>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--brand-text-secondary)', lineHeight: 1, padding: 4 }}>
-          â
+          ✕
         </button>
       </div>
 
@@ -504,7 +504,7 @@ function ExpandedPanel({
                   color: 'white', fontWeight: 700, fontSize: 13, cursor: !logValue ? 'default' : 'pointer',
                   opacity: !logValue ? 0.5 : 1, transition: 'background 0.2s',
                 }}>
-                  {saveSuccess ? 'â Saved!' : saving ? 'Savingâ¦' : 'Save'}
+                  {saveSuccess ? '✓ Saved!' : saving ? 'Saving…' : 'Save'}
                 </button>
               </div>
             </div>
@@ -513,7 +513,7 @@ function ExpandedPanel({
   );
 }
 
-// âââ Main Component âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function MetricCards({ clientId }: MetricCardsProps) {
   const [allMetrics, setAllMetrics] = useState<MetricRow[]>([]);
@@ -674,9 +674,9 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
 
   const getSummary = (key: string) => {
     if (key === 'workouts') return { current: String(workoutCount), change: null as string | null, changeNum: null as number | null };
-    if (key === 'streak') return { current: streakDays > 0 ? String(streakDays) : 'â', change: null as string | null, changeNum: null as number | null };
+    if (key === 'streak') return { current: streakDays > 0 ? String(streakDays) : '—', change: null as string | null, changeNum: null as number | null };
     const pts = getDataPoints(key);
-    if (pts.length === 0) return { current: 'â', change: null as string | null, changeNum: null as number | null };
+    if (pts.length === 0) return { current: '—', change: null as string | null, changeNum: null as number | null };
     const cur = pts[pts.length - 1].value;
     const start = pts[0].value;
     const diff = cur - start;
@@ -704,7 +704,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
         }
       `}</style>
 
-      {/* Global range control â drives every chart at once */}
+      {/* Global range control — drives every chart at once */}
       <div style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {RANGES.map((r, i) => (
@@ -801,7 +801,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
                     <span style={{ width: 22, fontSize: 9, fontWeight: 700, color: b.color }}>{b.label}</span>
                     <div style={{ flex: 1, height: 14, borderRadius: 7, background: 'var(--brand-bg)', position: 'relative', overflow: 'hidden' }}>
                       <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: Math.min(100, Math.round(pct * 100)) + '%', background: b.color, borderRadius: 7, transition: 'width 0.6s ease' }} />
-                      <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: 'var(--brand-text)' }}>{tgt > 0 ? Math.round(pct * 100) + '%' : 'â'}</span>
+                      <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: 'var(--brand-text)' }}>{tgt > 0 ? Math.round(pct * 100) + '%' : '—'}</span>
                     </div>
                     <span style={{ fontSize: 8, fontWeight: 600, color: 'var(--brand-text-secondary)', minWidth: 42, textAlign: 'right' }}>{Math.round(avgv)}/{Math.round(tgt)}{b.unit}</span>
                   </div>
