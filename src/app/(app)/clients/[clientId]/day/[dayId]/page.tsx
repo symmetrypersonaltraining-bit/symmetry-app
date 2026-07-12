@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import WorkoutDayEditor from "./WorkoutDayEditor";
+import ClientProfileNav from "@/components/ClientProfileNav";
 
 export default async function WorkoutDayEditPage({
   params,
@@ -110,6 +111,7 @@ export default async function WorkoutDayEditPage({
               Launch Session
             </Link>
       </div>
+      <ClientProfileNav clientId={clientId} active="program" />
       <div className="p-4">
         <WorkoutDayEditor
           dayId={dayId}
