@@ -110,7 +110,7 @@ export default function CelebrationScreen({
 
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const seed = hashStr(String(clientId || "") + today);
-  const variant = seed % 20;
+  const variant = seed % 25;
 
   const [tapIdx, setTapIdx] = useState(0);
   const [reroll, setReroll] = useState(0);
@@ -453,7 +453,7 @@ export default function CelebrationScreen({
         <div style={{ color: "#d9b183", fontSize: 11, marginTop: 8 }}>Pairs beautifully with an enormous dinner.</div>
       </div>
     );
-  } else {
+  } else if (variant === 19) {
     content = (
       <div style={{ ...bigCard, background: "#4d1233" }}>
         <div style={{ color: "#ff8fc0", fontSize: 24, fontWeight: 900 }}>IT&rsquo;S A MATCH! 💘</div>
@@ -463,6 +463,156 @@ export default function CelebrationScreen({
         </div>
         <div style={{ color: "#ffd3e8", fontSize: 13.5, lineHeight: 1.6 }}>
           {firstName + " and Results have liked each other. Results says: \"I do not usually show up this fast, but " + setCount + " sets? I will make an exception.\""}
+        </div>
+      </div>
+    );
+  } else if (variant === 20) {
+    content = (
+      <div style={{ ...bigCard, background: "#141024" }}>
+        <div style={{ width: 240, borderRadius: 16, padding: 4, background: "linear-gradient(120deg,#ffe14d,#ff7ae0,#5ef2c5,#7c9cf5,#ffe14d)", backgroundSize: "300% 300%", animation: "cs-shimmer 3s linear infinite", boxShadow: "0 12px 30px rgba(0,0,0,.5)" }}>
+          <div style={{ background: "#1a1330", borderRadius: 13, padding: 14, color: "#fff" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 800, letterSpacing: 1, color: "#ffe14d" }}>
+              <span>★ LEGENDARY ★</span>
+              <span>HP {vStr}</span>
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 900, margin: "6px 0 2px" }}>THE {firstName.toUpperCase()}</div>
+            <div style={{ fontSize: 9.5, color: "#b9a9ef", letterSpacing: 1, textTransform: "uppercase" }}>Apex Lifter · Gravity-Type</div>
+            <div style={{ background: "#0d0920", borderRadius: 10, fontSize: 52, padding: "14px 0", margin: "10px 0" }}>💪</div>
+            <div style={{ textAlign: "left", fontSize: 11, lineHeight: 1.7, color: "#d9c9ff" }}>
+              <b style={{ color: "#ffe14d" }}>⚡ MOVE:</b> Skips No Legs — deals {setCount} sets of damage.
+              <br />
+              <b style={{ color: "#5ef2c5" }}>🛡 PASSIVE:</b> Immune to excuses.
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#8f7cc9", marginTop: 10, borderTop: "1px solid #2c2350", paddingTop: 7 }}>
+              <span>#{(seed % 900) + 100}/025</span>
+              <span>RARITY ★★★★★</span>
+              <span>HOLO ✦</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: "var(--brand-text-secondary)", marginTop: 12 }}>Add it to the collection. Gotta lift &rsquo;em all.</div>
+      </div>
+    );
+  } else if (variant === 21) {
+    content = (
+      <div style={{ ...bigCard, background: "#08130d", color: "#fff", padding: 0 }}>
+        <div style={{ width: "100%", background: "#0a1f16", color: "#5ec9a3", fontSize: 11, fontWeight: 800, padding: "7px 0", whiteSpace: "nowrap", overflow: "hidden", borderBottom: "1px solid #16412f" }}>
+          <div style={{ display: "inline-block", animation: "cs-ticker 10s linear infinite" }}>
+            {"$GAINS ▲ +420%   ·   $EXCUSES ▼ -100%   ·   $COUCH ▼ -88%   ·   $GRAVITY ▼ HALTED   ·   $GAINS ▲ +420%   ·   $EXCUSES ▼ -100%   ·   $COUCH ▼ -88%   ·   $GRAVITY ▼ HALTED   ·   "}
+          </div>
+        </div>
+        <div style={{ padding: "18px 16px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1 }}>
+          <div style={{ fontSize: 11, color: "#7bbfa0", letterSpacing: 1 }}>{"NASDAQ: $" + firstName.toUpperCase()}</div>
+          <div style={{ fontSize: 44, fontWeight: 900, color: "#5ec9a3", margin: "4px 0" }}>▲ 420%</div>
+          <div style={{ fontSize: 12, color: "#9fe3c6" }}>
+            Volume traded today: <b>{vStr} lbs</b>
+          </div>
+          <svg viewBox="0 0 200 60" style={{ width: 210, height: 64, margin: "14px 0" }}>
+            <polyline points="0,52 30,48 60,50 90,36 120,30 150,16 200,4" fill="none" stroke="#5ec9a3" strokeWidth={3} />
+            <polygon points="0,52 30,48 60,50 90,36 120,30 150,16 200,4 200,60 0,60" fill="#5ec9a322" />
+          </svg>
+          <div style={{ background: "#0a1f16", border: "1px solid #16412f", borderRadius: 12, padding: "12px 14px", fontSize: 12, lineHeight: 1.6, color: "#bfe6d5", textAlign: "left" }}>
+            <b style={{ color: "#5ec9a3" }}>📈 Analyst note:</b> We are upgrading {firstName} to <b>STRONG BUY</b>. Gravity shorted this position and got margin-called. {setCount} sets of pure bullish momentum.
+          </div>
+        </div>
+      </div>
+    );
+  } else if (variant === 22) {
+    content = (
+      <div style={{ ...bigCard, background: "var(--brand-surface)", color: "var(--brand-text)", justifyContent: "flex-start", padding: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 2 }}>Today&rsquo;s Session</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <div style={{ fontSize: 30, fontWeight: 900, color: "var(--brand-primary)" }}>4.9</div>
+          <div style={{ textAlign: "left" }}>
+            <div style={{ color: "#f5a623", fontSize: 15 }}>★★★★★</div>
+            <div style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>1,204 muscle fibers reviewed</div>
+          </div>
+        </div>
+        <div style={{ width: "100%", textAlign: "left", borderTop: "1px solid var(--brand-border)", paddingTop: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 800 }}>★★★★★ The Crowd</div>
+          <div style={{ fontSize: 11.5, color: "var(--brand-text-secondary)", lineHeight: 1.5, margin: "2px 0 10px" }}>&ldquo;Showed up, hit {setCount} sets, left it all on the floor. 10/10 would spot again.&rdquo;</div>
+          <div style={{ fontSize: 12, fontWeight: 800 }}>★★★★★ Future You</div>
+          <div style={{ fontSize: 11.5, color: "var(--brand-text-secondary)", lineHeight: 1.5, margin: "2px 0 10px" }}>&ldquo;I look great. Thank you for this. — sent from 6 months from now&rdquo;</div>
+          <div style={{ fontSize: 12, fontWeight: 800 }}>
+            ★ Gravity <span style={{ fontSize: 9, background: "#fde", color: "#c0392b", padding: "1px 6px", borderRadius: 20, marginLeft: 4 }}>1 star</span>
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--brand-text-secondary)", lineHeight: 1.5, marginTop: 2 }}>&ldquo;Would not recommend. Kept getting lifted against my will. Reporting to the Department of Downward Forces.&rdquo;</div>
+        </div>
+      </div>
+    );
+  } else if (variant === 23) {
+    content = (
+      <div style={{ ...bigCard, background: "#0b0f17", color: "#fff", justifyContent: "flex-start", padding: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 2 }}>💪 The Muscle Group</div>
+        <div style={{ fontSize: 10, color: "#8ea0be", marginBottom: 12 }}>Chest, Delts, Triceps, Core +3</div>
+        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+          {[
+            ["Chest", "bro. BRO. that last set 😮‍💨"],
+            ["Triceps", "why do we do this to ourselves"],
+            ["Core", "i wasn't even supposed to be here today and i STILL felt that"],
+          ].map(([who, msg]) => (
+            <div key={who} style={{ alignSelf: "flex-start", maxWidth: "82%" }}>
+              <div style={{ fontSize: 9, color: "#8ea0be", marginBottom: 2, paddingLeft: 8 }}>{who}</div>
+              <div style={{ background: "#2a3346", padding: "9px 12px", borderRadius: "14px 14px 14px 4px" }}>{msg}</div>
+            </div>
+          ))}
+          <div style={{ alignSelf: "flex-end", maxWidth: "82%" }}>
+            <div style={{ background: "linear-gradient(135deg,#0EA5E9,#0F4C81)", padding: "9px 12px", borderRadius: "14px 14px 4px 14px" }}>worth it. see you all tomorrow 😤</div>
+          </div>
+          <div style={{ alignSelf: "flex-start", maxWidth: "82%" }}>
+            <div style={{ fontSize: 9, color: "#8ea0be", marginBottom: 2, paddingLeft: 8 }}>Legs</div>
+            <div style={{ background: "#2a3346", padding: "9px 12px", borderRadius: "14px 14px 14px 4px" }}>wait it&rsquo;s not our day right. RIGHT??</div>
+          </div>
+        </div>
+      </div>
+    );
+  } else {
+    content = (
+      <div style={{ ...bigCard, background: "#20304a" }}>
+        <div style={{ background: "#fff", color: "#000", width: 246, padding: "12px 14px", border: "2px solid #000", textAlign: "left", fontFamily: "Arial, Helvetica, sans-serif" }}>
+          <div style={{ fontSize: 26, fontWeight: 900, borderBottom: "9px solid #000", paddingBottom: 2, lineHeight: 1 }}>Gains Facts</div>
+          <div style={{ fontSize: 11, borderBottom: "1px solid #000", padding: "3px 0" }}>1 brutal session per container</div>
+          <div style={{ fontSize: 11, fontWeight: 800, borderBottom: "5px solid #000", padding: "3px 0" }}>Amount Per Workout</div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 800, borderBottom: "1px solid #000", padding: "4px 0" }}>
+            <span>Volume</span>
+            <span>{vStr} lbs</span>
+          </div>
+          <div style={{ textAlign: "right", fontSize: 10, fontWeight: 800, borderBottom: "1px solid #000", padding: "2px 0" }}>% Daily Gains*</div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, borderBottom: "1px solid #000", padding: "4px 0" }}>
+            <span>
+              <b>Sets</b> {setCount}
+            </span>
+            <span>
+              <b>{Math.round((setCount / 12.5) * 100)}%</b>
+            </span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, borderBottom: "1px solid #000", padding: "4px 0" }}>
+            <span>
+              <b>Effort</b> Maxed
+            </span>
+            <span>
+              <b>100%</b>
+            </span>
+          </div>
+          {prCount > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, borderBottom: "1px solid #000", padding: "4px 0" }}>
+              <span>
+                <b>PRs</b> {prCount}
+              </span>
+              <span>
+                <b>🔥</b>
+              </span>
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, borderBottom: "5px solid #000", padding: "4px 0" }}>
+            <span>
+              <b>Excuses</b> 0g
+            </span>
+            <span>
+              <b>0%</b>
+            </span>
+          </div>
+          <div style={{ fontSize: 8.5, paddingTop: 4, lineHeight: 1.35 }}>*Percent Daily Gains based on a diet of consistently showing up. Not a substitute for leg day.</div>
         </div>
       </div>
     );
@@ -513,4 +663,4 @@ const poster: React.CSSProperties = { background: "#f7ecd8", border: "6px double
 const fortuneCard: React.CSSProperties = { background: "#fff", border: "1px solid var(--brand-border)", borderRadius: 4, padding: "12px 16px", fontSize: 13, color: "var(--brand-text)", boxShadow: "0 8px 26px rgba(20,30,55,.08)", maxWidth: 280, lineHeight: 1.6 };
 const ghostBtn: React.CSSProperties = { marginTop: 14, border: "1px solid var(--brand-border)", background: "var(--brand-surface)", color: "var(--brand-text)", borderRadius: 999, padding: "10px 16px", fontSize: 12, fontWeight: 800, cursor: "pointer" };
 const doneBtn: React.CSSProperties = { textAlign: "center", background: "var(--brand-primary)", color: "#fff", borderRadius: 999, padding: "13px 0", fontSize: 14, fontWeight: 800, textDecoration: "none" };
-const CSS = "@keyframes cs-fall{to{transform:translateY(760px) rotate(720deg)}}@keyframes cs-blink{50%{opacity:.3}}@keyframes cs-xp{from{width:6%}to{width:85%}}@keyframes cs-credits{from{transform:translateY(100%)}to{transform:translateY(-100%)}}@keyframes cs-stamp{from{transform:rotate(12deg) scale(3);opacity:0}to{transform:rotate(12deg) scale(1);opacity:.9}}";
+const CSS = "@keyframes cs-fall{to{transform:translateY(760px) rotate(720deg)}}@keyframes cs-blink{50%{opacity:.3}}@keyframes cs-xp{from{width:6%}to{width:85%}}@keyframes cs-credits{from{transform:translateY(100%)}to{transform:translateY(-100%)}}@keyframes cs-stamp{from{transform:rotate(12deg) scale(3);opacity:0}to{transform:rotate(12deg) scale(1);opacity:.9}}@keyframes cs-shimmer{0%{background-position:0% 0}100%{background-position:300% 0}}@keyframes cs-ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}";
