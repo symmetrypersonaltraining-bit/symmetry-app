@@ -24,7 +24,7 @@ import { createClient } from "@/lib/supabase/client";
 const supabase = createClient() as any;
 
 const LAPSE_DAYS = 3;
-const VARIANTS = [1, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+const VARIANTS = [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const;
 type VariantId = (typeof VARIANTS)[number];
 
 interface SlackerGateProps {
@@ -131,6 +131,11 @@ export default function SlackerGate({ clientId }: SlackerGateProps) {
       {variant === 8 && <BreakingNews {...props} />}
       {variant === 9 && <DisappointedDad {...props} />}
       {variant === 10 && <Intervention {...props} />}
+      {variant === 11 && <AreYouStillThere {...props} />}
+      {variant === 12 && <MissedCalls {...props} />}
+      {variant === 13 && <DeliveryDelayed {...props} />}
+      {variant === 14 && <GainsPet {...props} />}
+      {variant === 15 && <CaseFile {...props} />}
     </div>
   );
 }
@@ -165,6 +170,8 @@ function SharedStyles() {
 @keyframes ssfill{to{width:var(--w)}}
 @keyframes ssroll{0%{left:-80px;transform:rotate(0)}100%{left:110%;transform:rotate(720deg)}}
 @keyframes ssticker{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
+@keyframes sspulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes sswilt{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
 `}</style>
   );
 }
@@ -620,6 +627,226 @@ function Intervention({ daysOut, onDismiss }: ScreenProps) {
         <button className="ss-btn2" style={{ borderColor: "#2a2a2a", color: "#444", borderRadius: 12 }} onClick={() => setMinute("The intervention will continue until morale improves.")}>
           {minute}
         </button>
+      </div>
+    </>
+  );
+}
+
+/* ================================================================== */
+/* 11 — Are You Still Training                                          */
+/* ================================================================== */
+
+function AreYouStillThere({ daysOut, onDismiss }: ScreenProps) {
+  const [rest, setRest] = useState("Just 5 more minutes of rest…");
+  return (
+    <>
+      <div style={{ position: "fixed", inset: 0, background: "#0a0a0a", zIndex: -1 }} />
+      <div className="ss-card" style={{ background: "#141414", border: "1.5px solid #262626", boxShadow: "0 20px 50px rgba(0,0,0,.6)" }}>
+        <div className="ss-badge" style={{ background: "#2a0a0a", border: "1px solid #e50914", color: "#e50914" }}>
+          <div className="ss-dot" style={{ background: "#e50914" }} />
+          {daysOut} days since your last log
+        </div>
+        <span className="ss-emoji" style={{ animation: "sspulse 2s infinite" }}>⏸️</span>
+        <div className="ss-h" style={{ color: "#fff" }}>
+          Are you still<br /><span style={{ color: "#e50914" }}>training?</span>
+        </div>
+        <div className="ss-sub" style={{ color: "#888" }}>
+          Your program has been paused for {daysOut} days. We&apos;ll keep your spot… but the couch is starting to think it won.
+        </div>
+        <div style={{ background: "#0a0a0a", borderRadius: 10, padding: 12, marginBottom: 16, textAlign: "left" }}>
+          <div style={{ fontSize: 11, color: "#666", marginBottom: 6 }}>CONTINUE TRAINING</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 26 }}>🎬</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Your Program · Next Up</div>
+              <div style={{ height: 4, background: "#333", borderRadius: 3, marginTop: 6, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: "12%", background: "#e50914" }} />
+              </div>
+              <div style={{ fontSize: 9.5, color: "#666", marginTop: 3 }}>You left mid-set, legend</div>
+            </div>
+          </div>
+        </div>
+        <button className="ss-btn" style={{ background: "#e50914", color: "#fff" }} onClick={onDismiss}>
+          ▶ Resume the season
+        </button>
+        <button className="ss-btn2" style={{ borderColor: "#333", color: "#555" }} onClick={() => setRest("The couch counts that as a win.")}>
+          {rest}
+        </button>
+        <div className="ss-foot" style={{ color: "#333" }}>SymmetriX · Skip intro · Skip excuses</div>
+      </div>
+    </>
+  );
+}
+
+/* ================================================================== */
+/* 12 — Missed Calls                                                   */
+/* ================================================================== */
+
+function MissedCalls({ daysOut, onDismiss }: ScreenProps) {
+  const [decline, setDecline] = useState("Decline (they'll call again)");
+  const callRow = (emoji: string, name: string, sub: string, extra: React.ReactNode, radius: string) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", background: "rgba(255,255,255,.05)", borderRadius: radius, marginTop: 1 }}>
+      <div style={{ fontSize: 22 }}>{emoji}</div>
+      <div style={{ flex: 1, textAlign: "left" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
+          {name} {extra}
+        </div>
+        <div style={{ fontSize: 10.5, color: "#8ea0be" }}>{sub}</div>
+      </div>
+      <div style={{ color: "#30d158" }}>📞</div>
+    </div>
+  );
+  return (
+    <>
+      <div style={{ position: "fixed", inset: 0, background: "linear-gradient(180deg,#1a2a3a,#0a1220)", zIndex: -1 }} />
+      <div className="ss-card" style={{ background: "rgba(20,28,44,.7)", border: "1px solid #2a3850", backdropFilter: "blur(6px)" }}>
+        <div style={{ fontSize: 44, fontWeight: 200, color: "#fff", margin: "2px 0 4px" }}>9:41</div>
+        <div className="ss-badge" style={{ background: "#2a1500", border: "1px solid #ff9500", color: "#ff9500" }}>
+          <div className="ss-dot" style={{ background: "#ff9500" }} />
+          {daysOut} days · 3 missed calls
+        </div>
+        <div style={{ width: "100%", margin: "6px 0 14px" }}>
+          {callRow("🏋️", "Leg Day", "missed call · every day this week", <span style={{ color: "#ff453a" }}>(7)</span>, "12px 12px 4px 4px")}
+          {callRow("🥗", "Your Macros", "missed call · “u up?”", null, "4px")}
+          {callRow("👨‍💼", "Dustin", "voicemail · 0:04", null, "4px 4px 12px 12px")}
+        </div>
+        <div style={{ background: "rgba(255,149,0,.1)", border: "1px solid #ff950044", borderRadius: 10, padding: "10px 12px", fontSize: 11.5, color: "#ffb761", textAlign: "left", lineHeight: 1.5, marginBottom: 14 }}>
+          🎙️ <strong>Voicemail:</strong> &ldquo;Hey it&apos;s your dumbbells. We&apos;re all just sittin&apos; here. Rackin&apos; up. Call us back, yeah?&rdquo;
+        </div>
+        <button className="ss-btn" style={{ background: "#30d158", color: "#000" }} onClick={onDismiss}>
+          📲 Call them back — I&apos;m in
+        </button>
+        <button className="ss-btn2" style={{ borderColor: "#2a3850", color: "#5f6f8c" }} onClick={() => setDecline("They left another voicemail.")}>
+          {decline}
+        </button>
+      </div>
+    </>
+  );
+}
+
+/* ================================================================== */
+/* 13 — Delivery Delayed                                               */
+/* ================================================================== */
+
+function DeliveryDelayed({ daysOut, onDismiss }: ScreenProps) {
+  const [couch, setCouch] = useState("Leave it with the couch");
+  const step = (icon: string, color: string, label: React.ReactNode, connector: string | null) => (
+    <>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <div style={{ color }}>{icon}</div>
+        <div style={{ fontSize: 12, color: "#333" }}>{label}</div>
+      </div>
+      {connector && <div style={{ borderLeft: connector, height: 12, marginLeft: 6 }} />}
+    </>
+  );
+  return (
+    <>
+      <div style={{ position: "fixed", inset: 0, background: "#f3f4f6", zIndex: -1 }} />
+      <div className="ss-card" style={{ background: "#fff", border: "1px solid #e5e7eb", boxShadow: "0 10px 40px rgba(0,0,0,.15)" }}>
+        <div className="ss-badge" style={{ background: "#fff4e5", border: "1px solid #f59e0b", color: "#b45309" }}>
+          <div className="ss-dot" style={{ background: "#f59e0b" }} />
+          Delivery exception · day {daysOut}
+        </div>
+        <span className="ss-emoji">📦</span>
+        <div className="ss-h" style={{ color: "#111" }}>
+          Your gains are<br /><span style={{ color: "#b45309" }}>stuck in transit.</span>
+        </div>
+        <div className="ss-sub" style={{ color: "#666" }}>
+          Out for delivery, but the recipient hasn&apos;t been home in {daysOut} days.
+        </div>
+        <div style={{ width: "100%", textAlign: "left", marginBottom: 16 }}>
+          {step("✓", "#22c55e", <span><strong>Ordered</strong> — you signed up, hyped</span>, "2px solid #22c55e")}
+          {step("✓", "#22c55e", <span><strong>Shipped</strong> — program built &amp; loaded</span>, "2px solid #22c55e")}
+          {step("✓", "#22c55e", <span><strong>Out for delivery</strong> — {daysOut} days ago</span>, "2px dashed #f59e0b")}
+          {step("✗", "#ef4444", <span><strong>Delivered</strong> — <span style={{ color: "#ef4444" }}>FAILED: nobody home</span></span>, null)}
+        </div>
+        <button className="ss-btn" style={{ background: "#111", color: "#fff" }} onClick={onDismiss}>
+          🏠 I&apos;m home! Deliver my gains
+        </button>
+        <button className="ss-btn2" style={{ borderColor: "#e5e7eb", color: "#999" }} onClick={() => setCouch("The couch signed for it. Uh oh.")}>
+          {couch}
+        </button>
+        <div className="ss-foot" style={{ color: "#bbb" }}>Symmetry Logistics · handle with grit</div>
+      </div>
+    </>
+  );
+}
+
+/* ================================================================== */
+/* 14 — Gains Pet                                                      */
+/* ================================================================== */
+
+function GainsPet({ daysOut, onDismiss }: ScreenProps) {
+  const [nap, setNap] = useState("Let Gainz nap (rude)");
+  return (
+    <>
+      <div style={{ position: "fixed", inset: 0, background: "#0d1a12", zIndex: -1 }} />
+      <div className="ss-card" style={{ background: "#12241a", border: "1.5px solid #1f4a30", boxShadow: "0 20px 50px rgba(0,0,0,.6)" }}>
+        <div className="ss-badge" style={{ background: "#08130d", border: "1px solid #3ad29f", color: "#3ad29f" }}>
+          <div className="ss-dot" style={{ background: "#3ad29f" }} />
+          Gainz hasn&apos;t been fed in {daysOut} days
+        </div>
+        <div style={{ background: "#9bbf3a", border: "5px solid #2a2a2a", borderRadius: 14, padding: "16px 10px", marginBottom: 14, boxShadow: "inset 0 0 0 3px #7a9a2e" }}>
+          <div style={{ fontSize: 56, animation: "sswilt 1.6s ease-in-out infinite" }}>🥀</div>
+          <div style={{ fontFamily: "'Courier New', monospace", fontSize: 12, fontWeight: 800, color: "#2a3a10", marginTop: 4 }}>GAINZ · Lv.14 · 😵</div>
+          <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 8, fontFamily: "'Courier New', monospace", fontSize: 9, color: "#2a3a10", fontWeight: 700 }}>
+            <span>HUNGER</span>
+            <div style={{ width: 90, height: 8, background: "#5a7020", border: "1px solid #2a3a10" }}>
+              <div style={{ height: "100%", width: "14%", background: "#d43a2a" }} />
+            </div>
+          </div>
+        </div>
+        <div className="ss-h" style={{ color: "#fff", fontSize: 20 }}>
+          Your gains pet is<br /><span style={{ color: "#3ad29f" }}>wilting.</span>
+        </div>
+        <div className="ss-sub" style={{ color: "#7a9a70" }}>
+          Gainz eats logged workouts. It&apos;s been {daysOut} days. Don&apos;t let Gainz go dark.
+        </div>
+        <button className="ss-btn" style={{ background: "#3ad29f", color: "#04120c" }} onClick={onDismiss}>
+          🍖 Feed Gainz a workout
+        </button>
+        <button className="ss-btn2" style={{ borderColor: "#1f4a30", color: "#5a7a60" }} onClick={() => setNap("Gainz did the sad pixel wobble.")}>
+          {nap}
+        </button>
+        <div className="ss-foot" style={{ color: "#2a4a35" }}>Tamagotchi mode · Gainz remembers everything</div>
+      </div>
+    </>
+  );
+}
+
+/* ================================================================== */
+/* 15 — Detective Case File                                            */
+/* ================================================================== */
+
+function CaseFile({ daysOut, onDismiss }: ScreenProps) {
+  const [plead, setPlead] = useState("Plead the fifth");
+  return (
+    <>
+      <div style={{ position: "fixed", inset: 0, background: "#14110c", zIndex: -1 }} />
+      <div className="ss-card" style={{ background: "#ede4d0", border: "1px solid #cbbfa0", boxShadow: "0 20px 50px rgba(0,0,0,.7)", transform: "rotate(-.6deg)" }}>
+        <div style={{ position: "absolute", top: -8, right: 14, background: "#c0392b", color: "#fff", fontSize: 9, fontWeight: 900, letterSpacing: 2, padding: "5px 12px", transform: "rotate(6deg)", borderRadius: 2 }}>CASE REOPENED</div>
+        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 3, color: "#8a7a55", textTransform: "uppercase", marginBottom: 6 }}>Case File #0043</div>
+        <span className="ss-emoji">🕵️</span>
+        <div className="ss-h" style={{ color: "#2a2318", fontFamily: "Georgia, serif" }}>The Missing Client</div>
+        <div className="ss-sub" style={{ color: "#6a5d42" }}>
+          Day {daysOut} of the disappearance. Detective Gautreaux is back on the case, coffee going cold.
+        </div>
+        <div style={{ background: "#fbf7ec", border: "1px solid #d8cdb0", borderRadius: 4, padding: "12px 14px", textAlign: "left", marginBottom: 14, fontFamily: "'Courier New', monospace" }}>
+          <div style={{ fontSize: 11, color: "#3a3020", lineHeight: 1.9 }}>
+            <strong>SUBJECT:</strong> Owns gym gear. Uses it &ldquo;sometimes.&rdquo;<br />
+            <strong>LAST SEEN:</strong> The app, {daysOut} days ago, mid-set<br />
+            <strong>EVIDENCE:</strong> Untouched program 🔍<br />
+            <strong>MOTIVE:</strong> The couch. Always the couch.<br />
+            <strong style={{ color: "#c0392b" }}>STATUS:</strong> <span style={{ color: "#c0392b" }}>SOLVABLE — one log cracks it</span>
+          </div>
+        </div>
+        <button className="ss-btn" style={{ background: "#2a2318", color: "#f0e8d5", borderRadius: 4 }} onClick={onDismiss}>
+          🔦 Turn myself in — I&apos;m back
+        </button>
+        <button className="ss-btn2" style={{ borderColor: "#cbbfa0", color: "#8a7a55", borderRadius: 4 }} onClick={() => setPlead("Denied. The evidence is right there.")}>
+          {plead}
+        </button>
+        <div className="ss-foot" style={{ color: "#8a7a55" }}>Symmetry Bureau of Investigation · Princeton, TX</div>
       </div>
     </>
   );
