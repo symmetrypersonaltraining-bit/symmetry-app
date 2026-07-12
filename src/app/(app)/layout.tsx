@@ -35,11 +35,12 @@ export default async function AppLayout({
   return (
     <div className="min-h-screen" style={{ background: "var(--brand-bg)" }}>
       <RealtimeScheduleSync />
-      <div className="pb-20">{children}</div>
-      {/* Docked assist/feedback: z below every sheet, dock and nav (>=50) so it never covers them */}
-      <div style={{ position: "fixed", top: 10, right: 14, zIndex: 30 }}>
+      {/* Docked feedback strip: reserves its own row in the page flow, so the
+          button can NEVER cover content (fixed overlays float over scrolled content). */}
+      <div style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", justifyContent: "flex-end", padding: "8px 14px 6px", background: "var(--brand-bg)" }}>
         <HeaderAssist solid />
       </div>
+      <div className="pb-20">{children}</div>
       <SessionDock />
       <BottomNav />
     </div>

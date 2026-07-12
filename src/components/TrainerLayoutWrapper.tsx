@@ -105,12 +105,12 @@ export default function TrainerLayoutWrapper({ children }: Props) {
       />
       <div className="flex-1 min-w-0 overflow-y-auto">
         <div className="lg:hidden h-14" />
+        {/* Docked strip: reserves its own row, so these buttons never cover content */}
+        <div style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, padding: "8px 14px 6px", background: "var(--brand-bg)" }}>
+          <button onClick={handleToggleMode} aria-label="Switch to client view" className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: "var(--brand-primary)", color: "white", border: "none", cursor: "pointer" }}><i className="ti ti-user text-sm" /> Client View</button>
+          <HeaderAssist solid />
+        </div>
         {children}
-      </div>
-      {/* Docked assist/feedback: z below every sheet, dock and nav (>=50) so it never covers them */}
-      <div style={{ position: "fixed", top: 10, right: 14, zIndex: 30, display: "flex", alignItems: "center", gap: 8 }}>
-        <button onClick={handleToggleMode} aria-label="Switch to client view" className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: "var(--brand-primary)", color: "white", border: "none", cursor: "pointer" }}><i className="ti ti-user text-sm" /> Client View</button>
-        <HeaderAssist solid />
       </div>
       <SessionDock />
       <AIAssistant />
