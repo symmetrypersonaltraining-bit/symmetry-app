@@ -12,7 +12,7 @@ workflows:
       - name: Install web dependencies
         script: npm install
       - name: Add Capacitor (build tooling only)
-        script: npm install @capacitor/core@^6 @capacitor/cli@^6 @capacitor/android@^6 @capacitor/app@^6
+        script: npm install @capacitor/core@^6 @capacitor/cli@^6 @capacitor/android@^6 @capacitor/app@^6 @capacitor-community/speech-recognition@^6
       - name: Generate Android project
         script: npx cap add android || npx cap sync android
       - name: Sync Capacitor into Android
@@ -27,8 +27,12 @@ workflows:
               s = re.sub(r'android:enableOnBackInvokedCallback="[^"]*"', 'android:enableOnBackInvokedCallback="false"', s)
           else:
               s = s.replace("<application", '<application android:enableOnBackInvokedCallback="false"', 1)
+          if "android.permission.RECORD_AUDIO" not in s:
+              s = s.replace("<application", '<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <application', 1)
+          if "android.speech.RecognitionService" not in s:
+              s = s.replace("<application", '<queries><intent><action android:name="android.speech.RecognitionService" /></intent></queries>\n    <application', 1)
           open(p, "w").write(s)
-          print("manifest patched: predictive back disabled")
+          print("manifest patched: predictive back disabled + mic permission + speech service query")
           EOF
       - name: Generate app icon and splash
         script: |
