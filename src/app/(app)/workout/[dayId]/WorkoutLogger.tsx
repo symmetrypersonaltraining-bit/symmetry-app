@@ -243,8 +243,10 @@ function TimerWheel({ onClose }: { onClose: () => void }) {
 }
 
 // \u2500\u2500\u2500 EXERCISE HISTORY DRAWER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
+function ExerciseHistory({ exerciseId, exId, clientId, exerciseName, onClose, onPrefill }: {
   exerciseId: string;
+  exId?: string | null;
+  clientId?: string | null;
   exerciseName: string;
   onClose: () => void;
   onPrefill?: (weight: string, reps: string) => void;
@@ -255,11 +257,15 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      // History is keyed by the underlying MOVEMENT (exercise_id) so it survives
+      // program rebuilds; falls back to the prescription id for legacy rows.
+      let q = supabase
         .from("set_logs")
         .select("set_number, weight_lbs, reps, workout_logs(log_date)")
-        .eq("prescribed_exercise_id", exerciseId)
-        .eq("completed", true)
+        .eq("completed", true);
+      q = exId ? q.eq("exercise_id", exId) : q.eq("prescribed_exercise_id", exerciseId);
+      if (clientId) q = q.eq("client_id", clientId);
+      const { data } = await q
         .order("logged_at", { ascending: false })
         .limit(64);
 
@@ -275,7 +281,8 @@ function ExerciseHistory({ exerciseId, exerciseName, onClose, onPrefill }: {
       setLoading(false);
     }
     load();
-  }, [exerciseId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exerciseId, exId, clientId]);
 
   function fmtDate(d: string) {
     return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -583,7 +590,7 @@ export default function WorkoutLogger({
   const [restTimer, setRestTimer] = useState<number | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [fieldCfg, setFieldCfg] = useState<Record<string, string[]>>({});
-  const [historyExercise, setHistoryExercise] = useState<{ id: string; name: string } | null>(null);
+  const [historyExercise, setHistoryExercise] = useState<{ id: string; exId?: string | null; name: string } | null>(null);
   const [sessionNote, setSessionNote] = useState("");
   const [listening, setListening] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
@@ -785,30 +792,43 @@ export default function WorkoutLogger({
   const [prevByPe, setPrevByPe] = useState<Record<string, Record<number, { weight: string; reps: string }>>>({});
   useEffect(() => {
     if (!clientId) return;
-    const peIds = (localSections || []).flatMap((sec: any) => (sec.prescribed_exercises || []).map((p: any) => p.id));
+    const peList = (localSections || []).flatMap((sec: any) => (sec.prescribed_exercises || []) as any[]);
+    const peIds = peList.map((p: any) => p.id);
     if (!peIds.length) return;
+    // Key history by the underlying MOVEMENT (exercise_id) so previous weights
+    // survive program rebuilds; fall back to prescribed_exercise_id for old rows.
+    const exByPe: Record<string, string> = {};
+    for (const p of peList) if (p?.exercises?.id) exByPe[p.id] = p.exercises.id;
+    const exIds = Array.from(new Set(Object.values(exByPe)));
     let cancelled = false;
     (async () => {
       try {
+        const orFilter = exIds.length
+          ? `exercise_id.in.(${exIds.join(',')}),prescribed_exercise_id.in.(${peIds.join(',')})`
+          : `prescribed_exercise_id.in.(${peIds.join(',')})`;
         const { data } = await supabase
           .from('set_logs')
-          .select('prescribed_exercise_id, set_number, weight_lbs, reps, workout_log_id, logged_at')
+          .select('prescribed_exercise_id, exercise_id, set_number, weight_lbs, reps, workout_log_id, logged_at')
           .eq('client_id', clientId)
-          .in('prescribed_exercise_id', peIds)
-          .order('logged_at', { ascending: false });
+          .or(orFilter)
+          .order('logged_at', { ascending: false })
+          .limit(1000);
         if (cancelled || !data) return;
         const map: Record<string, Record<number, { weight: string; reps: string }>> = {};
         const chosen: Record<string, string> = {};
-        for (const row of data as any[]) {
-          const pe = row.prescribed_exercise_id as string;
-          if (workoutLogId && row.workout_log_id === workoutLogId) continue;
-          if (!chosen[pe]) chosen[pe] = row.workout_log_id;
-          if (row.workout_log_id !== chosen[pe]) continue;
-          if (!map[pe]) map[pe] = {};
-          map[pe][row.set_number] = {
-            weight: row.weight_lbs != null ? String(row.weight_lbs) : '',
-            reps: row.reps != null ? String(row.reps) : '',
-          };
+        for (const pe of peIds) {
+          for (const row of data as any[]) {
+            if (workoutLogId && row.workout_log_id === workoutLogId) continue;
+            const match = (row.exercise_id && exByPe[pe] && row.exercise_id === exByPe[pe]) || row.prescribed_exercise_id === pe;
+            if (!match) continue;
+            if (!chosen[pe]) chosen[pe] = row.workout_log_id;
+            if (row.workout_log_id !== chosen[pe]) continue;
+            if (!map[pe]) map[pe] = {};
+            if (!map[pe][row.set_number]) map[pe][row.set_number] = {
+              weight: row.weight_lbs != null ? String(row.weight_lbs) : '',
+              reps: row.reps != null ? String(row.reps) : '',
+            };
+          }
         }
         setPrevByPe(map);
       } catch (e) {}
@@ -906,6 +926,7 @@ export default function WorkoutLogger({
       const s = sets[peId][si];
       await supabase.from("set_logs").upsert({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
+        exercise_id: allFlat.find(p => p.id === peId)?.exercises?.id ?? null,
         set_number: si + 1,
         weight_lbs: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (parseFloat(s.weight) || 0),
         reps: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (parseInt(s.reps) || 0),
@@ -934,10 +955,13 @@ export default function WorkoutLogger({
       const arr = sets[peId] || [];
       const rows = arr.map((s, i) => ({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
+        exercise_id: currentExercise.exercises?.id ?? null,
         set_number: i + 1,
-        weight_lbs: parseFloat(s.weight) || 0,
-        reps: parseInt(s.reps) || 0,
+        weight_lbs: isCardioEx(currentExercise) ? null : (parseFloat(s.weight) || 0),
+        reps: isCardioEx(currentExercise) ? null : (parseInt(s.reps) || 0),
         duration_seconds: s.time ? parseTimeToSecs(s.time) : null,
+        speed: isCardioEx(currentExercise) ? (s.speed ? parseFloat(s.speed) || 0 : null) : null,
+        heart_rate: isCardioEx(currentExercise) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
         completed: true, logged_at: new Date().toISOString(),
       }));
       if (rows.length) {
@@ -1149,7 +1173,7 @@ export default function WorkoutLogger({
         {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
         {videoUrl && <VideoModal url={videoUrl} onClose={() => setVideoUrl(null)} />}
         {historyExercise && (
-          <ExerciseHistory exerciseId={historyExercise.id} exerciseName={historyExercise.name}
+          <ExerciseHistory exerciseId={historyExercise.id} exId={historyExercise.exId} clientId={clientId} exerciseName={historyExercise.name}
             onClose={() => setHistoryExercise(null)}
             onPrefill={(w, r) => prefillSets(currentExercise.id, w, r)} />
         )}
@@ -1231,7 +1255,7 @@ export default function WorkoutLogger({
               )}
             </div>
             <div className="flex flex-col gap-2 ml-3 mt-1 flex-shrink-0">
-              <button onClick={() => setHistoryExercise({ id: currentExercise.id, name: currentExercise.exercises?.name })}
+              <button onClick={() => setHistoryExercise({ id: currentExercise.id, exId: currentExercise.exercises?.id, name: currentExercise.exercises?.name })}
                 className="w-10 h-10 rounded-xl flex items-center justify-center"
                 style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
                 title="View history">
@@ -1437,7 +1461,7 @@ export default function WorkoutLogger({
   return (
     <div style={{ background: "var(--brand-bg)", minHeight: "100vh", paddingBottom: 96 }}>
       {historyExercise && (
-        <ExerciseHistory exerciseId={historyExercise.id} exerciseName={historyExercise.name}
+        <ExerciseHistory exerciseId={historyExercise.id} exId={historyExercise.exId} clientId={clientId} exerciseName={historyExercise.name}
           onClose={() => setHistoryExercise(null)}
           onPrefill={(w, r) => prefillSets(historyExercise.id, w, r)} />
       )}
@@ -1538,7 +1562,7 @@ export default function WorkoutLogger({
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
-                      <button onClick={e => { e.stopPropagation(); setHistoryExercise({ id: pe.id, name: pe.exercises?.name }); }}
+                      <button onClick={e => { e.stopPropagation(); setHistoryExercise({ id: pe.id, exId: pe.exercises?.id, name: pe.exercises?.name }); }}
                         className="w-8 h-8 rounded-lg flex items-center justify-center"
                         style={{ background: "var(--brand-card)" }} title="View history">
                         <i className="ti ti-chart-bar text-sm" style={{ color: "var(--brand-primary)" }} />
