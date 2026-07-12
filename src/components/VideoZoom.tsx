@@ -29,6 +29,18 @@ export default function VideoZoom() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Hardware/browser Back closes the enlarged video instead of leaving the page.
+  useEffect(() => {
+    if (!src) return;
+    try { history.pushState({ ...(history.state || {}), __symZoom: true }, ""); } catch { /* noop */ }
+    const onPop = () => setSrc(null);
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      try { if (history.state && (history.state as { __symZoom?: boolean }).__symZoom) history.back(); } catch { /* noop */ }
+    };
+  }, [src]);
+
   if (!src) return null;
   return (
     <div data-zoom-overlay onClick={() => setSrc(null)} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 14, cursor: "zoom-out", animation: "symm-rise .18s ease both" }}>

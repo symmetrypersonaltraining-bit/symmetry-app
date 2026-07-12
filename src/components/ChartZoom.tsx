@@ -30,6 +30,18 @@ export default function ChartZoom() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Hardware/browser Back closes the enlarged chart instead of leaving the page.
+  useEffect(() => {
+    if (!markup) return;
+    try { history.pushState({ ...(history.state || {}), __symZoom: true }, ""); } catch { /* noop */ }
+    const onPop = () => setMarkup(null);
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      try { if (history.state && (history.state as { __symZoom?: boolean }).__symZoom) history.back(); } catch { /* noop */ }
+    };
+  }, [markup]);
+
   if (!markup) return null;
   return (
     <div

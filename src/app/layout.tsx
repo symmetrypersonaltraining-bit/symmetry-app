@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import HapticTap from "@/components/HapticTap";
 import VersionWatcher from "@/components/VersionWatcher";
+import BackButtonGuard from "@/components/BackButtonGuard";
 import FloatingDock from "@/components/FloatingDock";
 import AIAssistant from "@/components/AIAssistant";
 import ChartZoom from "@/components/ChartZoom";
@@ -46,6 +47,7 @@ export default function RootLayout({
       <body>
         <HapticTap />
         <VersionWatcher />
+        <BackButtonGuard />
         <FloatingDock />
         <AIAssistant />
         <ChartZoom />
