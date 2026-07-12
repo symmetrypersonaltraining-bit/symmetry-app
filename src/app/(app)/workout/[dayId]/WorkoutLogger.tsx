@@ -1016,17 +1016,26 @@ export default function WorkoutLogger({
 
   function startVoiceNote() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    const r = new SR();
-    recognitionRef.current = r;
-    r.continuous = false; r.interimResults = false; r.lang = "en-US";
-    r.onstart = () => setListening(true);
-    r.onend = () => setListening(false);
-    r.onresult = (e: any) => {
-      const t = e.results[0]?.[0]?.transcript || "";
-      if (t) setSessionNote(prev => prev ? prev + " " + t : t);
-    };
-    r.start();
+    if (!SR) { alert("Voice dictation isn't available in this app's browser. You can type your note instead."); return; }
+    try {
+      const r = new SR();
+      recognitionRef.current = r;
+      r.continuous = false; r.interimResults = false; r.lang = "en-US";
+      r.onstart = () => setListening(true);
+      r.onend = () => setListening(false);
+      r.onerror = (e: any) => {
+        setListening(false);
+        const code = e?.error || "";
+        alert(code === "not-allowed" || code === "service-not-allowed"
+          ? "Microphone access is blocked. Enable the mic permission for the app, then try again."
+          : "Voice dictation didn't work here. You can type your note instead.");
+      };
+      r.onresult = (e: any) => {
+        const t = e.results[0]?.[0]?.transcript || "";
+        if (t) setSessionNote(prev => prev ? prev + " " + t : t);
+      };
+      r.start();
+    } catch { setListening(false); alert("Voice dictation couldn't start. You can type your note instead."); }
   }
 
   async function saveTrainerNote() {
@@ -1048,14 +1057,22 @@ export default function WorkoutLogger({
 
   function startTrainerVoice() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    const r = new SR();
-    r.continuous = false; r.interimResults = false; r.lang = "en-US";
-    r.onresult = (e: any) => {
-      const t = e.results[0]?.[0]?.transcript || "";
-      if (t) setTrainerNoteText(prev => prev ? prev + " " + t : t);
-    };
-    r.start();
+    if (!SR) { alert("Voice dictation isn't available in this app's browser. You can type your note instead."); return; }
+    try {
+      const r = new SR();
+      r.continuous = false; r.interimResults = false; r.lang = "en-US";
+      r.onerror = (e: any) => {
+        const code = e?.error || "";
+        alert(code === "not-allowed" || code === "service-not-allowed"
+          ? "Microphone access is blocked. Enable the mic permission for the app, then try again."
+          : "Voice dictation didn't work here. You can type your note instead.");
+      };
+      r.onresult = (e: any) => {
+        const t = e.results[0]?.[0]?.transcript || "";
+        if (t) setTrainerNoteText(prev => prev ? prev + " " + t : t);
+      };
+      r.start();
+    } catch { alert("Voice dictation couldn't start. You can type your note instead."); }
   }
 
   // \u2500\u2500\u2500 WORKOUT COMPLETE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
