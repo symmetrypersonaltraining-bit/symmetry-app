@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { startDictation, type DictationHandle } from "@/lib/dictation";
 import { createClient } from "@/lib/supabase/client";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -20,6 +21,7 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
   const [done, setDone] = useState(false);
   const [listening, setListening] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const dictRef = useRef<DictationHandle | null>(null);
 
   const buzz = (m: number | number[]) => { try { (navigator as any).vibrate && (navigator as any).vibrate(m as any); } catch {} };
 
@@ -38,17 +40,13 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
   }, []);
 
   function startVoice() {
-    try {
-      const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      if (!SR) { alert("Voice input is not supported on this browser."); return; }
-      const rec = new SR();
-      rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
-      rec.onstart = () => setListening(true);
-      rec.onend = () => setListening(false);
-      rec.onerror = () => setListening(false);
-      rec.onresult = (e: any) => { const t = e.results[0][0].transcript; setMsg((m) => (m ? m + " " : "") + t); };
-      rec.start();
-    } catch { setListening(false); }
+    if (listening) { dictRef.current?.stop(); setListening(false); return; }
+    dictRef.current = startDictation({
+      onResult: (t) => setMsg((m) => (m ? m + " " : "") + t),
+      onStart: () => setListening(true),
+      onEnd: () => setListening(false),
+      onUnavailable: () => { setListening(false); alert("Voice dictation isn't available here yet. You can type instead."); },
+    });
   }
 
   async function submit() {
