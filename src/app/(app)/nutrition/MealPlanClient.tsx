@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
 interface MealPlan { id: string; version_number: number; meals: Meal[]; }
-interface AdherenceLog { id: string; meal_id: string | null; meal_position: number; adherence: string; off_plan_details: string | null; notes: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null; food_id?: string | null; servings?: number | null; macros_pending?: boolean | null; }
+interface AdherenceLog { id: string; meal_id: string | null; meal_position: number; adherence: string; off_plan_details: string | null; notes: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null; food_id?: string | null; servings?: number | null; macros_pending?: boolean | null; item_overrides?: Record<string, { amount?: number }> | null; }
 interface MacroTarget { calories: number; protein: number; carbs: number; fats: number; }
 
 const ADHERENCE_OPTIONS = [
@@ -447,6 +447,10 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const [photoLoading, setPhotoLoading] = useState(false);
   const [photoResult,  setPhotoResult]  = useState<string | null>(null);
   const [offPlanNotes, setOffPlanNotes] = useState("");
+  // Per-day food-amount overrides (feedback 8ec01614) — plan rows stay canonical.
+  const [amountsModal, setAmountsModal] = useState<{ mealId: string; position: number; mealName: string } | null>(null);
+  const [amountEdits, setAmountEdits] = useState<Record<string, string>>({});
+  const [savingAmounts, setSavingAmounts] = useState(false);
 
   // Restore the last viewed date so navigating away + Back doesn't reset to today.
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -502,11 +506,28 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       } else if (opt.pct !== null && log.meal_id) {
         const meal = sortedMeals.find(m => m.id === log.meal_id);
         if (meal) {
-          const m = getMealMacros(meal);
-          kcal    += m.kcal    * opt.pct;
-          protein += m.protein * opt.pct;
-          carbs   += m.carbs   * opt.pct;
-          fats    += m.fats    * opt.pct;
+          const ov = log.item_overrides || null;
+          if (ov && Object.keys(ov).length) {
+            // Per-item adjusted amounts: scale each item's macros by newAmount/plannedAmount.
+            let p = 0, c = 0, f = 0;
+            for (const item of meal.meal_items || []) {
+              const oAmt = ov[item.id]?.amount;
+              const scale = (oAmt != null && item.amount) ? (oAmt / item.amount) : 1;
+              p += (item.protein || 0) * scale;
+              c += (item.carbs   || 0) * scale;
+              f += (item.fats    || 0) * scale;
+            }
+            kcal    += (p * 4 + c * 4 + f * 9) * opt.pct;
+            protein += p * opt.pct;
+            carbs   += c * opt.pct;
+            fats    += f * opt.pct;
+          } else {
+            const m = getMealMacros(meal);
+            kcal    += m.kcal    * opt.pct;
+            protein += m.protein * opt.pct;
+            carbs   += m.carbs   * opt.pct;
+            fats    += m.fats    * opt.pct;
+          }
         }
       }
     }
@@ -544,6 +565,34 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       }, { onConflict: "client_id,log_date,meal_position" }).select().single();
       if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== meal.position), data as AdherenceLog]);
     } finally { setSaving(null); }
+  }
+
+  async function saveAmounts() {
+    if (!amountsModal) return;
+    setSavingAmounts(true);
+    try {
+      const meal = sortedMeals.find(m => m.id === amountsModal.mealId);
+      const overrides: Record<string, { amount: number }> = {};
+      for (const it of meal?.meal_items || []) {
+        const v = amountEdits[it.id];
+        if (v == null || v === "") continue;
+        const n = parseFloat(v);
+        if (!isFinite(n) || n < 0) continue;
+        if (it.amount != null && Math.abs(n - it.amount) < 1e-9) continue; // unchanged from plan
+        overrides[it.id] = { amount: n };
+      }
+      const existing = logs.find(l => l.meal_position === amountsModal.position);
+      const { data, error } = await supabase.from("meal_adherence_logs").upsert({
+        client_id: clientId, log_date: selectedDate, meal_id: amountsModal.mealId,
+        meal_position: amountsModal.position,
+        adherence: existing?.adherence || "Full",
+        item_overrides: Object.keys(overrides).length ? overrides : null,
+        source: "client",
+      }, { onConflict: "client_id,log_date,meal_position" }).select().single();
+      if (error) { alert("Couldn't save the adjusted amounts. Please try again."); return; }
+      if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== amountsModal.position), data as AdherenceLog]);
+      setAmountsModal(null);
+    } finally { setSavingAmounts(false); }
   }
 
   async function saveNotes(position: number) {
@@ -744,6 +793,44 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         </div>
       )}
 
+      {/* Adjust-amounts sheet (per-day override; the trainer's plan is never edited) */}
+      {amountsModal && (
+        <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
+          onClick={() => setAmountsModal(null)}>
+          <div className="w-full rounded-t-3xl p-5 pb-10" style={{ background: "var(--brand-surface)" }}
+            onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>
+                Adjust amounts: {amountsModal.mealName}
+              </h3>
+              <button onClick={() => setAmountsModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+            <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
+              Change how much you actually ate — your plan stays the same, and today&apos;s macros scale to match.
+            </p>
+            {(sortedMeals.find(m => m.id === amountsModal.mealId)?.meal_items || [])
+              .filter(it => !it.is_unlimited)
+              .sort((a, b) => a.position - b.position)
+              .map(it => (
+                <div key={it.id} className="flex items-center gap-2 mb-2">
+                  <span className="flex-1 text-sm truncate" style={{ color: "var(--brand-text)" }}>{it.food}</span>
+                  <input type="number" value={amountEdits[it.id] ?? ""} inputMode="decimal"
+                    onChange={e => setAmountEdits(prev => ({ ...prev, [it.id]: e.target.value }))}
+                    className="w-20 text-center text-sm py-2 rounded-xl outline-none"
+                    style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
+                  <span className="text-xs w-16 truncate" style={{ color: "var(--brand-text-secondary)" }}>{it.unit || ""}</span>
+                </div>
+              ))}
+            <button onClick={saveAmounts} disabled={savingAmounts}
+              className="w-full py-3.5 rounded-2xl text-sm font-bold text-white mt-2"
+              style={{ background: "var(--brand-primary)", opacity: savingAmounts ? 0.6 : 1 }}>
+              {savingAmounts ? "Saving..." : "Save amounts"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       {!isTrainer && (
         <div className="px-4 pt-6 pb-4" style={{ background: "var(--brand-surface)", borderBottom: "1px solid var(--brand-border)" }}>
@@ -879,11 +966,15 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                       <i className="ti ti-point-filled text-xs mt-0.5 flex-shrink-0" style={{ color: "var(--brand-primary)" }} />
                       <span className="text-sm" style={{ color: "var(--brand-text)" }}>
                         {item.food}
-                        {!item.is_unlimited && item.amount && (
-                          <span className="ml-1 text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                            {item.amount}{item.unit ? ` ${item.unit}` : ""}
-                          </span>
-                        )}
+                        {!item.is_unlimited && item.amount && (() => {
+                          const ov = mealLog?.item_overrides?.[item.id]?.amount;
+                          const adjusted = ov != null && ov !== item.amount;
+                          return (
+                            <span className="ml-1 text-xs" style={{ color: adjusted ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>
+                              {adjusted ? (<><s style={{ opacity: 0.55 }}>{item.amount}</s> {ov}</>) : item.amount}{item.unit ? ` ${item.unit}` : ""}{adjusted ? " (adjusted)" : ""}
+                            </span>
+                          );
+                        })()}
                         {item.is_unlimited && (
                           <span className="ml-1 text-xs" style={{ color: "var(--brand-text-secondary)" }}>(unlimited)</span>
                         )}
@@ -952,6 +1043,23 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                         style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}
                         title="Snap photo for AI macro analysis">
                         <i className="ti ti-camera text-sm" />
+                      </button>
+                      {/* Adjust food amounts (per-day override; plan stays canonical) */}
+                      <button
+                        onClick={() => {
+                          const existing = logs.find(l => l.meal_position === meal.position);
+                          const seed: Record<string, string> = {};
+                          for (const it of meal.meal_items || []) {
+                            const ov = existing?.item_overrides?.[it.id]?.amount;
+                            seed[it.id] = ov != null ? String(ov) : (it.amount != null ? String(it.amount) : "");
+                          }
+                          setAmountEdits(seed);
+                          setAmountsModal({ mealId: meal.id, position: meal.position, mealName: meal.name });
+                        }}
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}
+                        title="Adjust food amounts">
+                        <i className="ti ti-pencil text-sm" />
                       </button>
                     </div>
                   </div>
