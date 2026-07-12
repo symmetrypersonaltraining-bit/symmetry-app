@@ -10,7 +10,7 @@ export async function markMessageRead(id: string): Promise<void> {
     .eq('id', id);
 }
 
-export async function sendMessage(clientId: string, body: string): Promise<void> {
+export async function sendMessage(clientId: string, body: string, imageUrl?: string | null): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
@@ -25,11 +25,12 @@ export async function sendMessage(clientId: string, body: string): Promise<void>
     to_id: clientRow.auth_user_id,
     client_id: clientId,
     body,
+    image_url: imageUrl || null,
   });
   revalidatePath('/messages');
 }
 
-export async function sendClientMessage(body: string): Promise<void> {
+export async function sendClientMessage(body: string, imageUrl?: string | null): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
@@ -49,11 +50,12 @@ export async function sendClientMessage(body: string): Promise<void> {
     to_id: (trainerId as string),
     client_id: clientRecord.id,
     body,
+    image_url: imageUrl || null,
   });
   revalidatePath('/messages');
 }
 
-export async function sendBroadcastMessage(body: string): Promise<number> {
+export async function sendBroadcastMessage(body: string, imageUrl?: string | null): Promise<number> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || user.email !== 'symmetrypersonaltraining@gmail.com') return 0;
@@ -63,22 +65,22 @@ export async function sendBroadcastMessage(body: string): Promise<number> {
     .not('auth_user_id', 'is', null);
   const rows = (clients || [])
     .filter((c: any) => c.auth_user_id && c.auth_user_id !== user.id)
-    .map((c: any) => ({ from_id: user.id, to_id: c.auth_user_id, client_id: c.id, body, is_broadcast: true }));
+    .map((c: any) => ({ from_id: user.id, to_id: c.auth_user_id, client_id: c.id, body, image_url: imageUrl || null, is_broadcast: true }));
   if (rows.length) {
     await supabase.from('messages').insert(rows);
   }
   revalidatePath('/messages');
   if (rows.length) {
-    await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, is_broadcast: true });
+    await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, image_url: imageUrl || null, is_broadcast: true });
   }
   return rows.length;
 }
 
-export async function sendGroupMessage(body: string): Promise<void> {
+export async function sendGroupMessage(body: string, imageUrl?: string | null): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, is_group: true });
+  await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, image_url: imageUrl || null, is_group: true });
   revalidatePath("/messages");
 }
 

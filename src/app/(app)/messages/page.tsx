@@ -68,7 +68,7 @@ export default async function MessagesPage(props: {
     if (selectedClientId && selectedClientId !== "broadcast") {
       const { data: msgs } = await supabase
         .from("messages")
-        .select("id, from_id, to_id, client_id, body, read_at, created_at")
+        .select("id, from_id, to_id, client_id, body, read_at, created_at, image_url")
         .eq("client_id", selectedClientId)
         .is("deleted_at", null)
         .order("created_at", { ascending: true });
@@ -136,7 +136,7 @@ export default async function MessagesPage(props: {
 
   const { data: msgs } = await supabase
     .from("messages")
-    .select("id, from_id, to_id, client_id, body, read_at, created_at")
+    .select("id, from_id, to_id, client_id, body, read_at, created_at, image_url")
     .eq("client_id", clientRecord.id)
     .is("deleted_at", null)
     .order("created_at", { ascending: true });

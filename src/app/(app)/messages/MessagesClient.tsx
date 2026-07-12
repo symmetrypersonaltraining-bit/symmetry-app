@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { sendMessage, sendClientMessage, sendGroupMessage, sendBroadcastMessage, deleteMessage, deleteThread } from "../home/messageActions";
+import { createClient } from "@/lib/supabase/client";
 
 interface Message {
   id: string;
@@ -11,6 +12,7 @@ interface Message {
   to_id: string;
   client_id: string | null;
   body: string;
+  image_url?: string | null;
   read_at: string | null;
   created_at: string | null;
 }
@@ -52,6 +54,26 @@ function getInitials(name: string) {
   return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
+// Downscale an image to max 1280px (longest side) JPEG to keep uploads small.
+// Falls back to the original file if anything fails.
+async function compressImage(file: File, max = 1280): Promise<Blob> {
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const w = Math.max(1, Math.round(bmp.width * scale));
+    const h = Math.max(1, Math.round(bmp.height * scale));
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    const ctx = cv.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bmp, 0, 0, w, h);
+    return await new Promise<Blob>((res) => cv.toBlob((b) => res(b || file), "image/jpeg", 0.82));
+  } catch {
+    return file;
+  }
+}
+
 export default function MessagesClient({ isTrainer, clients, selectedClientId, thread, currentUserId, unreadByClient, senderNames = {}, lastByClient = {} }: Props) {
   const router = useRouter();
   const [body, setBody] = useState("");
@@ -62,6 +84,22 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
   const inputRef = useRef<HTMLInputElement>(null);
   const [confirmDelThread, setConfirmDelThread] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachPreview, setAttachPreview] = useState<string | null>(null);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const onPickImage = (f: File | null | undefined) => {
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { alert("Please choose an image file."); return; }
+    setAttachPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(f); });
+    setAttachFile(f);
+  };
+  const clearAttach = () => {
+    setAttachPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+    setAttachFile(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "instant" });
@@ -86,20 +124,39 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
 
   const handleSend = useCallback(async () => {
     const trimmed = body.trim();
-    if (!trimmed || sending) return;
+    if ((!trimmed && !attachFile) || sending) return;
     setSending(true);
     try {
+      let imageUrl: string | null = null;
+      if (attachFile) {
+        try {
+          const blob = await compressImage(attachFile);
+          const supabase = createClient();
+          const scope = selectedClientId && selectedClientId !== "broadcast" ? selectedClientId : "misc";
+          const path = scope + "/" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ".jpg";
+          const { error: upErr } = await supabase.storage.from("message-images").upload(path, blob, { contentType: "image/jpeg", upsert: false });
+          if (upErr) throw upErr;
+          const { data: pub } = supabase.storage.from("message-images").getPublicUrl(path);
+          if (!pub?.publicUrl) throw new Error("no public url");
+          imageUrl = pub.publicUrl;
+        } catch (upErr) {
+          console.error("image upload failed:", upErr);
+          alert("Image upload failed \u2014 your message was not sent. Please try again.");
+          return;
+        }
+      }
       if (selectedClientId === "group") {
-        await sendGroupMessage(trimmed);
+        await sendGroupMessage(trimmed, imageUrl);
       } else if (isTrainer && selectedClientId === "broadcast") {
-        const n = await sendBroadcastMessage(trimmed);
+        const n = await sendBroadcastMessage(trimmed, imageUrl);
         setBroadcastSent(n);
       } else if (isTrainer && selectedClientId) {
-        await sendMessage(selectedClientId, trimmed);
+        await sendMessage(selectedClientId, trimmed, imageUrl);
       } else {
-        await sendClientMessage(trimmed);
+        await sendClientMessage(trimmed, imageUrl);
       }
       setBody("");
+      clearAttach();
       router.refresh();
     } catch (err) {
       console.error("send failed:", err);
@@ -107,7 +164,8 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
       setSending(false);
       inputRef.current?.focus();
     }
-  }, [body, sending, isTrainer, selectedClientId, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [body, sending, isTrainer, selectedClientId, router, attachFile]);
 
   // Group messages by day
   const grouped: { day: string; msgs: Message[] }[] = [];
@@ -152,7 +210,11 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                     <div className="max-w-[78%] rounded-2xl px-4 py-2.5"
                       style={{ background: isMe ? "var(--brand-primary)" : "var(--brand-surface)", border: isMe ? "none" : "1px solid var(--brand-border)", borderBottomRightRadius: isMe ? 4 : 16, borderBottomLeftRadius: isMe ? 16 : 4 }}>
                       <p className="text-[11px] font-bold mb-0.5" style={{ color: isMe ? "rgba(255,255,255,0.85)" : "var(--brand-primary)" }}>{nameForFrom(m)}</p>
-                      <p className="text-sm leading-relaxed" style={{ color: isMe ? "white" : "var(--brand-text)" }}>{m.body.split("\n").map((ln, li) => (<span key={li}>{li > 0 ? <br /> : null}{ln}</span>))}</p>
+                      {m.image_url ? (
+                        <img src={m.image_url} alt="Attached image" loading="lazy" onClick={() => setViewerUrl(m.image_url || null)}
+                          style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 12, cursor: "zoom-in", display: "block", marginBottom: m.body ? 6 : 0 }} />
+                      ) : null}
+                      {m.body ? <p className="text-sm leading-relaxed" style={{ color: isMe ? "white" : "var(--brand-text)" }}>{m.body.split("\n").map((ln, li) => (<span key={li}>{li > 0 ? <br /> : null}{ln}</span>))}</p> : null}
                       <div className={"flex items-center gap-2 mt-1 " + (isMe ? "justify-end" : "justify-start")}>
                         <span className="text-[10px]" style={{ color: isMe ? "rgba(255,255,255,0.55)" : "var(--brand-text-secondary)" }}>{fmtTime(m.created_at)}</span>
                         {isMe && <span className="text-[10px]" style={{ color: m.read_at ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)" }}>{m.read_at ? "✓✓" : "✓"}</span>}
@@ -167,19 +229,38 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
         ))}
         <div ref={bottomRef} />
       </div>
-      <div className="border-t p-3 flex items-center gap-2" style={{ borderColor: "var(--brand-border)", background: "var(--brand-bg)" }}>
-        <textarea ref={inputRef as any} rows={2} onInput={(e) => { const t = e.currentTarget as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160) + "px"; }} type="text" value={body} onChange={e => setBody(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-          placeholder="Message..." className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
-          style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} ></textarea>
-        <button onClick={handleSend} disabled={!body.trim() || sending}
-          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
-          style={{ background: body.trim() && !sending ? "var(--brand-primary)" : "var(--brand-surface)", border: "1px solid var(--brand-border)", opacity: !body.trim() || sending ? 0.6 : 1 }}>
-          {sending
-            ? <i className="ti ti-loader-2 animate-spin text-sm" style={{ color: "var(--brand-text-secondary)" }} />
-            : <i className="ti ti-send text-sm" style={{ color: body.trim() ? "white" : "var(--brand-text-secondary)" }} />}
-        </button>
+      <div className="border-t p-3" style={{ borderColor: "var(--brand-border)", background: "var(--brand-bg)" }}>
+        {attachPreview && (
+          <div className="flex items-center gap-2 mb-2">
+            <img src={attachPreview} alt="Attachment preview" style={{ height: 56, borderRadius: 8 }} />
+            <button onClick={clearAttach} aria-label="Remove attachment" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brand-text-secondary)" }}><i className="ti ti-x" /></button>
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => onPickImage(e.target.files && e.target.files[0])} />
+          <button onClick={() => fileRef.current?.click()} disabled={sending} aria-label="Attach image" title="Attach image"
+            className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", cursor: "pointer" }}>
+            <i className="ti ti-camera text-sm" style={{ color: "var(--brand-text-secondary)" }} />
+          </button>
+          <textarea ref={inputRef as never} rows={2} onInput={(e) => { const t = e.currentTarget as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160) + "px"; }} value={body} onChange={e => setBody(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+            placeholder="Message..." className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
+            style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} ></textarea>
+          <button onClick={handleSend} disabled={(!body.trim() && !attachFile) || sending}
+            className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
+            style={{ background: (body.trim() || attachFile) && !sending ? "var(--brand-primary)" : "var(--brand-surface)", border: "1px solid var(--brand-border)", opacity: (!body.trim() && !attachFile) || sending ? 0.6 : 1 }}>
+            {sending
+              ? <i className="ti ti-loader-2 animate-spin text-sm" style={{ color: "var(--brand-text-secondary)" }} />
+              : <i className="ti ti-send text-sm" style={{ color: body.trim() || attachFile ? "white" : "var(--brand-text-secondary)" }} />}
+          </button>
+        </div>
       </div>
+      {viewerUrl && (
+        <div onClick={() => setViewerUrl(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, cursor: "zoom-out" }}>
+          <img src={viewerUrl} alt="Attached image" style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 8 }} />
+        </div>
+      )}
     </div>
   );
 
@@ -352,9 +433,20 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
       </div>
       <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--brand-border)", fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>{clientTitle}</div>
       <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>{ThreadPanel()}</div>
-      <div style={{ display: "flex", gap: 8, padding: 10, borderTop: "1px solid var(--brand-border)" }}>
-        <textarea ref={inputRef as any} rows={1} value={body} onChange={(e) => setBody(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} onInput={(e) => { const t = e.currentTarget as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 140) + "px"; }} placeholder={isGroup ? "Message the group..." : "Message your coach..."} style={{ flex: 1, resize: "none", borderRadius: 16, border: "1px solid var(--brand-border)", padding: "10px 12px", fontSize: 14, background: "var(--brand-surface)", color: "var(--brand-text)", fontFamily: "inherit" }} />
-        <button onClick={handleSend} disabled={sending || !body.trim()} style={{ border: "none", borderRadius: 999, padding: "0 18px", fontWeight: 800, fontSize: 14, background: "var(--brand-primary)", color: "#fff", cursor: "pointer", opacity: sending || !body.trim() ? 0.5 : 1 }}>Send</button>
+      <div style={{ padding: 10, borderTop: "1px solid var(--brand-border)" }}>
+        {attachPreview && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <img src={attachPreview} alt="Attachment preview" style={{ height: 56, borderRadius: 8 }} />
+            <button onClick={clearAttach} aria-label="Remove attachment" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brand-text-secondary)" }}><i className="ti ti-x" /></button>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => fileRef.current?.click()} disabled={sending} aria-label="Attach image" title="Attach image" style={{ border: "1px solid var(--brand-border)", borderRadius: 999, width: 42, flexShrink: 0, background: "var(--brand-surface)", color: "var(--brand-text-secondary)", cursor: "pointer" }}>
+            <i className="ti ti-camera" />
+          </button>
+          <textarea ref={inputRef as never} rows={1} value={body} onChange={(e) => setBody(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} onInput={(e) => { const t = e.currentTarget as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 140) + "px"; }} placeholder={isGroup ? "Message the group..." : "Message your coach..."} style={{ flex: 1, resize: "none", borderRadius: 16, border: "1px solid var(--brand-border)", padding: "10px 12px", fontSize: 14, background: "var(--brand-surface)", color: "var(--brand-text)", fontFamily: "inherit" }} />
+          <button onClick={handleSend} disabled={sending || (!body.trim() && !attachFile)} style={{ border: "none", borderRadius: 999, padding: "0 18px", fontWeight: 800, fontSize: 14, background: "var(--brand-primary)", color: "#fff", cursor: "pointer", opacity: sending || (!body.trim() && !attachFile) ? 0.5 : 1 }}>Send</button>
+        </div>
       </div>
     </div>
   );
