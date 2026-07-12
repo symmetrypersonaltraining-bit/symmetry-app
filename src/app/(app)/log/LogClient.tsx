@@ -15,6 +15,7 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
   const [tab, setTab] = useState<"weigh" | "cardio">("weigh");
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Weigh-in state
   const [weight, setWeight] = useState("");
@@ -40,7 +41,7 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
       const bf = bodyFat ? parseFloat(bodyFat) : null;
       const lean = bf !== null ? w * (1 - bf / 100) : null;
       const fat = bf !== null ? w * (bf / 100) : null;
-      const { data } = await supabase.from("metrics").upsert({
+      const { data, error } = await supabase.from("metrics").upsert({
         client_id: clientId,
         metric_date: weighDate,
         weight: w,
@@ -49,6 +50,11 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
         fat_mass: fat,
         source: "client_app",
       }, { onConflict: "client_id,metric_date" }).select().single();
+      if (error) {
+        setErrorMsg(error.message || "Couldn't save your weigh-in. Please try again.");
+        setTimeout(() => setErrorMsg(null), 4000);
+        return;
+      }
       if (data) {
         setMetrics(prev => [data as Metric, ...prev.filter(m => m.metric_date !== weighDate)].slice(0, 5));
       }
@@ -62,7 +68,7 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
     if (!duration) return;
     setSaving(true);
     try {
-      const { data } = await supabase.from("cardio_logs").insert({
+      const { data, error } = await supabase.from("cardio_logs").insert({
         client_id: clientId,
         log_date: cardioDate,
         type: cardioType,
@@ -72,6 +78,11 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
         avg_hr: avgHr ? parseInt(avgHr) : null,
         source: "client_app",
       }).select().single();
+      if (error) {
+        setErrorMsg(error.message || "Couldn't save your cardio. Please try again.");
+        setTimeout(() => setErrorMsg(null), 4000);
+        return;
+      }
       if (data) {
         setCardioLogs(prev => [data as CardioLog, ...prev].slice(0, 5));
       }
@@ -92,6 +103,13 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-sm font-semibold text-white shadow-lg"
           style={{ background: "#22c55e" }}>
           \u2713 {success}
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-sm font-semibold text-white shadow-lg"
+          style={{ background: "#ef4444" }}>
+          {errorMsg}
         </div>
       )}
 
