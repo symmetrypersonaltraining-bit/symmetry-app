@@ -73,7 +73,7 @@ export async function POST(request: Request) {
   // Fetch the reminder with client info
   const { data: reminder, error } = await supabase
     .from("payment_reminders")
-    .select("*, clients(name, email, payment_reminders_enabled)")
+    .select("*, clients(name, email, payment_reminders_enabled, flat_billing)")
     .eq("id", reminderId)
     .maybeSingle();
 
@@ -90,7 +90,8 @@ export async function POST(request: Request) {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
   const amountDue = parseFloat(reminder.amount_due) || 0;
-  const credits = parseFloat(reminder.billing_credits) || 0;
+  // Flat-billed clients (e.g. quarterly flat fee) never get cancellation credits deducted.
+  const credits = client.flat_billing === true ? 0 : (parseFloat(reminder.billing_credits) || 0);
   const netDue = amountDue - credits;
 
   const sent = await sendEmail(

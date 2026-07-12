@@ -18,6 +18,7 @@ export interface ReminderCalcInput {
   lastCycleApprovedOn?: string | null; // CT date the PREVIOUS round was approved - anchors the look-back so post-approval cancels are never missed
   draftAmount: number; // current amount_due on the reminder row
   override: boolean; // Dustin explicitly accepted a non-calculated amount
+  flatBilling?: boolean; // client is flat-billed: NEVER deduct cancellation credits (always full fee)
 }
 
 export interface ReminderCalcResult {
@@ -71,10 +72,14 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
   const blocking: string[] = [];
   const warnings: string[] = [];
   const rate = i.sessionRate ?? 0;
-  const autoCredits = round2(i.cancelledFull * rate + i.cancelledHalf * rate * 0.5);
-  const totalCredits = round2(autoCredits + (i.manualCredits || 0));
+  const flat = i.flatBilling === true;
+  const autoCredits = flat ? 0 : round2(i.cancelledFull * rate + i.cancelledHalf * rate * 0.5);
+  const totalCredits = flat ? 0 : round2(autoCredits + (i.manualCredits || 0));
 
-  if ((i.cancelledFull > 0 || i.cancelledHalf > 0) && !i.sessionRate) {
+  if (flat && (i.cancelledFull > 0 || i.cancelledHalf > 0)) {
+    warnings.push("Flat billing: " + i.cancelledFull + " full / " + i.cancelledHalf + " half cancels ignored - full fee billed");
+  }
+  if (!flat && (i.cancelledFull > 0 || i.cancelledHalf > 0) && !i.sessionRate) {
     blocking.push("Cancelled sessions in this cycle but no session rate on file");
   }
   if (i.fee == null) blocking.push("No fee on file - set the client fee first");

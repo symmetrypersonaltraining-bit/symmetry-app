@@ -24,6 +24,7 @@ interface Rem {
   cancelledFull: number;
   cancelledHalf: number;
   lastApprovedOn: string | null;
+  flatBilling: boolean;
 }
 
 interface Edit {
@@ -52,7 +53,7 @@ export default function ReminderEditor() {
         .order("due_date");
       const { data: clients } = await sup
         .from("clients")
-        .select("id, name, current_fees, session_rate");
+        .select("id, name, current_fees, session_rate, flat_billing");
       const { data: pays } = await sup
         .from("calendar_payments")
         .select("client_id, amount, payment_date, cadence")
@@ -107,7 +108,7 @@ export default function ReminderEditor() {
           name: c.name || "?", fee: c.current_fees == null ? null : Number(c.current_fees),
           sessionRate: c.session_rate == null ? null : Number(c.session_rate),
           cadence: cad, lastPay: lastPayOf(r.client_id), cancelledFull: full, cancelledHalf: half,
-          lastApprovedOn: la,
+          lastApprovedOn: la, flatBilling: c.flat_billing === true,
         };
       });
       setRows(out);
@@ -137,7 +138,7 @@ export default function ReminderEditor() {
         fee: r.fee, sessionRate: r.sessionRate, cadence: r.cadence, dueDate: e.due,
         cancelledFull: r.cancelledFull, cancelledHalf: r.cancelledHalf,
         manualCredits: parseFloat(e.manual) || 0, lastPaymentAmount: r.lastPay,
-        lastCycleApprovedOn: r.lastApprovedOn,
+        lastCycleApprovedOn: r.lastApprovedOn, flatBilling: r.flatBilling,
         draftAmount: parseFloat(e.amount) || 0, override: e.override,
       });
       const patch: any = {
@@ -191,7 +192,7 @@ export default function ReminderEditor() {
           fee: r.fee, sessionRate: r.sessionRate, cadence: r.cadence, dueDate: e.due,
           cancelledFull: r.cancelledFull, cancelledHalf: r.cancelledHalf,
           manualCredits: parseFloat(e.manual) || 0, lastPaymentAmount: r.lastPay,
-        lastCycleApprovedOn: r.lastApprovedOn,
+        lastCycleApprovedOn: r.lastApprovedOn, flatBilling: r.flatBilling,
           draftAmount: parseFloat(e.amount) || 0, override: e.override,
         });
         const blocked = calc.blocking.length > 0;
