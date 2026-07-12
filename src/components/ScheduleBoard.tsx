@@ -66,6 +66,8 @@ export default function ScheduleBoard({
 }) {
   const router = useRouter();
   const today = todayCT();
+  // Workouts may be moved up to 7 days BACK (Dustin 2026-07-12); Peak Week + completed stay locked.
+  const minMoveDate = addDays(today, -7);
   const [workouts, setWorkouts] = useState<BoardWorkout[]>(initial);
   const [overDate, setOverDate] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -106,7 +108,7 @@ export default function ScheduleBoard({
     if (!toDate) return;
     const w = workouts.find((x) => x.id === id);
     if (!w || w.date === toDate) return;
-    if (toDate < today) { flash("Can't move a workout into the past."); return; }
+    if (toDate < minMoveDate) { flash("Can't move a workout more than 7 days back."); return; }
     if (isLockedDate(toDate) || isLockedDate(w.date)) { flash("Peak Week workouts are locked."); return; }
     setWorkouts((prev) => prev.map((x) => (x.id === id ? { ...x, date: toDate } : x)));
     try {
@@ -247,7 +249,7 @@ export default function ScheduleBoard({
     const under = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
     const dayEl = under && under.closest ? under.closest("[data-board-date]") : null;
     const dt = dayEl ? (dayEl as HTMLElement).getAttribute("data-board-date") : null;
-    setOverDate(dt && !isLockedDate(dt) && dt >= today ? dt : null);
+    setOverDate(dt && !isLockedDate(dt) && dt >= minMoveDate ? dt : null);
   }
   function onTileUp(e: React.PointerEvent) {
     const d = dragRef.current;
@@ -413,7 +415,7 @@ export default function ScheduleBoard({
             <input
               type="date"
               value={pickDate}
-              min={today}
+              min={minMoveDate}
               onChange={(e) => setPickDate(e.target.value)}
               style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-bg)", color: "var(--brand-text)", fontSize: 15, fontFamily: "inherit" }}
             />
@@ -421,8 +423,8 @@ export default function ScheduleBoard({
               <button onClick={() => setMovePick(null)} style={{ flex: "0 0 auto", background: "transparent", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)", borderRadius: 12, padding: "12px 16px", fontWeight: 700, cursor: "pointer" }}>Cancel</button>
               <button
                 onClick={() => { if (pickDate) { moveWorkout(movePick.id, pickDate); setMovePick(null); } }}
-                disabled={isLockedDate(pickDate) || pickDate < today}
-                style={{ flex: 1, background: "var(--brand-primary)", color: "#fff", border: "none", borderRadius: 12, padding: 12, fontWeight: 800, fontSize: 14, cursor: "pointer", opacity: isLockedDate(pickDate) || pickDate < today ? 0.6 : 1 }}
+                disabled={isLockedDate(pickDate) || pickDate < minMoveDate}
+                style={{ flex: 1, background: "var(--brand-primary)", color: "#fff", border: "none", borderRadius: 12, padding: 12, fontWeight: 800, fontSize: 14, cursor: "pointer", opacity: isLockedDate(pickDate) || pickDate < minMoveDate ? 0.6 : 1 }}
               >
                 Move here
               </button>
