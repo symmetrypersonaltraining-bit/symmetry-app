@@ -1134,6 +1134,11 @@ export default function WorkoutLogger({
     const peSets = sets[currentExercise.id] || [];
     const xFields = fieldCfg[currentExercise.id] || defaultTrackedFields(currentExercise);
     const saveFields = async (nf: string[]) => { setFieldCfg(prev => ({ ...prev, [currentExercise.id]: nf })); try { await supabase.from("prescribed_exercises").update({ tracked_fields: nf }).eq("id", currentExercise.id); } catch {} };
+    // Chip list matches the white preview: cardio gets Time/Speed/HR, strength gets
+    // Weight/Reps/Time/Each side — plus any field already tracked on this exercise,
+    // so the session view always shows the same fields as the edit/preview screen.
+    const chipList: string[] = isCardioEx(currentExercise) ? ["time", "speed", "hr"] : ["weight", "reps", "time", "each_side"];
+    for (const f of xFields) if (!chipList.includes(f) && ["weight", "reps", "time", "speed", "hr", "each_side"].includes(f)) chipList.push(f);
 
     return (
       <div className="fixed inset-0 flex flex-col z-[999]" style={{ background: "var(--session-bg)", ...(kbVV ? { top: kbVV.top, height: kbVV.height, bottom: "auto" } : {}) }}>
@@ -1266,13 +1271,13 @@ export default function WorkoutLogger({
         <div className="flex-1 overflow-y-auto px-5">
           <div className="flex items-center gap-2 mb-1" style={{ flexWrap: "wrap" }}>
             <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>Track:</span>
-            {(["weight", "reps", "time", "each_side"] as string[]).map((f) => {
+            {chipList.map((f) => {
               const on = xFields.includes(f);
               return (
                 <button key={f} type="button" onClick={() => saveFields(on ? xFields.filter((x: string) => x !== f) : [...xFields, f])}
                   className="px-2.5 py-1 rounded-full text-xs font-medium"
                   style={{ background: on ? "var(--brand-primary)" : "rgba(255,255,255,0.08)", color: on ? "white" : "rgba(255,255,255,0.5)", border: "none" }}>
-                  {f === "weight" ? "Weight" : f === "reps" ? "Reps" : f === "time" ? "Time" : "Each side"}
+                  {f === "weight" ? "Weight" : f === "reps" ? "Reps" : f === "time" ? "Time" : f === "speed" ? "Speed" : f === "hr" ? "HR" : "Each side"}
                 </button>
               );
             })}
@@ -1282,6 +1287,8 @@ export default function WorkoutLogger({
             {xFields.includes("weight") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>WEIGHT (lb)</div>}
             {xFields.includes("reps") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>REPS</div>}
             {xFields.includes("time") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>TIME (min)</div>}
+            {xFields.includes("speed") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>SPEED (mph)</div>}
+            {xFields.includes("hr") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>HR (bpm)</div>}
             <div className="w-12" />
           </div>
           
@@ -1316,6 +1323,24 @@ export default function WorkoutLogger({
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="decimal" />)}
+              {xFields.includes("speed") && (<input type="text" value={setEntry.speed} onFocus={focusScroll} onBlur={focusBlur}
+                onChange={e => updateSet(currentExercise.id, si, "speed", e.target.value)}
+                disabled={setEntry.done} placeholder=""
+                className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
+                style={{
+                  background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
+                  color: setEntry.done ? "#22c55e" : "white",
+                  border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
+                }} inputMode="decimal" />)}
+              {xFields.includes("hr") && (<input type="text" value={setEntry.hr} onFocus={focusScroll} onBlur={focusBlur}
+                onChange={e => updateSet(currentExercise.id, si, "hr", e.target.value)}
+                disabled={setEntry.done} placeholder=""
+                className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
+                style={{
+                  background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
+                  color: setEntry.done ? "#22c55e" : "white",
+                  border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
+                }} inputMode="numeric" />)}
               <button onClick={() => { if (setEntry.done) { updateSet(currentExercise.id, si, "done", false); } else { logSet(currentExercise.id, si); } }}
                 disabled={saving}
                 className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
