@@ -1,0 +1,98 @@
+# ============================================================================
+# Symmetry iOS (TestFlight) — STAGED workflow, ready to merge into codemagic.yaml
+# ----------------------------------------------------------------------------
+# This file is NOT read by Codemagic (only codemagic.yaml is), so committing it
+# is CI-inert and cannot break main. When the Apple Developer account is ACTIVE:
+#   1. In App Store Connect: create an API key -> add it to Codemagic as an
+#      integration named  codemagic_asc  (referenced below).
+#   2. Register the app (bundle id com.symmetry.app) in App Store Connect;
+#      copy its numeric Apple ID into APP_STORE_APPLE_ID below.
+#   3. Paste the `ios-testflight:` block into codemagic.yaml under `workflows:`.
+#   4. Run "Symmetry iOS (TestFlight)" on mac_mini_m2.
+# Mirrors the android-debug pattern: Capacitor deps installed in CI (kept OUT of
+# package.json), @capacitor/app + speech-recognition plugin, and the manifest/
+# Info.plist patched in-CI (mic + speech permission strings). iOS analog of the
+# predictive-back patch is not needed (that's Android-only); the iOS-specific add
+# is the Info.plist usage strings + export-compliance flag.
+# ============================================================================
+
+workflows:
+  ios-testflight:
+    name: Symmetry iOS (TestFlight)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: codemagic_asc      # <-- create this integration once the ASC API key exists
+    environment:
+      node: 20
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store         # automatic managed signing via codemagic_asc
+        bundle_identifier: com.symmetry.app
+      vars:
+        BUNDLE_ID: "com.symmetry.app"
+        APP_STORE_APPLE_ID: ""               # <-- fill with the app's numeric Apple ID after registering it in ASC
+    scripts:
+      - name: Install web dependencies
+        script: npm install
+
+      - name: Add Capacitor (build tooling only — kept OUT of package.json, installed in CI)
+        script: npm install @capacitor/core@^6 @capacitor/cli@^6 @capacitor/ios@^6 @capacitor/app@^6 @capacitor-community/speech-recognition@^6
+
+      - name: Generate iOS project
+        script: npx cap add ios || npx cap sync ios
+
+      - name: Sync Capacitor into iOS
+        script: npx cap sync ios
+
+      - name: Patch Info.plist (mic + speech permission strings + export compliance)
+        script: |
+          python3 - << 'EOF'
+          import plistlib, glob
+          matches = glob.glob("ios/App/App/Info.plist")
+          if not matches:
+              raise SystemExit("Info.plist not found — check Capacitor iOS scaffold path")
+          p = matches[0]
+          with open(p, "rb") as f:
+              pl = plistlib.load(f)
+          pl["NSMicrophoneUsageDescription"] = "Symmetry uses the microphone so you can log workouts and notes by voice."
+          pl["NSSpeechRecognitionUsageDescription"] = "Symmetry uses speech recognition to turn your dictation into logged sets, reps, and notes."
+          # Standard HTTPS only -> declare no non-exempt encryption so TestFlight skips the export-compliance prompt
+          pl["ITSAppUsesNonExemptEncryption"] = False
+          with open(p, "wb") as f:
+              plistlib.dump(pl, f)
+          print("Info.plist patched: mic + speech usage strings + ITSAppUsesNonExemptEncryption=false")
+          EOF
+
+      - name: Generate app icon (mirror Android icon step)
+        script: |
+          python3 -m pip install --quiet --user pillow numpy || pip3 install --quiet pillow numpy
+          python3 resources/generate_icons.py || true
+          # Fallback: if generate_icons.py doesn't emit the iOS AppIcon set, generate from source logo.
+          npx --yes @capacitor/assets generate --ios --iconBackgroundColor '#0F4C81' --iconBackgroundColorDark '#0B0F17' || true
+
+      - name: Set marketing + build version
+        script: |
+          cd ios/App
+          agvtool new-marketing-version 1.0.0 || true
+          agvtool new-version -all "${BUILD_NUMBER:-1}" || true
+
+      - name: Set up code signing (managed by codemagic_asc)
+        script: xcode-project use-profiles
+
+      - name: Build & archive IPA
+        script: |
+          xcode-project build-ipa \
+            --project "ios/App/App.xcodeproj" \
+            --scheme "App"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Clients                          # external group; first external build needs a light Beta App Review,
+                                             # then enable the public TestFlight link in App Store Connect
