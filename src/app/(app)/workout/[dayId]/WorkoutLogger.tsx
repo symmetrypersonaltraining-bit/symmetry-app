@@ -637,6 +637,32 @@ export default function WorkoutLogger({
       if (!a || a.tagName !== "INPUT") setTyping(false);
     }, 120);
   }, []);
+  // Keyboard-close detection v2 (v1 REVERTED 7/13 — on Android the window
+  // resizes WITH the keyboard, so "is it full height" fired on open and kicked
+  // focus out of inputs). v2: remember the pre-keyboard height and only
+  // un-collapse after a real shrink -> grow-back cycle. Cannot fire on open.
+  const kbBaseH = useRef(0);
+  const kbWasOpen = useRef(false);
+  useEffect(() => {
+    try { kbBaseH.current = window.innerHeight; } catch { /* noop */ }
+    const onResize = () => {
+      try {
+        const h = window.innerHeight;
+        if (h < kbBaseH.current - 150) { kbWasOpen.current = true; return; }
+        if (h >= kbBaseH.current - 80) {
+          if (kbWasOpen.current) {
+            kbWasOpen.current = false;
+            const a = document.activeElement as HTMLElement | null;
+            if (a && a.tagName === "INPUT") a.blur();
+            setTyping(false);
+          }
+          if (h > kbBaseH.current) kbBaseH.current = h;
+        }
+      } catch { /* noop */ }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   // After the layout settles (kbVV toggles OR typing begins), pull the focused input to the top
   // of the scroll area so it clears the keyboard even for lower set rows.
   useEffect(() => {
