@@ -637,6 +637,27 @@ export default function WorkoutLogger({
       if (!a || a.tagName !== "INPUT") setTyping(false);
     }, 120);
   }, []);
+  // Android: closing the keyboard with the hardware Back button does NOT blur
+  // the focused input, which left the logger stuck in typing mode (header
+  // hidden, screen looked frozen). When the visual viewport returns to (near)
+  // full height while typing, force-blur and un-collapse. iOS webviews without
+  // reliable visualViewport still exit via the normal blur path.
+  useEffect(() => {
+    if (!typing) return;
+    const vv = (window as { visualViewport?: { height: number; addEventListener: (t: string, f: () => void) => void; removeEventListener: (t: string, f: () => void) => void } }).visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      try {
+        if (vv.height >= window.innerHeight - 80) {
+          const a = document.activeElement as HTMLElement | null;
+          if (a && a.tagName === "INPUT") a.blur();
+          setTyping(false);
+        }
+      } catch { /* noop */ }
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, [typing]);
   // After the layout settles (kbVV toggles OR typing begins), pull the focused input to the top
   // of the scroll area so it clears the keyboard even for lower set rows.
   useEffect(() => {
