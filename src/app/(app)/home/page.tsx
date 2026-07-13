@@ -81,26 +81,33 @@ export default async function HomePage() {
     // Today's scheduled workouts — provides day_id for Start button + completion status
     const { data: todayWorkoutRows } = await supabase
       .from("scheduled_workouts")
-      .select("id, client_id, status, day_id, days(id, label)")
+      .select("id, client_id, status, day_id, supervised, position, days(id, label)")
       .is("deleted_at", null)
       .eq("scheduled_date", todayStrCT);
 
+    // The trainer's "Today's Sessions" must launch the SUPERVISED day (what the client trains
+    // WITH the trainer), never their solo mobility/cardio/walk homework. Rank each candidate:
+    // supervised first, then a real training day over a solo/cardio/mobility day, then lower
+    // position; lowest score wins. (Previously it only avoided /cardio/ and didn't order the
+    // query, so a solo mobility day could shadow the supervised strength session.)
     type ClientDay = { dayId: string; dayLabel: string; status: string };
+    const SOLO_RE = /cardio|treadmill|\bwalk\b|stair.?master|mobility|daily reset|elliptical|\bbike\b/i;
+    const dayRank = (label: string, supervised: boolean, position: number) =>
+      (supervised ? 0 : 100) + (SOLO_RE.test(label) ? 10 : 0) + Math.max(0, Math.min(9, position || 0));
+    const bestRank: Record<string, number> = {};
     const clientDayMap: Record<string, ClientDay> = {};
     for (const w of todayWorkoutRows || []) {
       const row = w as any;
-      if (row.client_id) {
-        const label = (row.days?.label || "Training") as string;
-        const isCardio = /cardio/i.test(label);
-        const existing = clientDayMap[row.client_id];
-        // Trainer session = the supervised training day; a client’s cardio must not overwrite it.
-        if (!existing || (/cardio/i.test(existing.dayLabel) && !isCardio)) {
-          clientDayMap[row.client_id] = {
-            dayId: row.days?.id || row.day_id,
-            dayLabel: label,
-            status: row.status || "scheduled",
-          };
-        }
+      if (!row.client_id) continue;
+      const label = (row.days?.label || "Training") as string;
+      const score = dayRank(label, row.supervised === true, row.position);
+      if (bestRank[row.client_id] === undefined || score < bestRank[row.client_id]) {
+        bestRank[row.client_id] = score;
+        clientDayMap[row.client_id] = {
+          dayId: row.days?.id || row.day_id,
+          dayLabel: label,
+          status: row.status || "scheduled",
+        };
       }
     }
 
