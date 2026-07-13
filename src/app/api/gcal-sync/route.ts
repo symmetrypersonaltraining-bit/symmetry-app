@@ -31,18 +31,35 @@ export async function POST(req: NextRequest) {
     const clients = clientRows as Array<{id: string; name: string}> | null;
     if (!clients?.length) return NextResponse.json({ error: 'No clients found' }, { status: 500 });
 
-    const clientMap = clients.map((c: any) => ({
-      id: c.id,
-      name: (c.name || '').toLowerCase(),
-      first: (c.name || '').split(' ')[0].toLowerCase(),
-    }));
+    const clientMap = clients.map((c: any) => {
+      const parts = (c.name || '').toLowerCase().split(/\s+/).filter(Boolean);
+      return {
+        id: c.id,
+        name: (c.name || '').toLowerCase(),
+        first: parts[0] || '',
+        last: parts.length > 1 ? parts[parts.length - 1] : '',
+      };
+    });
 
+    // Word-boundary test, regex-escaped (names can contain punctuation).
+    const hasWord = (s: string, t: string) =>
+      t.length > 1 && new RegExp('\\b' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(s);
+
+    // Match an event title to a client by the strongest, least-ambiguous signal:
+    //   full name > first AND last both present > a UNIQUE last name > a UNIQUE first name.
+    // Last name outranks a bare first-name match so "Robert Burns" resolves to
+    // "Robby Burns" (shared last name) instead of "Robert Miller" (shared first name).
+    // When a signal is ambiguous (matches >1 client), fall through rather than mis-guess.
     function matchClient(summary: string): string | null {
       const s = (summary || '').toLowerCase();
       const full = clientMap.find(c => c.name.length > 0 && s.includes(c.name));
       if (full) return full.id;
-      const first = clientMap.find(c => c.first.length > 2 && new RegExp('\\b' + c.first + '\\b').test(s));
-      if (first) return first.id;
+      const both = clientMap.filter(c => c.first && c.last && hasWord(s, c.first) && hasWord(s, c.last));
+      if (both.length === 1) return both[0].id;
+      const byLast = clientMap.filter(c => c.last.length > 2 && hasWord(s, c.last));
+      if (byLast.length === 1) return byLast[0].id;
+      const byFirst = clientMap.filter(c => c.first.length > 2 && hasWord(s, c.first));
+      if (byFirst.length === 1) return byFirst[0].id;
       return null;
     }
 
