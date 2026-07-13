@@ -89,10 +89,10 @@ export async function POST(request: Request) {
   const dueDate = new Date(reminder.due_date).toLocaleDateString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
-  const amountDue = parseFloat(reminder.amount_due) || 0;
-  // Flat-billed clients (e.g. quarterly flat fee) never get cancellation credits deducted.
-  const credits = client.flat_billing === true ? 0 : (parseFloat(reminder.billing_credits) || 0);
-  const netDue = amountDue - credits;
+  // amount_due is the FINAL amount the client owes — cancellation/flat credits are already
+  // baked into it by the reminder editor. Do NOT subtract billing_credits again here (that
+  // double-counted the credit and under-billed the client).
+  const netDue = parseFloat(reminder.amount_due) || 0;
 
   const sent = await sendEmail(
     client.email,

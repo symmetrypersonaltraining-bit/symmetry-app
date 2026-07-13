@@ -39,7 +39,7 @@ export default function PendingRemindersPanel({ reminders }: Props) {
     return "var(--brand-text-secondary)";
   }
 
-  const totalDue = reminders.reduce((a, r) => a + r.amountDue - r.billingCredits, 0);
+  const totalDue = reminders.reduce((a, r) => a + r.amountDue, 0); // amount_due is final; credits already applied
   const overdue = reminders.filter(r => daysUntil(r.dueDate) < 0);
   const dueSoon = reminders.filter(r => { const d = daysUntil(r.dueDate); return d >= 0 && d <= 7; });
 
@@ -85,7 +85,7 @@ export default function PendingRemindersPanel({ reminders }: Props) {
       <div>
         {display.map((r, i) => {
           const days = daysUntil(r.dueDate);
-          const net = r.amountDue - r.billingCredits;
+          const net = r.amountDue; // amount_due is final; credits already applied
           const color = urgencyColor(days);
           const isPaused = r.notificationStatus === "paused";
           return (

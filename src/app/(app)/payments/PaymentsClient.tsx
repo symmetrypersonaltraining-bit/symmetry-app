@@ -80,7 +80,7 @@ interface ConfirmModalProps {
 
 function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
   const supabase = createClient();
-  const [amount, setAmount] = useState(String(client.amountDue - client.billingCredits));
+  const [amount, setAmount] = useState(String(client.amountDue)); // amount_due is final; credits already applied
   const [notes, setNotes] = useState(client.notes || "");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -572,7 +572,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
   const pendingCount = filtered.filter(c => c.notificationStatus === "pending" || c.notificationStatus === "no_reminder").length;
   const totalOwed = filtered
     .filter(c => c.notificationStatus !== "paid" && c.notificationStatus !== "cancelled" && c.notificationStatus !== "no_reminder" && c.notificationStatus !== "disabled")
-    .reduce((a, c) => a + c.amountDue - c.billingCredits, 0);
+    .reduce((a, c) => a + c.amountDue, 0); // amount_due is final; credits already applied
   const overdueCount = filtered.filter(c => c.dueDate && daysUntil(c.dueDate, today) < 0 && c.notificationStatus !== "paid").length;
 
   async function handleMarkPaid(c: ClientPayment) {
@@ -794,7 +794,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
 
         {filtered.map(c => {
           const days = c.dueDate ? daysUntil(c.dueDate, today) : null;
-          const net = c.amountDue - c.billingCredits;
+          const net = c.amountDue; // amount_due is final; credits already applied
           const s = STATUS_META[c.notificationStatus] || STATUS_META.pending;
           const isUpdating = updating === c.clientId;
           const initials = c.clientName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
