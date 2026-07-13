@@ -643,25 +643,45 @@ export default function WorkoutLogger({
   // un-collapse after a real shrink -> grow-back cycle. Cannot fire on open.
   const kbBaseH = useRef(0);
   const kbWasOpen = useRef(false);
+  // v3 (7/13): debounce the grow-back. When switching between set inputs Android can
+  // flicker the keyboard closed->open for a moment; v2 treated that flicker as a real
+  // close and un-collapsed the header (and blurred the input) mid-typing. Now the
+  // un-collapse only fires if the window is STILL near full height ~450ms later; a
+  // flicker re-shrinks first, which cancels the timer. A real close still restores
+  // the header, just half a beat later.
+  const kbCloseT = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     try { kbBaseH.current = window.innerHeight; } catch { /* noop */ }
     const onResize = () => {
       try {
         const h = window.innerHeight;
-        if (h < kbBaseH.current - 150) { kbWasOpen.current = true; return; }
+        if (h < kbBaseH.current - 150) {
+          kbWasOpen.current = true;
+          if (kbCloseT.current) { clearTimeout(kbCloseT.current); kbCloseT.current = null; }
+          return;
+        }
         if (h >= kbBaseH.current - 80) {
-          if (kbWasOpen.current) {
-            kbWasOpen.current = false;
-            const a = document.activeElement as HTMLElement | null;
-            if (a && a.tagName === "INPUT") a.blur();
-            setTyping(false);
-          }
           if (h > kbBaseH.current) kbBaseH.current = h;
+          if (kbWasOpen.current && !kbCloseT.current) {
+            kbCloseT.current = setTimeout(() => {
+              kbCloseT.current = null;
+              try {
+                if (window.innerHeight < kbBaseH.current - 80) return; // keyboard came back — was a flicker
+                kbWasOpen.current = false;
+                const a = document.activeElement as HTMLElement | null;
+                if (a && a.tagName === "INPUT") a.blur();
+                setTyping(false);
+              } catch { /* noop */ }
+            }, 450);
+          }
         }
       } catch { /* noop */ }
     };
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      if (kbCloseT.current) { clearTimeout(kbCloseT.current); kbCloseT.current = null; }
+    };
   }, []);
   // After the layout settles (kbVV toggles OR typing begins), pull the focused input to the top
   // of the scroll area so it clears the keyboard even for lower set rows.
