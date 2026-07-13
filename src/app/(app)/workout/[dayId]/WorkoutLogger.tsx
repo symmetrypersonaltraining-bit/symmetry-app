@@ -773,7 +773,17 @@ export default function WorkoutLogger({
   const progressPct = totalSets > 0 ? Math.round((doneSets / totalSets) * 100) : 0;
   const currentSection = localSections[activeSectionIdx];
   const currentExercise = currentSection?.prescribed_exercises[activeExerciseIdx];
-  const isCardioEx = (pe: any) => !!pe && (pe.volume_type === "duration" || /conditioning/i.test((pe.exercises && pe.exercises.modality) || ""));
+  // Cardio = true conditioning work (treadmill, ropes, stair master, etc.). A duration-based
+  // stretch or mobility hold is NOT cardio — keying off volume_type wrongly locked every timed
+  // stretch to Time/Speed/HR only and hid the Reps/Weight options. Classify by modality, plus a
+  // narrow name check so machine cardio that's mistagged still shows speed/HR. Duration exercises
+  // still default to Time (defaultTrackedFields) and their time still saves (duration_seconds).
+  const isCardioEx = (pe: any) => {
+    if (!pe) return false;
+    const ex = pe.exercises || {};
+    return /conditioning|cardio/i.test(ex.modality || "")
+      || /treadmill|elliptical|stair.?master|stationary bike|spin bike|rowing machine|battle rope|\bjog(ging)?\b|sprint/i.test(ex.name || "");
+  };
 
   // --- Auto-advance to the next exercise once the current one is fully logged ---
   const __goNextExercise = () => {
