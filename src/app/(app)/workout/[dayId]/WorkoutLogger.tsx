@@ -681,7 +681,40 @@ export default function WorkoutLogger({
       if (raw) {
         const d = JSON.parse(raw);
         if (d && typeof d === 'object') {
-          if (d.sets && Object.keys(d.sets).length) setSets(d.sets);
+          if (d.sets && Object.keys(d.sets).length) {
+            // Merge the saved draft ONTO the freshly prescribed-prefilled sets instead of
+            // replacing them. A completed set is real logged data (kept as-is); every other
+            // set falls back to the prescribed prefill where the draft is blank — so a stale
+            // or blank draft can never wipe the prescribed reps (self-heals old blank drafts).
+            const draft = d.sets as Record<string, SetData[]>;
+            setSets(prev => {
+              const merged: Record<string, SetData[]> = { ...prev };
+              for (const peId of Object.keys(prev)) {
+                const draftArr = draft[peId];
+                if (!Array.isArray(draftArr)) continue;
+                merged[peId] = prev[peId].map((base, i) => {
+                  const dr = draftArr[i];
+                  if (!dr) return base;
+                  if (dr.done) return dr;
+                  return {
+                    weight: dr.weight || base.weight,
+                    reps: dr.reps || base.reps,
+                    time: dr.time || base.time,
+                    speed: dr.speed || base.speed,
+                    hr: dr.hr || base.hr,
+                    done: false,
+                  };
+                });
+                if (draftArr.length > prev[peId].length) {
+                  merged[peId] = merged[peId].concat(draftArr.slice(prev[peId].length));
+                }
+              }
+              for (const peId of Object.keys(draft)) {
+                if (!merged[peId]) merged[peId] = draft[peId];
+              }
+              return merged;
+            });
+          }
           if (typeof d.activeSectionIdx === 'number') setActiveSectionIdx(d.activeSectionIdx);
           if (typeof d.activeExerciseIdx === 'number') setActiveExerciseIdx(d.activeExerciseIdx);
           if (typeof d.sessionMode === 'boolean') setSessionMode(d.sessionMode);
