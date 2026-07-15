@@ -637,37 +637,43 @@ export default function WorkoutLogger({
       if (!a || a.tagName !== "INPUT") setTyping(false);
     }, 120);
   }, []);
-  // Keyboard-close detection v2 (v1 REVERTED 7/13 — on Android the window
-  // resizes WITH the keyboard, so "is it full height" fired on open and kicked
-  // focus out of inputs). v2: remember the pre-keyboard height and only
-  // un-collapse after a real shrink -> grow-back cycle. Cannot fire on open.
-  // Keyboard-close recovery (7/13, poll-based self-heal). The collapse-while-typing
-  // behavior is intentional — it lifts the set/rep rows above the keyboard, keep it.
-  // The ONLY job here is to GUARANTEE the collapsed chrome comes back once the keyboard
-  // is gone, INCLUDING when Android's "hide keyboard" button dismisses it WITHOUT
-  // blurring the input (so no focusout ever fires). Resize events were unreliable for
-  // this; a short poll comparing innerHeight to a no-keyboard baseline always recovers.
-  // It never resets until it has SEEN the keyboard actually open, so it cannot kick
-  // focus out of an input mid-typing.
+  // Keyboard-close recovery v4 (7/13). Collapse-while-typing is intentional (it lifts
+  // the set/rep rows above the keyboard) — keep it. This ONLY guarantees the collapsed
+  // header comes back once the keyboard is actually gone, including (a) Android's "hide
+  // keyboard" button, which dismisses WITHOUT blurring the input, and (b) any case where
+  // `typing` is left true while the keyboard is already down (which stuck the header
+  // collapsed at rest). Poll compares innerHeight to a no-keyboard baseline. It only
+  // restores after the keyboard has been confirmed DOWN for several consecutive ticks,
+  // with a startup grace, so it never un-collapses during a flicker or the open animation.
   const kbBaseH = useRef(0);
   useEffect(() => { try { kbBaseH.current = window.innerHeight; } catch { /* noop */ } }, []);
   useEffect(() => {
     if (!typing) return;
     let fullH = 0;
     try { fullH = Math.max(window.innerHeight, kbBaseH.current || 0); } catch { /* noop */ }
-    let sawShrink = false;
+    let opened = false;
+    let downTicks = 0;
+    let start = 0;
+    try { start = Date.now(); } catch { /* noop */ }
     const id = setInterval(() => {
       try {
         const h = window.innerHeight;
         if (h > fullH) { fullH = h; kbBaseH.current = h; }   // keep the no-keyboard baseline current
-        if (h < fullH - 120) { sawShrink = true; return; }   // keyboard is open — leave collapsed
-        if (sawShrink && h >= fullH - 60) {                  // keyboard was open and is now gone
+        if (h < fullH - 120) { opened = true; downTicks = 0; return; }  // keyboard is open — stay collapsed
+        downTicks++;                                         // keyboard looks down this tick
+        let elapsed = 0; try { elapsed = Date.now() - start; } catch { /* noop */ }
+        // Restore once the keyboard has been down for a sustained window (>=3 ticks ~750ms).
+        // Either we saw it open then close, or enough grace has passed that it clearly is
+        // not up — in both cases nothing covers the rows, so bring the header back. The
+        // sustained requirement + grace stop a mid-typing flicker or the open animation
+        // from un-collapsing.
+        if (downTicks >= 3 && (opened || elapsed > 1200)) {
           const a = document.activeElement as HTMLElement | null;
           if (a && a.tagName === "INPUT") a.blur();
           setTyping(false);
         }
       } catch { /* noop */ }
-    }, 300);
+    }, 250);
     return () => clearInterval(id);
   }, [typing]);
   // After the layout settles (kbVV toggles OR typing begins), pull the focused input to the top
