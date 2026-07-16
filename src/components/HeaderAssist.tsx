@@ -50,7 +50,7 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
   }
 
   async function submit() {
-    if (!msg.trim() && !sentiment) return;
+    if (!msg.trim() && !sentiment && !file) return;
     setSending(true); buzz([10, 40, 10]);
     try {
       const sb: any = createClient();
