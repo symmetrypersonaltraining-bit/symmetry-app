@@ -253,7 +253,7 @@ export default function CelebrationScreen({
           {min > 0 ? " • " + min + " MINUTES" : ""}
           {prCount > 0 ? " • " + prCount + " NEW PR" : ""}
           <br />
-          Crowds gasped. Plates trembled. Legs remained un-skipped.
+          Crowds gasped. Plates trembled. Not a single set was skipped.
         </div>
       </div>
     );
@@ -364,7 +364,7 @@ export default function CelebrationScreen({
             {"BAGGAGE: " + vStr + " lbs (checked ✓)"}<br />
             <b style={{ color: "#22c55e" }}>{"STATUS: LANDED" + (prCount > 0 ? " — " + prCount + " PR COLLECTED" : "")}</b>
           </div>
-          <div style={{ borderTop: "2px dashed #ccd", padding: "8px 14px", fontSize: 10, color: "#889" }}>Your legs may feel like they are still in the air tomorrow.</div>
+          <div style={{ borderTop: "2px dashed #ccd", padding: "8px 14px", fontSize: 10, color: "#889" }}>Your muscles may feel like they are still in the air tomorrow.</div>
         </div>
       </div>
     );
