@@ -1137,6 +1137,12 @@ export default function WorkoutLogger({
             .from("scheduled_workouts")
             .update({ status: "completed", workout_log_id: logId })
             .eq("id", __swId);
+        } else {
+          // No scheduled row matched (unscheduled / make-up session) - create a completed
+          // one so the workout still counts in every tracking tile and counter.
+          await (supabase as any)
+            .from("scheduled_workouts")
+            .insert({ client_id: clientId, day_id: day.id, scheduled_date: __today, status: "completed", workout_log_id: logId, source: "client_self_assign" });
         }
       } catch {}
       setWorkoutComplete(true);
