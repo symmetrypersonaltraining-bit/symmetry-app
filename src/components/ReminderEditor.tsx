@@ -164,6 +164,13 @@ export default function ReminderEditor() {
         notification_status: "paid",
         paid_confirmed_at: new Date().toISOString(),
       }).eq("id", r.id);
+      // Notify the client their payment was received (feedback b0ee64d6)
+      await sup.from("client_notifications").insert({
+        client_id: r.client_id,
+        type: "payment_received",
+        title: "Payment received ✓",
+        body: "Thanks! We've received your payment" + (r.amount_due != null ? " of $" + Number(r.amount_due).toFixed(2) : "") + ".",
+      });
       if (r.fee != null) {
         await sup.from("payment_reminders").insert({
           client_id: r.client_id,
