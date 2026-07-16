@@ -37,7 +37,8 @@ export default function SetPasswordPage() {
         .eq("client_id", clientRec.id)
         .maybeSingle();
 
-      if (!settings?.password_is_temporary && clientRec?.onboarding_complete) { router.replace("/home"); return; }
+      const isRecovery = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("recovery") === "1";
+      if (!isRecovery && !settings?.password_is_temporary && clientRec?.onboarding_complete) { router.replace("/home"); return; }
       setChecking(false);
     }
     check();
