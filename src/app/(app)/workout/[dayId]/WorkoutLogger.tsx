@@ -598,6 +598,11 @@ export default function WorkoutLogger({
   const [trainerNoteText, setTrainerNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
+  // Per-exercise notes (client or trainer flags an issue with THIS movement).
+  const [exNoteText, setExNoteText] = useState("");
+  const [savingExNote, setSavingExNote] = useState(false);
+  const [exNoteSaved, setExNoteSaved] = useState(false);
+  const [exNotePrior, setExNotePrior] = useState<{ id: string; note: string; author: string; created_at: string }[]>([]);
   const [localSections, setLocalSections] = useState<Section[]>(sections);
   const [swapTargetPe, setSwapTargetPe] = useState<PrescribedExercise | null>(null);
 
@@ -812,6 +817,24 @@ export default function WorkoutLogger({
   const progressPct = totalSets > 0 ? Math.round((doneSets / totalSets) * 100) : 0;
   const currentSection = localSections[activeSectionIdx];
   const currentExercise = currentSection?.prescribed_exercises[activeExerciseIdx];
+  // Load prior notes for THIS movement so client + trainer see what was flagged before,
+  // keyed on exercise_id like set-log history. Isolated; revert = remove this block.
+  const __exNoteExId = currentExercise?.exercises?.id;
+  useEffect(() => {
+    let on = true;
+    setExNoteText(""); setExNoteSaved(false);
+    if (!__exNoteExId || !clientId) { setExNotePrior([]); return; }
+    (async () => {
+      try {
+        const { data } = await supabase.from("exercise_notes")
+          .select("id, note, author, created_at")
+          .eq("client_id", clientId).eq("exercise_id", __exNoteExId)
+          .order("created_at", { ascending: false }).limit(5);
+        if (on) setExNotePrior((data as unknown as { id: string; note: string; author: string; created_at: string }[]) || []);
+      } catch { if (on) setExNotePrior([]); }
+    })();
+    return () => { on = false; };
+  }, [__exNoteExId, clientId]);
   // Cardio = true conditioning work (treadmill, ropes, stair master, etc.). A duration-based
   // stretch or mobility hold is NOT cardio — keying off volume_type wrongly locked every timed
   // stretch to Time/Speed/HR only and hid the Reps/Weight options. Classify by modality, plus a
@@ -1148,6 +1171,27 @@ export default function WorkoutLogger({
     finally { setSavingNote(false); }
   }
 
+  async function saveExerciseNote() {
+    if (!exNoteText.trim() || !currentExercise) return;
+    setSavingExNote(true);
+    try {
+      const row = {
+        client_id: clientId,
+        exercise_id: currentExercise.exercises?.id ?? null,
+        prescribed_exercise_id: currentExercise.id,
+        workout_log_id: workoutLogId,
+        day_id: day?.id ?? null,
+        note: exNoteText.trim(),
+        author: isTrainerSession ? "trainer" : "client",
+      };
+      const { data } = await supabase.from("exercise_notes").insert(row).select("id, note, author, created_at");
+      if (data && data[0]) setExNotePrior(prev => [data[0] as unknown as { id: string; note: string; author: string; created_at: string }, ...prev]);
+      setExNoteText(""); setExNoteSaved(true);
+      setTimeout(() => setExNoteSaved(false), 2500);
+    } catch (e) { console.error(e); }
+    finally { setSavingExNote(false); }
+  }
+
   function startTrainerVoice() {
     startDictation({
       onResult: (t) => setTrainerNoteText(prev => prev ? prev + " " + t : t),
@@ -1433,7 +1477,39 @@ export default function WorkoutLogger({
           <button type="button" onClick={() => addSetRow(currentExercise.id)} className="flex-1 py-2 rounded-xl text-xs font-semibold" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.85)", border: "1px dashed rgba(255,255,255,0.22)" }}>&#65291; Add set</button>
           <button type="button" onClick={() => removeSetRow(currentExercise.id)} className="flex-1 py-2 rounded-xl text-xs font-semibold" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.85)", border: "1px dashed rgba(255,255,255,0.22)" }}>&#8722; Remove set</button>
         </div>
-        <button type="button" onClick={logAllCurrentSets} className="w-full mb-3 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "var(--brand-primary)" }}>Check all sets complete</button></div>
+        <button type="button" onClick={logAllCurrentSets} className="w-full mb-3 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "var(--brand-primary)" }}>Check all sets complete</button>
+
+        {/* Per-exercise notes — client or trainer flags an issue with THIS movement
+            (pain, couldn't do it, form). Saved to exercise_notes keyed by exercise so
+            programming (app + chat) reads the history. Sits in the scroll area so it never
+            touches the sticky footer or keyboard chrome. Isolated; revert = remove block. */}
+        <div className="mb-4 rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)" }}>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <i className="ti ti-message-report text-sm" style={{ color: "var(--brand-primary)" }} />
+            <p className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.75)" }}>Notes on this movement</p>
+          </div>
+          {exNotePrior.length > 0 && (
+            <div className="mb-2 space-y-1">
+              {exNotePrior.map(n => (
+                <div key={n.id} className="text-[11px] rounded-lg px-2 py-1" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)" }}>
+                  <span style={{ color: "var(--brand-primary)" }}>{n.author === "trainer" ? "You" : "Client"}: </span>{n.note}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input type="text" value={exNoteText} onChange={e => setExNoteText(e.target.value)}
+              onFocus={focusScroll} onBlur={focusBlur}
+              placeholder={'Pain, couldn\u2019t do it, form issue\u2026'}
+              className="flex-1 text-xs px-3 py-2 rounded-lg outline-none"
+              style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(255,255,255,0.15)" }} />
+            <button onClick={saveExerciseNote} disabled={savingExNote || !exNoteText.trim()}
+              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: exNoteSaved ? "#22c55e" : "var(--brand-primary)" }}>
+              <i className={`ti ${exNoteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
+            </button>
+          </div>
+        </div></div>
 
         {/* Bottom controls */}
         <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", display: kbVV ? "none" : undefined }}>
