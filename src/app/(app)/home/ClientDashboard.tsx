@@ -613,6 +613,8 @@ export default function ClientDashboard({
             <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{greeting},</p>
             <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}><span style={{ backgroundImage: hour < 12 ? "linear-gradient(100deg,#ff9f5a,#ff6b6b,#c86dd7)" : hour < 17 ? "linear-gradient(100deg,#7c9cf5,#5ec9a3,#ffd36e)" : "linear-gradient(100deg,#6366f1,#8b6ff0,#3aa8c1)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>{firstName}</span> 👋</h1>
           </div>
+          <div className="flex items-center gap-2">
+          <MessagesBell />
           {streakDays > 0 && (
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${isMilestone ? "animate-pulse" : ""}`}
               style={{ background: isMilestone ? "#f59e0b20" : "var(--brand-surface)", border: `1px solid ${isMilestone ? "#f59e0b" : "var(--brand-border)"}` }}>
@@ -623,6 +625,7 @@ export default function ClientDashboard({
               </div>
             </div>
           )}
+          </div>
         </div>
 
         {/* Payment Notifications */}
