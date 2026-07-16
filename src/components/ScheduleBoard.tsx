@@ -375,6 +375,7 @@ export default function ScheduleBoard({
                         style={{
                           display: "flex",
                           alignItems: "center",
+                          flexWrap: "wrap",
                           gap: 7,
                           background: "var(--brand-bg)",
                           border: "1px solid var(--brand-border)",
@@ -393,7 +394,7 @@ export default function ScheduleBoard({
                           <span style={{ width: 10 }} />
                         )}
                         <span style={{ fontSize: 13.5 }}>{t === "car" ? "🏃" : t === "mob" ? "🧘" : "🏋️"}</span>
-                        <span style={{ flex: 1, fontWeight: 600, fontSize: 12.5, color: "var(--brand-text)", lineHeight: 1.25, minWidth: 0, wordBreak: "break-word" }}>
+                        <span style={{ flex: 1, fontWeight: 600, fontSize: 12.5, color: "var(--brand-text)", lineHeight: 1.25, minWidth: 96, wordBreak: "break-word" }}>
                           {w.label}
                           {done ? <span style={{ color: "#22c55e" }}> ✓</span> : null}
                         </span>
