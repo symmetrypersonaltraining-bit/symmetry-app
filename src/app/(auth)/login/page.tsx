@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"password" | "magic">("password");
   const [magicSent, setMagicSent] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const router = useRouter();
   const supabase = createClient();
@@ -86,6 +87,15 @@ export default function LoginPage() {
       setMagicSent(true);
       setLoading(false);
     }
+  }
+
+  async function handleForgot() {
+    if (!email) { setError("Enter your email above first, then tap Forgot password."); return; }
+    setLoading(true);
+    setError(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/set-password?recovery=1` });
+    setLoading(false);
+    if (error) setError(error.message); else setResetSent(true);
   }
 
   return (
@@ -224,6 +234,17 @@ export default function LoginPage() {
                     }}
                   />
                 </div>
+              )}
+
+              {mode === "password" && (
+                <button type="button" onClick={handleForgot} className="text-xs" style={{ color: "#0F4C81" }}>
+                  Forgot password?
+                </button>
+              )}
+              {resetSent && (
+                <p className="text-sm" style={{ color: "#0a7d3f" }}>
+                  Check your email for a link to reset your password.
+                </p>
               )}
 
               {error && (
