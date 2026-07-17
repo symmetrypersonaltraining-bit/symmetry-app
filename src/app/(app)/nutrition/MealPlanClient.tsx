@@ -1005,22 +1005,23 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
             <div className="flex items-center justify-between mb-1">
               <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>
                 {mealPlan ? `Off-Plan: ${offPlanModal.mealName}` : `Log ${offPlanModal.mealName}`}
-              </h3>              <button onClick={() => setOffPlanModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-
-              <button
-                onClick={() => cameraRef.current?.click()}
-                disabled={photoLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
-                style={{ background: "#0EA5E920", color: "#0EA5E9", border: "1px solid #0EA5E940" }}>
-                {photoLoading
-                  ? <><i className="ti ti-loader-2 animate-spin" /> Analyzing...</>
-                  : <><i className="ti ti-camera" /> Snap Photo</>
-                }
-              </button>
+              </h3>
+              <button onClick={() => setOffPlanModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
             </div>
             <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
-              {mealPlan ? "What did you have instead?" : "What did you eat?"} Snap a photo for AI macro analysis.
+              {mealPlan ? "What did you have instead?" : "What did you eat?"} Snap a photo and the AI fills in the macros.
             </p>
+            {/* Prominent camera / AI photo button — the primary off-plan entry */}
+            <button
+              onClick={() => cameraRef.current?.click()}
+              disabled={photoLoading}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold mb-3"
+              style={{ background: "#0EA5E920", color: "#0EA5E9", border: "1px solid #0EA5E940" }}>
+              {photoLoading
+                ? <><i className="ti ti-loader-2 animate-spin" /> Analyzing photo…</>
+                : <><i className="ti ti-camera" /> Snap a photo for AI macro analysis</>
+              }
+            </button>
             {photoResult && (
               <div className="mb-3 px-3 py-2 rounded-xl text-xs"
                 style={{ background: "#0EA5E910", color: "#0EA5E9", border: "1px solid #0EA5E930" }}>
