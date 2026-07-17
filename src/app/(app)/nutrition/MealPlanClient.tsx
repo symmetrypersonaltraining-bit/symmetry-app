@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import GroceryListSheet from "./GroceryListSheet";
+import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
@@ -32,6 +33,14 @@ const FREE_SLOTS = [
 const CARD_STYLE: React.CSSProperties = { background: "var(--brand-surface)", border: "1px solid var(--brand-border)", boxShadow: "0 8px 26px rgba(20,30,55,0.08)" };
 
 interface Food { id: string; name: string; serving: string | null; protein: number | null; carbs: number | null; fats: number | null; verified: boolean | null; }
+// An added/swapped-in library food. `servings` is the multiplier currentMacros uses (kept unchanged);
+// amount+unit+serving drive the unit-conversion UI and recompute `servings` via servingsFor().
+interface AddedFood { food_id: string | null; name: string; servings: number; p: number; c: number; f: number; serving?: string | null; amount?: number; unit?: string; }
+function addedFromFood(fd: Food): AddedFood {
+  const ps = parseServing(fd.serving);
+  return { food_id: fd.id, name: fd.name, p: fd.protein || 0, c: fd.carbs || 0, f: fd.fats || 0, serving: fd.serving || null, amount: ps.amount, unit: ps.unit, servings: servingsFor(ps.amount, ps.unit, fd.serving) };
+}
+function reServings(x: AddedFood): AddedFood { return { ...x, servings: servingsFor(x.amount ?? 1, x.unit ?? "serving", x.serving) }; }
 interface RecentEntry { label: string; food_id: string | null; p: number; c: number; f: number; }
 
 function quickKcal(p: number, c: number, f: number) { return Math.round(4 * p + 4 * c + 9 * f); }
@@ -440,7 +449,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const [sheetAdh, setSheetAdh] = useState<string>("Full");
   // Draft per-item amounts + added items for the option being logged in the sheet.
   const [sheetItems, setSheetItems] = useState<Record<string, number>>({});
-  const [sheetAdds, setSheetAdds] = useState<{ food_id: string | null; name: string; servings: number; p: number; c: number; f: number }[]>([]);
+  const [sheetAdds, setSheetAdds] = useState<AddedFood[]>([]);
   const [sheetQ, setSheetQ] = useState("");
   const [sheetResults, setSheetResults] = useState<Food[]>([]);
   const [showGrocery, setShowGrocery] = useState(false);
@@ -465,7 +474,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const [amountEdits, setAmountEdits] = useState<Record<string, string>>({});
   const [savingAmounts, setSavingAmounts] = useState(false);
   // Add/swap items from the food library inside the adjust-amounts sheet (per-day only).
-  const [amountAdds, setAmountAdds] = useState<{ food_id: string | null; name: string; servings: number; p: number; c: number; f: number }[]>([]);
+  const [amountAdds, setAmountAdds] = useState<AddedFood[]>([]);
   const [amtQ, setAmtQ] = useState("");
   const [amtResults, setAmtResults] = useState<Food[]>([]);
   useEffect(() => {
@@ -1091,7 +1100,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                 <div className="mt-1 rounded-xl overflow-hidden" style={{ border: "1px solid var(--brand-border)" }}>
                   {amtResults.map(fd => (
                     <button key={fd.id}
-                      onClick={() => { setAmountAdds(prev => [...prev, { food_id: fd.id, name: fd.name, servings: 1, p: fd.protein || 0, c: fd.carbs || 0, f: fd.fats || 0 }]); setAmtQ(""); setAmtResults([]); }}
+                      onClick={() => { setAmountAdds(prev => [...prev, addedFromFood(fd)]); setAmtQ(""); setAmtResults([]); }}
                       className="w-full text-left px-3 py-2 text-sm"
                       style={{ background: "var(--brand-surface)", color: "var(--brand-text)", borderBottom: "1px solid var(--brand-border)" }}>
                       {fd.name}
@@ -1103,13 +1112,16 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                 </div>
               )}
               {amountAdds.map((ad, i) => (
-                <div key={i} className="flex items-center gap-2 mt-2">
+                <div key={i} className="flex items-center gap-1.5 mt-2">
                   <span className="flex-1 text-sm truncate" style={{ color: "var(--brand-text)" }}>&#65291; {ad.name}</span>
-                  <input type="number" value={ad.servings} inputMode="decimal"
-                    onChange={e => { const v = parseFloat(e.target.value); setAmountAdds(prev => prev.map((x, j) => j === i ? { ...x, servings: isFinite(v) && v > 0 ? v : 0 } : x)); }}
-                    className="w-16 text-center text-sm py-2 rounded-xl outline-none"
+                  <input type="number" value={ad.amount ?? 1} inputMode="decimal"
+                    onChange={e => { const v = parseFloat(e.target.value); setAmountAdds(prev => prev.map((x, j) => j === i ? reServings({ ...x, amount: isFinite(v) && v >= 0 ? v : 0 }) : x)); }}
+                    className="w-14 text-center text-sm py-2 rounded-xl outline-none"
                     style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
-                  <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>srv</span>
+                  <select value={ad.unit ?? "serving"} onChange={e => setAmountAdds(prev => prev.map((x, j) => j === i ? reServings({ ...x, unit: e.target.value }) : x))}
+                    className="text-xs py-2 rounded-xl outline-none" style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)", maxWidth: 74 }}>
+                    {unitsForServing(ad.serving).map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
                   <button onClick={() => setAmountAdds(prev => prev.filter((_, j) => j !== i))}
                     className="text-sm" style={{ color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>&#10005;</button>
                 </div>
@@ -1203,18 +1215,18 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                       );
                     })}
                     {sheetAdds.map((ad, i) => (
-                      <div key={"add-" + i} className="flex items-center gap-2 py-2 px-1" style={{ borderBottom: "1px dashed var(--brand-border)" }}>
+                      <div key={"add-" + i} className="flex items-center gap-1.5 py-2 px-1" style={{ borderBottom: "1px dashed var(--brand-border)" }}>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm truncate" style={{ color: "var(--brand-text)" }}>＋ {ad.name}</p>
-                          <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{Math.round(ad.p)}P · {Math.round(ad.c)}C · {Math.round(ad.f)}F / serving</p>
+                          <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{Math.round(ad.p * (ad.servings || 0))}P · {Math.round(ad.c * (ad.servings || 0))}C · {Math.round(ad.f * (ad.servings || 0))}F</p>
                         </div>
-                        <div className="flex items-center rounded-lg overflow-hidden flex-shrink-0" style={{ border: "1px solid var(--brand-border)" }}>
-                          <button onClick={() => setSheetAdds(prev => prev.map((x, j) => j === i ? { ...x, servings: Math.max(0, +(x.servings - 0.5).toFixed(2)) } : x))}
-                            className="w-8 h-8 text-base font-bold" style={{ background: "var(--brand-card)", color: "var(--brand-primary)" }}>−</button>
-                          <span className="w-10 text-center text-sm" style={{ color: "var(--brand-text)" }}>{ad.servings}</span>
-                          <button onClick={() => setSheetAdds(prev => prev.map((x, j) => j === i ? { ...x, servings: +(x.servings + 0.5).toFixed(2) } : x))}
-                            className="w-8 h-8 text-base font-bold" style={{ background: "var(--brand-card)", color: "var(--brand-primary)" }}>＋</button>
-                        </div>
+                        <input type="number" inputMode="decimal" value={ad.amount ?? 1}
+                          onChange={e => { const v = parseFloat(e.target.value); setSheetAdds(prev => prev.map((x, j) => j === i ? reServings({ ...x, amount: isFinite(v) && v >= 0 ? v : 0 }) : x)); }}
+                          className="w-12 text-center text-sm py-1.5 rounded-lg outline-none flex-shrink-0" style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
+                        <select value={ad.unit ?? "serving"} onChange={e => setSheetAdds(prev => prev.map((x, j) => j === i ? reServings({ ...x, unit: e.target.value }) : x))}
+                          className="text-xs py-1.5 rounded-lg outline-none flex-shrink-0" style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)", maxWidth: 72 }}>
+                          {unitsForServing(ad.serving).map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
                         <button onClick={() => setSheetAdds(prev => prev.filter((_, j) => j !== i))}
                           className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center" style={{ background: "#fbe9ec", color: "#d0384f" }}><i className="ti ti-x text-xs" /></button>
                       </div>
@@ -1227,7 +1239,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                         <div className="mt-1 rounded-lg overflow-hidden" style={{ border: "1px solid var(--brand-border)" }}>
                           {sheetResults.map(fd => (
                             <button key={fd.id}
-                              onClick={() => { setSheetAdds(prev => [...prev, { food_id: fd.id, name: fd.name, servings: 1, p: fd.protein || 0, c: fd.carbs || 0, f: fd.fats || 0 }]); setSheetQ(""); setSheetResults([]); }}
+                              onClick={() => { setSheetAdds(prev => [...prev, addedFromFood(fd)]); setSheetQ(""); setSheetResults([]); }}
                               className="w-full text-left px-3 py-2 text-sm" style={{ background: "var(--brand-surface)", color: "var(--brand-text)", borderBottom: "1px solid var(--brand-border)" }}>
                               {fd.name}<span className="ml-1 text-xs" style={{ color: "var(--brand-text-secondary)" }}>{Math.round(fd.protein || 0)}P · {Math.round(fd.carbs || 0)}C · {Math.round(fd.fats || 0)}F</span>
                             </button>
@@ -1443,14 +1455,14 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                   ))}
 
                   {/* Items added for this day via the adjust-amounts sheet */}
-                  {(mealLog?.item_overrides?.__added as { name?: string; servings?: number }[] | undefined)?.map((ad, adi) => (
+                  {(mealLog?.item_overrides?.__added as { name?: string; servings?: number; amount?: number; unit?: string }[] | undefined)?.map((ad, adi) => (
                     <div key={"added-" + adi} className="px-4 py-1.5 flex items-start gap-2"
                       style={{ borderTop: "1px solid var(--brand-border)" }}>
                       <i className="ti ti-plus text-xs mt-0.5 flex-shrink-0" style={{ color: "var(--brand-primary)" }} />
                       <span className="text-sm" style={{ color: "var(--brand-text)" }}>
                         {ad.name}
                         <span className="ml-1 text-xs" style={{ color: "var(--brand-primary)" }}>
-                          {ad.servings && ad.servings !== 1 ? `×${ad.servings} ` : ""}(added)
+                          {ad.amount != null && ad.unit ? `${ad.amount} ${ad.unit} ` : (ad.servings && ad.servings !== 1 ? `×${ad.servings} ` : "")}(added)
                         </span>
                       </span>
                     </div>
