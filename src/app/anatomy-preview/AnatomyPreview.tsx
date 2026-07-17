@@ -53,14 +53,15 @@ export default function AnatomyPreview() {
         (gltf: { scene: ThreeNS.Object3D }) => {
           if (disposed) return;
           const model = gltf.scene;
+          holder.add(model);
           model.updateMatrixWorld(true);
           const { box } = processAnatomy(THREE, model, { bone: boneMat, muscle: muscleMat });
           const size = new THREE.Vector3(); box.getSize(size);
           const center = new THREE.Vector3(); box.getCenter(center);
-          model.position.sub(center);            // center the VISIBLE anatomy
-          const fit = 4.7 / (size.y || 1);
+          const fit = 3.9 / (size.y || 1);        // fit the whole body in view
           holder.scale.setScalar(fit);
-          holder.add(model);
+          // negate the visible-center (post-scale) so the body sits dead-center
+          holder.position.set(-center.x * fit, -center.y * fit, -center.z * fit);
           setStatus('');
         },
         (p: { loaded: number; total: number }) => { if (p.total) setStatus(`Loading your skeleton… ${Math.round((p.loaded / p.total) * 100)}%`); },

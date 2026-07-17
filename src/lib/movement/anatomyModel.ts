@@ -48,21 +48,29 @@ export function processAnatomy(
     const mesh = o as ThreeNS.Mesh;
     if (!mesh.isMesh) return;
     const nm = mesh.name || '';
-    if (has(nm, HIDE) && !has(nm, MUSCLE)) {
-      mesh.visible = false;
-      hidden++;
-      return;
+    const isMuscle = has(nm, MUSCLE);
+    // 1) named soft-tissue sheets → hide
+    if (has(nm, HIDE) && !isMuscle) {
+      mesh.visible = false; hidden++; return;
     }
-    mesh.material = has(nm, MUSCLE) ? mats.muscle : mats.bone;
-    mesh.frustumCulled = false;
-    visible++;
-    // union this mesh into the visible-box
+    // 2) geometric spike-catcher: a compact mesh with a stray far vertex has an
+    //    extreme bounding-box aspect ratio. Long bones (~15:1) stay; spikes (>45:1) go.
     mesh.geometry.computeBoundingBox();
     const gb = mesh.geometry.boundingBox;
     if (gb) {
-      const b = gb.clone().applyMatrix4(mesh.matrixWorld);
-      box.union(b);
+      const dx = gb.max.x - gb.min.x, dy = gb.max.y - gb.min.y, dz = gb.max.z - gb.min.z;
+      const dims = [dx, dy, dz].sort((a, b) => a - b);
+      const smallest = Math.max(dims[0], 1e-5);
+      const aspect = dims[2] / smallest;
+      const midAspect = dims[1] / smallest;
+      if (aspect > 45 && midAspect > 20) { // thin in TWO axes = spike/sliver
+        mesh.visible = false; hidden++; return;
+      }
     }
+    mesh.material = isMuscle ? mats.muscle : mats.bone;
+    mesh.frustumCulled = false;
+    visible++;
+    if (gb) box.union(gb.clone().applyMatrix4(mesh.matrixWorld));
   });
   return { box, visible, hidden };
 }
