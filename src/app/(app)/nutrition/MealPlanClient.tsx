@@ -438,6 +438,11 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const [slotSheet, setSlotSheet] = useState<{ position: number; timing: string } | null>(null);
   const [sheetOptId, setSheetOptId] = useState<string>("");
   const [sheetAdh, setSheetAdh] = useState<string>("Full");
+  // Draft per-item amounts + added items for the option being logged in the sheet.
+  const [sheetItems, setSheetItems] = useState<Record<string, number>>({});
+  const [sheetAdds, setSheetAdds] = useState<{ food_id: string | null; name: string; servings: number; p: number; c: number; f: number }[]>([]);
+  const [sheetQ, setSheetQ] = useState("");
+  const [sheetResults, setSheetResults] = useState<Food[]>([]);
 
   const [notesMap, setNotesMap] = useState<Record<number, string>>(() => {
     const m: Record<number, string> = {};
@@ -473,6 +478,19 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     return () => clearTimeout(tmr);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [amtQ, amountsModal]);
+
+  // Food-library search inside the multi-option slot sheet (add/swap items).
+  useEffect(() => {
+    if (!slotSheet || sheetQ.trim().length < 2) { setSheetResults([]); return; }
+    const tmr = setTimeout(async () => {
+      try {
+        const { data } = await supabase.from("foods").select("*").ilike("name", "%" + sheetQ.trim() + "%").limit(6);
+        setSheetResults((data as Food[]) || []);
+      } catch { /* noop */ }
+    }, 250);
+    return () => clearTimeout(tmr);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetQ, slotSheet]);
 
   // Restore the last viewed date so navigating away + Back doesn't reset to today.
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -745,34 +763,100 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   }
 
   // ---- Multi-option slot bottom sheet (Mockup B) ----
+  // Sensible +/- step per unit (grams jump by 10, cups by 0.25, etc.).
+  function stepFor(unit: string | null) {
+    const u = (unit || "").toLowerCase();
+    if (u === "g" || u === "gram" || u === "grams") return 10;
+    if (u.includes("cup")) return 0.25;
+    if (u.includes("tbsp") || u.includes("tsp") || u.includes("scoop")) return 0.5;
+    if (u === "oz") return 1;
+    return 1;
+  }
+  // Seed the draft item amounts + added items for a given option (applying any
+  // existing per-day override only when the existing log is for that same option).
+  function seedSheetDraft(meal: Meal, existing: AdherenceLog | null | undefined) {
+    const seed: Record<string, number> = {};
+    for (const it of meal.meal_items || []) {
+      const ov = existing?.item_overrides?.[it.id]?.amount;
+      seed[it.id] = ov != null ? Number(ov) : (it.amount != null ? Number(it.amount) : 0);
+    }
+    setSheetItems(seed);
+    setSheetAdds((existing?.item_overrides?.__added as typeof sheetAdds) || []);
+  }
   function openSlotSheet(slot: { position: number; options: Meal[] }) {
     const existing = logs.find(l => l.meal_position === slot.position);
     const validAdh = existing?.adherence && ADHERENCE_OPTIONS.some(o => o.key === existing.adherence);
-    setSheetOptId(existing?.meal_id || slot.options[0].id);
+    const chosenId = existing?.meal_id || slot.options[0].id;
+    const chosen = slot.options.find(o => o.id === chosenId) || slot.options[0];
+    setSheetOptId(chosen.id);
     setSheetAdh(validAdh ? existing!.adherence : "Full");
+    seedSheetDraft(chosen, existing?.meal_id === chosen.id ? existing : null);
+    setSheetQ(""); setSheetResults([]);
     setSlotSheet({ position: slot.position, timing: slot.options[0].timing || "" });
   }
+  function pickSheetOption(slot: { position: number; options: Meal[] }, optId: string) {
+    setSheetOptId(optId);
+    const opt = slot.options.find(o => o.id === optId);
+    const existing = logs.find(l => l.meal_position === slot.position);
+    if (opt) seedSheetDraft(opt, existing?.meal_id === optId ? existing : null);
+    setSheetQ(""); setSheetResults([]);
+  }
   function closeSlotSheet() { setSlotSheet(null); }
+  // Live macros for the drafted option (full option; adherence scaling handled by currentMacros).
+  function draftOptionMacros(meal: Meal) {
+    let p = 0, c = 0, f = 0;
+    for (const it of meal.meal_items || []) {
+      const amt = sheetItems[it.id];
+      const scale = (amt != null && it.amount) ? amt / it.amount : (amt === 0 ? 0 : 1);
+      p += (it.protein || 0) * scale; c += (it.carbs || 0) * scale; f += (it.fats || 0) * scale;
+    }
+    for (const ad of sheetAdds) { const sv = ad.servings || 1; p += ad.p * sv; c += ad.c * sv; f += ad.f * sv; }
+    return { protein: p, carbs: c, fats: f, kcal: p * 4 + c * 4 + f * 9 };
+  }
   async function saveSlotSheet(slot: { position: number; options: Meal[] }) {
     const chosen = slot.options.find(o => o.id === sheetOptId);
     if (!chosen) return;
     if (sheetAdh === "Off-plan") { closeSlotSheet(); logAdherence(chosen, "Off-plan"); return; }
-    await logAdherence(chosen, sheetAdh);
-    closeSlotSheet();
-  }
-  // Reuse the existing per-day adjust-amounts sheet for whichever option is chosen.
-  function openAdjustForChosen(meal: Meal) {
-    const existing = logs.find(l => l.meal_position === meal.position);
-    const seed: Record<string, string> = {};
-    for (const it of meal.meal_items || []) {
-      const ov = existing?.item_overrides?.[it.id]?.amount;
-      seed[it.id] = ov != null ? String(ov) : (it.amount != null ? String(it.amount) : "");
+    // Build item_overrides: only items whose draft amount differs from the plan.
+    const overrides: Record<string, { amount: number }> = {};
+    for (const it of chosen.meal_items || []) {
+      const amt = sheetItems[it.id];
+      if (amt == null) continue;
+      if (it.amount != null && Math.abs(amt - it.amount) < 1e-9) continue;
+      overrides[it.id] = { amount: amt };
     }
-    setAmountEdits(seed);
-    setAmountAdds(existing?.item_overrides?.__added || []);
-    setAmtQ(""); setAmtResults([]);
-    setAmountsModal({ mealId: meal.id, position: meal.position, mealName: meal.name });
-    closeSlotSheet();
+    const cleanAdds = sheetAdds.filter(a => a.name && a.servings > 0);
+    const ovPayload: Record<string, any> = { ...overrides };
+    if (cleanAdds.length) ovPayload.__added = cleanAdds;
+    const hasOv = Object.keys(overrides).length > 0 || cleanAdds.length > 0;
+    setSaving(chosen.id);
+    try {
+      const { data, error } = await supabase.from("meal_adherence_logs").upsert({
+        client_id: clientId, log_date: selectedDate, meal_id: chosen.id,
+        meal_position: chosen.position, adherence: sheetAdh,
+        item_overrides: hasOv ? ovPayload : null,
+        off_plan_details: null, est_kcal: null, est_protein: null, est_carbs: null, est_fats: null,
+        source: "client", notes: notesMap[chosen.position] || null,
+      }, { onConflict: "client_id,log_date,meal_position" }).select().single();
+      if (error) { alert("Couldn't save this meal. Please try again."); return; }
+      if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== chosen.position), data as AdherenceLog]);
+      closeSlotSheet();
+    } finally { setSaving(null); }
+  }
+  // Macros for a logged option, applying any per-day item_overrides (mirrors currentMacros).
+  function loggedOptionMacros(meal: Meal, log: AdherenceLog | undefined) {
+    const ov = log?.item_overrides;
+    if (!ov || !Object.keys(ov).length) return getMealMacros(meal);
+    let p = 0, c = 0, f = 0;
+    for (const it of meal.meal_items || []) {
+      const o = ov[it.id]?.amount;
+      const scale = (o != null && it.amount) ? o / it.amount : 1;
+      p += (it.protein || 0) * scale; c += (it.carbs || 0) * scale; f += (it.fats || 0) * scale;
+    }
+    for (const ad of (ov.__added as { servings?: number; p?: number; c?: number; f?: number }[]) || []) {
+      const sv = ad.servings || 1; p += (ad.p || 0) * sv; c += (ad.c || 0) * sv; f += (ad.f || 0) * sv;
+    }
+    return { kcal: p * 4 + c * 4 + f * 9, protein: p, carbs: c, fats: f };
   }
   // Compact row for a multi-option slot.
   function renderMultiSlot(slot: { position: number; options: Meal[] }) {
@@ -781,7 +865,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     const logOpt = slotLog ? ADHERENCE_OPTIONS.find(o => o.key === slotLog.adherence) : null;
     const logColor = logOpt?.color || null;
     const isOffPlan = slotLog?.adherence === "Off-plan";
-    const macros = picked ? getMealMacros(picked) : null;
+    const macros = picked ? loggedOptionMacros(picked, slotLog) : null;
     const subtitle = picked
       ? picked.name
       : isOffPlan
@@ -1000,7 +1084,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         const slot = slots.find(s => s.position === slotSheet.position);
         if (!slot) return null;
         const chosen = slot.options.find(o => o.id === sheetOptId) || null;
-        const preview = chosen ? getMealMacros(chosen) : { kcal: 0, protein: 0, carbs: 0, fats: 0 };
+        const draft = chosen ? draftOptionMacros(chosen) : { kcal: 0, protein: 0, carbs: 0, fats: 0 };
         return (
           <div className="fixed inset-0 z-[1100] flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
             onClick={closeSlotSheet}>
@@ -1012,25 +1096,92 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                 <button onClick={closeSlotSheet} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
               </div>
               <label className="text-xs font-bold uppercase tracking-wider block mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Which option?</label>
-              <select value={sheetOptId} onChange={e => setSheetOptId(e.target.value)}
+              <select value={sheetOptId} onChange={e => pickSheetOption(slot, e.target.value)}
                 className="w-full px-3 py-3 rounded-xl text-sm outline-none"
                 style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}>
                 {slot.options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
               </select>
               {chosen && (
                 <>
-                  <div className="mt-3 rounded-xl p-3" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
-                    {(chosen.meal_items || []).slice().sort((a, b) => a.position - b.position).map(it => (
-                      <div key={it.id} className="flex justify-between py-1 text-sm" style={{ color: "var(--brand-text)" }}>
-                        <span className="min-w-0 truncate mr-2">{it.food}</span>
-                        <span className="flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }}>{it.is_unlimited ? "unlimited" : `${it.amount ?? ""}${it.unit ? " " + it.unit : ""}`}</span>
+                  <label className="text-xs font-bold uppercase tracking-wider block mt-4 mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Items — adjust, add or remove</label>
+                  <div className="rounded-xl p-2" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+                    {(chosen.meal_items || []).slice().sort((a, b) => a.position - b.position).map(it => {
+                      if (it.is_unlimited) {
+                        return (
+                          <div key={it.id} className="flex items-center justify-between py-2 px-1" style={{ borderBottom: "1px dashed var(--brand-border)" }}>
+                            <span className="text-sm min-w-0 truncate mr-2" style={{ color: "var(--brand-text)" }}>{it.food}</span>
+                            <span className="text-xs flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }}>unlimited</span>
+                          </div>
+                        );
+                      }
+                      const amt = sheetItems[it.id] ?? 0;
+                      const removed = amt === 0;
+                      const st = stepFor(it.unit);
+                      return (
+                        <div key={it.id} className="flex items-center gap-2 py-2 px-1" style={{ borderBottom: "1px dashed var(--brand-border)" }}>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm truncate" style={{ color: removed ? "var(--brand-text-secondary)" : "var(--brand-text)", textDecoration: removed ? "line-through" : "none" }}>{it.food}</p>
+                            <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{it.unit || ""}{it.amount != null ? ` · plan ${it.amount}` : ""}</p>
+                          </div>
+                          {removed ? (
+                            <button onClick={() => setSheetItems(prev => ({ ...prev, [it.id]: it.amount ?? st }))}
+                              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ background: "var(--brand-card)", color: "var(--brand-primary)" }}>Restore</button>
+                          ) : (
+                            <>
+                              <div className="flex items-center rounded-lg overflow-hidden flex-shrink-0" style={{ border: "1px solid var(--brand-border)" }}>
+                                <button onClick={() => setSheetItems(prev => ({ ...prev, [it.id]: Math.max(0, +((prev[it.id] ?? 0) - st).toFixed(2)) }))}
+                                  className="w-8 h-8 text-base font-bold" style={{ background: "var(--brand-card)", color: "var(--brand-primary)" }}>−</button>
+                                <input type="number" inputMode="decimal" value={amt}
+                                  onChange={e => { const v = parseFloat(e.target.value); setSheetItems(prev => ({ ...prev, [it.id]: isFinite(v) && v >= 0 ? v : 0 })); }}
+                                  className="w-12 text-center text-sm outline-none" style={{ background: "var(--brand-surface)", color: "var(--brand-text)", height: 32, border: "none" }} />
+                                <button onClick={() => setSheetItems(prev => ({ ...prev, [it.id]: +(((prev[it.id] ?? 0) + st).toFixed(2)) }))}
+                                  className="w-8 h-8 text-base font-bold" style={{ background: "var(--brand-card)", color: "var(--brand-primary)" }}>＋</button>
+                              </div>
+                              <button onClick={() => setSheetItems(prev => ({ ...prev, [it.id]: 0 }))}
+                                className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center" style={{ background: "#fbe9ec", color: "#d0384f" }} title="Remove"><i className="ti ti-x text-xs" /></button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {sheetAdds.map((ad, i) => (
+                      <div key={"add-" + i} className="flex items-center gap-2 py-2 px-1" style={{ borderBottom: "1px dashed var(--brand-border)" }}>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm truncate" style={{ color: "var(--brand-text)" }}>＋ {ad.name}</p>
+                          <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{Math.round(ad.p)}P · {Math.round(ad.c)}C · {Math.round(ad.f)}F / serving</p>
+                        </div>
+                        <div className="flex items-center rounded-lg overflow-hidden flex-shrink-0" style={{ border: "1px solid var(--brand-border)" }}>
+                          <button onClick={() => setSheetAdds(prev => prev.map((x, j) => j === i ? { ...x, servings: Math.max(0, +(x.servings - 0.5).toFixed(2)) } : x))}
+                            className="w-8 h-8 text-base font-bold" style={{ background: "var(--brand-card)", color: "var(--brand-primary)" }}>−</button>
+                          <span className="w-10 text-center text-sm" style={{ color: "var(--brand-text)" }}>{ad.servings}</span>
+                          <button onClick={() => setSheetAdds(prev => prev.map((x, j) => j === i ? { ...x, servings: +(x.servings + 0.5).toFixed(2) } : x))}
+                            className="w-8 h-8 text-base font-bold" style={{ background: "var(--brand-card)", color: "var(--brand-primary)" }}>＋</button>
+                        </div>
+                        <button onClick={() => setSheetAdds(prev => prev.filter((_, j) => j !== i))}
+                          className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center" style={{ background: "#fbe9ec", color: "#d0384f" }}><i className="ti ti-x text-xs" /></button>
                       </div>
                     ))}
-                    {chosen.swaps && <p className="text-xs mt-2" style={{ color: "var(--brand-text-secondary)" }}><span className="font-medium">Swap: </span>{chosen.swaps}</p>}
+                    {/* Add item from library */}
+                    <div className="pt-2 px-1">
+                      <input type="text" value={sheetQ} onChange={e => setSheetQ(e.target.value)} placeholder="Add / swap in a food…"
+                        className="w-full text-sm px-3 py-2 rounded-lg outline-none" style={{ background: "var(--brand-surface)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
+                      {sheetResults.length > 0 && (
+                        <div className="mt-1 rounded-lg overflow-hidden" style={{ border: "1px solid var(--brand-border)" }}>
+                          {sheetResults.map(fd => (
+                            <button key={fd.id}
+                              onClick={() => { setSheetAdds(prev => [...prev, { food_id: fd.id, name: fd.name, servings: 1, p: fd.protein || 0, c: fd.carbs || 0, f: fd.fats || 0 }]); setSheetQ(""); setSheetResults([]); }}
+                              className="w-full text-left px-3 py-2 text-sm" style={{ background: "var(--brand-surface)", color: "var(--brand-text)", borderBottom: "1px solid var(--brand-border)" }}>
+                              {fd.name}<span className="ml-1 text-xs" style={{ color: "var(--brand-text-secondary)" }}>{Math.round(fd.protein || 0)}P · {Math.round(fd.carbs || 0)}C · {Math.round(fd.fats || 0)}F</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {chosen.swaps && <p className="text-xs mt-2 px-1" style={{ color: "var(--brand-text-secondary)" }}><span className="font-medium">Swap: </span>{chosen.swaps}</p>}
                   </div>
                   <div className="flex justify-between text-sm mt-2 px-1">
                     <span style={{ color: "var(--brand-text-secondary)" }}>This option</span>
-                    <b style={{ color: "var(--brand-text)" }}>{Math.round(preview.kcal)} cal · {Math.round(preview.protein)}P · {Math.round(preview.carbs)}C · {Math.round(preview.fats)}F</b>
+                    <b style={{ color: "var(--brand-text)" }}>{Math.round(draft.kcal)} cal · {Math.round(draft.protein)}P · {Math.round(draft.carbs)}C · {Math.round(draft.fats)}F</b>
                   </div>
                   <label className="text-xs font-bold uppercase tracking-wider block mt-4 mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>How much did you eat?</label>
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -1050,12 +1201,6 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                       className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-white"
                       style={{ background: "var(--brand-primary)", opacity: saving === chosen.id ? 0.6 : 1 }}>
                       {saving === chosen.id ? "Saving..." : sheetAdh === "Off-plan" ? "Log off-plan…" : "Log meal"}
-                    </button>
-                    <button onClick={() => openAdjustForChosen(chosen)}
-                      className="px-4 rounded-2xl flex items-center justify-center"
-                      style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}
-                      title="Adjust amounts / add items">
-                      <i className="ti ti-pencil" />
                     </button>
                   </div>
                 </>
