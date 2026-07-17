@@ -920,29 +920,29 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       <div key={`slot-${slot.position}`} onClick={() => openSlotSheet(slot)}
         className="rounded-2xl overflow-hidden cursor-pointer"
         style={{ background: "var(--brand-surface)", border: slotLog && logColor ? `1.5px solid ${logColor}40` : "1px solid var(--brand-border)" }}>
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-start justify-between gap-2 p-4">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: slotLog && logColor ? `${logColor}20` : "var(--brand-card)" }}>
               {slotLog && logColor
                 ? <div className="w-3 h-3 rounded-full" style={{ background: logColor }} />
                 : <span className="text-sm font-bold" style={{ color: "var(--brand-text-secondary)" }}>M{slot.position}</span>}
             </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-sm" style={{ color: "var(--brand-text)" }}>{slotTitle(slot)}</p>
-              <p className="text-xs mt-0.5 truncate" style={{ color: "var(--brand-text-secondary)" }}>{subtitle}</p>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm truncate leading-tight" style={{ color: "var(--brand-text)" }}>{slotTitle(slot)}</p>
+              <p className="text-xs mt-0.5 truncate leading-tight" style={{ color: "var(--brand-text-secondary)" }}>{subtitle}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-col items-end gap-1 flex-shrink-0" style={{ maxWidth: "44%" }}>
+            {logOpt
+              ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: `${logOpt.color}20`, color: logOpt.color }}>{logOpt.label}</span>
+              : <i className="ti ti-chevron-right text-lg" style={{ color: "var(--brand-text-secondary)" }} />}
             {macros && (
-              <div className="text-right">
-                <p className="text-xs font-bold" style={{ color: "var(--brand-text)" }}>{Math.round(macros.kcal)} cal</p>
-                <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{Math.round(macros.protein)}P·{Math.round(macros.carbs)}C·{Math.round(macros.fats)}F</p>
+              <div className="text-right leading-tight">
+                <p className="text-xs font-bold whitespace-nowrap" style={{ color: "var(--brand-text)" }}>{Math.round(macros.kcal)} cal</p>
+                <p className="text-xs whitespace-nowrap" style={{ color: "var(--brand-text-secondary)" }}>{Math.round(macros.protein)}P·{Math.round(macros.carbs)}C·{Math.round(macros.fats)}F</p>
               </div>
             )}
-            {logOpt
-              ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: `${logOpt.color}20`, color: logOpt.color }}>{logOpt.label}</span>
-              : <i className="ti ti-chevron-right text-lg" style={{ color: "var(--brand-text-secondary)" }} />}
           </div>
         </div>
       </div>
