@@ -8,7 +8,8 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import PayLinksRow from "./PayLinksRow";
 
-interface Due { id: string; due: string; amount: number; note: string | null; acked: boolean; }
+interface CreditSession { date: string; type: string; amount: number; }
+interface Due { id: string; due: string; amount: number; note: string | null; acked: boolean; credits: CreditSession[]; }
 
 export default function PaymentDueBanner() {
   const [dues, setDues] = useState<Due[]>([]);
@@ -25,13 +26,14 @@ export default function PaymentDueBanner() {
         if (!cid) return;
         const { data: rems } = await sup
           .from("payment_reminders")
-          .select("id, due_date, amount_due, sms_message, client_ack_at")
+          .select("id, due_date, amount_due, sms_message, client_ack_at, credit_details")
           .eq("client_id", cid)
           .eq("notification_status", "sent")
           .lte("due_date", new Date(Date.now() + 7 * 86400000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
           .order("due_date");
         setDues((rems || []).map((r: any) => ({
           id: r.id, due: r.due_date, amount: Number(r.amount_due), note: r.sms_message, acked: !!r.client_ack_at,
+          credits: Array.isArray(r.credit_details?.sessions) ? r.credit_details.sessions : [],
         })));
       } catch {
         // never break client home
@@ -60,6 +62,14 @@ export default function PaymentDueBanner() {
           <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
             {d.note || "This stays here until you mark it paid."}
           </div>
+          {d.credits.length > 0 && (
+            <div className="mt-1.5 rounded-xl px-2.5 py-2 text-xs" style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}>
+              <span style={{ fontWeight: 700, color: "var(--brand-text)" }}>
+                {"−$" + d.credits.reduce((s, c) => s + (Number(c.amount) || 0), 0) + " credited this cycle"}
+              </span>
+              {" for sessions we didn't use: " + d.credits.map((c) => new Date(c.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) + (c.type === "half" ? " (½)" : "")).join(", ")}
+            </div>
+          )}
           <PayLinksRow amount={d.amount} />
           <button onClick={() => ack(d.id)} className="mt-2 w-full rounded-xl py-2 text-sm font-bold"
             style={{ background: "var(--brand-primary)", color: "#fff", border: "none", cursor: "pointer" }}>

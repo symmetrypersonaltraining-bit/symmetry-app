@@ -26,6 +26,7 @@ interface Rem {
   lastApprovedOn: string | null;
   flatBilling: boolean;
   approved_at: string | null;
+  creditDates: { date: string; type: "full" | "half" }[];
 }
 
 interface Edit {
@@ -95,13 +96,16 @@ export default function ReminderEditor() {
         const start = la && la < r.due_date ? la : baseStart;
         const end = reminderSendDate(r.due_date);
         let full = 0, half = 0;
+        const creditDates: { date: string; type: "full" | "half" }[] = [];
         (cancels || []).forEach((a: any) => {
           if (a.client_id !== r.client_id) return;
           const d = new Date(a.scheduled_at).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
           if (d > start && d <= end) {
-            if (a.status === "cancelled_half") half += 1; else full += 1;
+            if (a.status === "cancelled_half") { half += 1; creditDates.push({ date: d, type: "half" }); }
+            else { full += 1; creditDates.push({ date: d, type: "full" }); }
           }
         });
+        creditDates.sort((x, y) => x.date.localeCompare(y.date));
         return {
           id: r.id, client_id: r.client_id, due_date: r.due_date,
           amount_due: Number(r.amount_due), billing_credits: r.billing_credits == null ? null : Number(r.billing_credits),
@@ -111,6 +115,7 @@ export default function ReminderEditor() {
           cadence: cad, lastPay: lastPayOf(r.client_id), cancelledFull: full, cancelledHalf: half,
           lastApprovedOn: la, flatBilling: c.flat_billing === true,
           approved_at: r.approved_at || null,
+          creditDates,
         };
       });
       setRows(out);
@@ -143,11 +148,17 @@ export default function ReminderEditor() {
         lastCycleApprovedOn: r.lastApprovedOn, flatBilling: r.flatBilling,
         draftAmount: parseFloat(e.amount) || 0, override: e.override,
       });
+      const rate = r.sessionRate ?? 0;
+      const creditSessions = r.flatBilling ? [] : r.creditDates.map((cd) => ({
+        date: cd.date, type: cd.type, amount: cd.type === "half" ? Math.round(rate * 0.5 * 100) / 100 : rate,
+      }));
+      const manualC = parseFloat(e.manual) || 0;
       const patch: any = {
         amount_due: parseFloat(e.amount) || 0,
         due_date: e.due,
         billing_credits: calc.totalCredits,
         sms_message: e.note || null,
+        credit_details: (creditSessions.length || manualC) ? { sessions: creditSessions, manual: manualC } : null,
       };
       if (publish) {
         patch.notification_status = "sent";
@@ -222,6 +233,11 @@ export default function ReminderEditor() {
             {sent && (
               <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
                 {"Notified (in-app banner) " + (r.approved_at ? new Date(r.approved_at).toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "— publish time not recorded")}
+              </div>
+            )}
+            {!r.flatBilling && r.creditDates.length > 0 && (
+              <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+                {"Credited (cancelled sessions): " + r.creditDates.map((cd) => new Date(cd.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) + (cd.type === "half" ? " (½)" : "")).join(", ") + " — shown to the client on their reminder"}
               </div>
             )}
             <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
