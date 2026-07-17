@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import PlanRangeView from "./PlanRangeView";
+import GroceryListSheet from "./GroceryListSheet";
 
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
@@ -443,6 +444,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const [sheetAdds, setSheetAdds] = useState<{ food_id: string | null; name: string; servings: number; p: number; c: number; f: number }[]>([]);
   const [sheetQ, setSheetQ] = useState("");
   const [sheetResults, setSheetResults] = useState<Food[]>([]);
+  const [showGrocery, setShowGrocery] = useState(false);
 
   const [notesMap, setNotesMap] = useState<Record<number, string>>(() => {
     const m: Record<number, string> = {};
@@ -1280,6 +1282,11 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         );
       })()}
 
+      {/* Weekly grocery-list sheet */}
+      {showGrocery && mealPlan && (
+        <GroceryListSheet plan={mealPlan as unknown as { id: string; meals: { id: string; name: string; timing: string | null; position: number; meal_items: { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; position: number }[] }[] }} onClose={() => setShowGrocery(false)} />
+      )}
+
       {/* Header */}
       {!isTrainer && (
         <div className="px-4 pt-6 pb-4" style={{ background: "var(--brand-surface)", borderBottom: "1px solid var(--brand-border)" }}>
@@ -1381,6 +1388,17 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
               days={planRange === "1w" ? 7 : planRange === "4w" ? 28 : planRange === "8w" ? 56
                 : Math.max(1, Math.min(120, Math.round((new Date(customEnd + "T12:00:00").getTime() - new Date(selectedDate + "T12:00:00").getTime()) / 86400000) + 1))}
               basePlan={mealPlan as never} baseTarget={macroTarget as never} />
+          )}
+
+          {/* Weekly grocery-list generator */}
+          {planRange === "day" && (
+            <div className="px-4 mt-3">
+              <button onClick={() => setShowGrocery(true)}
+                className="w-full py-3 rounded-2xl text-sm font-bold flex items-center justify-center gap-2"
+                style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-primary)" }}>
+                <i className="ti ti-shopping-cart" /> Weekly grocery list
+              </button>
+            </div>
           )}
 
           {/* Meal cards */}
