@@ -86,6 +86,9 @@ function frontFrame(t: number, depth: number, valgus: number): Frame {
 function makeSquatView(view: 'front' | 'side_left', wedge: boolean, reps = 5): ViewCapture {
   const frames: Frame[] = [];
   let t = 0;
+  // Ankle-driven pattern: heels-elevated (wedge) removes the ankle limit, so the
+  // compensatory forward lean drops sharply — exactly what the wedge test detects.
+  const lean = wedge ? 0.12 : 0.85;
   for (let r = 0; r < reps; r++) {
     for (let i = 0; i <= 20; i++) {
       const depth = Math.sin((i / 20) * Math.PI); // 0→1→0
@@ -93,7 +96,7 @@ function makeSquatView(view: 'front' | 'side_left', wedge: boolean, reps = 5): V
       frames.push(
         view === 'front'
           ? frontFrame(t, depth, 0.06)
-          : sideFrame(t, depth, { forwardLean: 0.85, ankleStiff: true, wedge }),
+          : sideFrame(t, depth, { forwardLean: lean, ankleStiff: true, wedge }),
       );
     }
     // standing gap between reps
@@ -146,6 +149,8 @@ assert(out.suspectedRoot === 'lphc' || out.suspectedRoot === 'foot_ankle', `inta
 assert(out.keyframes.length > 0, `produced ${out.keyframes.length} per-view keyframe summaries`);
 assert(Object.values(out.assessmentFlags).some(Boolean), 'auto-filled at least one client_assessments flag');
 assert(out.wedge !== null, `wedge two-pass ran → verdict: ${out.wedge?.verdict}`);
+assert(out.wedge?.verdict === 'ankle_driven', `wedge correctly reads ankle-driven (lean cleaned up heels-raised) → ${out.wedge?.verdict}`);
+assert(root?.checkpoint === 'foot_ankle', `ankle-driven wedge → root reassigned to the ankle → ${root?.checkpoint}`);
 
 console.log('\n── Dose engine ──');
 const d7 = doseForPain(8, false); const d5 = doseForPain(5, false); const d2 = doseForPain(2, false);

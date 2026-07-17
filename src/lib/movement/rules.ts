@@ -234,32 +234,36 @@ export function sagittalFindings(frames: FrameFeatures[], reps: Rep[], cal: Cali
     });
   }
 
-  // Ankle dorsiflexion restriction (root signal) — measured at depth
+  // Ankle restriction (the root signal) — measured at squat depth.
+  // Two evidences: low dorsiflexion (tibia can't advance) and, when BlazePose
+  // foot landmarks exist, an actual heel lift. Either raises the flag; both
+  // together raise confidence. Keyed 'heel_rise' = the ankle checkpoint.
   const df = agg((f) => f.ankleDorsiflexion);
   if (df.length) {
-    const v = median(df);
-    const restricted = v < T.ankleDorsiflexionLowDeg;
-    out.push({
-      key: 'heel_rise', // paired below with DF metric; heel rise itself:
-      present: false, checkpoint: 'foot_ankle', severity: null, confidence: 0.5, side: null,
-      metric: `dorsiflexion ${d1(v)}° (target ≥30°)`, value: d1(v), repAgreement: 0, views: [view],
-    });
-    // Overwrite as proper finding when heel data exists
+    const dfV = median(df);
+    const restricted = dfV < T.ankleDorsiflexionLowDeg;
     const hr = agg((f) => f.heelRise);
     const hrV = hr.length ? median(hr) : 0;
     const hrPresent = hrV >= T.heelRiseFrac;
-    out[out.length - 1] = {
+    const present = hrPresent || restricted;
+    out.push({
       key: 'heel_rise',
-      present: hrPresent || restricted,
       checkpoint: 'foot_ankle',
-      severity: hrPresent ? severity(hrV, [T.heelRiseFrac, T.heelRiseFrac * 2, T.heelRiseFrac * 3.2]) : restricted ? (v < 18 ? 'moderate' : 'mild') : null,
+      present,
+      severity: hrPresent
+        ? severity(hrV, [T.heelRiseFrac, T.heelRiseFrac * 2, T.heelRiseFrac * 3.2])
+        : restricted
+          ? (dfV < 18 ? 'moderate' : 'mild')
+          : null,
       confidence: Math.min(0.95, 0.5 + qualityScore * 0.3 + (hr.length ? 0.1 : 0)),
       side: null,
-      metric: hrPresent ? `heel lift ${Math.round(hrV * 100)}% tibia · DF ${d1(v)}°` : `dorsiflexion ${d1(v)}° (target ≥30°)`,
-      value: d1(v),
+      metric: hrPresent
+        ? `heel lift ${Math.round(hrV * 100)}% tibia · dorsiflexion ${d1(dfV)}°`
+        : `dorsiflexion ${d1(dfV)}° (target ≥30°)`,
+      value: d1(dfV),
       repAgreement: hrPresent ? 0.8 : restricted ? 0.7 : 0,
       views: [view],
-    };
+    });
   }
 
   return out;

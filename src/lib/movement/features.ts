@@ -127,18 +127,13 @@ export function extractSagittal(frame: Frame, view: ViewName, cal: Calibration |
   // Femur vs horizontal → depth
   const femurAngle = angleFromHorizontal(pt(hip!), pt(knee!));
 
-  // Ankle dorsiflexion: shank vs foot. With BlazePose feet use heel/foot_index;
-  // fallback: shank angle from vertical at depth approximates DF demand.
+  // Ankle dorsiflexion proxy: the tibia's forward travel past vertical at depth
+  // IS the dorsiflexion demand met (stiff ankle → tibia can't advance → low DF →
+  // flagged vs the 30° norm). When BlazePose foot landmarks exist, a flat foot
+  // (heel–toe line near horizontal) confirms the reading; a lifted heel is
+  // captured separately as heelRise, so we don't double-count it here.
   const heel = S('heel'); const foot = S('foot_index');
-  let ankleDorsiflexion: number | undefined;
-  if (need(heel, foot)) {
-    ankleDorsiflexion = 90 - angleAt(pt(knee!), pt(ankle!), pt(foot!)) + 90 - 90; // shank–foot interior minus neutral
-    ankleDorsiflexion = Math.max(0, 90 - angleAt(pt(knee!), pt(ankle!), pt(foot!)) + 0) + tibiaAngle * 0.35;
-    // Robust proxy: tibia advance angle + foot line correction
-    ankleDorsiflexion = Math.round((tibiaAngle + Math.max(0, 12 - angleFromHorizontal(pt(heel!), pt(foot!)))) * 10) / 10;
-  } else {
-    ankleDorsiflexion = tibiaAngle; // MoveNet fallback: tibia advance ≈ DF at depth
-  }
+  const ankleDorsiflexion = Math.round(tibiaAngle * 10) / 10;
 
   // Heel rise (BlazePose only): heel y above foot_index baseline
   let heelRise: number | undefined;
@@ -202,8 +197,9 @@ function kneeDev(hip: Pt, knee: Pt, ankle: Pt, side: 'left' | 'right', midlineX:
   const legLen = (dist(hip, knee) + dist(knee, ankle)) / 2 || 1e-9;
   const off = knee.x - lineX;
   const angle = (Math.atan2(Math.abs(off), legLen) * 180) / Math.PI;
-  const medial = side === 'left' ? off < 0 : off > 0; // screen-left leg: medial = toward +x? resolved by caller mapping
-  // Caller passes side as the SCREEN side of that leg; medial = toward midline:
+  // `side` is the SCREEN side of this leg; medial = toward the body midline.
+  // + = valgus (knee caves toward midline), − = varus (knee bows away).
+  void side;
   const towardMid = (lineX < midlineX && off > 0) || (lineX > midlineX && off < 0);
   return towardMid ? angle : -angle;
 }

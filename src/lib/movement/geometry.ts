@@ -56,35 +56,8 @@ export function angleFromHorizontal(a: Pt, b: Pt): number {
   return deg(Math.atan2(dy, dx));
 }
 
-/**
- * Frontal-plane projection deviation at the knee:
- * + = knee medial to the hip→ankle line (valgus for that leg), − = lateral (varus).
- * `side` flips the medial direction (medial = toward body midline).
- */
-export function frontalKneeDeviation(hip: Pt, knee: Pt, ankle: Pt, side: 'left' | 'right', midlineX: number): number {
-  // Perpendicular distance of knee from hip–ankle line, signed toward midline.
-  const dx = ankle.x - hip.x;
-  const dy = ankle.y - hip.y;
-  const len = Math.hypot(dx, dy) || 1e-9;
-  // signed perpendicular distance (screen coords)
-  const cross = (knee.x - hip.x) * dy - (knee.y - hip.y) * dx;
-  const perp = cross / len;
-  // Convert to an angle at the knee for scale-independence
-  const legLen = (dist(hip, knee) + dist(knee, ankle)) / 2 || 1e-9;
-  const angle = deg(Math.atan2(Math.abs(perp), legLen));
-  // Medial = toward midline: for LEFT leg (screen: typically left of midline)
-  // medial means knee.x > line (toward center) → perp sign depends on geometry;
-  // simpler robust check: compare knee.x to line-x at knee.y, relative to midline.
-  const t = dy === 0 ? 0 : (knee.y - hip.y) / dy;
-  const lineXAtKnee = hip.x + dx * t;
-  const towardMidline = side === 'left' ? knee.x > lineXAtKnee : knee.x < lineXAtKnee;
-  const isMedial =
-    (side === 'left' && knee.x > lineXAtKnee && lineXAtKnee < midlineX + 1) ||
-    (side === 'right' && knee.x < lineXAtKnee && lineXAtKnee > midlineX - 1)
-      ? true
-      : towardMidline;
-  return isMedial ? angle : -angle;
-}
+// (Knee frontal-plane deviation is computed in features.ts::kneeDev, which
+//  resolves medial/lateral against the body midline. No duplicate here.)
 
 /** Exponential moving average smoother for keypoint streams. */
 export class EmaSmoother {
