@@ -435,7 +435,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
   // Multi-option bottom sheet (Mockup B). Only used for slots that have >1 option;
   // single-option plans (e.g. Dustin's) never open this and render exactly as before.
-  const [slotSheet, setSlotSheet] = useState<{ position: number; timing: string } | null>(null);
+  const [slotSheet, setSlotSheet] = useState<{ position: number; timing: string; extra?: boolean } | null>(null);
   const [sheetOptId, setSheetOptId] = useState<string>("");
   const [sheetAdh, setSheetAdh] = useState<string>("Full");
   // Draft per-item amounts + added items for the option being logged in the sheet.
@@ -813,11 +813,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     for (const ad of sheetAdds) { const sv = ad.servings || 1; p += ad.p * sv; c += ad.c * sv; f += ad.f * sv; }
     return { protein: p, carbs: c, fats: f, kcal: p * 4 + c * 4 + f * 9 };
   }
-  async function saveSlotSheet(slot: { position: number; options: Meal[] }) {
-    const chosen = slot.options.find(o => o.id === sheetOptId);
-    if (!chosen) return;
-    if (sheetAdh === "Off-plan") { closeSlotSheet(); logAdherence(chosen, "Off-plan"); return; }
-    // Build item_overrides: only items whose draft amount differs from the plan.
+  function buildOverridePayload(chosen: Meal): Record<string, any> | null {
     const overrides: Record<string, { amount: number }> = {};
     for (const it of chosen.meal_items || []) {
       const amt = sheetItems[it.id];
@@ -829,19 +825,70 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     const ovPayload: Record<string, any> = { ...overrides };
     if (cleanAdds.length) ovPayload.__added = cleanAdds;
     const hasOv = Object.keys(overrides).length > 0 || cleanAdds.length > 0;
+    return hasOv ? ovPayload : null;
+  }
+  async function writeOptionLog(chosen: Meal, targetPos: number): Promise<boolean> {
     setSaving(chosen.id);
     try {
       const { data, error } = await supabase.from("meal_adherence_logs").upsert({
         client_id: clientId, log_date: selectedDate, meal_id: chosen.id,
-        meal_position: chosen.position, adherence: sheetAdh,
-        item_overrides: hasOv ? ovPayload : null,
+        meal_position: targetPos, adherence: sheetAdh,
+        item_overrides: buildOverridePayload(chosen),
         off_plan_details: null, est_kcal: null, est_protein: null, est_carbs: null, est_fats: null,
-        source: "client", notes: notesMap[chosen.position] || null,
+        source: "client", notes: notesMap[targetPos] || null,
       }, { onConflict: "client_id,log_date,meal_position" }).select().single();
-      if (error) { alert("Couldn't save this meal. Please try again."); return; }
-      if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== chosen.position), data as AdherenceLog]);
-      closeSlotSheet();
+      if (error) { alert("Couldn't save this meal. Please try again."); return false; }
+      if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== targetPos), data as AdherenceLog]);
+      return true;
     } finally { setSaving(null); }
+  }
+  function openOffPlanAt(pos: number, mealName: string) {
+    setOffPlanDetails(""); setOffPlanKcal(""); setOffPlanP(""); setOffPlanC(""); setOffPlanF("");
+    setPhotoResult(null); setOffPlanNotes("");
+    setOffPlanModal({ mealId: null, position: pos, mealName });
+    closeSlotSheet();
+  }
+  async function saveSlotSheet(slot: { position: number; options: Meal[] }) {
+    const chosen = slot.options.find(o => o.id === sheetOptId);
+    if (!chosen) return;
+    // Extra meals land on a fresh 101+ position; plan slots keep their own position.
+    const targetPos = slotSheet?.extra ? slotSheet.position : chosen.position;
+    if (sheetAdh === "Off-plan") { openOffPlanAt(targetPos, chosen.name); return; }
+    if (await writeOptionLog(chosen, targetPos)) closeSlotSheet();
+  }
+  // "+2nd" — log the drafted option as a SECOND entry (fresh position, never overwrites the slot).
+  async function saveSlotAsSecond() {
+    const chosen = slots.flatMap(s => s.options).find(o => o.id === sheetOptId);
+    if (!chosen) return;
+    const pos = nextQuickPos(logs);
+    if (sheetAdh === "Off-plan") { openOffPlanAt(pos, chosen.name); return; }
+    if (await writeOptionLog(chosen, pos)) closeSlotSheet();
+  }
+  function openExtraSheet() {
+    const pos = nextQuickPos(logs);
+    setSheetOptId(""); setSheetAdh("Full"); setSheetItems({}); setSheetAdds([]);
+    setSheetQ(""); setSheetResults([]);
+    setSlotSheet({ position: pos, timing: "Extra meal / snack", extra: true });
+  }
+  // Row renderer for extra meals / snacks (positions 100+) shown in the plan day view.
+  function renderExtraRow(l: AdherenceLog) {
+    const meal = l.meal_id ? sortedMeals.find(m => m.id === l.meal_id) : null;
+    const opt = ADHERENCE_OPTIONS.find(o => o.key === l.adherence);
+    const color = opt?.color || "#8b5cf6";
+    const name = meal ? meal.name : (l.off_plan_details || "Extra entry");
+    const mac = meal ? loggedOptionMacros(meal, l) : { kcal: Number(l.est_kcal) || 0, protein: Number(l.est_protein) || 0, carbs: Number(l.est_carbs) || 0, fats: Number(l.est_fats) || 0 };
+    return (
+      <div key={`extra-${l.id}`} className="rounded-2xl p-3 flex items-center justify-between" style={{ background: "var(--brand-surface)", border: `1.5px solid ${color}30` }}>
+        <div className="min-w-0 flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{name}</p>
+            <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{Math.round(mac.kcal)} cal · {Math.round(mac.protein)}P · {Math.round(mac.carbs)}C · {Math.round(mac.fats)}F{l.macros_pending ? " · pending" : ""}</p>
+          </div>
+        </div>
+        <button onClick={() => deleteLog(l.meal_position)} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)" }} title="Delete"><i className="ti ti-trash text-sm" /></button>
+      </div>
+    );
   }
   // Macros for a logged option, applying any per-day item_overrides (mirrors currentMacros).
   function loggedOptionMacros(meal: Meal, log: AdherenceLog | undefined) {
@@ -1081,7 +1128,9 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
       {/* Multi-option slot bottom sheet (Mockup B) */}
       {slotSheet && (() => {
-        const slot = slots.find(s => s.position === slotSheet.position);
+        const slot = slotSheet.extra
+          ? { position: slotSheet.position, options: slots.flatMap(s => s.options) }
+          : slots.find(s => s.position === slotSheet.position);
         if (!slot) return null;
         const chosen = slot.options.find(o => o.id === sheetOptId) || null;
         const draft = chosen ? draftOptionMacros(chosen) : { kcal: 0, protein: 0, carbs: 0, fats: 0 };
@@ -1092,13 +1141,14 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
               onClick={e => e.stopPropagation()}>
               <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>{slotTitle(slot)}</h3>
+                <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>{slotSheet.extra ? slotSheet.timing : slotTitle(slot)}</h3>
                 <button onClick={closeSlotSheet} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
               </div>
               <label className="text-xs font-bold uppercase tracking-wider block mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Which option?</label>
               <select value={sheetOptId} onChange={e => pickSheetOption(slot, e.target.value)}
                 className="w-full px-3 py-3 rounded-xl text-sm outline-none"
                 style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}>
+                {slotSheet.extra && <option value="">Choose an option…</option>}
                 {slot.options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
               </select>
               {chosen && (
@@ -1200,8 +1250,14 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                     <button onClick={() => saveSlotSheet(slot)} disabled={saving === chosen.id}
                       className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-white"
                       style={{ background: "var(--brand-primary)", opacity: saving === chosen.id ? 0.6 : 1 }}>
-                      {saving === chosen.id ? "Saving..." : sheetAdh === "Off-plan" ? "Log off-plan…" : "Log meal"}
+                      {saving === chosen.id ? "Saving..." : sheetAdh === "Off-plan" ? "Log off-plan…" : slotSheet.extra ? "Add extra meal" : "Log meal"}
                     </button>
+                    {!slotSheet.extra && (
+                      <button onClick={saveSlotAsSecond} disabled={saving === chosen.id}
+                        className="px-4 rounded-2xl text-sm font-bold flex-shrink-0"
+                        style={{ background: "var(--brand-card)", color: "var(--brand-primary)", border: "1px solid var(--brand-border)" }}
+                        title="Log a second option for this meal too">+2nd</button>
+                    )}
                   </div>
                 </>
               )}
@@ -1504,6 +1560,25 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
               );
             })}
           </div>
+
+          {/* Extra meals / snacks (positions 100+) + add button */}
+          {planRange === "day" && (
+            <div className="px-4 mt-3">
+              {logs.filter(l => l.meal_position >= 100).length > 0 && (
+                <>
+                  <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Extra meals &amp; snacks</p>
+                  <div className="space-y-2 mb-3">
+                    {logs.filter(l => l.meal_position >= 100).slice().sort((a, b) => a.meal_position - b.meal_position).map(l => renderExtraRow(l))}
+                  </div>
+                </>
+              )}
+              <button onClick={openExtraSheet}
+                className="w-full py-3.5 rounded-2xl text-sm font-bold"
+                style={{ background: "var(--brand-surface)", border: "1px dashed var(--brand-border)", color: "var(--brand-primary)" }}>
+                ＋ Add an extra meal / snack
+              </button>
+            </div>
+          )}
 
           {/* 7-day summary */}
           {planRange === "day" && weekLogs.length > 0 && (
