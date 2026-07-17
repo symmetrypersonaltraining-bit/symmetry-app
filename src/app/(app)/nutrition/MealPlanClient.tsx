@@ -433,6 +433,12 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   }, [macroRange, clientId, today]);
   const [saving, setSaving] = useState<string | null>(null);
 
+  // Multi-option bottom sheet (Mockup B). Only used for slots that have >1 option;
+  // single-option plans (e.g. Dustin's) never open this and render exactly as before.
+  const [slotSheet, setSlotSheet] = useState<{ position: number; timing: string } | null>(null);
+  const [sheetOptId, setSheetOptId] = useState<string>("");
+  const [sheetAdh, setSheetAdh] = useState<string>("Full");
+
   const [notesMap, setNotesMap] = useState<Record<number, string>>(() => {
     const m: Record<number, string> = {};
     for (const l of todayLogs) if (l.notes) m[l.meal_position] = l.notes;
@@ -507,6 +513,20 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     if (!mealPlan?.meals) return [];
     return [...mealPlan.meals].sort((a, b) => a.position - b.position);
   }, [mealPlan]);
+
+  // Group meals into slots by position. A slot with >1 meal is a multi-option slot
+  // (Gerard/Jerry) → compact row + bottom-sheet dropdown. A slot with exactly 1 meal
+  // renders through the original single-meal card path, untouched.
+  const slots = useMemo(() => {
+    const byPos: Record<number, Meal[]> = {};
+    for (const m of sortedMeals) { (byPos[m.position] ||= []).push(m); }
+    return Object.keys(byPos)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map((position) => ({ position, options: byPos[position] }));
+  }, [sortedMeals]);
+  const slotTitle = (slot: { position: number; options: Meal[] }) =>
+    (slot.options[0].timing && slot.options[0].timing.length <= 24 ? slot.options[0].timing : null) || `Meal ${slot.position}`;
 
   function getMealMacros(meal: Meal) {
     let protein = 0, carbs = 0, fats = 0;
@@ -724,6 +744,82 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     } finally { setSaving(null); }
   }
 
+  // ---- Multi-option slot bottom sheet (Mockup B) ----
+  function openSlotSheet(slot: { position: number; options: Meal[] }) {
+    const existing = logs.find(l => l.meal_position === slot.position);
+    const validAdh = existing?.adherence && ADHERENCE_OPTIONS.some(o => o.key === existing.adherence);
+    setSheetOptId(existing?.meal_id || slot.options[0].id);
+    setSheetAdh(validAdh ? existing!.adherence : "Full");
+    setSlotSheet({ position: slot.position, timing: slot.options[0].timing || "" });
+  }
+  function closeSlotSheet() { setSlotSheet(null); }
+  async function saveSlotSheet(slot: { position: number; options: Meal[] }) {
+    const chosen = slot.options.find(o => o.id === sheetOptId);
+    if (!chosen) return;
+    if (sheetAdh === "Off-plan") { closeSlotSheet(); logAdherence(chosen, "Off-plan"); return; }
+    await logAdherence(chosen, sheetAdh);
+    closeSlotSheet();
+  }
+  // Reuse the existing per-day adjust-amounts sheet for whichever option is chosen.
+  function openAdjustForChosen(meal: Meal) {
+    const existing = logs.find(l => l.meal_position === meal.position);
+    const seed: Record<string, string> = {};
+    for (const it of meal.meal_items || []) {
+      const ov = existing?.item_overrides?.[it.id]?.amount;
+      seed[it.id] = ov != null ? String(ov) : (it.amount != null ? String(it.amount) : "");
+    }
+    setAmountEdits(seed);
+    setAmountAdds(existing?.item_overrides?.__added || []);
+    setAmtQ(""); setAmtResults([]);
+    setAmountsModal({ mealId: meal.id, position: meal.position, mealName: meal.name });
+    closeSlotSheet();
+  }
+  // Compact row for a multi-option slot.
+  function renderMultiSlot(slot: { position: number; options: Meal[] }) {
+    const slotLog = logs.find(l => l.meal_position === slot.position);
+    const picked = slotLog ? slot.options.find(o => o.id === slotLog.meal_id) : null;
+    const logOpt = slotLog ? ADHERENCE_OPTIONS.find(o => o.key === slotLog.adherence) : null;
+    const logColor = logOpt?.color || null;
+    const isOffPlan = slotLog?.adherence === "Off-plan";
+    const macros = picked ? getMealMacros(picked) : null;
+    const subtitle = picked
+      ? picked.name
+      : isOffPlan
+        ? (slotLog?.off_plan_details || "Off-plan")
+        : `${slot.options.length} options · tap to choose`;
+    return (
+      <div key={`slot-${slot.position}`} onClick={() => openSlotSheet(slot)}
+        className="rounded-2xl overflow-hidden cursor-pointer"
+        style={{ background: "var(--brand-surface)", border: slotLog && logColor ? `1.5px solid ${logColor}40` : "1px solid var(--brand-border)" }}>
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: slotLog && logColor ? `${logColor}20` : "var(--brand-card)" }}>
+              {slotLog && logColor
+                ? <div className="w-3 h-3 rounded-full" style={{ background: logColor }} />
+                : <span className="text-sm font-bold" style={{ color: "var(--brand-text-secondary)" }}>M{slot.position}</span>}
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm" style={{ color: "var(--brand-text)" }}>{slotTitle(slot)}</p>
+              <p className="text-xs mt-0.5 truncate" style={{ color: "var(--brand-text-secondary)" }}>{subtitle}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {macros && (
+              <div className="text-right">
+                <p className="text-xs font-bold" style={{ color: "var(--brand-text)" }}>{Math.round(macros.kcal)} cal</p>
+                <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{Math.round(macros.protein)}P·{Math.round(macros.carbs)}C·{Math.round(macros.fats)}F</p>
+              </div>
+            )}
+            {logOpt
+              ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: `${logOpt.color}20`, color: logOpt.color }}>{logOpt.label}</span>
+              : <i className="ti ti-chevron-right text-lg" style={{ color: "var(--brand-text-secondary)" }} />}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const offPlanSavingKey = offPlanModal ? (offPlanModal.mealId || `pos-${offPlanModal.position}`) : null;
 
   return (
@@ -899,6 +995,76 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         </div>
       )}
 
+      {/* Multi-option slot bottom sheet (Mockup B) */}
+      {slotSheet && (() => {
+        const slot = slots.find(s => s.position === slotSheet.position);
+        if (!slot) return null;
+        const chosen = slot.options.find(o => o.id === sheetOptId) || null;
+        const preview = chosen ? getMealMacros(chosen) : { kcal: 0, protein: 0, carbs: 0, fats: 0 };
+        return (
+          <div className="fixed inset-0 z-[1100] flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
+            onClick={closeSlotSheet}>
+            <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)", maxHeight: "88vh", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: "calc(28px + env(safe-area-inset-bottom))" }}
+              onClick={e => e.stopPropagation()}>
+              <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>{slotTitle(slot)}</h3>
+                <button onClick={closeSlotSheet} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+              </div>
+              <label className="text-xs font-bold uppercase tracking-wider block mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Which option?</label>
+              <select value={sheetOptId} onChange={e => setSheetOptId(e.target.value)}
+                className="w-full px-3 py-3 rounded-xl text-sm outline-none"
+                style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}>
+                {slot.options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+              {chosen && (
+                <>
+                  <div className="mt-3 rounded-xl p-3" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+                    {(chosen.meal_items || []).slice().sort((a, b) => a.position - b.position).map(it => (
+                      <div key={it.id} className="flex justify-between py-1 text-sm" style={{ color: "var(--brand-text)" }}>
+                        <span className="min-w-0 truncate mr-2">{it.food}</span>
+                        <span className="flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }}>{it.is_unlimited ? "unlimited" : `${it.amount ?? ""}${it.unit ? " " + it.unit : ""}`}</span>
+                      </div>
+                    ))}
+                    {chosen.swaps && <p className="text-xs mt-2" style={{ color: "var(--brand-text-secondary)" }}><span className="font-medium">Swap: </span>{chosen.swaps}</p>}
+                  </div>
+                  <div className="flex justify-between text-sm mt-2 px-1">
+                    <span style={{ color: "var(--brand-text-secondary)" }}>This option</span>
+                    <b style={{ color: "var(--brand-text)" }}>{Math.round(preview.kcal)} cal · {Math.round(preview.protein)}P · {Math.round(preview.carbs)}C · {Math.round(preview.fats)}F</b>
+                  </div>
+                  <label className="text-xs font-bold uppercase tracking-wider block mt-4 mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>How much did you eat?</label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {ADHERENCE_OPTIONS.map(opt => {
+                      const active = sheetAdh === opt.key;
+                      return (
+                        <button key={opt.key} onClick={() => setSheetAdh(opt.key)}
+                          className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                          style={{ background: active ? `${opt.color}25` : "var(--brand-card)", color: active ? opt.color : "var(--brand-text-secondary)", border: `1.5px solid ${active ? opt.color : "transparent"}` }}>
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <button onClick={() => saveSlotSheet(slot)} disabled={saving === chosen.id}
+                      className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-white"
+                      style={{ background: "var(--brand-primary)", opacity: saving === chosen.id ? 0.6 : 1 }}>
+                      {saving === chosen.id ? "Saving..." : sheetAdh === "Off-plan" ? "Log off-plan…" : "Log meal"}
+                    </button>
+                    <button onClick={() => openAdjustForChosen(chosen)}
+                      className="px-4 rounded-2xl flex items-center justify-center"
+                      style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}
+                      title="Adjust amounts / add items">
+                      <i className="ti ti-pencil" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Header */}
       {!isTrainer && (
         <div className="px-4 pt-6 pb-4" style={{ background: "var(--brand-surface)", borderBottom: "1px solid var(--brand-border)" }}>
@@ -1004,7 +1170,9 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
           {/* Meal cards */}
           <div className="px-4 mt-4 space-y-3" style={{ display: planRange === "day" ? undefined : "none" }}>
-            {sortedMeals.map(meal => {
+            {slots.map(slot => {
+              if (slot.options.length > 1) return renderMultiSlot(slot);
+              const meal = slot.options[0];
               const mealLog  = logs.find(l => l.meal_id === meal.id);
               const macros   = getMealMacros(meal);
               const isLogged = !!mealLog;
