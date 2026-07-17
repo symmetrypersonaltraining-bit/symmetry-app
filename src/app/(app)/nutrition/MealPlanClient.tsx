@@ -912,7 +912,11 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     const logOpt = slotLog ? ADHERENCE_OPTIONS.find(o => o.key === slotLog.adherence) : null;
     const logColor = logOpt?.color || null;
     const isOffPlan = slotLog?.adherence === "Off-plan";
-    const macros = picked ? loggedOptionMacros(picked, slotLog) : null;
+    const macros = picked
+      ? loggedOptionMacros(picked, slotLog)
+      : (slotLog && isOffPlan)
+        ? { kcal: Number(slotLog.est_kcal) || 0, protein: Number(slotLog.est_protein) || 0, carbs: Number(slotLog.est_carbs) || 0, fats: Number(slotLog.est_fats) || 0 }
+        : null;
     const subtitle = picked
       ? picked.name
       : isOffPlan
