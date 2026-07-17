@@ -5,6 +5,7 @@
 // just so you can SEE the anatomy visual on any device.
 import { useEffect, useRef, useState } from 'react';
 import type * as ThreeNS from 'three';
+import { processAnatomy } from '@/lib/movement/anatomyModel';
 
 export default function AnatomyPreview() {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -36,8 +37,12 @@ export default function AnatomyPreview() {
       const under = new THREE.PointLight(0x2ef2b4, 0.8, 30); under.position.set(0, -3, 3); scene.add(under);
 
       const boneMat = new THREE.MeshStandardMaterial({
-        color: 0xdff2ff, roughness: 0.38, metalness: 0.0, transparent: true, opacity: 0.6,
-        emissive: 0x2a6a9a, emissiveIntensity: 0.5, side: THREE.DoubleSide,
+        color: 0xeaf6ff, roughness: 0.4, metalness: 0.0, transparent: true, opacity: 0.6,
+        emissive: 0x2a6a9a, emissiveIntensity: 0.45, side: THREE.DoubleSide,
+      });
+      const muscleMat = new THREE.MeshStandardMaterial({
+        color: 0xff5a6e, roughness: 0.5, metalness: 0.0, transparent: true, opacity: 0.34,
+        emissive: 0x7a1524, emissiveIntensity: 0.5, side: THREE.DoubleSide,
       });
 
       const holder = new THREE.Group(); scene.add(holder);
@@ -48,12 +53,12 @@ export default function AnatomyPreview() {
         (gltf: { scene: ThreeNS.Object3D }) => {
           if (disposed) return;
           const model = gltf.scene;
-          model.traverse((o: ThreeNS.Object3D) => { const m = o as ThreeNS.Mesh; if (m.isMesh) { m.material = boneMat; m.frustumCulled = false; } });
-          const box = new THREE.Box3().setFromObject(model);
+          model.updateMatrixWorld(true);
+          const { box } = processAnatomy(THREE, model, { bone: boneMat, muscle: muscleMat });
           const size = new THREE.Vector3(); box.getSize(size);
           const center = new THREE.Vector3(); box.getCenter(center);
-          model.position.sub(center);
-          const fit = 4.6 / (size.y || 1);
+          model.position.sub(center);            // center the VISIBLE anatomy
+          const fit = 4.7 / (size.y || 1);
           holder.scale.setScalar(fit);
           holder.add(model);
           setStatus('');

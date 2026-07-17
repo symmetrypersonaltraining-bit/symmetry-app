@@ -15,6 +15,7 @@
 import { useEffect, useRef } from 'react';
 import type * as ThreeNS from 'three';
 import type { Keypoint } from '@/lib/movement/types';
+import { processAnatomy } from '@/lib/movement/anatomyModel';
 
 interface Props {
   keypoints: Keypoint[];
@@ -50,11 +51,16 @@ export default function LiveAnatomy3D({ keypoints, width, height }: Props) {
       const rimL = new THREE.PointLight(0x38e1ff, 1.4, 40); rimL.position.set(-4, 2, 3); scene.add(rimL);
       const rimR = new THREE.PointLight(0x8b7bff, 1.1, 40); rimR.position.set(4, 1, 3); scene.add(rimR);
 
-      // translucent glowing "glass bone" material
+      // translucent glowing materials — glass bone + red muscle
       const boneMat = new THREE.MeshStandardMaterial({
-        color: 0xdff2ff, roughness: 0.4, metalness: 0.0,
+        color: 0xeaf6ff, roughness: 0.4, metalness: 0.0,
         transparent: true, opacity: 0.55,
         emissive: 0x2a6a9a, emissiveIntensity: 0.45, side: THREE.DoubleSide,
+      });
+      const muscleMat = new THREE.MeshStandardMaterial({
+        color: 0xff5a6e, roughness: 0.5, metalness: 0.0,
+        transparent: true, opacity: 0.3,
+        emissive: 0x7a1524, emissiveIntensity: 0.5, side: THREE.DoubleSide,
       });
 
       const holder = new THREE.Group();      // whole body, we position/scale this
@@ -72,15 +78,11 @@ export default function LiveAnatomy3D({ keypoints, width, height }: Props) {
         (gltf: { scene: ThreeNS.Object3D }) => {
           if (disposed) return;
           model = gltf.scene;
-          model.traverse((o: ThreeNS.Object3D) => {
-            const mesh = o as ThreeNS.Mesh;
-            if (mesh.isMesh) { mesh.material = boneMat; mesh.frustumCulled = false; }
-          });
-          // center the model on its bounding box + measure height for scaling
-          const box = new THREE.Box3().setFromObject(model);
+          model.updateMatrixWorld(true);
+          const { box } = processAnatomy(THREE, model, { bone: boneMat, muscle: muscleMat });
           const size = new THREE.Vector3(); box.getSize(size);
           const center = new THREE.Vector3(); box.getCenter(center);
-          model.position.sub(center);      // center at origin
+          model.position.sub(center);      // center visible anatomy at origin
           modelH = size.y || 1;
           holder.add(model);
         },
