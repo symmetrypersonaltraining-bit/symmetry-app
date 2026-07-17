@@ -25,6 +25,7 @@ interface Rem {
   cancelledHalf: number;
   lastApprovedOn: string | null;
   flatBilling: boolean;
+  approved_at: string | null;
 }
 
 interface Edit {
@@ -47,7 +48,7 @@ export default function ReminderEditor() {
       const sup = createClient() as any;
       const { data: rems } = await sup
         .from("payment_reminders")
-        .select("id, client_id, due_date, amount_due, billing_credits, sms_message, notification_status")
+        .select("id, client_id, due_date, amount_due, billing_credits, sms_message, notification_status, approved_at")
         .in("notification_status", ["pending", "sent"])
         .lte("due_date", new Date(Date.now() + 7 * 86400000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
         .order("due_date");
@@ -109,6 +110,7 @@ export default function ReminderEditor() {
           sessionRate: c.session_rate == null ? null : Number(c.session_rate),
           cadence: cad, lastPay: lastPayOf(r.client_id), cancelledFull: full, cancelledHalf: half,
           lastApprovedOn: la, flatBilling: c.flat_billing === true,
+          approved_at: r.approved_at || null,
         };
       });
       setRows(out);
@@ -217,6 +219,11 @@ export default function ReminderEditor() {
             <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
               {"Fee $" + (r.fee ?? "?") + (r.cadence ? " / " + r.cadence : "") + " · rate $" + (r.sessionRate ?? "?") + "/session · billing cycle " + calc.cycleStart + " → " + calc.cycleEnd + " (reminder sends " + calc.cycleEnd + ") · due " + r.due_date}
             </div>
+            {sent && (
+              <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+                {"Notified (in-app banner) " + (r.approved_at ? new Date(r.approved_at).toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "— publish time not recorded")}
+              </div>
+            )}
             <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
               {"Cancelled in cycle: " + r.cancelledFull + " full, " + r.cancelledHalf + " half → auto credit $" + calc.autoCredits + " · calculated: $" + calc.expected}
             </div>
