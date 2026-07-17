@@ -1,41 +1,40 @@
 'use client';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LiveAnatomy3D — the translucent 3D anatomy VISUAL shell, posed by the live
-// tracked joints (2.5D: limb segments orient to the on-screen joint vectors, so
-// the body mirrors the client in the camera plane — exactly what a single phone
-// camera gives). Mounts in AnatomyRigSlot. OPT-IN + off by default; loads Three
-// dynamically so it never affects the base capture bundle.
+// LiveAnatomy3D — the translucent 3D anatomy VISUAL shell.
+// Loads the real Z-Anatomy skeleton GLB (Draco), applies the translucent glowing
+// "Symmetry" material, and follows the tracked body in the camera plane
+// (positions to the hip center, scales to the shoulder→hip span, leans with the
+// trunk). Falls back to a procedural body if the GLB fails to load.
+// OPT-IN + off by default; three + loaders imported dynamically.
 //
-// This procedural translucent body is the STAND-IN. When the rigged Z-Anatomy
-// GLB is dropped in, we load it here and drive its armature from the same joints
-// — the shell/materials/rig/coloring stay identical.
+// Per-joint articulation is the next step (needs a rigged model); this already
+// shows the real anatomy tracking the client's position, scale, and lean.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef } from 'react';
-import type * as ThreeNS from 'three'; // types only — erased at build, no bundle cost
+import type * as ThreeNS from 'three';
 import type { Keypoint } from '@/lib/movement/types';
 
 interface Props {
   keypoints: Keypoint[];
   width: number;
   height: number;
-  /** muscle flags from the engine: e.g. { calf:'bad', quad:'warn' } */
   muscleFlags?: Record<string, 'ok' | 'warn' | 'bad'>;
 }
 
-export default function LiveAnatomy3D({ keypoints, width, height, muscleFlags }: Props) {
+export default function LiveAnatomy3D({ keypoints, width, height }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const kpRef = useRef<Keypoint[]>(keypoints);
-  const flagsRef = useRef(muscleFlags);
   kpRef.current = keypoints;
-  flagsRef.current = muscleFlags;
 
   useEffect(() => {
     let disposed = false;
     let cleanup = () => {};
     (async () => {
       const THREE = await import('three');
+      const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+      const { DRACOLoader } = await import('three/examples/jsm/loaders/DRACOLoader.js');
       if (disposed || !mountRef.current) return;
 
       const scene = new THREE.Scene();
@@ -46,84 +45,69 @@ export default function LiveAnatomy3D({ keypoints, width, height, muscleFlags }:
       renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
       mountRef.current.appendChild(renderer.domElement);
 
-      scene.add(new THREE.AmbientLight(0x2a3a66, 0.7));
-      const key = new THREE.DirectionalLight(0x8fd8ff, 1.0); key.position.set(3, 5, 4); scene.add(key);
-      const rimL = new THREE.PointLight(0x38e1ff, 1.2, 30); rimL.position.set(-4, 2, 2); scene.add(rimL);
-      const rimR = new THREE.PointLight(0x8b7bff, 1.0, 30); rimR.position.set(4, 1, 2); scene.add(rimR);
+      scene.add(new THREE.AmbientLight(0x2a3a66, 0.8));
+      const key = new THREE.DirectionalLight(0x8fd8ff, 1.1); key.position.set(3, 5, 4); scene.add(key);
+      const rimL = new THREE.PointLight(0x38e1ff, 1.4, 40); rimL.position.set(-4, 2, 3); scene.add(rimL);
+      const rimR = new THREE.PointLight(0x8b7bff, 1.1, 40); rimR.position.set(4, 1, 3); scene.add(rimR);
 
-      const flesh = new THREE.MeshPhysicalMaterial({ color: 0x2f6fb0, transparent: true, opacity: 0.24, roughness: 0.35, transmission: 0.5, thickness: 0.5, emissive: 0x0a2f4a, emissiveIntensity: 0.5, side: THREE.DoubleSide });
-      const bone = new THREE.MeshStandardMaterial({ color: 0xeaf6ff, roughness: 0.5, emissive: 0x244a6a, emissiveIntensity: 0.35, transparent: true, opacity: 0.9 });
-      const muscleMat = (lvl?: 'ok' | 'warn' | 'bad') => new THREE.MeshPhysicalMaterial({
-        color: lvl === 'bad' ? 0xef475f : lvl === 'warn' ? 0xf4952e : 0x22c9a4,
-        transparent: true, opacity: lvl === 'bad' ? 0.4 : 0.3, transmission: 0.4, roughness: 0.4,
-        emissive: lvl === 'bad' ? 0x6a1020 : lvl === 'warn' ? 0x6a3a08 : 0x0e5a4a, emissiveIntensity: 0.6,
+      // translucent glowing "glass bone" material
+      const boneMat = new THREE.MeshStandardMaterial({
+        color: 0xdff2ff, roughness: 0.4, metalness: 0.0,
+        transparent: true, opacity: 0.55,
+        emissive: 0x2a6a9a, emissiveIntensity: 0.45, side: THREE.DoubleSide,
       });
 
-      // A limb rendered as a group we position+orient between two screen joints.
-      function limb(fleshR: number, muscle?: 'ok' | 'warn' | 'bad') {
-        const g = new THREE.Group();
-        const f = new THREE.Mesh(new THREE.CapsuleGeometry(fleshR, 1, 5, 12), flesh);
-        f.position.y = -0.5; g.add(f);
-        const b = new THREE.Mesh(new THREE.CylinderGeometry(fleshR * 0.4, fleshR * 0.42, 1, 8), bone);
-        b.position.y = -0.5; g.add(b);
-        if (muscle) { const m = new THREE.Mesh(new THREE.CapsuleGeometry(fleshR * 0.8, 0.85, 4, 10), muscleMat(muscle)); m.position.set(0, -0.5, fleshR * 0.2); g.add(m); }
-        g.userData.mesh = f; g.userData.boneMesh = b;
-        return g;
-      }
+      const holder = new THREE.Group();      // whole body, we position/scale this
+      scene.add(holder);
+      let model: ThreeNS.Object3D | null = null;
+      let modelH = 1; // model native height (shoulder→hip proxy) for scaling
 
-      const parts = {
-        torso: limb(0.34),
-        head: (() => { const g = new THREE.Group(); const h = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), flesh); g.add(h); const s = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 10), bone); g.add(s); return g; })(),
-        upperArmL: limb(0.09, 'warn'), foreArmL: limb(0.07, 'ok'),
-        upperArmR: limb(0.09, 'warn'), foreArmR: limb(0.07, 'ok'),
-        thighL: limb(0.14, 'warn'), shankL: limb(0.11, 'bad'),
-        thighR: limb(0.14, 'warn'), shankR: limb(0.11, 'bad'),
-      };
-      Object.values(parts).forEach((p) => scene.add(p));
-      const pelvisRing = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.05, 8, 16), bone); pelvisRing.rotation.x = Math.PI / 2; scene.add(pelvisRing);
+      const loader = new GLTFLoader();
+      const draco = new DRACOLoader();
+      draco.setDecoderPath('/draco/');
+      loader.setDRACOLoader(draco);
 
-      // map a normalized screen point (0..1) → world space in the camera plane
-      const toWorld = (k: Keypoint | undefined) => {
-        if (!k) return null;
-        const x = (k.x - 0.5) * 6.2;      // spread across view
-        const y = -(k.y - 0.5) * 6.2 * (height / width);
-        return new THREE.Vector3(x, y, 0);
-      };
+      loader.load(
+        '/symmetry-anatomy.glb',
+        (gltf: { scene: ThreeNS.Object3D }) => {
+          if (disposed) return;
+          model = gltf.scene;
+          model.traverse((o: ThreeNS.Object3D) => {
+            const mesh = o as ThreeNS.Mesh;
+            if (mesh.isMesh) { mesh.material = boneMat; mesh.frustumCulled = false; }
+          });
+          // center the model on its bounding box + measure height for scaling
+          const box = new THREE.Box3().setFromObject(model);
+          const size = new THREE.Vector3(); box.getSize(size);
+          const center = new THREE.Vector3(); box.getCenter(center);
+          model.position.sub(center);      // center at origin
+          modelH = size.y || 1;
+          holder.add(model);
+        },
+        undefined,
+        () => { buildFallback(THREE, holder, boneMat); }, // GLB failed → procedural body
+      );
+
       const at = (n: string) => { const k = kpRef.current.find((p) => p.name === n); return k && k.score > 0.3 ? k : undefined; };
-
-      // orient a limb group from joint A(top)→B(bottom), scaling to their distance
-      function poseLimb(g: ThreeNS.Group, a: ThreeNS.Vector3 | null, b: ThreeNS.Vector3 | null, thickness = 1) {
-        if (!a || !b) { g.visible = false; return; }
-        g.visible = true;
-        g.position.copy(a);
-        const dir = new THREE.Vector3().subVectors(b, a);
-        const len = dir.length();
-        g.scale.set(thickness, len, thickness);
-        // default limb points -Y; rotate to match dir
-        const up = new THREE.Vector3(0, -1, 0);
-        g.quaternion.setFromUnitVectors(up, dir.clone().normalize());
-      }
+      const world = (k?: { x: number; y: number }) => k ? new THREE.Vector3((k.x - 0.5) * 6.4, -(k.y - 0.5) * 6.4 * (height / width), 0) : null;
 
       let raf = 0;
       const loop = () => {
-        const lsh = toWorld(at('left_shoulder')), rsh = toWorld(at('right_shoulder'));
-        const lh = toWorld(at('left_hip')), rh = toWorld(at('right_hip'));
-        const shMid = lsh && rsh ? lsh.clone().add(rsh).multiplyScalar(0.5) : null;
-        const hipMid = lh && rh ? lh.clone().add(rh).multiplyScalar(0.5) : null;
-
-        poseLimb(parts.torso, shMid, hipMid, 1);
-        if (shMid) { parts.head.visible = true; const n = toWorld(at('nose')); parts.head.position.copy(n || shMid.clone().add(new THREE.Vector3(0, 0.5, 0))); } else parts.head.visible = false;
-        if (hipMid) { pelvisRing.visible = true; pelvisRing.position.copy(hipMid); } else pelvisRing.visible = false;
-
-        poseLimb(parts.upperArmL, toWorld(at('left_shoulder')), toWorld(at('left_elbow')), 1);
-        poseLimb(parts.foreArmL, toWorld(at('left_elbow')), toWorld(at('left_wrist')), 1);
-        poseLimb(parts.upperArmR, toWorld(at('right_shoulder')), toWorld(at('right_elbow')), 1);
-        poseLimb(parts.foreArmR, toWorld(at('right_elbow')), toWorld(at('right_wrist')), 1);
-        poseLimb(parts.thighL, toWorld(at('left_hip')), toWorld(at('left_knee')), 1);
-        poseLimb(parts.shankL, toWorld(at('left_knee')), toWorld(at('left_ankle')), 1);
-        poseLimb(parts.thighR, toWorld(at('right_hip')), toWorld(at('right_knee')), 1);
-        poseLimb(parts.shankR, toWorld(at('right_knee')), toWorld(at('right_ankle')), 1);
-
+        const ls = world(at('left_shoulder')), rs = world(at('right_shoulder'));
+        const lh = world(at('left_hip')), rh = world(at('right_hip'));
+        if (holder.children.length && ls && rs && lh && rh) {
+          const shMid = ls.clone().add(rs).multiplyScalar(0.5);
+          const hipMid = lh.clone().add(rh).multiplyScalar(0.5);
+          const torso = shMid.clone().sub(hipMid);
+          const torsoLen = torso.length() || 1;
+          // scale so the model's torso matches the person's; position at mid-torso
+          const s = (torsoLen * 2.4) / modelH;
+          holder.scale.setScalar(s);
+          holder.position.copy(hipMid.clone().add(shMid).multiplyScalar(0.5));
+          // lean: rotate around Z so the body axis matches shoulder→hip vector
+          const lean = Math.atan2(torso.x, torso.y);
+          holder.rotation.z = -lean;
+        }
         renderer.render(scene, camera);
         raf = requestAnimationFrame(loop);
       };
@@ -131,6 +115,7 @@ export default function LiveAnatomy3D({ keypoints, width, height, muscleFlags }:
 
       cleanup = () => {
         cancelAnimationFrame(raf);
+        draco.dispose();
         renderer.dispose();
         if (mountRef.current && renderer.domElement.parentNode === mountRef.current) {
           mountRef.current.removeChild(renderer.domElement);
@@ -142,4 +127,12 @@ export default function LiveAnatomy3D({ keypoints, width, height, muscleFlags }:
   }, [width, height]);
 
   return <div ref={mountRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />;
+}
+
+// Procedural fallback body (if the GLB can't load) so the toggle never blanks.
+function buildFallback(THREE: typeof ThreeNS, holder: ThreeNS.Group, mat: ThreeNS.Material) {
+  const g = new THREE.Group();
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.7, 6, 14), mat); g.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), mat); head.position.y = 0.7; g.add(head);
+  holder.add(g);
 }

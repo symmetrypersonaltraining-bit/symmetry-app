@@ -26,11 +26,15 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
-  // Always allow static assets and auth callback
+  // Always allow static assets, auth callback, and the public anatomy preview
   if (
     pathname.startsWith("/auth") ||
     pathname.startsWith("/api/") ||
-    pathname.startsWith("/_next/")
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/draco/") ||
+    pathname.startsWith("/anatomy-preview") ||
+    pathname.endsWith(".glb") ||
+    pathname.endsWith(".wasm")
   ) {
     return supabaseResponse;
   }
