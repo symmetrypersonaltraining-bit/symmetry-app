@@ -9,8 +9,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import SkeletonOverlay, { AnatomyRigSlot } from '@/components/movement/SkeletonOverlay';
 import { createDetector, estimateDistanceFt, keypointQuality, type PoseDetectorHandle } from '@/lib/movement/pose';
+
+// Heavy 3D visual shell — loaded only when the trainer toggles it on.
+const LiveAnatomy3D = dynamic(() => import('@/components/movement/LiveAnatomy3D'), { ssr: false });
 import { VIEW_SCRIPTS, MOVEMENT_DEMOS, evaluateGate, gatePassed, nextCoachingCue, speak } from '@/lib/movement/coach';
 import type { Frame, Keypoint, ViewCapture, ViewName } from '@/lib/movement/types';
 
@@ -33,6 +37,7 @@ export default function CaptureClient({ clientId, clientName, capturedBy }: { cl
   const [distanceFt, setDistanceFt] = useState(0);
   const [gate, setGate] = useState<ReturnType<typeof evaluateGate>>([]);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [anatomyOn, setAnatomyOn] = useState(false); // opt-in translucent 3D shell
   const [captured, setCaptured] = useState<ViewCapture[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [modelReady, setModelReady] = useState(false);
@@ -192,10 +197,14 @@ export default function CaptureClient({ clientId, clientName, capturedBy }: { cl
     <div style={{ minHeight: '100vh', background: '#04070f', color: '#eaf2ff', paddingBottom: 24 }}>
       <div style={{ position: 'relative', width: '100%', maxWidth: 480, margin: '0 auto', aspectRatio: '9/16', background: '#02040a', overflow: 'hidden' }}>
         <video ref={videoRef} playsInline muted style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: facing === 'user' ? 'scaleX(-1)' : 'none' }} />
-        {/* translucent realistic anatomy visual layer mounts here (rigged to joints) */}
-        <AnatomyRigSlot />
-        {/* joint-accurate tracking skeleton (the measuring layer) */}
-        {(phase === 'setup' || phase === 'recording' || phase === 'demo') && kps.length > 0 && (
+        {/* translucent realistic anatomy visual layer mounts here (posed by the same joints) */}
+        <AnatomyRigSlot>
+          {anatomyOn && kps.length > 0 && (phase === 'setup' || phase === 'recording' || phase === 'demo') && (
+            <LiveAnatomy3D keypoints={kps} width={dims.w} height={dims.h} muscleFlags={{ calf: 'bad', quad: 'warn' }} />
+          )}
+        </AnatomyRigSlot>
+        {/* joint-accurate tracking skeleton (the measuring layer) — hidden when the shell is on */}
+        {!anatomyOn && (phase === 'setup' || phase === 'recording' || phase === 'demo') && kps.length > 0 && (
           <SkeletonOverlay keypoints={kps} width={dims.w} height={dims.h} flagged={flagged} />
         )}
 
@@ -284,9 +293,14 @@ export default function CaptureClient({ clientId, clientName, capturedBy }: { cl
         <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11, color: '#7ea2d6' }}>
           View {viewIdx + 1} / {VIEW_SEQUENCE.length}
         </div>
-        <label style={{ fontSize: 12, color: '#9fb9e8', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input type="checkbox" checked={voiceOn} onChange={(e) => setVoiceOn(e.target.checked)} /> AI voice coach
-        </label>
+        <div style={{ display: 'flex', gap: 14 }}>
+          <label style={{ fontSize: 12, color: '#9fb9e8', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={anatomyOn} onChange={(e) => setAnatomyOn(e.target.checked)} /> 3D anatomy
+          </label>
+          <label style={{ fontSize: 12, color: '#9fb9e8', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={voiceOn} onChange={(e) => setVoiceOn(e.target.checked)} /> AI voice coach
+          </label>
+        </div>
       </div>
       <p style={{ maxWidth: 480, margin: '10px auto 0', padding: '0 14px', fontSize: 10, color: '#5a6d95', lineHeight: 1.5, textAlign: 'center' }}>
         Processed on your device. Raw video is never uploaded or stored — only the movement measurements.
