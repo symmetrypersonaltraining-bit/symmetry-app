@@ -4,6 +4,7 @@
 // note, and the proposed program. Reads the analysis from sessionStorage
 // (just-captured) or is passed a persisted assessment.
 import { useEffect, useState } from 'react';
+import BodyMapResults from '@/components/movement/BodyMapResults';
 
 interface AnyResult { [k: string]: unknown }
 
@@ -29,6 +30,11 @@ export default function ResultsClient({ initial }: { initial?: AnyResult | null 
     <div style={{ maxWidth: 560, margin: '0 auto', padding: '18px 14px 60px', color: '#eaf2ff' }}>
       <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10, color: '#67d9ff', letterSpacing: 1.5 }}>YOUR MOVEMENT SCREEN</div>
       <h1 style={{ fontSize: 22, margin: '4px 0 10px' }}>{edu.headline ?? 'Here’s what’s happening'}</h1>
+
+      {/* anatomy body map with the findings pinned on */}
+      <Section title="Your body — what we found where">
+        <BodyMapResults chain={chain} labels={labels} />
+      </Section>
 
       {/* chain */}
       <Section title="The chain — ground up">
