@@ -1259,7 +1259,11 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                     {ADHERENCE_OPTIONS.map(opt => {
                       const active = sheetAdh === opt.key;
                       return (
-                        <button key={opt.key} onClick={() => setSheetAdh(opt.key)}
+                        <button key={opt.key} onClick={() => {
+                          // Off-plan → jump straight to the photo/AI modal (same as single-option meals)
+                          if (opt.key === "Off-plan") { closeSlotSheet(); logAdherence(chosen, "Off-plan"); return; }
+                          setSheetAdh(opt.key);
+                        }}
                           className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
                           style={{ background: active ? `${opt.color}25` : "var(--brand-card)", color: active ? opt.color : "var(--brand-text-secondary)", border: `1.5px solid ${active ? opt.color : "transparent"}` }}>
                           {opt.label}
