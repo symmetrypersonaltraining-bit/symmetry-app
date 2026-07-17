@@ -17,6 +17,7 @@ const TRAINER_NAV: SidebarItem[] = [
   { href: "/home", label: "Home", icon: "ti-home" },
   { href: "/schedule", label: "Schedule", icon: "ti-calendar" },
   { href: "/clients", label: "Clients", icon: "ti-users" },
+  { href: "/movement/testers", label: "Movement", icon: "ti-scan" },
   { href: "/messages", label: "Messages", icon: "ti-message-circle" },
   {
     label: "Library",
