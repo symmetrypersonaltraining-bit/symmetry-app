@@ -1134,6 +1134,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         if (!slot) return null;
         const chosen = slot.options.find(o => o.id === sheetOptId) || null;
         const draft = chosen ? draftOptionMacros(chosen) : { kcal: 0, protein: 0, carbs: 0, fats: 0 };
+        const existingLog = !slotSheet.extra ? logs.find(l => l.meal_position === slotSheet.position) : undefined;
         return (
           <div className="fixed inset-0 z-[1100] flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
             onClick={closeSlotSheet}>
@@ -1142,7 +1143,16 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
               <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>{slotSheet.extra ? slotSheet.timing : slotTitle(slot)}</h3>
-                <button onClick={closeSlotSheet} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                <div className="flex items-center gap-3">
+                  {existingLog && (
+                    <button onClick={() => { deleteLog(slotSheet.position); closeSlotSheet(); }}
+                      className="text-xs font-semibold flex items-center gap-1" style={{ color: "#d0384f" }}
+                      title="Delete this logged meal">
+                      <i className="ti ti-trash text-sm" /> Remove
+                    </button>
+                  )}
+                  <button onClick={closeSlotSheet} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                </div>
               </div>
               <label className="text-xs font-bold uppercase tracking-wider block mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Which option?</label>
               <select value={sheetOptId} onChange={e => pickSheetOption(slot, e.target.value)}
