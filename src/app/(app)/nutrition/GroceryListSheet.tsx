@@ -159,21 +159,19 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
     }
     if (prepped.length > 0) {
       lines.push("");
-      lines.push("Meal prep card");
+      lines.push("Meal prep card (amounts are PER CONTAINER)");
       for (const p of prepped) {
-        lines.push(`${p.meal.name} (${p.slotName}) — ${p.n} container${p.n === 1 ? "" : "s"}`);
+        lines.push(`${p.meal.name} (${p.slotName}) — make ${p.n} container${p.n === 1 ? "" : "s"}, each with:`);
         for (const it of p.items) {
+          const perContainer = { total: it.total / p.n, unit: it.unit, basis: it.basis, unlimited: it.unlimited };
           const row = it.alts ? list.find(r => r.key === it.key) : undefined;
           if (it.alts && row && !row.unlimited && row.mealDays > 0 && it.total > 0) {
             const ad = mealAltDays(altDaysFor(row.key, it.alts.length, row.mealDays), row.mealDays, p.n);
-            const perDay = it.total / p.n;
-            lines.push(`  • ${it.food}:`);
             it.alts.forEach((name, i) => {
-              const sub = { total: perDay * ad[i], unit: it.unit, basis: it.basis, unlimited: false };
-              lines.push(`     - ${name} — ${fmt(ad[i])} container${ad[i] === 1 ? "" : "s"}: ${qtyText(sub)}`);
+              if (ad[i] > 0) lines.push(`  • ${name} — ${qtyText(perContainer)} each × ${fmt(ad[i])} container${ad[i] === 1 ? "" : "s"}`);
             });
           } else {
-            lines.push(`  • ${it.food} — ${qtyText(it)}`);
+            lines.push(`  • ${it.food} — ${qtyText(perContainer)}${it.unlimited ? "" : " each"}`);
           }
         }
       }
@@ -354,34 +352,30 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
                       {p.n} container{p.n === 1 ? "" : "s"}
                     </span>
                   </div>
-                  <p className="text-xs mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>{p.slotName} · batch amounts for {p.n} day{p.n === 1 ? "" : "s"}</p>
+                  <p className="text-xs mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>{p.slotName} · each container gets:</p>
                   <div className="space-y-1">
                     {p.items.map((it, i) => {
+                      const perContainer = { total: it.total / p.n, unit: it.unit, basis: it.basis, unlimited: it.unlimited };
                       const row = it.alts ? list.find(r => r.key === it.key) : undefined;
                       if (it.alts && row && !row.unlimited && row.mealDays > 0 && it.total > 0) {
                         const ad = mealAltDays(altDaysFor(row.key, it.alts.length, row.mealDays), row.mealDays, p.n);
-                        const perDay = it.total / p.n;
                         return (
                           <div key={i}>
-                            <p className="text-xs font-semibold mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>{it.food}</p>
-                            {it.alts.map((name, ai) => {
-                              const sub = { total: perDay * ad[ai], unit: it.unit, basis: it.basis, unlimited: false };
-                              return (
-                                <div key={ai} className="flex items-center justify-between text-sm pl-2" style={{ color: "var(--brand-text)" }}>
-                                  <span className="min-w-0 truncate mr-2">{name}</span>
-                                  <span className="flex-shrink-0" style={{ color: "var(--brand-text)" }}>
-                                    {ad[ai] > 0 ? `${fmt(ad[ai])}× · ${qtyText(sub)}` : "—"}
-                                  </span>
+                            {it.alts.map((name, ai) => (
+                              ad[ai] > 0 ? (
+                                <div key={ai} className="flex items-center justify-between text-sm" style={{ color: "var(--brand-text)" }}>
+                                  <span className="min-w-0 truncate mr-2">{name} <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>× {fmt(ad[ai])}</span></span>
+                                  <span className="flex-shrink-0" style={{ color: "var(--brand-text)" }}>{qtyText(perContainer)}</span>
                                 </div>
-                              );
-                            })}
+                              ) : null
+                            ))}
                           </div>
                         );
                       }
                       return (
                         <div key={i} className="flex items-center justify-between text-sm" style={{ color: "var(--brand-text)" }}>
                           <span className="min-w-0 truncate mr-2">{it.food}</span>
-                          <span className="flex-shrink-0" style={{ color: "var(--brand-text)" }}>{qtyText(it)}</span>
+                          <span className="flex-shrink-0" style={{ color: "var(--brand-text)" }}>{qtyText(perContainer)}</span>
                         </div>
                       );
                     })}
