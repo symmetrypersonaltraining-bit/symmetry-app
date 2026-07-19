@@ -629,9 +629,19 @@ export default function WorkoutLogger({
   // collapse the header + bottom chrome and pull the focused box to the top of the screen,
   // so it always clears the keyboard. Isolated; revert = remove `typing` usage.
   const [typing, setTyping] = useState(false);
+  // Desktop guard (Mac/PC bug fix): the keyboard-safe collapse + recovery poll must ONLY
+  // run where an on-screen keyboard can exist. On desktop the poll sees "keyboard down"
+  // immediately and force-blurred every input ~1.2s after focus (notes field kicked users
+  // out mid-typing). Coarse pointer = touch device; fine pointer = physical keyboard.
+  const touchDevice = useRef(false);
+  useEffect(() => {
+    try { touchDevice.current = window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1; }
+    catch { touchDevice.current = false; }
+  }, []);
   const focusScroll = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     const el = e.currentTarget;
     focusedInputRef.current = el;
+    if (!touchDevice.current) return; // desktop: no keyboard to clear — leave layout alone
     setTyping(true);
     setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 130);
     setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 350);
@@ -653,7 +663,7 @@ export default function WorkoutLogger({
   const kbBaseH = useRef(0);
   useEffect(() => { try { kbBaseH.current = window.innerHeight; } catch { /* noop */ } }, []);
   useEffect(() => {
-    if (!typing) return;
+    if (!typing || !touchDevice.current) return; // desktop never runs the recovery poll
     let fullH = 0;
     try { fullH = Math.max(window.innerHeight, kbBaseH.current || 0); } catch { /* noop */ }
     let opened = false;
