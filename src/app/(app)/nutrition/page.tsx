@@ -83,7 +83,7 @@ export default async function NutritionPage({
     const [mpRes, tlRes, mtRes, wlRes] = await Promise.all([
       supabase
         .from("meal_plans")
-        .select("id, version_number, meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, protein, carbs, fats, position))")
+        .select("id, version_number, meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, position))")
         .eq("client_id", clientId)
         .eq("status", "live")
         .lte("effective_date", today)
