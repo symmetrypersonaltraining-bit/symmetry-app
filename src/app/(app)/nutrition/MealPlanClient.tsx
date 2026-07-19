@@ -45,6 +45,52 @@ interface RecentEntry { label: string; food_id: string | null; p: number; c: num
 
 function quickKcal(p: number, c: number, f: number) { return Math.round(4 * p + 4 * c + 9 * f); }
 
+// Phone camera photos are 3–12 MB — far over Vercel's ~4.5 MB request limit, which made
+// AI photo analysis die with an opaque error. Downscale to ≤1280px JPEG (~200–400 KB)
+// before upload; analysis quality is unaffected.
+async function compressPhotoToBase64(file: File): Promise<{ base64: string; mime: string }> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxDim = 1280;
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("no canvas");
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+    return { base64: dataUrl.split(",")[1], mime: "image/jpeg" };
+  } catch {
+    // Fallback: send the original file (small files still work fine).
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+    return { base64: dataUrl.split(",")[1], mime: file.type || "image/jpeg" };
+  }
+}
+
+async function analyzeMealPhoto(file: File): Promise<{ ok: true; json: any } | { ok: false; message: string }> {
+  const { base64, mime } = await compressPhotoToBase64(file);
+  let res: Response;
+  try {
+    res = await fetch("/api/analyze-meal-photo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageBase64: base64, mimeType: mime }) });
+  } catch {
+    return { ok: false, message: "Network error — check your connection and try again." };
+  }
+  let json: any = null;
+  try { json = await res.json(); } catch { /* non-JSON (e.g. proxy error page) */ }
+  if (!res.ok && !json) return { ok: false, message: `Analysis failed (error ${res.status}) — try again or enter macros manually.` };
+  if (!json) return { ok: false, message: "Analysis failed — try again or enter macros manually." };
+  if (json.error) return { ok: false, message: String(json.error) };
+  return { ok: true, json };
+}
+
 function nextQuickPos(logs: AdherenceLog[]) {
   const used = new Set(logs.map((l) => l.meal_position));
   let p = 101;
@@ -236,20 +282,16 @@ function QuickLog({ clientId, selectedDate, logs, setLogs }: { clientId: string;
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoBusy(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const dataUrl = reader.result as string;
-        const base64 = dataUrl.split(",")[1];
-        const res = await fetch("/api/analyze-meal-photo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageBase64: base64, mimeType: file.type || "image/jpeg" }) });
-        const json = await res.json();
-        if (!json.error) {
-          const p = json.protein_g || 0, c = json.carbs_g || 0, f = json.fats_g || 0;
-          await insertQuick({ off_plan_details: json.description || json.meal_name || "Photo meal", est_protein: p, est_carbs: c, est_fats: f, est_kcal: json.calories || quickKcal(p, c, f), macros_pending: false });
-        }
-      } finally { setPhotoBusy(false); if (photoRef.current) photoRef.current.value = ""; }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const result = await analyzeMealPhoto(file);
+      if (result.ok) {
+        const json = result.json;
+        const p = json.protein_g || 0, c = json.carbs_g || 0, f = json.fat_g ?? json.fats_g ?? 0;
+        await insertQuick({ off_plan_details: json.description || json.meal_name || "Photo meal", est_protein: p, est_carbs: c, est_fats: f, est_kcal: json.calories || quickKcal(p, c, f), macros_pending: false });
+      } else {
+        alert(result.message);
+      }
+    } finally { setPhotoBusy(false); if (photoRef.current) photoRef.current.value = ""; }
   }
   async function deleteQuick(id: string) {
     await supabase.from("meal_adherence_logs").delete().eq("id", id);
@@ -683,34 +725,25 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     if (!file) return;
     setPhotoLoading(true);
     setPhotoResult(null);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const dataUrl = reader.result as string;
-        const base64 = dataUrl.split(",")[1];
-        const res = await fetch("/api/analyze-meal-photo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64: base64, mimeType: file.type || "image/jpeg" }),
-        });
-        const json = await res.json();
-        if (json.error) {
-          setPhotoResult("Could not analyze photo.");
-        } else {
-          setOffPlanKcal(json.calories?.toString() || "");
-          setOffPlanP(json.protein_g?.toString() || "");
-          setOffPlanC(json.carbs_g?.toString() || "");
-          setOffPlanF(json.fat_g?.toString() || "");
-          setOffPlanDetails(json.description || "");
-          setPhotoResult(`AI detected: ${json.description}`);
-        }
-      } catch {
-        setPhotoResult("Error analyzing photo.");
-      } finally {
-        setPhotoLoading(false);
+    try {
+      const result = await analyzeMealPhoto(file);
+      if (!result.ok) {
+        setPhotoResult(result.message);
+      } else {
+        const json = result.json;
+        setOffPlanKcal(json.calories?.toString() || "");
+        setOffPlanP(json.protein_g?.toString() || "");
+        setOffPlanC(json.carbs_g?.toString() || "");
+        setOffPlanF((json.fat_g ?? json.fats_g)?.toString() || "");
+        setOffPlanDetails(json.description || "");
+        setPhotoResult(`AI detected: ${json.description}`);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setPhotoResult("Error analyzing photo — try again or enter macros manually.");
+    } finally {
+      setPhotoLoading(false);
+      if (cameraRef.current) cameraRef.current.value = "";
+    }
   }
 
   async function saveOffPlan() {
@@ -722,7 +755,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       const pr = offPlanP ? parseFloat(offPlanP) : null;
       const cb = offPlanC ? parseFloat(offPlanC) : null;
       const ft = offPlanF ? parseFloat(offPlanF) : null;
-      const { data } = await supabase.from("meal_adherence_logs").upsert({
+      const { data, error } = await supabase.from("meal_adherence_logs").upsert({
         client_id: clientId, log_date: selectedDate, meal_id: offPlanModal.mealId,
         meal_position: offPlanModal.position, adherence: "Off-plan",
         off_plan_details: offPlanDetails || null,
@@ -739,6 +772,11 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         photo_url: null,
         off_plan_notes: offPlanNotes || null,
       }, { onConflict: "client_id,log_date,meal_position" }).select().single();
+      if (error) {
+        // Keep the modal open (with everything they entered) and say what went wrong.
+        alert(`Couldn't save this meal — ${error.message}. Please try again.`);
+        return;
+      }
       if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== offPlanModal.position), data as AdherenceLog]);
       setOffPlanModal(null); setOffPlanNotes("");
     } finally { setSaving(null); }
