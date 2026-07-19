@@ -128,11 +128,45 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
   const fmt = (n: number) => (Math.round(n * 100) / 100).toString();
   // Meat & fish get a pounds conversion so the client knows what to buy (16 oz = 1 lb).
   const lbSuffix = (total: number, unit: string | null) =>
-    unit && unit.trim().toLowerCase() === "oz" && total > 0 ? ` · ${fmt(total / 16)} lb` : "";
+    unit && unit.replace(/cooked|raw/gi, "").trim().toLowerCase() === "oz" && total > 0 ? ` · ${fmt(total / 16)} lb` : "";
   const qtyText = (r: { total: number; unit: string | null; basis: string | null; unlimited: boolean }, withLb = false) => {
     const unit = `${r.unit ? " " + r.unit : ""}${basisTag(r.basis)}`;
     if (r.unlimited && r.total === 0) return "as needed";
     return `${fmt(r.total)}${unit}${withLb ? lbSuffix(r.total, r.unit) : ""}${r.unlimited ? " + as needed" : ""}`;
+  };
+
+  // ---- GROCERY amounts are always RAW (you buy it raw). Cooked-marked items convert: ----
+  // meat/poultry/fish ×4/3 (25% moisture loss) · rice/grains cooked→dry (÷3 by volume, ÷2.8 by
+  // weight) · potatoes ×1.2. Anything else marked cooked passes through with its cooked tag.
+  const RAW_RULES: { match: RegExp; kind: "meat" | "grain" | "potato" }[] = [
+    { match: /beef|chicken|turkey|pork|steak|salmon|tilapia|cod|shrimp|bison|lamb|sirloin|mahi|halibut|snapper|fish/i, kind: "meat" },
+    { match: /\brice\b|pasta|quinoa|oats|oatmeal/i, kind: "grain" },
+    { match: /potato/i, kind: "potato" },
+  ];
+  const isCookedEntry = (food: string, unit: string | null, basis: string | null) =>
+    basis === "cooked" || /\bcooked\b/i.test(food || "") || /\bcooked\b/i.test(unit || "");
+  const cleanUnit = (unit: string | null) => (unit ? unit.replace(/\s*(cooked|raw)\s*/gi, " ").replace(/\s+/g, " ").trim() : unit);
+  const groceryQty = (name: string, r: { total: number; unit: string | null; basis: string | null; unlimited: boolean }) => {
+    if (r.unlimited && r.total === 0) return "as needed";
+    if (r.total > 0 && isCookedEntry(name, r.unit, r.basis)) {
+      const rule = RAW_RULES.find(x => x.match.test(name || ""));
+      if (rule) {
+        const u = cleanUnit(r.unit);
+        const isVol = /cup|tbsp|tsp|fl oz|ml/i.test(u || "");
+        const rawTotal = rule.kind === "meat" ? r.total * (4 / 3) : rule.kind === "potato" ? r.total * 1.2 : isVol ? r.total / 3 : r.total / 2.8;
+        const tag = rule.kind === "grain" ? "dry" : "raw";
+        return `${fmt(rawTotal)}${u ? " " + u : ""} ${tag}${lbSuffix(rawTotal, u)}${r.unlimited ? " + as needed" : ""}`;
+      }
+    }
+    return qtyText(r, true);
+  };
+  // ---- PREP amounts stay COOKED, shown in both oz and grams for weight items ----
+  const prepQty = (r: { total: number; unit: string | null; basis: string | null; unlimited: boolean }) => {
+    if (r.unlimited) return qtyText(r);
+    const u = cleanUnit(r.unit)?.toLowerCase();
+    if (u === "oz" && r.total > 0) return `${fmt(r.total)} oz${basisTag(r.basis)} · ${Math.round(r.total * 28.35)} g`;
+    if (u === "g" && r.total > 0) return `${Math.round(r.total)} g${basisTag(r.basis)} · ${fmt(r.total / 28.35)} oz`;
+    return qtyText(r);
   };
   // Days-per-alternative for a single meal's share of a split item (proportional to the global split).
   const mealAltDays = (globalAlt: number[], mealDays: number, n: number) =>
@@ -143,7 +177,7 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
 
   function copyList() {
     const lines: string[] = [];
-    lines.push(`Grocery list — ${fmtShort(startISO)} to ${fmtShort(endISO)} (${numDays} day${numDays === 1 ? "" : "s"})`);
+    lines.push(`Grocery list (RAW buy amounts) — ${fmtShort(startISO)} to ${fmtShort(endISO)} (${numDays} day${numDays === 1 ? "" : "s"})`);
     for (const r of list) {
       if (r.alts && !r.unlimited && r.mealDays > 0 && r.total > 0) {
         const ad = altDaysFor(r.key, r.alts.length, r.mealDays);
@@ -151,15 +185,15 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
         lines.push(`• ${r.food}:`);
         r.alts.forEach((name, i) => {
           const sub = { total: perDay * ad[i], unit: r.unit, basis: r.basis, unlimited: false };
-          lines.push(`   - ${name} — ${ad[i]} meal${ad[i] === 1 ? "" : "s"}: ${qtyText(sub, true)}`);
+          lines.push(`   - ${name} — ${ad[i]} meal${ad[i] === 1 ? "" : "s"}: ${groceryQty(name + " " + r.food, sub)}`);
         });
       } else {
-        lines.push(`• ${r.food} — ${qtyText(r, true)}`);
+        lines.push(`• ${r.food} — ${groceryQty(r.food, r)}`);
       }
     }
     if (prepped.length > 0) {
       lines.push("");
-      lines.push("Meal prep card (amounts are PER CONTAINER)");
+      lines.push("Meal prep card (cooked amounts, PER CONTAINER)");
       for (const p of prepped) {
         lines.push(`${p.meal.name} (${p.slotName}) — make ${p.n} container${p.n === 1 ? "" : "s"}, each with:`);
         for (const it of p.items) {
@@ -168,10 +202,10 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
           if (it.alts && row && !row.unlimited && row.mealDays > 0 && it.total > 0) {
             const ad = mealAltDays(altDaysFor(row.key, it.alts.length, row.mealDays), row.mealDays, p.n);
             it.alts.forEach((name, i) => {
-              if (ad[i] > 0) lines.push(`  • ${name} — ${qtyText(perContainer)} each × ${fmt(ad[i])} container${ad[i] === 1 ? "" : "s"}`);
+              if (ad[i] > 0) lines.push(`  • ${name} — ${prepQty(perContainer)} each × ${fmt(ad[i])} container${ad[i] === 1 ? "" : "s"}`);
             });
           } else {
-            lines.push(`  • ${it.food} — ${qtyText(perContainer)}${it.unlimited ? "" : " each"}`);
+            lines.push(`  • ${it.food} — ${prepQty(perContainer)}${it.unlimited ? "" : " each"}`);
           }
         }
       }
@@ -197,7 +231,7 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
         </div>
         <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
-          Pick your dates, set how many days you&apos;ll eat each option, and we&apos;ll build your shopping list and prep card.
+          Pick your dates and how many days you&apos;ll eat each option. Grocery amounts are RAW (what to buy); prep card amounts are cooked.
         </p>
 
         {/* ---- Date range picker ---- */}
@@ -298,7 +332,7 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
                   return (
                     <div key={i} className="flex items-center justify-between text-sm" style={{ color: "var(--brand-text)" }}>
                       <span className="min-w-0 truncate mr-2">{r.food}</span>
-                      <span className="flex-shrink-0 font-semibold" style={{ color: "var(--brand-text)" }}>{qtyText(r, true)}</span>
+                      <span className="flex-shrink-0 font-semibold" style={{ color: "var(--brand-text)" }}>{groceryQty(r.food, r)}</span>
                     </div>
                   );
                 }
@@ -325,7 +359,7 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
                               className="w-7 h-7 text-sm font-bold" style={{ background: "var(--brand-bg)", color: "var(--brand-primary)" }}>＋</button>
                           </div>
                           <span className="flex-shrink-0 font-semibold text-sm text-right" style={{ color: "var(--brand-text)", minWidth: "5.5rem" }}>
-                            {ad[ai] > 0 ? qtyText(sub, true) : "—"}
+                            {ad[ai] > 0 ? groceryQty(name + " " + r.food, sub) : "—"}
                           </span>
                         </div>
                       );
@@ -365,7 +399,7 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
                               ad[ai] > 0 ? (
                                 <div key={ai} className="flex items-center justify-between text-sm" style={{ color: "var(--brand-text)" }}>
                                   <span className="min-w-0 truncate mr-2">{name} <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>× {fmt(ad[ai])}</span></span>
-                                  <span className="flex-shrink-0" style={{ color: "var(--brand-text)" }}>{qtyText(perContainer)}</span>
+                                  <span className="flex-shrink-0" style={{ color: "var(--brand-text)" }}>{prepQty(perContainer)}</span>
                                 </div>
                               ) : null
                             ))}
@@ -375,7 +409,7 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
                       return (
                         <div key={i} className="flex items-center justify-between text-sm" style={{ color: "var(--brand-text)" }}>
                           <span className="min-w-0 truncate mr-2">{it.food}</span>
-                          <span className="flex-shrink-0" style={{ color: "var(--brand-text)" }}>{qtyText(perContainer)}</span>
+                          <span className="flex-shrink-0" style={{ color: "var(--brand-text)" }}>{prepQty(perContainer)}</span>
                         </div>
                       );
                     })}
