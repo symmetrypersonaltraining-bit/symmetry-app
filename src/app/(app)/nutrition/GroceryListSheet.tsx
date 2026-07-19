@@ -61,18 +61,37 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
 
   const basisTag = (b?: string | null) => (b === "raw" ? " raw" : b === "cooked" ? " cooked" : "");
 
+  // Foods written as alternatives ("Chicken Breast (even days) OR Ground Beef (odd days)")
+  // get split so the client sees how much of EACH to buy.
+  const parseAlts = (food: string): string[] | null => {
+    const parts = (food || "").split(/\s+OR\s+/i).map(p => p.trim()).filter(Boolean);
+    return parts.length >= 2 ? parts : null;
+  };
+  // Distribute n days across k alternatives: first (n mod k) get the extra day (4/3 for 7 over 2).
+  const distribute = (n: number, k: number) => {
+    const base = Math.floor(n / k), extra = n % k;
+    return Array.from({ length: k }, (_, i) => base + (i < extra ? 1 : 0));
+  };
+  // altOverride[aggKey] = client-adjusted days per alternative.
+  const [altOverride, setAltOverride] = useState<Record<string, number[]>>({});
+  const altDaysFor = (key: string, k: number, mealDays: number) => {
+    const o = altOverride[key];
+    if (o) return Array.from({ length: k }, (_, i) => Math.max(0, Math.min(o[i] ?? 0, mealDays)));
+    return distribute(mealDays, k);
+  };
+
   // ---- Grocery list: amount × days, merged across all meals ----
   const list = useMemo(() => {
-    const agg: Record<string, { food: string; unit: string | null; basis: string | null; total: number; unlimited: boolean }> = {};
+    const agg: Record<string, { key: string; food: string; unit: string | null; basis: string | null; total: number; unlimited: boolean; mealDays: number; alts: string[] | null }> = {};
     for (const s of slots) {
       for (const opt of s.options) {
         const n = daysFor(opt, s);
         if (n <= 0) continue;
         for (const it of opt.meal_items || []) {
           const key = (it.food || "").toLowerCase() + "||" + (it.unit || "") + "||" + (it.basis || "");
-          if (!agg[key]) agg[key] = { food: it.food, unit: it.unit, basis: it.basis || null, total: 0, unlimited: false };
+          if (!agg[key]) agg[key] = { key, food: it.food, unit: it.unit, basis: it.basis || null, total: 0, unlimited: false, mealDays: 0, alts: parseAlts(it.food) };
           if (it.is_unlimited || it.amount == null) { agg[key].unlimited = true; }
-          else agg[key].total += (Number(it.amount) || 0) * n;
+          else { agg[key].total += (Number(it.amount) || 0) * n; agg[key].mealDays += n; }
         }
       }
     }
@@ -81,7 +100,7 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
 
   // ---- Prep card: per selected option → containers + batch amounts ----
   const prep = useMemo(() => {
-    const rows: { meal: GMeal; slotName: string; n: number; isFresh: boolean; items: { food: string; unit: string | null; basis: string | null; total: number; unlimited: boolean }[] }[] = [];
+    const rows: { meal: GMeal; slotName: string; n: number; isFresh: boolean; items: { key: string; food: string; unit: string | null; basis: string | null; total: number; unlimited: boolean; alts: string[] | null }[] }[] = [];
     for (const s of slots) {
       for (const opt of s.options) {
         const n = daysFor(opt, s);
@@ -92,11 +111,13 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
           n,
           isFresh: !!fresh[opt.id],
           items: (opt.meal_items || []).map(it => ({
+            key: (it.food || "").toLowerCase() + "||" + (it.unit || "") + "||" + (it.basis || ""),
             food: it.food,
             unit: it.unit,
             basis: it.basis || null,
             total: it.is_unlimited || it.amount == null ? 0 : (Number(it.amount) || 0) * n,
             unlimited: it.is_unlimited || it.amount == null,
+            alts: it.is_unlimited || it.amount == null ? null : parseAlts(it.food),
           })),
         });
       }
@@ -105,10 +126,17 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
   }, [slots, daysOverride, numDays, fresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fmt = (n: number) => (Math.round(n * 100) / 100).toString();
-  const qtyText = (r: { total: number; unit: string | null; basis: string | null; unlimited: boolean }) => {
+  // Meat & fish get a pounds conversion so the client knows what to buy (16 oz = 1 lb).
+  const lbSuffix = (total: number, unit: string | null) =>
+    unit && unit.trim().toLowerCase() === "oz" && total > 0 ? ` · ${fmt(total / 16)} lb` : "";
+  const qtyText = (r: { total: number; unit: string | null; basis: string | null; unlimited: boolean }, withLb = false) => {
     const unit = `${r.unit ? " " + r.unit : ""}${basisTag(r.basis)}`;
-    return r.unlimited && r.total === 0 ? "as needed" : `${fmt(r.total)}${unit}${r.unlimited ? " + as needed" : ""}`;
+    if (r.unlimited && r.total === 0) return "as needed";
+    return `${fmt(r.total)}${unit}${withLb ? lbSuffix(r.total, r.unit) : ""}${r.unlimited ? " + as needed" : ""}`;
   };
+  // Days-per-alternative for a single meal's share of a split item (proportional to the global split).
+  const mealAltDays = (globalAlt: number[], mealDays: number, n: number) =>
+    globalAlt.map(d => (mealDays > 0 ? Math.round((d / mealDays) * n * 100) / 100 : 0));
   const anySelected = list.length > 0;
   const prepped = prep.filter(p => !p.isFresh);
   const freshRows = prep.filter(p => p.isFresh);
@@ -116,13 +144,38 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
   function copyList() {
     const lines: string[] = [];
     lines.push(`Grocery list — ${fmtShort(startISO)} to ${fmtShort(endISO)} (${numDays} day${numDays === 1 ? "" : "s"})`);
-    for (const r of list) lines.push(`• ${r.food} — ${qtyText(r)}`);
+    for (const r of list) {
+      if (r.alts && !r.unlimited && r.mealDays > 0 && r.total > 0) {
+        const ad = altDaysFor(r.key, r.alts.length, r.mealDays);
+        const perDay = r.total / r.mealDays;
+        lines.push(`• ${r.food}:`);
+        r.alts.forEach((name, i) => {
+          const sub = { total: perDay * ad[i], unit: r.unit, basis: r.basis, unlimited: false };
+          lines.push(`   - ${name} — ${ad[i]} meal${ad[i] === 1 ? "" : "s"}: ${qtyText(sub, true)}`);
+        });
+      } else {
+        lines.push(`• ${r.food} — ${qtyText(r, true)}`);
+      }
+    }
     if (prepped.length > 0) {
       lines.push("");
       lines.push("Meal prep card");
       for (const p of prepped) {
         lines.push(`${p.meal.name} (${p.slotName}) — ${p.n} container${p.n === 1 ? "" : "s"}`);
-        for (const it of p.items) lines.push(`  • ${it.food} — ${qtyText(it)}`);
+        for (const it of p.items) {
+          const row = it.alts ? list.find(r => r.key === it.key) : undefined;
+          if (it.alts && row && !row.unlimited && row.mealDays > 0 && it.total > 0) {
+            const ad = mealAltDays(altDaysFor(row.key, it.alts.length, row.mealDays), row.mealDays, p.n);
+            const perDay = it.total / p.n;
+            lines.push(`  • ${it.food}:`);
+            it.alts.forEach((name, i) => {
+              const sub = { total: perDay * ad[i], unit: it.unit, basis: it.basis, unlimited: false };
+              lines.push(`     - ${name} — ${fmt(ad[i])} container${ad[i] === 1 ? "" : "s"}: ${qtyText(sub)}`);
+            });
+          } else {
+            lines.push(`  • ${it.food} — ${qtyText(it)}`);
+          }
+        }
       }
     }
     if (freshRows.length > 0) {
@@ -241,12 +294,47 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
             <p className="text-sm py-2" style={{ color: "var(--brand-text-secondary)" }}>Pick some options above to build your list.</p>
           ) : (
             <div className="space-y-1.5">
-              {list.map((r, i) => (
-                <div key={i} className="flex items-center justify-between text-sm" style={{ color: "var(--brand-text)" }}>
-                  <span className="min-w-0 truncate mr-2">{r.food}</span>
-                  <span className="flex-shrink-0 font-semibold" style={{ color: "var(--brand-text)" }}>{qtyText(r)}</span>
-                </div>
-              ))}
+              {list.map((r, i) => {
+                const canSplit = r.alts && !r.unlimited && r.mealDays > 0 && r.total > 0;
+                if (!canSplit) {
+                  return (
+                    <div key={i} className="flex items-center justify-between text-sm" style={{ color: "var(--brand-text)" }}>
+                      <span className="min-w-0 truncate mr-2">{r.food}</span>
+                      <span className="flex-shrink-0 font-semibold" style={{ color: "var(--brand-text)" }}>{qtyText(r, true)}</span>
+                    </div>
+                  );
+                }
+                const alts = r.alts as string[];
+                const ad = altDaysFor(r.key, alts.length, r.mealDays);
+                const used = ad.reduce((t, v) => t + v, 0);
+                const perDay = r.total / r.mealDays;
+                return (
+                  <div key={i} className="rounded-lg p-2 -mx-1" style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)" }}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="min-w-0 truncate mr-2 text-xs font-semibold" style={{ color: "var(--brand-text-secondary)" }}>{r.food}</span>
+                      <span className="flex-shrink-0 text-xs" style={{ color: used === r.mealDays ? "var(--brand-text-secondary)" : "#ef4444" }}>{used}/{r.mealDays} meals</span>
+                    </div>
+                    {alts.map((name, ai) => {
+                      const sub = { total: perDay * ad[ai], unit: r.unit, basis: r.basis, unlimited: false };
+                      return (
+                        <div key={ai} className="flex items-center gap-2 py-1">
+                          <span className="flex-1 min-w-0 text-sm truncate" style={{ color: ad[ai] > 0 ? "var(--brand-text)" : "var(--brand-text-secondary)" }}>{name}</span>
+                          <div className="flex items-center rounded-lg overflow-hidden flex-shrink-0" style={{ border: "1px solid var(--brand-border)" }}>
+                            <button onClick={() => setAltOverride(p => { const cur = altDaysFor(r.key, alts.length, r.mealDays); cur[ai] = Math.max(0, cur[ai] - 1); return { ...p, [r.key]: cur }; })}
+                              className="w-7 h-7 text-sm font-bold" style={{ background: "var(--brand-bg)", color: "var(--brand-primary)" }}>−</button>
+                            <span className="w-7 text-center text-xs" style={{ color: "var(--brand-text)" }}>{ad[ai]}</span>
+                            <button onClick={() => setAltOverride(p => { const cur = altDaysFor(r.key, alts.length, r.mealDays); cur[ai] = Math.min(r.mealDays, cur[ai] + 1); return { ...p, [r.key]: cur }; })}
+                              className="w-7 h-7 text-sm font-bold" style={{ background: "var(--brand-bg)", color: "var(--brand-primary)" }}>＋</button>
+                          </div>
+                          <span className="flex-shrink-0 font-semibold text-sm text-right" style={{ color: "var(--brand-text)", minWidth: "5.5rem" }}>
+                            {ad[ai] > 0 ? qtyText(sub, true) : "—"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -268,12 +356,35 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
                   </div>
                   <p className="text-xs mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>{p.slotName} · batch amounts for {p.n} day{p.n === 1 ? "" : "s"}</p>
                   <div className="space-y-1">
-                    {p.items.map((it, i) => (
-                      <div key={i} className="flex items-center justify-between text-sm" style={{ color: "var(--brand-text)" }}>
-                        <span className="min-w-0 truncate mr-2">{it.food}</span>
-                        <span className="flex-shrink-0" style={{ color: "var(--brand-text)" }}>{qtyText(it)}</span>
-                      </div>
-                    ))}
+                    {p.items.map((it, i) => {
+                      const row = it.alts ? list.find(r => r.key === it.key) : undefined;
+                      if (it.alts && row && !row.unlimited && row.mealDays > 0 && it.total > 0) {
+                        const ad = mealAltDays(altDaysFor(row.key, it.alts.length, row.mealDays), row.mealDays, p.n);
+                        const perDay = it.total / p.n;
+                        return (
+                          <div key={i}>
+                            <p className="text-xs font-semibold mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>{it.food}</p>
+                            {it.alts.map((name, ai) => {
+                              const sub = { total: perDay * ad[ai], unit: it.unit, basis: it.basis, unlimited: false };
+                              return (
+                                <div key={ai} className="flex items-center justify-between text-sm pl-2" style={{ color: "var(--brand-text)" }}>
+                                  <span className="min-w-0 truncate mr-2">{name}</span>
+                                  <span className="flex-shrink-0" style={{ color: "var(--brand-text)" }}>
+                                    {ad[ai] > 0 ? `${fmt(ad[ai])}× · ${qtyText(sub)}` : "—"}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={i} className="flex items-center justify-between text-sm" style={{ color: "var(--brand-text)" }}>
+                          <span className="min-w-0 truncate mr-2">{it.food}</span>
+                          <span className="flex-shrink-0" style={{ color: "var(--brand-text)" }}>{qtyText(it)}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
