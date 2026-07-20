@@ -30,7 +30,9 @@ workflows:
           echo "GOOGLE_SERVICES_JSON present — wiring Firebase push."
           npm install @capacitor/push-notifications@^6
           npx cap sync android
-          echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
+          # Accept the raw google-services.json content (paste the file as-is into
+          # the Codemagic var). printf '%s' preserves it verbatim, no base64 needed.
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
           python3 - << 'EOF'
           import re
           # Root build.gradle: add the google-services classpath.
