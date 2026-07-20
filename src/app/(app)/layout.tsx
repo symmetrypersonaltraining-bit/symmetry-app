@@ -5,6 +5,7 @@ import BottomNav from "@/components/BottomNav";
 import SessionDock from "@/components/SessionDock";
 import HeaderAssist from "@/components/HeaderAssist";
 import RealtimeScheduleSync from "@/components/RealtimeScheduleSync";
+import PushRegister from "@/components/PushRegister";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -27,6 +28,7 @@ export default async function AppLayout({
     return (
       <>
         <RealtimeScheduleSync />
+        <PushRegister />
         <TrainerLayoutWrapper>{children}</TrainerLayoutWrapper>
       </>
     );

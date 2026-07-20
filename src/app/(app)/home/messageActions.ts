@@ -1,6 +1,7 @@
 'use server'; // trigger deploy
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { sendPushToUser } from '@/lib/push';
 
 export async function markMessageRead(id: string): Promise<void> {
   const supabase = await createClient();
@@ -37,7 +38,7 @@ export async function sendClientMessage(body: string, imageUrl?: string | null):
 
   const { data: clientRecord } = await supabase
     .from('clients')
-    .select('id')
+    .select('id, name')
     .eq('auth_user_id', user.id)
     .maybeSingle();
   if (!clientRecord) return;
@@ -53,6 +54,10 @@ export async function sendClientMessage(body: string, imageUrl?: string | null):
     image_url: imageUrl || null,
   });
   revalidatePath('/messages');
+
+  // Push-notify the trainer of the new client message (no-op until FCM is wired).
+  const who = (clientRecord as { name?: string }).name || 'A client';
+  await sendPushToUser(trainerId as string, `New message from ${who}`, (body || '').slice(0, 140), { url: '/messages' });
 }
 
 export async function sendBroadcastMessage(body: string, imageUrl?: string | null): Promise<number> {
