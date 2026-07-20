@@ -635,8 +635,12 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         protein += log.est_protein || 0;
         carbs   += log.est_carbs   || 0;
         fats    += log.est_fats    || 0;
-      } else if (opt.pct !== null && log.meal_id) {
-        const meal = sortedMeals.find(m => m.id === log.meal_id);
+      } else if (opt.pct !== null) {
+        // Resolve by meal_id first (multi-option slots pick a specific option); fall
+        // back to the plan meal at this position so a Full/¾/½ log whose meal_id is
+        // null or stale (re-versioned plan) still contributes its macros to the ring.
+        const meal = sortedMeals.find(m => m.id === log.meal_id)
+          || (log.meal_position <= 100 ? sortedMeals.find(m => m.position === log.meal_position) : undefined);
         if (meal) {
           const ov = log.item_overrides || null;
           if (ov && Object.keys(ov).length) {
@@ -682,7 +686,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
   async function logAdherence(meal: Meal, adherenceKey: string) {
     if (adherenceKey === "Off-plan") {
-      const existing = logs.find(l => l.meal_id === meal.id);
+      const existing = logs.find(l => l.meal_position === meal.position);
       setOffPlanDetails(existing?.off_plan_details || "");
       setOffPlanKcal(existing?.est_kcal?.toString() || "");
       setOffPlanP(existing?.est_protein?.toString() || "");
@@ -1452,7 +1456,11 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
             {slots.map(slot => {
               if (slot.options.length > 1) return renderMultiSlot(slot);
               const meal = slot.options[0];
-              const mealLog  = logs.find(l => l.meal_id === meal.id);
+              // Logged-state is keyed on POSITION, not meal_id. An Off-plan, swapped, or
+              // rolled-up log at this slot can carry meal_id=null (or a stale id after a
+              // plan re-version); it must still render this slot as logged. Keying on
+              // meal_id was the "M3 shows unlogged even though the row is correct" bug.
+              const mealLog  = logs.find(l => l.meal_position === meal.position);
               const macros   = getMealMacros(meal);
               const isLogged = !!mealLog;
               const logOpt   = mealLog ? ADHERENCE_OPTIONS.find(o => o.key === mealLog.adherence) : null;
@@ -1581,7 +1589,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                       {/* Camera button \u2014 beside Off Plan */}
                       <button
                         onClick={() => {
-                          const existing = logs.find(l => l.meal_id === meal.id);
+                          const existing = logs.find(l => l.meal_position === meal.position);
                           setOffPlanDetails(existing?.off_plan_details || "");
                           setOffPlanKcal(existing?.est_kcal?.toString() || "");
                           setOffPlanP(existing?.est_protein?.toString() || "");
