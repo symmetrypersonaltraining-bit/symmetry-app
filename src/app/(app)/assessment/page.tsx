@@ -234,8 +234,25 @@ export default function AssessmentPage() {
 
   const saveAssessment = async (createAccount: boolean) => {
     setSaving(true);
-    const supabase = createClient();
     try {
+      if (createAccount) {
+        // Full onboarding (server route, needs admin): saves the assessment,
+        // creates the client profile with all info, creates their login with a
+        // temp password (client resets on first login), links the assessment to
+        // the profile, and emails the APK invite.
+        const res = await fetch('/api/create-client-from-assessment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data, aiResult }),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Failed to create client');
+        router.push('/clients');
+        return;
+      }
+
+      // Archive only — save the assessment without creating an account.
+      const supabase = createClient();
       const assessmentPayload = {
         first_name: data.first_name,
         last_name: data.last_name,
@@ -277,43 +294,16 @@ export default function AssessmentPage() {
         nutrition_notes: data.nutrition_notes,
         ai_program_recommendation: aiResult ? JSON.stringify(aiResult) : null,
         ai_assessment_summary: aiResult?.assessment_summary || null,
-        status: createAccount ? 'active' : 'pending_signup',
+        status: 'pending_signup',
       };
-
-      const { data: assessment, error: assessErr } = await supabase
+      const { error: assessErr } = await supabase
         .from('client_assessments')
-        .insert(Object.fromEntries(Object.entries(assessmentPayload as any).map(([k, v]) => [k, v === '' ? null : v])) as any)
-        .select()
-        .single();
-
+        .insert(Object.fromEntries(Object.entries(assessmentPayload as any).map(([k, v]) => [k, v === '' ? null : v])) as any);
       if (assessErr) throw assessErr;
-
-      if (createAccount) {
-        const { error: clientErr } = await supabase
-          .from('clients')
-          .insert(Object.fromEntries(Object.entries({
-            name: `${data.first_name} ${data.last_name}`.trim(),
-            email: data.email,
-            phone: data.phone,
-            date_of_birth: data.date_of_birth || null,
-            emergency_contact_name: data.emergency_contact_name,
-            emergency_contact_phone: data.emergency_contact_phone,
-            experience_level: data.experience_level,
-            primary_goal: data.primary_goal,
-            days_per_week: data.days_per_week,
-            injuries: data.current_injuries,
-            medical_notes: data.chronic_conditions,
-            assessment_id: assessment.id,
-          } as any).map(([k, v]) => [k, v === '' ? null : v])) as any);
-
-        if (clientErr) throw clientErr;
-        router.push('/clients');
-      } else {
-        router.push('/clients');
-      }
-    } catch (e) {
+      router.push('/clients');
+    } catch (e: any) {
       console.error('Save error:', e);
-      alert('Error saving assessment. Please try again.');
+      alert(e?.message || 'Error saving assessment. Please try again.');
     } finally {
       setSaving(false);
     }
