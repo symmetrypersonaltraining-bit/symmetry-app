@@ -20,6 +20,24 @@ const ADHERENCE_OPTIONS = [
 { key: "Off-plan",       label: "Off Plan", color: "#8b5cf6", pct: null },
 ];
 
+// Robust lookup for a log's adherence. Covers EVERY value the DB `adherence` CHECK
+// allows — including "Partial" (a valid value not in the chip list, e.g. written by
+// Claude or the legacy rollup) — and never returns null, so a logged meal can never
+// render as "unlogged" or drop out of the macro totals. Keep this aligned with the
+// DB constraint (Full/3-4/1-2/1-4/Partial/Off-plan/Skipped).
+const ADHERENCE_META: Record<string, { label: string; color: string; pct: number | null }> = {
+  "1/4":     { label: "¼",       color: "#ef4444", pct: 0.25 },
+  "1/2":     { label: "½",       color: "#f59e0b", pct: 0.5  },
+  "3/4":     { label: "¾",       color: "#84cc16", pct: 0.75 },
+  "Full":    { label: "Full",     color: "#22c55e", pct: 1.0  },
+  "Partial": { label: "Partial",  color: "#eab308", pct: 0.5  },
+  "Skipped": { label: "Skip",     color: "#6b7280", pct: 0    },
+  "Off-plan":{ label: "Off Plan", color: "#8b5cf6", pct: null },
+};
+function adhMeta(key: string | null | undefined): { label: string; color: string; pct: number | null } {
+  return (key && ADHERENCE_META[key]) || { label: key || "Logged", color: "#8b5cf6", pct: null };
+}
+
 const FREE_SLOTS = [
   { position: 1, label: "Meal 1", timing: "Morning" },
   { position: 2, label: "Meal 2", timing: "Mid-Morning" },
@@ -491,10 +509,10 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       let kcal = 0, protein = 0, carbs = 0, fats = 0;
       for (const log of logsArr) {
         dayset.add(log.log_date);
-        const opt = ADHERENCE_OPTIONS.find((o) => o.key === log.adherence);
+        const opt = adhMeta(log.adherence);
         if (log.adherence === "Off-plan") {
           kcal += log.est_kcal || 0; protein += log.est_protein || 0; carbs += log.est_carbs || 0; fats += log.est_fats || 0;
-        } else if (opt && opt.pct !== null && itemsByMeal[log.meal_id]) {
+        } else if (opt.pct !== null && itemsByMeal[log.meal_id]) {
           const m = itemsByMeal[log.meal_id];
           protein += m.protein * opt.pct; carbs += m.carbs * opt.pct; fats += m.fats * opt.pct;
           kcal += (m.protein * 4 + m.carbs * 4 + m.fats * 9) * opt.pct;
@@ -628,8 +646,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const currentMacros = useMemo(() => {
     let kcal = 0, protein = 0, carbs = 0, fats = 0;
     for (const log of logs) {
-      const opt = ADHERENCE_OPTIONS.find(o => o.key === log.adherence);
-      if (!opt) continue;
+      const opt = adhMeta(log.adherence);
       if (log.adherence === "Off-plan") {
         kcal    += log.est_kcal    || 0;
         protein += log.est_protein || 0;
@@ -941,8 +958,8 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   // Row renderer for extra meals / snacks (positions 100+) shown in the plan day view.
   function renderExtraRow(l: AdherenceLog) {
     const meal = l.meal_id ? sortedMeals.find(m => m.id === l.meal_id) : null;
-    const opt = ADHERENCE_OPTIONS.find(o => o.key === l.adherence);
-    const color = opt?.color || "#8b5cf6";
+    const opt = adhMeta(l.adherence);
+    const color = opt.color;
     const name = meal ? meal.name : (l.off_plan_details || "Extra entry");
     const mac = meal ? loggedOptionMacros(meal, l) : { kcal: Number(l.est_kcal) || 0, protein: Number(l.est_protein) || 0, carbs: Number(l.est_carbs) || 0, fats: Number(l.est_fats) || 0 };
     return (
@@ -977,7 +994,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   function renderMultiSlot(slot: { position: number; options: Meal[] }) {
     const slotLog = logs.find(l => l.meal_position === slot.position);
     const picked = slotLog ? slot.options.find(o => o.id === slotLog.meal_id) : null;
-    const logOpt = slotLog ? ADHERENCE_OPTIONS.find(o => o.key === slotLog.adherence) : null;
+    const logOpt = slotLog ? adhMeta(slotLog.adherence) : null;
     const logColor = logOpt?.color || null;
     const isOffPlan = slotLog?.adherence === "Off-plan";
     const macros = picked
@@ -1463,7 +1480,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
               const mealLog  = logs.find(l => l.meal_position === meal.position);
               const macros   = getMealMacros(meal);
               const isLogged = !!mealLog;
-              const logOpt   = mealLog ? ADHERENCE_OPTIONS.find(o => o.key === mealLog.adherence) : null;
+              const logOpt   = mealLog ? adhMeta(mealLog.adherence) : null;
               const logColor = logOpt?.color || null;
               const isSaving = saving === meal.id;
               const noteVal  = notesMap[meal.position] || "";
