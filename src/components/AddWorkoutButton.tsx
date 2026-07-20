@@ -13,7 +13,7 @@ function daysAgoCT(n: number) {
   return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
 }
 
-export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: { dateStr?: string; label?: string }) {
+export default function AddWorkoutButton({ dateStr, label = "+ Add workout", clientId }: { dateStr?: string; label?: string; clientId?: string }) {
   const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [lib, setLib] = useState<LibDay[]>([]);
@@ -34,11 +34,17 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
     return data && data[0] ? (data[0] as any).id : null;
   }
 
+  // Trainer override: when a clientId is passed (managing a client), act on that
+  // client; otherwise fall back to the logged-in user's own profile.
+  async function effectiveClientId(): Promise<string | null> {
+    return clientId || (await resolveClientId());
+  }
+
   async function openSheet() {
     setOpen(true);
     if (lib.length) return;
     setLoading(true);
-    const cid = await resolveClientId();
+    const cid = await effectiveClientId();
     const days: LibDay[] = [];
     if (cid) {
       const asn = await supabase.from("program_assignments").select("program_id").eq("client_id", cid);
@@ -62,7 +68,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
     if (busy) return;
     setBusy(true);
     try {
-      const cid = await resolveClientId();
+      const cid = await effectiveClientId();
       if (!cid) { window.alert("Could not find your client profile."); return; }
       const ex = await supabase.from("scheduled_workouts").select("position").eq("client_id", cid).eq("scheduled_date", pickedDate).order("position", { ascending: false }).limit(1);
       const last = (ex.data as any[]) || [];
@@ -80,7 +86,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
         window.location.reload();
         return;
       }
-      const ins = await (supabase as any).from("scheduled_workouts").insert({ client_id: cid, day_id: d.id, scheduled_date: pickedDate, position: pos, status: "scheduled", source: "client_self_assign" });
+      const ins = await (supabase as any).from("scheduled_workouts").insert({ client_id: cid, day_id: d.id, scheduled_date: pickedDate, position: pos, status: "scheduled", source: clientId ? "trainer" : "client_self_assign" });
       if (ins.error) { window.alert("Could not add: " + ins.error.message); return; }
       window.location.reload();
     } finally { setBusy(false); }
@@ -90,7 +96,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
     if (busy || !text.trim()) return;
     setBusy(true);
     try {
-      const cid = await resolveClientId();
+      const cid = await effectiveClientId();
       if (!cid) { window.alert("Could not find your client profile."); return; }
       const ins = await (supabase as any).from("offplan_workout_logs").insert({ client_id: cid, log_date: pickedDate, description: text.trim().slice(0, 80), details: text.trim(), status: "pending" });
       if (ins.error) { window.alert("Could not add: " + ins.error.message); return; }

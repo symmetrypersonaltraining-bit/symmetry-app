@@ -10,6 +10,7 @@ import PrivateProfilePanel from "@/components/PrivateProfilePanel";
 import AssessmentPanel from "@/components/AssessmentPanel";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
 import ScheduleBoard from "@/components/ScheduleBoard";
+import AddWorkoutButton from "@/components/AddWorkoutButton";
 
 interface MetricPoint {
   metric_date: string;
@@ -939,6 +940,7 @@ export default function ClientProfileTabs({ client, metrics, allWorkouts, client
           <>
             <TrainingCalendar workouts={allWorkouts} clientId={clientId} />
             <div className="px-4 pb-6">
+              <div className="mb-3"><AddWorkoutButton clientId={clientId} label="+ Add / backlog workout" /></div>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>Quick schedule — find, launch, move or remove</p>
               <ScheduleBoard
                 workouts={allWorkouts.map((w) => { const dd: any = w.days; return { id: w.id, dayId: ((dd && typeof dd === "object" ? dd.id : dd) || w.day_id || w.id) as string, date: w.scheduled_date, label: ((dd && typeof dd === "object") ? dd.label : (dd || "Workout")) as string, status: w.status }; })}
