@@ -150,12 +150,27 @@ export async function POST(req: NextRequest) {
       else reconciled = (rc as any)?.removed || 0;
     }
 
+    // Payments reconcile: same safe pattern as appointments — remove FUTURE
+    // gcal-synced payment rows whose event vanished, so a deleted calendar
+    // payment can't linger as a phantom upcoming charge. Self-healing.
+    let reconciledPayments = 0;
+    if (!resetFirst && allEvents.length >= 50) {
+      const seenPayIds = allEvents.map((e: any) => e.id).filter(Boolean);
+      const { data: rcp, error: rcpErr } = await supabase.rpc('gcal_reconcile_payments', {
+        p_seen_ids: seenPayIds,
+        p_time_min: timeMin,
+        p_time_max: timeMax,
+      });
+      if (rcpErr) errors.push('reconcile_payments: ' + rcpErr.message);
+      else reconciledPayments = (rcp as any)?.removed || 0;
+    }
+
     await supabase.rpc('gcal_generate_payment_notifications');
 
     const dollarEvents = allEvents.filter((e: any) => /\$\s?\d/.test(e.summary || ''));
     const clientDollar = dollarEvents.filter((e: any) => matchClient(e.summary || ''));
     const laurenEvents = allEvents.filter((e: any) => (e.summary || '').toLowerCase().includes('lauren')).slice(0, 4);
-    return NextResponse.json({ ok: true, synced, payments, reconciled, total: allEvents.length, dollar_events: dollarEvents.length, client_dollar: clientDollar.length, client_dollar_samples: clientDollar.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), lauren_samples: laurenEvents.map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), dollar_samples: dollarEvents.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | start:' + JSON.stringify(e.start || {})), errors: errors.slice(0, 10) });
+    return NextResponse.json({ ok: true, synced, payments, reconciled, reconciled_payments: reconciledPayments, total: allEvents.length, dollar_events: dollarEvents.length, client_dollar: clientDollar.length, client_dollar_samples: clientDollar.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), lauren_samples: laurenEvents.map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), dollar_samples: dollarEvents.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | start:' + JSON.stringify(e.start || {})), errors: errors.slice(0, 10) });
   } catch (e: any) {
     const msg = e.message || String(e);
     if (msg.includes('disabled') || msg.includes('not connected')) {
