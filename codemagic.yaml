@@ -8,6 +8,10 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       node: 20
+      groups:
+        # Codemagic app-level variable group holding GOOGLE_SERVICES_JSON (the
+        # raw google-services.json). Only consumed by the gated push-wiring step.
+        - push
     scripts:
       - name: Install web dependencies
         script: npm install
