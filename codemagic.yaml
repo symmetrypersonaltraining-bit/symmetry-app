@@ -17,6 +17,46 @@ workflows:
         script: npx cap add android || npx cap sync android
       - name: Sync Capacitor into Android
         script: npx cap sync android
+      - name: Wire Firebase push (only when GOOGLE_SERVICES_JSON is set)
+        script: |
+          # FULLY GATED: with no GOOGLE_SERVICES_JSON secure var, this is a no-op
+          # and the build is byte-for-byte identical to the pre-push build. When
+          # the var is present (base64 of google-services.json), we pull in the
+          # push plugin + Google Services gradle plugin so FCM works.
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "GOOGLE_SERVICES_JSON not set — skipping push wiring (push stays inert)."
+            exit 0
+          fi
+          echo "GOOGLE_SERVICES_JSON present — wiring Firebase push."
+          npm install @capacitor/push-notifications@^6
+          npx cap sync android
+          echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
+          python3 - << 'EOF'
+          import re
+          # Root build.gradle: add the google-services classpath.
+          rb = "android/build.gradle"
+          s = open(rb).read()
+          if "com.google.gms:google-services" not in s:
+              s = re.sub(r'(dependencies\s*\{)',
+                         r"\1\n        classpath 'com.google.gms:google-services:4.4.2'",
+                         s, count=1)
+              open(rb, "w").write(s)
+          # App build.gradle: apply the google-services plugin (needs the json above).
+          ab = "android/app/build.gradle"
+          s = open(ab).read()
+          if "com.google.gms.google-services" not in s:
+              s = s.rstrip() + "\napply plugin: 'com.google.gms.google-services'\n"
+              open(ab, "w").write(s)
+          # Manifest: Android 13+ runtime notification permission.
+          mp = "android/app/src/main/AndroidManifest.xml"
+          s = open(mp).read()
+          if "POST_NOTIFICATIONS" not in s:
+              s = s.replace("<application",
+                            '<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <application',
+                            1)
+              open(mp, "w").write(s)
+          print("push wired: google-services.json + gradle plugin + POST_NOTIFICATIONS")
+          EOF
       - name: Disable Android predictive back (hardware Back must reach the WebView)
         script: |
           python3 - << 'EOF'
