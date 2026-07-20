@@ -682,7 +682,7 @@ export default function WorkoutLogger({
         // not up — in both cases nothing covers the rows, so bring the header back. The
         // sustained requirement + grace stop a mid-typing flicker or the open animation
         // from un-collapsing.
-        if (downTicks >= 3 && (opened || elapsed > 1200)) {
+        if (downTicks >= 3 && (opened || elapsed < 0)) {
           const a = document.activeElement as HTMLElement | null;
           if (a && a.tagName === "INPUT") a.blur();
           setTyping(false);
