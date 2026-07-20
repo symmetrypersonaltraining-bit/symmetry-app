@@ -182,6 +182,8 @@ function QuickLog({ clientId, selectedDate, logs, setLogs }: { clientId: string;
   const [typed, setTyped] = useState("");
   const [showPortions, setShowPortions] = useState(false);
   const [portions, setPortions] = useState({ p: 0, c: 0, f: 0, v: 0 });
+  const [showMacros, setShowMacros] = useState(false);
+  const [macros, setMacros] = useState({ p: "", c: "", f: "" });
   const [recents, setRecents] = useState<RecentEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -278,6 +280,12 @@ function QuickLog({ clientId, selectedDate, logs, setLogs }: { clientId: string;
     await insertQuick({ off_plan_details: label, est_protein: p, est_carbs: c, est_fats: f, est_kcal: quickKcal(p, c, f), macros_pending: false });
     setTyped(""); setPortions({ p: 0, c: 0, f: 0, v: 0 }); setShowPortions(false);
   }
+  async function logMacros() {
+    const p = parseFloat(macros.p) || 0, c = parseFloat(macros.c) || 0, f = parseFloat(macros.f) || 0;
+    if (p + c + f === 0) return;
+    await insertQuick({ off_plan_details: typed.trim() || "Off-plan meal", est_protein: p, est_carbs: c, est_fats: f, est_kcal: quickKcal(p, c, f), macros_pending: false });
+    setTyped(""); setMacros({ p: "", c: "", f: "" }); setShowMacros(false);
+  }
   async function handleQuickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -361,6 +369,21 @@ function QuickLog({ clientId, selectedDate, logs, setLogs }: { clientId: string;
           <button onClick={() => setShowPortions(!showPortions)} className="flex-1 py-2.5 rounded-full text-xs font-bold" style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}>Portions ✋</button>
           <button onClick={logTyped} disabled={busy || !typed.trim()} className="flex-1 py-2.5 rounded-full text-xs font-bold text-white" style={{ background: "var(--brand-primary)", opacity: typed.trim() ? 1 : 0.5 }}>Save — macros tonight</button>
         </div>
+        <button onClick={() => setShowMacros(!showMacros)} className="w-full mt-2 py-2 rounded-full text-xs font-semibold" style={{ background: "transparent", color: "var(--brand-primary)", border: "1px dashed var(--brand-border)" }}>{showMacros ? "Hide macro entry" : "＋ Enter exact macros (P / C / F)"}</button>
+        {showMacros && (
+          <div className="mt-3 pt-3" style={{ borderTop: "1px dashed var(--brand-border)" }}>
+            <div className="grid grid-cols-3 gap-2">
+              {([["p", "Protein"], ["c", "Carbs"], ["f", "Fats"]] as ["p" | "c" | "f", string][]).map(([k, lab]) => (
+                <div key={k}>
+                  <p className="text-center mb-1" style={{ color: "var(--brand-text-secondary)", fontSize: 10, fontWeight: 700 }}>{lab} (g)</p>
+                  <input value={macros[k]} onChange={(e) => setMacros({ ...macros, [k]: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" placeholder="0" className="w-full text-center rounded-xl py-2.5 text-sm font-bold outline-none" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} />
+                </div>
+              ))}
+            </div>
+            <p className="text-center mt-2" style={{ color: "var(--brand-text-secondary)", fontSize: 11 }}>= {quickKcal(parseFloat(macros.p) || 0, parseFloat(macros.c) || 0, parseFloat(macros.f) || 0)} cal{typed.trim() ? "" : " · add a name above"}</p>
+            <button onClick={logMacros} disabled={busy || ((parseFloat(macros.p) || 0) + (parseFloat(macros.c) || 0) + (parseFloat(macros.f) || 0)) === 0} className="w-full mt-2 py-2.5 rounded-full text-xs font-bold text-white" style={{ background: "var(--brand-primary)", opacity: ((parseFloat(macros.p) || 0) + (parseFloat(macros.c) || 0) + (parseFloat(macros.f) || 0)) > 0 ? 1 : 0.5 }}>Log with these macros</button>
+          </div>
+        )}
         {showPortions && (
           <div className="mt-3 pt-3" style={{ borderTop: "1px dashed var(--brand-border)" }}>
             <div className="grid grid-cols-2 gap-2">
