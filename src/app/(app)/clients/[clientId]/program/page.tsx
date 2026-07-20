@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { startDictation } from "@/lib/dictation";
 import Link from "next/link";
 
 // ---- Types ----
@@ -384,19 +385,13 @@ function WorkoutEditor({
   }
 
   function startMic() {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    const recognition = new SR();
-    recognition.lang = "en-US";
-    recognition.onresult = (e: any) => {
-      setWorkoutName(e.results[0][0].transcript);
-      setMicActive(false);
-    };
-    recognition.onerror = () => setMicActive(false);
-    recognition.onend = () => setMicActive(false);
-    micRef.current = recognition;
-    recognition.start();
-    setMicActive(true);
+    // Unified dictation: native app (Capacitor) + browser.
+    micRef.current = startDictation({
+      onStart: () => setMicActive(true),
+      onEnd: () => setMicActive(false),
+      onResult: (t) => { setWorkoutName(t); setMicActive(false); },
+      onUnavailable: () => setMicActive(false),
+    });
   }
 
   function stopMic() {

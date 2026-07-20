@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { startDictation } from '@/lib/dictation';
 
 // \u2500\u2500\u2500 Types \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
@@ -143,23 +144,13 @@ export default function AssessmentPage() {
   // \u2500\u2500\u2500 Voice Input \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   const startVoice = (field: keyof AssessmentData) => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      alert('Voice input not supported in this browser.');
-      return;
-    }
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const rec = new SR();
-    rec.lang = 'en-US';
-    rec.interimResults = false;
-    setListenField(field);
-    rec.onresult = (e: any) => {
-      const transcript = e.results[0][0].transcript;
-      set(field, transcript);
-      setListenField(null);
-    };
-    rec.onerror = () => setListenField(null);
-    rec.onend = () => setListenField(null);
-    rec.start();
+    // Unified dictation: native app (Capacitor) + browser.
+    startDictation({
+      onStart: () => setListenField(field),
+      onEnd: () => setListenField(null),
+      onResult: (transcript) => { set(field, transcript); setListenField(null); },
+      onUnavailable: () => { setListenField(null); alert("Voice input isn't available here."); },
+    });
   };
 
   const MicBtn = ({ field }: { field: keyof AssessmentData }) => (

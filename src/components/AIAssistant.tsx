@@ -1,5 +1,6 @@
 "use client";
 import { createClient } from "@/lib/supabase/client";
+import { startDictation } from "@/lib/dictation";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
@@ -89,27 +90,16 @@ export default function AIAssistant() {
   }, [messages, loading, getContext]);
 
   const startVoice = useCallback(() => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      setError("Voice not supported in this browser. Use Chrome.");
-      return;
-    }
-    const recognition = new SR();
-    recognitionRef.current = recognition;
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-    recognition.onstart = () => setListening(true);
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => { setListening(false); setError("Voice error. Try again."); };
-    recognition.onresult = (e: any) => {
-      const transcript = e.results[0]?.[0]?.transcript || "";
-      if (transcript) {
-        setInput(transcript);
-        sendMessage(transcript);
-      }
-    };
-    recognition.start();
+    // Unified dictation: works in the native app (Capacitor speech plugin) AND
+    // the browser. The raw webkitSpeechRecognition path is dead inside the APK.
+    recognitionRef.current = startDictation({
+      onStart: () => setListening(true),
+      onEnd: () => setListening(false),
+      onResult: (transcript) => {
+        if (transcript) { setInput(transcript); sendMessage(transcript); }
+      },
+      onUnavailable: () => { setListening(false); setError("Voice input isn't available here."); },
+    });
   }, [sendMessage]);
 
   const stopVoice = useCallback(() => {

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { startDictation } from "@/lib/dictation";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -65,18 +66,16 @@ export default function FloatingDock() {
     window.addEventListener("mousemove", mm); window.addEventListener("mouseup", mu);
   }
 
+  const voiceRef = useRef<{ stop: () => void } | null>(null);
   function startVoice() {
-    try {
-      const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      if (!SR) { alert("Voice input is not supported on this browser."); return; }
-      const rec = new SR();
-      rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
-      rec.onstart = () => setListening(true);
-      rec.onend = () => setListening(false);
-      rec.onerror = () => setListening(false);
-      rec.onresult = (e: any) => { const t = e.results[0][0].transcript; setMsg((m) => (m ? m + " " : "") + t); };
-      rec.start();
-    } catch { setListening(false); }
+    // Toggle: tap to start, tap again to stop. Works in the native app + browser.
+    if (listening) { try { voiceRef.current?.stop(); } catch { /* noop */ } setListening(false); return; }
+    voiceRef.current = startDictation({
+      onStart: () => setListening(true),
+      onEnd: () => setListening(false),
+      onResult: (t) => setMsg((m) => (m ? m + " " : "") + t),
+      onUnavailable: () => { setListening(false); alert("Voice input isn't available here."); },
+    });
   }
   async function submit() {
     if (!msg.trim() && !sentiment) return;
