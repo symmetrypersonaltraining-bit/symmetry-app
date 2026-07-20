@@ -1,6 +1,7 @@
 // Shared invite-email builder — used by BOTH /api/create-client (new client with
 // invite) and /api/invite-client (invite/re-invite existing client) so the two
-// can never drift again. Sends the Android APK download + login steps.
+// can never drift again. Sends the Android APK download + login steps, plus an
+// iPhone section (web app / Add to Home Screen) until the iOS app ships.
 
 export function buildInviteEmailHtml(opts: {
   firstName: string;
@@ -53,6 +54,15 @@ export function buildInviteEmailHtml(opts: {
         <p style="margin: 0 0 6px; font-size: 13px; color: #555;"><strong>2.</strong> Open the downloaded file and tap <strong>Install</strong>. If your phone warns about &quot;unknown sources,&quot; tap the prompt to allow it, then Install.</p>
         <p style="margin: 0 0 6px; font-size: 13px; color: #555;"><strong>3.</strong> Open the app and sign in with the <strong>email and temporary password above</strong>.</p>
         <p style="margin: 0; font-size: 13px; color: #555;"><strong>4.</strong> You'll be prompted to <strong>set your own password</strong> right away — pick one you'll remember, and you're in.</p>
+      </div>
+
+      <!-- iPhone -->
+      <div style="background: #f7f7f9; border-radius: 10px; padding: 16px; margin: 24px 0; border: 1px solid #e6e6ee;">
+        <p style="margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #333;">🍎 On an iPhone?</p>
+        <p style="margin: 0 0 8px; font-size: 13px; color: #555;">The App Store version is coming soon. For now you can use the app right in your browser:</p>
+        <p style="margin: 0 0 6px; font-size: 13px; color: #555;"><strong>1.</strong> Open <a href="https://symmetry-app-omega.vercel.app" style="color: #0066cc; font-weight: 600;">this link</a> in Safari.</p>
+        <p style="margin: 0 0 6px; font-size: 13px; color: #555;"><strong>2.</strong> Tap the <strong>Share</strong> icon, then <strong>Add to Home Screen</strong> — you'll get an app icon that opens full-screen.</p>
+        <p style="margin: 0; font-size: 13px; color: #555;"><strong>3.</strong> Open it and sign in with the <strong>email and temporary password above</strong>, then set your own password.</p>
       </div>
 
       <p style="color: #999; font-size: 13px; margin: 0; text-align: center;">
