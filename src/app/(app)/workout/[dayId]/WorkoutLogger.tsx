@@ -611,17 +611,45 @@ export default function WorkoutLogger({
   // behind the keyboard. Bind the fixed logger to the visual viewport and center the focused
   // input above it. Isolated; no-ops on desktop / where unsupported. Revert = remove this block. ---
   const [kbVV, setKbVV] = useState<{ top: number; height: number } | null>(null);
+  const kbWasOpen = useRef(false);
   useEffect(() => {
     const vp = typeof window !== "undefined" ? window.visualViewport : null;
     if (!vp || !sessionMode) { setKbVV(null); return; }
     const onVV = () => {
       const covered = window.innerHeight - vp.height;
-      setKbVV(covered > 120 ? { top: vp.offsetTop, height: vp.height } : null);
+      if (covered > 120) {
+        kbWasOpen.current = true;
+        setKbVV({ top: vp.offsetTop, height: vp.height });
+      } else {
+        setKbVV(null);
+        // Viewport grew back = keyboard closed. If it had actually been open,
+        // restore the collapsed header. This CANNOT fire while the keyboard is up
+        // (the viewport would still be shrunk), so it never kicks you out mid-typing.
+        if (kbWasOpen.current) { kbWasOpen.current = false; setTyping(false); }
+      }
     };
     onVV();
     vp.addEventListener("resize", onVV);
     vp.addEventListener("scroll", onVV);
     return () => { vp.removeEventListener("resize", onVV); vp.removeEventListener("scroll", onVV); };
+  }, [sessionMode]);
+  // Native keyboard "did hide" (Capacitor Keyboard plugin, if bundled in the app):
+  // the definitive close signal on Android/iOS — fires even when the input keeps
+  // focus (back-button / swipe-down dismiss) and the height signals don't. Guarded:
+  // no-op if the plugin isn't present, so it can only ever HELP restore the header.
+  useEffect(() => {
+    if (!sessionMode) return;
+    let removed = false;
+    let handle: { remove?: () => void } | null = null;
+    try {
+      const kb = (window as unknown as { Capacitor?: { Plugins?: { Keyboard?: { addListener?: (e: string, cb: () => void) => unknown } } } }).Capacitor?.Plugins?.Keyboard;
+      if (kb && typeof kb.addListener === "function") {
+        Promise.resolve(kb.addListener("keyboardDidHide", () => { setTyping(false); setKbVV(null); kbWasOpen.current = false; }))
+          .then((h) => { if (removed) { try { (h as { remove?: () => void })?.remove?.(); } catch { /* noop */ } } else handle = h as { remove?: () => void }; })
+          .catch(() => { /* noop */ });
+      }
+    } catch { /* plugin absent — web-layer recovery handles it */ }
+    return () => { removed = true; try { handle?.remove?.(); } catch { /* noop */ } };
   }, [sessionMode]);
   const focusedInputRef = useRef<HTMLInputElement | null>(null);
   // `typing` = a set input is focused. Drives the keyboard-safe layout WITHOUT relying on
