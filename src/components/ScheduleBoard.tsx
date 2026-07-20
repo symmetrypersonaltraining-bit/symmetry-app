@@ -162,7 +162,7 @@ export default function ScheduleBoard({
   // (all reads filter deleted_at IS NULL) but the row is preserved (reversible).
   async function removeWorkout(w: BoardWorkout) {
     if (isLockedDate(w.date)) { flash("Peak Week workouts are locked."); return; }
-    if (typeof window !== "undefined" && !window.confirm(`Remove "${w.label}" from ${shortLabel(w.date)}? You can re-add it later.`)) return;
+    if (typeof window !== "undefined" && !window.confirm(`Delete "${w.label}" from ${shortLabel(w.date)}? This just removes it — to keep it for another day, use Move instead. You can also re-add it later.`)) return;
     setWorkouts((prev) => prev.filter((x) => x.id !== w.id));
     try {
       const supabase: any = createClient();
