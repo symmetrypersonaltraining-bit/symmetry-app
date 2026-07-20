@@ -590,7 +590,13 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     try {
       if (typeof window === "undefined") return today;
       const saved = sessionStorage.getItem("sym:nutrition:date:" + clientId);
-      return saved && /^\d{4}-\d{2}-\d{2}$/.test(saved) ? saved : today;
+      const savedOn = sessionStorage.getItem("sym:nutrition:dateSavedOn:" + clientId);
+      // Only restore the last-viewed date if it was saved earlier on THIS SAME real day.
+      // In the installed app the browser session never ends, so without this a date the
+      // user once scrolled back to (e.g. yesterday) would silently reopen days later —
+      // and a meal logged then lands on the WRONG date. Snap to today on any new day.
+      if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved) && savedOn === today) return saved;
+      return today;
     } catch { return today; }
   });
   const [tab, setTab] = useState<"plan" | "quick">(mealPlan ? "plan" : "quick");
@@ -601,7 +607,11 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   function formatNutritionDate(s: string) { const [y,m,d]=s.split("-").map(Number); const dt=new Date(y, m-1, d); return dt.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}); }
   useEffect(() => {
     let active = true;
-    try { sessionStorage.setItem("sym:nutrition:date:" + clientId, selectedDate); } catch { /* noop */ }
+    try {
+      sessionStorage.setItem("sym:nutrition:date:" + clientId, selectedDate);
+      // Stamp the real day this was saved on, so a stale date can't be restored on a later day.
+      sessionStorage.setItem("sym:nutrition:dateSavedOn:" + clientId, today);
+    } catch { /* noop */ }
     (async () => {
       const { data } = await supabase.from("meal_adherence_logs").select("*").eq("client_id", clientId).eq("log_date", selectedDate);
       if (!active) return;
@@ -610,7 +620,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       const m: Record<number, string> = {}; for (const l of rows) if ((l as any).notes) m[(l as any).meal_position] = (l as any).notes; setNotesMap(m);
     })();
     return () => { active = false; };
-  }, [selectedDate, clientId]);
+  }, [selectedDate, clientId, today]);
   const cameraRef = useRef<HTMLInputElement>(null);
 
   const sortedMeals = useMemo(() => {
