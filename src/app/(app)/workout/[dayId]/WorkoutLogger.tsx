@@ -652,37 +652,32 @@ export default function WorkoutLogger({
       if (!a || a.tagName !== "INPUT") setTyping(false);
     }, 120);
   }, []);
-  // Keyboard-close recovery v4 (7/13). Collapse-while-typing is intentional (it lifts
-  // the set/rep rows above the keyboard) — keep it. This ONLY guarantees the collapsed
-  // header comes back once the keyboard is actually gone, including (a) Android's "hide
-  // keyboard" button, which dismisses WITHOUT blurring the input, and (b) any case where
-  // `typing` is left true while the keyboard is already down (which stuck the header
-  // collapsed at rest). Poll compares innerHeight to a no-keyboard baseline. It only
-  // restores after the keyboard has been confirmed DOWN for several consecutive ticks,
-  // with a startup grace, so it never un-collapses during a flicker or the open animation.
+  // Keyboard-close recovery v5 (7/16). CRITICAL FIX: the v4 time-based fallback
+  // (`elapsed > 1200`) blurred the focused input on devices where the keyboard does NOT
+  // shrink innerHeight (iOS / overlay keyboards) — it read "never shrank" as "keyboard
+  // gone" and kicked focus out mid-typing (Tyler couldn't log reps). Now we restore the
+  // header ONLY after a real shrink -> sustained grow-back, which unambiguously means the
+  // keyboard opened and then closed. If the keyboard never shrank the screen on this
+  // device, `opened` stays false and we NEVER touch focus — the user types freely; a
+  // genuine close still blurs the input and focusBlur restores the header. No timer guess.
   const kbBaseH = useRef(0);
   useEffect(() => { try { kbBaseH.current = window.innerHeight; } catch { /* noop */ } }, []);
   useEffect(() => {
-    if (!typing || !touchDevice.current) return; // desktop never runs the recovery poll
+    if (!typing) return;
     let fullH = 0;
     try { fullH = Math.max(window.innerHeight, kbBaseH.current || 0); } catch { /* noop */ }
     let opened = false;
     let downTicks = 0;
-    let start = 0;
-    try { start = Date.now(); } catch { /* noop */ }
     const id = setInterval(() => {
       try {
         const h = window.innerHeight;
         if (h > fullH) { fullH = h; kbBaseH.current = h; }   // keep the no-keyboard baseline current
         if (h < fullH - 120) { opened = true; downTicks = 0; return; }  // keyboard is open — stay collapsed
         downTicks++;                                         // keyboard looks down this tick
-        let elapsed = 0; try { elapsed = Date.now() - start; } catch { /* noop */ }
-        // Restore once the keyboard has been down for a sustained window (>=3 ticks ~750ms).
-        // Either we saw it open then close, or enough grace has passed that it clearly is
-        // not up — in both cases nothing covers the rows, so bring the header back. The
-        // sustained requirement + grace stop a mid-typing flicker or the open animation
-        // from un-collapsing.
-        if (downTicks >= 3 && (opened || elapsed < 0)) {
+        // Restore ONLY if we actually saw the keyboard open first (opened) and it has now
+        // been down for a sustained window (>=3 ticks ~750ms so a flicker between fields
+        // can't trigger it). No shrink ever observed => never blur => the user keeps typing.
+        if (opened && downTicks >= 3) {
           const a = document.activeElement as HTMLElement | null;
           if (a && a.tagName === "INPUT") a.blur();
           setTyping(false);
