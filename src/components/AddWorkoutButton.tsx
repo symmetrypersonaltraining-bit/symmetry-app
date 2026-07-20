@@ -23,6 +23,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [pickedDate, setPickedDate] = useState<string>(dateStr || ctToday());
+  const [markDone, setMarkDone] = useState(false);
   const minDate = daysAgoCT(90);
 
   async function resolveClientId(): Promise<string | null> {
@@ -66,6 +67,19 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
       const ex = await supabase.from("scheduled_workouts").select("position").eq("client_id", cid).eq("scheduled_date", pickedDate).order("position", { ascending: false }).limit(1);
       const last = (ex.data as any[]) || [];
       const pos = last[0] && last[0].position ? last[0].position + 1 : 1;
+      if (markDone) {
+        // Backlog a FINISHED workout: mirror completeWorkout() — write a completed
+        // workout_logs row and a completed scheduled_workouts row linked to it, so it
+        // counts in history/progress/tracking. Dated to the picked day (noon UTC keeps
+        // the same calendar date in Central).
+        const completedAt = new Date(pickedDate + "T12:00:00Z").toISOString();
+        const wl = await (supabase as any).from("workout_logs").insert({ client_id: cid, day_id: d.id, log_date: pickedDate, completed: true, completed_at: completedAt, started_at: completedAt, status: "Done as planned", source: "trainer_backfill" }).select("id").single();
+        if (wl.error || !wl.data) { window.alert("Could not add: " + (wl.error ? wl.error.message : "no log created")); return; }
+        const insC = await (supabase as any).from("scheduled_workouts").insert({ client_id: cid, day_id: d.id, scheduled_date: pickedDate, position: pos, status: "completed", workout_log_id: wl.data.id, source: "trainer" });
+        if (insC.error) { window.alert("Could not add: " + insC.error.message); return; }
+        window.location.reload();
+        return;
+      }
       const ins = await (supabase as any).from("scheduled_workouts").insert({ client_id: cid, day_id: d.id, scheduled_date: pickedDate, position: pos, status: "scheduled", source: "client_self_assign" });
       if (ins.error) { window.alert("Could not add: " + ins.error.message); return; }
       window.location.reload();
@@ -104,6 +118,10 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
             {!custom ? (
               <>
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your workouts" style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", marginBottom: 10 }} />
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", userSelect: "none" }}>
+                  <input type="checkbox" checked={markDone} onChange={(e) => setMarkDone(e.target.checked)} style={{ width: 16, height: 16 }} />
+                  Mark completed on this date (backlog a finished workout)
+                </label>
                 {loading ? (
                   <div style={{ padding: 20, textAlign: "center", opacity: 0.6 }}>Loading...</div>
                 ) : (
