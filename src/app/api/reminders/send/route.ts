@@ -12,7 +12,7 @@ async function sendEmail(to: string, subject: string, html: string) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "Symmetry Corrective <onboarding@resend.dev>",
+      from: "Symmetry Corrective <noreply@symmetrypersonaltraining.com>",
       to: [to],
       subject,
       html,

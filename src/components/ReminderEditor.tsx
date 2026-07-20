@@ -165,6 +165,24 @@ export default function ReminderEditor() {
         patch.approved_at = new Date().toISOString();
       }
       await sup.from("payment_reminders").update(patch).eq("id", r.id);
+      if (publish) {
+        // Auto-email the client the reminder on approval. Best-effort: the approval
+        // + in-app banner already committed above, so an email failure never blocks
+        // the approval — we just surface a notice. The send route stamps email_sent_at.
+        try {
+          const res = await fetch("/api/reminders/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reminderId: r.id }),
+          });
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({} as any));
+            alert("Reminder approved and the in-app banner is showing, but the email didn't send: " + (j.error || ("HTTP " + res.status)));
+          }
+        } catch (sendErr: any) {
+          alert("Reminder approved and the in-app banner is showing, but the email didn't send: " + (sendErr?.message || "network error"));
+        }
+      }
       await load();
     } finally { setBusy(null); }
   };
