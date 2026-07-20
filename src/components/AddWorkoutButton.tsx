@@ -6,6 +6,12 @@ import { createClient } from "@/lib/supabase/client";
 type LibDay = { id: string; label: string };
 
 function ctToday() { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }); }
+function daysAgoCT(n: number) {
+  const t = ctToday(); const [y, m, d] = t.split("-").map(Number);
+  const dt = new Date(y, m - 1, d); dt.setDate(dt.getDate() - n);
+  const p = (x: number) => String(x).padStart(2, "0");
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+}
 
 export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: { dateStr?: string; label?: string }) {
   const supabase = createClient();
@@ -16,7 +22,8 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
   const [custom, setCustom] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
-  const target = dateStr || ctToday();
+  const [pickedDate, setPickedDate] = useState<string>(dateStr || ctToday());
+  const minDate = daysAgoCT(90);
 
   async function resolveClientId(): Promise<string | null> {
     const { data: u } = await supabase.auth.getUser();
@@ -56,10 +63,10 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
     try {
       const cid = await resolveClientId();
       if (!cid) { window.alert("Could not find your client profile."); return; }
-      const ex = await supabase.from("scheduled_workouts").select("position").eq("client_id", cid).eq("scheduled_date", target).order("position", { ascending: false }).limit(1);
+      const ex = await supabase.from("scheduled_workouts").select("position").eq("client_id", cid).eq("scheduled_date", pickedDate).order("position", { ascending: false }).limit(1);
       const last = (ex.data as any[]) || [];
       const pos = last[0] && last[0].position ? last[0].position + 1 : 1;
-      const ins = await (supabase as any).from("scheduled_workouts").insert({ client_id: cid, day_id: d.id, scheduled_date: target, position: pos, status: "scheduled", source: "client_self_assign" });
+      const ins = await (supabase as any).from("scheduled_workouts").insert({ client_id: cid, day_id: d.id, scheduled_date: pickedDate, position: pos, status: "scheduled", source: "client_self_assign" });
       if (ins.error) { window.alert("Could not add: " + ins.error.message); return; }
       window.location.reload();
     } finally { setBusy(false); }
@@ -71,7 +78,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
     try {
       const cid = await resolveClientId();
       if (!cid) { window.alert("Could not find your client profile."); return; }
-      const ins = await (supabase as any).from("offplan_workout_logs").insert({ client_id: cid, log_date: target, description: text.trim().slice(0, 80), details: text.trim(), status: "pending" });
+      const ins = await (supabase as any).from("offplan_workout_logs").insert({ client_id: cid, log_date: pickedDate, description: text.trim().slice(0, 80), details: text.trim(), status: "pending" });
       if (ins.error) { window.alert("Could not add: " + ins.error.message); return; }
       window.location.reload();
     } finally { setBusy(false); }
@@ -88,6 +95,11 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout" }: {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 800 }}>Add a workout</div>
               <button onClick={() => setOpen(false)} style={{ border: "none", background: "transparent", fontSize: 13, cursor: "pointer", color: "inherit", opacity: 0.6 }}>Close</button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+              <label style={{ fontSize: 12.5, fontWeight: 700, opacity: 0.75 }}>Date</label>
+              <input type="date" value={pickedDate} min={minDate} max={ctToday()} onChange={(e) => setPickedDate(e.target.value)} style={{ flex: 1, minWidth: 150, padding: "9px 10px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", fontSize: 14, fontFamily: "inherit" }} />
+              {pickedDate !== ctToday() && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--brand-primary, #7c9cf5)" }}>backdated</span>}
             </div>
             {!custom ? (
               <>
