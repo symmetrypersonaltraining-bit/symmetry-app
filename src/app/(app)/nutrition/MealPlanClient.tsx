@@ -8,7 +8,7 @@ import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
 interface MealPlan { id: string; version_number: number; meals: Meal[]; }
-interface AdherenceLog { id: string; meal_id: string | null; meal_position: number; adherence: string; off_plan_details: string | null; notes: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null; food_id?: string | null; servings?: number | null; macros_pending?: boolean | null; item_overrides?: Record<string, any> | null; }
+interface AdherenceLog { id: string; meal_id: string | null; meal_position: number; adherence: string; off_plan_details: string | null; notes: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null; food_id?: string | null; servings?: number | null; macros_pending?: boolean | null; item_overrides?: Record<string, any> | null; photo_url?: string | null; }
 interface MacroTarget { calories: number; protein: number; carbs: number; fats: number; }
 
 const ADHERENCE_OPTIONS = [
@@ -91,6 +91,26 @@ async function compressPhotoToBase64(file: File): Promise<{ base64: string; mime
     });
     return { base64: dataUrl.split(",")[1], mime: file.type || "image/jpeg" };
   }
+}
+
+// Same downscale as above but returns a Blob for uploading to storage (off-plan photo attachment).
+async function compressPhotoToBlob(file: File): Promise<Blob> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxDim = 1280;
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("no canvas");
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
+    const blob: Blob | null = await new Promise((res) => canvas.toBlob(b => res(b), "image/jpeg", 0.8));
+    if (blob) return blob;
+  } catch { /* fall through to original file */ }
+  return file;
 }
 
 async function analyzeMealPhoto(file: File): Promise<{ ok: true; json: any } | { ok: false; message: string }> {
@@ -552,6 +572,8 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   const [photoLoading, setPhotoLoading] = useState(false);
   const [photoResult,  setPhotoResult]  = useState<string | null>(null);
   const [offPlanNotes, setOffPlanNotes] = useState("");
+  const [offPlanPhotoFile, setOffPlanPhotoFile] = useState<File | null>(null);
+  const [offPlanPhotoPreview, setOffPlanPhotoPreview] = useState<string | null>(null);
   // Per-day food-amount overrides (feedback 8ec01614) — plan rows stay canonical.
   const [amountsModal, setAmountsModal] = useState<{ mealId: string; position: number; mealName: string } | null>(null);
   const [amountEdits, setAmountEdits] = useState<Record<string, string>>({});
@@ -777,6 +799,9 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   async function handlePhotoCapture(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Keep the image so it's saved to the log (attachment), not just analyzed & discarded.
+    setOffPlanPhotoFile(file);
+    try { setOffPlanPhotoPreview(URL.createObjectURL(file)); } catch {}
     setPhotoLoading(true);
     setPhotoResult(null);
     try {
@@ -809,6 +834,15 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       const pr = offPlanP ? parseFloat(offPlanP) : null;
       const cb = offPlanC ? parseFloat(offPlanC) : null;
       const ft = offPlanF ? parseFloat(offPlanF) : null;
+      let photoUrl: string | null = null;
+      if (offPlanPhotoFile) {
+        try {
+          const blob = await compressPhotoToBlob(offPlanPhotoFile);
+          const path = `${clientId}/${selectedDate}-${offPlanModal.position}-${Date.now()}.jpg`;
+          const { error: upErr } = await supabase.storage.from("meal-photos").upload(path, blob, { contentType: "image/jpeg", upsert: true });
+          if (!upErr) photoUrl = supabase.storage.from("meal-photos").getPublicUrl(path).data.publicUrl || null;
+        } catch (e) { console.error(e); }
+      }
       const { data, error } = await supabase.from("meal_adherence_logs").upsert({
         client_id: clientId, log_date: selectedDate, meal_id: offPlanModal.mealId,
         meal_position: offPlanModal.position, adherence: "Off-plan",
@@ -823,7 +857,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
           : null,
         notes: notesMap[offPlanModal.position] || null,
         source: "client",
-        photo_url: null,
+        photo_url: photoUrl,
         off_plan_notes: offPlanNotes || null,
       }, { onConflict: "client_id,log_date,meal_position" }).select().single();
       if (error) {
@@ -832,7 +866,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         return;
       }
       if (data) setLogs(prev => [...prev.filter(l => l.meal_position !== offPlanModal.position), data as AdherenceLog]);
-      setOffPlanModal(null); setOffPlanNotes("");
+      setOffPlanModal(null); setOffPlanNotes(""); setOffPlanPhotoFile(null); setOffPlanPhotoPreview(null);
     } finally { setSaving(null); }
   }
 
@@ -843,7 +877,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     setOffPlanP(existing?.est_protein?.toString() || "");
     setOffPlanC(existing?.est_carbs?.toString() || "");
     setOffPlanF(existing?.est_fats?.toString() || "");
-    setPhotoResult(null);
+    setPhotoResult(null); setOffPlanPhotoFile(null); setOffPlanPhotoPreview(null);
     setOffPlanModal({ mealId: null, position: slot.position, mealName: slot.label });
   }
 
@@ -939,7 +973,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   }
   function openOffPlanAt(pos: number, mealName: string) {
     setOffPlanDetails(""); setOffPlanKcal(""); setOffPlanP(""); setOffPlanC(""); setOffPlanF("");
-    setPhotoResult(null); setOffPlanNotes("");
+    setPhotoResult(null); setOffPlanNotes(""); setOffPlanPhotoFile(null); setOffPlanPhotoPreview(null);
     setOffPlanModal({ mealId: null, position: pos, mealName });
     closeSlotSheet();
   }
@@ -1118,6 +1152,12 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
               <div className="mb-3 px-3 py-2 rounded-xl text-xs"
                 style={{ background: "#0EA5E910", color: "#0EA5E9", border: "1px solid #0EA5E930" }}>
                 {photoResult}
+              </div>
+            )}
+            {offPlanPhotoPreview && (
+              <div className="mb-3">
+                <img src={offPlanPhotoPreview} alt="Attached meal" className="rounded-xl max-h-40 w-auto object-cover" style={{ border: "1px solid var(--brand-border)" }} />
+                <p className="text-[11px] mt-1" style={{ color: "var(--brand-text-secondary)" }}>Photo will be attached to this log.</p>
               </div>
             )}
             <textarea value={offPlanDetails} onChange={e => setOffPlanDetails(e.target.value)}
@@ -1590,6 +1630,14 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
                           {mealLog.est_fats    ? ` ${Math.round(mealLog.est_fats)}F`   : ""}
                         </span>
                       )}
+                    </div>
+                  )}
+                  {/* Attached off-plan photo */}
+                  {mealLog?.photo_url && (
+                    <div className="mx-4 mb-2">
+                      <a href={mealLog.photo_url} target="_blank" rel="noopener noreferrer">
+                        <img src={mealLog.photo_url} alt="Off-plan meal" className="rounded-xl max-h-40 object-cover" style={{ border: "1px solid var(--brand-border)" }} />
+                      </a>
                     </div>
                   )}
 
