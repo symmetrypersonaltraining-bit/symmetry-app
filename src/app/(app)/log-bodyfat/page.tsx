@@ -119,6 +119,15 @@ export default function LogBodyFatPage() {
       client_id: clientId, metric_date: today, body_fat_pct: Number(bf.toFixed(1)), source: "caliper",
     }, { onConflict: "client_id,metric_date" });
     if (__r1.error || __r2.error) { alert("Save failed: " + (__r1.error ? __r1.error.message : "ok") + " | " + (__r2.error ? __r2.error.message : "ok")); setSaving(false); return; }
+    // Ensure lean/fat mass can be computed (DB trigger needs weight + bf on the row):
+    // if today has no weigh-in yet, seed the most recent known weight so lean/fat populate.
+    const { data: __lastW } = await supabase.from("metrics")
+      .select("weight").eq("client_id", clientId).not("weight", "is", null)
+      .order("metric_date", { ascending: false }).limit(1).maybeSingle();
+    if (__lastW?.weight != null) {
+      await supabase.from("metrics").update({ weight: __lastW.weight })
+        .eq("client_id", clientId).eq("metric_date", today).is("weight", null);
+    }
     setDone(true);
     setSaving(false);
     setTimeout(() => router.back(), 700);
