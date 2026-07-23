@@ -240,9 +240,13 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
   const workoutSet = useMemo(() => new Set(workoutDates), [workoutDates]);
   const scheduledSet = useMemo(() => {
     const s = new Set<string>();
+    // Prefer the full-month, all-status list so a manually added or moved (incl. past) workout still shows a dot.
+    if (monthScheduledWorkouts && monthScheduledWorkouts.length) {
+      monthScheduledWorkouts.forEach((w) => { if (w.status !== "completed") s.add(w.date); });
+    }
     upcomingDays.forEach((a) => s.add(a.date));
     return s;
-  }, [upcomingDays]);
+  }, [upcomingDays, monthScheduledWorkouts]);
   const paymentSet = useMemo(() => {
     const s = new Set<string>();
     paymentReminders.forEach((p) => s.add(p.date));

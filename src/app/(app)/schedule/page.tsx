@@ -63,7 +63,7 @@ export default async function SchedulePage() {
   const monthStart = `${year_val}-${pad(month + 1)}-01`;
   const monthEnd = `${year_val}-${pad(month + 1)}-${pad(daysInMonth)}`;
   const todayStr = `${year_val}-${pad(month + 1)}-${pad(today)}`;
-  const futureEnd = new Date(year_val, month, today + 30);
+  const futureEnd = new Date(year_val, month, today + 60);
   const futureEndStr = `${futureEnd.getFullYear()}-${pad(futureEnd.getMonth() + 1)}-${pad(futureEnd.getDate())}`;
 
   let workoutDates: string[] = [];
@@ -100,7 +100,7 @@ export default async function SchedulePage() {
       .lte("scheduled_date", futureEndStr)
       .neq("status", "completed")
       .order("scheduled_date")
-      .limit(10);
+      .limit(60);
 
     upcomingDays = (upcoming || []).map((w: any) => ({
       id: (w.day_id || (w.days as any)?.id || w.id) as string,

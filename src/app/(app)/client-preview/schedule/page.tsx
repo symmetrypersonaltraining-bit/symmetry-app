@@ -29,7 +29,7 @@ export default async function ClientPreviewSchedulePage() {
   const monthEnd = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
   const todayStr = now.toISOString().split("T")[0];
   const futureEnd = new Date(now);
-  futureEnd.setDate(futureEnd.getDate() + 30);
+  futureEnd.setDate(futureEnd.getDate() + 60);
   const futureEndStr = futureEnd.toISOString().split("T")[0];
 
   const { data: monthWorkouts } = await supabase
@@ -44,6 +44,13 @@ export default async function ClientPreviewSchedulePage() {
     .filter((w: any) => w.status === "completed")
     .map((w: any) => w.scheduled_date);
 
+  const monthScheduledWorkouts = (monthWorkouts || []).map((w: any) => ({
+    id: w.id as string,
+    date: w.scheduled_date as string,
+    status: w.status as string,
+    label: "Workout",
+  }));
+
   const { data: upcoming } = await supabase
     .from("scheduled_workouts")
     .select("id, day_id, scheduled_date, status, days(id, label)")
@@ -53,7 +60,7 @@ export default async function ClientPreviewSchedulePage() {
     .lte("scheduled_date", futureEndStr)
     .neq("status", "completed")
     .order("scheduled_date")
-    .limit(10);
+    .limit(60);
 
   const upcomingDays = (upcoming || []).map((w: any) => ({
     id: (w.day_id || (w.days as any)?.id || w.id) as string,
@@ -80,6 +87,7 @@ export default async function ClientPreviewSchedulePage() {
       upcomingDays={upcomingDays}
       isTrainer={false}
       paymentReminders={[]}
+      monthScheduledWorkouts={monthScheduledWorkouts}
       defaultView="week"
     />
   );
