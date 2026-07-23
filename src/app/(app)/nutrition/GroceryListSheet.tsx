@@ -126,13 +126,17 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
   }, [slots, daysOverride, numDays, fresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fmt = (n: number) => (Math.round(n * 100) / 100).toString();
-  // Meat & fish get a pounds conversion so the client knows what to buy (16 oz = 1 lb).
-  const lbSuffix = (total: number, unit: string | null) =>
-    unit && unit.replace(/cooked|raw/gi, "").trim().toLowerCase() === "oz" && total > 0 ? ` · ${fmt(total / 16)} lb` : "";
-  const qtyText = (r: { total: number; unit: string | null; basis: string | null; unlimited: boolean }, withLb = false) => {
+  // MEAT & FISH ONLY get a pounds conversion so the client knows what to buy (16 oz = 1 lb).
+  // Liquids stored in "oz" (coconut water, almond milk, broth) are fluid ounces — never weigh
+  // them in lb, or the list shows nonsense like "3.5 lb of coconut water".
+  const MEAT_FISH = /beef|chicken|turkey|pork|steak|salmon|tilapia|cod|shrimp|bison|lamb|sirloin|mahi|halibut|snapper|fish|sardine/i;
+  const lbSuffix = (total: number, unit: string | null, name?: string | null) =>
+    unit && unit.replace(/cooked|raw/gi, "").trim().toLowerCase() === "oz" && total > 0 && MEAT_FISH.test(name || "")
+      ? ` · ${fmt(total / 16)} lb` : "";
+  const qtyText = (r: { total: number; unit: string | null; basis: string | null; unlimited: boolean }, withLb = false, name?: string | null) => {
     const unit = `${r.unit ? " " + r.unit : ""}${basisTag(r.basis)}`;
     if (r.unlimited && r.total === 0) return "as needed";
-    return `${fmt(r.total)}${unit}${withLb ? lbSuffix(r.total, r.unit) : ""}${r.unlimited ? " + as needed" : ""}`;
+    return `${fmt(r.total)}${unit}${withLb ? lbSuffix(r.total, r.unit, name) : ""}${r.unlimited ? " + as needed" : ""}`;
   };
 
   // ---- GROCERY amounts are always RAW (you buy it raw). Cooked-marked items convert: ----
@@ -155,10 +159,10 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
         const isVol = /cup|tbsp|tsp|fl oz|ml/i.test(u || "");
         const rawTotal = rule.kind === "meat" ? r.total * (4 / 3) : rule.kind === "potato" ? r.total * 1.2 : isVol ? r.total / 3 : r.total / 2.8;
         const tag = rule.kind === "grain" ? "dry" : "raw";
-        return `${fmt(rawTotal)}${u ? " " + u : ""} ${tag}${lbSuffix(rawTotal, u)}${r.unlimited ? " + as needed" : ""}`;
+        return `${fmt(rawTotal)}${u ? " " + u : ""} ${tag}${lbSuffix(rawTotal, u, name)}${r.unlimited ? " + as needed" : ""}`;
       }
     }
-    return qtyText(r, true);
+    return qtyText(r, true, name);
   };
   // ---- PREP amounts stay COOKED, shown in both oz and grams for weight items ----
   const prepQty = (r: { total: number; unit: string | null; basis: string | null; unlimited: boolean }) => {
