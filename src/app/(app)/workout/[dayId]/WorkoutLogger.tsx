@@ -681,10 +681,13 @@ export default function WorkoutLogger({
     const el = e.currentTarget;
     focusedInputRef.current = el;
     if (!touchDevice.current) return; // desktop: no keyboard to clear — leave layout alone
-    // PERMANENT FIX (recurring "header pushed out, doesn't come back"): do NOT collapse the
-    // header on focus. Collapsing relied on fragile "keyboard closed" signals to restore, which
-    // the Android WebView doesn't fire reliably, leaving the top section stuck off-screen. The
-    // header now stays put; we only scroll the focused input up so it clears the keyboard.
+    // Collapse the header + bottom chrome so the on-screen keyboard can't cover the set/rep
+    // inputs. Driven by FOCUS (fires on every device) because some Android WebViews never
+    // resize window.visualViewport, so kbVV stays null and the kbVV-only collapse never runs
+    // (this was the "keyboard covers the boxes" regression). Restore: focusBlur (tapping a
+    // set's check button or another control blurs the input) + the innerHeight poll + the
+    // Capacitor keyboardDidHide listener all set typing=false.
+    setTyping(true);
     setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 130);
     setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 350);
   }, []);
@@ -1375,7 +1378,7 @@ export default function WorkoutLogger({
         {/* Exercise header — collapse while the keyboard is open so the set/rep inputs are not
             covered. Gated on kbVV (the VisualViewport signal, which reliably clears when the
             keyboard closes) NOT on `typing` (the fragile focus signal that left it stuck off-screen). */}
-        <div className="px-5 mb-4 flex-shrink-0" style={{ display: kbVV ? "none" : undefined }}>
+        <div className="px-5 mb-4 flex-shrink-0" style={{ display: (kbVV || typing) ? "none" : undefined }}>
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "var(--brand-primary)" }}>
@@ -1572,7 +1575,7 @@ export default function WorkoutLogger({
         </div></div>
 
         {/* Bottom controls */}
-        <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", display: kbVV ? "none" : undefined }}>
+        <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", display: (kbVV || typing) ? "none" : undefined }}>
           
           {/* Trainer AI note */}
           {isTrainerSession && (
@@ -1624,7 +1627,7 @@ export default function WorkoutLogger({
             )}
           </div>
         </div>
-        <div className="flex-shrink-0 flex" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0c1626", paddingBottom: "env(safe-area-inset-bottom)", display: kbVV ? "none" : undefined }}>
+        <div className="flex-shrink-0 flex" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0c1626", paddingBottom: "env(safe-area-inset-bottom)", display: (kbVV || typing) ? "none" : undefined }}>
           {(isTrainerSession
             ? [
                 { href: "/home", icon: "ti-home", label: "Home" },
