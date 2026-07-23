@@ -79,6 +79,8 @@ export default function LogBodyFatPage() {
   const [vals, setVals] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [entryMode, setEntryMode] = useState<"caliper" | "direct">("caliper");
+  const [directBf, setDirectBf] = useState("");
 
   useEffect(() => {
     if (clientId) return;
@@ -105,20 +107,27 @@ export default function LogBodyFatPage() {
   }
   const bf = sum > 0 ? 495 / D - 450 : 0;
   const bfValid = bf > 0 && bf < 60;
+  const effBf = entryMode === "direct" ? (parseFloat(directBf) || 0) : bf;
+  const effValid = effBf > 0 && effBf < 60;
 
   async function save() {
-    if (!clientId || !bfValid || saving) return;
+    if (!clientId || !effValid || saving) return;
     setSaving(true);
     const __d = new Date(); const today = __d.getFullYear() + "-" + String(__d.getMonth()+1).padStart(2,"0") + "-" + String(__d.getDate()).padStart(2,"0");
-    const __r1 = await supabase.from("skinfold_logs").insert({
-      client_id: clientId, log_date: today, method: method + "-site",
-      sites: vals, sum_mm: sum, body_density: Number(D.toFixed(4)),
-      body_fat_pct: Number(bf.toFixed(1)), age: ageN, sex: male ? "male" : "female",
-    });
+    const bfNum = Number(effBf.toFixed(1));
+    if (entryMode === "caliper") {
+      const __r1 = await supabase.from("skinfold_logs").insert({
+        client_id: clientId, log_date: today, method: method + "-site",
+        sites: vals, sum_mm: sum, body_density: Number(D.toFixed(4)),
+        body_fat_pct: bfNum, age: ageN, sex: male ? "male" : "female",
+      });
+      if (__r1.error) { alert("Save failed: " + __r1.error.message); setSaving(false); return; }
+    }
     const __r2 = await supabase.from("metrics").upsert({
-      client_id: clientId, metric_date: today, body_fat_pct: Number(bf.toFixed(1)), source: "caliper",
+      client_id: clientId, metric_date: today, body_fat_pct: bfNum,
+      source: entryMode === "direct" ? "trainer_backfill" : "caliper",
     }, { onConflict: "client_id,metric_date" });
-    if (__r1.error || __r2.error) { alert("Save failed: " + (__r1.error ? __r1.error.message : "ok") + " | " + (__r2.error ? __r2.error.message : "ok")); setSaving(false); return; }
+    if (__r2.error) { alert("Save failed: " + __r2.error.message); setSaving(false); return; }
     // Ensure lean/fat mass can be computed (DB trigger needs weight + bf on the row):
     // if today has no weigh-in yet, seed the most recent known weight so lean/fat populate.
     const { data: __lastW } = await supabase.from("metrics")
@@ -151,8 +160,20 @@ export default function LogBodyFatPage() {
       </div>
       <div style={{ padding: 16, maxWidth: 520, margin: "0 auto" }}>
         <p style={{ color: "var(--brand-text-secondary)", fontSize: 13, marginTop: 0 }}>
-          Choose a method and enter your caliper sites (mm). Body fat is calculated and logged to your chart, and the raw measurements are saved.
+          Log body fat by caliper measurement, or enter a known % directly (e.g. from an InBody scan). Lean &amp; fat mass are filled in automatically.
         </p>
+        <div style={{ display: "flex", gap: 5, background: "var(--brand-bg)", border: "1px solid var(--brand-border)", borderRadius: 12, padding: 4, marginBottom: 14 }}>
+          <button style={seg(entryMode === "caliper")} onClick={() => setEntryMode("caliper")}>Caliper</button>
+          <button style={seg(entryMode === "direct")} onClick={() => setEntryMode("direct")}>Enter % directly</button>
+        </div>
+        {entryMode === "direct" && (
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-text-secondary)" }}>Body fat %</label>
+            <input style={inputStyle} type="number" inputMode="decimal" placeholder="e.g. 22.5"
+              value={directBf} onChange={(e) => setDirectBf(e.target.value)} />
+          </div>
+        )}
+        {entryMode === "caliper" && (<>
         <div style={{ display: "flex", gap: 5, background: "var(--brand-bg)", border: "1px solid var(--brand-border)", borderRadius: 12, padding: 4, marginBottom: 14 }}>
           <button style={seg(method === "7")} onClick={() => setMethod("7")}>7-site &middot; Jackson-Pollock</button>
           <button style={seg(method === "4")} onClick={() => setMethod("4")}>4-site &middot; Durnin-Womersley</button>
@@ -177,18 +198,19 @@ export default function LogBodyFatPage() {
           ))}
       {method ? <CaliperGuide method={method} /> : null}
         </div>
+        </>)}
         <div style={{ display: "flex", alignItems: "center", gap: 14, background: "color-mix(in srgb, var(--brand-primary) 9%, transparent)", borderRadius: 14, padding: 14, marginTop: 8 }}>
-          <div style={{ fontSize: 34, fontWeight: 800, color: "var(--brand-primary)" }}>{bfValid ? bf.toFixed(1) + "%" : "\u2014"}</div>
+          <div style={{ fontSize: 34, fontWeight: 800, color: "var(--brand-primary)" }}>{effValid ? effBf.toFixed(1) + "%" : "\u2014"}</div>
           <div>
             <div style={{ fontWeight: 700 }}>Body fat</div>
-            <div style={{ fontSize: 12, color: "var(--brand-text-secondary)" }}>{sum > 0 ? "density " + D.toFixed(4) + " \u00b7 \u03a3 " + sum + "mm" : "enter sites"}</div>
+            <div style={{ fontSize: 12, color: "var(--brand-text-secondary)" }}>{entryMode === "direct" ? "entered directly" : (sum > 0 ? "density " + D.toFixed(4) + " \u00b7 \u03a3 " + sum + "mm" : "enter sites")}</div>
           </div>
         </div>
         <button
           onClick={save}
-          disabled={!bfValid || saving || !clientId}
-          style={{ width: "100%", marginTop: 14, padding: 14, borderRadius: 13, border: 0, fontWeight: 800, fontSize: 14, color: "#fff", cursor: "pointer", opacity: !bfValid || !clientId ? 0.5 : 1, background: done ? "var(--brand-accent)" : "var(--brand-primary)" }}>
-          {done ? "\u2713 Logged to your chart" : saving ? "Saving\u2026" : "Calculate & log body fat"}
+          disabled={!effValid || saving || !clientId}
+          style={{ width: "100%", marginTop: 14, padding: 14, borderRadius: 13, border: 0, fontWeight: 800, fontSize: 14, color: "#fff", cursor: "pointer", opacity: !effValid || !clientId ? 0.5 : 1, background: done ? "var(--brand-accent)" : "var(--brand-primary)" }}>
+          {done ? "\u2713 Logged to your chart" : saving ? "Saving\u2026" : entryMode === "direct" ? "Log body fat" : "Calculate & log body fat"}
         </button>
       </div>
     </div>

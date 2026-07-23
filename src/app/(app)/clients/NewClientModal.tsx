@@ -30,6 +30,10 @@ export default function NewClientModal({ onClose }: Props) {
     injuries_limitations: "",
     training_frequency: "",
     current_fees: "",
+    session_rate: "",
+    billing_cadence: "monthly",
+    first_payment_date: "",
+    training_days: [] as string[],
     notes: "",
     send_invite: true,
   });
@@ -54,10 +58,13 @@ export default function NewClientModal({ onClose }: Props) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create client");
+      const reminderNote = data.reminderCreated
+        ? ` Payment reminder set for ${form.first_payment_date || "today"}.`
+        : "";
       setSuccess(
-        data.invited
+        (data.invited
           ? `${data.name} created! Invite email sent to ${form.email}.`
-          : `${data.name} created! No invite sent \u2014 link their account later.`
+          : `${data.name} created! No invite sent \u2014 link their account later.`) + reminderNote
       );
       setTimeout(() => {
         onClose();
@@ -157,12 +164,58 @@ export default function NewClientModal({ onClose }: Props) {
                   style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} />
               </div>
               <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Monthly Fees ($)</label>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Payment Rate ($ / cycle)</label>
                 <input type="number" value={form.current_fees} onChange={e => set("current_fees", e.target.value)}
-                  placeholder="300"
+                  placeholder="990"
                   className="w-full rounded-lg px-3 py-2 text-sm"
                   style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} />
               </div>
+            </div>
+
+            {/* First Payment Date + Billing Cycle (drives the reminder created on save) */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>First Payment Date</label>
+                <input type="date" value={form.first_payment_date} onChange={e => set("first_payment_date", e.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Billing Cycle</label>
+                <select value={form.billing_cadence} onChange={e => set("billing_cadence", e.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>
+                  <option value="weekly">Weekly</option>
+                  <option value="biweekly">Biweekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Training Days */}
+            <div>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Training Days</label>
+              <div className="flex flex-wrap gap-2">
+                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => {
+                  const on = form.training_days.includes(d);
+                  return (
+                    <button key={d} type="button"
+                      onClick={() => setForm(f => ({ ...f, training_days: on ? f.training_days.filter(x => x !== d) : [...f.training_days, d] }))}
+                      className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+                      style={{
+                        background: on ? "var(--brand-primary)" : "var(--brand-bg)",
+                        color: on ? "white" : "var(--brand-text-secondary)",
+                        border: `1px solid ${on ? "var(--brand-primary)" : "var(--brand-border)"}`,
+                      }}>
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs mt-1.5" style={{ color: "var(--brand-text-secondary)" }}>
+                A payment reminder is created on save (defaults to today if no date set). Editable on the Payments page.
+              </p>
             </div>
 
             {/* Experience + Frequency */}
