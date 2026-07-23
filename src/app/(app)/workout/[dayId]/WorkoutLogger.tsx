@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { startDictation } from "@/lib/dictation";
 import { createClient } from "@/lib/supabase/client";
+import { sendClientMessage } from "@/app/(app)/home/messageActions";
 import Link from "next/link";
 import OffPlanBanner from "@/components/OffPlanBanner";
 import CelebrationScreen from "@/components/CelebrationScreen";
@@ -531,6 +532,16 @@ function defaultTrackedFields(pe: any): string[] {
   return eachSide ? [...base, "each_side"] : base;
 }
 
+// Dumbbell/kettlebell or unilateral movements => weight is entered PER HAND, not total.
+const DB_NAME_RE = /\bdumbbell\b|\bdb\b|\bkettlebell\b|\bkb\b|goblet/i;
+function isPerHandLoad(pe: any): boolean {
+  const nm = String(pe?.exercises?.name || "");
+  const equip = (pe?.exercises?.equipment_required || []).join(" ").toLowerCase();
+  const dbHeld = DB_NAME_RE.test(nm) || /dumbbell|kettlebell/.test(equip);
+  const uni = pe?.unilateral === true || SIDE_NAME_RE.test(nm);
+  return dbHeld || uni;
+}
+
 function VideoModal({ url, onClose }: { url: string; onClose: () => void }) {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^&?#]+)/);
   const id = m ? m[1] : null;
@@ -670,7 +681,10 @@ export default function WorkoutLogger({
     const el = e.currentTarget;
     focusedInputRef.current = el;
     if (!touchDevice.current) return; // desktop: no keyboard to clear — leave layout alone
-    setTyping(true);
+    // PERMANENT FIX (recurring "header pushed out, doesn't come back"): do NOT collapse the
+    // header on focus. Collapsing relied on fragile "keyboard closed" signals to restore, which
+    // the Android WebView doesn't fire reliably, leaving the top section stuck off-screen. The
+    // header now stays put; we only scroll the focused input up so it clears the keyboard.
     setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 130);
     setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 350);
   }, []);
@@ -1225,6 +1239,11 @@ export default function WorkoutLogger({
       };
       const { data } = await supabase.from("exercise_notes").insert(row).select("id, note, author, created_at");
       if (data && data[0]) setExNotePrior(prev => [data[0] as unknown as { id: string; note: string; author: string; created_at: string }, ...prev]);
+      // Client-authored notes also land in the trainer's messaging inbox, tagged with the movement, so Dustin can answer.
+      if (!isTrainerSession) {
+        const exName = currentExercise.exercises?.name ?? "Exercise";
+        try { await sendClientMessage(`[Question · ${exName}]\n${row.note}`); } catch (e) { console.error(e); }
+      }
       setExNoteText(""); setExNoteSaved(true);
       setTimeout(() => setExNoteSaved(false), 2500);
     } catch (e) { console.error(e); }
@@ -1354,7 +1373,7 @@ export default function WorkoutLogger({
         </div>
 
         {/* Exercise header */}
-        <div className="px-5 mb-4 flex-shrink-0" style={{ display: (kbVV || typing) ? "none" : undefined }}>
+        <div className="px-5 mb-4 flex-shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "var(--brand-primary)" }}>
@@ -1447,7 +1466,7 @@ export default function WorkoutLogger({
           </div>
           <div className="flex gap-2 mb-2">
             <div className="w-8" />
-            {xFields.includes("weight") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>WEIGHT (lb)</div>}
+            {xFields.includes("weight") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>{isPerHandLoad(currentExercise) ? "WEIGHT (lb/hand)" : "WEIGHT (lb)"}</div>}
             {xFields.includes("reps") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>REPS</div>}
             {xFields.includes("time") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>TIME (min)</div>}
             {xFields.includes("speed") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>SPEED (mph)</div>}
@@ -1764,7 +1783,7 @@ export default function WorkoutLogger({
                   )}
                   {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f]); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} disabled={setEntry.done} placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} disabled={setEntry.done} placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} disabled={setEntry.done} placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { updateSet(pe.id, si, "done", false); } else { logSet(pe.id, si); } }} disabled={saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="flex items-center gap-1.5 mb-1 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["weight","Weight"],["reps","Reps"],["time","Time"],["each_side","Each side"]] as [string,string][]).map(([f, lab]) => { const on = sFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? sFields.filter((x: string) => x !== f) : [...sFields, f]); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div><div className="grid mb-2" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
                     <div />
-                    {sFields.includes("weight") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>LBS</div>}
+                    {sFields.includes("weight") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>{isPerHandLoad(pe) ? "LBS/HAND" : "LBS"}</div>}
                     {sFields.includes("reps") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>REPS</div>}
                     {sFields.includes("time") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>TIME (min)</div>}
                     <div />
