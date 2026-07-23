@@ -45,6 +45,10 @@ interface AssessmentData {
   activity_level: string;
   days_per_week: number;
   preferred_time: string;
+  training_days: string[];
+  payment_rate: string;
+  billing_cadence: string;
+  first_payment_date: string;
 
   // Goals
   primary_goal: string;
@@ -71,6 +75,7 @@ const defaultData: AssessmentData = {
   lateral_asymmetry: false, balance_deficits: false, ohsa_notes: '',
   experience_level: '', years_training: '', activity_level: '',
   days_per_week: 3, preferred_time: '',
+  training_days: [], payment_rate: '', billing_cadence: 'monthly', first_payment_date: '',
   primary_goal: '', secondary_goal: '', goal_timeline: '',
   target_weight: '', goal_notes: '',
   occupation_type: '', stress_level: 5, sleep_hours: '', nutrition_notes: '',
@@ -556,6 +561,58 @@ export default function AssessmentPage() {
                 {[1,2,3,4,5,6,7].map(n => <span key={n}>{n}</span>)}
               </div>
             </Field>
+
+            <Field label="Training Days">
+              <div className="grid grid-cols-7 gap-1">
+                {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => {
+                  const on = data.training_days.includes(d);
+                  return (
+                    <button key={d} type="button"
+                      onClick={() => set('training_days', on ? data.training_days.filter(x => x !== d) : [...data.training_days, d])}
+                      className="py-2 rounded-lg border text-xs font-semibold transition-all"
+                      style={{
+                        backgroundColor: on ? 'rgba(168,85,247,0.2)' : 'var(--brand-bg)',
+                        borderColor: on ? 'rgba(168,85,247,0.6)' : 'var(--brand-border)',
+                        color: on ? '#7c3aed' : 'var(--brand-text-secondary)',
+                      }}>
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+
+            <div className="pt-4 mt-2 border-t space-y-6" style={{ borderColor: 'var(--brand-border)' }}>
+              <p className="text-sm font-bold" style={{ color: 'var(--brand-text)' }}>Billing</p>
+              <Field label="Payment Rate ($ per cycle)">
+                <input type="number" min="0" step="1" inputMode="decimal"
+                  value={data.payment_rate}
+                  onChange={e => set('payment_rate', e.target.value)}
+                  placeholder="e.g. 990" className={inputClass} />
+              </Field>
+              <Field label="Billing Cycle">
+                <div className="grid grid-cols-4 gap-2">
+                  {['weekly','biweekly','monthly','quarterly'].map(c => (
+                    <button key={c} type="button" onClick={() => set('billing_cadence', c)}
+                      className="py-2.5 rounded-lg border text-xs font-medium capitalize transition-all"
+                      style={{
+                        backgroundColor: data.billing_cadence === c ? 'rgba(168,85,247,0.2)' : 'var(--brand-bg)',
+                        borderColor: data.billing_cadence === c ? 'rgba(168,85,247,0.6)' : 'var(--brand-border)',
+                        color: data.billing_cadence === c ? '#7c3aed' : 'var(--brand-text-secondary)',
+                      }}>
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <Field label="First Payment Date">
+                <input type="date" value={data.first_payment_date}
+                  onChange={e => set('first_payment_date', e.target.value)} className={inputClass} />
+              </Field>
+              <p className="text-xs" style={{ color: 'var(--brand-text-secondary)' }}>
+                A payment reminder is created for this date the moment you create the client. You can edit the amount, date, and everything else afterward on the Payments page.
+              </p>
+            </div>
 
             <Field label="Preferred Training Time">
               <div className="grid grid-cols-3 gap-2">

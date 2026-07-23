@@ -89,13 +89,25 @@ export async function POST(req: NextRequest) {
   if (uErr) return NextResponse.json({ error: uErr.message }, { status: 500 });
   const authUserId = newUser.user?.id;
 
+  // Billing inputs captured on the assessment (payment rate, cadence, first due date, training days)
+  const daysPerWeek = data.days_per_week ? Number(data.days_per_week) : null;
+  const fee = (data.payment_rate ?? data.current_fees);
+  const feeNum = (fee === "" || fee == null) ? null : Number(fee);
+  const sessionRateNum = (data.session_rate === "" || data.session_rate == null) ? null : Number(data.session_rate);
+  const trainingDays = Array.isArray(data.training_days) ? data.training_days.join(",") : nn(data.training_days);
+  const firstDue = nn(data.first_payment_date) || new Date().toISOString().split("T")[0];
+  const cadence = nn(data.billing_cadence) || "monthly";
+
   // 3) Create the client profile with all assessment info
   const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
   const { data: clientRow, error: cErr } = await admin.from("clients").insert({
     name, email, phone: nn(data.phone), date_of_birth: nn(data.date_of_birth),
     start_date: new Date().toISOString().split("T")[0],
     experience_level: nn(data.experience_level), primary_goal: nn(data.primary_goal),
-    days_per_week: nn(data.days_per_week), injuries: nn(data.current_injuries),
+    days_per_week: daysPerWeek, training_frequency: daysPerWeek,
+    training_days: trainingDays, current_fees: feeNum, session_rate: sessionRateNum,
+    billing_cadence: cadence,
+    injuries: nn(data.current_injuries),
     medical_notes: nn(data.chronic_conditions),
     emergency_contact_name: nn(data.emergency_contact_name), emergency_contact_phone: nn(data.emergency_contact_phone),
     assessment_id: assessment.id, auth_user_id: authUserId,
@@ -110,6 +122,20 @@ export async function POST(req: NextRequest) {
   await admin.from("client_app_settings").upsert({
     client_id: clientRow.id, password_is_temporary: true, first_login_completed: false,
   }, { onConflict: "client_id" });
+
+  // 5b) Create the first payment reminder IMMEDIATELY so it exists the moment the client is created.
+  // Editable afterward on the Payments page (amount, due date, credits, approve & notify, confirm paid).
+  let reminderCreated = false;
+  if (feeNum && feeNum > 0) {
+    const { error: rErr } = await admin.from("payment_reminders").insert({
+      client_id: clientRow.id,
+      due_date: firstDue,
+      amount_due: feeNum,
+      billing_credits: 0,
+      notification_status: "pending",
+    });
+    reminderCreated = !rErr;
+  }
 
   // 6) Send the APK invite email (non-fatal if it fails)
   const resendKey = process.env.RESEND_API_KEY;
@@ -132,6 +158,7 @@ export async function POST(req: NextRequest) {
     clientId: clientRow.id,
     name: clientRow.name,
     emailSent,
+    reminderCreated,
     tempPassword: resendKey ? undefined : tempPassword,
   });
 }

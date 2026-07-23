@@ -15,7 +15,8 @@ export async function PATCH(
 
   const body = await req.json();
 
-  const allowed = ["payment_reminders_enabled", "current_fees", "notes"];
+  const allowed = ["payment_reminders_enabled", "current_fees", "notes",
+    "session_rate", "billing_cadence", "training_frequency", "days_per_week", "training_days"];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];

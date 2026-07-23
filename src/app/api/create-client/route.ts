@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
     name, email, phone, date_of_birth, start_date,
     experience_level, primary_goal, injuries_limitations,
     training_frequency, current_fees, notes, send_invite,
+    billing_cadence, first_payment_date, training_days, session_rate, days_per_week,
   } = body;
 
   if (!name || !email) {
@@ -86,8 +87,12 @@ export async function POST(req: NextRequest) {
       experience_level: experience_level || null,
       primary_goal: primary_goal || null,
       injuries_limitations: injuries_limitations || null,
-      training_frequency: training_frequency ? Number(training_frequency) : null,
+      training_frequency: training_frequency ? Number(training_frequency) : (days_per_week ? Number(days_per_week) : null),
+      days_per_week: days_per_week ? Number(days_per_week) : (training_frequency ? Number(training_frequency) : null),
+      training_days: Array.isArray(training_days) ? training_days.join(",") : (training_days || null),
       current_fees: current_fees ? Number(current_fees) : null,
+      session_rate: session_rate ? Number(session_rate) : null,
+      billing_cadence: billing_cadence || "monthly",
       notes: notes || null,
       auth_user_id: authUserId,
       onboarding_complete: false,
@@ -99,6 +104,21 @@ export async function POST(req: NextRequest) {
 
   if (clientErr) {
     return NextResponse.json({ error: clientErr.message }, { status: 500 });
+  }
+
+  // Create the first payment reminder immediately (editable on the Payments page).
+  let reminderCreated = false;
+  const feeNum = current_fees ? Number(current_fees) : null;
+  if (feeNum && feeNum > 0) {
+    const dueDate = first_payment_date || new Date().toISOString().split("T")[0];
+    const { error: rErr } = await admin.from("payment_reminders").insert({
+      client_id: clientRow.id,
+      due_date: dueDate,
+      amount_due: feeNum,
+      billing_credits: 0,
+      notification_status: "pending",
+    });
+    reminderCreated = !rErr;
   }
 
   // If invited: create client_app_settings so login redirect works, then send email
@@ -126,6 +146,7 @@ export async function POST(req: NextRequest) {
     success: true,
     clientId: clientRow.id,
     name: clientRow.name,
+    reminderCreated,
     invited: !!send_invite && !!authUserId,
     // Include temp password in response for trainer to copy if Resend not configured
     tempPassword: send_invite && !process.env.RESEND_API_KEY ? tempPassword : undefined,
