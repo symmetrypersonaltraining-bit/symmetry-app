@@ -658,21 +658,32 @@ export default function NutritionV3Client(props: Props) {
 
   // ---- coach card ---------------------------------------------------------
   useEffect(() => {
-    if (!coachOn) return;
+    if (!coachOn || selectedDate !== today) return;
     let on = true;
+    const cacheKey = "sym:v3:coach:" + clientId + ":" + today;
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) { setCoachApi(JSON.parse(cached)); return; }
+    } catch { /* noop */ }
     (async () => {
       try {
+        // No question → the coach endpoint returns one proactive insight
+        // (metered server-side). Cached per client/day to keep costs tiny.
         const res = await fetch("/api/nutrition-ai/coach", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clientId, date: selectedDate }),
+          body: JSON.stringify({ clientId }),
         });
         if (!res.ok) return;
         const json = await res.json().catch(() => null);
-        if (on && json && (json.message || json.text)) setCoachApi({ message: json.message || json.text, kind: json.kind });
+        if (json && (json.message || json.text)) {
+          const payload = { message: json.message || json.text, kind: json.kind };
+          try { sessionStorage.setItem(cacheKey, JSON.stringify(payload)); } catch { /* noop */ }
+          if (on) setCoachApi(payload);
+        }
       } catch { /* endpoint not deployed yet — local heuristics used */ }
     })();
     return () => { on = false; };
-  }, [clientId, selectedDate, coachOn]);
+  }, [clientId, selectedDate, today, coachOn]);
 
   const coach = useMemo(() => {
     if (!coachOn || coachDismissed) return null;

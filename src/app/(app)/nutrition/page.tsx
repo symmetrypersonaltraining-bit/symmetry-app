@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import MealPlanClient from "./MealPlanClient";
 import NutritionV3Client from "./v3/NutritionV3Client";
 import NutritionAverages from "@/components/NutritionAverages";
+import AveragesStrip from "@/components/nutrition/AveragesStrip";
 import ClientSelector from "@/components/ClientSelector";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -199,7 +200,13 @@ export default async function NutritionPage({
       )}
       {isTrainer && (
         <div className="mt-4">
-          <NutritionAverages clientId={clientId!} today={today} />
+          {nutritionV3 ? (
+            // v3 clients: shared averages strip (canonical dailyTotals calc —
+            // understands the v3 log protocol, so trainer numbers match the client's).
+            <div className="px-4"><AveragesStrip clientId={clientId!} today={today} /></div>
+          ) : (
+            <NutritionAverages clientId={clientId!} today={today} />
+          )}
         </div>
       )}
       </>
