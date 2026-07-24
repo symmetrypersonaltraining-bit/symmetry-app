@@ -269,7 +269,7 @@ function ExerciseHistory({ exerciseId, exId, clientId, exerciseName, onClose, on
       if (clientId) q = q.eq("client_id", clientId);
       const { data } = await q
         .order("logged_at", { ascending: false })
-        .limit(64);
+        .limit(500);
 
       if (data) {
         const grouped: Record<string, HistoryEntry> = {};
@@ -278,7 +278,7 @@ function ExerciseHistory({ exerciseId, exId, clientId, exerciseName, onClose, on
           if (!grouped[date]) grouped[date] = { log_date: date, sets: [] };
           grouped[date].sets.push({ set_number: row.set_number, weight_lbs: row.weight_lbs, reps: row.reps });
         }
-        setHistory(Object.values(grouped).slice(0, 8));
+        setHistory(Object.values(grouped)); // full history — scrolls (no session cap)
       }
       setLoading(false);
     }
@@ -296,53 +296,59 @@ function ExerciseHistory({ exerciseId, exId, clientId, exerciseName, onClose, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
-      <div className="w-full rounded-t-3xl p-5 flex-1 min-h-0 overflow-y-auto"
-        style={{ background: "var(--brand-surface)" }} onClick={e => e.stopPropagation()}>
-        <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-xs uppercase tracking-widest mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>History</p>
-            <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>{exerciseName}</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            {onPrefill && lastWeight != null && (
-              <button onClick={() => { onPrefill(String(lastWeight), String(lastReps ?? "")); onClose(); }}
-                className="text-xs px-3 py-1.5 rounded-full font-semibold"
-                style={{ background: "var(--brand-primary)", color: "white" }}>
-                Use last
+      <div className="w-full rounded-t-3xl flex flex-col"
+        style={{ background: "var(--brand-surface)", maxHeight: "85vh" }} onClick={e => e.stopPropagation()}>
+        {/* Fixed header */}
+        <div className="p-5 pb-3 flex-shrink-0">
+          <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-widest mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>History{history.length > 0 ? ` \u00b7 ${history.length} sessions` : ""}</p>
+              <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>{exerciseName}</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              {onPrefill && lastWeight != null && (
+                <button onClick={() => { onPrefill(String(lastWeight), String(lastReps ?? "")); onClose(); }}
+                  className="text-xs px-3 py-1.5 rounded-full font-semibold"
+                  style={{ background: "var(--brand-primary)", color: "white" }}>
+                  Use last
+                </button>
+              )}
+              <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: "var(--brand-card)" }}>
+                <i className="ti ti-x text-sm" style={{ color: "var(--brand-text-secondary)" }} />
               </button>
-            )}
-            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ background: "var(--brand-card)" }}>
-              <i className="ti ti-x text-sm" style={{ color: "var(--brand-text-secondary)" }} />
-            </button>
+            </div>
           </div>
         </div>
-        {loading ? (
-          <div className="py-8 text-center text-sm" style={{ color: "var(--brand-text-secondary)" }}>Loading{'\u2026'}</div>
-        ) : history.length === 0 ? (
-          <div className="py-8 text-center">
-            <i className="ti ti-history text-3xl block mb-2" style={{ color: "var(--brand-text-secondary)" }} />
-            <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>No history yet for this exercise</p>
-          </div>
-        ) : history.map((entry, i) => (
-          <div key={i} className="mb-4 rounded-xl p-4"
-            style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)" }}>
-            <p className="text-xs font-semibold mb-2" style={{ color: "var(--brand-primary)" }}>
-              {i === 0 ? "Most Recent \u00b7 " : ""}{fmtDate(entry.log_date)}
-            </p>
-            {entry.sets.sort((a, b) => a.set_number - b.set_number).map(s => (
-              <div key={s.set_number} className="flex items-center gap-3 py-1 text-sm">
-                <span className="w-6 text-xs" style={{ color: "var(--brand-text-secondary)" }}>S{s.set_number}</span>
-                <span className="font-medium" style={{ color: "var(--brand-text)" }}>
-                  {s.weight_lbs ? `${s.weight_lbs} lb` : "BW"}
-                </span>
-                <span style={{ color: "var(--brand-text-secondary)" }}>{'\u00d7'}</span>
-                <span style={{ color: "var(--brand-text)" }}>{s.reps ?? "\u2014"} reps</span>
-              </div>
-            ))}
-          </div>
-        ))}
+        {/* Scrollable list \u2014 shows the FULL dated history, scrolls as far back as it goes */}
+        <div className="px-5 pb-8 overflow-y-auto flex-1" style={{ WebkitOverflowScrolling: "touch" as any, overscrollBehavior: "contain" }}>
+          {loading ? (
+            <div className="py-8 text-center text-sm" style={{ color: "var(--brand-text-secondary)" }}>Loading{'\u2026'}</div>
+          ) : history.length === 0 ? (
+            <div className="py-8 text-center">
+              <i className="ti ti-history text-3xl block mb-2" style={{ color: "var(--brand-text-secondary)" }} />
+              <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>No history yet for this exercise</p>
+            </div>
+          ) : history.map((entry, i) => (
+            <div key={i} className="mb-4 rounded-xl p-4"
+              style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)" }}>
+              <p className="text-xs font-semibold mb-2" style={{ color: "var(--brand-primary)" }}>
+                {i === 0 ? "Most Recent \u00b7 " : ""}{fmtDate(entry.log_date)}
+              </p>
+              {entry.sets.sort((a, b) => a.set_number - b.set_number).map(s => (
+                <div key={s.set_number} className="flex items-center gap-3 py-1 text-sm">
+                  <span className="w-6 text-xs" style={{ color: "var(--brand-text-secondary)" }}>S{s.set_number}</span>
+                  <span className="font-medium" style={{ color: "var(--brand-text)" }}>
+                    {s.weight_lbs ? `${s.weight_lbs} lb` : "BW"}
+                  </span>
+                  <span style={{ color: "var(--brand-text-secondary)" }}>{'\u00d7'}</span>
+                  <span style={{ color: "var(--brand-text)" }}>{s.reps ?? "\u2014"} reps</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -532,6 +538,18 @@ function defaultTrackedFields(pe: any): string[] {
   return eachSide ? [...base, "each_side"] : base;
 }
 
+// Reps that should ALWAYS prefill from the day's programmed target (editable).
+// Parses the first integer out of volume_value for rep-based movements so a
+// programmed set never shows a blank rep box. Timed/distance movements stay blank.
+function programmedReps(pe: any): string {
+  const vt = pe?.volume_type;
+  if (vt === "reps" || vt === "rep_range") {
+    const m = String(pe?.volume_value ?? "").match(/\d+/);
+    return m ? m[0] : "";
+  }
+  return "";
+}
+
 // Dumbbell/kettlebell or unilateral movements => weight is entered PER HAND, not total.
 const DB_NAME_RE = /\bdumbbell\b|\bdb\b|\bkettlebell\b|\bkb\b|goblet/i;
 function isPerHandLoad(pe: any): boolean {
@@ -583,7 +601,7 @@ export default function WorkoutLogger({
         const logs = existingSetLogs.filter(sl => sl.prescribed_exercise_id === pe.id);
         result[pe.id] = Array.from({ length: (pe.sets || 3) }, (_, i) => {
           const ex = logs.find(l => l.set_number === i + 1);
-          return { weight: ex?.weight_lbs?.toString() || "", reps: ex?.reps?.toString() || ((pe.volume_type === "reps" || pe.volume_type === "rep_range") && pe.volume_value ? (String(pe.volume_value).match(/\d+/)?.[0] || "") : ""), time: ex?.duration_seconds != null ? fmtSecs(ex.duration_seconds) : "", speed: ex?.speed != null ? String(ex.speed) : "", hr: ex?.heart_rate != null ? String(ex.heart_rate) : "", done: ex?.completed ?? false };
+          return { weight: ex?.weight_lbs?.toString() || "", reps: (ex?.reps != null ? ex.reps.toString() : programmedReps(pe)), time: ex?.duration_seconds != null ? fmtSecs(ex.duration_seconds) : "", speed: ex?.speed != null ? String(ex.speed) : "", hr: ex?.heart_rate != null ? String(ex.heart_rate) : "", done: ex?.completed ?? false };
         });
       }
     }
@@ -616,6 +634,14 @@ export default function WorkoutLogger({
   const [exNotePrior, setExNotePrior] = useState<{ id: string; note: string; author: string; created_at: string }[]>([]);
   const [localSections, setLocalSections] = useState<Section[]>(sections);
   const [swapTargetPe, setSwapTargetPe] = useState<PrescribedExercise | null>(null);
+  // V6 consolidated logger: feedback sheet (both roles) → app_feedback; AI note sheet
+  // (trainer only) → trainer_notes; cue collapsed behind an ⓘ toggle to shorten the header.
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [fbText, setFbText] = useState("");
+  const [fbSent, setFbSent] = useState(false);
+  const [fbSending, setFbSending] = useState(false);
+  const [showAiNote, setShowAiNote] = useState(false);
+  const [showCue, setShowCue] = useState(false);
 
   // --- Keyboard-aware session logger: when the on-screen keyboard opens the visual viewport
   // shrinks but a position:fixed overlay does not, so the active input + bottom bars end up
@@ -971,18 +997,31 @@ export default function WorkoutLogger({
           .limit(1000);
         if (cancelled || !data) return;
         const map: Record<string, Record<number, { weight: string; reps: string }>> = {};
-        const chosen: Record<string, string> = {};
+        const rows = data as any[]; // already ordered logged_at DESC (newest first)
+        const matches = (row: any, pe: string) =>
+          (row.exercise_id && exByPe[pe] && row.exercise_id === exByPe[pe]) || row.prescribed_exercise_id === pe;
         for (const pe of peIds) {
-          for (const row of data as any[]) {
+          // Pick the most recent PRIOR session for this movement that has a REAL (>0)
+          // logged weight — this is the fix for wrong prefills: ~half of set_logs were
+          // saved with weight 0 (blank boxes), so the old "most recent row" logic pulled
+          // 0s / stale numbers. Fall back to the most recent session at all (so reps still
+          // prefill for bodyweight movements that legitimately have no weight).
+          let realLog: string | null = null;
+          let anyLog: string | null = null;
+          for (const row of rows) {
             if (workoutLogId && row.workout_log_id === workoutLogId) continue;
-            const match = (row.exercise_id && exByPe[pe] && row.exercise_id === exByPe[pe]) || row.prescribed_exercise_id === pe;
-            if (!match) continue;
-            if (!chosen[pe]) chosen[pe] = row.workout_log_id;
-            if (row.workout_log_id !== chosen[pe]) continue;
+            if (!matches(row, pe)) continue;
+            if (anyLog === null) anyLog = row.workout_log_id;
+            if (row.weight_lbs != null && Number(row.weight_lbs) > 0) { realLog = row.workout_log_id; break; }
+          }
+          const useLog = realLog || anyLog;
+          if (!useLog) continue;
+          for (const row of rows) {
+            if (row.workout_log_id !== useLog || !matches(row, pe)) continue;
             if (!map[pe]) map[pe] = {};
             if (!map[pe][row.set_number]) map[pe][row.set_number] = {
-              weight: row.weight_lbs != null ? String(row.weight_lbs) : '',
-              reps: row.reps != null ? String(row.reps) : '',
+              weight: (row.weight_lbs != null && Number(row.weight_lbs) > 0) ? String(row.weight_lbs) : '',
+              reps: (row.reps != null && Number(row.reps) > 0) ? String(row.reps) : '',
             };
           }
         }
@@ -1084,8 +1123,8 @@ export default function WorkoutLogger({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
         exercise_id: allFlat.find(p => p.id === peId)?.exercises?.id ?? null,
         set_number: si + 1,
-        weight_lbs: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (parseFloat(s.weight) || 0),
-        reps: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (parseInt(s.reps) || 0),
+        weight_lbs: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (s.weight?.trim() ? (parseFloat(s.weight) || null) : null),
+        reps: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (s.reps?.trim() ? (parseInt(s.reps) || null) : null),
         duration_seconds: s.time ? parseTimeToSecs(s.time) : null,
         speed: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.speed ? parseFloat(s.speed) || 0 : null) : null,
         heart_rate: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
@@ -1113,8 +1152,8 @@ export default function WorkoutLogger({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
         exercise_id: currentExercise.exercises?.id ?? null,
         set_number: i + 1,
-        weight_lbs: isCardioEx(currentExercise) ? null : (parseFloat(s.weight) || 0),
-        reps: isCardioEx(currentExercise) ? null : (parseInt(s.reps) || 0),
+        weight_lbs: isCardioEx(currentExercise) ? null : (s.weight?.trim() ? (parseFloat(s.weight) || null) : null),
+        reps: isCardioEx(currentExercise) ? null : (s.reps?.trim() ? (parseInt(s.reps) || null) : null),
         duration_seconds: s.time ? parseTimeToSecs(s.time) : null,
         speed: isCardioEx(currentExercise) ? (s.speed ? parseFloat(s.speed) || 0 : null) : null,
         heart_rate: isCardioEx(currentExercise) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
@@ -1217,6 +1256,9 @@ export default function WorkoutLogger({
       await supabase.from("trainer_notes").insert({
         client_id: clientId,
         day_id: day.id,
+        exercise_id: currentExercise?.exercises?.id ?? null,
+        prescribed_exercise_id: currentExercise?.id ?? null,
+        author: "trainer",
         note: trainerNoteText.trim(),
         created_at: new Date().toISOString(),
       });
@@ -1251,6 +1293,30 @@ export default function WorkoutLogger({
       setTimeout(() => setExNoteSaved(false), 2500);
     } catch (e) { console.error(e); }
     finally { setSavingExNote(false); }
+  }
+
+  async function submitFeedback() {
+    if (!fbText.trim()) return;
+    setFbSending(true);
+    let src = "app";
+    try { const m = localStorage.getItem("symmetry_view_mode"); if (m) src = m + "-app"; } catch { /* noop */ }
+    try {
+      await supabase.from("app_feedback").insert({
+        source: src,
+        client_context: typeof window !== "undefined" ? window.location.pathname : null,
+        transcript: fbText.trim(),
+        status: "new",
+      });
+    } catch (e) { console.error(e); }
+    setFbSent(true); setFbText(""); setFbSending(false);
+    setTimeout(() => { setFbSent(false); setShowFeedback(false); }, 2200);
+  }
+
+  function startFeedbackVoice() {
+    startDictation({
+      onResult: (t) => setFbText(prev => prev ? prev + " " + t : t),
+      onUnavailable: () => alert("Voice dictation isn't available here yet. You can type instead."),
+    });
   }
 
   function startTrainerVoice() {
@@ -1342,6 +1408,70 @@ export default function WorkoutLogger({
         {timePick && <TimePickerSheet initial={parseTimeToSecs(sets[timePick.peId]?.[timePick.si]?.time || "") || 0} onSet={(secs) => { updateSet(timePick.peId, timePick.si, "time", fmtSecs(secs)); setTimePick(null); }} onClose={() => setTimePick(null)} />}
         {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
 
+        {/* Feedback sheet (both roles) -> app_feedback for fast fixes */}
+        {showFeedback && (
+          <div className="fixed inset-0 z-[1000] flex items-end" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setShowFeedback(false)}>
+            <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)", paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }} onClick={e => e.stopPropagation()}>
+              <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
+              {fbSent ? (
+                <div className="py-6 text-center font-semibold" style={{ color: "#22c55e" }}>&#10003; Thanks &mdash; sent to the fix list.</div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-1">
+                    <i className="ti ti-flag text-base" style={{ color: "#f59e0b" }} />
+                    <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>Report an issue / feedback</h3>
+                  </div>
+                  <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>Speak or type &mdash; this screen is tagged automatically so it can be fixed fast.</p>
+                  <div className="flex gap-2">
+                    <input type="text" value={fbText} onChange={e => setFbText(e.target.value)}
+                      placeholder={"What went wrong or what you'd change…"}
+                      className="flex-1 text-sm px-3 py-2.5 rounded-xl outline-none"
+                      style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
+                    <button onClick={startFeedbackVoice} className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.35)" }}>
+                      <i className="ti ti-microphone text-sm" style={{ color: "#f59e0b" }} />
+                    </button>
+                    <button onClick={submitFeedback} disabled={fbSending || !fbText.trim()}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#f59e0b" }}>
+                      <i className="ti ti-send text-sm text-white" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* AI Programming Note sheet (trainer only) -> trainer_notes for the Command Center */}
+        {showAiNote && isTrainerSession && (
+          <div className="fixed inset-0 z-[1000] flex items-end" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setShowAiNote(false)}>
+            <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)", paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }} onClick={e => e.stopPropagation()}>
+              <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
+              <div className="flex items-center gap-2 mb-1">
+                <i className="ti ti-brain text-base" style={{ color: "#8b5cf6" }} />
+                <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>AI Programming Note</h3>
+              </div>
+              <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>Saved to {clientName ? clientName.split(" ")[0] + "'s" : "this client's"} programming notes ({currentExercise.exercises?.name}) for your Command Center chat.</p>
+              <div className="flex gap-2">
+                <input type="text" value={trainerNoteText} onChange={e => setTrainerNoteText(e.target.value)}
+                  placeholder={"e.g. bump to 140 next week, elbows flaring…"}
+                  className="flex-1 text-sm px-3 py-2.5 rounded-xl outline-none"
+                  style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid rgba(139,92,246,0.3)" }} />
+                <button onClick={startTrainerVoice} className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.3)" }}>
+                  <i className="ti ti-microphone text-sm" style={{ color: "#8b5cf6" }} />
+                </button>
+                <button onClick={saveTrainerNote} disabled={savingNote || !trainerNoteText.trim()}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: noteSaved ? "#22c55e" : "#8b5cf6" }}>
+                  <i className={`ti ${noteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
+                </button>
+              </div>
+              {noteSaved && <p className="text-xs mt-2" style={{ color: "#22c55e" }}>Saved to this client&apos;s programming notes.</p>}
+            </div>
+          </div>
+        )}
+
         {/* Top bar */}
         <div className="flex items-center justify-between px-3 pt-2 pb-2 flex-shrink-0 gap-2">
           <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -1361,12 +1491,18 @@ export default function WorkoutLogger({
             <p className="text-white/40 text-xs truncate">{day.label}</p>
             <p className="text-white/60 text-xs">{globalIdx + 1} / {totalExercises}</p>
           </div>
-          <button onClick={() => setShowTimer(true)}
-            className="flex items-center gap-1.5 px-2.5 h-9 rounded-full flex-shrink-0"
-            style={{ background: "rgba(96,165,250,0.16)", border: "1px solid rgba(96,165,250,0.4)" }}>
-            <i className="ti ti-clock text-base" style={{ color: "#8ec2ff" }} />
-            <span className="text-xs font-bold" style={{ color: "#8ec2ff" }}>Timer</span>
-          </button>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button onClick={() => setShowFeedback(true)} aria-label="Report an issue or feedback"
+              className="w-9 h-9 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(245,158,11,0.16)", border: "1px solid rgba(245,158,11,0.4)" }}>
+              <i className="ti ti-flag text-base" style={{ color: "#f5b34a" }} />
+            </button>
+            <button onClick={() => setShowTimer(true)} aria-label="Timer / stopwatch"
+              className="w-9 h-9 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(96,165,250,0.16)", border: "1px solid rgba(96,165,250,0.4)" }}>
+              <i className="ti ti-clock text-base" style={{ color: "#8ec2ff" }} />
+            </button>
+          </div>
         </div>
 
         {/* Progress bar */}
@@ -1375,83 +1511,63 @@ export default function WorkoutLogger({
             style={{ width: `${progressPct}%`, background: "var(--brand-primary)" }} />
         </div>
 
-        {/* Exercise header — collapse while the keyboard is open so the set/rep inputs are not
-            covered. Gated on kbVV (the VisualViewport signal, which reliably clears when the
-            keyboard closes) NOT on `typing` (the fragile focus signal that left it stuck off-screen). */}
-        <div className="px-5 mb-4 flex-shrink-0">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "var(--brand-primary)" }}>
-                {currentSection.client_facing_name || currentSection.internal_name}
-              </p>
-              {currentExercise?.exercises?.video_url ? (() => {
+        {/* Exercise header (V6 micro-pill) — one compact row: small video thumb + name +
+            inline History/Swap. Meta as micro-pills, cue collapsed behind an info toggle to
+            keep the header short so all sets sit above the keyboard. NO keyboard-conditioned
+            layout — nothing here moves when the keyboard opens. */}
+        <div className="px-5 mb-3 flex-shrink-0">
+          <p className="text-[11px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: "var(--brand-primary)" }}>
+            {currentSection.client_facing_name || currentSection.internal_name}
+          </p>
+          <div className="flex items-center gap-2.5">
+            {currentExercise?.exercises?.video_url && (() => {
               const __vid = __ytId(currentExercise.exercises.video_url);
               return (
-                <div data-no-swipe style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-                  <button type="button" data-no-swipe aria-label="Play exercise demo"
-                    onClick={() => setVideoUrl(currentExercise.exercises!.video_url!)}
-                    style={{ position: 'relative', width: 88, height: 50, flexShrink: 0, borderRadius: 10, overflow: 'hidden', padding: 0, border: 'none', cursor: 'pointer', backgroundColor: '#111', backgroundImage: __vid ? ('url(https://img.youtube.com/vi/' + __vid + '/hqdefault.jpg)') : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                    <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ width: 0, height: 0, borderTop: '6px solid transparent', borderBottom: '6px solid transparent', borderLeft: '10px solid #fff', marginLeft: 2 }} />
-                    </span>
-                  </button>
-                  <h2 className="text-2xl font-bold text-white leading-tight">{currentExercise.exercises?.name}</h2>
-                </div>
+                <button type="button" data-no-swipe aria-label="Play exercise demo"
+                  onClick={() => setVideoUrl(currentExercise.exercises!.video_url!)}
+                  style={{ position: 'relative', width: 60, height: 38, flexShrink: 0, borderRadius: 8, overflow: 'hidden', padding: 0, border: 'none', cursor: 'pointer', backgroundColor: '#111', backgroundImage: __vid ? ('url(https://img.youtube.com/vi/' + __vid + '/hqdefault.jpg)') : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                  <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 22, height: 22, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ width: 0, height: 0, borderTop: '5px solid transparent', borderBottom: '5px solid transparent', borderLeft: '8px solid #fff', marginLeft: 1 }} />
+                  </span>
+                </button>
               );
-            })() : (
-            <h2 className="text-2xl font-bold text-white leading-tight">{currentExercise.exercises?.name}</h2>
-            )}
-            {currentExercise.exercises?.video_url && (
-              <button type="button" onClick={() => setVideoUrl(currentExercise.exercises!.video_url!)}
-                className="inline-flex items-center gap-1.5 mt-1.5 text-sm font-medium hidden"
-                style={{ color: "#60a5fa", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                <i className="ti ti-video text-base" /> Watch demo
-              </button>
-            )}
-              {currentExercise.load_descriptor && (
-                <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>{currentExercise.load_descriptor}</p>
-              )}
-              {currentExercise.cue && (
-                <p className="text-xs mt-1 italic" style={{ color: "rgba(255,255,255,0.35)" }}>
-                  &ldquo;{currentExercise.cue}&rdquo;
-                </p>
-              )}
-            </div>
-            <div className="flex flex-col gap-2 ml-3 mt-1 flex-shrink-0">
-              <button onClick={() => setHistoryExercise({ id: currentExercise.id, exId: currentExercise.exercises?.id, name: currentExercise.exercises?.name })}
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
-                title="View history">
-                <i className="ti ti-chart-bar text-base" style={{ color: "#7fa8ff" }} />
-              </button>
-              <button onClick={() => setSwapTargetPe(currentExercise)}
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
-                title="Swap exercise">
-                <i className="ti ti-switch-horizontal text-base" style={{ color: "#e0a83e" }} />
-              </button>
-            </div>
+            })()}
+            <h2 className="text-xl font-bold text-white leading-tight flex-1 min-w-0">{currentExercise.exercises?.name}</h2>
+            <button onClick={() => setHistoryExercise({ id: currentExercise.id, exId: currentExercise.exercises?.id, name: currentExercise.exercises?.name })}
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }} title="View history">
+              <i className="ti ti-chart-bar text-base" style={{ color: "#7fa8ff" }} />
+            </button>
+            <button onClick={() => setSwapTargetPe(currentExercise)}
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }} title="Swap exercise">
+              <i className="ti ti-switch-horizontal text-base" style={{ color: "#e0a83e" }} />
+            </button>
           </div>
-          <div className="flex gap-2 mt-3 flex-wrap">
+          <div className="flex gap-1.5 mt-2 flex-wrap items-center">
             {currentExercise.volume_value && (
-              <span className="text-xs px-2.5 py-1 rounded-full"
-                style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>
-                {currentExercise.volume_value}
-              </span>
+              <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>{currentExercise.volume_value}</span>
             )}
             {currentExercise.tempo && (
-              <span className="text-xs px-2.5 py-1 rounded-full"
-                style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
-                {currentExercise.tempo}
-              </span>
+              <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>{currentExercise.tempo}</span>
+            )}
+            {currentExercise.load_descriptor && (
+              <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>{currentExercise.load_descriptor}</span>
             )}
             {xFields.includes("each_side") && (
-              <span className="text-xs px-2.5 py-1 rounded-full"
-                style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>
-                Each side
-              </span>
+              <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>Each side</span>
+            )}
+            {currentExercise.cue && (
+              <button type="button" onClick={() => setShowCue(v => !v)}
+                className="text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"
+                style={{ background: showCue ? "rgba(14,165,233,0.15)" : "rgba(255,255,255,0.06)", color: showCue ? "var(--brand-primary)" : "rgba(255,255,255,0.55)", border: "none" }}>
+                <i className="ti ti-info-circle text-xs" /> Cue
+              </button>
             )}
           </div>
+          {showCue && currentExercise.cue && (
+            <p className="text-xs mt-2 italic" style={{ color: "rgba(255,255,255,0.45)" }}>&ldquo;{currentExercise.cue}&rdquo;</p>
+          )}
         </div>
 
         {/* Sets */}
@@ -1536,11 +1652,20 @@ export default function WorkoutLogger({
               </button>
             </div>
           ))}
-        <div className="flex gap-2 mb-3">
-          <button type="button" onClick={() => addSetRow(currentExercise.id)} className="flex-1 py-2 rounded-xl text-xs font-semibold" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.85)", border: "1px dashed rgba(255,255,255,0.22)" }}>&#65291; Add set</button>
-          <button type="button" onClick={() => removeSetRow(currentExercise.id)} className="flex-1 py-2 rounded-xl text-xs font-semibold" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.85)", border: "1px dashed rgba(255,255,255,0.22)" }}>&#8722; Remove set</button>
+        {/* Consolidated toolbar: set stepper + Check all + (trainer) AI note */}
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center rounded-xl overflow-hidden flex-shrink-0" style={{ border: "1px dashed rgba(255,255,255,0.22)" }}>
+            <button type="button" onClick={() => removeSetRow(currentExercise.id)} aria-label="Remove set" className="w-9 h-10 flex items-center justify-center text-lg" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.85)" }}>&#8722;</button>
+            <span className="px-2 text-[11px] font-semibold whitespace-nowrap" style={{ color: "rgba(255,255,255,0.7)" }}>{peSets.length} sets</span>
+            <button type="button" onClick={() => addSetRow(currentExercise.id)} aria-label="Add set" className="w-9 h-10 flex items-center justify-center text-lg" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.85)" }}>&#65291;</button>
+          </div>
+          <button type="button" onClick={logAllCurrentSets} className="flex-1 h-10 rounded-xl text-sm font-semibold text-white" style={{ background: "var(--brand-primary)" }}>Check all</button>
+          {isTrainerSession && (
+            <button type="button" onClick={() => setShowAiNote(true)} className="flex items-center gap-1 px-3 h-10 rounded-xl text-xs font-semibold flex-shrink-0" style={{ background: "rgba(139,92,246,0.16)", color: "#b79cf7", border: "1px solid rgba(139,92,246,0.3)" }}>
+              <i className="ti ti-brain text-sm" /> AI note
+            </button>
+          )}
         </div>
-        <button type="button" onClick={logAllCurrentSets} className="w-full mb-3 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "var(--brand-primary)" }}>Check all sets complete</button>
 
         {/* Per-exercise notes — client or trainer flags an issue with THIS movement
             (pain, couldn't do it, form). Saved to exercise_notes keyed by exercise so
@@ -1577,31 +1702,7 @@ export default function WorkoutLogger({
         {/* Bottom controls (Prev/Next/Complete) — always visible; never hidden by keyboard state. */}
         <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           
-          {/* Trainer AI note */}
-          {isTrainerSession && (
-            <div className="mb-3 rounded-xl p-3" style={{ display: isTrainerSession ? undefined : "none", background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
-              <div className="flex items-center gap-1.5 mb-1">
-                <i className="ti ti-brain text-sm" style={{ color: "#8b5cf6" }} />
-                <p className="text-xs font-semibold" style={{ color: "#8b5cf6" }}>AI Programming Note</p>
-              </div>
-              <div className="flex gap-2">
-                <input type="text" value={trainerNoteText} onChange={e => setTrainerNoteText(e.target.value)}
-                  placeholder={'Note for AI program adjustments\u2026'}
-                  className="flex-1 text-xs px-3 py-2 rounded-lg outline-none"
-                  style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(139,92,246,0.3)" }} />
-                <button onClick={startTrainerVoice}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.3)" }}>
-                  <i className="ti ti-microphone text-sm" style={{ color: "#8b5cf6" }} />
-                </button>
-                <button onClick={saveTrainerNote} disabled={savingNote || !trainerNoteText.trim()}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: noteSaved ? "#22c55e" : "rgba(139,92,246,0.8)" }}>
-                  <i className={`ti ${noteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
-                </button>
-              </div>
-            </div>
-          )}
+          {/* AI Programming Note moved to a toolbar-opened sheet so it never blocks the sets */}
 
           <div className="flex gap-3">
             <button onClick={() => navigateToGlobal(Math.max(0, globalIdx - 1))} disabled={globalIdx === 0}
