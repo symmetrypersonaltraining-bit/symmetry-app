@@ -1,5 +1,4 @@
 "use client";
-import MessagesBell from "@/components/MessagesBell";
 import AddWorkoutButton from "@/components/AddWorkoutButton";
 
 import { useState, useMemo } from "react";
@@ -601,7 +600,6 @@ export default function ClientDashboard({
       )}
 
       <div className="p-4 pb-28 space-y-4 max-w-lg mx-auto cw-reveal">
-      <MessagesBell variant="banner" />
         <PrankInvoice />
         <PaymentDueBanner />
       {isMilestone && streakDays > 0 && (
@@ -614,7 +612,6 @@ export default function ClientDashboard({
             <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}><span style={{ backgroundImage: hour < 12 ? "linear-gradient(100deg,#ff9f5a,#ff6b6b,#c86dd7)" : hour < 17 ? "linear-gradient(100deg,#7c9cf5,#5ec9a3,#ffd36e)" : "linear-gradient(100deg,#6366f1,#8b6ff0,#3aa8c1)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>{firstName}</span> 👋</h1>
           </div>
           <div className="flex items-center gap-2">
-          <MessagesBell />
           {streakDays > 0 && (
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${isMilestone ? "animate-pulse" : ""}`}
               style={{ background: isMilestone ? "#f59e0b20" : "var(--brand-surface)", border: `1px solid ${isMilestone ? "#f59e0b" : "var(--brand-border)"}` }}>
@@ -769,18 +766,8 @@ export default function ClientDashboard({
                 </div>
               </div>
             </Link>
-            <Link href={`${basePath}/messages`} className="col-span-2">
-              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer cw-lift" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#3b82f620" }}>
-                  <i className="ti ti-message-circle text-lg" style={{ color: "#3b82f6" }} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Message Trainer</p>
-                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Chat with Dustin</p>
-                </div>
-                <i className="ti ti-chevron-right text-xs" style={{ color: "var(--brand-text-secondary)" }} />
-              </div>
-            </Link>
+            {/* "Message Trainer" card removed — the bottom-nav Messages tab (with
+                unread badge) is the single messaging entry point for clients. */}
           </div>
         </div>
 

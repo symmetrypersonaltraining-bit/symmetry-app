@@ -27,21 +27,39 @@ const CLIENT_NAV: NavItem[] = [
   { href: "/settings",                 label: "Settings", icon: "ti-settings" },
 ];
 
+const CLIENT_MODE_COOKIE_MAXAGE = 60 * 60 * 24 * 30; // 30 days
+
 export default function TrainerLayoutWrapper({ children }: Props) {
   const [clientMode, setClientMode] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const stored = localStorage.getItem("symmetry_view_mode");
-    if (stored === "client") setClientMode(true);
+    if (stored === "client") {
+      setClientMode(true);
+      // RE-ASSERT the cookie on mount. Client mode was persisted in
+      // localStorage but the cookie could have expired — when that happens the
+      // layout still shows client mode while SERVER pages (/messages, /home…)
+      // read no cookie and render the TRAINER branch (e.g. the full client
+      // inbox leaks into Client View). Keeping the cookie fresh (30 days) makes
+      // every server page reliably see client mode.
+      try { document.cookie = "symmetry_client_mode=1; path=/; max-age=" + CLIENT_MODE_COOKIE_MAXAGE; } catch { /* noop */ }
+    }
   }, []);
+
+  // Keep the cookie fresh while client mode is active (covers long sessions /
+  // SPA navigation without a full remount).
+  useEffect(() => {
+    if (!clientMode) return;
+    try { document.cookie = "symmetry_client_mode=1; path=/; max-age=" + CLIENT_MODE_COOKIE_MAXAGE; } catch { /* noop */ }
+  }, [clientMode]);
 
   function handleToggleMode() {
     const next = !clientMode;
     setClientMode(next);
     localStorage.setItem("symmetry_view_mode", next ? "client" : "trainer");
     if (next) {
-      document["cookie"] = "symmetry_client_mode=1; path=/; max-age=86400";
+      document["cookie"] = "symmetry_client_mode=1; path=/; max-age=" + CLIENT_MODE_COOKIE_MAXAGE;
     } else {
       document["cookie"] = "symmetry_client_mode=; path=/; max-age=0";
     }

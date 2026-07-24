@@ -91,7 +91,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
               <p className="font-semibold truncate" style={{ color: "var(--brand-text)" }}>{userName || "—"}</p>
               <p className="text-sm truncate" style={{ color: "var(--brand-text-secondary)" }}>{userEmail}</p>
             </div>
-            {isTrainer && <span className="badge badge-primary ml-auto flex-shrink-0">Trainer</span>}
+            {isTrainer && !isInClientMode && <span className="badge badge-primary ml-auto flex-shrink-0">Trainer</span>}
           </div>
         </div>
       </section>

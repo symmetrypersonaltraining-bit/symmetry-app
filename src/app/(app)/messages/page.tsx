@@ -145,11 +145,19 @@ export default async function MessagesPage(props: {
     );
   }
 
-  const { data: clientRecord } = await supabase
-    .from("clients")
-    .select("id")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
+  // Resolve the signed-in user's own client record. For the trainer in Client
+  // View (client-mode cookie set → isTrainer false above), their client record
+  // may be linked by email rather than auth_user_id — resolve by email so
+  // Dustin's Client View shows HIS own Trainer/Group threads (never the inbox).
+  let clientRecord: { id: string } | null = null;
+  {
+    const byAuth = await supabase.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
+    clientRecord = (byAuth.data as { id: string } | null) ?? null;
+    if (!clientRecord && user.email) {
+      const byEmail = await supabase.from("clients").select("id").eq("email", user.email).maybeSingle();
+      clientRecord = (byEmail.data as { id: string } | null) ?? null;
+    }
+  }
 
   if (!clientRecord) redirect("/home");
 
