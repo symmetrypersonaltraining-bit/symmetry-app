@@ -66,6 +66,7 @@ type SheetState =
   | { kind: "forward" }
   | { kind: "extrapick" }
   | { kind: "saveplan" }
+  | { kind: "aiplan"; mode: "targets" | "consult" }
   | null;
 
 interface Row {
@@ -730,44 +731,67 @@ export default function NutritionV3Client(props: Props) {
 
   // ---- open-plan → real plan ---------------------------------------------
   const [savingPlan, setSavingPlan] = useState(false);
+
+  // Shared insert path (manual save-my-day AND accepted AI drafts) — reuses the
+  // existing meal_plans → meals → meal_items → macro_targets insert pattern.
+  async function insertPlanFromDraft(
+    planName: string,
+    effective: string,
+    targets: Macros,
+    draftMeals: { name: string; timing: string | null; items: { food: string; amount: number | null; unit: string | null; p: number; c: number; f: number; free?: boolean; basis?: string | null }[] }[],
+    reason: string
+  ): Promise<boolean> {
+    const { data: prev } = await supabase.from("meal_plans").select("version_number").eq("client_id", clientId).order("version_number", { ascending: false }).limit(1).maybeSingle();
+    const nextVer = ((prev as { version_number?: number } | null)?.version_number || 0) + 1;
+    const { data: mp, error: mpErr } = await supabase.from("meal_plans").insert({
+      client_id: clientId, version_number: nextVer, effective_date: effective, status: "live",
+      change_reason: reason,
+    }).select().single();
+    if (mpErr || !mp) { toast.error("Couldn't create the plan — " + (mpErr?.message || "unknown error").slice(0, 80)); return false; }
+    const planId = (mp as { id: string }).id;
+    for (let i = 0; i < draftMeals.length; i++) {
+      const dm = draftMeals[i];
+      const { data: mealRow, error: mealErr } = await supabase.from("meals").insert({
+        meal_plan_id: planId, name: dm.name || `Meal ${i + 1}`, timing: dm.timing, position: i + 1, swaps: null,
+      }).select().single();
+      if (mealErr || !mealRow) continue;
+      const mealId = (mealRow as { id: string }).id;
+      const itemsPayload = dm.items.map((it, j) => ({
+        meal_id: mealId, food: it.food, amount: it.amount ?? 1, unit: it.unit || "serving",
+        is_unlimited: !!it.free, basis: it.basis ?? null,
+        protein: r(it.p || 0), carbs: r(it.c || 0), fats: r(it.f || 0),
+        position: j + 1,
+      }));
+      if (itemsPayload.length) await supabase.from("meal_items").insert(itemsPayload);
+    }
+    await supabase.from("macro_targets").insert({
+      client_id: clientId, calories: r(targets.kcal), protein: r(targets.protein),
+      carbs: r(targets.carbs), fats: r(targets.fats), effective_date: effective,
+    });
+    closeAllSheets();
+    toast.success(`🎯 ${planName} is live (v${nextVer}) — targets now feed your macro bar & charts`, { duration: 4200 });
+    setTimeout(() => { try { window.location.reload(); } catch { /* noop */ } }, 1800);
+    return true;
+  }
+
   async function saveDayAsPlan(planName: string, effective: string) {
     setSavingPlan(true);
     try {
       const built = rows.filter((rw) => rw.kind === "openslot" && rw.meta?.items?.length);
       if (!built.length) { toast.error("Build at least one slot first"); return; }
       const totalsAll = computeDayTotals(logs, []);
-      const { data: prev } = await supabase.from("meal_plans").select("version_number").eq("client_id", clientId).order("version_number", { ascending: false }).limit(1).maybeSingle();
-      const nextVer = ((prev as { version_number?: number } | null)?.version_number || 0) + 1;
-      const { data: mp, error: mpErr } = await supabase.from("meal_plans").insert({
-        client_id: clientId, version_number: nextVer, effective_date: effective, status: "live",
-        change_reason: `Client-built plan from open logging (${planName})`,
-      }).select().single();
-      if (mpErr || !mp) { toast.error("Couldn't create the plan — " + (mpErr?.message || "unknown error").slice(0, 80)); return; }
-      const planId = (mp as { id: string }).id;
-      for (let i = 0; i < built.length; i++) {
-        const rw = built[i];
+      const draftMeals = built.map((rw) => {
         const slot = OPEN_SLOTS.find((s) => s.position === rw.position);
-        const { data: mealRow, error: mealErr } = await supabase.from("meals").insert({
-          meal_plan_id: planId, name: slot?.name || rw.meta!.name || `Meal ${i + 1}`,
-          timing: rw.meta?.time || slot?.time || null, position: i + 1, swaps: null,
-        }).select().single();
-        if (mealErr || !mealRow) continue;
-        const mealId = (mealRow as { id: string }).id;
-        const itemsPayload = (rw.meta!.items || []).map((it, j) => ({
-          meal_id: mealId, food: it.n, amount: 1, unit: it.a || "serving",
-          is_unlimited: !!it.free, basis: it.a || null,
-          protein: r((it.p || 0) * (it.fac ?? 1)), carbs: r((it.c || 0) * (it.fac ?? 1)), fats: r((it.f || 0) * (it.fac ?? 1)),
-          position: j + 1,
-        }));
-        if (itemsPayload.length) await supabase.from("meal_items").insert(itemsPayload);
-      }
-      await supabase.from("macro_targets").insert({
-        client_id: clientId, calories: r(totalsAll.kcal), protein: r(totalsAll.protein),
-        carbs: r(totalsAll.carbs), fats: r(totalsAll.fats), effective_date: effective,
+        return {
+          name: slot?.name || rw.meta!.name || "Meal",
+          timing: rw.meta?.time || slot?.time || null,
+          items: (rw.meta!.items || []).map((it) => ({
+            food: it.n, amount: 1, unit: it.a || "serving", basis: it.a || null, free: !!it.free,
+            p: (it.p || 0) * (it.fac ?? 1), c: (it.c || 0) * (it.fac ?? 1), f: (it.f || 0) * (it.fac ?? 1),
+          })),
+        };
       });
-      closeAllSheets();
-      toast.success(`🎯 ${planName} is live (v${nextVer}) — reload to start one-tap logging`, { duration: 4200 });
-      setTimeout(() => { try { window.location.reload(); } catch { /* noop */ } }, 1800);
+      await insertPlanFromDraft(planName, effective, totalsAll, draftMeals, `Client-built plan from open logging (${planName})`);
     } finally { setSavingPlan(false); }
   }
 
@@ -957,6 +981,14 @@ export default function NutritionV3Client(props: Props) {
             </span>
             <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
           </button>
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            <button onClick={() => openSheet({ kind: "aiplan", mode: "targets" })} className="px-3 py-2 rounded-full text-xs font-semibold" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>
+              ✦ Build me a plan from targets
+            </button>
+            <button onClick={() => openSheet({ kind: "aiplan", mode: "consult" })} className="px-3 py-2 rounded-full text-xs font-semibold" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>
+              ✦ Recommend my targets
+            </button>
+          </div>
         </div>
       )}
 
@@ -1153,6 +1185,31 @@ export default function NutritionV3Client(props: Props) {
       case "forward": return <ForwardSheetView />;
       case "extrapick": return <ExtraPickSheetView />;
       case "saveplan": return <SavePlanSheetView />;
+      case "aiplan":
+        return (
+          <AiPlanSheet
+            mode={s.mode}
+            clientName={clientName}
+            saving={savingPlan}
+            onAccept={async (draft, label) => {
+              setSavingPlan(true);
+              try {
+                await insertPlanFromDraft(
+                  `${clientName.split(" ")[0]}'s Plan (${label})`,
+                  today,
+                  { kcal: draft.targets.kcal, protein: draft.targets.p, carbs: draft.targets.c, fats: draft.targets.f },
+                  draft.meals.map((dm) => ({
+                    name: dm.name, timing: dm.timing,
+                    items: dm.items.map((it) => ({ food: it.food, amount: it.amount, unit: it.unit, p: it.p, c: it.c, f: it.f })),
+                  })),
+                  `Client-accepted AI draft (${label})`
+                );
+              } finally { setSavingPlan(false); }
+            }}
+            onClose={closeAllSheets}
+            onBack={backSheet}
+          />
+        );
       default: return null;
     }
   }
@@ -1891,6 +1948,152 @@ function ForwardSheet({
       <div style={{ margin: "0 -1rem" }}>
         <PlanRangeView clientId={clientId} startDate={today} days={range} basePlan={mealPlan as never} baseTarget={macroTarget ? { calories: macroTarget.calories } : null} />
       </div>
+    </Sheet>
+  );
+}
+
+interface PlanDraft {
+  targets: { kcal: number; p: number; c: number; f: number };
+  reasoning: string | null;
+  meals: { name: string; timing: string | null; items: { food: string; amount: number | null; unit: string | null; p: number; c: number; f: number; kcal: number }[] }[];
+  totals: { kcal: number; p: number; c: number; f: number };
+}
+
+const CONSULT_QUESTIONS: { q: string; key: string; chips: string[] }[] = [
+  { q: "What's the goal right now?", key: "goal", chips: ["Lose fat", "Recomp", "Build muscle"] },
+  { q: "How fast do you want the scale to move?", key: "pace", chips: ["Steady & sustainable", "Aggressive", "Slow — protect performance"] },
+  { q: "Activity outside training?", key: "activity", chips: ["Desk job", "On my feet all day", "Mixed"] },
+];
+
+function AiPlanSheet({
+  mode, clientName, saving, onAccept, onClose, onBack,
+}: {
+  mode: "targets" | "consult";
+  clientName: string;
+  saving: boolean;
+  onAccept: (draft: PlanDraft, label: string) => Promise<void>;
+  onClose: () => void;
+  onBack: () => void;
+}) {
+  const [tgIn, setTgIn] = useState({ kcal: "2200", p: "180", c: "230", f: "55" });
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [step, setStep] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState<PlanDraft | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const label = mode === "targets" ? "AI draft" : "coach consult";
+  const inputStyle: React.CSSProperties = { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 12, padding: "10px 12px", fontSize: 13, width: "100%", outline: "none", textAlign: "center" };
+
+  async function run(body: Record<string, unknown>) {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch("/api/nutrition-ai/plan-build", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json || json.error || !Array.isArray(json.meals)) {
+        setErr(json?.error || "Couldn't draft a plan right now — try again in a moment (this feature is limited per day).");
+        return;
+      }
+      setDraft(json as PlanDraft);
+    } catch {
+      setErr("Network error — check your connection and try again.");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <Sheet
+      title={mode === "targets" ? "✦ Build me a plan" : "✦ Coach consult"}
+      subtitle={draft ? "Draft — review, then make it your ongoing plan" : mode === "targets" ? "5 itemized meals drafted to your targets" : "3 quick questions → recommended targets + a plan"}
+      onClose={onClose}
+      onBack={onBack}
+    >
+      {!draft && !busy && mode === "targets" && (
+        <>
+          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Daily targets — kcal · P · C · F (g)</p>
+          <div className="grid grid-cols-4 gap-2 mb-3">
+            {(["kcal", "p", "c", "f"] as const).map((k) => (
+              <input key={k} value={tgIn[k]} inputMode="numeric" onChange={(e) => setTgIn({ ...tgIn, [k]: e.target.value.replace(/[^0-9]/g, "") })} placeholder={k.toUpperCase()} style={inputStyle} />
+            ))}
+          </div>
+          <button onClick={() => run({ targets: { kcal: +tgIn.kcal, p: +tgIn.p, c: +tgIn.c, f: +tgIn.f } })}
+            className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>
+            ✦ Draft 5 meals to these targets →
+          </button>
+        </>
+      )}
+
+      {!draft && !busy && mode === "consult" && (
+        <>
+          <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "var(--brand-text-secondary)" }}>Question {Math.min(step + 1, CONSULT_QUESTIONS.length)} of {CONSULT_QUESTIONS.length}</p>
+          <p className="text-sm mb-3" style={{ color: "var(--brand-text)" }}>{CONSULT_QUESTIONS[Math.min(step, CONSULT_QUESTIONS.length - 1)].q}</p>
+          <div className="flex gap-1.5 flex-wrap">
+            {CONSULT_QUESTIONS[Math.min(step, CONSULT_QUESTIONS.length - 1)].chips.map((chip) => (
+              <button key={chip}
+                onClick={() => {
+                  const q = CONSULT_QUESTIONS[step];
+                  const next = { ...answers, [q.key]: chip };
+                  setAnswers(next);
+                  if (step + 1 >= CONSULT_QUESTIONS.length) run({ consult: { answers: next } });
+                  else setStep(step + 1);
+                }}
+                className="px-4 py-2.5 rounded-full text-sm font-semibold"
+                style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>
+                {chip}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs mt-4" style={{ color: "var(--brand-text-secondary)" }}>
+            Your recent weight trend and goal come from your profile automatically — the coach combines them with these answers.
+          </p>
+        </>
+      )}
+
+      {busy && (
+        <div className="flex items-center gap-3 rounded-2xl p-4" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+          <span className="inline-block w-5 h-5 rounded-full animate-spin flex-shrink-0" style={{ border: "2.5px solid var(--brand-border)", borderTopColor: "var(--brand-primary)" }} />
+          <span className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
+            ✦ {mode === "consult" ? "Crunching your trend + drafting 5 meals…" : "Drafting 5 meals against your targets…"}
+          </span>
+        </div>
+      )}
+
+      {err && <p className="text-xs mt-2 rounded-xl p-2.5" style={{ background: "rgba(245,158,11,0.12)", color: "#b45309", border: "1px solid rgba(245,158,11,0.4)" }}>{err}</p>}
+
+      {draft && (
+        <>
+          {draft.reasoning && (
+            <div className="rounded-xl p-3 mb-2 text-xs leading-relaxed" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.4)", color: "var(--brand-text)" }}>
+              <b>Recommended: {draft.targets.kcal.toLocaleString()} kcal · {draft.targets.p}P / {draft.targets.c}C / {draft.targets.f}F.</b> {draft.reasoning}
+            </div>
+          )}
+          {draft.meals.map((dm, i) => {
+            const sub = dm.items.reduce((a, it) => ({ k: a.k + (it.kcal || 0), p: a.p + (it.p || 0) }), { k: 0, p: 0 });
+            return (
+              <div key={i} className="rounded-2xl p-3 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+                <div className="flex justify-between items-center mb-1">
+                  <p className="text-xs font-bold" style={{ color: "var(--brand-text)" }}>{dm.name}{dm.timing ? <span style={{ color: "var(--brand-text-secondary)", fontWeight: 600 }}> · {dm.timing}</span> : null}</p>
+                  <p className="text-xs font-bold" style={{ color: "var(--brand-text)" }}>{Math.round(sub.k)} cal · {Math.round(sub.p)}P</p>
+                </div>
+                {dm.items.map((it, j) => (
+                  <div key={j} className="flex justify-between py-0.5 text-xs" style={{ color: "var(--brand-text-secondary)", borderBottom: j < dm.items.length - 1 ? "1px dashed var(--brand-border)" : "none" }}>
+                    <span>{it.food}</span>
+                    <b style={{ color: "var(--brand-text)" }}>{it.amount != null ? `${it.amount}${it.unit ? " " + it.unit : ""}` : it.unit || ""}</b>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+          <div className="flex justify-between py-2 text-sm font-bold" style={{ color: "var(--brand-text)" }}>
+            <span style={{ color: "var(--brand-text-secondary)", fontWeight: 500 }}>Draft total</span>
+            <span>{Math.round(draft.totals.kcal)} cal · {Math.round(draft.totals.p)}P / {Math.round(draft.totals.c)}C / {Math.round(draft.totals.f)}F</span>
+          </div>
+          <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>Every meal stays editable after accepting — swap, adjust amounts, reorder, all of it.</p>
+          <button onClick={() => onAccept(draft, label)} disabled={saving}
+            className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>
+            {saving ? "Creating your plan…" : `Accept — make it my ongoing plan ✓ (${clientName.split(" ")[0]})`}
+          </button>
+        </>
+      )}
     </Sheet>
   );
 }
