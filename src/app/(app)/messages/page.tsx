@@ -21,6 +21,10 @@ export default async function MessagesPage(props: {
 
   if (searchParams.client === "group") {
     const { data: gmsgs } = await supabase.from("messages").select("*").eq("is_group", true).is("deleted_at", null).order("created_at", { ascending: true });
+    // Opening the Group tab marks the group read for this user (advances their
+    // group_reads watermark) so the badge / bell / banner clear.
+    const __nowIso = new Date().toISOString();
+    await supabase.from("group_reads").upsert({ user_id: user.id, last_read_at: __nowIso, updated_at: __nowIso }, { onConflict: "user_id" });
     const { data: allClients } = await supabase.from("clients").select("*").not("auth_user_id", "is", null).order("name");
     const senderNames: Record<string, string> = {};
     for (const cc of (allClients || []) as any[]) { if (cc.auth_user_id) senderNames[cc.auth_user_id] = String(cc.name || "").trim().split(" ")[0]; }

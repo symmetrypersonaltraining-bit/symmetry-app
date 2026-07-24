@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { aggregateNotifications, totalUnread, NotifRow, RawUnread } from "@/lib/notifications";
+import { fetchGroupUnread, groupUnreadAsRows, markGroupRead } from "@/lib/groupUnread";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -55,7 +56,11 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(300);
-      const unread = (raw as RawUnread[]) || [];
+      const direct = (raw as RawUnread[]) || [];
+      // Fold in per-user GROUP unread (group_reads watermark) as synthetic rows
+      // so a new group message shows a "Group" row routing to /messages?client=group.
+      const group = await fetchGroupUnread(supabase, user.id);
+      const unread = direct.concat(groupUnreadAsRows(group, user.id));
 
       let clientNames: Record<string, string> = {};
       if (isTrainer) {
@@ -88,9 +93,13 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
     try {
       const supabase = createClient();
       const { myUserId } = ctx.current;
+      if (row.kind === "group") {
+        // Group unread is watermark-based → advance the caller's group_reads.
+        await markGroupRead(supabase, myUserId);
+        return;
+      }
       let q = supabase.from("messages").update({ read_at: new Date().toISOString() }).eq("to_id", myUserId).is("read_at", null);
-      if (row.kind === "group") q = q.eq("is_group", true);
-      else if (row.kind === "client" && row.clientId) q = q.eq("client_id", row.clientId);
+      if (row.kind === "client" && row.clientId) q = q.eq("client_id", row.clientId);
       else q = q.eq("is_group", false); // client "Trainer" row → all their direct + broadcasts
       await q;
     } catch { /* noop */ }
@@ -106,7 +115,10 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
   async function markAll() {
     try {
       const supabase = createClient();
-      await supabase.from("messages").update({ read_at: new Date().toISOString() }).eq("to_id", ctx.current.myUserId).is("read_at", null).is("deleted_at", null);
+      await Promise.all([
+        supabase.from("messages").update({ read_at: new Date().toISOString() }).eq("to_id", ctx.current.myUserId).is("read_at", null).is("deleted_at", null),
+        markGroupRead(supabase, ctx.current.myUserId),
+      ]);
     } catch { /* noop */ }
     setRows([]);
   }

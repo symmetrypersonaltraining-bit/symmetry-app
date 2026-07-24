@@ -438,12 +438,17 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
   const clientTitle = isGroup ? "Group Chat" : "Dustin — Trainer";
   const pill = (active: boolean) => ({ flex: 1, textAlign: "center" as const, padding: "10px 0", borderRadius: 999, textDecoration: "none", fontSize: 13.5, fontWeight: active ? 800 : 600, background: active ? "var(--brand-primary)" : "var(--brand-surface)", color: active ? "#fff" : "var(--brand-text)", border: "1px solid var(--brand-border)" });
   return (
-    <div style={{ background: "var(--brand-bg)", height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--brand-border)" }}>
+    // Definite height (viewport minus the app header + bottom nav) so the
+    // Trainer/Group toggle stays PINNED at the top and the composer at the
+    // bottom while only the message list scrolls between them. Previously the
+    // root was height:100% with no bounded parent, so the whole page scrolled
+    // and the toggle scrolled out of reach.
+    <div style={{ background: "var(--brand-bg)", height: "calc(100dvh - 108px)", minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <div style={{ flexShrink: 0, display: "flex", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--brand-border)", background: "var(--brand-bg)" }}>
         <Link href="/messages" style={pill(!isGroup) as any}>Trainer</Link>
         <Link href="/messages?client=group" style={pill(isGroup) as any}>Group</Link>
       </div>
-      <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--brand-border)", fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>{clientTitle}</div>
+      <div style={{ flexShrink: 0, padding: "8px 14px", borderBottom: "1px solid var(--brand-border)", fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>{clientTitle}</div>
       {/* Single composer: ThreadPanel renders the message list AND the composer,
           exactly like the trainer layout. (Previously a second composer was
           appended here → double input box on the client view.) */}

@@ -8,12 +8,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { fetchGroupUnread } from "@/lib/groupUnread";
 
 export default function MessageNotifier() {
   const router = useRouter();
   const [show, setShow] = useState(false);
   const [text, setText] = useState("New message");
+  const [href, setHref] = useState("/messages");
   const prev = useRef<number | null>(null);
+  const prevGroup = useRef<number | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -34,17 +37,23 @@ export default function MessageNotifier() {
           .eq("to_id", user.id).is("read_at", null).is("deleted_at", null)
           .eq("is_broadcast", false).eq("is_group", false);
         if (scopeId) q = q.eq("client_id", scopeId);
-        const { count } = await q;
-        const c = count || 0;
+        const [{ count }, group] = await Promise.all([q, fetchGroupUnread(supabase, user.id)]);
+        const direct = count || 0;
+        const grp = group.count;
+        const c = direct + grp;
         if (!on) return;
         if (prev.current != null && c > prev.current) {
           const delta = c - prev.current;
-          setText(delta > 1 ? `${delta} new messages` : "New message");
+          // If the whole increase came from the group chat, deep-link to Group.
+          const groupOnly = prevGroup.current != null && grp > prevGroup.current && (grp - prevGroup.current) >= delta;
+          setText(groupOnly ? (delta > 1 ? `${delta} new group messages` : "New group message") : (delta > 1 ? `${delta} new messages` : "New message"));
+          setHref(groupOnly ? "/messages?client=group" : "/messages");
           setShow(true);
           if (hideTimer.current) clearTimeout(hideTimer.current);
           hideTimer.current = setTimeout(() => setShow(false), 6000);
         }
         prev.current = c;
+        prevGroup.current = grp;
       } catch { /* noop */ }
     }
     load();
@@ -55,7 +64,7 @@ export default function MessageNotifier() {
   if (!show) return null;
   return (
     <button
-      onClick={() => { setShow(false); router.push("/messages"); }}
+      onClick={() => { setShow(false); router.push(href); }}
       style={{
         position: "fixed", top: "calc(env(safe-area-inset-top) + 8px)", left: 12, right: 12, zIndex: 3000,
         display: "flex", alignItems: "center", gap: 12, textAlign: "left",
