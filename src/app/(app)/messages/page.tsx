@@ -44,7 +44,11 @@ export default async function MessagesPage(props: {
       .not("auth_user_id", "is", null)
       .order("name");
 
-    let selectedClientId = searchParams.client || null;
+    // Only a client the trainer EXPLICITLY opened (?client=…) is "read". A
+    // client auto-selected below (latest-unread) is shown but stays UNREAD so
+    // the bell/badge stays accurate until it's actually opened.
+    const explicitClientId = searchParams.client || null;
+    let selectedClientId = explicitClientId;
   if (!selectedClientId) {
     const { data: __latestUnread } = await supabase
       .from("messages")
@@ -74,12 +78,17 @@ export default async function MessagesPage(props: {
         .order("created_at", { ascending: true });
       thread = msgs || [];
 
-      await supabase
-        .from("messages")
-        .update({ read_at: new Date().toISOString() })
-        .eq("client_id", selectedClientId)
-        .eq("to_id", user.id)
-        .is("read_at", null);
+      // Mark read ONLY when the trainer explicitly opened this client — never
+      // just because it was auto-selected on inbox load (that was silently
+      // clearing unread without the trainer reading it).
+      if (explicitClientId && explicitClientId === selectedClientId) {
+        await supabase
+          .from("messages")
+          .update({ read_at: new Date().toISOString() })
+          .eq("client_id", selectedClientId)
+          .eq("to_id", user.id)
+          .is("read_at", null);
+      }
     }
 
     const { data: unreadData } = await supabase
