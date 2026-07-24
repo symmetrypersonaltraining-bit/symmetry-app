@@ -21,6 +21,7 @@ export default async function WorkoutsLibraryPage() {
   const { data: days } = await supabase
     .from("days")
     .select("id, label, position, phases(label, programs(id, name))")
+    .is("client_owner_id", null) // exclude clients' personal AI-created workouts from the main library
     .order("position");
 
   const SECTION_COUNTS: Record<string, number> = {};

@@ -5,7 +5,7 @@
 //   ai_usage_log(client_id, feature, model, tokens_in, tokens_out, cost_usd, created_at)
 //   client_app_settings.ai_daily_*_limit int columns (per-client overrides).
 
-export type AiFeature = "chat" | "parse" | "photo" | "plan_build" | "verify";
+export type AiFeature = "chat" | "parse" | "photo" | "plan_build" | "verify" | "workout_build";
 
 /** client_app_settings column that overrides the daily cap for each feature. */
 export const LIMIT_COLUMNS: Record<AiFeature, string> = {
@@ -14,6 +14,7 @@ export const LIMIT_COLUMNS: Record<AiFeature, string> = {
   photo: "ai_daily_photo_limit",
   plan_build: "ai_daily_plan_build_limit",
   verify: "ai_daily_verify_limit",
+  workout_build: "workout_build_daily_limit",
 };
 
 /** Per-client per-day defaults when the settings column is null/missing. */
@@ -23,6 +24,7 @@ export const DEFAULT_LIMITS: Record<AiFeature, number> = {
   photo: 20,
   plan_build: 1,
   verify: 20,
+  workout_build: 8,
 };
 
 /** Global kill switch: month-to-date spend at/over this pauses ALL AI features. */

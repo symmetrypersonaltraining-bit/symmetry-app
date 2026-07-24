@@ -407,6 +407,7 @@ function SwapModal({ pe, onClose, onSwap }: { pe: PrescribedExercise; onClose: (
         .from("exercises")
         .select("id, name, modality, muscle_group, equipment_required")
         .ilike("name", `%${query}%`)
+        .is("client_owner_id", null)
         .limit(30);
       setResults(data || []);
       setLoading(false);
