@@ -8,7 +8,11 @@ import ClientSelector from "@/components/ClientSelector";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
-async function isClientMode(): Promise<boolean> {
+async function isClientMode(asMarker?: string): Promise<boolean> {
+  // Explicit ?as=client marker OR the cookie (marker wins on first render even
+  // before the client-mode cookie propagates) — fixes intermittent trainer-UI
+  // leak in Client View.
+  if (asMarker === "client") return true;
   const cookieStore = await cookies();
   return cookieStore.get("symmetry_client_mode")?.value === "1";
 }
@@ -16,15 +20,15 @@ async function isClientMode(): Promise<boolean> {
 export default async function NutritionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ clientId?: string }>;
+  searchParams: Promise<{ clientId?: string; as?: string }>;
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const isTrainer = user.email === TRAINER_EMAIL;
-  const inClientMode = await isClientMode();
   const sp = await searchParams;
+  const inClientMode = await isClientMode(sp?.as);
 
   let clientId: string | null = sp?.clientId ?? null;
   let clientName = "";

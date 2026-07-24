@@ -14,17 +14,18 @@ interface Props {
 }
 
 // Client-mode bottom nav tabs — SAME tabs/order/icons as the real client
-// BottomNav (rendered by the shared AppBottomNav). Hrefs point at the routes
-// that render the identical client component for the trainer's own data:
-// /home & /nutrition are client-mode-aware on their real route; progress uses
-// its client-preview route (real /progress still shows the trainer selector).
+// BottomNav (rendered by the shared AppBottomNav). Hrefs carry ?as=client so
+// the SERVER deterministically renders the client branch on first render even
+// if the client-mode cookie hasn't propagated yet (fixes the intermittent
+// trainer-UI leak). /progress uses its client-preview route (real /progress
+// still shows the trainer selector).
 const CLIENT_NAV: NavItem[] = [
-  { href: "/home",                     label: "Home",     icon: "ti-home",          activeMatch: "/home" },
-  { href: "/workout",                  label: "Workout",  icon: "ti-barbell" },
-  { href: "/nutrition",                label: "Nutrition", icon: "ti-salad" },
+  { href: "/home?as=client",           label: "Home",     icon: "ti-home",          activeMatch: "/home" },
+  { href: "/workout?as=client",        label: "Workout",  icon: "ti-barbell",       activeMatch: "/workout" },
+  { href: "/nutrition?as=client",      label: "Nutrition", icon: "ti-salad",        activeMatch: "/nutrition" },
   { href: "/client-preview/progress",  label: "Progress", icon: "ti-chart-line",    activeMatch: "/client-preview/progress" },
-  { href: "/messages",                 label: "Messages", icon: "ti-message-circle", badge: "messages" },
-  { href: "/settings",                 label: "Settings", icon: "ti-settings" },
+  { href: "/messages?as=client",       label: "Messages", icon: "ti-message-circle", badge: "messages", activeMatch: "/messages" },
+  { href: "/settings?as=client",       label: "Settings", icon: "ti-settings",      activeMatch: "/settings" },
 ];
 
 const CLIENT_MODE_COOKIE_MAXAGE = 60 * 60 * 24 * 30; // 30 days
@@ -63,10 +64,12 @@ export default function TrainerLayoutWrapper({ children }: Props) {
     } else {
       document["cookie"] = "symmetry_client_mode=; path=/; max-age=0";
     }
-    // Both modes land on /home — the real client route which, with the
-    // client-mode cookie set, renders the identical ClientDashboard. Keeps the
-    // Client View on the same pages a real client uses.
-    router.push("/home");
+    // Land on /home. Entering client view carries ?as=client so the first
+    // server render is deterministically the client dashboard (belt-and-
+    // suspenders with the cookie). router.refresh() invalidates the router
+    // cache so a page prefetched in the OTHER mode can't be served stale.
+    router.push(next ? "/home?as=client" : "/home");
+    router.refresh();
   }
 
   // ── CLIENT MODE ───────────────────────────────────────────────────────────

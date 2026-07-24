@@ -45,6 +45,7 @@ export default function AppBottomNav({ items }: { items: NavItem[] }) {
           <Link
             key={item.href}
             href={item.href}
+            prefetch={false}
             className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors relative"
           >
             {active && (

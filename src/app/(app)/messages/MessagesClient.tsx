@@ -445,8 +445,11 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
     // and the toggle scrolled out of reach.
     <div style={{ background: "var(--brand-bg)", height: "calc(100dvh - 150px)", minHeight: 320, display: "flex", flexDirection: "column" }}>
       <div style={{ flexShrink: 0, display: "flex", gap: 8, padding: "8px 12px 10px", borderBottom: "1px solid var(--brand-border)", background: "var(--brand-bg)" }}>
-        <Link href="/messages" style={pill(!isGroup) as any}>Trainer</Link>
-        <Link href="/messages?client=group" style={pill(isGroup) as any}>Group</Link>
+        {/* Carry ?as=client + disable prefetch so the SERVER renders the client
+            branch (not the trainer inbox) on first render, and Next can't serve
+            a stale prefetched trainer-mode render. */}
+        <Link href="/messages?as=client" prefetch={false} style={pill(!isGroup) as any}>Trainer</Link>
+        <Link href="/messages?client=group&as=client" prefetch={false} style={pill(isGroup) as any}>Group</Link>
       </div>
       <div style={{ flexShrink: 0, padding: "8px 14px", borderBottom: "1px solid var(--brand-border)", fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>{clientTitle}</div>
       {/* Single composer: ThreadPanel renders the message list AND the composer,

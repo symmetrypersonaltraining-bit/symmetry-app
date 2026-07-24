@@ -10,18 +10,26 @@ import SlackerGate from "@/components/SlackerScreen";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
-async function isClientMode(): Promise<boolean> {
+async function isClientMode(asMarker?: string): Promise<boolean> {
+  // Explicit ?as=client marker OR the cookie. The marker guarantees the client
+  // branch renders on the FIRST server render even if the cookie (set in a
+  // client effect) hasn't propagated yet — fixes the intermittent trainer-UI
+  // leak in Client View.
+  if (asMarker === "client") return true;
   const cookieStore = await cookies();
   return cookieStore.get("symmetry_client_mode")?.value === "1";
 }
 
-export default async function HomePage() {
+export default async function HomePage(props: {
+  searchParams?: Promise<{ as?: string }>;
+}) {
+  const searchParams = (await props.searchParams) ?? {};
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const isTrainer = (user?.email ?? "") === TRAINER_EMAIL;
-  const isInClientMode = isTrainer ? await isClientMode() : false;
+  const isInClientMode = isTrainer ? await isClientMode(searchParams.as) : false;
 
   // ── TRAINER VIEW ──────────────────────────────────────────────────────────
   if (isTrainer && !isInClientMode) {

@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import SettingsClient from "./SettingsClient";
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ gcal?: string }> }) {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ gcal?: string; as?: string }> }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -11,14 +11,17 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const { data: profile } = await supabase.from("clients").select("name").eq("auth_user_id", user.id).maybeSingle();
   const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
   const cookieStore = await cookies();
-  const isInClientMode = isTrainer && cookieStore.get("symmetry_client_mode")?.value === "1";
+  const sp = await searchParams;
+  // Explicit ?as=client marker OR the cookie (marker wins on first render even
+  // before the client-mode cookie propagates) — fixes intermittent trainer-UI
+  // leak in Client View (settings hides trainer-only sections in client mode).
+  const isInClientMode = isTrainer && (sp?.as === "client" || cookieStore.get("symmetry_client_mode")?.value === "1");
   const userName = isTrainer ? "Dustin Gautreaux" : (profile?.name ?? user.email ?? "");
 
   const { data: trainerSettings } = isTrainer
     ? await supabase.from("trainer_settings").select("gcal_sync_enabled, google_refresh_token").eq("user_id", user.id).maybeSingle()
     : { data: null };
 
-  const sp = await searchParams;
   const gcalStatus = sp?.gcal ?? null;
 
   return (

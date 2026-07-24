@@ -9,18 +9,25 @@ import ScheduleBoard from "@/components/ScheduleBoard";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
-async function isClientMode(): Promise<boolean> {
+async function isClientMode(asMarker?: string): Promise<boolean> {
+  // Explicit ?as=client marker OR the cookie (marker wins on first render even
+  // before the client-mode cookie propagates) — fixes intermittent trainer-UI
+  // leak in Client View.
+  if (asMarker === "client") return true;
   const cookieStore = await cookies();
   return cookieStore.get("symmetry_client_mode")?.value === "1";
 }
 
-export default async function WorkoutPage() {
+export default async function WorkoutPage(props: {
+  searchParams?: Promise<{ as?: string }>;
+}) {
+  const searchParams = (await props.searchParams) ?? {};
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const isTrainer = user.email === TRAINER_EMAIL;
-  const inClientMode = isTrainer ? await isClientMode() : false;
+  const inClientMode = isTrainer ? await isClientMode(searchParams.as) : false;
 
   // Central time today
   const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
