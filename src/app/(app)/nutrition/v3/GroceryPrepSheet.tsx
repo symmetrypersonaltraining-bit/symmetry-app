@@ -5,50 +5,16 @@
 // v3). Everything lives here: start-date + day-count controls, an inline
 // grocery list (RAW) and full meal-prep production sheet (COOKED, every meal's
 // actual items shown inline), and TWO PDF buttons — "Grocery PDF" and
-// "Meal Prep PDF" — that generate a shareable/sendable PDF via the browser's
-// native print (Save as PDF / Share). Printing happens through a hidden iframe
-// so the user NEVER leaves the app — no dead-end screen.
+// "Meal Prep PDF" — that generate a REAL PDF client-side (jsPDF) and hand it to
+// the native share sheet (or download fallback). window.print() is a silent
+// no-op in the Capacitor WebView, so it is NOT used here.
 
 import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import Sheet from "./Sheet";
 import { PlanMeal } from "@/lib/nutrition/dailyTotals";
 import { buildGroceryList, buildPrepCards, RangeSpec } from "@/lib/nutrition/groceryEngine";
-import { buildPrintDocument, PrintKind } from "@/lib/nutrition/printHtml";
-
-// Print a full HTML document via a hidden iframe → native print dialog
-// ("Save as PDF" / Share). No navigation, so the sheet stays open behind it
-// and dismissing the dialog returns straight to the app. Falls back to a new
-// window (with its own Close + Share) only if the iframe can't be used.
-function printHtmlDoc(html: string) {
-  try {
-    const iframe = document.createElement("iframe");
-    iframe.setAttribute("aria-hidden", "true");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.style.opacity = "0";
-    document.body.appendChild(iframe);
-    const cw = iframe.contentWindow;
-    if (!cw) { iframe.remove(); throw new Error("no iframe window"); }
-    cw.document.open();
-    cw.document.write(html);
-    cw.document.close();
-    const fire = () => {
-      try { cw.focus(); cw.print(); } catch { /* noop */ }
-      setTimeout(() => { try { iframe.remove(); } catch { /* noop */ } }, 2000);
-    };
-    // Give the browser a tick to lay out before printing.
-    setTimeout(fire, 350);
-  } catch {
-    try {
-      const w = window.open("", "_blank");
-      if (w) { w.document.write(html); w.document.close(); }
-    } catch { /* noop */ }
-  }
-}
+import { buildGroceryPdf, buildPrepPdf, sharePdf, PdfCtx } from "@/lib/nutrition/pdf";
 
 function todayChicago(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
@@ -94,12 +60,40 @@ export default function GroceryPrepSheet({
     ["free", "Free / unlimited"],
   ];
 
-  function makePdf(kind: PrintKind) {
-    const html = buildPrintDocument(
-      { kind, clientName, planLabel, meals, target, startISO, days, todayISO: today },
-      { toolbar: "none" }
-    );
-    printHtmlDoc(html);
+  const [busy, setBusy] = useState<"grocery" | "prep" | null>(null);
+
+  // Build the PDF with jsPDF and hand it to the native share sheet (or download
+  // fallback). Always toasts — never a silent no-op. NO window.print().
+  async function makePdf(kind: "grocery" | "prep") {
+    if (busy) return;
+    setBusy(kind);
+    const ctx: PdfCtx = { clientName, planLabel, meals, target, startISO, days, todayISO: today };
+    const t = toast.loading("Preparing PDF…");
+    try {
+      const doc = kind === "grocery" ? buildGroceryPdf(ctx) : buildPrepPdf(ctx);
+      const filename = kind === "grocery" ? "symmetry-grocery.pdf" : "symmetry-meal-prep.pdf";
+      const label = kind === "grocery" ? "Grocery List" : "Meal Prep";
+      const outcome = await sharePdf(doc, filename, `Symmetry — ${label}`, `Symmetry ${label.toLowerCase()} for ${clientName}`);
+      toast.success(outcome === "shared" ? "Opening share…" : "PDF downloaded ✓", { id: t });
+    } catch (e) {
+      // Some WebViews reject share for non-file reasons or the user cancels —
+      // fall back to a plain download so the button never does nothing.
+      try {
+        const doc = kind === "grocery" ? buildGroceryPdf(ctx) : buildPrepPdf(ctx);
+        const filename = kind === "grocery" ? "symmetry-grocery.pdf" : "symmetry-meal-prep.pdf";
+        const blob = doc.output("blob");
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        toast.success("PDF downloaded ✓", { id: t });
+      } catch {
+        toast.error("Couldn't create the PDF — try again", { id: t });
+      }
+    } finally {
+      setBusy(null);
+    }
   }
 
   const stepBtn: React.CSSProperties = { background: "var(--brand-bg)", color: "var(--brand-primary)", border: "1px solid var(--brand-border)" };
@@ -130,17 +124,17 @@ export default function GroceryPrepSheet({
         <p className="text-xs mt-2" style={{ color: "var(--brand-text-secondary)" }}>{rangeLabel}</p>
       </div>
 
-      {/* PDF actions — the sendable outputs */}
+      {/* PDF actions — the sendable outputs (real jsPDF → native share/download) */}
       <div className="grid grid-cols-2 gap-2 mb-3">
-        <button onClick={() => makePdf("grocery")} className="py-3 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2" style={{ background: "var(--brand-primary)" }}>
-          🛒 Grocery PDF
+        <button onClick={() => makePdf("grocery")} disabled={busy !== null} className="py-3 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2" style={{ background: "var(--brand-primary)", opacity: busy && busy !== "grocery" ? 0.6 : 1 }}>
+          {busy === "grocery" ? "Preparing…" : "🛒 Grocery PDF"}
         </button>
-        <button onClick={() => makePdf("prep")} className="py-3 rounded-2xl text-sm font-bold flex items-center justify-center gap-2" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-primary)", color: "var(--brand-primary)" }}>
-          📦 Meal Prep PDF
+        <button onClick={() => makePdf("prep")} disabled={busy !== null} className="py-3 rounded-2xl text-sm font-bold flex items-center justify-center gap-2" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-primary)", color: "var(--brand-primary)", opacity: busy && busy !== "prep" ? 0.6 : 1 }}>
+          {busy === "prep" ? "Preparing…" : "📦 Meal Prep PDF"}
         </button>
       </div>
       <p className="text-xs text-center mb-3" style={{ color: "var(--brand-text-secondary)" }}>
-        Opens your print dialog — pick <b>Save as PDF</b> or <b>Share</b> to send it to a client or family.
+        Generates a PDF — <b>Share</b> it to a client/family or it saves to your device.
       </p>
 
       {/* view toggle */}
