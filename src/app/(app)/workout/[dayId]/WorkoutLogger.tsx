@@ -611,6 +611,8 @@ export default function WorkoutLogger({
 
   const [sets, setSets] = useState<Record<string, SetData[]>>(buildInitialSets);
   const [workoutLogId, setWorkoutLogId] = useState<string | null>(existingLogId);
+  // Shared in-flight guard so concurrent saves create one workout_logs row, not several.
+  const logIdPromiseRef = useRef<Promise<string> | null>(null);
   const [saving, setSaving] = useState(false);
   // Set-save failures used to be swallowed: the upsert's error was never read, so a set that
   // never reached the database still turned green and counted toward progress. Surface it.
@@ -1079,14 +1081,29 @@ export default function WorkoutLogger({
 
   async function ensureWorkoutLog(): Promise<string> {
     if (workoutLogId) return workoutLogId;
+    // workoutLogId comes from the render closure, so two saves fired before React re-renders
+    // (a double-tap on "Check all", or a set button tapped while another save is in flight)
+    // both saw null and both INSERTed. The partial unique index only covers completed rows, so
+    // two open logs are perfectly legal at the DB level - that is how a client ended up with 5
+    // rows for one session. Memoise the in-flight insert so concurrent callers share one row.
+    if (logIdPromiseRef.current) return logIdPromiseRef.current;
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-    const { data, error } = await supabase.from("workout_logs").insert({
-      client_id: clientId, day_id: day.id, log_date: today,
-      started_at: new Date().toISOString(), completed: false,
-    }).select("id").single();
-    if (error) throw error;
-    setWorkoutLogId(data.id);
-    return data.id;
+    const p = (async () => {
+      const { data, error } = await supabase.from("workout_logs").insert({
+        client_id: clientId, day_id: day.id, log_date: today,
+        started_at: new Date().toISOString(), completed: false,
+      }).select("id").single();
+      if (error) throw error;
+      setWorkoutLogId(data.id);
+      return data.id as string;
+    })();
+    logIdPromiseRef.current = p;
+    try {
+      return await p;
+    } catch (e) {
+      logIdPromiseRef.current = null; // let a later save retry after a failure
+      throw e;
+    }
   }
 
   const updateSet = useCallback((peId: string, si: number, field: keyof SetData, value: string | boolean) => {
@@ -1679,7 +1696,7 @@ export default function WorkoutLogger({
             <span className="px-2 text-[11px] font-semibold whitespace-nowrap" style={{ color: "rgba(255,255,255,0.7)" }}>{peSets.length} sets</span>
             <button type="button" onClick={() => addSetRow(currentExercise.id)} aria-label="Add set" className="w-9 h-10 flex items-center justify-center text-lg" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.85)" }}>&#65291;</button>
           </div>
-          <button type="button" onClick={logAllCurrentSets} className="flex-1 h-10 rounded-xl text-sm font-semibold text-white" style={{ background: "var(--brand-primary)" }}>Check all</button>
+          <button type="button" onClick={logAllCurrentSets} disabled={saving} className="flex-1 h-10 rounded-xl text-sm font-semibold text-white disabled:opacity-60" style={{ background: "var(--brand-primary)" }}>Check all</button>
           {isTrainerSession && (
             <button type="button" onClick={() => setShowAiNote(true)} className="flex items-center gap-1 px-3 h-10 rounded-xl text-xs font-semibold flex-shrink-0" style={{ background: "rgba(139,92,246,0.16)", color: "#b79cf7", border: "1px solid rgba(139,92,246,0.3)" }}>
               <i className="ti ti-brain text-sm" /> AI note
