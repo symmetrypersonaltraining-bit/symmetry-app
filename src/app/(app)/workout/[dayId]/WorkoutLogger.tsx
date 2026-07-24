@@ -1212,10 +1212,16 @@ export default function WorkoutLogger({
     setSaving(true);
     try {
       const logId = await ensureWorkoutLog();
-      await supabase.from("workout_logs").update({
+      // Must be checked. If this update fails (e.g. it would violate
+      // uq_workout_log_one_completed because another completed log already exists for this
+      // client/day/date) the error used to be discarded, the celebration screen still played,
+      // the draft was cleared, and the scheduled row below was still flipped to "completed" -
+      // leaving a session that looks done on the schedule but counts nowhere.
+      const { error: completeErr } = await supabase.from("workout_logs").update({
         completed: true, completed_at: new Date().toISOString(), status: "Done as planned",
         note: sessionNote || null,
       }).eq("id", logId);
+      if (completeErr) throw completeErr;
       try {
         const __today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
         // Mark the scheduled workout complete. Prefer today's instance; if the
@@ -1257,8 +1263,14 @@ export default function WorkoutLogger({
             .insert({ client_id: clientId, day_id: day.id, scheduled_date: __today, status: "completed", workout_log_id: logId, source: "client_self_assign" });
         }
       } catch {}
+      setSaveError(null);
       setWorkoutComplete(true);
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    } catch (e) {
+      // Previously there was no catch at all: a thrown error escaped as an unhandled rejection
+      // and the Complete button just silently un-greyed with no explanation.
+      console.error(e);
+      setSaveError("Couldn't finish the workout - your sets are saved. Check your connection and tap Complete again.");
     } finally { setSaving(false); }
   }
 
