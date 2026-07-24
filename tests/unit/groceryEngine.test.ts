@@ -203,6 +203,146 @@ describe("raw→cooked conversions — weight-based grains and potatoes", () => 
   });
 });
 
+// ---------------------------------------------------------------------------
+// meals.rotation day_parity metadata — preferred over string parsing.
+// ---------------------------------------------------------------------------
+describe("meals.rotation day_parity — grocery list uses exact metadata amounts", () => {
+  // Same alternating meal as the fixture, but with structured metadata whose
+  // odd amount (5 oz) DIFFERS from the item amount (6 oz) — proves the
+  // metadata, not the string parser, drives the math.
+  const rotMeal = (): PlanMeal => ({
+    ...fixturePlan()[2],
+    rotation: {
+      type: "day_parity",
+      even: { food: "Chicken Breast", amount: 6, unit: "oz" },
+      odd: { food: "Ground Beef 93/7", amount: 5, unit: "oz" },
+    },
+  });
+
+  it("Monday window: chicken 6 oz × 4 even days, beef 5 oz × 3 odd days", () => {
+    const list = buildGroceryList([rotMeal()], MON);
+    assert.equal(list.find((x) => x.food === "Chicken Breast")!.qty, "2 lb raw (32 oz)");
+    // 5 × 3 = 15 cooked → ×4/3 = 20 oz raw (string parser would say 24).
+    assert.equal(list.find((x) => x.food === "Ground Beef 93/7")!.qty, "1 lb 4 oz raw (20 oz)");
+  });
+  it("split flips with the start date (Tuesday: 3 even / 4 odd)", () => {
+    const list = buildGroceryList([rotMeal()], TUE);
+    assert.equal(list.find((x) => x.food === "Chicken Breast")!.qty, "1 lb 8 oz raw (24 oz)");
+    // 5 × 4 = 20 cooked → 26.67 raw.
+    assert.equal(list.find((x) => x.food === "Ground Beef 93/7")!.qty, "1 lb 10.7 oz raw (26.67 oz)");
+  });
+  it("works when the item food is already normalized (no 'A OR B' string)", () => {
+    const m = rotMeal();
+    m.meal_items[0] = { ...m.meal_items[0], food: "Chicken Breast" };
+    const list = buildGroceryList([m], MON);
+    assert.equal(list.find((x) => x.food === "Chicken Breast")!.qty, "2 lb raw (32 oz)");
+    assert.equal(list.find((x) => x.food === "Ground Beef 93/7")!.qty, "1 lb 4 oz raw (20 oz)");
+  });
+  it("metadata 'oz cooked' units mark the alternative cooked (raw conversion applies)", () => {
+    const m = rotMeal();
+    m.meal_items[0] = { ...m.meal_items[0], basis: null, unit: "oz cooked", food: "Chicken Breast OR Ground Beef 93/7" };
+    m.rotation = {
+      type: "day_parity",
+      even: { food: "Chicken Breast", amount: 6, unit: "oz cooked" },
+      odd: { food: "Ground Beef 93/7", amount: 6, unit: "oz cooked" },
+    };
+    const list = buildGroceryList([m], MON);
+    assert.equal(list.find((x) => x.food === "Chicken Breast")!.qty, "2 lb raw (32 oz)");
+    assert.equal(list.find((x) => x.food === "Ground Beef 93/7")!.qty, "1 lb 8 oz raw (24 oz)");
+  });
+  it("weekly rotation metadata is informational — string parser still runs", () => {
+    const m = fixturePlan()[2];
+    m.rotation = { type: "weekly", note: "Week 2 of 3" };
+    const list = buildGroceryList([m], MON);
+    assert.equal(list.find((x) => x.food === "Chicken Breast")!.qty, "2 lb raw (32 oz)");
+    assert.equal(list.find((x) => x.food === "Ground Beef 93/7")!.qty, "1 lb 8 oz raw (24 oz)");
+  });
+  it("malformed day_parity (missing odd) falls back to the string parser", () => {
+    const m = fixturePlan()[2];
+    m.rotation = { type: "day_parity", even: { food: "Chicken Breast", amount: 6, unit: "oz" } };
+    const list = buildGroceryList([m], MON);
+    assert.equal(list.find((x) => x.food === "Chicken Breast")!.qty, "2 lb raw (32 oz)");
+    assert.equal(list.find((x) => x.food === "Ground Beef 93/7")!.qty, "1 lb 8 oz raw (24 oz)");
+  });
+});
+
+describe("meals.rotation day_parity — prep cards", () => {
+  const rotMeal = (): PlanMeal => ({
+    ...fixturePlan()[2],
+    rotation: {
+      type: "day_parity",
+      even: { food: "Chicken Breast", amount: 6, unit: "oz" },
+      odd: { food: "Ground Beef 93/7", amount: 5, unit: "oz" },
+    },
+  });
+
+  it("splits into metadata-labeled versions with real parity container counts", () => {
+    const { cards } = buildPrepCards([rotMeal()], MON);
+    assert.equal(cards.length, 1);
+    const groups = cards[0].groups;
+    assert.equal(groups.length, 2);
+    assert.equal(groups[0].label, "CHICKEN BREAST VERSION");
+    assert.equal(groups[0].containers, 4);
+    assert.equal(groups[1].label, "GROUND BEEF 93/7 VERSION");
+    assert.equal(groups[1].containers, 3);
+  });
+  it("per-container + batch lines use the exact metadata amount (5 oz beef, not 6)", () => {
+    const { cards } = buildPrepCards([rotMeal()], MON);
+    const beef = cards[0].groups[1];
+    assert.equal(beef.items.find((i) => i.food === "Ground Beef 93/7")!.qty, "5 oz cooked (142 g)");
+    assert.equal(
+      beef.batch.find((b) => b.startsWith("Ground Beef")),
+      "Ground Beef 93/7 — cook 15 oz (15 oz) total (from 1 lb 4 oz raw) → 5 oz per container ×3"
+    );
+  });
+  it("container split flips with the start date", () => {
+    const { cards } = buildPrepCards([rotMeal()], TUE);
+    assert.equal(cards[0].groups[0].containers, 3);
+    assert.equal(cards[0].groups[1].containers, 4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Prod verification fixture — Dustin's LIVE plan v2 (0fc5bea1) M2, verbatim
+// from prod meals/meal_items + the meals.rotation jsonb populated 2026-07-24.
+// ---------------------------------------------------------------------------
+describe("Dustin live plan v2 M2 — prod rotation jsonb drives the exact protein split", () => {
+  const dustinM2 = (): PlanMeal => ({
+    id: "40a7a5f5-5175-4f38-b49f-2e6ced80d55a",
+    name: "M2 — Lunch",
+    timing: "8:00–9:00 AM — first break between clients",
+    position: 2,
+    rotation: {
+      type: "day_parity",
+      even: { food: "Chicken Breast", amount: 6, unit: "oz" },
+      odd: { food: "Ground Beef 96/4", amount: 6, unit: "oz" },
+    },
+    meal_items: [
+      { id: "718d48f4", food: "Chicken Breast (even days) OR Ground Beef 96/4 (odd days)", amount: 6, unit: "oz", is_unlimited: false, basis: null, protein: 46, carbs: 0, fats: 7, position: 1 },
+      { id: "6dd28cf1", food: "Basmati Rice", amount: 67.5, unit: "g", is_unlimited: false, basis: null, protein: 2, carbs: 15, fats: 0.2, position: 2 },
+      { id: "13c883f1", food: "Broccoli / Asparagus / Green Beans", amount: 2, unit: "cup", is_unlimited: true, basis: null, protein: 0, carbs: 0, fats: 0, position: 3 },
+    ],
+  });
+  // 7 days from Fri 2026-07-24 → 24,25,26,27,28,29,30 = 4 even / 3 odd.
+  const WEEK: RangeSpec = { startISO: "2026-07-24", days: 7 };
+
+  it("grocery: chicken 6 oz × 4 even days, beef 6 oz × 3 odd days (not cooked → no raw conversion)", () => {
+    const list = buildGroceryList([dustinM2()], WEEK);
+    assert.equal(list.find((x) => x.food === "Chicken Breast")!.qty, "1 lb 8 oz (24 oz)");
+    assert.equal(list.find((x) => x.food === "Ground Beef 96/4")!.qty, "1 lb 2 oz (18 oz)");
+    assert.equal(list.find((x) => x.food === "Chicken Breast")!.group, "protein");
+  });
+  it("prep sheet: both container groups with real parity counts", () => {
+    const { cards } = buildPrepCards([dustinM2()], WEEK);
+    const groups = cards[0].groups;
+    assert.equal(groups.length, 2);
+    assert.equal(groups[0].label, "CHICKEN BREAST VERSION");
+    assert.equal(groups[0].containers, 4);
+    assert.equal(groups[1].label, "GROUND BEEF 96/4 VERSION");
+    assert.equal(groups[1].containers, 3);
+  });
+});
+
 describe("buildPrepCards — alternation versions with real day counts", () => {
   it("alternating meal splits into CHICKEN/BEEF versions, 4/3 containers from a Monday", () => {
     const { cards } = buildPrepCards([fixturePlan()[2]], MON);

@@ -39,12 +39,33 @@ export interface PlanItem {
   position: number;
 }
 
+// meals.rotation jsonb — structured rotation/alternation metadata (additive,
+// null for non-rotating meals). Two shapes (see BUILD_NOTES):
+//   • { type: "day_parity", even: {food, amount, unit}, odd: {food, amount, unit} }
+//     — the meal's alternating item resolves to `even` on even day-of-month
+//     dates and `odd` on odd dates. The grocery/prep engine COMPUTES with this
+//     (exact per-item amounts per parity; string parsing becomes fallback).
+//   • { type: "weekly", note: "Week 2 of 3" } — informational only; weekly
+//     rotation is handled by plan versions + the auto-flip job.
+export interface RotationEntry {
+  food: string;
+  amount: number | null;
+  unit: string | null;
+}
+export interface MealRotation {
+  type: "day_parity" | "weekly";
+  even?: RotationEntry;
+  odd?: RotationEntry;
+  note?: string;
+}
+
 export interface PlanMeal {
   id: string;
   name: string;
   timing: string | null;
   position: number;
   swaps?: string | null;
+  rotation?: MealRotation | null;
   meal_items: PlanItem[];
 }
 

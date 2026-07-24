@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
     supabase.from("clients").select("name").eq("id", clientId).maybeSingle(),
     supabase
       .from("meal_plans")
-      .select("id, version_number, effective_date, meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, position))")
+      .select("id, version_number, effective_date, meals(id, name, timing, position, swaps, rotation, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, position))")
       .eq("client_id", clientId).eq("status", "live").lte("effective_date", today)
       .order("effective_date", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("macro_targets").select("calories, protein, carbs, fats").eq("client_id", clientId)

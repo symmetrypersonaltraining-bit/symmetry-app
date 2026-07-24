@@ -9,18 +9,22 @@
 //   • Prep production sheet stays COOKED (oz first, grams secondary) with
 //     per-container detail + batch cook totals.
 //
-// Alternating meals: the prod schema has no first-class alternation table yet,
-// so the engine reads the existing meals-level convention — an item's food
-// written as "A OR B" (GroceryListSheet's convention), optionally annotated
-// "(even days)" / "(odd days)". Annotated alternatives are counted against the
-// REAL calendar dates in the window (day-of-month parity), so "7 days from an
-// odd start" correctly yields 4/3 splits. Un-annotated "A OR B" items fall
-// back to an even distribution. If Dustin wants richer patterns (Mon/Wed/Fri,
-// week A/week B), the plan data needs a structured meals.rotation jsonb —
-// noted in BUILD_NOTES; this engine is where it would plug in.
+// Alternating meals — two sources, in priority order:
+//   1. STRUCTURED (preferred): meals.rotation jsonb with type "day_parity"
+//      ({ even: {food, amount, unit}, odd: {...} }) gives EXACT per-item
+//      amounts for each parity; the alternating item resolves to the even
+//      entry on even day-of-month dates and the odd entry on odd dates.
+//      "weekly" rotation metadata is informational only (plan versions + the
+//      auto-flip job handle it) and is ignored here.
+//   2. STRING FALLBACK: an item's food written as "A OR B" (GroceryListSheet's
+//      convention), optionally annotated "(even days)" / "(odd days)".
+// Either way, parity alternatives are counted against the REAL calendar dates
+// in the window (day-of-month parity), so "7 days from an odd start" correctly
+// yields 4/3 splits. Un-annotated "A OR B" strings fall back to an even
+// distribution.
 // ============================================================================
 
-import { PlanMeal, PlanItem, kcalOf } from "./dailyTotals";
+import { PlanMeal, PlanItem, MealRotation, RotationEntry, kcalOf } from "./dailyTotals";
 
 export interface RangeSpec {
   startISO: string; // YYYY-MM-DD (America/Chicago logical date)
@@ -92,6 +96,39 @@ export function parityCounts(range: RangeSpec): { even: number; odd: number } {
     if (dt.getUTCDate() % 2 === 0) even++; else odd++;
   }
   return { even, odd };
+}
+
+// Validated meal-level day_parity rotation metadata, or null. "weekly" and
+// malformed payloads (missing even/odd food) return null → string fallback.
+export function dayParityRotation(meal: PlanMeal): (MealRotation & { even: RotationEntry; odd: RotationEntry }) | null {
+  const r = meal.rotation;
+  if (!r || r.type !== "day_parity") return null;
+  if (!r.even?.food || !r.odd?.food) return null;
+  return r as MealRotation & { even: RotationEntry; odd: RotationEntry };
+}
+
+// The plan item a meal-level day_parity rotation resolves: the meal's
+// alternating "A OR B" item if present, else an item whose food exactly
+// matches one of the rotation alternatives (covers later-normalized names).
+export function rotationTarget(
+  meal: PlanMeal,
+  rot: MealRotation & { even: RotationEntry; odd: RotationEntry }
+): PlanItem | null {
+  const items = meal.meal_items || [];
+  return (
+    items.find((it) => !it.is_unlimited && !!parseAlts(it.food)) ??
+    items.find((it) => {
+      const f = (it.food || "").trim().toLowerCase();
+      return f === rot.even.food.trim().toLowerCase() || f === rot.odd.food.trim().toLowerCase();
+    }) ??
+    null
+  );
+}
+
+// Resolve an alternating item to one rotation alternative (exact amount/unit
+// from the metadata; missing fields inherit from the underlying item).
+function resolveRotationEntry(it: PlanItem, e: RotationEntry): PlanItem {
+  return { ...it, food: e.food, amount: e.amount ?? it.amount, unit: e.unit ?? it.unit };
 }
 
 // Days each alternative is eaten within the range.
@@ -182,7 +219,22 @@ export function buildGroceryList(
       }
       if (days <= 0) continue;
       const label = meal.name.split("—")[0].trim() || `Meal ${pos}`;
+      const rot = dayParityRotation(meal);
+      const rotIt = rot ? rotationTarget(meal, rot) : null;
       for (const it of meal.meal_items || []) {
+        // Structured day_parity metadata wins: exact per-parity amounts.
+        if (rot && rotIt && it === rotIt && !it.is_unlimited) {
+          const pc = parityCounts(range);
+          const scale = days / range.days;
+          ([["even", pc.even], ["odd", pc.odd]] as const).forEach(([k, days_k]) => {
+            const res = resolveRotationEntry(it, rot[k]);
+            const n = days_k * scale;
+            if (n <= 0) return;
+            if (res.amount == null) add(res.food, res.unit, isCooked(res), null, true, label);
+            else add(res.food, res.unit, isCooked(res), (Number(res.amount) || 0) * n, false, `${label} · ${Math.round(n)}d`);
+          });
+          continue;
+        }
         const alts = parseAlts(it.food);
         if (alts && it.amount != null && !it.is_unlimited) {
           const counts = altDayCounts(alts, range);
@@ -296,7 +348,18 @@ export function buildPrepCards(
         groups.push({ label, containers, items, perContainer: mm, batch });
       };
 
-      if (altItem) {
+      const rot = dayParityRotation(meal);
+      const rotIt = rot ? rotationTarget(meal, rot) : null;
+      if (rot && rotIt) {
+        // Structured metadata: exact per-parity amounts + real calendar counts.
+        const pc = parityCounts(range);
+        const entries: [RotationEntry, number][] = [[rot.even, pc.even], [rot.odd, pc.odd]];
+        entries.forEach(([e, n]) => {
+          buildGroup(`${e.food.toUpperCase()} VERSION`, Math.round((n * days) / range.days), (it) =>
+            it === rotIt ? resolveRotationEntry(it, e) : it
+          );
+        });
+      } else if (altItem) {
         const alts = parseAlts(altItem.food)!;
         const counts = altDayCounts(alts, range).map((n) => Math.round((n * days) / range.days));
         alts.forEach((alt, i) => {
