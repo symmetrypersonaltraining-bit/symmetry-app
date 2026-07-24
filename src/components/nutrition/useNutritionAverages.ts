@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { computeDayTotals, adherencePct, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
+import { computeDayTotals, adherencePct, isExtraLog, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
 
 export type RangeKey = "1w" | "2w" | "4w" | "8w" | "custom";
 
@@ -96,8 +96,19 @@ export function useNutritionAverages(
     for (const d of days) {
       const t = computeDayTotals(byDate[d], pseudoMeals);
       kcal += t.kcal; p += t.protein; c += t.carbs; f += t.fats;
-      // adherence: avg proration across the day's plan-band logs (positions ≤ 20).
-      const planLogs = byDate[d].filter((l) => l.meal_position <= 20 && !l.item_overrides?.__removed && !l.item_overrides?.__unlogged && !l.item_overrides?.__custom?.unlogged && l.adherence);
+      // adherence: avg proration across the day's PLAN meals only.
+      // `meal_position <= 20` alone is not the plan band: v3 moved quick-add extras out of the
+      // legacy 101+ range into EXTRA_POSITIONS [6, 7], and those rows are written with
+      // adherence "Off-plan", which scores 0.75. So every snack landed inside the adherence
+      // denominator and pulled the number down — log all 6 meals Full, add one Diet Coke, and
+      // the card reported (6 + 0.75) / 7 = 96% instead of 100%. Confirmed on live data.
+      // Reuse the canonical isExtraLog so this agrees with how extras are rendered. Plan
+      // positions for the day are the ones carrying a real meal_id (or an inserted custom meal).
+      const dayLogs = byDate[d];
+      const planPositions = new Set<number>(
+        dayLogs.filter((l) => !!l.meal_id || !!l.item_overrides?.__custom).map((l) => l.meal_position),
+      );
+      const planLogs = dayLogs.filter((l) => l.meal_position <= 20 && !isExtraLog(l, planPositions) && !l.item_overrides?.__removed && !l.item_overrides?.__unlogged && !l.item_overrides?.__custom?.unlogged && l.adherence);
       if (planLogs.length) {
         let s = 0;
         for (const l of planLogs) s += l.adherence === "Off-plan" ? 0.75 : (adherencePct(l.adherence) ?? 0);
