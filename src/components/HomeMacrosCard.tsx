@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { computeDayTotals, PlanMeal, PlanItem, LogRow } from "@/lib/nutrition/dailyTotals";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -36,36 +37,76 @@ export default function HomeMacrosCard() {
         }
       }
       if (!clientId || !on) return;
-      const [logsRes, mtRes, mpRes] = await Promise.all([
+      // For v3 clients the home ring MUST match the Nutrition screen's top card
+      // exactly. That card computes today's totals via computeDayTotals (the
+      // canonical calc). Fetch the same inputs and — when the v3 flag is on —
+      // run the same function so the numbers never diverge. Non-v3 clients keep
+      // the legacy inline proration below.
+      const [logsRes, mtRes, mpRes, settingsRes] = await Promise.all([
         supabase.from("meal_adherence_logs").select("*").eq("client_id", clientId).eq("log_date", today),
         supabase.from("macro_targets").select("*").eq("client_id", clientId).lte("effective_date", today).order("effective_date", { ascending: false }).limit(1),
-        supabase.from("meal_plans").select("id, meals(id, meal_items(protein, carbs, fats))").eq("client_id", clientId).eq("status", "live").lte("effective_date", today).order("effective_date", { ascending: false }).limit(1),
+        supabase.from("meal_plans").select("id, meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, position))").eq("client_id", clientId).eq("status", "live").lte("effective_date", today).order("effective_date", { ascending: false }).limit(1),
+        // Tolerates the column not existing yet (flag stays off → legacy calc).
+        supabase.from("client_app_settings").select("nutrition_v3").eq("client_id", clientId).maybeSingle(),
       ]);
       if (!on) return;
-      const logs = (logsRes.data || []) as { adherence: string; meal_id: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null }[];
       const mt = (mtRes.data || [])[0] as TargetState | undefined;
-      const plan = (mpRes.data || [])[0] as { meals?: { id: string; meal_items?: { protein: number | null; carbs: number | null; fats: number | null }[] }[] } | undefined;
-      const mealMacros: Record<string, { p: number; c: number; f: number }> = {};
-      for (const meal of (plan && plan.meals) || []) {
-        let p = 0, c = 0, f = 0;
-        for (const it of meal.meal_items || []) { p += it.protein || 0; c += it.carbs || 0; f += it.fats || 0; }
-        mealMacros[meal.id] = { p, c, f };
-      }
-      const PCT: Record<string, number> = { "1/4": 0.25, "1/2": 0.5, "3/4": 0.75, "Full": 1, "Partial": 0.5, "Skipped": 0 };
-      let p = 0, c = 0, f = 0, k = 0;
-      for (const log of logs) {
-        if (log.adherence === "Off-plan") {
-          p += log.est_protein || 0; c += log.est_carbs || 0; f += log.est_fats || 0;
-          k += log.est_kcal != null ? log.est_kcal : hmKcal(log.est_protein || 0, log.est_carbs || 0, log.est_fats || 0);
-        } else {
-          const pct = PCT[log.adherence];
-          if (pct && log.meal_id && mealMacros[log.meal_id]) {
-            const m = mealMacros[log.meal_id];
-            p += m.p * pct; c += m.c * pct; f += m.f * pct; k += hmKcal(m.p, m.c, m.f) * pct;
+      const plan = (mpRes.data || [])[0] as {
+        meals?: { id: string; name?: string | null; timing?: string | null; position?: number | null; swaps?: string | null;
+          meal_items?: Array<Record<string, unknown>> }[];
+      } | undefined;
+      const nutritionV3 = (settingsRes.data as { nutrition_v3?: boolean } | null)?.nutrition_v3 === true;
+
+      if (nutritionV3) {
+        // Canonical path — identical to NutritionV3Client's `totals`.
+        const planMeals: PlanMeal[] = (plan?.meals || []).map((m) => ({
+          id: String(m.id),
+          name: String(m.name ?? ""),
+          timing: (m.timing ?? null) as string | null,
+          position: Number(m.position) || 0,
+          swaps: (m.swaps ?? null) as string | null,
+          meal_items: ((m.meal_items || []) as Array<Record<string, unknown>>).map((it): PlanItem => ({
+            id: String(it.id),
+            food: String(it.food || ""),
+            amount: (it.amount ?? null) as number | null,
+            unit: (it.unit ?? null) as string | null,
+            is_unlimited: !!it.is_unlimited,
+            basis: (it.basis ?? null) as string | null,
+            protein: (it.protein ?? null) as number | null,
+            carbs: (it.carbs ?? null) as number | null,
+            fats: (it.fats ?? null) as number | null,
+            position: Number(it.position) || 0,
+          })),
+        }));
+        const t = computeDayTotals((logsRes.data || []) as LogRow[], planMeals);
+        setConsumed({ kcal: t.kcal, protein: t.protein, carbs: t.carbs, fats: t.fats });
+      } else {
+        // Legacy inline proration (unchanged behavior for non-v3 clients).
+        const logs = (logsRes.data || []) as { adherence: string; meal_id: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null }[];
+        const mealMacros: Record<string, { p: number; c: number; f: number }> = {};
+        for (const meal of (plan && plan.meals) || []) {
+          let p = 0, c = 0, f = 0;
+          for (const it of (meal.meal_items || []) as Array<{ protein?: number | null; carbs?: number | null; fats?: number | null }>) {
+            p += it.protein || 0; c += it.carbs || 0; f += it.fats || 0;
+          }
+          mealMacros[meal.id] = { p, c, f };
+        }
+        const PCT: Record<string, number> = { "1/4": 0.25, "1/2": 0.5, "3/4": 0.75, "Full": 1, "Partial": 0.5, "Skipped": 0 };
+        let p = 0, c = 0, f = 0, k = 0;
+        for (const log of logs) {
+          if (log.adherence === "Off-plan") {
+            p += log.est_protein || 0; c += log.est_carbs || 0; f += log.est_fats || 0;
+            k += log.est_kcal != null ? log.est_kcal : hmKcal(log.est_protein || 0, log.est_carbs || 0, log.est_fats || 0);
+          } else {
+            const pct = PCT[log.adherence];
+            if (pct && log.meal_id && mealMacros[log.meal_id]) {
+              const m = mealMacros[log.meal_id];
+              p += m.p * pct; c += m.c * pct; f += m.f * pct; k += hmKcal(m.p, m.c, m.f) * pct;
+            }
           }
         }
+        setConsumed({ kcal: k, protein: p, carbs: c, fats: f });
       }
-      setConsumed({ kcal: k, protein: p, carbs: c, fats: f });
       if (mt) setTarget({ calories: mt.calories || 0, protein: mt.protein || 0, carbs: mt.carbs || 0, fats: mt.fats || 0 });
     })();
     return () => { on = false; };

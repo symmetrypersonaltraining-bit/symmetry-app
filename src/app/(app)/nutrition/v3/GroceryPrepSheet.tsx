@@ -62,8 +62,9 @@ export default function GroceryPrepSheet({
 
   const [busy, setBusy] = useState<"grocery" | "prep" | null>(null);
 
-  // Build the PDF with jsPDF and hand it to the native share sheet (or download
-  // fallback). Always toasts — never a silent no-op. NO window.print().
+  // Build the PDF with jsPDF and hand it off via sharePdf's robust fallback
+  // chain (share → download → open in system browser). Always toasts — never a
+  // silent no-op. NO window.print() (a no-op in the Capacitor WebView).
   async function makePdf(kind: "grocery" | "prep") {
     if (busy) return;
     setBusy(kind);
@@ -74,23 +75,16 @@ export default function GroceryPrepSheet({
       const filename = kind === "grocery" ? "symmetry-grocery.pdf" : "symmetry-meal-prep.pdf";
       const label = kind === "grocery" ? "Grocery List" : "Meal Prep";
       const outcome = await sharePdf(doc, filename, `Symmetry — ${label}`, `Symmetry ${label.toLowerCase()} for ${clientName}`);
-      toast.success(outcome === "shared" ? "Opening share…" : "PDF downloaded ✓", { id: t });
-    } catch (e) {
-      // Some WebViews reject share for non-file reasons or the user cancels —
-      // fall back to a plain download so the button never does nothing.
-      try {
-        const doc = kind === "grocery" ? buildGroceryPdf(ctx) : buildPrepPdf(ctx);
-        const filename = kind === "grocery" ? "symmetry-grocery.pdf" : "symmetry-meal-prep.pdf";
-        const blob = doc.output("blob");
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 4000);
-        toast.success("PDF downloaded ✓", { id: t });
-      } catch {
-        toast.error("Couldn't create the PDF — try again", { id: t });
-      }
+      toast.success(
+        outcome === "shared" ? "Opening share…"
+          : outcome === "opened" ? "Opening PDF…"
+          : "PDF downloaded ✓",
+        { id: t },
+      );
+    } catch {
+      // sharePdf only throws when NOTHING (share/download/open) could hand off
+      // the PDF — surface it so the button is never silent.
+      toast.error("Couldn't open the PDF — try again", { id: t });
     } finally {
       setBusy(null);
     }

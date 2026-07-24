@@ -271,8 +271,22 @@ export function buildPlanPdf(ctx: PdfCtx): jsPDF {
   return d.doc;
 }
 
-// Generate → native share (with the PDF file) → download fallback. Guarded and
-// dependency-injectable so it can be unit-tested. Returns which path ran.
+// Generate the PDF, then run a ROBUST fallback chain so a tap ALWAYS produces a
+// sendable/openable PDF — critical inside the Capacitor Android/iOS WebView,
+// where navigator.share(files) AND <a download> can both silently fail. Order:
+//
+//   (0) Capacitor native shell → go straight to the system browser
+//       (window.open(blobUrl,'_blank'), else location.href = blobUrl), since
+//       thin WebViews commonly block share/download. This hands the real PDF to
+//       Chrome / the OS PDF viewer where the user can Save/Share.
+//   (1) navigator.canShare({files}) → navigator.share({files})
+//   (2) else <a download> (blob URL)
+//   (3) else FINAL fallback: window.open(blobUrl,'_blank'); if null →
+//       window.location.href = blobUrl
+//
+// Every step is guarded (a thrown/blocked step falls through to the next) and
+// dependency-injectable so the chain is unit-testable. Returns which path ran;
+// throws only if literally nothing could hand off the PDF (caller toasts error).
 export async function sharePdf(
   doc: jsPDF,
   filename: string,
@@ -283,31 +297,77 @@ export async function sharePdf(
     docObj?: Document;
     urlObj?: { createObjectURL: (b: unknown) => string; revokeObjectURL: (u: string) => void };
     FileCtor?: typeof File;
+    win?: {
+      open?: (url: string, target?: string) => unknown;
+      location?: { href: string };
+      Capacitor?: { isNativePlatform?: () => boolean };
+    };
   }
-): Promise<"shared" | "downloaded"> {
+): Promise<"shared" | "downloaded" | "opened"> {
   const nav = (deps?.nav ?? (typeof navigator !== "undefined" ? navigator : undefined)) as
     | { canShare?: (d: unknown) => boolean; share?: (d: unknown) => Promise<void> } | undefined;
   const documentObj = deps?.docObj ?? (typeof document !== "undefined" ? document : undefined);
   const URLObj = deps?.urlObj ?? (typeof URL !== "undefined" ? URL : undefined);
   const FileCtor = deps?.FileCtor ?? (typeof File !== "undefined" ? File : undefined);
+  const win = deps?.win ?? (typeof window !== "undefined"
+    ? (window as unknown as NonNullable<NonNullable<Parameters<typeof sharePdf>[4]>["win"]>)
+    : undefined);
 
   const blob = doc.output("blob");
   const file = FileCtor ? new FileCtor([blob], filename, { type: "application/pdf" }) : null;
 
-  if (file && nav?.canShare && nav.canShare({ files: [file] }) && nav.share) {
-    await nav.share({ files: [file], title, text });
-    return "shared";
-  }
-  // Fallback: trigger a download of the blob.
-  if (URLObj && documentObj) {
+  // Hand the PDF to a fresh browser context so the OS/Chrome can display it and
+  // offer Save/Share. Popup blocked (open() returns null) → navigate current
+  // context to the blob URL instead. Returns true if we managed to hand it off.
+  const openExternal = (): boolean => {
+    if (!URLObj) return false;
     const url = URLObj.createObjectURL(blob);
-    const a = documentObj.createElement("a");
-    a.href = url;
-    a.download = filename;
-    documentObj.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URLObj.revokeObjectURL(url), 4000);
+    let handed = false;
+    try {
+      const w = win?.open ? win.open(url, "_blank") : null;
+      if (w) handed = true;
+      else if (win?.location) { win.location.href = url; handed = true; }
+    } catch {
+      try { if (win?.location) { win.location.href = url; handed = true; } } catch { /* noop */ }
+    }
+    // Keep the URL alive long enough for the new context to load it.
+    setTimeout(() => { try { URLObj.revokeObjectURL(url); } catch { /* noop */ } }, 60000);
+    return handed;
+  };
+
+  // (0) Capacitor native shell — prefer the external/system browser.
+  const isNative = !!(win?.Capacitor
+    && typeof win.Capacitor.isNativePlatform === "function"
+    && win.Capacitor.isNativePlatform());
+  if (isNative) {
+    if (openExternal()) return "opened";
   }
-  return "downloaded";
+
+  // (1) Native/web share sheet with the actual file attached.
+  if (file && nav?.canShare && nav.canShare({ files: [file] }) && nav.share) {
+    try {
+      await nav.share({ files: [file], title, text });
+      return "shared";
+    } catch { /* user cancelled or webview blocked share — fall through */ }
+  }
+
+  // (2) <a download> via blob URL.
+  if (URLObj && documentObj) {
+    try {
+      const url = URLObj.createObjectURL(blob);
+      const a = documentObj.createElement("a");
+      a.href = url;
+      a.download = filename;
+      documentObj.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => { try { URLObj.revokeObjectURL(url); } catch { /* noop */ } }, 4000);
+      return "downloaded";
+    } catch { /* download blocked in this webview — fall through to open */ }
+  }
+
+  // (3) FINAL fallback: open the PDF in a new browser context (→ location.href).
+  if (openExternal()) return "opened";
+
+  throw new Error("no-pdf-target");
 }
