@@ -38,7 +38,7 @@ interface MealPlanShape {
   meals: PlanMeal[];
 }
 interface MacroTarget { calories: number; protein: number; carbs: number; fats: number; }
-interface DbLog extends LogRow { id: string; log_date: string; client_id?: string; off_plan_macros?: Record<string, unknown> | null; }
+interface DbLog extends LogRow { id: string; log_date: string; client_id?: string; off_plan_macros?: Record<string, unknown> | null; analysis_status?: string | null; }
 
 interface Props {
   clientId: string;
@@ -1205,6 +1205,7 @@ export default function NutritionV3Client(props: Props) {
         return (
           <AiPlanSheet
             mode={s.mode}
+            clientId={clientId}
             clientName={clientName}
             saving={savingPlan}
             onAccept={async (draft, label) => {
@@ -1230,7 +1231,7 @@ export default function NutritionV3Client(props: Props) {
     }
   }
 
-  async function patchCustom(row: Row, meta: CustomMeta) {
+  async function patchCustom(row: Row, meta: CustomMeta, photoUrl?: string | null) {
     const m = customMealMacros(meta);
     const logged = !meta.unlogged;
     await upsertLog(row.position, {
@@ -1239,6 +1240,7 @@ export default function NutritionV3Client(props: Props) {
       est_kcal: logged ? r(m.kcal) : null, est_protein: logged ? r(m.protein) : null,
       est_carbs: logged ? r(m.carbs) : null, est_fats: logged ? r(m.fats) : null,
       off_plan_details: meta.name, macros_pending: false,
+      ...(photoUrl ? { photo_url: photoUrl } : {}),
       item_overrides: keepOv(row, { __custom: meta, ...(logged ? {} : { __unlogged: true }) }),
     });
   }
@@ -1445,8 +1447,7 @@ export default function NutritionV3Client(props: Props) {
             const meta: CustomMeta = row.meta
               ? { ...row.meta, items: [...row.meta.items, ...items], unlogged: false }
               : { name: OPEN_SLOTS.find((x) => x.position === row.position)?.name || "Meal", items, kind: "slot" };
-            await patchCustom(row, { ...meta, unlogged: false });
-            if (est.photoUrl) await upsertLog(row.position, { photo_url: est.photoUrl });
+            await patchCustom(row, { ...meta, unlogged: false }, est.photoUrl);
             closeAllSheets();
             toast.success("Logged ✓ — totals updated");
             return;
@@ -1461,7 +1462,11 @@ export default function NutritionV3Client(props: Props) {
             est_fats: est.pending ? null : r(est.f),
             macros_pending: !!est.pending,
             photo_url: est.photoUrl ?? null,
-            off_plan_macros: est.pending ? null : { kcal: r(est.k), protein: r(est.p), carbs: r(est.c), fats: r(est.f), description: est.desc, estimated: true },
+            // est_* + off_plan_macros always land together in this ONE write —
+            // photo analyses reuse the analyze route's structured object verbatim
+            // (description/source/restaurant) so the two can never disagree.
+            off_plan_macros: est.pending ? null : est.opm ?? { kcal: r(est.k), protein: r(est.p), carbs: r(est.c), fats: r(est.f), description: est.desc, estimated: true },
+            ...(est.pending ? {} : est.opm ? { analysis_status: "complete" } : {}),
             item_overrides: keepOv(row),
           });
           closeAllSheets();
@@ -1982,9 +1987,10 @@ const CONSULT_QUESTIONS: { q: string; key: string; chips: string[] }[] = [
 ];
 
 function AiPlanSheet({
-  mode, clientName, saving, onAccept, onClose, onBack,
+  mode, clientId, clientName, saving, onAccept, onClose, onBack,
 }: {
   mode: "targets" | "consult";
+  clientId: string;
   clientName: string;
   saving: boolean;
   onAccept: (draft: PlanDraft, label: string) => Promise<void>;
@@ -2004,13 +2010,15 @@ function AiPlanSheet({
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetch("/api/nutrition-ai/plan-build", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const res = await fetch("/api/nutrition-ai/plan-build", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, clientId }) });
       const json = await res.json().catch(() => null);
-      if (!res.ok || !json || json.error || !Array.isArray(json.meals)) {
+      // Route contract: { draft: true, plan: {...} } (tolerate a bare plan too).
+      const plan = json && typeof json.plan === "object" && json.plan ? json.plan : json;
+      if (!res.ok || !json || json.error || !plan || !Array.isArray(plan.meals)) {
         setErr(json?.error || "Couldn't draft a plan right now — try again in a moment (this feature is limited per day).");
         return;
       }
-      setDraft(json as PlanDraft);
+      setDraft(plan as PlanDraft);
     } catch {
       setErr("Network error — check your connection and try again.");
     } finally { setBusy(false); }
@@ -2165,14 +2173,14 @@ function OffPlanFlow({
   clientId: string;
   selectedDate: string;
   title: string;
-  onCommit: (est: { desc: string; k: number; p: number; c: number; f: number; pending?: boolean; photoUrl?: string | null; items?: CustomItem[] }) => Promise<void>;
+  onCommit: (est: { desc: string; k: number; p: number; c: number; f: number; pending?: boolean; photoUrl?: string | null; items?: CustomItem[]; opm?: Record<string, unknown> | null }) => Promise<void>;
   onClose: () => void;
   onBack?: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [mode, setMode] = useState<"pick" | "photo" | "typed">("pick");
   const [busy, setBusy] = useState(false);
-  const [est, setEst] = useState<{ desc: string; k: number; p: number; c: number; f: number; items?: CustomItem[] } | null>(null);
+  const [est, setEst] = useState<{ desc: string; k: number; p: number; c: number; f: number; items?: CustomItem[]; opm?: Record<string, unknown> | null } | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -2214,11 +2222,16 @@ function OffPlanFlow({
     setEst(null);
     try {
       const { base64 } = await compressPhoto(file);
-      const res = await fetch("/api/analyze-meal-photo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageBase64: base64, mimeType: "image/jpeg" }) });
+      // clientId scopes the per-client AI meter server-side; any typed text
+      // rides along as extra context (restaurant names, quantities, ...).
+      const res = await fetch("/api/analyze-meal-photo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageBase64: base64, mimeType: "image/jpeg", clientId, text: text.trim() || undefined }) });
       const json = await res.json().catch(() => null);
       if (!json || json.error) { setErrMsg(json?.error || "Analysis failed — try again or type it instead."); return; }
       const p = Number(json.protein_g) || 0, c = Number(json.carbs_g) || 0, f = Number(json.fat_g ?? json.fats_g) || 0;
-      setEst({ desc: json.description || "Photo meal", k: Number(json.calories) || kcalOf(p, c, f), p, c, f });
+      // Keep the route's structured off_plan_macros (description/source/restaurant)
+      // so the commit write persists exactly what the analysis produced.
+      const opm = json.off_plan_macros && typeof json.off_plan_macros === "object" ? (json.off_plan_macros as Record<string, unknown>) : null;
+      setEst({ desc: json.description || "Photo meal", k: Number(json.calories) || kcalOf(p, c, f), p, c, f, opm });
     } catch {
       setErrMsg("Network error — check your connection and try again.");
     } finally {
