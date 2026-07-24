@@ -40,6 +40,7 @@ export default function AppBottomNav({ items }: { items: NavItem[] }) {
       {items.map((item) => {
         const active = isActive(item);
         const showBadge = item.badge === "messages" && unread > 0;
+        const blink = showBadge; // Messages tab blinks (icon + label) on unread — a 2nd, unmissable notification
         return (
           <Link
             key={item.href}
@@ -52,7 +53,10 @@ export default function AppBottomNav({ items }: { items: NavItem[] }) {
             <span className="relative">
               <i
                 className={`ti ${item.icon} text-xl transition-transform duration-300 ${active ? "scale-110 -translate-y-0.5" : ""}`}
-                style={{ color: active ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}
+                style={{
+                  color: blink ? "#ef4444" : active ? "var(--brand-primary)" : "var(--brand-text-secondary)",
+                  animation: blink ? "cw-blink 1s ease-in-out infinite" : undefined,
+                }}
               />
               {showBadge && (
                 <span
@@ -70,7 +74,10 @@ export default function AppBottomNav({ items }: { items: NavItem[] }) {
             </span>
             <span
               className="text-[10px] font-medium"
-              style={{ color: active ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}
+              style={{
+                color: blink ? "#ef4444" : active ? "var(--brand-primary)" : "var(--brand-text-secondary)",
+                animation: blink ? "cw-blink 1s ease-in-out infinite" : undefined,
+              }}
             >
               {item.label}
             </span>
