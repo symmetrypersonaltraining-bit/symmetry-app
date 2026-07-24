@@ -26,9 +26,9 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   themeColor: "#0F4C81",
-  // Let the on-screen keyboard resize the layout so fixed overlays (workout logger)
-  // rise above it instead of being covered. Chrome/Android; harmless elsewhere.
-  interactiveWidget: "resizes-content",
+  // Keyboard OVERLAYS content instead of resizing/scrolling it, so the workout logger's
+  // pinned sets never move when the keyboard opens. Chrome/Android; harmless elsewhere.
+  interactiveWidget: "overlays-content",
 };
 
 export default function RootLayout({

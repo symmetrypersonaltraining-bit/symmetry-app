@@ -704,18 +704,10 @@ export default function WorkoutLogger({
     catch { touchDevice.current = false; }
   }, []);
   const focusScroll = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
-    const el = e.currentTarget;
-    focusedInputRef.current = el;
-    if (!touchDevice.current) return; // desktop: no keyboard to clear — leave layout alone
-    // Collapse the header + bottom chrome so the on-screen keyboard can't cover the set/rep
-    // inputs. Driven by FOCUS (fires on every device) because some Android WebViews never
-    // resize window.visualViewport, so kbVV stays null and the kbVV-only collapse never runs
-    // (this was the "keyboard covers the boxes" regression). Restore: focusBlur (tapping a
-    // set's check button or another control blurs the input) + the innerHeight poll + the
-    // Capacitor keyboardDidHide listener all set typing=false.
-    setTyping(true);
-    setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 130);
-    setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 350);
+    // The sets are a pinned (non-scrolling) block and the keyboard overlays the area below
+    // them, so focusing a set must NOT scroll or collapse anything — that scroll-to-focus was
+    // exactly what moved the page and hid the earlier sets. Just remember the focused input.
+    focusedInputRef.current = e.currentTarget;
   }, []);
   const focusBlur = useCallback(() => {
     setTimeout(() => {
@@ -1570,8 +1562,10 @@ export default function WorkoutLogger({
           )}
         </div>
 
-        {/* Sets */}
-        <div className="flex-1 overflow-y-auto px-5">
+        {/* Sets — PINNED block (flex-shrink-0, no internal scroll) so the keyboard never
+            compresses or scrolls them. All sets stay fixed and fully visible; the keyboard
+            overlays the (secondary) controls below. Nothing here moves on keyboard state. */}
+        <div className="flex-shrink-0 px-5">
           <div className="flex items-center gap-2 mb-1" style={{ flexWrap: "wrap" }}>
             <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>Track:</span>
             {chipList.map((f) => {
@@ -1646,9 +1640,9 @@ export default function WorkoutLogger({
                 }} inputMode="numeric" />)}
               <button onClick={() => { if (setEntry.done) { updateSet(currentExercise.id, si, "done", false); } else { logSet(currentExercise.id, si); } }}
                 disabled={saving}
-                className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}>
-                <i className={`ti ${setEntry.done ? "ti-check" : "ti-player-play"} text-xl text-white`} />
+                <i className={`ti ${setEntry.done ? "ti-check" : "ti-player-play"} text-lg text-white`} />
               </button>
             </div>
           ))}
@@ -1699,11 +1693,13 @@ export default function WorkoutLogger({
           </div>
         </div></div>
 
-        {/* Bottom controls (Prev/Next/Complete) — always visible; never hidden by keyboard state. */}
-        <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          
-          {/* AI Programming Note moved to a toolbar-opened sheet so it never blocks the sets */}
+        {/* Flexible spacer: absorbs free space so the bar + tab bar sit at the bottom when the
+            keyboard is down, and collapses to nothing when it's up (pushing them behind the
+            keyboard) — the pinned sets above never move either way. */}
+        <div className="flex-1 min-h-0" />
 
+        {/* Bottom controls (Prev/Next/Complete). */}
+        <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           <div className="flex gap-3">
             <button onClick={() => navigateToGlobal(Math.max(0, globalIdx - 1))} disabled={globalIdx === 0}
               className="flex-1 py-3.5 rounded-2xl text-sm font-semibold transition-all"
