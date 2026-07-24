@@ -1326,7 +1326,7 @@ export default function WorkoutLogger({
     for (const f of xFields) if (!chipList.includes(f) && ["weight", "reps", "time", "speed", "hr", "each_side"].includes(f)) chipList.push(f);
 
     return (
-      <div className="fixed inset-0 flex flex-col z-[999]" style={{ background: "var(--session-bg)", ...(kbVV ? { top: kbVV.top, height: kbVV.height, bottom: "auto" } : {}) }}>
+      <div className="fixed inset-0 flex flex-col z-[999]" style={{ background: "var(--session-bg)" }}>
         {/* Set-pop + PR-glow overlay (pointer-events:none, cannot block logging). Revert = remove this line. */}
         <SetFeedback sets={sets} prevByPe={prevByPe} />
         {/* Keep the phone screen awake during an active session. Isolated; no-ops where unsupported. Revert = remove this line. */}
@@ -1574,8 +1574,8 @@ export default function WorkoutLogger({
           </div>
         </div></div>
 
-        {/* Bottom controls */}
-        <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", display: (kbVV || typing) ? "none" : undefined }}>
+        {/* Bottom controls (Prev/Next/Complete) — always visible; never hidden by keyboard state. */}
+        <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           
           {/* Trainer AI note */}
           {isTrainerSession && (
@@ -1627,7 +1627,7 @@ export default function WorkoutLogger({
             )}
           </div>
         </div>
-        <div className="flex-shrink-0 flex" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0c1626", paddingBottom: "env(safe-area-inset-bottom)", display: (kbVV || typing) ? "none" : undefined }}>
+        <div className="flex-shrink-0 flex" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0c1626", paddingBottom: "env(safe-area-inset-bottom)" }}>
           {(isTrainerSession
             ? [
                 { href: "/home", icon: "ti-home", label: "Home" },
