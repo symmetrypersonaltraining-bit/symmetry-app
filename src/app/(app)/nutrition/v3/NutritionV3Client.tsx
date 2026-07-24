@@ -1961,6 +1961,29 @@ function OffPlanFlow({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
+  const [listening, setListening] = useState(false);
+
+  function startMic() {
+    // Voice logging: dictate into the typed flow (Web Speech API where available).
+    const w = window as unknown as { webkitSpeechRecognition?: new () => any; SpeechRecognition?: new () => any };
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SR) { setMode("typed"); toast("Voice input isn't supported on this device — type it instead"); return; }
+    try {
+      const rec = new SR();
+      rec.lang = "en-US";
+      rec.interimResults = false;
+      rec.onresult = (ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
+        const heard = Array.from(ev.results as ArrayLike<ArrayLike<{ transcript: string }>>).map((rr) => rr[0]?.transcript || "").join(" ").trim();
+        setListening(false);
+        if (heard) { setMode("typed"); setText((t) => (t ? t + ", " : "") + heard); }
+      };
+      rec.onerror = () => { setListening(false); setMode("typed"); };
+      rec.onend = () => setListening(false);
+      setListening(true);
+      setMode("typed");
+      rec.start();
+    } catch { setListening(false); setMode("typed"); }
+  }
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -2038,12 +2061,19 @@ function OffPlanFlow({
           {rowBtn("📷", "Snap a photo", "Restaurant & receipt aware — detects chains for official data", () => fileRef.current?.click())}
           {rowBtn("⌨", "Type foods with amounts", '"8 oz chicken, 1 cup rice" → AI parses each item', () => setMode("typed"))}
           {rowBtn("✏️", "Describe it loosely", '"chipotle bowl, double chicken, no rice"', () => setMode("typed"))}
+          {rowBtn("🎤", "Say it out loud", "Voice logging → transcript → estimate", startMic)}
         </>
       )}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
 
       {mode === "typed" && !est && (
         <>
+          {listening && (
+            <div className="flex items-center gap-3 rounded-2xl p-3 mb-2" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+              <span style={{ fontSize: 18 }}>🎤</span>
+              <span className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>Listening… say what you ate</span>
+            </div>
+          )}
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3}
             placeholder="e.g. 8 oz chicken breast, 1 cup jasmine rice, 1 tbsp olive oil — or 'chipotle bowl, double chicken'"
             style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 12, padding: "10px 12px", fontSize: 13, width: "100%", outline: "none", resize: "none", fontFamily: "inherit" }} />
