@@ -35,6 +35,7 @@ interface MealPlanShape {
   id: string;
   version_number: number;
   effective_date?: string | null;
+  title?: string | null;
   meals: PlanMeal[];
 }
 interface MacroTarget { calories: number; protein: number; carbs: number; fats: number; }
@@ -68,6 +69,7 @@ type SheetState =
   | { kind: "extrapick" }
   | { kind: "saveplan" }
   | { kind: "aiplan"; mode: "targets" | "consult" }
+  | { kind: "buildplan" }
   | null;
 
 interface Row {
@@ -174,7 +176,7 @@ export default function NutritionV3Client(props: Props) {
   const [coachDismissed, setCoachDismissed] = useState(false);
   const [coachOn, setCoachOn] = useState(true);
   const [coachApi, setCoachApi] = useState<{ message: string; kind?: string } | null>(null);
-  const [versions, setVersions] = useState<{ id: string; version_number: number | null; effective_date: string | null; status: string | null; change_reason: string | null; title?: string | null }[]>([]);
+  const [versions, setVersions] = useState<{ id: string; version_number: number | null; effective_date: string | null; status: string | null; change_reason: string | null; title?: string | null; created_by_client?: boolean | null }[]>([]);
   const [optSel, setOptSel] = useState<Record<number, string>>({}); // position → meal_id (option slots, pre-log)
   const [popKey, setPopKey] = useState<string | null>(null);
   // Unified summary-card range: "today" (live) or a range key (averages).
@@ -851,7 +853,7 @@ export default function NutritionV3Client(props: Props) {
     openSheet({ kind: "versions" });
     const { data } = await supabase
       .from("meal_plans")
-      .select("id, version_number, effective_date, status, change_reason, title")
+      .select("id, version_number, effective_date, status, change_reason, title, created_by_client")
       .eq("client_id", clientId)
       .order("effective_date", { ascending: false })
       .limit(12);
@@ -861,46 +863,47 @@ export default function NutritionV3Client(props: Props) {
   // ---- open-plan → real plan ---------------------------------------------
   const [savingPlan, setSavingPlan] = useState(false);
 
-  // Shared insert path (manual save-my-day AND accepted AI drafts) — reuses the
-  // existing meal_plans → meals → meal_items → macro_targets insert pattern.
+  // Shared switch path (manual save-my-day AND accepted AI drafts). Goes through
+  // the server /api/nutrition/adopt-plan route, which — with the service-role
+  // client — ARCHIVES the client's current live plan (trainer-authored or not;
+  // preserved + restorable) and installs this one marked created_by_client. This
+  // is why plan clients can switch to their own plan even though RLS won't let
+  // them archive trainer rows directly.
   async function insertPlanFromDraft(
     planName: string,
     effective: string,
     targets: Macros,
     draftMeals: { name: string; timing: string | null; items: { food: string; amount: number | null; unit: string | null; p: number; c: number; f: number; free?: boolean; basis?: string | null }[] }[],
-    reason: string
+    source: "ai" | "manual"
   ): Promise<boolean> {
-    const { data: prev } = await supabase.from("meal_plans").select("version_number").eq("client_id", clientId).order("version_number", { ascending: false }).limit(1).maybeSingle();
-    const nextVer = ((prev as { version_number?: number } | null)?.version_number || 0) + 1;
-    const { data: mp, error: mpErr } = await supabase.from("meal_plans").insert({
-      client_id: clientId, version_number: nextVer, effective_date: effective, status: "live",
-      change_reason: reason,
-    }).select().single();
-    if (mpErr || !mp) { toast.error("Couldn't create the plan — " + (mpErr?.message || "unknown error").slice(0, 80)); return false; }
-    const planId = (mp as { id: string }).id;
-    for (let i = 0; i < draftMeals.length; i++) {
-      const dm = draftMeals[i];
-      const { data: mealRow, error: mealErr } = await supabase.from("meals").insert({
-        meal_plan_id: planId, name: dm.name || `Meal ${i + 1}`, timing: dm.timing, position: i + 1, swaps: null,
-      }).select().single();
-      if (mealErr || !mealRow) continue;
-      const mealId = (mealRow as { id: string }).id;
-      const itemsPayload = dm.items.map((it, j) => ({
-        meal_id: mealId, food: it.food, amount: it.amount ?? 1, unit: it.unit || "serving",
-        is_unlimited: !!it.free, basis: it.basis === "cooked" || it.basis === "raw" ? it.basis : null,
-        protein: r(it.p || 0), carbs: r(it.c || 0), fats: r(it.f || 0),
-        position: j + 1,
-      }));
-      if (itemsPayload.length) await supabase.from("meal_items").insert(itemsPayload);
+    try {
+      const res = await fetch("/api/nutrition/adopt-plan", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId, title: planName, effectiveDate: effective, source,
+          targets: { calories: r(targets.kcal), protein: r(targets.protein), carbs: r(targets.carbs), fats: r(targets.fats) },
+          meals: draftMeals.map((dm) => ({
+            name: dm.name, timing: dm.timing,
+            items: dm.items.map((it) => ({
+              food: it.food, amount: it.amount ?? null, unit: it.unit || null,
+              basis: it.basis === "cooked" || it.basis === "raw" ? it.basis : null,
+              protein: it.p || 0, carbs: it.c || 0, fats: it.f || 0, is_unlimited: !!it.free,
+            })),
+          })),
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json || json.error || !json.planId) {
+        toast.error((json && json.error) || "Couldn't switch plans — try again"); return false;
+      }
+      closeAllSheets();
+      toast.success(`🎯 ${planName} is live — your previous plan is saved to history. Targets now feed everything.`, { duration: 4200 });
+      // page.tsx picks the latest live plan by effective_date — reload to switch over.
+      setTimeout(() => { try { window.location.reload(); } catch { /* noop */ } }, 1600);
+      return true;
+    } catch {
+      toast.error("Network error — check your connection and try again"); return false;
     }
-    await supabase.from("macro_targets").insert({
-      client_id: clientId, calories: r(targets.kcal), protein: r(targets.protein),
-      carbs: r(targets.carbs), fats: r(targets.fats), effective_date: effective,
-    });
-    closeAllSheets();
-    toast.success(`🎯 ${planName} is live (v${nextVer}) — targets now feed your macro bar & charts`, { duration: 4200 });
-    setTimeout(() => { try { window.location.reload(); } catch { /* noop */ } }, 1800);
-    return true;
   }
 
   async function saveDayAsPlan(planName: string, effective: string) {
@@ -920,7 +923,7 @@ export default function NutritionV3Client(props: Props) {
           })),
         };
       });
-      await insertPlanFromDraft(planName, effective, totalsAll, draftMeals, `Client-built plan from open logging (${planName})`);
+      await insertPlanFromDraft(planName, effective, totalsAll, draftMeals, "manual");
     } finally { setSavingPlan(false); }
   }
 
@@ -1405,6 +1408,7 @@ export default function NutritionV3Client(props: Props) {
       case "versions": return <VersionsSheetView />;
       case "forward": return <ForwardSheetView />;
       case "extrapick": return <ExtraPickSheetView />;
+      case "buildplan": return <BuildPlanSheetView />;
       case "saveplan": return <SavePlanSheetView />;
       case "aiplan":
         return (
@@ -1424,7 +1428,7 @@ export default function NutritionV3Client(props: Props) {
                     name: dm.name, timing: dm.timing,
                     items: dm.items.map((it) => ({ food: it.food, amount: it.amount, unit: it.unit, p: it.p, c: it.c, f: it.f })),
                   })),
-                  `Client-accepted AI draft (${label})`
+                  "ai"
                 );
               } finally { setSavingPlan(false); }
             }}
@@ -1904,6 +1908,7 @@ export default function NutritionV3Client(props: Props) {
     return (
       <Sheet title="Plan menu" subtitle={`${clientName}${mealPlan ? ` · plan v${mealPlan.version_number} (live)` : " · open plan"}`} onClose={closeAllSheets}>
         {mealPlan && rowBtn("🛒", "Grocery & Prep", "Shopping list + prep sheet · Grocery PDF / Meal Prep PDF to send", () => { closeAllSheets(); setShowGrocery(true); })}
+        {rowBtn("✦", "Build my own plan with AI", mealPlan ? "Switch to your own plan — your current one is saved to history" : "Design your plan from scratch", () => replaceSheet({ kind: "buildplan" }))}
         {rowBtn("📈", "Trends", "Averages + the same charts as today's progress page", () => replaceSheet({ kind: "trends" }))}
         {rowBtn("🗂", "Plan versions", "Current live + staged incoming — flips at midnight CT", () => { backSheet(); openVersions(); })}
         {mealPlan && rowBtn("📅", "Week ahead", "Forward view · 1w / 4w / 8w / custom", () => replaceSheet({ kind: "forward" }))}
@@ -1931,16 +1936,27 @@ export default function NutritionV3Client(props: Props) {
 
   function VersionsSheetView() {
     return (
-      <Sheet title="Plan versions" subtitle="Live plan + staged incoming — auto-flips at midnight CT" onClose={closeAllSheets}>
+      <Sheet title="Plan versions" subtitle="Live plan + history — your old plans stay here" onClose={closeAllSheets}>
+        <button onClick={() => replaceSheet({ kind: "buildplan" })} className="w-full flex items-center gap-3 rounded-2xl p-3 mb-3 text-left" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-primary)" }}>
+          <span className="flex items-center justify-center flex-shrink-0" style={{ width: 34, height: 34, borderRadius: 10, background: "var(--brand-surface)", fontSize: 15, color: "var(--brand-primary)" }}>✦</span>
+          <span className="text-sm font-semibold min-w-0" style={{ color: "var(--brand-text)" }}>
+            Build my own plan with AI
+            <span className="block text-xs font-normal" style={{ color: "var(--brand-text-secondary)" }}>Switch to your own — this plan is archived here, restorable anytime</span>
+          </span>
+          <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
+        </button>
         {versions.length === 0 && <p className="text-sm py-3 text-center" style={{ color: "var(--brand-text-secondary)" }}>Loading…</p>}
         {versions.map((v) => {
           const isLive = v.status === "live" && mealPlan?.id === v.id;
           const pending = (v.effective_date || "") > today;
           return (
             <div key={v.id} className="rounded-2xl p-3 mb-2" style={{ background: "var(--brand-bg)", border: `1px solid ${isLive ? "rgba(34,197,94,0.5)" : "var(--brand-border)"}` }}>
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>{planLabel(v)}</p>
-                <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 6, background: isLive ? "rgba(34,197,94,0.18)" : pending ? "rgba(198,158,60,0.18)" : "var(--brand-surface)", color: isLive ? GREEN : pending ? GOLD : "var(--brand-text-secondary)" }}>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold min-w-0" style={{ color: "var(--brand-text)" }}>
+                  {planLabel(v)}
+                  {v.created_by_client && <span style={{ marginLeft: 6, fontSize: 8.5, fontWeight: 800, background: "rgba(66,165,245,0.16)", color: BLUE, padding: "2px 6px", borderRadius: 5, verticalAlign: "middle" }}>BUILT BY YOU</span>}
+                </p>
+                <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 6, flexShrink: 0, background: isLive ? "rgba(34,197,94,0.18)" : pending ? "rgba(198,158,60,0.18)" : "var(--brand-surface)", color: isLive ? GREEN : pending ? GOLD : "var(--brand-text-secondary)" }}>
                   {isLive ? "LIVE" : pending ? `PENDING · EFF ${v.effective_date}` : "ARCHIVED"}
                 </span>
               </div>
@@ -1950,6 +1966,35 @@ export default function NutritionV3Client(props: Props) {
             </div>
           );
         })}
+      </Sheet>
+    );
+  }
+
+  function BuildPlanSheetView() {
+    const rowBtn = (ic: string, lab: string, sub: string, fn: () => void, primary?: boolean) => (
+      <button onClick={fn} className="w-full flex items-center gap-3 rounded-2xl p-3 mb-1.5 text-left" style={{ background: "var(--brand-bg)", border: `1px solid ${primary ? "var(--brand-primary)" : "var(--brand-border)"}` }}>
+        <span className="flex items-center justify-center flex-shrink-0" style={{ width: 34, height: 34, borderRadius: 10, background: "var(--brand-surface)", fontSize: 15, color: primary ? "var(--brand-primary)" : undefined }}>{ic}</span>
+        <span className="text-sm font-semibold min-w-0" style={{ color: "var(--brand-text)" }}>
+          {lab}<span className="block text-xs font-normal" style={{ color: "var(--brand-text-secondary)" }}>{sub}</span>
+        </span>
+        <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
+      </button>
+    );
+    return (
+      <Sheet title="Build my own plan" subtitle={mealPlan ? "Switch to a plan you build — current plan saved to history" : "Design your plan"} onClose={closeAllSheets} onBack={backSheet}>
+        {mealPlan && (
+          <div className="rounded-xl p-2.5 mb-3 text-xs leading-relaxed" style={{ background: "rgba(66,165,245,0.08)", border: "1px solid rgba(66,165,245,0.35)", color: "var(--brand-text)" }}>
+            Your current plan (<b>{mealPlan.title || `v${mealPlan.version_number}`}</b>) is <b>archived, not deleted</b> — it stays in Plan versions and can be restored anytime.
+          </div>
+        )}
+        {rowBtn("✦", "Recommend my targets", "3 quick questions → coach picks your macros, then builds 5 meals", () => replaceSheet({ kind: "aiplan", mode: "consult" }), true)}
+        {rowBtn("✦", "Build from my targets", "Enter kcal / P / C / F → AI drafts 5 itemized meals", () => replaceSheet({ kind: "aiplan", mode: "targets" }))}
+        {openMode
+          ? rowBtn("🛠", "Save the day I built", "Turn the slots you built today into your ongoing plan", () => replaceSheet({ kind: "saveplan" }))
+          : rowBtn("🥗", "Build manually from the food database", "Start an open day, build each meal from the DB, then save it as your plan", () => { closeAllSheets(); toast("Manual build: log an open day, then use ‘Save the day I built’ ✦", { duration: 4000 }); })}
+        <p className="text-xs mt-2" style={{ color: "var(--brand-text-secondary)" }}>
+          After switching, one-tap logging, grocery/prep and every chart follow your new plan.
+        </p>
       </Sheet>
     );
   }
