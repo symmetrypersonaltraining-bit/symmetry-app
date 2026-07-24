@@ -30,14 +30,15 @@ function mapRow(raw: Record<string, unknown>, fromCatalog: boolean): CatalogFood
     id: String(raw.id),
     name: String(raw.name ?? raw.food ?? ""),
     brand: (raw.brand as string) ?? null,
-    serving: (raw.serving ?? raw.serving_size ?? null) as string | null,
+    // food_catalog uses serving_desc; the legacy foods table uses serving.
+    serving: (raw.serving_desc ?? raw.serving ?? raw.serving_size ?? null) as string | null,
     protein: n(raw.protein ?? raw.protein_g),
     carbs: n(raw.carbs ?? raw.carbs_g),
     fats: n(raw.fats ?? raw.fat ?? raw.fat_g),
     kcal: raw.kcal != null || raw.calories != null ? n(raw.kcal ?? raw.calories) : null,
     verified: (raw.verified as boolean) ?? null,
     source: (raw.source as string) ?? (fromCatalog ? null : "foods"),
-    client_id: (raw.client_id as string) ?? null,
+    client_id: (raw.created_by_client_id as string) ?? (raw.client_id as string) ?? null,
   };
 }
 
@@ -78,7 +79,7 @@ export default function FoodSearchSheet({
         try {
           let query = supabase.from("food_catalog").select("*").limit(10);
           if (term.length >= 2) query = query.ilike("name", "%" + term + "%");
-          if (tab === "mine") query = query.eq("client_id", clientId);
+          if (tab === "mine") query = query.eq("created_by_client_id", clientId);
           const { data, error } = await query;
           if (error) throw error;
           catalogOk.current = true;
@@ -125,7 +126,15 @@ export default function FoodSearchSheet({
     try {
       const { data } = await supabase
         .from("food_catalog")
-        .insert({ client_id: clientId, name: cf.name.trim(), serving: cf.serving || "1 serving", protein: p, carbs: c, fats: f, source: "client", verified: false })
+        .insert({
+          created_by_client_id: clientId,
+          name: cf.name.trim(),
+          serving_desc: cf.serving || "1 serving",
+          kcal: kcalOf(p, c, f),
+          protein: p, carbs: c, fats: f,
+          source: "client",
+          verified: false,
+        })
         .select()
         .single();
       id = (data as { id?: string } | null)?.id ?? null;

@@ -197,7 +197,12 @@ export default function NutritionV3Client(props: Props) {
   async function saveMyMeal(name: string, items: CustomItem[]) {
     if (!myMealsOk) return;
     try {
-      const { data } = await supabase.from("my_meals").insert({ client_id: clientId, name, items }).select().single();
+      const t = customMealMacros({ name, items });
+      const { data } = await supabase
+        .from("my_meals")
+        .insert({ client_id: clientId, name, items, totals: { kcal: r(t.kcal), protein: r(t.protein), carbs: r(t.carbs), fats: r(t.fats) } })
+        .select()
+        .single();
       if (data) setMyMeals((prev) => [{ id: String((data as { id: string }).id), name, items }, ...prev]);
     } catch { /* table not ready — non-fatal */ }
   }
