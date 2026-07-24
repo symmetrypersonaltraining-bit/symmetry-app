@@ -22,6 +22,7 @@ import { parseFoodText } from "@/lib/nutrition/parseClient";
 import Sheet from "./Sheet";
 import FoodSearchSheet from "./FoodSearchSheet";
 import ComposerSheet from "./ComposerSheet";
+import CoachChatSheet from "./CoachChatSheet";
 import GroceryListSheet from "../GroceryListSheet";
 import PlanRangeView from "../PlanRangeView";
 import AveragesStrip from "@/components/nutrition/AveragesStrip";
@@ -1120,6 +1121,21 @@ export default function NutritionV3Client(props: Props) {
       {/* ==================== SHEETS ==================== */}
       {sheet && renderSheet(sheet)}
       {showGrocery && mealPlan && <GroceryListSheet plan={{ id: mealPlan.id, meals: planMeals as never }} onClose={() => setShowGrocery(false)} />}
+
+      {/* floating ✦ coach chat — today only ("Apply to today" writes an extras
+          row on the visible date); hidden by the Coach toggle and by
+          client_app_settings.coach_enabled (checked inside the component). */}
+      {coachOn && selectedDate === today && (
+        <CoachChatSheet
+          clientId={clientId}
+          onApplySuggestion={async (s) => {
+            await addExtra(
+              [{ n: s.label, p: s.delta.p, c: s.delta.c, f: s.delta.f, k: s.delta.kcal || kcalOf(s.delta.p, s.delta.c, s.delta.f), est: true }],
+              s.label
+            );
+          }}
+        />
+      )}
     </div>
   );
 
