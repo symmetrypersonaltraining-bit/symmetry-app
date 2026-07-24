@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import MealPlanClient from "../../nutrition/MealPlanClient";
+import NutritionV3Client from "../../nutrition/v3/NutritionV3Client";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -28,10 +29,21 @@ export default async function ClientPreviewNutritionPage() {
   const clientName = clientRecord.name || "Dustin";
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
+  // Feature flag: client_app_settings.nutrition_v3 → new one-tap logger (same as /nutrition).
+  let nutritionV3 = false;
+  try {
+    const { data: settings } = await supabase
+      .from("client_app_settings")
+      .select("nutrition_v3")
+      .eq("client_id", clientId)
+      .maybeSingle();
+    nutritionV3 = (settings as any)?.nutrition_v3 === true;
+  } catch { nutritionV3 = false; }
+
   const [mpRes, tlRes, mtRes, wlRes] = await Promise.all([
     supabase
       .from("meal_plans")
-      .select("id, version_number, meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, position))")
+      .select("id, version_number, title, meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, position))")
       .eq("client_id", clientId)
       .eq("status", "live")
       .lte("effective_date", today)
@@ -58,6 +70,30 @@ export default async function ClientPreviewNutritionPage() {
       .gte("log_date", new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0])
       .order("log_date", { ascending: false }),
   ]);
+
+  if (nutritionV3) {
+    const { data: inc } = await supabase
+      .from("meal_plans")
+      .select("id, version_number, effective_date, change_reason, title")
+      .eq("client_id", clientId)
+      .gt("effective_date", today)
+      .order("effective_date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    return (
+      <NutritionV3Client
+        clientId={clientId}
+        clientName={clientName}
+        mealPlan={mpRes.data as any}
+        incomingPlan={(inc || null) as any}
+        todayLogs={tlRes.data || []}
+        macroTarget={mtRes.data as any}
+        today={today}
+        isTrainer={false}
+      />
+    );
+  }
 
   return (
     <>
