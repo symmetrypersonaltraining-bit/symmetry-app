@@ -649,120 +649,31 @@ export default function WorkoutLogger({
   const [showAiNote, setShowAiNote] = useState(false);
   const [showCue, setShowCue] = useState(false);
 
-  // --- Keyboard-aware session logger: when the on-screen keyboard opens the visual viewport
-  // shrinks but a position:fixed overlay does not, so the active input + bottom bars end up
-  // behind the keyboard. Bind the fixed logger to the visual viewport and center the focused
-  // input above it. Isolated; no-ops on desktop / where unsupported. Revert = remove this block. ---
-  const [kbVV, setKbVV] = useState<{ top: number; height: number } | null>(null);
-  const kbWasOpen = useRef(false);
-  useEffect(() => {
-    const vp = typeof window !== "undefined" ? window.visualViewport : null;
-    if (!vp || !sessionMode) { setKbVV(null); return; }
-    const onVV = () => {
-      const covered = window.innerHeight - vp.height;
-      if (covered > 120) {
-        kbWasOpen.current = true;
-        setKbVV({ top: vp.offsetTop, height: vp.height });
-      } else {
-        setKbVV(null);
-        // Viewport grew back = keyboard closed. If it had actually been open,
-        // restore the collapsed header. This CANNOT fire while the keyboard is up
-        // (the viewport would still be shrunk), so it never kicks you out mid-typing.
-        if (kbWasOpen.current) { kbWasOpen.current = false; setTyping(false); }
-      }
-    };
-    onVV();
-    vp.addEventListener("resize", onVV);
-    vp.addEventListener("scroll", onVV);
-    return () => { vp.removeEventListener("resize", onVV); vp.removeEventListener("scroll", onVV); };
-  }, [sessionMode]);
-  // Native keyboard "did hide" (Capacitor Keyboard plugin, if bundled in the app):
-  // the definitive close signal on Android/iOS — fires even when the input keeps
-  // focus (back-button / swipe-down dismiss) and the height signals don't. Guarded:
-  // no-op if the plugin isn't present, so it can only ever HELP restore the header.
-  useEffect(() => {
-    if (!sessionMode) return;
-    let removed = false;
-    let handle: { remove?: () => void } | null = null;
-    try {
-      const kb = (window as unknown as { Capacitor?: { Plugins?: { Keyboard?: { addListener?: (e: string, cb: () => void) => unknown } } } }).Capacitor?.Plugins?.Keyboard;
-      if (kb && typeof kb.addListener === "function") {
-        Promise.resolve(kb.addListener("keyboardDidHide", () => { setTyping(false); setKbVV(null); kbWasOpen.current = false; }))
-          .then((h) => { if (removed) { try { (h as { remove?: () => void })?.remove?.(); } catch { /* noop */ } } else handle = h as { remove?: () => void }; })
-          .catch(() => { /* noop */ });
-      }
-    } catch { /* plugin absent — web-layer recovery handles it */ }
-    return () => { removed = true; try { handle?.remove?.(); } catch { /* noop */ } };
-  }, [sessionMode]);
+  // --- Keyboard handling: DELIBERATELY EMPTY ---------------------------------------------
+  // HARD RULE: nothing in the session view may be shown, hidden, moved or scrolled based on
+  // keyboard state. Two years of logger bugs came from exactly that. The sets are a pinned
+  // (non-shrinking) block and the keyboard simply overlays the secondary content below them.
+  //
+  // What used to live here and why it is gone (2026-07-25): a visualViewport listener set a
+  // `kbVV` state, and an effect keyed on it called
+  //   el.scrollIntoView({ block: "start", behavior: "smooth" })
+  // on the focused input ~90ms after the keyboard opened. That is the banned scroll-to-focus
+  // that 48d246f removed from focusScroll - it had simply survived in a second code path.
+  // It was also self-retriggering: the listener was bound to the visual viewport's `scroll`
+  // event and stored a NEW object each time, so scrollIntoView -> scroll event -> new kbVV ->
+  // scrollIntoView, a smooth-scroll fight for as long as the keyboard was open.
+  //
+  // The companion `typing` state was already dead: setTyping(true) existed nowhere in the file,
+  // so the recovery-poll interval, the touch-device guard and the innerHeight baseline could
+  // never run. All of it removed; kbVV had no other consumer anywhere in the JSX.
+  //
+  // Keep focusScroll/focusBlur as inert handlers so the ~40 input call sites are untouched.
   const focusedInputRef = useRef<HTMLInputElement | null>(null);
-  // `typing` = a set input is focused. Drives the keyboard-safe layout WITHOUT relying on
-  // visualViewport/keyboard detection (which some iOS webviews don't report): when typing we
-  // collapse the header + bottom chrome and pull the focused box to the top of the screen,
-  // so it always clears the keyboard. Isolated; revert = remove `typing` usage.
-  const [typing, setTyping] = useState(false);
-  // Desktop guard (Mac/PC bug fix): the keyboard-safe collapse + recovery poll must ONLY
-  // run where an on-screen keyboard can exist. On desktop the poll sees "keyboard down"
-  // immediately and force-blurred every input ~1.2s after focus (notes field kicked users
-  // out mid-typing). Coarse pointer = touch device; fine pointer = physical keyboard.
-  const touchDevice = useRef(false);
-  useEffect(() => {
-    try { touchDevice.current = window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1; }
-    catch { touchDevice.current = false; }
-  }, []);
   const focusScroll = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
-    // The sets are a pinned (non-scrolling) block and the keyboard overlays the area below
-    // them, so focusing a set must NOT scroll or collapse anything — that scroll-to-focus was
-    // exactly what moved the page and hid the earlier sets. Just remember the focused input.
+    // Remember the focused input only. MUST NOT scroll, collapse or reposition anything.
     focusedInputRef.current = e.currentTarget;
   }, []);
-  const focusBlur = useCallback(() => {
-    setTimeout(() => {
-      const a = document.activeElement as HTMLElement | null;
-      if (!a || a.tagName !== "INPUT") setTyping(false);
-    }, 120);
-  }, []);
-  // Keyboard-close recovery v5 (7/16). CRITICAL FIX: the v4 time-based fallback
-  // (`elapsed > 1200`) blurred the focused input on devices where the keyboard does NOT
-  // shrink innerHeight (iOS / overlay keyboards) — it read "never shrank" as "keyboard
-  // gone" and kicked focus out mid-typing (Tyler couldn't log reps). Now we restore the
-  // header ONLY after a real shrink -> sustained grow-back, which unambiguously means the
-  // keyboard opened and then closed. If the keyboard never shrank the screen on this
-  // device, `opened` stays false and we NEVER touch focus — the user types freely; a
-  // genuine close still blurs the input and focusBlur restores the header. No timer guess.
-  const kbBaseH = useRef(0);
-  useEffect(() => { try { kbBaseH.current = window.innerHeight; } catch { /* noop */ } }, []);
-  useEffect(() => {
-    if (!typing) return;
-    let fullH = 0;
-    try { fullH = Math.max(window.innerHeight, kbBaseH.current || 0); } catch { /* noop */ }
-    let opened = false;
-    let downTicks = 0;
-    const id = setInterval(() => {
-      try {
-        const h = window.innerHeight;
-        if (h > fullH) { fullH = h; kbBaseH.current = h; }   // keep the no-keyboard baseline current
-        if (h < fullH - 120) { opened = true; downTicks = 0; return; }  // keyboard is open — stay collapsed
-        downTicks++;                                         // keyboard looks down this tick
-        // Restore ONLY if we actually saw the keyboard open first (opened) and it has now
-        // been down for a sustained window (>=3 ticks ~750ms so a flicker between fields
-        // can't trigger it). No shrink ever observed => never blur => the user keeps typing.
-        if (opened && downTicks >= 3) {
-          const a = document.activeElement as HTMLElement | null;
-          if (a && a.tagName === "INPUT") a.blur();
-          setTyping(false);
-        }
-      } catch { /* noop */ }
-    }, 250);
-    return () => clearInterval(id);
-  }, [typing]);
-  // After the layout settles (kbVV toggles OR typing begins), pull the focused input to the top
-  // of the scroll area so it clears the keyboard even for lower set rows.
-  useEffect(() => {
-    if ((!kbVV && !typing) || !focusedInputRef.current) return;
-    const el = focusedInputRef.current;
-    const t = setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 90);
-    return () => clearTimeout(t);
-  }, [kbVV, typing]);
+  const focusBlur = useCallback(() => { /* intentionally inert - see note above */ }, []);
 
   // --- Auto-save / resume draft: persists logged sets so leaving the browser never loses progress ---
   const __draftKey = `symmetry_wl_${clientId || 'me'}_${day?.id || 'day'}_${isTrainerSession ? 't' : 'c'}`;
