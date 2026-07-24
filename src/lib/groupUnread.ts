@@ -13,14 +13,19 @@ export interface GroupUnread {
 
 // Pure predicate (unit-tested): a group message counts as unread for `userId`
 // when it's newer than their last_read_at, not sent by them, and not deleted.
+// When `includeOwn` is true the "not sent by them" rule is dropped — used for
+// Dustin's Client View (same auth account as the trainer) so his own
+// trainer-sent group/announcement messages DO notify his client app, exactly
+// like a real client would be notified.
 export function isGroupUnread(
   m: { is_group?: boolean | null; created_at: string | null; from_id: string; deleted_at?: string | null },
   lastReadAt: string | null,
   userId: string,
+  includeOwn = false,
 ): boolean {
   if (m.is_group !== true) return false;
   if (m.deleted_at != null) return false;
-  if (m.from_id === userId) return false;
+  if (!includeOwn && m.from_id === userId) return false;
   const created = m.created_at || "";
   const watermark = lastReadAt || "1970-01-01T00:00:00Z";
   return created > watermark;
@@ -30,24 +35,25 @@ export function countGroupUnread(
   messages: { is_group?: boolean | null; created_at: string | null; from_id: string; deleted_at?: string | null }[],
   lastReadAt: string | null,
   userId: string,
+  includeOwn = false,
 ): number {
-  return (messages || []).filter((m) => isGroupUnread(m, lastReadAt, userId)).length;
+  return (messages || []).filter((m) => isGroupUnread(m, lastReadAt, userId, includeOwn)).length;
 }
 
 // Fetch the caller's group unread (count + newest group message for a snippet).
-export async function fetchGroupUnread(supabase: SupabaseClient, userId: string): Promise<GroupUnread> {
+// `includeOwn` (client mode) counts the caller's own group messages too.
+export async function fetchGroupUnread(supabase: SupabaseClient, userId: string, includeOwn = false): Promise<GroupUnread> {
   try {
     const { data: gr } = await supabase.from("group_reads").select("last_read_at").eq("user_id", userId).maybeSingle();
     const lastReadAt = (gr as { last_read_at?: string } | null)?.last_read_at || "1970-01-01T00:00:00Z";
-    const { data: msgs } = await supabase
+    let q = supabase
       .from("messages")
       .select("id, body, created_at, image_url, from_id")
       .eq("is_group", true)
       .is("deleted_at", null)
-      .neq("from_id", userId)
-      .gt("created_at", lastReadAt)
-      .order("created_at", { ascending: false })
-      .limit(200);
+      .gt("created_at", lastReadAt);
+    if (!includeOwn) q = q.neq("from_id", userId);
+    const { data: msgs } = await q.order("created_at", { ascending: false }).limit(200);
     const rows = (msgs as { id: string; body: string; created_at: string; image_url: string | null; from_id: string }[]) || [];
     const latest = rows[0] ? { body: rows[0].body, created_at: rows[0].created_at, image_url: rows[0].image_url } : null;
     return { count: rows.length, latest };

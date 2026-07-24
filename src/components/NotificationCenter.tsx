@@ -59,7 +59,9 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
       const direct = (raw as RawUnread[]) || [];
       // Fold in per-user GROUP unread (group_reads watermark) as synthetic rows
       // so a new group message shows a "Group" row routing to /messages?client=group.
-      const group = await fetchGroupUnread(supabase, user.id);
+      // In client mode (Dustin's own client app) include his OWN trainer-sent
+      // group/announcement messages so the bell + center light up like a real client.
+      const group = await fetchGroupUnread(supabase, user.id, isClientMode);
       const unread = direct.concat(groupUnreadAsRows(group, user.id));
 
       let clientNames: Record<string, string> = {};
@@ -70,7 +72,7 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
           for (const c of ((cs as { id: string; name: string }[]) || [])) clientNames[c.id] = c.name;
         }
       }
-      setRows(aggregateNotifications(unread, { isTrainer, myUserId: user.id, clientNames }));
+      setRows(aggregateNotifications(unread, { isTrainer, myUserId: user.id, clientNames, clientMode: isClientMode }));
     } catch { /* noop */ }
   }, []);
 

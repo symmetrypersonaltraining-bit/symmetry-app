@@ -37,8 +37,12 @@ function snippetOf(body: string | null, hasImage: boolean): string {
 // client shaping + trainer client-name lookup.
 export function aggregateNotifications(
   rows: RawUnread[],
-  opts: { isTrainer: boolean; myUserId: string; clientNames?: Record<string, string> },
+  opts: { isTrainer: boolean; myUserId: string; clientNames?: Record<string, string>; clientMode?: boolean },
 ): NotifRow[] {
+  // In client mode (Dustin's own client app) carry the ?as=client marker on
+  // deep-links so tapping a notification lands on the CLIENT view, never the
+  // trainer inbox.
+  const asMarker = opts.clientMode ? "&as=client" : "";
   // Only genuine unread, not deleted, not my own (skips trainer self-broadcast copies).
   const live = (rows || []).filter(
     (m) => m.read_at == null && m.deleted_at == null && m.to_id === opts.myUserId && m.from_id !== opts.myUserId,
@@ -61,13 +65,13 @@ export function aggregateNotifications(
     const newest = g.rows.reduce((a, b) => ((b.created_at || "") > (a.created_at || "") ? b : a), g.rows[0]);
     const snippet = snippetOf(newest.body, !!newest.image_url);
     if (key === "group") {
-      out.push({ key, kind: "group", title: "Group Chat", snippet, count: g.rows.length, time: g.latest, href: "/messages?client=group" });
+      out.push({ key, kind: "group", title: "Group Chat", snippet, count: g.rows.length, time: g.latest, href: "/messages?client=group" + asMarker });
     } else if (opts.isTrainer) {
       const clientId = key.slice("client:".length);
       const title = (opts.clientNames && opts.clientNames[clientId]) || "Client";
       out.push({ key, kind: "client", clientId, title, snippet, count: g.rows.length, time: g.latest, href: "/messages?client=" + clientId });
     } else {
-      out.push({ key, kind: "trainer", title: "Trainer", snippet, count: g.rows.length, time: g.latest, href: "/messages" });
+      out.push({ key, kind: "trainer", title: "Trainer", snippet, count: g.rows.length, time: g.latest, href: opts.clientMode ? "/messages?as=client" : "/messages" });
     }
   }
 

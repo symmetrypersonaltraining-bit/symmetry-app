@@ -37,7 +37,9 @@ export default function MessageNotifier() {
           .eq("to_id", user.id).is("read_at", null).is("deleted_at", null)
           .eq("is_broadcast", false).eq("is_group", false);
         if (scopeId) q = q.eq("client_id", scopeId);
-        const [{ count }, group] = await Promise.all([q, fetchGroupUnread(supabase, user.id)]);
+        // In client mode (Dustin's own client app) include his OWN trainer-sent
+        // group/announcement messages so the banner slides in like a real client.
+        const [{ count }, group] = await Promise.all([q, fetchGroupUnread(supabase, user.id, isClientMode)]);
         const direct = count || 0;
         const grp = group.count;
         const c = direct + grp;
@@ -47,7 +49,7 @@ export default function MessageNotifier() {
           // If the whole increase came from the group chat, deep-link to Group.
           const groupOnly = prevGroup.current != null && grp > prevGroup.current && (grp - prevGroup.current) >= delta;
           setText(groupOnly ? (delta > 1 ? `${delta} new group messages` : "New group message") : (delta > 1 ? `${delta} new messages` : "New message"));
-          setHref(groupOnly ? "/messages?client=group" : "/messages");
+          setHref(groupOnly ? (isClientMode ? "/messages?client=group&as=client" : "/messages?client=group") : (isClientMode ? "/messages?as=client" : "/messages"));
           setShow(true);
           if (hideTimer.current) clearTimeout(hideTimer.current);
           hideTimer.current = setTimeout(() => setShow(false), 6000);

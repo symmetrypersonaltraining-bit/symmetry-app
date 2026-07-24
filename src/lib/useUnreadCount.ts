@@ -30,7 +30,10 @@ export function useUnreadCount(pollMs = 20000): number {
           .eq("to_id", user.id).is("read_at", null).is("deleted_at", null)
           .eq("is_group", false);
         if (scopeId) q = q.eq("client_id", scopeId);
-        const [{ count }, group] = await Promise.all([q, fetchGroupUnread(supabase, user.id)]);
+        // In client mode (Dustin viewing his own client app, same auth account
+        // as the trainer) count his OWN trainer-sent group/announcement messages
+        // too, so the badge lights up exactly like a real client's would.
+        const [{ count }, group] = await Promise.all([q, fetchGroupUnread(supabase, user.id, isClientMode)]);
         if (on) setUnread((count || 0) + group.count);
       } catch { /* noop */ }
     }
