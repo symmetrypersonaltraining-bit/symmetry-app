@@ -93,9 +93,18 @@ export function useNutritionAverages(
     for (const l of logs) (byDate[l.log_date] ||= []).push(l);
     let kcal = 0, p = 0, c = 0, f = 0, adhSum = 0, adhDays = 0;
     const days = Object.keys(byDate);
+    // A date can hold rows without anything actually being logged: reordering meals writes
+    // __unlogged placeholders, deleting writes __removed, swap/copy write __custom.unlogged.
+    // Counting those dates as logged days inflated the logging rate AND divided the calorie
+    // average by too many days. computeDayTotals already reports loggedCount for exactly this
+    // reason; the server-side twin (lib/ai/coach-context) filters on it, this hook never did.
+    let realDays = 0;
     for (const d of days) {
       const t = computeDayTotals(byDate[d], pseudoMeals);
-      kcal += t.kcal; p += t.protein; c += t.carbs; f += t.fats;
+      if (t.loggedCount > 0) {
+        realDays++;
+        kcal += t.kcal; p += t.protein; c += t.carbs; f += t.fats;
+      }
       // adherence: avg proration across the day's PLAN meals only.
       // `meal_position <= 20` alone is not the plan band: v3 moved quick-add extras out of the
       // legacy 101+ range into EXTRA_POSITIONS [6, 7], and those rows are written with
@@ -116,10 +125,10 @@ export function useNutritionAverages(
         adhDays++;
       }
     }
-    const denom = days.length || 1;
+    const denom = realDays || 1;
     const tRow = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
     setResult({
-      loggedDays: days.length,
+      loggedDays: realDays,
       totalDays: diffDays(start, end) + 1,
       kcal: kcal / denom, p: p / denom, c: c / denom, f: f / denom,
       adherence: adhDays ? adhSum / adhDays : null,
