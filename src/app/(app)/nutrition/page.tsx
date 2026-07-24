@@ -135,7 +135,7 @@ export default async function NutritionPage({
       // Staged/incoming plan (effective in the future) for the banner.
       const { data: inc } = await supabase
         .from("meal_plans")
-        .select("id, version_number, effective_date, change_reason")
+        .select("id, version_number, effective_date, change_reason, title")
         .eq("client_id", clientId)
         .gt("effective_date", today)
         .order("effective_date", { ascending: true })

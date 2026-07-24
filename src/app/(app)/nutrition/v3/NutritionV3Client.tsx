@@ -44,7 +44,7 @@ interface Props {
   clientId: string;
   clientName: string;
   mealPlan: MealPlanShape | null;
-  incomingPlan: { id: string; version_number: number | null; effective_date: string | null; change_reason?: string | null } | null;
+  incomingPlan: { id: string; version_number: number | null; effective_date: string | null; change_reason?: string | null; title?: string | null } | null;
   todayLogs: DbLog[];
   macroTarget: MacroTarget | null;
   today: string; // America/Chicago logical date
@@ -104,6 +104,20 @@ function fmtDateLong(s: string) {
 }
 function r(x: number) { return Math.round(x); }
 
+// Human-friendly plan name for banners/timeline: prefer the plan's title,
+// else a short leading phrase from the change reason, else "Plan v{n}".
+function planLabel(p: { title?: string | null; change_reason?: string | null; version_number?: number | null }): string {
+  const t = (p.title || "").trim();
+  if (t) return t;
+  const cr = (p.change_reason || "").trim();
+  if (cr) {
+    let s = cr.split(/\s[–—-]\s|[(:]/)[0].trim();
+    if (s.length > 46) s = s.slice(0, 46).trim() + "…";
+    if (s) return s;
+  }
+  return `Plan v${p.version_number ?? "—"}`;
+}
+
 // Photo helpers (same approach as the current logger — compress before upload).
 async function compressPhoto(file: File): Promise<{ base64: string; blob: Blob }> {
   try {
@@ -160,7 +174,7 @@ export default function NutritionV3Client(props: Props) {
   const [coachDismissed, setCoachDismissed] = useState(false);
   const [coachOn, setCoachOn] = useState(true);
   const [coachApi, setCoachApi] = useState<{ message: string; kind?: string } | null>(null);
-  const [versions, setVersions] = useState<{ id: string; version_number: number | null; effective_date: string | null; status: string | null; change_reason: string | null }[]>([]);
+  const [versions, setVersions] = useState<{ id: string; version_number: number | null; effective_date: string | null; status: string | null; change_reason: string | null; title?: string | null }[]>([]);
   const [optSel, setOptSel] = useState<Record<number, string>>({}); // position → meal_id (option slots, pre-log)
   const [popKey, setPopKey] = useState<string | null>(null);
 
@@ -823,7 +837,7 @@ export default function NutritionV3Client(props: Props) {
     openSheet({ kind: "versions" });
     const { data } = await supabase
       .from("meal_plans")
-      .select("id, version_number, effective_date, status, change_reason")
+      .select("id, version_number, effective_date, status, change_reason, title")
       .eq("client_id", clientId)
       .order("effective_date", { ascending: false })
       .limit(12);
@@ -1014,7 +1028,7 @@ export default function NutritionV3Client(props: Props) {
           style={{ background: "rgba(198,158,60,0.12)", border: "1px solid rgba(198,158,60,0.45)" }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: GOLD, flexShrink: 0 }} />
           <span className="text-xs" style={{ color: "var(--brand-text)" }}>
-            <b style={{ color: GOLD }}>Plan v{incomingPlan.version_number ?? "next"}</b> starts {fmtDateLong(incomingPlan.effective_date)} — tap for the version timeline
+            <b style={{ color: GOLD }}>{planLabel(incomingPlan)}</b> starts {fmtDateLong(incomingPlan.effective_date)} — tap for the version timeline
           </span>
           <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
         </button>
@@ -1836,7 +1850,7 @@ export default function NutritionV3Client(props: Props) {
           return (
             <div key={v.id} className="rounded-2xl p-3 mb-2" style={{ background: "var(--brand-bg)", border: `1px solid ${isLive ? "rgba(34,197,94,0.5)" : "var(--brand-border)"}` }}>
               <div className="flex items-center justify-between">
-                <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>Plan v{v.version_number ?? "—"}</p>
+                <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>{planLabel(v)}</p>
                 <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 6, background: isLive ? "rgba(34,197,94,0.18)" : pending ? "rgba(198,158,60,0.18)" : "var(--brand-surface)", color: isLive ? GREEN : pending ? GOLD : "var(--brand-text-secondary)" }}>
                   {isLive ? "LIVE" : pending ? `PENDING · EFF ${v.effective_date}` : "ARCHIVED"}
                 </span>
