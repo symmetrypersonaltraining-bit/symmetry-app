@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { startDictation, type DictationHandle } from "@/lib/dictation";
 import { createClient } from "@/lib/supabase/client";
+import NotificationCenter from "@/components/NotificationCenter";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -77,6 +78,7 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
   return (
     <>
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <NotificationCenter solid={solid} />
         {isTrainer && !clientMode && (
           <button aria-label="AI assistant" style={{ ...hBtn, fontSize: 11, fontWeight: 700 }}
             onClick={() => { buzz(12); window.dispatchEvent(new CustomEvent("symmetry:open-ai")); }}>AI</button>
