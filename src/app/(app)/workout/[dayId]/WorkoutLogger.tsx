@@ -612,6 +612,9 @@ export default function WorkoutLogger({
   const [sets, setSets] = useState<Record<string, SetData[]>>(buildInitialSets);
   const [workoutLogId, setWorkoutLogId] = useState<string | null>(existingLogId);
   const [saving, setSaving] = useState(false);
+  // Set-save failures used to be swallowed: the upsert's error was never read, so a set that
+  // never reached the database still turned green and counted toward progress. Surface it.
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const [activeExerciseIdx, setActiveExerciseIdx] = useState(0);
   const [workoutComplete, setWorkoutComplete] = useState(false);
@@ -1112,7 +1115,7 @@ export default function WorkoutLogger({
     try {
       const logId = await ensureWorkoutLog();
       const s = sets[peId][si];
-      await supabase.from("set_logs").upsert({
+      const { error: setErr } = await supabase.from("set_logs").upsert({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
         exercise_id: allFlat.find(p => p.id === peId)?.exercises?.id ?? null,
         set_number: si + 1,
@@ -1123,6 +1126,8 @@ export default function WorkoutLogger({
         heart_rate: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
         completed: true, logged_at: new Date().toISOString(),
       }, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
+      if (setErr) throw setErr;
+      setSaveError(null);
       updateSet(peId, si, "done", true);
       if (navigator.vibrate) navigator.vibrate(50);
       const pe = allFlat.find(p => p.id === peId);
@@ -1130,7 +1135,10 @@ export default function WorkoutLogger({
         const match = pe.rest.match(/(\d+)/);
         if (match) setRestTimer(parseInt(match[1]));
       }
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error(e);
+      setSaveError("That set didn't save — check your connection and tap the arrow again.");
+    }
     finally { setSaving(false); }
   }
 
@@ -1153,15 +1161,20 @@ export default function WorkoutLogger({
         completed: true, logged_at: new Date().toISOString(),
       }));
       if (rows.length) {
-        await supabase.from("set_logs").upsert(rows, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
+        const { error: batchErr } = await supabase.from("set_logs").upsert(rows, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
+        if (batchErr) throw batchErr;
       }
+      setSaveError(null);
       setSets(prev => {
         const u = { ...prev };
         u[peId] = (u[peId] || []).map(s => ({ ...s, done: true }));
         return u;
       });
       if (navigator.vibrate) navigator.vibrate(50);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      setSaveError("Those sets didn't save — check your connection and tap Check all again.");
+    }
     finally { setSaving(false); }
   }
 
@@ -1373,6 +1386,17 @@ export default function WorkoutLogger({
     );
   }
 
+  // Isolated overlay: only appears when a save actually failed, so a set can never look
+  // logged when it isn't. Fixed-position and dismissible \u2014 it never affects layout.
+  const saveErrorBanner = saveError ? (
+    <div role="alert" onClick={() => setSaveError(null)}
+      style={{ position: "fixed", left: 12, right: 12, bottom: 96, zIndex: 1400, cursor: "pointer",
+        background: "rgba(190,40,40,0.96)", color: "#fff", borderRadius: 12, padding: "10px 14px",
+        fontSize: 13, fontWeight: 600, boxShadow: "0 6px 24px rgba(0,0,0,0.45)" }}>
+      {saveError} <span style={{ opacity: 0.75, fontWeight: 400 }}>(tap to dismiss)</span>
+    </div>
+  ) : null;
+
   // \u2500\u2500\u2500 SESSION MODE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   if (sessionMode && currentExercise) {
     const peSets = sets[currentExercise.id] || [];
@@ -1503,6 +1527,7 @@ export default function WorkoutLogger({
           <div className="h-full rounded-full transition-all duration-500"
             style={{ width: `${progressPct}%`, background: "var(--brand-primary)" }} />
         </div>
+        {saveErrorBanner}
 
         {/* Exercise header (V6 micro-pill) — one compact row: small video thumb + name +
             inline History/Swap. Meta as micro-pills, cue collapsed behind an info toggle to
@@ -1762,6 +1787,7 @@ export default function WorkoutLogger({
       {showTimer && <TimerWheel onClose={() => setShowTimer(false)} />}
         {timePick && <TimePickerSheet initial={parseTimeToSecs(sets[timePick.peId]?.[timePick.si]?.time || "") || 0} onSet={(secs) => { updateSet(timePick.peId, timePick.si, "time", fmtSecs(secs)); setTimePick(null); }} onClose={() => setTimePick(null)} />}
       {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
+      {saveErrorBanner}
 
       {isTrainerSession && clientName && (
         <div className="flex items-center gap-2 px-4 py-2 text-xs font-medium" style={{ background: "#f59e0b", color: "white" }}>
