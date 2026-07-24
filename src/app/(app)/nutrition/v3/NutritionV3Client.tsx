@@ -250,7 +250,13 @@ export default function NutritionV3Client(props: Props) {
   }, [logs, planMeals, openMode, optSel]);
 
   const extras = useMemo(
-    () => logs.filter((l) => (l.meal_position >= 101 || (EXTRA_POSITIONS.includes(l.meal_position) && !planPositions.has(l.meal_position) && !l.meal_id && !l.item_overrides?.__custom?.kind)).valueOf() && !l.item_overrides?.__removed && (l.meal_position >= 101 || (EXTRA_POSITIONS.includes(l.meal_position) && !planPositions.has(l.meal_position)))),
+    () =>
+      logs.filter(
+        (l) =>
+          !l.item_overrides?.__removed &&
+          (l.meal_position >= 101 || // legacy quick-log band still renders
+            (EXTRA_POSITIONS.includes(l.meal_position) && !planPositions.has(l.meal_position) && !l.meal_id))
+      ),
     [logs, planPositions]
   );
 
@@ -314,12 +320,14 @@ export default function NutritionV3Client(props: Props) {
 
   // ---- celebrations -------------------------------------------------------
   const maybeCelebrate = useCallback((nextLogs: DbLog[]) => {
-    if (!coachOn || openMode) return;
+    if (!coachOn || openMode || selectedDate !== today) return;
     const positions = Array.from(planPositions);
     if (!positions.length) return;
     const allLogged = positions.every((pos) => {
-      const l = nextLogs.find((x) => x.meal_position === pos && !x.item_overrides?.__removed);
-      return l && l.adherence && !l.item_overrides?.__unlogged && !l.item_overrides?.__custom?.unlogged;
+      const l = nextLogs.find((x) => x.meal_position === pos);
+      if (!l) return false;
+      if (l.item_overrides?.__removed) return true; // deleted today — doesn't block the streak
+      return !!l.adherence && !l.item_overrides?.__unlogged && !l.item_overrides?.__custom?.unlogged;
     });
     const key = "sym:v3:celebrated:" + clientId + ":" + selectedDate;
     if (allLogged && !sessionStorage.getItem(key)) {
@@ -327,7 +335,7 @@ export default function NutritionV3Client(props: Props) {
       setCelebrate(true);
       toast("🎉 Day complete — every meal logged! 🔥 streak +1", { duration: 3200 });
     }
-  }, [coachOn, openMode, planPositions, clientId, selectedDate]);
+  }, [coachOn, openMode, planPositions, clientId, selectedDate, today]);
   useEffect(() => { maybeCelebrate(logs); }, [logs, maybeCelebrate]);
 
   // ---- one-tap + adherence ------------------------------------------------
@@ -850,8 +858,6 @@ export default function NutritionV3Client(props: Props) {
       </div>
     );
   }
-
-  const rowIndexByKey = new Map(displayRows.map((rw, i) => [rw.key, i]));
 
   return (
     <div className="pb-8">
@@ -1391,142 +1397,44 @@ export default function NutritionV3Client(props: Props) {
   function AdjustSheetView({ rowKey }: { rowKey: string }) {
     const row = rowByKey(rowKey);
     if (!row) return null;
-    if (row.kind === "custom" && row.meta) return <CustomEditInner row={row} />;
-    if (row.kind !== "plan" || !row.chosen) return null;
-    return <PlanAdjustInner row={row} />;
-  }
-
-  function PlanAdjustInner({ row }: { row: Row }) {
-    const meal = row.chosen!;
-    const existingOv = (row.log?.item_overrides || {}) as ItemOverrides;
-    const [amounts, setAmounts] = useState<Record<string, number>>(() => {
-      const seed: Record<string, number> = {};
-      for (const it of meal.meal_items || []) {
-        const o = existingOv[it.id] as { amount?: number } | undefined;
-        seed[it.id] = o?.amount ?? (it.amount != null ? Number(it.amount) : 0);
-      }
-      return seed;
-    });
-    const [adds, setAdds] = useState(existingOv.__added || []);
-    const stepFor = (unit: string | null) => {
-      const u = (unit || "").toLowerCase();
-      if (u === "g" || u.includes("gram")) return 10;
-      if (u.includes("cup")) return 0.25;
-      if (u.includes("tbsp") || u.includes("tsp") || u.includes("scoop")) return 0.5;
-      return 1;
-    };
-    const draft: ItemOverrides = {};
-    for (const it of meal.meal_items || []) {
-      const v = amounts[it.id];
-      if (v != null && it.amount != null && Math.abs(v - Number(it.amount)) > 1e-9) draft[it.id] = { amount: v };
+    if (row.kind === "custom" && row.meta) {
+      return (
+        <CustomEditSheet
+          key={rowKey}
+          initialMeta={row.meta}
+          onOpenFoodSearch={() => openSheet({ kind: "foodsearch", target: "adjust", rowKey })}
+          onClose={closeAllSheets}
+          onBack={backSheet}
+          onSave={async (meta) => { await patchCustom(row, meta); closeAllSheets(); toast.success("Saved — day totals updated ✓"); }}
+        />
+      );
     }
-    if (adds.length) draft.__added = adds;
-    const live = planMealMacros(meal, draft);
+    if (row.kind !== "plan" || !row.chosen) return null;
+    const existingOv = (row.log?.item_overrides || {}) as ItemOverrides;
+    const loggedNow = !!(row.log?.adherence && !existingOv.__unlogged && !existingOv.__custom?.unlogged);
     return (
-      <Sheet title={`Adjust / edit`} subtitle={row.log?.adherence && !existingOv.__unlogged ? "Logged — changes update today's totals immediately" : "Item overrides — macros recalc live"} onClose={closeAllSheets} onBack={backSheet}>
-        {(meal.meal_items || []).map((it) => (
-          <div key={it.id} className="flex items-center gap-2 rounded-xl p-2.5 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold truncate" style={{ color: "var(--brand-text)" }}>{it.food}</p>
-              <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>
-                {it.is_unlimited ? "FREE · UNLIMITED" : `plan: ${it.amount ?? "—"}${it.unit ? " " + it.unit : ""} · ${r(kcalOf(it.protein || 0, it.carbs || 0, it.fats || 0))} cal`}
-              </p>
-            </div>
-            {!it.is_unlimited && (
-              <div className="flex items-center gap-1">
-                <button onClick={() => setAmounts((p) => ({ ...p, [it.id]: Math.max(0, Math.round(((p[it.id] || 0) - stepFor(it.unit)) * 100) / 100) }))} className="w-8 h-8 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>−</button>
-                <span className="text-xs font-bold text-center" style={{ color: "var(--brand-text)", minWidth: 44 }}>{amounts[it.id] ?? 0}{it.unit ? ` ${it.unit}` : ""}</span>
-                <button onClick={() => setAmounts((p) => ({ ...p, [it.id]: Math.round(((p[it.id] || 0) + stepFor(it.unit)) * 100) / 100 }))} className="w-8 h-8 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>＋</button>
-              </div>
-            )}
-          </div>
-        ))}
-        {adds.map((ad, i) => (
-          <div key={"add" + i} className="flex items-center gap-2 rounded-xl p-2.5 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px dashed var(--brand-border)" }}>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold truncate" style={{ color: "var(--brand-text)" }}>{ad.name} <span style={{ color: BLUE, fontSize: 9, fontWeight: 800 }}>ADDED</span></p>
-              <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>{ad.servings} serving{ad.servings === 1 ? "" : "s"} · P{r(ad.p * ad.servings)} C{r(ad.c * ad.servings)} F{r(ad.f * ad.servings)}</p>
-            </div>
-            <button onClick={() => setAdds((p) => p.filter((_, j) => j !== i))} aria-label="remove" style={{ color: "var(--brand-text-secondary)", padding: 6 }}>✕</button>
-          </div>
-        ))}
-        <button onClick={() => openSheet({ kind: "foodsearch", target: "adjust", rowKey: row.key })} className="w-full flex items-center gap-3 rounded-2xl p-3 mt-1 mb-2 text-left" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
-          <span style={{ fontSize: 15 }}>🗄</span>
-          <span className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>Add from the food database<span className="block font-normal" style={{ color: "var(--brand-text-secondary)", fontSize: 10.5 }}>Search · serving picker · verified badges</span></span>
-          <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
-        </button>
-        <div className="flex justify-between py-2 text-sm font-bold" style={{ color: "var(--brand-text)" }}>
-          <span style={{ color: "var(--brand-text-secondary)", fontWeight: 500 }}>This meal now</span>
-          <span>{r(live.kcal)} cal · {r(live.protein)}P / {r(live.carbs)}C / {r(live.fats)}F</span>
-        </div>
-        <button
-          onClick={async () => {
-            const clean: ItemOverrides = {};
-            for (const k of Object.keys(draft)) if (k !== "__added") clean[k] = draft[k];
-            if (adds.length) clean.__added = adds;
-            const keepFlags: Partial<ItemOverrides> = {};
-            if (existingOv.__ord != null) keepFlags.__ord = existingOv.__ord;
-            const loggedNow = !!(row.log?.adherence && !existingOv.__unlogged && !existingOv.__custom?.unlogged);
-            if (!loggedNow) keepFlags.__unlogged = true;
-            const payload = { ...clean, ...keepFlags };
-            await upsertLog(row.position, {
-              meal_id: row.chosen?.id ?? null,
-              adherence: loggedNow ? row.log!.adherence : "Skipped",
-              item_overrides: Object.keys(payload).length ? payload : null,
-            });
-            closeAllSheets();
-            toast.success("Saved — day totals updated ✓");
-          }}
-          className="w-full py-3 rounded-2xl text-sm font-bold text-white"
-          style={{ background: "var(--brand-primary)" }}
-        >
-          Save — totals update ✓
-        </button>
-      </Sheet>
-    );
-  }
-
-  function CustomEditInner({ row }: { row: Row }) {
-    const [meta, setMeta] = useState<CustomMeta>(() => JSON.parse(JSON.stringify(row.meta)));
-    const live = customMealMacros(meta);
-    const inputStyle: React.CSSProperties = { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 10, padding: "9px 12px", fontSize: 13, width: "100%", outline: "none" };
-    return (
-      <Sheet title="Edit custom meal" subtitle="Steppers · rename · retime — totals recalc live" onClose={closeAllSheets} onBack={backSheet}>
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <input value={meta.name} onChange={(e) => setMeta({ ...meta, name: e.target.value })} placeholder="Meal name" style={inputStyle} />
-          <input value={meta.time || ""} onChange={(e) => setMeta({ ...meta, time: e.target.value })} placeholder="Time" style={inputStyle} />
-        </div>
-        {meta.items.map((it, j) => {
-          const fac = it.fac ?? 1;
-          return (
-            <div key={j} className="flex items-center gap-2 rounded-xl p-2.5 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold truncate" style={{ color: "var(--brand-text)" }}>{it.n}</p>
-                <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>{it.a || "1 serving"}{fac !== 1 ? ` ×${fac}` : ""} · {r((it.k ?? kcalOf(it.p, it.c, it.f)) * fac)} cal · {r(it.p * fac)}P/{r(it.c * fac)}C/{r(it.f * fac)}F</p>
-              </div>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setMeta({ ...meta, items: meta.items.map((x, k2) => k2 === j ? { ...x, fac: Math.max(0.25, Math.round(((x.fac ?? 1) - 0.25) * 100) / 100) } : x) })} className="w-7 h-7 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>−</button>
-                <span className="text-xs font-bold text-center" style={{ color: "var(--brand-text-secondary)", minWidth: 32 }}>×{fac}</span>
-                <button onClick={() => setMeta({ ...meta, items: meta.items.map((x, k2) => k2 === j ? { ...x, fac: Math.min(4, Math.round(((x.fac ?? 1) + 0.25) * 100) / 100) } : x) })} className="w-7 h-7 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>＋</button>
-              </div>
-              <button onClick={() => setMeta({ ...meta, items: meta.items.filter((_, k2) => k2 !== j) })} aria-label="remove" style={{ color: "var(--brand-text-secondary)", padding: 6 }}>✕</button>
-            </div>
-          );
-        })}
-        <button onClick={() => openSheet({ kind: "foodsearch", target: "adjust", rowKey: row.key })} className="w-full flex items-center gap-3 rounded-2xl p-3 mt-1 mb-2 text-left" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
-          <span style={{ fontSize: 15 }}>🗄</span>
-          <span className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>Add from the food database</span>
-          <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
-        </button>
-        <div className="flex justify-between py-2 text-sm font-bold" style={{ color: "var(--brand-text)" }}>
-          <span style={{ color: "var(--brand-text-secondary)", fontWeight: 500 }}>Total</span>
-          <span>{r(live.kcal)} cal · {r(live.protein)}P / {r(live.carbs)}C / {r(live.fats)}F</span>
-        </div>
-        <button onClick={async () => { await patchCustom(row, meta); closeAllSheets(); toast.success("Saved — day totals updated ✓"); }}
-          className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>
-          Save — totals update ✓
-        </button>
-      </Sheet>
+      <PlanAdjustSheet
+        key={rowKey}
+        meal={row.chosen}
+        existingOv={existingOv}
+        loggedNow={loggedNow}
+        onOpenFoodSearch={() => openSheet({ kind: "foodsearch", target: "adjust", rowKey })}
+        onClose={closeAllSheets}
+        onBack={backSheet}
+        onSave={async (clean) => {
+          const keepFlags: Partial<ItemOverrides> = {};
+          if (existingOv.__ord != null) keepFlags.__ord = existingOv.__ord;
+          if (!loggedNow) keepFlags.__unlogged = true;
+          const payload = { ...clean, ...keepFlags };
+          await upsertLog(row.position, {
+            meal_id: row.chosen?.id ?? null,
+            adherence: loggedNow ? row.log!.adherence : "Skipped",
+            item_overrides: Object.keys(payload).length ? payload : null,
+          });
+          closeAllSheets();
+          toast.success("Saved — day totals updated ✓");
+        }}
+      />
     );
   }
 
@@ -1760,21 +1668,15 @@ export default function NutritionV3Client(props: Props) {
   }
 
   function ForwardSheetView() {
-    const [range, setRange] = useState<7 | 28 | 56>(7);
     return (
-      <Sheet title="Week ahead" subtitle="Forward plan view — what's coming" onClose={closeAllSheets} onBack={backSheet}>
-        <div className="flex gap-1.5 mb-2">
-          {([7, 28, 56] as const).map((d) => (
-            <button key={d} onClick={() => setRange(d)} className="flex-1 py-2 rounded-lg text-xs font-bold"
-              style={range === d ? { background: "var(--brand-primary)", color: "#fff" } : { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}>
-              {d === 7 ? "1w" : d === 28 ? "4w" : "8w"}
-            </button>
-          ))}
-        </div>
-        <div style={{ margin: "0 -1rem" }}>
-          <PlanRangeView clientId={clientId} startDate={today} days={range} basePlan={mealPlan as never} baseTarget={macroTarget ? { calories: macroTarget.calories } : null} />
-        </div>
-      </Sheet>
+      <ForwardSheet
+        clientId={clientId}
+        today={today}
+        mealPlan={mealPlan}
+        macroTarget={macroTarget}
+        onClose={closeAllSheets}
+        onBack={backSheet}
+      />
     );
   }
 
@@ -1798,29 +1700,228 @@ export default function NutritionV3Client(props: Props) {
   }
 
   function SavePlanSheetView() {
-    const [name, setName] = useState(`${clientName.split(" ")[0]}'s Plan`);
-    const [eff, setEff] = useState(today);
-    const t = computeDayTotals(logs, []);
-    const inputStyle: React.CSSProperties = { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 12, padding: "10px 12px", fontSize: 13, width: "100%", outline: "none" };
     return (
-      <Sheet title="Save as my ongoing plan" subtitle="Targets computed from the day you built" onClose={closeAllSheets}>
-        <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, marginBottom: 8 }} />
-        <input type="date" value={eff} onChange={(e) => setEff(e.target.value || today)} style={{ ...inputStyle, marginBottom: 10, colorScheme: "dark light" }} />
-        <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "var(--brand-text-secondary)" }}>Computed targets — from your built day</p>
-        <div className="flex justify-between py-2 text-sm font-bold" style={{ color: "var(--brand-text)" }}>
-          <span style={{ color: "var(--brand-text-secondary)", fontWeight: 500 }}>Daily targets</span>
-          <span>{r(t.kcal)} cal · {r(t.protein)}P / {r(t.carbs)}C / {r(t.fats)}F</span>
-        </div>
-        <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
-          From then on it logs one-tap — the plan lands as v-next, live, effective on the date above. Your trainer sees it too.
-        </p>
-        <button onClick={() => saveDayAsPlan(name.trim() || "My Plan", eff)} disabled={savingPlan || t.kcal < 200}
-          className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)", opacity: t.kcal < 200 ? 0.5 : 1 }}>
-          {savingPlan ? "Creating your plan…" : t.kcal < 200 ? "Build at least one slot first" : "Make it my ongoing plan ✓"}
-        </button>
-      </Sheet>
+      <SavePlanSheet
+        defaultName={`${clientName.split(" ")[0]}'s Plan`}
+        today={today}
+        totals={computeDayTotals(logs, [])}
+        saving={savingPlan}
+        onSave={saveDayAsPlan}
+        onClose={closeAllSheets}
+      />
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Top-level stateful sheets (kept outside the main component so background
+// re-renders can't remount them and wipe in-progress edits).
+// ---------------------------------------------------------------------------
+
+function PlanAdjustSheet({
+  meal, existingOv, loggedNow, onOpenFoodSearch, onSave, onClose, onBack,
+}: {
+  meal: PlanMeal;
+  existingOv: ItemOverrides;
+  loggedNow: boolean;
+  onOpenFoodSearch: () => void;
+  onSave: (clean: ItemOverrides) => Promise<void>;
+  onClose: () => void;
+  onBack: () => void;
+}) {
+  const [amounts, setAmounts] = useState<Record<string, number>>(() => {
+    const seed: Record<string, number> = {};
+    for (const it of meal.meal_items || []) {
+      const o = existingOv[it.id] as { amount?: number } | undefined;
+      seed[it.id] = o?.amount ?? (it.amount != null ? Number(it.amount) : 0);
+    }
+    return seed;
+  });
+  const [adds, setAdds] = useState(existingOv.__added || []);
+  const [saving, setSaving] = useState(false);
+  const stepFor = (unit: string | null) => {
+    const u = (unit || "").toLowerCase();
+    if (u === "g" || u.includes("gram")) return 10;
+    if (u.includes("cup")) return 0.25;
+    if (u.includes("tbsp") || u.includes("tsp") || u.includes("scoop")) return 0.5;
+    return 1;
+  };
+  const draft: ItemOverrides = {};
+  for (const it of meal.meal_items || []) {
+    const v = amounts[it.id];
+    if (v != null && it.amount != null && Math.abs(v - Number(it.amount)) > 1e-9) draft[it.id] = { amount: v };
+  }
+  if (adds.length) draft.__added = adds;
+  const live = planMealMacros(meal, draft);
+  return (
+    <Sheet title="Adjust / edit" subtitle={loggedNow ? "Logged — changes update today's totals immediately" : "Item overrides — macros recalc live"} onClose={onClose} onBack={onBack}>
+      {(meal.meal_items || []).map((it) => (
+        <div key={it.id} className="flex items-center gap-2 rounded-xl p-2.5 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold truncate" style={{ color: "var(--brand-text)" }}>{it.food}</p>
+            <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>
+              {it.is_unlimited ? "FREE · UNLIMITED" : `plan: ${it.amount ?? "—"}${it.unit ? " " + it.unit : ""} · ${r(kcalOf(it.protein || 0, it.carbs || 0, it.fats || 0))} cal`}
+            </p>
+          </div>
+          {!it.is_unlimited && (
+            <div className="flex items-center gap-1">
+              <button onClick={() => setAmounts((p) => ({ ...p, [it.id]: Math.max(0, Math.round(((p[it.id] || 0) - stepFor(it.unit)) * 100) / 100) }))} className="w-8 h-8 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>−</button>
+              <span className="text-xs font-bold text-center" style={{ color: "var(--brand-text)", minWidth: 44 }}>{amounts[it.id] ?? 0}{it.unit ? ` ${it.unit}` : ""}</span>
+              <button onClick={() => setAmounts((p) => ({ ...p, [it.id]: Math.round(((p[it.id] || 0) + stepFor(it.unit)) * 100) / 100 }))} className="w-8 h-8 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>＋</button>
+            </div>
+          )}
+        </div>
+      ))}
+      {adds.map((ad, i) => (
+        <div key={"add" + i} className="flex items-center gap-2 rounded-xl p-2.5 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px dashed var(--brand-border)" }}>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold truncate" style={{ color: "var(--brand-text)" }}>{ad.name} <span style={{ color: BLUE, fontSize: 9, fontWeight: 800 }}>ADDED</span></p>
+            <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>{ad.servings} serving{ad.servings === 1 ? "" : "s"} · P{r(ad.p * ad.servings)} C{r(ad.c * ad.servings)} F{r(ad.f * ad.servings)}</p>
+          </div>
+          <button onClick={() => setAdds((p) => p.filter((_, j) => j !== i))} aria-label="remove" style={{ color: "var(--brand-text-secondary)", padding: 6 }}>✕</button>
+        </div>
+      ))}
+      <button onClick={onOpenFoodSearch} className="w-full flex items-center gap-3 rounded-2xl p-3 mt-1 mb-2 text-left" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+        <span style={{ fontSize: 15 }}>🗄</span>
+        <span className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>Add from the food database<span className="block font-normal" style={{ color: "var(--brand-text-secondary)", fontSize: 10.5 }}>Search · serving picker · verified badges</span></span>
+        <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
+      </button>
+      <div className="flex justify-between py-2 text-sm font-bold" style={{ color: "var(--brand-text)" }}>
+        <span style={{ color: "var(--brand-text-secondary)", fontWeight: 500 }}>This meal now</span>
+        <span>{r(live.kcal)} cal · {r(live.protein)}P / {r(live.carbs)}C / {r(live.fats)}F</span>
+      </div>
+      <button
+        onClick={async () => {
+          setSaving(true);
+          try {
+            const clean: ItemOverrides = {};
+            for (const k of Object.keys(draft)) if (k !== "__added") clean[k] = draft[k];
+            if (adds.length) clean.__added = adds;
+            await onSave(clean);
+          } finally { setSaving(false); }
+        }}
+        disabled={saving}
+        className="w-full py-3 rounded-2xl text-sm font-bold text-white"
+        style={{ background: "var(--brand-primary)" }}
+      >
+        {saving ? "Saving…" : "Save — totals update ✓"}
+      </button>
+    </Sheet>
+  );
+}
+
+function CustomEditSheet({
+  initialMeta, onOpenFoodSearch, onSave, onClose, onBack,
+}: {
+  initialMeta: CustomMeta;
+  onOpenFoodSearch: () => void;
+  onSave: (meta: CustomMeta) => Promise<void>;
+  onClose: () => void;
+  onBack: () => void;
+}) {
+  const [meta, setMeta] = useState<CustomMeta>(() => JSON.parse(JSON.stringify(initialMeta)));
+  const [saving, setSaving] = useState(false);
+  const live = customMealMacros(meta);
+  const inputStyle: React.CSSProperties = { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 10, padding: "9px 12px", fontSize: 13, width: "100%", outline: "none" };
+  return (
+    <Sheet title="Edit custom meal" subtitle="Steppers · rename · retime — totals recalc live" onClose={onClose} onBack={onBack}>
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <input value={meta.name} onChange={(e) => setMeta({ ...meta, name: e.target.value })} placeholder="Meal name" style={inputStyle} />
+        <input value={meta.time || ""} onChange={(e) => setMeta({ ...meta, time: e.target.value })} placeholder="Time" style={inputStyle} />
+      </div>
+      {meta.items.map((it, j) => {
+        const fac = it.fac ?? 1;
+        return (
+          <div key={j} className="flex items-center gap-2 rounded-xl p-2.5 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold truncate" style={{ color: "var(--brand-text)" }}>{it.n}</p>
+              <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>{it.a || "1 serving"}{fac !== 1 ? ` ×${fac}` : ""} · {r((it.k ?? kcalOf(it.p, it.c, it.f)) * fac)} cal · {r(it.p * fac)}P/{r(it.c * fac)}C/{r(it.f * fac)}F</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setMeta({ ...meta, items: meta.items.map((x, k2) => k2 === j ? { ...x, fac: Math.max(0.25, Math.round(((x.fac ?? 1) - 0.25) * 100) / 100) } : x) })} className="w-7 h-7 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>−</button>
+              <span className="text-xs font-bold text-center" style={{ color: "var(--brand-text-secondary)", minWidth: 32 }}>×{fac}</span>
+              <button onClick={() => setMeta({ ...meta, items: meta.items.map((x, k2) => k2 === j ? { ...x, fac: Math.min(4, Math.round(((x.fac ?? 1) + 0.25) * 100) / 100) } : x) })} className="w-7 h-7 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>＋</button>
+            </div>
+            <button onClick={() => setMeta({ ...meta, items: meta.items.filter((_, k2) => k2 !== j) })} aria-label="remove" style={{ color: "var(--brand-text-secondary)", padding: 6 }}>✕</button>
+          </div>
+        );
+      })}
+      <button onClick={onOpenFoodSearch} className="w-full flex items-center gap-3 rounded-2xl p-3 mt-1 mb-2 text-left" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+        <span style={{ fontSize: 15 }}>🗄</span>
+        <span className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>Add from the food database</span>
+        <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
+      </button>
+      <div className="flex justify-between py-2 text-sm font-bold" style={{ color: "var(--brand-text)" }}>
+        <span style={{ color: "var(--brand-text-secondary)", fontWeight: 500 }}>Total</span>
+        <span>{r(live.kcal)} cal · {r(live.protein)}P / {r(live.carbs)}C / {r(live.fats)}F</span>
+      </div>
+      <button onClick={async () => { setSaving(true); try { await onSave(meta); } finally { setSaving(false); } }} disabled={saving}
+        className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>
+        {saving ? "Saving…" : "Save — totals update ✓"}
+      </button>
+    </Sheet>
+  );
+}
+
+function ForwardSheet({
+  clientId, today, mealPlan, macroTarget, onClose, onBack,
+}: {
+  clientId: string;
+  today: string;
+  mealPlan: MealPlanShape | null;
+  macroTarget: MacroTarget | null;
+  onClose: () => void;
+  onBack: () => void;
+}) {
+  const [range, setRange] = useState<7 | 28 | 56>(7);
+  return (
+    <Sheet title="Week ahead" subtitle="Forward plan view — what's coming" onClose={onClose} onBack={onBack}>
+      <div className="flex gap-1.5 mb-2">
+        {([7, 28, 56] as const).map((d) => (
+          <button key={d} onClick={() => setRange(d)} className="flex-1 py-2 rounded-lg text-xs font-bold"
+            style={range === d ? { background: "var(--brand-primary)", color: "#fff" } : { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}>
+            {d === 7 ? "1w" : d === 28 ? "4w" : "8w"}
+          </button>
+        ))}
+      </div>
+      <div style={{ margin: "0 -1rem" }}>
+        <PlanRangeView clientId={clientId} startDate={today} days={range} basePlan={mealPlan as never} baseTarget={macroTarget ? { calories: macroTarget.calories } : null} />
+      </div>
+    </Sheet>
+  );
+}
+
+function SavePlanSheet({
+  defaultName, today, totals, saving, onSave, onClose,
+}: {
+  defaultName: string;
+  today: string;
+  totals: Macros;
+  saving: boolean;
+  onSave: (name: string, eff: string) => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(defaultName);
+  const [eff, setEff] = useState(today);
+  const inputStyle: React.CSSProperties = { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 12, padding: "10px 12px", fontSize: 13, width: "100%", outline: "none" };
+  return (
+    <Sheet title="Save as my ongoing plan" subtitle="Targets computed from the day you built" onClose={onClose}>
+      <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, marginBottom: 8 }} />
+      <input type="date" value={eff} onChange={(e) => setEff(e.target.value || today)} style={{ ...inputStyle, marginBottom: 10, colorScheme: "dark light" }} />
+      <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "var(--brand-text-secondary)" }}>Computed targets — from your built day</p>
+      <div className="flex justify-between py-2 text-sm font-bold" style={{ color: "var(--brand-text)" }}>
+        <span style={{ color: "var(--brand-text-secondary)", fontWeight: 500 }}>Daily targets</span>
+        <span>{r(totals.kcal)} cal · {r(totals.protein)}P / {r(totals.carbs)}C / {r(totals.fats)}F</span>
+      </div>
+      <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
+        From then on it logs one-tap — the plan lands as v-next, live, effective on the date above. Your trainer sees it too.
+      </p>
+      <button onClick={() => onSave(name.trim() || "My Plan", eff)} disabled={saving || totals.kcal < 200}
+        className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)", opacity: totals.kcal < 200 ? 0.5 : 1 }}>
+        {saving ? "Creating your plan…" : totals.kcal < 200 ? "Build at least one slot first" : "Make it my ongoing plan ✓"}
+      </button>
+    </Sheet>
+  );
 }
 
 // ---------------------------------------------------------------------------
