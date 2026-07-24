@@ -1378,7 +1378,7 @@ export default function WorkoutLogger({
         {/* Exercise header — collapse while the keyboard is open so the set/rep inputs are not
             covered. Gated on kbVV (the VisualViewport signal, which reliably clears when the
             keyboard closes) NOT on `typing` (the fragile focus signal that left it stuck off-screen). */}
-        <div className="px-5 mb-4 flex-shrink-0" style={{ display: (kbVV || typing) ? "none" : undefined }}>
+        <div className="px-5 mb-4 flex-shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "var(--brand-primary)" }}>
