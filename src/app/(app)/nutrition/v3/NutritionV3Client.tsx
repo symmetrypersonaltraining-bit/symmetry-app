@@ -1205,11 +1205,21 @@ export default function NutritionV3Client(props: Props) {
             : logged
             ? adh === "Skipped" ? "var(--brand-border)" : adh === "Off-plan" && !(row.kind === "custom") ? "rgba(66,165,245,0.45)" : "rgba(34,197,94,0.45)"
             : "var(--brand-border)";
-          const itemsTxt = row.kind === "plan" && row.chosen
-            ? (row.chosen.meal_items || []).map((it) => it.is_unlimited ? `${it.food} (free)` : it.food).join(" · ")
-            : row.meta?.items?.length
-            ? row.meta.items.map((it) => it.n).join(" · ")
-            : row.kind === "openslot" ? "Empty — nothing logged in this slot yet" : "";
+          // Full itemized contents for this row — every item on its own line
+          // (plan meal's items, or the active custom/option/built-slot items).
+          const itemList: { label: string; free?: boolean }[] =
+            row.kind === "plan" && row.chosen
+              ? [...(row.chosen.meal_items || [])].sort((a, b) => a.position - b.position).map((it) => ({
+                  label: it.food + (it.is_unlimited
+                    ? ""
+                    : it.amount != null
+                    ? ` — ${it.amount}${it.unit ? " " + it.unit : ""}`
+                    : it.unit ? ` — ${it.unit}` : ""),
+                  free: it.is_unlimited,
+                }))
+              : row.meta?.items?.length
+              ? row.meta.items.map((it) => ({ label: it.n + (it.free ? "" : it.a ? ` — ${it.a}` : ""), free: it.free }))
+              : [];
           const built = row.kind === "openslot" && (row.meta?.items?.length || 0) > 0;
           return (
             <div key={row.key}>
@@ -1234,9 +1244,18 @@ export default function NutritionV3Client(props: Props) {
                     {logged && adh === "Off-plan" && row.kind !== "custom" && estBadge()}
                     {built && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6, background: "rgba(34,197,94,0.15)", color: GREEN }}>{row.meta!.items.length} item{row.meta!.items.length > 1 ? "s" : ""}</span>}
                   </p>
-                  <p className="text-xs truncate mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                    {logged && adh === "Off-plan" && row.kind !== "custom" && row.log?.off_plan_details ? row.log.off_plan_details : itemsTxt}
-                  </p>
+                  {logged && adh === "Off-plan" && row.kind !== "custom" && row.log?.off_plan_details ? (
+                    <p className="mt-0.5" style={{ fontSize: 12.5, color: "var(--brand-text-secondary)" }}>{row.log.off_plan_details}</p>
+                  ) : row.kind === "openslot" && !built ? null : itemList.length ? (
+                    <div className="mt-1" style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                      {itemList.map((it, k) => (
+                        <p key={k} style={{ fontSize: 12.5, lineHeight: 1.35, color: "var(--brand-text-secondary)" }}>
+                          {it.label}
+                          {it.free && <span style={{ marginLeft: 5, fontSize: 8.5, fontWeight: 800, background: "rgba(34,197,94,0.15)", color: GREEN, padding: "1px 5px", borderRadius: 4, verticalAlign: "middle" }}>FREE</span>}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
                   {(row.kind !== "openslot" || built) && (
                     <p className="text-xs mt-0.5 font-semibold" style={{ color: "var(--brand-text-secondary)" }}>
                       <b style={{ color: "var(--brand-text)" }}>{r(logged && adh === "Off-plan" && row.kind !== "custom" ? (row.log?.est_kcal || 0) : mm.kcal)}</b> cal · {r(logged && adh === "Off-plan" && row.kind !== "custom" ? (row.log?.est_protein || 0) : mm.protein)}P / {r(logged && adh === "Off-plan" && row.kind !== "custom" ? (row.log?.est_carbs || 0) : mm.carbs)}C / {r(logged && adh === "Off-plan" && row.kind !== "custom" ? (row.log?.est_fats || 0) : mm.fats)}F
