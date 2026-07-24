@@ -1,14 +1,13 @@
 // ============================================================================
-// Nutrition v3 — real client-side PDF generation (jsPDF).
-//
-// The in-app Grocery & Prep sheet uses these to produce a genuinely sendable
-// PDF that works INSIDE the Capacitor Android/iOS WebView — window.print() is
-// a silent no-op there, so we build the bytes ourselves and hand them to the
-// native share sheet (or a download fallback). Same groceryEngine data as the
+// Nutrition v3 — PDF generation (jsPDF). Runs in Node (server route) AND the
+// WebView. The document builders (buildGroceryPdf / buildPrepPdf) are the SAME
+// generation logic used server-side: the /api/nutrition/pdf route calls them,
+// gets bytes via doc.output('arraybuffer'), and uploads to Supabase Storage —
+// because emitting a blob/File from inside the Capacitor Android WebView (no
+// native file/share plugins) is a silent no-op. Same groceryEngine data as the
 // on-screen list, so the PDF matches exactly.
 //
-// Pure of React/DOM except sharePdf() (which is guarded + dependency-injectable
-// for tests). jsPDF runs fine in the WebView and in node.
+// pdfBytes() → Node-friendly Uint8Array for storage upload.
 // ============================================================================
 
 import { jsPDF } from "jspdf";
@@ -269,6 +268,13 @@ export function buildPlanPdf(ctx: PdfCtx): jsPDF {
   });
   d.footer(ctx.todayISO);
   return d.doc;
+}
+
+// Build a PDF and return its raw bytes as a Uint8Array — used server-side to
+// upload to Supabase Storage. jsPDF's 'arraybuffer' output is a real PDF.
+export function pdfBytes(ctx: PdfCtx, kind: "grocery" | "prep" | "plan"): Uint8Array {
+  const doc = kind === "grocery" ? buildGroceryPdf(ctx) : kind === "prep" ? buildPrepPdf(ctx) : buildPlanPdf(ctx);
+  return new Uint8Array(doc.output("arraybuffer") as ArrayBuffer);
 }
 
 // Generate the PDF, then run a ROBUST fallback chain so a tap ALWAYS produces a

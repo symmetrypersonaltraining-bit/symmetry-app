@@ -5,16 +5,21 @@
 // v3). Everything lives here: start-date + day-count controls, an inline
 // grocery list (RAW) and full meal-prep production sheet (COOKED, every meal's
 // actual items shown inline), and TWO PDF buttons — "Grocery PDF" and
-// "Meal Prep PDF" — that generate a REAL PDF client-side (jsPDF) and hand it to
-// the native share sheet (or download fallback). window.print() is a silent
-// no-op in the Capacitor WebView, so it is NOT used here.
+// "Meal Prep PDF".
+//
+// PDF delivery: emitting a blob/File from inside the Capacitor Android WebView
+// (no native file/share plugins) is a silent no-op, so the buttons ask the
+// SERVER to build the PDF and store it at a public URL (/api/nutrition/pdf),
+// then COPY the link to the clipboard (proven to work in his WebView) and open
+// it in the system browser. A persistent success card shows the link with
+// Open / Copy buttons so he can always send it — never silent.
 
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Sheet from "./Sheet";
 import { PlanMeal } from "@/lib/nutrition/dailyTotals";
 import { buildGroceryList, buildPrepCards, RangeSpec } from "@/lib/nutrition/groceryEngine";
-import { buildGroceryPdf, buildPrepPdf, sharePdf, PdfCtx } from "@/lib/nutrition/pdf";
+import { generatePdfLink, copyLink } from "@/lib/nutrition/pdfLink";
 
 function todayChicago(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
@@ -61,33 +66,38 @@ export default function GroceryPrepSheet({
   ];
 
   const [busy, setBusy] = useState<"grocery" | "prep" | null>(null);
+  // Persistent success card: the last generated PDF link stays visible so he can
+  // Open it or Copy the link to paste into a text, even if window.open no-ops.
+  const [ready, setReady] = useState<{ kind: "grocery" | "prep"; url: string } | null>(null);
 
-  // Build the PDF with jsPDF and hand it off via sharePdf's robust fallback
-  // chain (share → download → open in system browser). Always toasts — never a
-  // silent no-op. NO window.print() (a no-op in the Capacitor WebView).
+  // Ask the SERVER to build + store the PDF, then copy the public link and open
+  // it in the system browser. Always toasts — never a silent no-op.
   async function makePdf(kind: "grocery" | "prep") {
     if (busy) return;
     setBusy(kind);
-    const ctx: PdfCtx = { clientName, planLabel, meals, target, startISO, days, todayISO: today };
-    const t = toast.loading("Preparing PDF…");
+    const t = toast.loading("Building PDF…");
     try {
-      const doc = kind === "grocery" ? buildGroceryPdf(ctx) : buildPrepPdf(ctx);
-      const filename = kind === "grocery" ? "symmetry-grocery.pdf" : "symmetry-meal-prep.pdf";
-      const label = kind === "grocery" ? "Grocery List" : "Meal Prep";
-      const outcome = await sharePdf(doc, filename, `Symmetry — ${label}`, `Symmetry ${label.toLowerCase()} for ${clientName}`);
+      const { url, copied } = await generatePdfLink({ clientId, kind, days, startDate: startISO });
+      setReady({ kind, url });
       toast.success(
-        outcome === "shared" ? "Opening share…"
-          : outcome === "opened" ? "Opening PDF…"
-          : "PDF downloaded ✓",
-        { id: t },
+        copied ? "PDF ready — link copied. Open it or paste into a text to send."
+          : "PDF ready — tap Open, or Copy link to send.",
+        { id: t, duration: 5000 },
       );
-    } catch {
-      // sharePdf only throws when NOTHING (share/download/open) could hand off
-      // the PDF — surface it so the button is never silent.
-      toast.error("Couldn't open the PDF — try again", { id: t });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't build the PDF — try again", { id: t });
     } finally {
       setBusy(null);
     }
+  }
+
+  async function copyReady(url: string) {
+    const ok = await copyLink(url);
+    if (ok) toast.success("Link copied ✓");
+    else toast.error("Couldn't copy — long-press the link to copy");
+  }
+  function openReady(url: string) {
+    try { window.open(url, "_blank"); } catch { /* noop */ }
   }
 
   const stepBtn: React.CSSProperties = { background: "var(--brand-bg)", color: "var(--brand-primary)", border: "1px solid var(--brand-border)" };
@@ -128,8 +138,24 @@ export default function GroceryPrepSheet({
         </button>
       </div>
       <p className="text-xs text-center mb-3" style={{ color: "var(--brand-text-secondary)" }}>
-        Generates a PDF — <b>Share</b> it to a client/family or it saves to your device.
+        Builds a PDF link — it&apos;s <b>copied to your clipboard</b> and opens in your browser, so you can text or email it.
       </p>
+
+      {/* persistent success card — the generated link with Open / Copy */}
+      {ready && (
+        <div className="rounded-2xl p-3 mb-3" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-primary)" }}>
+          <p className="text-xs font-bold mb-1" style={{ color: "var(--brand-text)" }}>
+            ✓ {ready.kind === "grocery" ? "Grocery" : "Meal Prep"} PDF ready
+          </p>
+          <a href={ready.url} target="_blank" rel="noopener noreferrer" className="block text-xs mb-2 break-all underline" style={{ color: "var(--brand-primary)" }}>
+            {ready.url}
+          </a>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => openReady(ready.url)} className="py-2 rounded-xl text-xs font-bold text-white" style={{ background: "var(--brand-primary)" }}>Open PDF</button>
+            <button onClick={() => copyReady(ready.url)} className="py-2 rounded-xl text-xs font-bold" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-primary)", color: "var(--brand-primary)" }}>Copy link</button>
+          </div>
+        </div>
+      )}
 
       {/* view toggle */}
       <div className="flex gap-1 p-1 rounded-xl mb-3" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
