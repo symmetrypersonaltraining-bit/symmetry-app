@@ -848,7 +848,6 @@ export default function NutritionV3Client(props: Props) {
   }
 
   function insertLine(at: number) {
-    if (openMode) return null;
     return (
       <div key={"ins" + at} className="flex items-center justify-center" style={{ height: 16, position: "relative", margin: "1px 0", visibility: dragState ? "hidden" : undefined }}>
         <span style={{ position: "absolute", left: 22, right: 22, top: "50%", height: 1, background: "var(--brand-border)", opacity: 0.55 }} />
@@ -874,14 +873,14 @@ export default function NutritionV3Client(props: Props) {
       `}</style>
 
       {/* date nav */}
-      <div className="flex items-center justify-center gap-1 px-4 pt-3">
+      <div className="relative flex items-center justify-center gap-1 px-4 pt-3">
         <button onClick={() => setSelectedDate(shiftDateStr(selectedDate, -1))} aria-label="previous day" className="w-11 h-10 flex items-center justify-center rounded-xl" style={{ color: "var(--brand-text-secondary)", fontSize: 20 }}>‹</button>
         <div className="text-center" style={{ minWidth: 170 }}>
           <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>{selectedDate === today ? "Today" : fmtDateLong(selectedDate)}</p>
           <p style={{ color: "var(--brand-text-secondary)", fontSize: 11 }}>{selectedDate === today ? fmtDateLong(selectedDate) : selectedDate > today ? "upcoming day" : "past day"}</p>
         </div>
         <button onClick={() => setSelectedDate(shiftDateStr(selectedDate, 1))} aria-label="next day" className="w-11 h-10 flex items-center justify-center rounded-xl" style={{ color: "var(--brand-text-secondary)", fontSize: 20 }}>›</button>
-        <button onClick={() => openSheet({ kind: "menu" })} aria-label="plan menu" className="w-11 h-10 flex items-center justify-center rounded-xl absolute right-3" style={{ color: "var(--brand-text)", fontSize: 20 }}>⋯</button>
+        <button onClick={() => openSheet({ kind: "menu" })} aria-label="plan menu" className="w-11 h-10 flex items-center justify-center rounded-xl absolute right-3 top-3" style={{ color: "var(--brand-text)", fontSize: 20 }}>⋯</button>
       </div>
 
       {/* incoming plan banner */}

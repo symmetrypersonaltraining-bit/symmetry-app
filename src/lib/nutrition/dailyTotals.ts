@@ -105,6 +105,7 @@ export interface LogRow {
   photo_url?: string | null;
   notes?: string | null;
   log_date?: string;
+  trainer_macro_override?: { kcal?: number | null; protein?: number | null; carbs?: number | null; fats?: number | null } | null;
 }
 
 export interface Macros {
@@ -210,6 +211,13 @@ export function logConsumedMacros(
   if (ov?.__unlogged) return ZERO;
   if (ov?.__custom?.unlogged) return ZERO;
   if (log.macros_pending) return ZERO;
+
+  // Trainer's manual correction always wins (matches DailyMacrosRing).
+  const tmo = log.trainer_macro_override;
+  if (tmo && (tmo.protein != null || tmo.carbs != null || tmo.fats != null)) {
+    const p = Number(tmo.protein) || 0, c = Number(tmo.carbs) || 0, f = Number(tmo.fats) || 0;
+    return { kcal: tmo.kcal != null ? Number(tmo.kcal) || 0 : kcalOf(p, c, f), protein: p, carbs: c, fats: f };
+  }
 
   if (log.adherence === "Off-plan" || (!log.adherence && (log.est_kcal != null || log.est_protein != null))) {
     // Off-plan / custom / extra: est_* is the source of truth; fall back to
