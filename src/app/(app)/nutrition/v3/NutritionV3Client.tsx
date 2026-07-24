@@ -23,7 +23,7 @@ import Sheet from "./Sheet";
 import FoodSearchSheet from "./FoodSearchSheet";
 import ComposerSheet from "./ComposerSheet";
 import CoachChatSheet, { CoachActionItem, CoachActions } from "./CoachChatSheet";
-import GroceryListSheet from "../GroceryListSheet";
+import GroceryPrepSheet from "./GroceryPrepSheet";
 import PlanRangeView from "../PlanRangeView";
 import AveragesStrip from "@/components/nutrition/AveragesStrip";
 
@@ -1234,7 +1234,16 @@ export default function NutritionV3Client(props: Props) {
 
       {/* ==================== SHEETS ==================== */}
       {sheet && renderSheet(sheet)}
-      {showGrocery && mealPlan && <GroceryListSheet plan={{ id: mealPlan.id, meals: planMeals as never }} onClose={() => setShowGrocery(false)} />}
+      {showGrocery && mealPlan && (
+        <GroceryPrepSheet
+          clientId={clientId}
+          clientName={clientName}
+          planLabel={`plan v${mealPlan.version_number}`}
+          meals={planMeals}
+          target={macroTarget ? { calories: macroTarget.calories, protein: macroTarget.protein, carbs: macroTarget.carbs, fats: macroTarget.fats } : null}
+          onClose={() => setShowGrocery(false)}
+        />
+      )}
 
       {/* floating ✦ coach chat — today only ("Apply to today" writes an extras
           row on the visible date); hidden by the Coach toggle and by
@@ -1812,11 +1821,9 @@ export default function NutritionV3Client(props: Props) {
         <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
       </button>
     );
-    const printBase = `/nutrition/print?clientId=${clientId}`;
     return (
       <Sheet title="Plan menu" subtitle={`${clientName}${mealPlan ? ` · plan v${mealPlan.version_number} (live)` : " · open plan"}`} onClose={closeAllSheets}>
-        {mealPlan && rowBtn("🛒", "Grocery & Prep", "Grocery RAW (meat in lb + oz) · prep cards COOKED", () => { closeAllSheets(); setShowGrocery(true); })}
-        {mealPlan && rowBtn("🖨", "Print / PDF", "Plan · grocery list · production sheet — share or save as PDF", () => { window.open(`${printBase}&kind=plan`, "_blank"); })}
+        {mealPlan && rowBtn("🛒", "Grocery & Prep", "Shopping list + prep sheet · Grocery PDF / Meal Prep PDF to send", () => { closeAllSheets(); setShowGrocery(true); })}
         {rowBtn("📈", "Trends", "Averages + the same charts as today's progress page", () => replaceSheet({ kind: "trends" }))}
         {rowBtn("🗂", "Plan versions", "Current live + staged incoming — flips at midnight CT", () => { backSheet(); openVersions(); })}
         {mealPlan && rowBtn("📅", "Week ahead", "Forward view · 1w / 4w / 8w / custom", () => replaceSheet({ kind: "forward" }))}
