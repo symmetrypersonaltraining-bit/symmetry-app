@@ -443,8 +443,8 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
     // bottom while only the message list scrolls between them. Previously the
     // root was height:100% with no bounded parent, so the whole page scrolled
     // and the toggle scrolled out of reach.
-    <div style={{ background: "var(--brand-bg)", height: "calc(100dvh - 108px)", minHeight: 0, display: "flex", flexDirection: "column" }}>
-      <div style={{ flexShrink: 0, display: "flex", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--brand-border)", background: "var(--brand-bg)" }}>
+    <div style={{ background: "var(--brand-bg)", height: "100%", minHeight: 0, maxHeight: "100%", display: "flex", flexDirection: "column" }}>
+      <div style={{ flexShrink: 0, display: "flex", gap: 8, padding: "8px 12px 10px", borderBottom: "1px solid var(--brand-border)", background: "var(--brand-bg)", position: "sticky", top: 0, zIndex: 5 }}>
         <Link href="/messages" style={pill(!isGroup) as any}>Trainer</Link>
         <Link href="/messages?client=group" style={pill(isGroup) as any}>Group</Link>
       </div>
