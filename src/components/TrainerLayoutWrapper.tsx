@@ -1,32 +1,35 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import TrainerSidebar from "./TrainerSidebar";
 import AIAssistant from "./AIAssistant";
 import Logo from "./Logo";
 import HeaderAssist from "./HeaderAssist";
 import SessionDock from "./SessionDock";
+import AppBottomNav, { type NavItem } from "./AppBottomNav";
 
 interface Props {
   children: React.ReactNode;
 }
 
-// Client-mode bottom nav tabs
-const CLIENT_NAV = [
-  { href: "/client-preview", label: "Home",      icon: "ti-home" },
-  { href: "/workout",                   label: "Workout",   icon: "ti-barbell" },
-  { href: "/client-preview/nutrition",  label: "Nutrition", icon: "ti-salad" },
-  { href: "/client-preview/progress",   label: "Progress",  icon: "ti-chart-line" },
-  { href: "/messages",                  label: "Messages",  icon: "ti-message-circle" },
-  { href: "/settings", label: "Settings", icon: "ti-settings" },
+// Client-mode bottom nav tabs — SAME tabs/order/icons as the real client
+// BottomNav (rendered by the shared AppBottomNav). Hrefs point at the routes
+// that render the identical client component for the trainer's own data:
+// /home & /nutrition are client-mode-aware on their real route; progress uses
+// its client-preview route (real /progress still shows the trainer selector).
+const CLIENT_NAV: NavItem[] = [
+  { href: "/home",                     label: "Home",     icon: "ti-home",          activeMatch: "/home" },
+  { href: "/workout",                  label: "Workout",  icon: "ti-barbell" },
+  { href: "/nutrition",                label: "Nutrition", icon: "ti-salad" },
+  { href: "/client-preview/progress",  label: "Progress", icon: "ti-chart-line",    activeMatch: "/client-preview/progress" },
+  { href: "/messages",                 label: "Messages", icon: "ti-message-circle", badge: "messages" },
+  { href: "/settings",                 label: "Settings", icon: "ti-settings" },
 ];
 
 export default function TrainerLayoutWrapper({ children }: Props) {
   const [clientMode, setClientMode] = useState(false);
   const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
     const stored = localStorage.getItem("symmetry_view_mode");
@@ -42,7 +45,10 @@ export default function TrainerLayoutWrapper({ children }: Props) {
     } else {
       document["cookie"] = "symmetry_client_mode=; path=/; max-age=0";
     }
-    router.push(next ? "/client-preview" : "/home");
+    // Both modes land on /home — the real client route which, with the
+    // client-mode cookie set, renders the identical ClientDashboard. Keeps the
+    // Client View on the same pages a real client uses.
+    router.push("/home");
   }
 
   // ── CLIENT MODE ───────────────────────────────────────────────────────────
@@ -75,21 +81,11 @@ export default function TrainerLayoutWrapper({ children }: Props) {
 
         <SessionDock />
 
-        {/* Client bottom nav */}
-        <div className="fixed bottom-0 left-0 right-0 z-40 flex items-end"
-          style={{ background: "var(--brand-surface)", borderTop: "1px solid var(--brand-border)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-          {CLIENT_NAV.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
-            return (
-              <Link key={item.href} href={item.href}
-                className="flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors"
-                style={{ color: active ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>
-                <i className={`ti ${item.icon} text-xl`} />
-                <span className="text-[10px] font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
+        {/* Client bottom nav — the SAME shared component as the real client
+            BottomNav (identical tabs/order/icons/active-state + Messages unread
+            badge). Only the hrefs differ (client-preview routes for the pages
+            that aren't yet client-mode-aware on their real route). */}
+        <AppBottomNav items={CLIENT_NAV} />
 
       </div>
     );

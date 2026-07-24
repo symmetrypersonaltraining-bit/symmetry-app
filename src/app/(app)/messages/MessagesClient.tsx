@@ -251,7 +251,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
           </button>
           <textarea ref={inputRef as never} rows={2} onInput={(e) => { const t = e.currentTarget as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160) + "px"; }} value={body} onChange={e => setBody(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder="Message..." className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
+            placeholder={isGroup ? "Message the group..." : isTrainer ? "Message..." : "Message your coach..."} className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
             style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} ></textarea>
           <button onClick={handleSend} disabled={(!body.trim() && !attachFile) || sending}
             className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
@@ -444,22 +444,10 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
         <Link href="/messages?client=group" style={pill(isGroup) as any}>Group</Link>
       </div>
       <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--brand-border)", fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>{clientTitle}</div>
-      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>{ThreadPanel()}</div>
-      <div style={{ padding: 10, borderTop: "1px solid var(--brand-border)" }}>
-        {attachPreview && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <img src={attachPreview} alt="Attachment preview" style={{ height: 56, borderRadius: 8 }} />
-            <button onClick={clearAttach} aria-label="Remove attachment" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brand-text-secondary)" }}><i className="ti ti-x" /></button>
-          </div>
-        )}
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => fileRef.current?.click()} disabled={sending} aria-label="Attach image" title="Attach image" style={{ border: "1px solid var(--brand-border)", borderRadius: 999, width: 42, flexShrink: 0, background: "var(--brand-surface)", color: "var(--brand-text-secondary)", cursor: "pointer" }}>
-            <i className="ti ti-camera" />
-          </button>
-          <textarea ref={inputRef as never} rows={1} value={body} onChange={(e) => setBody(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} onInput={(e) => { const t = e.currentTarget as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 140) + "px"; }} placeholder={isGroup ? "Message the group..." : "Message your coach..."} style={{ flex: 1, resize: "none", borderRadius: 16, border: "1px solid var(--brand-border)", padding: "10px 12px", fontSize: 14, background: "var(--brand-surface)", color: "var(--brand-text)", fontFamily: "inherit" }} />
-          <button onClick={handleSend} disabled={sending || (!body.trim() && !attachFile)} style={{ border: "none", borderRadius: 999, padding: "0 18px", fontWeight: 800, fontSize: 14, background: "var(--brand-primary)", color: "#fff", cursor: "pointer", opacity: sending || (!body.trim() && !attachFile) ? 0.5 : 1 }}>Send</button>
-        </div>
-      </div>
+      {/* Single composer: ThreadPanel renders the message list AND the composer,
+          exactly like the trainer layout. (Previously a second composer was
+          appended here → double input box on the client view.) */}
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{ThreadPanel()}</div>
     </div>
   );
 }
