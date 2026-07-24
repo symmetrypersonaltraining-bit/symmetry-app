@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { startDictation } from "@/lib/dictation";
 
 interface SwapDay { id: string; label: string; }
 interface OffPlanRow { id: string; description: string; details: string | null; status: string; }
@@ -25,7 +26,19 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
   const [image, setImage] = useState<{ data: string; media_type: string; preview: string } | null>(null);
   const [result, setResult] = useState<(GenResult & { dayId: string; logged: boolean }) | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const recRef = useRef<{ stop?: () => void } | null>(null);
+
+  function toggleMic() {
+    if (listening) { try { recRef.current?.stop?.(); } catch { /* noop */ } setListening(false); return; }
+    recRef.current = startDictation({
+      onResult: (t: string) => setAiPrompt((p) => (p ? p + " " + t : t)),
+      onStart: () => setListening(true),
+      onEnd: () => setListening(false),
+      onUnavailable: () => { setListening(false); alert("Voice isn't available here yet — you can type instead."); },
+    }) as { stop?: () => void } | null;
+  }
 
   useEffect(() => {
     let on = true;
@@ -130,7 +143,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
   const box: React.CSSProperties = { background: "var(--brand-surface)", border: "1px solid var(--brand-border)", borderRadius: 18 };
   const field: React.CSSProperties = { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" };
 
-  function reset() { setMode("menu"); setAiPrompt(""); setImage(null); setResult(null); setAiError(null); }
+  function reset() { try { recRef.current?.stop?.(); } catch { /* noop */ } setListening(false); setMode("menu"); setAiPrompt(""); setImage(null); setResult(null); setAiError(null); }
 
   const resultCard = result && (
     <div className="p-3 mt-2" style={box}>
@@ -226,9 +239,17 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
                 <input ref={fileRef} type="file" accept="image/*" onChange={pickImage} style={{ display: "none" }} />
               </div>
             )}
-            <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} rows={2}
-              placeholder={mode === "replace" ? "e.g. In a hotel with dumbbells only, keep it upper body" : mode === "equipment" ? "e.g. Pull-up bar, resistance bands, one 30lb dumbbell" : "e.g. Played beach volleyball for about an hour"}
-              className="w-full rounded-2xl p-3 text-sm outline-none resize-none" style={field} />
+            <div style={{ position: "relative" }}>
+              <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} rows={2}
+                placeholder={mode === "replace" ? "Speak or type — e.g. In a hotel with dumbbells only, keep it upper body" : mode === "equipment" ? "Speak or type what you have — e.g. Pull-up bar, bands, one 30lb dumbbell" : "Speak or type — e.g. Played beach volleyball for about an hour"}
+                className="w-full rounded-2xl p-3 text-sm outline-none resize-none" style={{ ...field, paddingRight: 44 }} />
+              <button type="button" onClick={toggleMic} aria-label={listening ? "Stop voice" : "Speak"}
+                className="absolute flex items-center justify-center rounded-full"
+                style={{ right: 8, bottom: 8, width: 32, height: 32, background: listening ? "#ef4444" : "var(--brand-primary)", border: "none" }}>
+                <i className={`ti ${listening ? "ti-player-stop-filled" : "ti-microphone"} text-sm text-white`} />
+              </button>
+            </div>
+            {listening && <p className="text-[11px] mt-1" style={{ color: "var(--brand-primary)" }}>🎤 Listening… tap the mic to stop.</p>}
             {aiError && <p className="text-xs mt-2" style={{ color: "#ef4444" }}>{aiError}</p>}
             <button onClick={() => generate(mode)} disabled={busy || (mode !== "replace" && !aiPrompt.trim() && !(mode === "equipment" && image))}
               className="w-full mt-2 py-2.5 rounded-full text-xs font-bold text-white"
