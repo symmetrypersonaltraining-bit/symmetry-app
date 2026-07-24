@@ -521,7 +521,10 @@ export default function NutritionV3Client(props: Props) {
   const dragRef = useRef<{
     key: string; startY: number; startX: number; pointerId: number;
     timer: ReturnType<typeof setTimeout> | null; active: boolean; ghost: HTMLElement | null; offY: number;
+    handleEl: HTMLElement;
   } | null>(null);
+  const moveHandlerRef = useRef<((e: PointerEvent) => void) | null>(null);
+  const upHandlerRef = useRef<((e: PointerEvent) => void) | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const displayRows = useMemo(() => {
@@ -562,17 +565,40 @@ export default function NutritionV3Client(props: Props) {
     toast.success("Reordered ✓");
   }
 
+  function detachDrag() {
+    if (moveHandlerRef.current) window.removeEventListener("pointermove", moveHandlerRef.current);
+    if (upHandlerRef.current) {
+      window.removeEventListener("pointerup", upHandlerRef.current);
+      window.removeEventListener("pointercancel", upHandlerRef.current);
+    }
+    moveHandlerRef.current = null;
+    upHandlerRef.current = null;
+  }
+
+  // Drag is engaged ONLY from the ⠿ handle. A pointerdown anywhere else on the
+  // row never reaches this, so normal swipes scroll natively. We don't even
+  // attach move listeners until the handle is pressed, and we never
+  // preventDefault (which is what kills scroll) until a hold actually activates.
   function onHandleDown(e: React.PointerEvent, key: string) {
-    const rowEl = (e.target as HTMLElement).closest("[data-rowkey]") as HTMLElement | null;
+    const handleEl = e.currentTarget as HTMLElement;
+    const rowEl = handleEl.closest("[data-rowkey]") as HTMLElement | null;
     if (!rowEl) return;
+    // Clear any stale/previous drag session before starting a new one.
+    if (dragRef.current?.timer) clearTimeout(dragRef.current.timer);
+    if (dragRef.current?.ghost) { try { dragRef.current.ghost.remove(); } catch { /* noop */ } }
+    detachDrag();
     const rect = rowEl.getBoundingClientRect();
     const st = {
       key, startY: e.clientY, startX: e.clientX, pointerId: e.pointerId,
-      timer: null as ReturnType<typeof setTimeout> | null, active: false, ghost: null as HTMLElement | null, offY: e.clientY - rect.top,
+      timer: null as ReturnType<typeof setTimeout> | null, active: false,
+      ghost: null as HTMLElement | null, offY: e.clientY - rect.top, handleEl,
     };
     st.timer = setTimeout(() => {
-      // ~400ms hold → lift
+      // ~400ms STILL-hold on the handle → lift into drag. Capture the pointer
+      // now (only once active) so the gesture stays with the handle.
       st.active = true;
+      st.timer = null;
+      try { handleEl.setPointerCapture(st.pointerId); } catch { /* noop */ }
       const ghost = rowEl.cloneNode(true) as HTMLElement;
       ghost.style.position = "fixed";
       ghost.style.zIndex = "2000";
@@ -590,38 +616,44 @@ export default function NutritionV3Client(props: Props) {
       try { navigator.vibrate?.(10); } catch { /* noop */ }
     }, 400);
     dragRef.current = st;
-  }
 
-  useEffect(() => {
-    function onMove(e: PointerEvent) {
-      const st = dragRef.current;
-      if (!st) return;
-      if (!st.active) {
-        // short press + move = scroll intent → cancel the pending lift
-        const dx = e.clientX - st.startX, dy = e.clientY - st.startY;
-        if (Math.sqrt(dx * dx + dy * dy) > 10 && st.timer) { clearTimeout(st.timer); dragRef.current = null; }
+    const onMove = (ev: PointerEvent) => {
+      const s = dragRef.current;
+      if (!s) return;
+      if (!s.active) {
+        // Movement before the hold fires = scroll intent → bail out and let the
+        // browser scroll. (Movement wins over hold.)
+        const dx = ev.clientX - s.startX, dy = ev.clientY - s.startY;
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+          if (s.timer) clearTimeout(s.timer);
+          dragRef.current = null;
+          detachDrag();
+        }
         return;
       }
-      e.preventDefault();
-      if (st.ghost) st.ghost.style.top = (e.clientY - st.offY) + "px";
+      // Active drag ONLY: now we own the gesture, so suppress scroll.
+      ev.preventDefault();
+      if (s.ghost) s.ghost.style.top = (ev.clientY - s.offY) + "px";
       const container = listRef.current;
       if (!container) return;
       const els = Array.from(container.querySelectorAll("[data-rowkey]")) as HTMLElement[];
       let over = els.length - 1;
-      for (let i = 0; i < els.length; i++) {
-        const rc = els[i].getBoundingClientRect();
-        if (e.clientY < rc.top + rc.height / 2) { over = i; break; }
+      for (let k = 0; k < els.length; k++) {
+        const rc = els[k].getBoundingClientRect();
+        if (ev.clientY < rc.top + rc.height / 2) { over = k; break; }
       }
       setDragState((prev) => (prev ? { ...prev, overIdx: over } : prev));
-    }
-    function onUp() {
-      const st = dragRef.current;
-      if (!st) return;
-      if (st.timer) clearTimeout(st.timer);
-      if (st.ghost) st.ghost.remove();
+    };
+    const onUp = () => {
+      const s = dragRef.current;
+      detachDrag();
+      if (!s) return;
+      if (s.timer) clearTimeout(s.timer);
+      if (s.ghost) s.ghost.remove();
+      try { s.handleEl.releasePointerCapture(s.pointerId); } catch { /* noop */ }
       dragRef.current = null;
       setDragState((ds) => {
-        if (st.active && ds) {
+        if (s.active && ds) {
           const idx = rows.findIndex((x) => x.key === ds.key);
           if (idx >= 0 && ds.overIdx !== idx) {
             const copy = [...rows];
@@ -632,17 +664,23 @@ export default function NutritionV3Client(props: Props) {
         }
         return null;
       });
-    }
+    };
+    moveHandlerRef.current = onMove;
+    upHandlerRef.current = onUp;
+    // Non-passive move listener attached ONLY for this drag session (removed on
+    // up/cancel/scroll-bail) so it can never interfere with normal scrolling.
     window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-    };
+  }
+
+  // Clean up any in-flight drag on unmount.
+  useEffect(() => () => {
+    if (dragRef.current?.timer) clearTimeout(dragRef.current.timer);
+    if (dragRef.current?.ghost) { try { dragRef.current.ghost.remove(); } catch { /* noop */ } }
+    detachDrag();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows]);
+  }, []);
 
   // ---- sheet helpers ------------------------------------------------------
   function openSheet(s: NonNullable<SheetState>) { setSheetStack((prev) => [...prev, s]); }
@@ -1194,7 +1232,7 @@ export default function NutritionV3Client(props: Props) {
       <p className="mx-4 mt-4 mb-2" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: "var(--brand-text-secondary)" }}>
         {openMode ? "TODAY — TAP A SLOT TO BUILD · ⋯ FOR MORE" : "MEALS — TAP CIRCLE TO LOG FULL · ⋯ FOR MORE · HOLD ⠿ TO MOVE"}
       </p>
-      <div ref={listRef} className="px-4">
+      <div ref={listRef} className="px-4" style={{ touchAction: "pan-y" }}>
         {insertLine(0)}
         {displayRows.map((row, i) => {
           const mm = rowMacros(row);
