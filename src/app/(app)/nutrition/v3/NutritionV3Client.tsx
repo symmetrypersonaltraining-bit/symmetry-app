@@ -759,7 +759,7 @@ export default function NutritionV3Client(props: Props) {
       const mealId = (mealRow as { id: string }).id;
       const itemsPayload = dm.items.map((it, j) => ({
         meal_id: mealId, food: it.food, amount: it.amount ?? 1, unit: it.unit || "serving",
-        is_unlimited: !!it.free, basis: it.basis ?? null,
+        is_unlimited: !!it.free, basis: it.basis === "cooked" || it.basis === "raw" ? it.basis : null,
         protein: r(it.p || 0), carbs: r(it.c || 0), fats: r(it.f || 0),
         position: j + 1,
       }));
@@ -787,7 +787,7 @@ export default function NutritionV3Client(props: Props) {
           name: slot?.name || rw.meta!.name || "Meal",
           timing: rw.meta?.time || slot?.time || null,
           items: (rw.meta!.items || []).map((it) => ({
-            food: it.n, amount: 1, unit: it.a || "serving", basis: it.a || null, free: !!it.free,
+            food: it.n, amount: 1, unit: it.a || "serving", basis: null, free: !!it.free,
             p: (it.p || 0) * (it.fac ?? 1), c: (it.c || 0) * (it.fac ?? 1), f: (it.f || 0) * (it.fac ?? 1),
           })),
         };
