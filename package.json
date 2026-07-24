@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:unit": "node --import tsx --test tests/unit/*.test.ts && node scripts/test-nutrition-ai.cjs",
+    "test:e2e": "playwright test",
+    "test:all": "npm run test:unit && npm run test:e2e"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",

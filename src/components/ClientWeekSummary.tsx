@@ -75,7 +75,7 @@ export default function ClientWeekSummary() {
         const [swLast, swThis, mealsLast, metricsRows, wlogs] = await Promise.all([
           supabase.from("scheduled_workouts").select("status, scheduled_date").is("deleted_at", null).eq("client_id", clientId).gte("scheduled_date", lastWkStart).lte("scheduled_date", lastWkEnd),
           supabase.from("scheduled_workouts").select("id").is("deleted_at", null).eq("client_id", clientId).gte("scheduled_date", thisWk).lte("scheduled_date", thisWkEnd),
-          supabase.from("meal_adherence_logs").select("adherence, log_date").eq("client_id", clientId).gte("log_date", lastWkStart).lte("log_date", lastWkEnd),
+          supabase.from("meal_adherence_logs").select("adherence, log_date, item_overrides").eq("client_id", clientId).gte("log_date", lastWkStart).lte("log_date", lastWkEnd),
           supabase.from("metrics").select("metric_date, weight").eq("client_id", clientId).gte("metric_date", metricWindow).order("metric_date", { ascending: true }),
           supabase.from("workout_logs").select("log_date, completed, status").eq("client_id", clientId).gte("log_date", addDays(today, -60)).order("log_date", { ascending: false }),
         ]);
@@ -85,7 +85,12 @@ export default function ClientWeekSummary() {
         const done = lastRows.filter((r: any) => r.status === "completed").length;
         const thisWeekCount = (swThis.data || []).length;
 
-        const meals = mealsLast.data || [];
+        // v3 placeholder rows (unlogged/removed stubs, ordering-only rows with
+        // no adherence) aren't real logs — exclude them from the counts.
+        const meals = (mealsLast.data || []).filter((m: any) => {
+          const ov = m.item_overrides || {};
+          return m.adherence && !ov.__unlogged && !ov.__removed && !ov.__custom?.unlogged;
+        });
         let nutritionPct: number | null = null;
         if (meals.length) {
           const onplan = meals.filter((m: any) => { const a = (m.adherence || "").toLowerCase(); return a === "full" || a === "partial" || a === "on-plan" || a === "on plan"; }).length;

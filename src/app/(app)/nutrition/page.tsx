@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import MealPlanClient from "./MealPlanClient";
+import NutritionV3Client from "./v3/NutritionV3Client";
 import NutritionAverages from "@/components/NutritionAverages";
+import AveragesStrip from "@/components/nutrition/AveragesStrip";
 import ClientSelector from "@/components/ClientSelector";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -78,8 +80,21 @@ export default async function NutritionPage({
   let todayLogs: any[] = [];
   let macroTarget: any = null;
   let weekLogs: any[] = [];
+  let nutritionV3 = false;
+  let incomingPlan: any = null;
 
   if (clientId) {
+    // Feature flag: client_app_settings.nutrition_v3 → new one-tap logger.
+    // Tolerates the column not existing yet (flag stays off, old UI renders).
+    try {
+      const { data: settings } = await supabase
+        .from("client_app_settings")
+        .select("nutrition_v3")
+        .eq("client_id", clientId)
+        .maybeSingle();
+      nutritionV3 = (settings as any)?.nutrition_v3 === true;
+    } catch { nutritionV3 = false; }
+
     const [mpRes, tlRes, mtRes, wlRes] = await Promise.all([
       supabase
         .from("meal_plans")
@@ -115,6 +130,19 @@ export default async function NutritionPage({
     todayLogs = tlRes.data || [];
     macroTarget = mtRes.data;
     weekLogs = wlRes.data || [];
+
+    if (nutritionV3) {
+      // Staged/incoming plan (effective in the future) for the banner.
+      const { data: inc } = await supabase
+        .from("meal_plans")
+        .select("id, version_number, effective_date, change_reason")
+        .eq("client_id", clientId)
+        .gt("effective_date", today)
+        .order("effective_date", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      incomingPlan = inc || null;
+    }
   }
 
   // Trainer NOT in client mode and no clientId from URL → show picker
@@ -147,6 +175,18 @@ export default async function NutritionPage({
         </div>
       )}
       <>
+      {nutritionV3 ? (
+        <NutritionV3Client
+          clientId={clientId!}
+          clientName={clientName}
+          mealPlan={mealPlan as any}
+          incomingPlan={incomingPlan as any}
+          todayLogs={todayLogs}
+          macroTarget={macroTarget as any}
+          today={today}
+          isTrainer={isTrainer}
+        />
+      ) : (
       <MealPlanClient
         clientId={clientId!}
         clientName={clientName}
@@ -157,9 +197,16 @@ export default async function NutritionPage({
         today={today}
         isTrainer={isTrainer}
       />
+      )}
       {isTrainer && (
         <div className="mt-4">
-          <NutritionAverages clientId={clientId!} today={today} />
+          {nutritionV3 ? (
+            // v3 clients: shared averages strip (canonical dailyTotals calc —
+            // understands the v3 log protocol, so trainer numbers match the client's).
+            <div className="px-4"><AveragesStrip clientId={clientId!} today={today} /></div>
+          ) : (
+            <NutritionAverages clientId={clientId!} today={today} />
+          )}
         </div>
       )}
       </>

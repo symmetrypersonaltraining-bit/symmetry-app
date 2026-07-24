@@ -93,8 +93,10 @@ export default function TrainerWeekDigest() {
           supabase.from("clients").select("id, name, weekly_focus, digest_snoozed_until"),
           supabase.from("scheduled_workouts").select("client_id").is("deleted_at", null).gte("scheduled_date", thisWk).lte("scheduled_date", thisWkEnd),
           supabase.from("workout_logs").select("client_id, log_date, completed, status").gte("log_date", recent),
-          supabase.from("meal_adherence_logs").select("client_id, adherence, log_date").gte("log_date", thisWk).lte("log_date", today),
-          supabase.from("meal_adherence_logs").select("client_id").gte("log_date", foodWindow).limit(10000),
+          supabase.from("meal_adherence_logs").select("client_id, adherence, log_date, item_overrides").gte("log_date", thisWk).lte("log_date", today),
+          // "ever logs food": null-adherence rows are v3 ordering/edit stubs and
+          // Skipped-only history isn't real food logging — filter server-side.
+          supabase.from("meal_adherence_logs").select("client_id").gte("log_date", foodWindow).not("adherence", "is", null).neq("adherence", "Skipped").limit(10000),
         ]);
 
         const clients = clientsRes.data || [];
@@ -112,7 +114,13 @@ export default function TrainerWeekDigest() {
             if (l.log_date >= thisWk && l.log_date <= today) (weekDone[l.client_id] = weekDone[l.client_id] || new Set<string>()).add(l.log_date);
           }
         }
-        for (const m of (mealsWeek.data || [])) { const k = m.client_id; (mealsByC[k] = mealsByC[k] || { on: 0, tot: 0 }); mealsByC[k].tot++; const a = (m.adherence || "").toLowerCase(); if (a === "full" || a === "partial" || a === "on-plan" || a === "on plan") mealsByC[k].on++; }
+        for (const m of (mealsWeek.data || [])) {
+          // v3 placeholder rows (unlogged/removed stubs, or ordering-only rows
+          // with no adherence) aren't real logs — don't count them.
+          const ov = m.item_overrides || {};
+          if (!m.adherence || ov.__unlogged || ov.__removed || ov.__custom?.unlogged) continue;
+          const k = m.client_id; (mealsByC[k] = mealsByC[k] || { on: 0, tot: 0 }); mealsByC[k].tot++; const a = (m.adherence || "").toLowerCase(); if (a === "full" || a === "partial" || a === "on-plan" || a === "on plan") mealsByC[k].on++;
+        }
         for (const f of (foodEver.data || [])) foodEverSet.add(f.client_id);
 
         const out: Row[] = [];

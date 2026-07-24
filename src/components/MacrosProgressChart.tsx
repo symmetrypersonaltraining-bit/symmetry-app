@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { computeDayTotals, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
 
 type Daily = { date: string; calories: number; protein: number; carbs: number; fats: number };
 const RANGES = ["1wk", "2wk", "4wk", "8wk", "Custom"];
@@ -27,35 +28,34 @@ export default function MacrosProgressChart({ clientId }: { clientId: string | n
     let active = true;
     (async () => {
       setLoading(true);
+      // Data computed through the canonical dailyTotals module (NutritionV3) so
+      // this chart, the macro bar and the averages strips always agree —
+      // adherence is properly prorated, Skipped counts 0, item overrides and
+      // the v3 log protocol (custom meals, placeholders) are all respected.
       const { data: logs } = await (supabase as any)
         .from("meal_adherence_logs")
-        .select("log_date, adherence, est_kcal, est_protein, est_carbs, est_fats, meal_id")
+        .select("*")
         .eq("client_id", clientId)
         .order("log_date");
-      const rows = (logs || []) as any[];
+      const rows = (logs || []) as (LogRow & { log_date: string })[];
       const mealIds = Array.from(new Set(rows.map(r => r.meal_id).filter(Boolean)));
-      const planned: Record<string, { p: number; c: number; f: number }> = {};
+      const pseudoMeals: PlanMeal[] = [];
       if (mealIds.length) {
-        const { data: items } = await (supabase as any).from("meal_items").select("meal_id, protein, carbs, fats").in("meal_id", mealIds);
+        const { data: items } = await (supabase as any).from("meal_items").select("id, meal_id, food, amount, unit, is_unlimited, protein, carbs, fats, position").in("meal_id", mealIds);
+        const byMeal: Record<string, PlanMeal> = {};
         for (const it of (items || []) as any[]) {
-          const m = planned[it.meal_id] || (planned[it.meal_id] = { p: 0, c: 0, f: 0 });
-          m.p += Number(it.protein || 0); m.c += Number(it.carbs || 0); m.f += Number(it.fats || 0);
+          const m = byMeal[it.meal_id] || (byMeal[it.meal_id] = { id: String(it.meal_id), name: "", timing: null, position: 0, meal_items: [] });
+          m.meal_items.push({ id: String(it.id), food: String(it.food || ""), amount: it.amount, unit: it.unit, is_unlimited: !!it.is_unlimited, protein: it.protein, carbs: it.carbs, fats: it.fats, position: Number(it.position) || 0 });
         }
+        pseudoMeals.push(...Object.values(byMeal));
       }
       if (!active) return;
-      const byDate: Record<string, Daily> = {};
-      for (const row of rows) {
-        const pl = planned[row.meal_id] || { p: 0, c: 0, f: 0 };
-        const skip = (row.adherence || "").toLowerCase() === "skip";
-        const kcal = row.est_kcal != null ? Number(row.est_kcal) : (skip ? 0 : 4*pl.p + 4*pl.c + 9*pl.f);
-        const pr = row.est_protein != null ? Number(row.est_protein) : (skip ? 0 : pl.p);
-        const ca = row.est_carbs != null ? Number(row.est_carbs) : (skip ? 0 : pl.c);
-        const fa = row.est_fats != null ? Number(row.est_fats) : (skip ? 0 : pl.f);
-        const d = byDate[row.log_date] || (byDate[row.log_date] = { date: row.log_date, calories: 0, protein: 0, carbs: 0, fats: 0 });
-        d.calories += kcal; d.protein += pr; d.carbs += ca; d.fats += fa;
-      }
-      const arr = Object.values(byDate).map(d => ({ date: d.date, calories: Math.round(d.calories), protein: Math.round(d.protein), carbs: Math.round(d.carbs), fats: Math.round(d.fats) }))
-        .sort((a,b) => a.date < b.date ? -1 : 1);
+      const byDate: Record<string, (LogRow & { log_date: string })[]> = {};
+      for (const row of rows) (byDate[row.log_date] ||= []).push(row);
+      const arr = Object.keys(byDate).map(date => {
+        const t = computeDayTotals(byDate[date], pseudoMeals);
+        return { date, calories: Math.round(t.kcal), protein: Math.round(t.protein), carbs: Math.round(t.carbs), fats: Math.round(t.fats) };
+      }).sort((a,b) => a.date < b.date ? -1 : 1);
       setDaily(arr);
       setLoading(false);
     })();
