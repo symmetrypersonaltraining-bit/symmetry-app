@@ -217,6 +217,124 @@ test("verify result: corrected macros normalized, kcal derived when absent", () 
   assert.strictEqual(nj.validateVerifyResult({ plausible: true }), null);
 });
 
+console.log("\nnutrition-json: /act validation (validateActReply)");
+test("valid swap_meal: items normalized, kcal derived, name defaulted from new_name", () => {
+  const r = nj.validateActReply({
+    intent: "swap_meal",
+    params: { position: 4, new_name: "Salmon + rice", items: [
+      { name: "salmon", amount: 6, unit: "oz", p: 34, c: 0, f: 11 },
+      { name: "jasmine rice", amount: 1, unit: "cup", p: 4, c: 45, f: 0, kcal: 205 },
+    ] },
+    confirmation: "Swap M3 → Salmon + rice (est 520 kcal · 38P/45C/11F)?",
+    reply: "Good call — salmon is an easy protein swap.",
+  });
+  assert.ok(r);
+  assert.strictEqual(r.intent, "swap_meal");
+  assert.strictEqual(r.params.meal.position, 4);
+  assert.strictEqual(r.params.name, "Salmon + rice");
+  assert.strictEqual(r.params.items[0].kcal, Math.round(34 * 4 + 0 * 4 + 11 * 9)); // derived
+  assert.strictEqual(r.params.items[1].kcal, 205);
+  assert.ok(r.confirmation && r.reply);
+});
+test("valid move_meal by names only (positions null, refs kept for fuzzy resolution)", () => {
+  const r = nj.validateActReply({
+    intent: "move_meal",
+    params: { from_name: "snack", to_name: "dinner" },
+    confirmation: "Move Snack after Dinner?",
+    reply: "Sure.",
+  });
+  assert.ok(r);
+  assert.deepStrictEqual(r.params.from, { position: null, name: "snack" });
+  assert.deepStrictEqual(r.params.to, { position: null, name: "dinner" });
+});
+test("log_meal: adherence defaults to Full; 'half' normalizes to 1/2", () => {
+  const base = { intent: "log_meal", confirmation: "Log M2 as eaten?", reply: "Logging it." };
+  assert.strictEqual(nj.validateActReply({ ...base, params: { position: 2 } }).params.adherence, "Full");
+  assert.strictEqual(nj.validateActReply({ ...base, params: { position: 2, adherence: "half" } }).params.adherence, "1/2");
+  assert.strictEqual(nj.validateActReply({ ...base, params: { position: 2, adherence: "nonsense" } }).params.adherence, "Full");
+});
+test("add_snack: items required + normalized, name defaults to item join", () => {
+  const r = nj.validateActReply({
+    intent: "add_snack",
+    params: { items: [{ name: "oreo", p: 0.5, c: 8.3, f: 2.3 }] },
+    confirmation: "Add 1 Oreo (est 55 kcal) as an extra?",
+    reply: "No stress — one cookie logged honestly beats a perfect fake day.",
+  });
+  assert.ok(r);
+  assert.strictEqual(r.params.name, "oreo");
+  assert.strictEqual(r.params.items[0].kcal, Math.round(0.5 * 4 + 8.3 * 4 + 2.3 * 9));
+});
+test("intent none passes through with clarify flag; confirmation forced null", () => {
+  const r = nj.validateActReply({ intent: "none", params: { clarify: true }, confirmation: "ignored", reply: "Which meal do you mean?" });
+  assert.ok(r);
+  assert.strictEqual(r.intent, "none");
+  assert.strictEqual(r.params.clarify, true);
+  assert.strictEqual(r.confirmation, null);
+});
+test("malformed replies return null (→ callClaudeJson retries once)", () => {
+  assert.strictEqual(nj.validateActReply(null), null);
+  assert.strictEqual(nj.validateActReply("swap it"), null);
+  assert.strictEqual(nj.validateActReply({ intent: "eat_meal", params: {}, confirmation: "x", reply: "y" }), null); // unknown intent
+  assert.strictEqual(nj.validateActReply({ intent: "swap_meal", params: { position: 4 }, confirmation: "x", reply: "y" }), null); // no items
+  assert.strictEqual(nj.validateActReply({ intent: "swap_meal", params: { position: 4, items: [{ amount: 1 }] }, confirmation: "x", reply: "y" }), null); // item w/o name
+  assert.strictEqual(nj.validateActReply({ intent: "delete_meal", params: { position: 4 }, reply: "y" }), null); // action without confirmation
+  assert.strictEqual(nj.validateActReply({ intent: "delete_meal", params: {}, confirmation: "x", reply: "y" }), null); // no meal reference
+  assert.strictEqual(nj.validateActReply({ intent: "move_meal", params: { from_position: 1 }, confirmation: "x", reply: "y" }), null); // move without a target
+  assert.strictEqual(nj.validateActReply({ intent: "none", params: {} }), null); // none without reply
+});
+
+console.log("\nnutrition-json: /act meal resolution (finalizeAct / resolveMealRef)");
+const actDay = [
+  { position: 1, label: "M1", name: "Oats & eggs", logged: true },
+  { position: 3, label: "M2", name: "Chicken & rice", logged: false },
+  { position: 4, label: "M3", name: "Greek yogurt bowl", logged: false },
+  { position: 5, label: "M4", name: "Chicken salad", logged: false },
+];
+const mkAct = (intent, params) => ({ intent, params, confirmation: "Do it?", reply: "ok" });
+test("exact position resolves as-is", () => {
+  const r = nj.finalizeAct(mkAct("delete_meal", { meal: { position: 4, name: null } }), actDay);
+  assert.strictEqual(r.intent, "delete_meal");
+  assert.strictEqual(r.params.meal.position, 4);
+});
+test("unique fuzzy name resolves ('greek yogurt' → position 4)", () => {
+  assert.strictEqual(nj.resolveMealRef({ position: null, name: "greek yogurt" }, actDay).position, 4);
+  const r = nj.finalizeAct(mkAct("log_meal", { meal: { position: null, name: "greek yogurt" }, adherence: "Full" }), actDay);
+  assert.strictEqual(r.intent, "log_meal");
+  assert.strictEqual(r.params.meal.position, 4);
+});
+test("label refs resolve by display order ('M2' / 'meal 2' → 2nd meal, position 3)", () => {
+  assert.strictEqual(nj.resolveMealRef({ position: null, name: "M2" }, actDay).position, 3);
+  assert.strictEqual(nj.resolveMealRef({ position: null, name: "meal 2" }, actDay).position, 3);
+});
+test("ambiguous name ('chicken' matches two) → intent none + clarify listing both", () => {
+  const res = nj.resolveMealRef({ position: null, name: "chicken" }, actDay);
+  assert.strictEqual(res.position, null);
+  assert.strictEqual(res.ambiguous.length, 2);
+  const r = nj.finalizeAct(mkAct("unlog_meal", { meal: { position: null, name: "chicken" } }), actDay);
+  assert.strictEqual(r.intent, "none");
+  assert.strictEqual(r.params.clarify, true);
+  assert.ok(r.reply.includes("Chicken & rice") && r.reply.includes("Chicken salad"));
+  assert.strictEqual(r.confirmation, null); // nothing confirmable — never guesses
+});
+test("unknown position with no name → clarify with today's meal list", () => {
+  const r = nj.finalizeAct(mkAct("delete_meal", { meal: { position: 9, name: null } }), actDay);
+  assert.strictEqual(r.intent, "none");
+  assert.strictEqual(r.params.clarify, true);
+  assert.ok(r.reply.includes("M1 Oats & eggs"));
+});
+test("copy_meal: missing 'to' stays null (end of day); resolvable 'to' resolves", () => {
+  const r = nj.finalizeAct(mkAct("copy_meal", { from: { position: 1, name: null }, to: null }), actDay);
+  assert.strictEqual(r.intent, "copy_meal");
+  assert.strictEqual(r.params.to, null);
+  const r2 = nj.finalizeAct(mkAct("copy_meal", { from: { position: 1, name: null }, to: { position: null, name: "chicken salad" } }), actDay);
+  assert.strictEqual(r2.params.to.position, 5);
+});
+test("move_meal onto itself → clarify instead of a no-op write", () => {
+  const r = nj.finalizeAct(mkAct("move_meal", { from: { position: 3, name: null }, to: { position: null, name: "chicken & rice" } }), actDay);
+  assert.strictEqual(r.intent, "none");
+  assert.strictEqual(r.params.clarify, true);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 fs.rmSync(outDir, { recursive: true, force: true });
 process.exit(failed ? 1 : 0);

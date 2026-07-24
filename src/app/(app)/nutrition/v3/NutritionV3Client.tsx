@@ -22,7 +22,7 @@ import { parseFoodText } from "@/lib/nutrition/parseClient";
 import Sheet from "./Sheet";
 import FoodSearchSheet from "./FoodSearchSheet";
 import ComposerSheet from "./ComposerSheet";
-import CoachChatSheet from "./CoachChatSheet";
+import CoachChatSheet, { CoachActionItem, CoachActions } from "./CoachChatSheet";
 import GroceryListSheet from "../GroceryListSheet";
 import PlanRangeView from "../PlanRangeView";
 import AveragesStrip from "@/components/nutrition/AveragesStrip";
@@ -671,6 +671,106 @@ export default function NutritionV3Client(props: Props) {
     toast.success("Added to your day ✓");
   }
 
+  // ---- coach chat "do-anything" actions -----------------------------------
+  // Thin adapters over the EXISTING write helpers so a confirmed chat action
+  // lands byte-identical with the manual UI (swap/copy/insert/delete/log/
+  // unlog/reorder — est_*+off_plan protocol, extras at 6/7, undo toasts where
+  // the underlying helper has one). CoachChatSheet only calls these after the
+  // client taps Confirm.
+  function aiItemsToCustom(items: CoachActionItem[]): CustomItem[] {
+    return items.map((it) => ({
+      n: it.name,
+      a: it.amount != null ? `${it.amount}${it.unit ? " " + it.unit : ""}` : null,
+      p: it.p, c: it.c, f: it.f, k: it.kcal || kcalOf(it.p, it.c, it.f),
+      est: true,
+    }));
+  }
+  function rowByPosition(position: number): Row {
+    const row = rows.find((x) => x.position === position);
+    if (!row) throw new Error("that meal isn't on today's list anymore");
+    return row;
+  }
+  function rowItemsForCopy(rw: Row): CustomItem[] {
+    return rw.kind === "custom" && rw.meta
+      ? (JSON.parse(JSON.stringify(rw.meta.items)) as CustomItem[])
+      : (rw.chosen?.meal_items || []).map((it) => ({
+          n: it.food, a: it.amount != null ? `${it.amount}${it.unit ? " " + it.unit : ""}` : null,
+          p: Number(it.protein) || 0, c: Number(it.carbs) || 0, f: Number(it.fats) || 0,
+          k: kcalOf(Number(it.protein) || 0, Number(it.carbs) || 0, Number(it.fats) || 0),
+          free: it.is_unlimited, fac: 1,
+        }));
+  }
+  const coachActions: CoachActions = {
+    // Same write as the composer swap path: custom meta (kind 'swap'), landed
+    // unlogged so the client taps the circle when eaten; saved to My Meals.
+    swapMealCustom: async (position, name, items) => {
+      const row = rowByPosition(position);
+      const meta: CustomMeta = {
+        name, time: rowTime(row), items: aiItemsToCustom(items), kind: "swap",
+        sourceMealId: row.kind === "plan" ? row.chosen?.id ?? null : row.meta?.sourceMealId ?? null,
+        unlogged: true,
+      };
+      await upsertLog(row.position, {
+        meal_id: null, adherence: "Skipped", est_kcal: null, est_protein: null, est_carbs: null, est_fats: null,
+        off_plan_details: name, macros_pending: false,
+        item_overrides: keepOv(row, { __custom: meta }),
+      });
+      await saveMyMeal(name, meta.items);
+      toast.success(`Swapped for “${name}” ✓ — tap the circle when eaten`);
+    },
+    // Place the meal at `from` in the display slot the meal at `to` occupies
+    // (same persistOrder path as drag / move up-down).
+    moveMeal: async (from, to) => {
+      const fi = rows.findIndex((x) => x.position === from);
+      const tiOrig = rows.findIndex((x) => x.position === to);
+      if (fi < 0 || tiOrig < 0) throw new Error("that meal isn't on today's list anymore");
+      if (fi === tiOrig) return;
+      const copy = [...rows];
+      const [moved] = copy.splice(fi, 1);
+      const tiRed = copy.findIndex((x) => x.position === to);
+      copy.splice(fi < tiOrig ? tiRed + 1 : tiRed, 0, moved);
+      await persistOrder(copy);
+      toast.success("Reordered — renumbered ✓");
+    },
+    // Same as "Copy to slot…": items + macros land as an unlogged day-custom
+    // (insert band 21–40) right after `to` (null → end of day).
+    copyMeal: async (from, to) => {
+      const src = rowByPosition(from);
+      const items = rowItemsForCopy(src);
+      if (!items.length) throw new Error("that meal is empty");
+      const srcIdx = rows.findIndex((x) => x.position === from);
+      const at = to == null ? rows.length : (() => {
+        const ti = rows.findIndex((x) => x.position === to);
+        return ti < 0 ? rows.length : ti + 1;
+      })();
+      const nameBase = rowName(src) || rowLabel(src, srcIdx);
+      await insertCustomMeal(at, { name: `${nameBase} (copy)`, time: null, items, kind: "copy" }, false);
+      toast.success("Copied ✓ — meals renumbered");
+    },
+    deleteMeal: async (position) => { await deleteRow(rowByPosition(position)); }, // standard undo toast inside
+    addExtraParsed: async (items, name) => { await addExtra(aiItemsToCustom(items), name); },
+    logMeal: async (position, adherence = "Full") => {
+      const row = rowByPosition(position);
+      if (row.kind === "openslot" && !(row.meta?.items?.length)) throw new Error("that slot is empty — build it first");
+      await setAdherence(row, adherence);
+    },
+    unlogMeal: async (position) => {
+      const row = rowByPosition(position);
+      if (!isLogged(row)) throw new Error("that meal isn't logged yet");
+      await unlogRow(row);
+    },
+  };
+  const coachDayContext = rows.map((row, i) => {
+    const m = rowMacros(row);
+    return {
+      position: row.position,
+      label: rowLabel(row, i),
+      name: rowName(row) || rowLabel(row, i),
+      logged: isLogged(row),
+      kcal: r(m.kcal), p: r(m.protein), c: r(m.carbs), f: r(m.fats),
+    };
+  });
+
   // ---- coach card ---------------------------------------------------------
   useEffect(() => {
     if (!coachOn || selectedDate !== today) return;
@@ -1128,6 +1228,8 @@ export default function NutritionV3Client(props: Props) {
       {coachOn && selectedDate === today && (
         <CoachChatSheet
           clientId={clientId}
+          dayContext={coachDayContext}
+          actions={coachActions}
           onApplySuggestion={async (s) => {
             await addExtra(
               [{ n: s.label, p: s.delta.p, c: s.delta.c, f: s.delta.f, k: s.delta.kcal || kcalOf(s.delta.p, s.delta.c, s.delta.f), est: true }],

@@ -220,6 +220,267 @@ export function validatePlanDraft(raw: unknown): PlanDraft | null {
 }
 
 // ---------------------------------------------------------------------------
+// /api/nutrition-ai/act — "do-anything" chat actions
+// The model returns {intent, params, confirmation, reply}. validateActReply
+// normalizes the shape (null → the caller retries once); finalizeAct then
+// resolves every meal reference against the day context (position first, then
+// fuzzy name/label match) and DOWNGRADES to intent 'none' with a clarifying
+// question whenever a reference is missing or ambiguous — never guesses.
+// ---------------------------------------------------------------------------
+
+export type ActIntent =
+  | "swap_meal"
+  | "move_meal"
+  | "copy_meal"
+  | "delete_meal"
+  | "add_snack"
+  | "log_meal"
+  | "unlog_meal"
+  | "none";
+
+const ACT_INTENTS: ActIntent[] = ["swap_meal", "move_meal", "copy_meal", "delete_meal", "add_snack", "log_meal", "unlog_meal", "none"];
+
+export type ActAdherence = "Full" | "3/4" | "1/2" | "1/4" | "Skipped";
+
+/** A meal reference as extracted from the model — resolved later by finalizeAct. */
+export interface ActMealRef {
+  position: number | null;
+  name: string | null;
+}
+
+export interface ActReply {
+  intent: ActIntent;
+  params: {
+    meal?: ActMealRef;      // swap / delete / log / unlog target
+    from?: ActMealRef;      // move / copy source
+    to?: ActMealRef | null; // move target · copy insertion point (null = end of day)
+    items?: ParsedItem[];   // swap_meal / add_snack
+    name?: string | null;   // new meal / snack label
+    adherence?: ActAdherence;
+    clarify?: boolean;      // intent 'none': reply is a clarifying question, not a Q&A question
+  };
+  confirmation: string | null; // required for every action intent
+  reply: string;
+}
+
+/** One meal of the day context the client sends ({position, name, logged state, macros}). */
+export interface ActDayMeal {
+  position: number;
+  label?: string | null; // display label ("M1"… or slot name)
+  name: string;
+  logged?: boolean;
+  kcal?: number;
+  p?: number;
+  c?: number;
+  f?: number;
+}
+
+function actStr(v: unknown): string | null {
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+function actPos(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+
+function actRef(p: any, posKeys: string[], nameKeys: string[]): ActMealRef {
+  let position: number | null = null;
+  for (const k of posKeys) {
+    position = actPos(p?.[k]);
+    if (position != null) break;
+  }
+  let name: string | null = null;
+  for (const k of nameKeys) {
+    name = actStr(p?.[k]);
+    if (name) break;
+  }
+  return { position, name };
+}
+
+function actAdherence(v: unknown): ActAdherence {
+  const s = String(v ?? "").trim().toLowerCase();
+  if (s === "3/4" || s === "0.75" || s === "three quarters" || s === "most") return "3/4";
+  if (s === "1/2" || s === "0.5" || s === "half") return "1/2";
+  if (s === "1/4" || s === "0.25" || s === "quarter" || s === "some") return "1/4";
+  if (s === "skipped" || s === "skip") return "Skipped";
+  return "Full";
+}
+
+/** Items for swap_meal / add_snack — same normalization as the parse endpoint. */
+function validateActItems(raw: unknown): ParsedItem[] | null {
+  const r = validateParseResult({ items: raw });
+  return r ? r.items : null;
+}
+
+export function validateActReply(raw: unknown): ActReply | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as any;
+  const intent = typeof r.intent === "string" ? (r.intent.trim() as ActIntent) : ("" as ActIntent);
+  if (!ACT_INTENTS.includes(intent)) return null;
+
+  const p = r.params && typeof r.params === "object" ? r.params : {};
+  const replyText = actStr(r.reply) ?? actStr(r.message);
+  const confirmation = actStr(r.confirmation);
+
+  if (intent === "none") {
+    if (!replyText) return null;
+    return { intent: "none", params: { clarify: Boolean(p.clarify) }, confirmation: null, reply: replyText };
+  }
+
+  // Every action intent needs a human confirmation sentence — nothing mutates
+  // without the client explicitly confirming it.
+  if (!confirmation) return null;
+  const reply = replyText ?? confirmation;
+
+  switch (intent) {
+    case "swap_meal": {
+      const meal = actRef(p, ["position", "meal_position"], ["meal_name", "meal", "target"]);
+      if (meal.position == null && !meal.name) return null;
+      const items = validateActItems(p.items);
+      if (!items) return null;
+      const name = actStr(p.new_name) ?? actStr(p.name) ?? items.map((it) => it.name).join(" + ");
+      return { intent, params: { meal, items, name }, confirmation, reply };
+    }
+    case "move_meal":
+    case "copy_meal": {
+      const from = actRef(p, ["from_position", "from", "position"], ["from_name", "meal_name", "meal"]);
+      if (from.position == null && !from.name) return null;
+      const to = actRef(p, ["to_position", "to"], ["to_name"]);
+      if (intent === "move_meal" && to.position == null && !to.name) return null;
+      const toRef = to.position == null && !to.name ? null : to; // copy: null → end of day
+      return { intent, params: { from, to: toRef }, confirmation, reply };
+    }
+    case "delete_meal":
+    case "unlog_meal": {
+      const meal = actRef(p, ["position", "meal_position"], ["meal_name", "meal", "name"]);
+      if (meal.position == null && !meal.name) return null;
+      return { intent, params: { meal }, confirmation, reply };
+    }
+    case "log_meal": {
+      const meal = actRef(p, ["position", "meal_position"], ["meal_name", "meal", "name"]);
+      if (meal.position == null && !meal.name) return null;
+      return { intent, params: { meal, adherence: actAdherence(p.adherence) }, confirmation, reply };
+    }
+    case "add_snack": {
+      const items = validateActItems(p.items);
+      if (!items) return null;
+      const name = actStr(p.name) ?? actStr(p.snack_name) ?? items.map((it) => it.name).join(" + ");
+      return { intent, params: { items, name }, confirmation, reply };
+    }
+    default:
+      return null;
+  }
+}
+
+function normName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+export interface RefResolution {
+  position: number | null;
+  /** Names of the candidate meals when the reference matched more than one. */
+  ambiguous: string[];
+}
+
+/**
+ * Resolve a meal reference against the day context: exact position first, then
+ * label ("M3" / "meal 3" = 3rd meal in display order), then fuzzy name match
+ * (exact → substring/token containment). Exactly one match resolves; zero or
+ * several do not.
+ */
+export function resolveMealRef(ref: ActMealRef, day: ActDayMeal[]): RefResolution {
+  if (ref.position != null && day.some((d) => d.position === ref.position)) {
+    return { position: ref.position, ambiguous: [] };
+  }
+  if (!ref.name) return { position: null, ambiguous: [] };
+  const q = normName(ref.name);
+  if (!q) return { position: null, ambiguous: [] };
+
+  // "M3" / "meal 3" → 3rd meal in display order.
+  const mNum = q.match(/^m(?:eal)?\s*(\d+)$/);
+  if (mNum) {
+    const idx = Number(mNum[1]) - 1;
+    if (idx >= 0 && idx < day.length) return { position: day[idx].position, ambiguous: [] };
+  }
+
+  const labelHit = day.filter((d) => d.label && normName(String(d.label)) === q);
+  if (labelHit.length === 1) return { position: labelHit[0].position, ambiguous: [] };
+
+  const exact = day.filter((d) => normName(d.name) === q);
+  if (exact.length === 1) return { position: exact[0].position, ambiguous: [] };
+  if (exact.length > 1) return { position: null, ambiguous: exact.map((d) => d.name) };
+
+  const qTokens = q.split(" ");
+  const fuzzy = day.filter((d) => {
+    const n = normName(d.name);
+    if (n.includes(q) || q.includes(n)) return true;
+    const nTokens = n.split(" ");
+    return qTokens.every((t) => nTokens.includes(t));
+  });
+  if (fuzzy.length === 1) return { position: fuzzy[0].position, ambiguous: [] };
+  return { position: null, ambiguous: fuzzy.map((d) => d.name) };
+}
+
+function clarifyReply(ref: ActMealRef, res: RefResolution, day: ActDayMeal[]): string {
+  const what = ref.name ? `“${ref.name}”` : ref.position != null ? `position ${ref.position}` : "that meal";
+  if (res.ambiguous.length > 1) {
+    return `I found more than one match for ${what} — did you mean ${res.ambiguous.slice(0, 4).join(" or ")}? Tell me which one.`;
+  }
+  const list = day.slice(0, 8).map((d, i) => `${d.label || "M" + (i + 1)} ${d.name}`).join(" · ");
+  return `I couldn't find ${what} on today's list. Today you have: ${list}. Which one did you mean?`;
+}
+
+const CLARIFY = (reply: string): ActReply => ({ intent: "none", params: { clarify: true }, confirmation: null, reply });
+
+/**
+ * Resolve every meal reference in a validated act against the day context.
+ * Any missing/ambiguous reference downgrades the whole act to intent 'none'
+ * with a clarifying question — the coach asks instead of guessing.
+ */
+export function finalizeAct(act: ActReply, day: ActDayMeal[]): ActReply {
+  if (act.intent === "none") return act;
+
+  // position null → could not resolve; `reply` holds the clarifying question.
+  const resolve = (ref: ActMealRef): { position: number | null; reply: string } => {
+    const res = resolveMealRef(ref, day);
+    if (res.position != null) return { position: res.position, reply: "" };
+    return { position: null, reply: clarifyReply(ref, res, day) };
+  };
+
+  switch (act.intent) {
+    case "swap_meal":
+    case "delete_meal":
+    case "log_meal":
+    case "unlog_meal": {
+      const r2 = resolve(act.params.meal!);
+      if (r2.position == null) return CLARIFY(r2.reply);
+      return { ...act, params: { ...act.params, meal: { position: r2.position, name: act.params.meal!.name } } };
+    }
+    case "move_meal":
+    case "copy_meal": {
+      const from = resolve(act.params.from!);
+      if (from.position == null) return CLARIFY(from.reply);
+      let to: ActMealRef | null = null;
+      if (act.params.to) {
+        const t = resolve(act.params.to);
+        if (t.position == null) return CLARIFY(t.reply);
+        if (act.intent === "move_meal" && t.position === from.position) {
+          return CLARIFY("That meal is already in that spot — tell me where you'd like it instead.");
+        }
+        to = { position: t.position, name: act.params.to.name };
+      } else if (act.intent === "move_meal") {
+        return CLARIFY("Where should it go? Tell me which meal to place it before or after.");
+      }
+      return { ...act, params: { ...act.params, from: { position: from.position, name: act.params.from!.name }, to } };
+    }
+    default:
+      return act; // add_snack — no meal references
+  }
+}
+
+// ---------------------------------------------------------------------------
 // /api/nutrition-ai/verify-food
 // ---------------------------------------------------------------------------
 

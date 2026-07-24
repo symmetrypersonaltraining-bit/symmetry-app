@@ -2,12 +2,18 @@
 
 // ============================================================================
 // Nutrition v3 — AI coach chat: floating ✦ button → bottom-sheet chat.
-// Talks to POST /api/nutrition-ai/coach { question, clientId } (cookie-auth,
-// metered server-side: 429 {capExceeded} per-client daily cap, 200 {paused}
-// global kill switch — both rendered as friendly coach bubbles).
-// suggestions[] from the coach render as one-tap "Apply to today" chips; the
-// parent applies each delta as a quick-log extra row (positions 6/7) via the
-// existing v3 write helpers, so the macro bar updates instantly.
+// Free text goes to POST /api/nutrition-ai/act { message, clientId,
+// dayContext } (cookie-auth, metered server-side: 429 {capExceeded} per-client
+// daily cap, 200 {paused} global kill switch — both rendered as friendly coach
+// bubbles). Two response shapes:
+//   • { intent:'none', message, suggestions? } — Q&A (the endpoint falls
+//     through to the coach behavior server-side). suggestions[] render as
+//     one-tap "Apply to today" chips (extras rows, positions 6/7).
+//   • { intent, params, confirmation, reply } — a "do-anything" action. The
+//     reply renders as a bubble + a confirmation card; NOTHING mutates until
+//     the client taps Confirm, which executes via the `actions` callbacks the
+//     parent passes down (the existing v3 write helpers — est_*+off_plan
+//     protocol, extras at 6/7, undo toasts where the helper has one).
 // Conversation is in-memory per open — closing the sheet resets it.
 // Respects client_app_settings.coach_enabled (button hidden when false; a
 // missing column / read error fails open so the coach stays available).
@@ -23,12 +29,75 @@ export interface CoachSuggestion {
   delta: { p: number; c: number; f: number; kcal: number };
 }
 
+/** One meal of today's list, sent to /act so the model can resolve references. */
+export interface CoachDayMeal {
+  position: number;
+  label: string;
+  name: string;
+  logged: boolean;
+  kcal: number;
+  p: number;
+  c: number;
+  f: number;
+}
+
+/** Item shape returned by /act for swap_meal / add_snack (server-normalized). */
+export interface CoachActionItem {
+  name: string;
+  amount: number | null;
+  unit: string | null;
+  kcal: number;
+  p: number;
+  c: number;
+  f: number;
+}
+
+export type CoachActionAdherence = "Full" | "3/4" | "1/2" | "1/4" | "Skipped";
+
+/**
+ * Callbacks the parent (NutritionV3Client) exposes so confirmed actions run
+ * through the EXISTING write helpers — same positions, protocols and toasts
+ * as the manual UI. All meal references are today's meal_position values.
+ */
+export interface CoachActions {
+  /** Replace a meal's contents for today (swap-for-custom write: unlogged, __custom.kind 'swap'). */
+  swapMealCustom: (position: number, name: string, items: CoachActionItem[]) => Promise<void>;
+  /** Reorder: place the meal at `from` where the meal at `to` currently sits (persistOrder path). */
+  moveMeal: (from: number, to: number) => Promise<void>;
+  /** Duplicate the meal at `from`; the copy lands after the meal at `to` (null → end of day), unlogged. */
+  copyMeal: (from: number, to: number | null) => Promise<void>;
+  /** Remove a meal for today only (standard undo toast). */
+  deleteMeal: (position: number) => Promise<void>;
+  /** Log an off-plan extra (positions 6/7, est_* protocol). */
+  addExtraParsed: (items: CoachActionItem[], name: string) => Promise<void>;
+  /** Mark a meal eaten at the given adherence (default Full). */
+  logMeal: (position: number, adherence?: CoachActionAdherence) => Promise<void>;
+  /** Un-log a logged meal (placeholder-preserving unlog write). */
+  unlogMeal: (position: number) => Promise<void>;
+}
+
+interface PendingAction {
+  intent: string;
+  params: {
+    position?: number;
+    from?: number;
+    to?: number | null;
+    name?: string;
+    adherence?: CoachActionAdherence;
+    items?: CoachActionItem[];
+  };
+  confirmation: string;
+}
+
 interface Msg {
   role: "client" | "coach";
   text: string;
   suggestions?: CoachSuggestion[];
+  action?: PendingAction;
+  actionState?: "pending" | "done" | "cancelled" | "failed";
 }
 
+const ACTION_CHIPS = ["Swap a meal", "Move a meal", "I ate something extra"];
 const QUICK_CHIPS = [
   "How's my adherence this week?",
   "Am I on track with protein today?",
@@ -38,7 +107,7 @@ const QUICK_CHIPS = [
 const CAP_MESSAGE =
   "You've maxed out Coach for today — I'll be back with fresh answers tomorrow. Everything you log still counts as normal.";
 const GREETING =
-  "Hey — I'm your coach. I can see your logs, targets and trends. Ask me anything, or tap a question below.";
+  "Hey — I'm your coach. I can see your logs, targets and trends. Ask me anything — or tell me what to change (\"swap M4 for salmon and rice\", \"I ate a cookie\") and I'll set it up for you to confirm.";
 
 function num(v: unknown): number {
   const n = Number(v);
@@ -73,9 +142,15 @@ function fmtDelta(d: CoachSuggestion["delta"]): string {
 
 export default function CoachChatSheet({
   clientId,
+  dayContext,
+  actions,
   onApplySuggestion,
 }: {
   clientId: string;
+  /** Today's meals as rendered — sent with every message so /act can resolve references. */
+  dayContext: CoachDayMeal[];
+  /** Existing v3 write helpers — confirmed actions execute through these only. */
+  actions: CoachActions;
   /** Writes the delta as a quick-log extra row (positions 6/7) for today. */
   onApplySuggestion: (s: CoachSuggestion) => Promise<void>;
 }) {
@@ -88,6 +163,7 @@ export default function CoachChatSheet({
   const [capped, setCapped] = useState(false);
   const [applied, setApplied] = useState<Set<string>>(new Set()); // "msgIdx:sugIdx"
   const [applying, setApplying] = useState<string | null>(null);
+  const [acting, setActing] = useState<number | null>(null); // msg index of the executing action
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -120,6 +196,7 @@ export default function CoachChatSheet({
     setCapped(false);
     setApplied(new Set());
     setApplying(null);
+    setActing(null);
     setOpen(true);
   }
 
@@ -130,13 +207,16 @@ export default function CoachChatSheet({
     setInput("");
     setSending(true);
     try {
-      const res = await fetch("/api/nutrition-ai/coach", {
+      const res = await fetch("/api/nutrition-ai/act", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, clientId }),
+        body: JSON.stringify({ message: question, clientId, dayContext }),
       });
       const json = (await res.json().catch(() => null)) as
-        | { message?: string; suggestions?: unknown; error?: string; paused?: boolean; capExceeded?: boolean }
+        | {
+            intent?: string; params?: PendingAction["params"]; confirmation?: string; reply?: string;
+            message?: string; suggestions?: unknown; error?: string; paused?: boolean; capExceeded?: boolean;
+          }
         | null;
       if (res.status === 429 || json?.capExceeded) {
         setCapped(true);
@@ -148,6 +228,16 @@ export default function CoachChatSheet({
         setMsgs((m) => [...m, {
           role: "coach",
           text: json.message || json.error || "AI features are taking a short break this month — you can still log everything manually.",
+        }]);
+        return;
+      }
+      // Action intent → coach reply + confirmation card. Nothing mutates here.
+      if (res.ok && json?.intent && json.intent !== "none" && json.confirmation && json.params) {
+        setMsgs((m) => [...m, {
+          role: "coach",
+          text: json.reply || json.confirmation!,
+          action: { intent: json.intent!, params: json.params!, confirmation: json.confirmation! },
+          actionState: "pending",
         }]);
         return;
       }
@@ -165,6 +255,72 @@ export default function CoachChatSheet({
     } finally {
       setSending(false);
     }
+  }
+
+  // ---- confirmed-action execution (existing v3 write helpers only) --------
+  async function runAction(a: PendingAction): Promise<void> {
+    const p = a.params;
+    const needPos = (v: number | null | undefined): number => {
+      if (typeof v !== "number" || !isFinite(v)) throw new Error("that meal isn't on today's list anymore");
+      return v;
+    };
+    switch (a.intent) {
+      case "swap_meal":
+        if (!p.items?.length) throw new Error("the new meal came back empty");
+        await actions.swapMealCustom(needPos(p.position), p.name || p.items.map((i2) => i2.name).join(" + "), p.items);
+        break;
+      case "move_meal":
+        await actions.moveMeal(needPos(p.from), needPos(p.to));
+        break;
+      case "copy_meal":
+        await actions.copyMeal(needPos(p.from), typeof p.to === "number" ? p.to : null);
+        break;
+      case "delete_meal":
+        await actions.deleteMeal(needPos(p.position));
+        break;
+      case "add_snack":
+        if (!p.items?.length) throw new Error("the snack came back empty");
+        await actions.addExtraParsed(p.items, p.name || p.items.map((i2) => i2.name).join(" + "));
+        break;
+      case "log_meal":
+        await actions.logMeal(needPos(p.position), p.adherence || "Full");
+        break;
+      case "unlog_meal":
+        await actions.unlogMeal(needPos(p.position));
+        break;
+      default:
+        throw new Error("I don't know how to do that yet");
+    }
+  }
+
+  async function confirmAction(mi: number) {
+    const msg = msgs[mi];
+    if (!msg?.action || msg.actionState !== "pending" || acting != null) return;
+    setActing(mi);
+    try {
+      await runAction(msg.action);
+      setMsgs((m) => [
+        ...m.map((x, i) => (i === mi ? { ...x, actionState: "done" as const } : x)),
+        { role: "coach" as const, text: "✓ Done — " + msg.action!.confirmation.replace(/\s*\?+\s*$/, "") + "." },
+      ]);
+    } catch (e) {
+      const why = e instanceof Error && e.message ? e.message : "something went wrong";
+      setMsgs((m) => [
+        ...m.map((x, i) => (i === mi ? { ...x, actionState: "failed" as const } : x)),
+        { role: "coach" as const, text: "I couldn't finish that — " + why + ". Nothing was changed." },
+      ]);
+    } finally {
+      setActing(null);
+    }
+  }
+
+  function cancelAction(mi: number) {
+    const msg = msgs[mi];
+    if (!msg?.action || msg.actionState !== "pending" || acting != null) return;
+    setMsgs((m) => [
+      ...m.map((x, i) => (i === mi ? { ...x, actionState: "cancelled" as const } : x)),
+      { role: "coach" as const, text: "No problem — nothing changed." },
+    ]);
   }
 
   async function apply(mi: number, si: number, s: CoachSuggestion) {
@@ -228,6 +384,53 @@ export default function CoachChatSheet({
                   >
                     {msg.text}
                   </div>
+                  {msg.action && (
+                    <div
+                      className="mt-1.5"
+                      style={{
+                        maxWidth: "82%",
+                        padding: "10px 13px",
+                        borderRadius: 14,
+                        background:
+                          msg.actionState === "done" ? "rgba(34,197,94,0.10)"
+                          : msg.actionState === "pending" ? "var(--brand-surface)"
+                          : "var(--brand-bg)",
+                        border: `1px solid ${
+                          msg.actionState === "done" ? "rgba(34,197,94,0.5)"
+                          : msg.actionState === "pending" ? "var(--brand-primary)"
+                          : "var(--brand-border)"
+                        }`,
+                        opacity: msg.actionState === "cancelled" || msg.actionState === "failed" ? 0.6 : 1,
+                      }}
+                    >
+                      <span className="block text-xs font-bold" style={{ color: msg.actionState === "done" ? "#22c55e" : "var(--brand-primary)" }}>
+                        {msg.actionState === "done" ? "✓ Done" : msg.actionState === "cancelled" ? "Cancelled" : msg.actionState === "failed" ? "Didn't go through" : "Confirm this change?"}
+                      </span>
+                      <span className="block text-xs mt-0.5" style={{ color: "var(--brand-text)", textDecoration: msg.actionState === "cancelled" ? "line-through" : undefined }}>
+                        {msg.action.confirmation}
+                      </span>
+                      {msg.actionState === "pending" && (
+                        <span className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => confirmAction(mi)}
+                            disabled={acting != null}
+                            className="flex-1 text-xs font-bold text-white"
+                            style={{ minHeight: 44, borderRadius: 12, background: "var(--brand-primary)", opacity: acting === mi ? 0.6 : 1 }}
+                          >
+                            {acting === mi ? "Working…" : "Confirm ✓"}
+                          </button>
+                          <button
+                            onClick={() => cancelAction(mi)}
+                            disabled={acting != null}
+                            className="flex-1 text-xs font-bold"
+                            style={{ minHeight: 44, borderRadius: 12, background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}
+                          >
+                            Cancel
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {msg.suggestions?.map((s, si) => {
                     const key = mi + ":" + si;
                     const done = applied.has(key);
@@ -270,9 +473,9 @@ export default function CoachChatSheet({
               )}
             </div>
 
-            {/* quick chips */}
+            {/* quick chips — action starters first, then the Q&A chips */}
             <div className="flex gap-1.5 pt-2 pb-2" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", flexShrink: 0 }}>
-              {QUICK_CHIPS.map((q) => (
+              {[...ACTION_CHIPS, ...QUICK_CHIPS].map((q) => (
                 <button
                   key={q}
                   onClick={() => send(q)}
