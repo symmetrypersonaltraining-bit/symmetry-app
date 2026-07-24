@@ -4,7 +4,6 @@ import { cookies } from "next/headers";
 import MealPlanClient from "./MealPlanClient";
 import NutritionV3Client from "./v3/NutritionV3Client";
 import NutritionAverages from "@/components/NutritionAverages";
-import AveragesStrip from "@/components/nutrition/AveragesStrip";
 import ClientSelector from "@/components/ClientSelector";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -198,15 +197,12 @@ export default async function NutritionPage({
         isTrainer={isTrainer}
       />
       )}
-      {isTrainer && (
+      {isTrainer && !nutritionV3 && (
+        // v3 folds range averages + adherence + logging rate into the unified
+        // summary card inside NutritionV3Client (shown for client AND trainer),
+        // so no separate strip here. Non-v3 clients keep the legacy averages.
         <div className="mt-4">
-          {nutritionV3 ? (
-            // v3 clients: shared averages strip (canonical dailyTotals calc —
-            // understands the v3 log protocol, so trainer numbers match the client's).
-            <div className="px-4"><AveragesStrip clientId={clientId!} today={today} /></div>
-          ) : (
-            <NutritionAverages clientId={clientId!} today={today} />
-          )}
+          <NutritionAverages clientId={clientId!} today={today} />
         </div>
       )}
       </>

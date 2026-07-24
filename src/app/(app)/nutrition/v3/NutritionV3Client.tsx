@@ -25,7 +25,7 @@ import ComposerSheet from "./ComposerSheet";
 import CoachChatSheet, { CoachActionItem, CoachActions } from "./CoachChatSheet";
 import GroceryPrepSheet from "./GroceryPrepSheet";
 import PlanRangeView from "../PlanRangeView";
-import AveragesStrip from "@/components/nutrition/AveragesStrip";
+import { useNutritionAverages, RangeKey as AvgRangeKey, shiftDate } from "@/components/nutrition/useNutritionAverages";
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -177,6 +177,10 @@ export default function NutritionV3Client(props: Props) {
   const [versions, setVersions] = useState<{ id: string; version_number: number | null; effective_date: string | null; status: string | null; change_reason: string | null; title?: string | null }[]>([]);
   const [optSel, setOptSel] = useState<Record<number, string>>({}); // position → meal_id (option slots, pre-log)
   const [popKey, setPopKey] = useState<string | null>(null);
+  // Unified summary-card range: "today" (live) or a range key (averages).
+  const [summaryRange, setSummaryRange] = useState<"today" | AvgRangeKey>("today");
+  const [customStart, setCustomStart] = useState(shiftDate(today, -6));
+  const [customEnd, setCustomEnd] = useState(today);
 
   const planMeals = useMemo(() => [...(mealPlan?.meals || [])].sort((a, b) => a.position - b.position), [mealPlan]);
   const planPositions = useMemo(() => new Set(planMeals.map((m) => m.position)), [planMeals]);
@@ -282,6 +286,16 @@ export default function NutritionV3Client(props: Props) {
   );
 
   const totals = useMemo(() => computeDayTotals(logs, planMeals), [logs, planMeals]);
+
+  // Averages for the unified summary card. When "today" is selected we still
+  // fetch a 1W window so ADHERENCE % and LOGGING RATE stay visible; when a
+  // range is selected the card shows that range's averages. refreshKey ties it
+  // to today's live logs so the rolling stats update as meals are logged.
+  const statsRangeKey: AvgRangeKey = summaryRange === "today" ? "1w" : summaryRange;
+  const avgRefreshKey = `${selectedDate}:${logs.length}:${r(totals.kcal)}`;
+  const { loading: avgLoading, result: avgResult } = useNutritionAverages(
+    clientId, today, statsRangeKey, customStart, customEnd, avgRefreshKey,
+  );
 
   // ---- row helpers --------------------------------------------------------
   const rowByKey = (key: string) => rows.find((x) => x.key === key);
@@ -1034,46 +1048,112 @@ export default function NutritionV3Client(props: Props) {
         </button>
       )}
 
-      {/* macro bar */}
-      <div className="mx-4 mt-2 p-3.5" style={CARD}>
-        <div className="flex items-baseline justify-between mb-2">
-          <div style={{ fontSize: 21, fontWeight: 800, color: "var(--brand-text)" }}>
-            {r(totals.kcal).toLocaleString()}{" "}
-            <small style={{ fontSize: 13, color: "var(--brand-text-secondary)", fontWeight: 600 }}>
-              {tg ? `/ ${tg.calories.toLocaleString()} cal` : "cal eaten"}
-            </small>
+      {/* unified summary card — today's live macros OR range averages, plus
+          adherence % and logging rate (always shown). One hero card. */}
+      {(() => {
+        const isToday = summaryRange === "today";
+        // Values driving the macro area: live today totals, or range averages.
+        const showAvg = !isToday;
+        const avgOk = !!avgResult && avgResult.loggedDays > 0;
+        const kcalVal = showAvg ? (avgResult ? avgResult.kcal : 0) : totals.kcal;
+        const pVal = showAvg ? (avgResult ? avgResult.p : 0) : totals.protein;
+        const cVal = showAvg ? (avgResult ? avgResult.c : 0) : totals.carbs;
+        const fVal = showAvg ? (avgResult ? avgResult.f : 0) : totals.fats;
+        // Target: live macroTarget for today; the range's effective target for averages.
+        const tgt = showAvg ? (avgResult?.target ?? null) : (tg ? { kcal: tg.calories, p: tg.protein, c: tg.carbs, f: tg.fats } : null);
+        const isOverK = tgt ? kcalVal > tgt.kcal : false;
+        const barPct = tgt && tgt.kcal > 0 ? Math.min(100, (kcalVal / tgt.kcal) * 100) : 0;
+        const rangeChips: { key: "today" | AvgRangeKey; label: string }[] = [
+          { key: "today", label: "Today" }, { key: "1w", label: "1W" }, { key: "2w", label: "2W" },
+          { key: "4w", label: "4W" }, { key: "8w", label: "8W" }, { key: "custom", label: "Custom" },
+        ];
+        return (
+          <div className="mx-4 mt-2 p-3.5" style={CARD}>
+            {/* range toggle */}
+            <div className="flex gap-1 mb-3 flex-wrap">
+              {rangeChips.map((rc) => (
+                <button key={rc.key} onClick={() => setSummaryRange(rc.key)} className="px-2.5 py-1.5 rounded-full text-xs font-bold"
+                  style={summaryRange === rc.key ? { background: "var(--brand-primary)", color: "#fff" } : { background: "var(--brand-bg)", color: "var(--brand-text-secondary)" }}>
+                  {rc.label}
+                </button>
+              ))}
+            </div>
+            {summaryRange === "custom" && (
+              <div className="flex gap-2 items-center mb-3 text-xs">
+                <input type="date" value={customStart} max={today} onChange={(e) => setCustomStart(e.target.value)} className="flex-1 rounded-lg px-2 py-1.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", colorScheme: "dark light" }} />
+                <span style={{ color: "var(--brand-text-secondary)" }}>to</span>
+                <input type="date" value={customEnd} max={today} onChange={(e) => setCustomEnd(e.target.value)} className="flex-1 rounded-lg px-2 py-1.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", colorScheme: "dark light" }} />
+              </div>
+            )}
+
+            {showAvg && avgLoading && !avgResult ? (
+              <p className="text-center py-4 text-sm" style={{ color: "var(--brand-text-secondary)" }}>Loading…</p>
+            ) : showAvg && !avgOk ? (
+              <p className="text-center py-4 text-sm" style={{ color: "var(--brand-text-secondary)" }}>No logs in this range yet.</p>
+            ) : (
+              <>
+                <div className="flex items-baseline justify-between mb-2">
+                  <div style={{ fontSize: 21, fontWeight: 800, color: "var(--brand-text)" }}>
+                    {r(kcalVal).toLocaleString()}{" "}
+                    <small style={{ fontSize: 13, color: "var(--brand-text-secondary)", fontWeight: 600 }}>
+                      {tgt ? `/ ${tgt.kcal.toLocaleString()} cal` : (showAvg ? "avg cal / day" : "cal eaten")}
+                    </small>
+                  </div>
+                  {showAvg ? (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--brand-text-secondary)" }}>avg / day</span>
+                  ) : tgt ? (
+                    <span style={{ fontSize: 12, fontWeight: 600, color: isOverK ? ORANGE : "var(--brand-text-secondary)" }}>
+                      {isOverK ? `${r(kcalVal - tgt.kcal).toLocaleString()} over` : `${r(tgt.kcal - kcalVal).toLocaleString()} left`}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 11, color: "var(--brand-text-secondary)", border: "1px dashed var(--brand-border)", borderRadius: 8, padding: "3px 8px" }}>
+                      no targets set
+                    </span>
+                  )}
+                </div>
+                {tgt && (
+                  <div style={{ height: 8, background: "var(--brand-bg)", borderRadius: 6, overflow: "hidden", marginBottom: 10 }}>
+                    <i style={{ display: "block", height: "100%", width: `${barPct}%`, borderRadius: 6, background: isOverK ? ORANGE : "var(--brand-primary)", transition: "width 0.4s cubic-bezier(0.4,0,0.2,1), background 0.3s" }} />
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  {pill("PROTEIN", pVal, tgt ? tgt.p : null, "var(--brand-primary)")}
+                  {pill("CARBS", cVal, tgt ? tgt.c : null, "#5ec9a3")}
+                  {pill("FAT", fVal, tgt ? tgt.f : null, BLUE)}
+                </div>
+                {!showAvg && totals.pendingCount > 0 && (
+                  <p className="mt-2 text-center" style={{ fontSize: 10, color: "#b45309" }}>
+                    {totals.pendingCount} entr{totals.pendingCount === 1 ? "y" : "ies"} pending AI macros — totals update tonight
+                  </p>
+                )}
+                {!showAvg && openMode && (
+                  <p className="mt-2" style={{ fontSize: 11, color: "var(--brand-text-secondary)" }}>
+                    Open plan: nothing pre-filled — build each slot from the food database (or photo / typed). Totals grow as you log.
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* adherence + logging rate — always shown */}
+            <div className="flex items-center mt-3 pt-3" style={{ borderTop: "1px dashed var(--brand-border)" }}>
+              <div className="text-center flex-1">
+                <p className="font-extrabold" style={{ color: "var(--brand-text)", fontSize: 16, lineHeight: 1.1 }}>
+                  {avgResult && avgResult.adherence != null ? Math.round(avgResult.adherence) + "%" : "—"}
+                </p>
+                <p style={{ color: "var(--brand-text-secondary)", fontSize: 9, fontWeight: 700, letterSpacing: 0.8 }}>ADHERENCE</p>
+                <p style={{ color: "var(--brand-text-secondary)", fontSize: 9 }}>plan meals{isToday ? " · 7d" : ""}</p>
+              </div>
+              <div className="text-center flex-1">
+                <p className="font-extrabold" style={{ color: "var(--brand-text)", fontSize: 16, lineHeight: 1.1 }}>
+                  {avgResult ? Math.round((avgResult.loggedDays / avgResult.totalDays) * 100) + "%" : "—"}
+                </p>
+                <p style={{ color: "var(--brand-text-secondary)", fontSize: 9, fontWeight: 700, letterSpacing: 0.8 }}>LOGGING RATE</p>
+                <p style={{ color: "var(--brand-text-secondary)", fontSize: 9 }}>{avgResult ? `${avgResult.loggedDays} of ${avgResult.totalDays} days` : (isToday ? "last 7 days" : "")}</p>
+              </div>
+            </div>
           </div>
-          {tg ? (
-            <span style={{ fontSize: 12, fontWeight: 600, color: over ? ORANGE : "var(--brand-text-secondary)" }}>
-              {over ? `${r(totals.kcal - tg.calories).toLocaleString()} over` : `${r(tg.calories - totals.kcal).toLocaleString()} left`}
-            </span>
-          ) : (
-            <span style={{ fontSize: 11, color: "var(--brand-text-secondary)", border: "1px dashed var(--brand-border)", borderRadius: 8, padding: "3px 8px" }}>
-              no targets set
-            </span>
-          )}
-        </div>
-        {tg && (
-          <div style={{ height: 8, background: "var(--brand-bg)", borderRadius: 6, overflow: "hidden", marginBottom: 10 }}>
-            <i style={{ display: "block", height: "100%", width: `${pctK}%`, borderRadius: 6, background: over ? ORANGE : "var(--brand-primary)", transition: "width 0.4s cubic-bezier(0.4,0,0.2,1), background 0.3s" }} />
-          </div>
-        )}
-        <div className="flex gap-2">
-          {pill("PROTEIN", totals.protein, tg ? tg.protein : null, "var(--brand-primary)")}
-          {pill("CARBS", totals.carbs, tg ? tg.carbs : null, "#5ec9a3")}
-          {pill("FAT", totals.fats, tg ? tg.fats : null, BLUE)}
-        </div>
-        {totals.pendingCount > 0 && (
-          <p className="mt-2 text-center" style={{ fontSize: 10, color: "#b45309" }}>
-            {totals.pendingCount} entr{totals.pendingCount === 1 ? "y" : "ies"} pending AI macros — totals update tonight
-          </p>
-        )}
-        {openMode && (
-          <p className="mt-2" style={{ fontSize: 11, color: "var(--brand-text-secondary)" }}>
-            Open plan: nothing pre-filled — build each slot from the food database (or photo / typed). Totals grow as you log.
-          </p>
-        )}
-      </div>
+        );
+      })()}
 
       {/* coach card */}
       {coach && (
@@ -1835,8 +1915,10 @@ export default function NutritionV3Client(props: Props) {
 
   function TrendsSheetView() {
     return (
-      <Sheet title="Trends" subtitle="Averages here · full charts unchanged on Progress" onClose={closeAllSheets} onBack={backSheet}>
-        <AveragesStrip clientId={clientId} today={today} />
+      <Sheet title="Trends" subtitle="Averages live on your summary card · full charts on Progress" onClose={closeAllSheets} onBack={backSheet}>
+        <p className="text-sm mb-3" style={{ color: "var(--brand-text-secondary)" }}>
+          Your <b style={{ color: "var(--brand-text)" }}>summary card</b> up top carries the range averages (1W/2W/4W/8W/custom) with adherence % and logging rate. For the full weight · BF% · calorie &amp; adherence charts, open Progress.
+        </p>
         <a href="/progress" className="block w-full py-3 rounded-2xl text-sm font-bold text-white text-center" style={{ background: "var(--brand-primary)" }}>
           Open full charts — weight · BF% · calories · adherence ›
         </a>
