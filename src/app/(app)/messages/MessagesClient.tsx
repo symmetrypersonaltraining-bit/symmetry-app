@@ -15,6 +15,8 @@ interface Message {
   image_url?: string | null;
   read_at: string | null;
   created_at: string | null;
+  is_broadcast?: boolean | null;
+  __recipients?: number;
 }
 
 interface Client {
@@ -209,7 +211,11 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                   <div key={m.id} className={"flex " + (isMe ? "justify-end" : "justify-start")}>
                     <div className="max-w-[78%] rounded-2xl px-4 py-2.5"
                       style={{ background: isMe ? "var(--brand-primary)" : "var(--brand-surface)", border: isMe ? "none" : "1px solid var(--brand-border)", borderBottomRightRadius: isMe ? 4 : 16, borderBottomLeftRadius: isMe ? 16 : 4 }}>
-                      <p className="text-[11px] font-bold mb-0.5" style={{ color: isMe ? "rgba(255,255,255,0.85)" : "var(--brand-primary)" }}>{nameForFrom(m)}</p>
+                      <p className="text-[11px] font-bold mb-0.5 flex items-center gap-1.5" style={{ color: isMe ? "rgba(255,255,255,0.85)" : "var(--brand-primary)" }}>
+                        {nameForFrom(m)}
+                        {m.is_broadcast ? <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: 0.4, padding: "1px 5px", borderRadius: 4, background: isMe ? "rgba(255,255,255,0.2)" : "color-mix(in srgb, var(--brand-primary) 16%, transparent)", color: isMe ? "#fff" : "var(--brand-primary)" }}>ANNOUNCEMENT</span> : null}
+                        {m.__recipients ? <span style={{ fontSize: 9, fontWeight: 600, opacity: 0.8 }}>· {m.__recipients} recipient{m.__recipients === 1 ? "" : "s"}</span> : null}
+                      </p>
                       {m.image_url ? (
                         <img src={m.image_url} alt="Attached image" loading="lazy" onClick={() => setViewerUrl(m.image_url || null)}
                           style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 12, cursor: "zoom-in", display: "block", marginBottom: m.body ? 6 : 0 }} />
@@ -269,7 +275,13 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
     const isBroadcast = selectedClientId === "broadcast";
   const isGroup = selectedClientId === "group";
     const selectedClient = clients.find(c => c.id === selectedClientId) || null;
+    const unreadFor = (id: string) => (readClients.has(id) ? 0 : (unreadByClient[id] || 0));
     const sortedClients = [...clients].sort((a, b) => {
+      // Unread clients always rise to the top (Dustin can't miss them), then by
+      // most-recent message, then by name.
+      const ua = unreadFor(a.id) > 0 ? 1 : 0;
+      const ub = unreadFor(b.id) > 0 ? 1 : 0;
+      if (ua !== ub) return ub - ua;
       const ta = lastByClient[a.id]?.created_at || "";
       const tb = lastByClient[b.id]?.created_at || "";
       if (ta && tb) return tb.localeCompare(ta);
@@ -422,14 +434,14 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
     );
   }
 
-  // Client single-thread layout (with Coach / Group Chat toggle + composer)
-  const clientTitle = isGroup ? "Group Chat" : "Symmetry Corrective";
-  const pill = (active) => ({ flex: 1, textAlign: "center", padding: "8px 0", borderRadius: 999, textDecoration: "none", fontSize: 13, fontWeight: active ? 800 : 600, background: active ? "var(--brand-primary)" : "var(--brand-surface)", color: active ? "#fff" : "var(--brand-text)", border: "1px solid var(--brand-border)" });
+  // Client single-thread layout (with Trainer / Group toggle + composer)
+  const clientTitle = isGroup ? "Group Chat" : "Dustin — Trainer";
+  const pill = (active: boolean) => ({ flex: 1, textAlign: "center" as const, padding: "10px 0", borderRadius: 999, textDecoration: "none", fontSize: 13.5, fontWeight: active ? 800 : 600, background: active ? "var(--brand-primary)" : "var(--brand-surface)", color: active ? "#fff" : "var(--brand-text)", border: "1px solid var(--brand-border)" });
   return (
     <div style={{ background: "var(--brand-bg)", height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--brand-border)" }}>
-        <Link href="/messages" style={pill(!isGroup) as any}>Coach</Link>
-        <Link href="/messages?client=group" style={pill(isGroup) as any}>Group Chat</Link>
+        <Link href="/messages" style={pill(!isGroup) as any}>Trainer</Link>
+        <Link href="/messages?client=group" style={pill(isGroup) as any}>Group</Link>
       </div>
       <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--brand-border)", fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>{clientTitle}</div>
       <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>{ThreadPanel()}</div>

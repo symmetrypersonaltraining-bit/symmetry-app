@@ -66,13 +66,23 @@ export default async function MessagesPage(props: {
 
     let thread: any[] = [];
   if (selectedClientId === "broadcast") {
+    // Broadcasts sent to N clients share one body + created_at. Dedupe so the
+    // trainer sees each announcement ONCE (with a recipient count) — confirming
+    // it went out — not N duplicate rows.
     const { data: __bmsgs } = await supabase.from("messages").select("*").eq("from_id", user.id).eq("is_broadcast", true).is("deleted_at", null).order("created_at", { ascending: true });
-    thread = __bmsgs || [];
+    const seen = new Map<string, any>();
+    for (const m of (__bmsgs || []) as any[]) {
+      const key = (m.created_at || "") + "|" + (m.body || "") + "|" + (m.image_url || "");
+      if (!seen.has(key)) seen.set(key, { ...m, __recipients: 0 });
+      // Count real recipients (per-client rows have a client_id; the self-copy doesn't).
+      if (m.client_id) seen.get(key).__recipients += 1;
+    }
+    thread = Array.from(seen.values());
   }
     if (selectedClientId && selectedClientId !== "broadcast") {
       const { data: msgs } = await supabase
         .from("messages")
-        .select("id, from_id, to_id, client_id, body, read_at, created_at, image_url")
+        .select("id, from_id, to_id, client_id, body, read_at, created_at, image_url, is_broadcast")
         .eq("client_id", selectedClientId)
         .is("deleted_at", null)
         .order("created_at", { ascending: true });
@@ -143,13 +153,18 @@ export default async function MessagesPage(props: {
 
   if (!clientRecord) redirect("/home");
 
+  // The client's Trainer thread = everything at their client_id that isn't a
+  // group message — which INCLUDES broadcasts (is_broadcast rows carry the
+  // client's client_id), so announcements show here as trainer messages.
   const { data: msgs } = await supabase
     .from("messages")
-    .select("id, from_id, to_id, client_id, body, read_at, created_at, image_url")
+    .select("id, from_id, to_id, client_id, body, read_at, created_at, image_url, is_broadcast")
     .eq("client_id", clientRecord.id)
     .is("deleted_at", null)
+    .is("is_group", false)
     .order("created_at", { ascending: true });
 
+  // Opening the Trainer thread marks its messages read (client explicitly here).
   await supabase
       .from("messages")
       .update({ read_at: new Date().toISOString() })

@@ -4,11 +4,11 @@ import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 // Registers this device for push notifications and stores the FCM token so the
-// server can push to it. Mounted in the TRAINER branch of the app layout only —
-// so today only the trainer registers a token (scope: trainer message alerts).
-// Fully guarded: no-ops on web/PWA and in any native build that doesn't yet have
-// the @capacitor/push-notifications plugin, so it can't affect anyone until push
-// is wired end-to-end (see PUSH-NOTIFICATIONS handoff).
+// server can push to it. Mounted for BOTH the trainer AND clients so everyone
+// can receive message/broadcast push. Also deep-links to the target screen when
+// a notification is tapped (data.url). Fully guarded: no-ops on web/PWA and in
+// any native build without the @capacitor/push-notifications plugin, so it can't
+// affect anyone until push is wired end-to-end.
 export default function PushRegister() {
   useEffect(() => {
     (async () => {
@@ -20,7 +20,7 @@ export default function PushRegister() {
               PushNotifications?: {
                 requestPermissions?: () => Promise<{ receive?: string }>;
                 register?: () => Promise<void>;
-                addListener?: (event: string, cb: (data: { value?: string }) => void) => void;
+                addListener?: (event: string, cb: (data: unknown) => void) => void;
               };
             };
           };
@@ -37,7 +37,7 @@ export default function PushRegister() {
 
         if (PN.addListener) {
           PN.addListener("registration", async (t) => {
-            const token = t?.value;
+            const token = (t as { value?: string })?.value;
             if (!token) return;
             try {
               const supabase = createClient();
@@ -47,6 +47,17 @@ export default function PushRegister() {
                 { user_id: user.id, token, platform: "android", updated_at: new Date().toISOString() },
                 { onConflict: "token" },
               );
+            } catch { /* noop */ }
+          });
+
+          // Deep-link: navigate to data.url when a notification is tapped.
+          PN.addListener("pushNotificationActionPerformed", (evt) => {
+            try {
+              const e = evt as { notification?: { data?: Record<string, string> } };
+              const url = e?.notification?.data?.url;
+              if (url && typeof url === "string" && url.startsWith("/")) {
+                window.location.href = url;
+              }
             } catch { /* noop */ }
           });
         }

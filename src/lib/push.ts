@@ -64,23 +64,48 @@ async function getAccessToken(sa: ServiceAccount): Promise<string | null> {
   }
 }
 
-// Send a push to every device token registered for a user. Safe/no-op without creds.
-export async function sendPushToUser(
+export interface PushResult {
+  ok: boolean;            // at least one token delivered
+  reason?: string;        // why nothing was sent (no creds / no tokens / no oauth)
+  attempted: number;
+  delivered: number;
+  results: { token: string; status: number; error?: string; pruned?: boolean }[];
+}
+
+// FCM v1 data payload MUST be string-valued.
+function stringifyData(data?: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of Object.keys(data || {})) {
+    const v = (data as Record<string, unknown>)[k];
+    if (v != null) out[k] = String(v);
+  }
+  return out;
+}
+
+// Detailed sender — returns per-token FCM status/error so failures are visible
+// (used by /api/push-test). Prunes tokens FCM reports as unregistered/invalid so
+// stale tokens self-heal. Never throws.
+export async function sendPushDiagnostics(
   userId: string,
   title: string,
   body: string,
-  data?: Record<string, string>,
-): Promise<void> {
+  data?: Record<string, unknown>,
+): Promise<PushResult> {
+  const out: PushResult = { ok: false, attempted: 0, delivered: 0, results: [] };
   try {
     const sa = getServiceAccount();
-    if (!sa || !userId) return;
+    if (!sa) { out.reason = "FCM_SERVICE_ACCOUNT_JSON not set (push disabled)"; return out; }
+    if (!userId) { out.reason = "no userId"; return out; }
     const admin: any = createAdminClient();
     const { data: rows } = await admin.from("device_tokens").select("token").eq("user_id", userId);
     const tokens: string[] = ((rows as { token: string }[]) || []).map((r) => r.token).filter(Boolean);
-    if (!tokens.length) return;
+    if (!tokens.length) { out.reason = "no device tokens registered for this user"; return out; }
     const access = await getAccessToken(sa);
-    if (!access) return;
+    if (!access) { out.reason = "could not mint FCM OAuth token — check FCM_SERVICE_ACCOUNT_JSON"; return out; }
+    const strData = stringifyData(data);
     for (const token of tokens) {
+      out.attempted++;
+      const masked = "…" + token.slice(-8);
       try {
         const r = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
           method: "POST",
@@ -89,16 +114,43 @@ export async function sendPushToUser(
             message: {
               token,
               notification: { title, body },
-              data: data || {},
-              android: { priority: "high" },
+              data: strData,
+              android: { priority: "high", notification: { sound: "default" } },
             },
           }),
         });
-        // Prune dead tokens so they don't accumulate.
-        if (r.status === 404 || r.status === 410) {
-          try { await admin.from("device_tokens").delete().eq("token", token); } catch { /* noop */ }
+        const txt = await r.text().catch(() => "");
+        let errCode = "";
+        try { const j = JSON.parse(txt); errCode = j?.error?.status || j?.error?.details?.[0]?.errorCode || ""; } catch { /* noop */ }
+        if (r.ok) {
+          out.delivered++;
+          out.results.push({ token: masked, status: r.status });
+        } else {
+          // Prune only for token-invalidity signals (never for a generic payload
+          // error, so a bug can't nuke a good token).
+          const dead = r.status === 404 || r.status === 410 ||
+            /UNREGISTERED|registration-token-not-registered|NOT_FOUND/i.test(txt);
+          if (dead) { try { await admin.from("device_tokens").delete().eq("token", token); } catch { /* noop */ } }
+          out.results.push({ token: masked, status: r.status, error: (errCode || txt).slice(0, 200), pruned: dead });
         }
-      } catch { /* one token failing must not stop the rest */ }
+      } catch (e) {
+        out.results.push({ token: masked, status: 0, error: String(e).slice(0, 160) });
+      }
     }
-  } catch { /* push must never break the caller */ }
+    out.ok = out.delivered > 0;
+    return out;
+  } catch (e) {
+    out.reason = "exception: " + String(e).slice(0, 150);
+    return out;
+  }
+}
+
+// Fire-and-forget wrapper — used by message sends. Never throws / never blocks.
+export async function sendPushToUser(
+  userId: string,
+  title: string,
+  body: string,
+  data?: Record<string, string>,
+): Promise<void> {
+  try { await sendPushDiagnostics(userId, title, body, data); } catch { /* push must never break the caller */ }
 }
