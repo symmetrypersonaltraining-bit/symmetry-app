@@ -93,13 +93,21 @@ export default async function WorkoutDayPage({
   }
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-  const { data: existingLog } = await supabase
+  // NEVER .maybeSingle() here: it returns null (PGRST116) as soon as two rows exist for the
+  // same client/day/date, which silently opened the logger with every set blank and lost the
+  // client's in-progress work. Duplicates are real in production (one client had 5 rows for a
+  // single session), so take the array and pick the row to resume: the still-open log first,
+  // then the earliest.
+  const { data: existingLogs } = await supabase
     .from("workout_logs")
-    .select("id, completed, set_logs(*)")
+    .select("id, completed, log_date, set_logs(*)")
     .eq("client_id", clientId || "")
     .eq("day_id", resolvedDayId)
     .gte("log_date", today)
-    .maybeSingle();
+    .order("completed", { ascending: true })
+    .order("log_date", { ascending: true })
+    .order("id", { ascending: true });
+  const existingLog = (existingLogs && existingLogs.length > 0) ? existingLogs[0] : null;
 
   const { data: swInst } = await supabase
     .from("scheduled_workouts")
