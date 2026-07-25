@@ -6,6 +6,18 @@
 // disagree about who is slipping. The difference is the audience: this tells
 // Dustin, it never messages a client.
 //
+// Accuracy rules this file exists to hold (verified against the live roster
+// 2026-07-25 — a wrong label here costs trust in the whole feed):
+//   * "Never trained" is judged on LIFETIME history, not a rolling window.
+//     Someone who trained 60 days ago and stopped is quiet, not new.
+//   * A nutrition gap is only a gap for someone who has logged food before.
+//     Telling Dustin every day that a client who has never once logged a meal
+//     still hasn't is nagging, not information.
+//   * Brand-new clients get a grace period before they show up as a task.
+//   * The "down on volume" bucket compares a client to THEIR OWN month, not to
+//     a fixed threshold — otherwise two thirds of a healthy roster gets flagged
+//     and the feed stops meaning anything.
+//
 // Trainer-only. Returns first names + the reason, nothing sensitive.
 
 import { NextResponse } from "next/server";
@@ -14,6 +26,16 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
+
+const NEW_CLIENT_GRACE_DAYS = 4; // don't chase someone who signed up yesterday
+const SILENT_DAYS = 10; // nudges are paused past here — needs a person
+const QUIET_DAYS = 5;
+const OVERTRAIN_7D = 10;
+const NUTRITION_GAP_DAYS = 5;
+const NUTRITION_MIN_30D_SESSIONS = 8; // actively training, so food matters now
+// Two or three meal logs ever is someone who tried it once, not a food logger.
+// Below this it isn't a habit that lapsed, so there's nothing to point at.
+const NUTRITION_MIN_LIFETIME_LOGS = 5;
 
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 function shiftDays(iso: string, delta: number): string {
@@ -56,20 +78,25 @@ export async function GET() {
   const since7 = shiftDays(today, -6);
 
   try {
+    // Full history, not a window. Both tables are small (hundreds of rows), and
+    // a window is exactly what makes "never trained" lie about a lapsed client.
     const [clientsRes, wlRes, mealRes] = await Promise.all([
-      admin.from("clients").select("id, name, primary_goal").not("auth_user_id", "is", null),
-      admin.from("workout_logs").select("client_id, log_date").eq("completed", true).gte("log_date", since30),
-      admin.from("meal_adherence_logs").select("client_id, log_date").gte("log_date", since30),
+      admin.from("clients").select("id, name, primary_goal, created_at").not("auth_user_id", "is", null),
+      admin.from("workout_logs").select("client_id, log_date").eq("completed", true),
+      admin.from("meal_adherence_logs").select("client_id, log_date").not("adherence", "is", null),
     ]);
 
-    const clients = (clientsRes.data as { id: string; name: string | null; primary_goal: string | null }[]) || [];
+    const clients = (clientsRes.data as { id: string; name: string | null; primary_goal: string | null; created_at: string | null }[]) || [];
+
     const wo = new Map<string, string[]>();
     for (const r of ((wlRes.data as { client_id: string; log_date: string }[]) || [])) {
+      if (!r.log_date) continue;
       if (!wo.has(r.client_id)) wo.set(r.client_id, []);
       wo.get(r.client_id)!.push(r.log_date);
     }
     const ml = new Map<string, string[]>();
     for (const r of ((mealRes.data as { client_id: string; log_date: string }[]) || [])) {
+      if (!r.log_date) continue;
       if (!ml.has(r.client_id)) ml.set(r.client_id, []);
       ml.get(r.client_id)!.push(r.log_date);
     }
@@ -77,60 +104,107 @@ export async function GET() {
     const rows: AttentionRow[] = [];
 
     for (const c of clients) {
-      // Skip the trainer's own client row and seed/test accounts.
-      if ((c.name || "").toLowerCase().includes("test client")) continue;
-      if (/dustin/i.test(c.name || "")) continue;
+      const nm = (c.name || "").toLowerCase();
+      if (nm.includes("test client")) continue;
+      if (/dustin/i.test(c.name || "")) continue; // the trainer's own client row
+
       const w = wo.get(c.id) || [];
       const m = ml.get(c.id) || [];
       const first = (c.name || "").split(" ")[0] || "Client";
-      const w7 = new Set(w.filter((d) => d >= since7)).size;
-      const w30 = new Set(w).size;
-      const lastW = w.length ? w.slice().sort().at(-1)! : null;
-      const dsw = lastW ? daysBetween(lastW, today) : null;
-      const lastM = m.length ? m.slice().sort().at(-1)! : null;
-      const dsm = lastM ? daysBetween(lastM, today) : null;
       const rehab = isRehab(c.primary_goal);
 
+      const joined = c.created_at ? String(c.created_at).slice(0, 10) : null;
+      const daysSinceJoin = joined ? daysBetween(joined, today) : 999;
+
+      const w7 = new Set(w.filter((d) => d >= since7 && d <= today)).size;
+      const w30 = new Set(w.filter((d) => d >= since30 && d <= today)).size;
+      const lastW = w.length ? w.slice().sort().at(-1)! : null;
+      const dsw = lastW ? daysBetween(lastW, today) : null;
+
+      const everLoggedFood = m.length >= NUTRITION_MIN_LIFETIME_LOGS;
+      const lastM = m.length ? m.slice().sort().at(-1)! : null;
+      const dsm = lastM ? daysBetween(lastM, today) : null;
+
+      // 1. Signed up, never once trained. Lifetime check, with a grace period
+      //    so a client who joined yesterday isn't already a task.
       if (!w.length) {
-        rows.push({ id: c.id, name: first, reason: "Never trained", detail: "No completed session on record", severity: 2, tag: "onboard" });
+        if (daysSinceJoin < NEW_CLIENT_GRACE_DAYS) continue;
+        rows.push({
+          id: c.id,
+          name: first,
+          reason: "Never trained",
+          detail: `Signed up ${daysSinceJoin} days ago, no completed session yet${everLoggedFood ? " — but they are logging food, so they're in the app" : ""}`,
+          severity: daysSinceJoin >= 14 ? 3 : 2,
+          tag: "onboard",
+        });
         continue;
       }
-      if (dsw != null && dsw >= 10) {
+
+      // 2. Gone quiet long enough that the automated nudges have given up.
+      if (dsw != null && dsw >= SILENT_DAYS) {
         rows.push({
           id: c.id,
           name: first,
           reason: `Silent ${dsw} days`,
-          detail: `${w30} sessions in 30d${dsm == null ? " · never logged food" : ""} — automated nudges are paused, needs a personal message`,
+          detail: `${w30} sessions in the last 30d — automated nudges are paused this far out, needs a personal message`,
           severity: 3,
           tag: "escalate",
         });
         continue;
       }
-      if (w7 >= 10) {
-        rows.push({ id: c.id, name: first, reason: "Overtraining risk", detail: `${w7} sessions in 7 days — tell them to rest`, severity: 2, tag: "rest" });
+
+      // 3. Training every single day. Telling them to rest is coaching.
+      if (w7 >= OVERTRAIN_7D) {
+        rows.push({
+          id: c.id,
+          name: first,
+          reason: "Overtraining risk",
+          detail: `${w7} sessions in 7 days — worth telling them to take a day`,
+          severity: 2,
+          tag: "rest",
+        });
         continue;
       }
-      if (dsw != null && dsw >= 5) {
+
+      // 4. Quiet, but not yet silent.
+      if (dsw != null && dsw >= QUIET_DAYS) {
         rows.push({
           id: c.id,
           name: first,
           reason: `${dsw} days since training`,
-          detail: rehab ? `Rehab client — gentle check-in` : `${w30} sessions in 30d`,
+          detail: rehab
+            ? `Rehab client — a gentle check-in, not a push`
+            : `${w30} sessions in the last 30d`,
           severity: 2,
           tag: "quiet",
         });
         continue;
       }
-      if (w7 <= 3 && w30 <= 10) {
-        rows.push({ id: c.id, name: first, reason: "Slipping", detail: `${w7} this week, ${w30} this month`, severity: 2, tag: "slipping" });
-        continue;
-      }
-      if (w7 >= 4 && (dsm == null || dsm >= 5)) {
+
+      // 5. Volume down against THEIR OWN month — not a fixed threshold. A
+      //    regular who did 10 sessions in 30 days and 1 this week is a real
+      //    signal; someone who trains twice a week and did twice is fine.
+      if (w7 <= 1 && w30 >= 4) {
         rows.push({
           id: c.id,
           name: first,
-          reason: "Training hard, not logging food",
-          detail: dsm == null ? `${w7} sessions this week · has never logged a meal` : `${w7} sessions this week · ${dsm} days since a food log`,
+          reason: "Down on volume",
+          detail: `${w7} session${w7 === 1 ? "" : "s"} this week vs ${w30} in the last 30d — off their own pace`,
+          severity: 2,
+          tag: "slipping",
+        });
+        continue;
+      }
+
+      // 6. Nutrition gap — ONLY for people who actually log food. A client who
+      //    has never logged a meal is a conversation to have once, not a daily
+      //    line item.
+      if (everLoggedFood && w30 >= NUTRITION_MIN_30D_SESSIONS && dsm != null && dsm >= NUTRITION_GAP_DAYS) {
+        rows.push({
+          id: c.id,
+          name: first,
+          reason: "Training hard, food logging stopped",
+          detail: `${w30} sessions in 30d · ${dsm} days since their last food log (they have logged ${m.length} before)`,
           severity: 1,
           tag: "nutrition",
         });
