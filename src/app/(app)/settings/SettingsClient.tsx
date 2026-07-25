@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useTheme, THEMES } from "@/components/ThemeProvider";
 import { AvatarSelf } from "@/components/Avatar";
 import PaymentsSettingsCard from "@/components/PaymentsSettingsCard";
+import ExperienceSettings from "@/components/ExperienceSettings";
 
 interface Props {
   userEmail: string;
@@ -97,6 +98,14 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
       </section>
 
         <PaymentsSettingsCard />
+
+      {/* Switches for the 2026-07-25 polish features: sound, vibration,
+          leaderboard opt-in, check-in nudges, plus the trainer-only master
+          switch that takes AI nudges live. */}
+      <section>
+        <p className="section-header">Experience</p>
+        <ExperienceSettings isTrainer={isTrainer && !isInClientMode} />
+      </section>
 
       <section>
         <p className="section-header">Security</p>
