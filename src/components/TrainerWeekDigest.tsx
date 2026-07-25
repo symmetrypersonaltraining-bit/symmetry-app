@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { isExcludedFromRoster } from "@/lib/demoClient";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -90,7 +91,7 @@ export default function TrainerWeekDigest() {
         const foodWindow = addDays(today, -180);
 
         const [clientsRes, swThis, wlogs, mealsWeek, foodEver] = await Promise.all([
-          supabase.from("clients").select("id, name, weekly_focus, digest_snoozed_until"),
+          supabase.from("clients").select("id, name, email, weekly_focus, digest_snoozed_until"),
           supabase.from("scheduled_workouts").select("client_id").is("deleted_at", null).gte("scheduled_date", thisWk).lte("scheduled_date", thisWkEnd),
           supabase.from("workout_logs").select("client_id, log_date, completed, status").gte("log_date", recent),
           supabase.from("meal_adherence_logs").select("client_id, adherence, log_date, item_overrides").gte("log_date", thisWk).lte("log_date", today),
@@ -125,6 +126,8 @@ export default function TrainerWeekDigest() {
 
         const out: Row[] = [];
         for (const c of clients) {
+          // Demo/test accounts stay out of the trainer's real week.
+          if (isExcludedFromRoster(c)) continue;
           if (/dustin/i.test(c.name || "")) continue;
           if (c.digest_snoozed_until && c.digest_snoozed_until >= today) continue;
           const total = thisTotal[c.id] || 0;

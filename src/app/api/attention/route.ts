@@ -22,6 +22,7 @@
 
 import { NextResponse } from "next/server";
 import { TRAINER_EMAIL, Db } from "@/lib/ai/scope";
+import { isExcludedFromRoster } from "@/lib/demoClient";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
@@ -81,12 +82,12 @@ export async function GET() {
     // Full history, not a window. Both tables are small (hundreds of rows), and
     // a window is exactly what makes "never trained" lie about a lapsed client.
     const [clientsRes, wlRes, mealRes] = await Promise.all([
-      admin.from("clients").select("id, name, primary_goal, created_at").not("auth_user_id", "is", null),
+      admin.from("clients").select("id, name, email, primary_goal, created_at").not("auth_user_id", "is", null),
       admin.from("workout_logs").select("client_id, log_date").eq("completed", true),
       admin.from("meal_adherence_logs").select("client_id, log_date").not("adherence", "is", null),
     ]);
 
-    const clients = (clientsRes.data as { id: string; name: string | null; primary_goal: string | null; created_at: string | null }[]) || [];
+    const clients = (clientsRes.data as { id: string; name: string | null; email: string | null; primary_goal: string | null; created_at: string | null }[]) || [];
 
     const wo = new Map<string, string[]>();
     for (const r of ((wlRes.data as { client_id: string; log_date: string }[]) || [])) {
@@ -104,8 +105,8 @@ export async function GET() {
     const rows: AttentionRow[] = [];
 
     for (const c of clients) {
-      const nm = (c.name || "").toLowerCase();
-      if (nm.includes("test client")) continue;
+      // Demo and test accounts never appear in the trainer's real workload.
+      if (isExcludedFromRoster(c)) continue;
       if (/dustin/i.test(c.name || "")) continue; // the trainer's own client row
 
       const w = wo.get(c.id) || [];

@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { resolveAiScope, Db } from "@/lib/ai/scope";
+import { excludedClientIds } from "@/lib/demoClient";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
     if (!ids.length) return NextResponse.json({ rows: [], me: null, optedIn, window: win });
 
     const [namesRes, logRes] = await Promise.all([
-      admin.from("clients").select("id, name").in("id", ids),
+      admin.from("clients").select("id, name, email").in("id", ids),
       admin
         .from("workout_logs")
         .select("client_id, log_date")
@@ -62,8 +63,11 @@ export async function GET(req: NextRequest) {
         .gte("log_date", since),
     ]);
 
+    // Demo/test accounts never rank against real people.
+    const nameRows = (namesRes.data as { id: string; name: string | null; email: string | null }[]) || [];
+    const excluded = excludedClientIds(nameRows);
     const names = new Map(
-      ((namesRes.data as { id: string; name: string | null }[]) || []).map((c) => [c.id, (c.name || "").split(" ")[0] || "Member"]),
+      nameRows.filter((c) => !excluded.has(c.id)).map((c) => [c.id, (c.name || "").split(" ")[0] || "Member"]),
     );
 
     // Distinct DAYS trained, not raw log rows — two sessions in one day is one
@@ -75,6 +79,7 @@ export async function GET(req: NextRequest) {
     }
 
     const ranked = ids
+      .filter((id) => !excluded.has(id))
       .map((id) => ({ id, first: names.get(id) || "Member", sessions: days.get(id)?.size ?? 0 }))
       .sort((a, b) => b.sessions - a.sessions || a.first.localeCompare(b.first))
       .map((r, i) => ({ ...r, rank: i + 1 }));

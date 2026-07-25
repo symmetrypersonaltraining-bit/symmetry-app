@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { TRAINER_EMAIL, resolveAiScope, Db } from "@/lib/ai/scope";
+import { excludedClientIds } from "@/lib/demoClient";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
@@ -80,8 +81,15 @@ export async function GET() {
     // Without the anonymous group total a challenge reads as dead until
     // everyone opts in, which nobody would. The total makes it feel alive on
     // day one while still naming only the people who chose to be named.
+    // Demo/test accounts are dropped from BOTH the named standings and the
+    // anonymous group total — an inflated total is just as misleading to the
+    // people reading it as a fake name on the board would be.
+    const { data: allClients } = await db.from("clients").select("id, name, email");
+    const excluded = excludedClientIds(allClients as { id: string; name: string | null; email: string | null }[] | null);
+    const rankIds = ids.filter((id) => !excluded.has(id));
+
     const [namesRes, woRes, mlRes] = await Promise.all([
-      db.from("clients").select("id, name").in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
+      db.from("clients").select("id, name").in("id", rankIds.length ? rankIds : ["00000000-0000-0000-0000-000000000000"]),
       db
         .from("workout_logs")
         .select("client_id, log_date")
@@ -109,6 +117,7 @@ export async function GET() {
     // showing up, and duplicate logs can't inflate a rank.
     const days = new Map<string, Set<string>>();
     const add = (cid: string, d: string) => {
+      if (excluded.has(cid)) return; // never counts, named or anonymous
       if (!days.has(cid)) days.set(cid, new Set());
       days.get(cid)!.add(d);
     };
@@ -126,7 +135,7 @@ export async function GET() {
     }
     const myScore = meId ? days.get(meId)?.size || 0 : 0;
 
-    const scored = ids
+    const scored = rankIds
       .map((id) => ({ id, first: names.get(id) || "Member", score: days.get(id)?.size || 0 }))
       .sort((a, b) => b.score - a.score || a.first.localeCompare(b.first));
 
