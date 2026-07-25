@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { EmptyStateCard } from "@/components/FunMoments";
 
 interface DayWithProgram {
   id: string;
@@ -87,21 +88,14 @@ export default async function WorkoutsLibraryPage() {
       </div>
 
       {programGroups.length === 0 ? (
-        <div className="card text-center py-16">
-          <i
-            className="ti ti-list-check"
-            style={{ fontSize: 48, color: "var(--brand-border)", display: "block", marginBottom: 12 }}
-          />
-          <p className="font-semibold" style={{ color: "var(--brand-text)" }}>
-            No workouts yet
-          </p>
-          <p className="text-sm mt-1" style={{ color: "var(--brand-text-secondary)" }}>
-            Create programs in the Programs tab to build your workout library
-          </p>
-          <Link href="/library/programs" className="btn btn-primary btn-sm mt-4 inline-flex">
-            Go to Programs
-          </Link>
-        </div>
+        <EmptyStateCard
+          k="library"
+          action={
+            <Link href="/library/programs" className="btn btn-primary btn-sm inline-flex">
+              Go to Programs
+            </Link>
+          }
+        />
       ) : (
         <div className="space-y-6">
           {programGroups.map(([programId, group]) => (

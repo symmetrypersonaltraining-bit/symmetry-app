@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { FunLoader } from "@/components/FunMoments";
 
 type RangeKey = "day" | "1w" | "2w" | "4w" | "8w" | "custom";
 const RANGES: { key: RangeKey; label: string; days: number }[] = [
@@ -116,7 +117,7 @@ export default function NutritionAverages({ clientId, today }: { clientId: strin
         </div>
       )}
       {loading ? (
-        <div style={{ textAlign: "center", padding: "24px 0", opacity: 0.6, fontSize: 13 }}>Loading...</div>
+        <FunLoader />
       ) : !result || result.loggedDays === 0 ? (
         <div style={{ textAlign: "center", padding: "24px 0", opacity: 0.6, fontSize: 13 }}>No logs {isToday ? "today" : "in this range"} yet.</div>
       ) : (

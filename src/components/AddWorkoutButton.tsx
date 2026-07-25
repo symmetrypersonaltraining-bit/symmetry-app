@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { FunLoader } from "@/components/FunMoments";
 
 type LibDay = { id: string; label: string };
 
@@ -129,7 +130,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
                   Mark completed on this date (backlog a finished workout)
                 </label>
                 {loading ? (
-                  <div style={{ padding: 20, textAlign: "center", opacity: 0.6 }}>Loading...</div>
+                  <FunLoader label="Pulling up your workouts…" />
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {filtered.map((d) => (
