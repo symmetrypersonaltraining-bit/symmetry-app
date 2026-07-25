@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import TrainerWeekDigest from "@/components/TrainerWeekDigest";
+import AttentionFeed from "@/components/AttentionFeed";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
 
@@ -174,6 +175,10 @@ export default function TrainerHome({
             {dateLabel}
           </p>
         </div>
+
+        {/* Short "act on these first" strip. Renders nothing when nobody is
+            flagged, so a clean week costs zero screen space. */}
+        <AttentionFeed />
 
         <TrainerWeekDigest />
 
