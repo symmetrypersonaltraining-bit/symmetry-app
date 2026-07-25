@@ -7,6 +7,7 @@ import HeaderAssist from "@/components/HeaderAssist";
 import RealtimeScheduleSync from "@/components/RealtimeScheduleSync";
 import PushRegister from "@/components/PushRegister";
 import MessageNotifier from "@/components/MessageNotifier";
+import PullToRefresh from "@/components/PullToRefresh";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -31,6 +32,7 @@ export default async function AppLayout({
         <RealtimeScheduleSync />
         <PushRegister />
         <MessageNotifier />
+        <PullToRefresh />
         <TrainerLayoutWrapper>{children}</TrainerLayoutWrapper>
       </>
     );
@@ -42,6 +44,7 @@ export default async function AppLayout({
       {/* Clients register for push AND get the in-app new-message banner too. */}
       <PushRegister />
       <MessageNotifier />
+      <PullToRefresh />
       {/* Docked feedback strip: reserves its own row in the page flow, so the
           button can NEVER cover content (fixed overlays float over scrolled content). */}
       <div style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", justifyContent: "flex-end", padding: "8px 14px 6px", background: "var(--brand-bg)" }}>
