@@ -551,6 +551,25 @@ function programmedReps(pe: any): string {
   return "";
 }
 
+// Timed movements (foam rolling, stretches, holds) ALWAYS prefill the time field from the
+// programmed duration so a duration set never shows blank. Parses "1 min", "1 min each side",
+// "45 sec", "90 sec", "30s", "2 min" -> seconds -> the app's time format (e.g. "1" = 1:00).
+function programmedTimeSecs(pe: any): number | null {
+  const v = String(pe?.volume_value ?? "").toLowerCase();
+  if (!v) return null;
+  let m = v.match(/(\d+(?:\.\d+)?)\s*min/);
+  if (m) return Math.round(parseFloat(m[1]) * 60);
+  m = v.match(/(\d+)\s*(?:sec|s\b)/);
+  if (m) return parseInt(m[1], 10);
+  return null;
+}
+function programmedTime(pe: any): string {
+  const vt = pe?.volume_type;
+  if (vt !== "duration" && !/min|sec/i.test(String(pe?.volume_value ?? ""))) return "";
+  const s = programmedTimeSecs(pe);
+  return s != null ? fmtSecs(s) : "";
+}
+
 // Dumbbell/kettlebell or unilateral movements => weight is entered PER HAND, not total.
 const DB_NAME_RE = /\bdumbbell\b|\bdb\b|\bkettlebell\b|\bkb\b|goblet/i;
 function isPerHandLoad(pe: any): boolean {
@@ -602,7 +621,7 @@ export default function WorkoutLogger({
         const logs = existingSetLogs.filter(sl => sl.prescribed_exercise_id === pe.id);
         result[pe.id] = Array.from({ length: (pe.sets || 3) }, (_, i) => {
           const ex = logs.find(l => l.set_number === i + 1);
-          return { weight: ex?.weight_lbs?.toString() || "", reps: (ex?.reps != null ? ex.reps.toString() : programmedReps(pe)), time: ex?.duration_seconds != null ? fmtSecs(ex.duration_seconds) : "", speed: ex?.speed != null ? String(ex.speed) : "", hr: ex?.heart_rate != null ? String(ex.heart_rate) : "", done: ex?.completed ?? false };
+          return { weight: ex?.weight_lbs?.toString() || "", reps: (ex?.reps != null ? ex.reps.toString() : programmedReps(pe)), time: ex?.duration_seconds != null ? fmtSecs(ex.duration_seconds) : programmedTime(pe), speed: ex?.speed != null ? String(ex.speed) : "", hr: ex?.heart_rate != null ? String(ex.heart_rate) : "", done: ex?.completed ?? false };
         });
       }
     }
