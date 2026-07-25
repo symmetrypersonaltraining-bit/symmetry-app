@@ -53,19 +53,12 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
         const ph = await supabase.from("phases").select("id").in("program_id", progIds as string[]);
         const phaseIds = ((ph.data as any[]) || []).map((p) => p.id);
         if (phaseIds.length) {
-          // The AI workout builder attaches client-owned days to the client's SHARED program
-          // phase, so a plain phase query also returns other clients' AI workouts. Keep the
-          // real program days plus this client's own saved workouts, nothing else.
-          const own = await supabase.from("days").select("id, label").in("phase_id", phaseIds as string[])
-            .or(`client_owner_id.is.null,client_owner_id.eq.${cid}`).order("position");
+          const own = await supabase.from("days").select("id, label").in("phase_id", phaseIds as string[]).order("position");
           for (const d of ((own.data as LibDay[]) || [])) days.push(d);
         }
       }
     }
-    // Shared library only — never another client's AI-generated day. Without this filter the
-    // 400-row alphabetical window also fills up with AI days (up to 33 clients x 8/day) and
-    // silently pushes real library workouts out of the picker.
-    const shared = await supabase.from("days").select("id, label").is("client_owner_id", null).order("label").limit(400); // full library (Dustin 7/13)
+    const shared = await supabase.from("days").select("id, label").order("label").limit(400); // full library (Dustin 7/13)
     for (const s of ((shared.data as LibDay[]) || [])) if (!days.find((d) => d.id === s.id)) days.push(s);
     setLib(days);
     setLoading(false);

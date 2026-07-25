@@ -611,12 +611,7 @@ export default function WorkoutLogger({
 
   const [sets, setSets] = useState<Record<string, SetData[]>>(buildInitialSets);
   const [workoutLogId, setWorkoutLogId] = useState<string | null>(existingLogId);
-  // Shared in-flight guard so concurrent saves create one workout_logs row, not several.
-  const logIdPromiseRef = useRef<Promise<string> | null>(null);
   const [saving, setSaving] = useState(false);
-  // Set-save failures used to be swallowed: the upsert's error was never read, so a set that
-  // never reached the database still turned green and counted toward progress. Surface it.
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const [activeExerciseIdx, setActiveExerciseIdx] = useState(0);
   const [workoutComplete, setWorkoutComplete] = useState(false);
@@ -649,31 +644,120 @@ export default function WorkoutLogger({
   const [showAiNote, setShowAiNote] = useState(false);
   const [showCue, setShowCue] = useState(false);
 
-  // --- Keyboard handling: DELIBERATELY EMPTY ---------------------------------------------
-  // HARD RULE: nothing in the session view may be shown, hidden, moved or scrolled based on
-  // keyboard state. Two years of logger bugs came from exactly that. The sets are a pinned
-  // (non-shrinking) block and the keyboard simply overlays the secondary content below them.
-  //
-  // What used to live here and why it is gone (2026-07-25): a visualViewport listener set a
-  // `kbVV` state, and an effect keyed on it called
-  //   el.scrollIntoView({ block: "start", behavior: "smooth" })
-  // on the focused input ~90ms after the keyboard opened. That is the banned scroll-to-focus
-  // that 48d246f removed from focusScroll - it had simply survived in a second code path.
-  // It was also self-retriggering: the listener was bound to the visual viewport's `scroll`
-  // event and stored a NEW object each time, so scrollIntoView -> scroll event -> new kbVV ->
-  // scrollIntoView, a smooth-scroll fight for as long as the keyboard was open.
-  //
-  // The companion `typing` state was already dead: setTyping(true) existed nowhere in the file,
-  // so the recovery-poll interval, the touch-device guard and the innerHeight baseline could
-  // never run. All of it removed; kbVV had no other consumer anywhere in the JSX.
-  //
-  // Keep focusScroll/focusBlur as inert handlers so the ~40 input call sites are untouched.
+  // --- Keyboard-aware session logger: when the on-screen keyboard opens the visual viewport
+  // shrinks but a position:fixed overlay does not, so the active input + bottom bars end up
+  // behind the keyboard. Bind the fixed logger to the visual viewport and center the focused
+  // input above it. Isolated; no-ops on desktop / where unsupported. Revert = remove this block. ---
+  const [kbVV, setKbVV] = useState<{ top: number; height: number } | null>(null);
+  const kbWasOpen = useRef(false);
+  useEffect(() => {
+    const vp = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vp || !sessionMode) { setKbVV(null); return; }
+    const onVV = () => {
+      const covered = window.innerHeight - vp.height;
+      if (covered > 120) {
+        kbWasOpen.current = true;
+        setKbVV({ top: vp.offsetTop, height: vp.height });
+      } else {
+        setKbVV(null);
+        // Viewport grew back = keyboard closed. If it had actually been open,
+        // restore the collapsed header. This CANNOT fire while the keyboard is up
+        // (the viewport would still be shrunk), so it never kicks you out mid-typing.
+        if (kbWasOpen.current) { kbWasOpen.current = false; setTyping(false); }
+      }
+    };
+    onVV();
+    vp.addEventListener("resize", onVV);
+    vp.addEventListener("scroll", onVV);
+    return () => { vp.removeEventListener("resize", onVV); vp.removeEventListener("scroll", onVV); };
+  }, [sessionMode]);
+  // Native keyboard "did hide" (Capacitor Keyboard plugin, if bundled in the app):
+  // the definitive close signal on Android/iOS — fires even when the input keeps
+  // focus (back-button / swipe-down dismiss) and the height signals don't. Guarded:
+  // no-op if the plugin isn't present, so it can only ever HELP restore the header.
+  useEffect(() => {
+    if (!sessionMode) return;
+    let removed = false;
+    let handle: { remove?: () => void } | null = null;
+    try {
+      const kb = (window as unknown as { Capacitor?: { Plugins?: { Keyboard?: { addListener?: (e: string, cb: () => void) => unknown } } } }).Capacitor?.Plugins?.Keyboard;
+      if (kb && typeof kb.addListener === "function") {
+        Promise.resolve(kb.addListener("keyboardDidHide", () => { setTyping(false); setKbVV(null); kbWasOpen.current = false; }))
+          .then((h) => { if (removed) { try { (h as { remove?: () => void })?.remove?.(); } catch { /* noop */ } } else handle = h as { remove?: () => void }; })
+          .catch(() => { /* noop */ });
+      }
+    } catch { /* plugin absent — web-layer recovery handles it */ }
+    return () => { removed = true; try { handle?.remove?.(); } catch { /* noop */ } };
+  }, [sessionMode]);
   const focusedInputRef = useRef<HTMLInputElement | null>(null);
+  // `typing` = a set input is focused. Drives the keyboard-safe layout WITHOUT relying on
+  // visualViewport/keyboard detection (which some iOS webviews don't report): when typing we
+  // collapse the header + bottom chrome and pull the focused box to the top of the screen,
+  // so it always clears the keyboard. Isolated; revert = remove `typing` usage.
+  const [typing, setTyping] = useState(false);
+  // Desktop guard (Mac/PC bug fix): the keyboard-safe collapse + recovery poll must ONLY
+  // run where an on-screen keyboard can exist. On desktop the poll sees "keyboard down"
+  // immediately and force-blurred every input ~1.2s after focus (notes field kicked users
+  // out mid-typing). Coarse pointer = touch device; fine pointer = physical keyboard.
+  const touchDevice = useRef(false);
+  useEffect(() => {
+    try { touchDevice.current = window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1; }
+    catch { touchDevice.current = false; }
+  }, []);
   const focusScroll = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
-    // Remember the focused input only. MUST NOT scroll, collapse or reposition anything.
+    // The sets are a pinned (non-scrolling) block and the keyboard overlays the area below
+    // them, so focusing a set must NOT scroll or collapse anything — that scroll-to-focus was
+    // exactly what moved the page and hid the earlier sets. Just remember the focused input.
     focusedInputRef.current = e.currentTarget;
   }, []);
-  const focusBlur = useCallback(() => { /* intentionally inert - see note above */ }, []);
+  const focusBlur = useCallback(() => {
+    setTimeout(() => {
+      const a = document.activeElement as HTMLElement | null;
+      if (!a || a.tagName !== "INPUT") setTyping(false);
+    }, 120);
+  }, []);
+  // Keyboard-close recovery v5 (7/16). CRITICAL FIX: the v4 time-based fallback
+  // (`elapsed > 1200`) blurred the focused input on devices where the keyboard does NOT
+  // shrink innerHeight (iOS / overlay keyboards) — it read "never shrank" as "keyboard
+  // gone" and kicked focus out mid-typing (Tyler couldn't log reps). Now we restore the
+  // header ONLY after a real shrink -> sustained grow-back, which unambiguously means the
+  // keyboard opened and then closed. If the keyboard never shrank the screen on this
+  // device, `opened` stays false and we NEVER touch focus — the user types freely; a
+  // genuine close still blurs the input and focusBlur restores the header. No timer guess.
+  const kbBaseH = useRef(0);
+  useEffect(() => { try { kbBaseH.current = window.innerHeight; } catch { /* noop */ } }, []);
+  useEffect(() => {
+    if (!typing) return;
+    let fullH = 0;
+    try { fullH = Math.max(window.innerHeight, kbBaseH.current || 0); } catch { /* noop */ }
+    let opened = false;
+    let downTicks = 0;
+    const id = setInterval(() => {
+      try {
+        const h = window.innerHeight;
+        if (h > fullH) { fullH = h; kbBaseH.current = h; }   // keep the no-keyboard baseline current
+        if (h < fullH - 120) { opened = true; downTicks = 0; return; }  // keyboard is open — stay collapsed
+        downTicks++;                                         // keyboard looks down this tick
+        // Restore ONLY if we actually saw the keyboard open first (opened) and it has now
+        // been down for a sustained window (>=3 ticks ~750ms so a flicker between fields
+        // can't trigger it). No shrink ever observed => never blur => the user keeps typing.
+        if (opened && downTicks >= 3) {
+          const a = document.activeElement as HTMLElement | null;
+          if (a && a.tagName === "INPUT") a.blur();
+          setTyping(false);
+        }
+      } catch { /* noop */ }
+    }, 250);
+    return () => clearInterval(id);
+  }, [typing]);
+  // After the layout settles (kbVV toggles OR typing begins), pull the focused input to the top
+  // of the scroll area so it clears the keyboard even for lower set rows.
+  useEffect(() => {
+    if ((!kbVV && !typing) || !focusedInputRef.current) return;
+    const el = focusedInputRef.current;
+    const t = setTimeout(() => { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_e) {} }, 90);
+    return () => clearTimeout(t);
+  }, [kbVV, typing]);
 
   // --- Auto-save / resume draft: persists logged sets so leaving the browser never loses progress ---
   const __draftKey = `symmetry_wl_${clientId || 'me'}_${day?.id || 'day'}_${isTrainerSession ? 't' : 'c'}`;
@@ -992,29 +1076,14 @@ export default function WorkoutLogger({
 
   async function ensureWorkoutLog(): Promise<string> {
     if (workoutLogId) return workoutLogId;
-    // workoutLogId comes from the render closure, so two saves fired before React re-renders
-    // (a double-tap on "Check all", or a set button tapped while another save is in flight)
-    // both saw null and both INSERTed. The partial unique index only covers completed rows, so
-    // two open logs are perfectly legal at the DB level - that is how a client ended up with 5
-    // rows for one session. Memoise the in-flight insert so concurrent callers share one row.
-    if (logIdPromiseRef.current) return logIdPromiseRef.current;
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-    const p = (async () => {
-      const { data, error } = await supabase.from("workout_logs").insert({
-        client_id: clientId, day_id: day.id, log_date: today,
-        started_at: new Date().toISOString(), completed: false,
-      }).select("id").single();
-      if (error) throw error;
-      setWorkoutLogId(data.id);
-      return data.id as string;
-    })();
-    logIdPromiseRef.current = p;
-    try {
-      return await p;
-    } catch (e) {
-      logIdPromiseRef.current = null; // let a later save retry after a failure
-      throw e;
-    }
+    const { data, error } = await supabase.from("workout_logs").insert({
+      client_id: clientId, day_id: day.id, log_date: today,
+      started_at: new Date().toISOString(), completed: false,
+    }).select("id").single();
+    if (error) throw error;
+    setWorkoutLogId(data.id);
+    return data.id;
   }
 
   const updateSet = useCallback((peId: string, si: number, field: keyof SetData, value: string | boolean) => {
@@ -1043,7 +1112,7 @@ export default function WorkoutLogger({
     try {
       const logId = await ensureWorkoutLog();
       const s = sets[peId][si];
-      const { error: setErr } = await supabase.from("set_logs").upsert({
+      await supabase.from("set_logs").upsert({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
         exercise_id: allFlat.find(p => p.id === peId)?.exercises?.id ?? null,
         set_number: si + 1,
@@ -1054,8 +1123,6 @@ export default function WorkoutLogger({
         heart_rate: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
         completed: true, logged_at: new Date().toISOString(),
       }, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
-      if (setErr) throw setErr;
-      setSaveError(null);
       updateSet(peId, si, "done", true);
       if (navigator.vibrate) navigator.vibrate(50);
       const pe = allFlat.find(p => p.id === peId);
@@ -1063,10 +1130,7 @@ export default function WorkoutLogger({
         const match = pe.rest.match(/(\d+)/);
         if (match) setRestTimer(parseInt(match[1]));
       }
-    } catch(e) {
-      console.error(e);
-      setSaveError("That set didn't save — check your connection and tap the arrow again.");
-    }
+    } catch(e) { console.error(e); }
     finally { setSaving(false); }
   }
 
@@ -1089,20 +1153,15 @@ export default function WorkoutLogger({
         completed: true, logged_at: new Date().toISOString(),
       }));
       if (rows.length) {
-        const { error: batchErr } = await supabase.from("set_logs").upsert(rows, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
-        if (batchErr) throw batchErr;
+        await supabase.from("set_logs").upsert(rows, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
       }
-      setSaveError(null);
       setSets(prev => {
         const u = { ...prev };
         u[peId] = (u[peId] || []).map(s => ({ ...s, done: true }));
         return u;
       });
       if (navigator.vibrate) navigator.vibrate(50);
-    } catch (e) {
-      console.error(e);
-      setSaveError("Those sets didn't save — check your connection and tap Check all again.");
-    }
+    } catch (e) { console.error(e); }
     finally { setSaving(false); }
   }
 
@@ -1123,32 +1182,22 @@ export default function WorkoutLogger({
     setSaving(true);
     try {
       const logId = await ensureWorkoutLog();
-      // Must be checked. If this update fails (e.g. it would violate
-      // uq_workout_log_one_completed because another completed log already exists for this
-      // client/day/date) the error used to be discarded, the celebration screen still played,
-      // the draft was cleared, and the scheduled row below was still flipped to "completed" -
-      // leaving a session that looks done on the schedule but counts nowhere.
-      const { error: completeErr } = await supabase.from("workout_logs").update({
+      await supabase.from("workout_logs").update({
         completed: true, completed_at: new Date().toISOString(), status: "Done as planned",
         note: sessionNote || null,
       }).eq("id", logId);
-      if (completeErr) throw completeErr;
       try {
         const __today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
         // Mark the scheduled workout complete. Prefer today's instance; if the
         // workout was scheduled for a prior day and never moved, fall back to the
         // most recent still-scheduled instance on/before today so make-up logs
         // still show as completed on the schedule.
-        // deleted_at + status guards: without them this could pick a soft-deleted or already
-        // skipped row and flip it to "completed", resurrecting a workout the client deleted.
         const { data: __todayRow } = await (supabase as any)
           .from("scheduled_workouts")
           .select("id")
           .eq("client_id", clientId)
           .eq("day_id", day.id)
           .eq("scheduled_date", __today)
-          .is("deleted_at", null)
-          .neq("status", "skipped")
           .order("id")
           .limit(1);
         let __swId: string | null =
@@ -1160,7 +1209,6 @@ export default function WorkoutLogger({
             .eq("client_id", clientId)
             .eq("day_id", day.id)
             .eq("status", "scheduled")
-            .is("deleted_at", null)
             .lte("scheduled_date", __today)
             .order("scheduled_date", { ascending: false })
             .limit(1);
@@ -1179,14 +1227,8 @@ export default function WorkoutLogger({
             .insert({ client_id: clientId, day_id: day.id, scheduled_date: __today, status: "completed", workout_log_id: logId, source: "client_self_assign" });
         }
       } catch {}
-      setSaveError(null);
       setWorkoutComplete(true);
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-    } catch (e) {
-      // Previously there was no catch at all: a thrown error escaped as an unhandled rejection
-      // and the Complete button just silently un-greyed with no explanation.
-      console.error(e);
-      setSaveError("Couldn't finish the workout - your sets are saved. Check your connection and tap Complete again.");
     } finally { setSaving(false); }
   }
 
@@ -1331,17 +1373,6 @@ export default function WorkoutLogger({
     );
   }
 
-  // Isolated overlay: only appears when a save actually failed, so a set can never look
-  // logged when it isn't. Fixed-position and dismissible \u2014 it never affects layout.
-  const saveErrorBanner = saveError ? (
-    <div role="alert" onClick={() => setSaveError(null)}
-      style={{ position: "fixed", left: 12, right: 12, bottom: 96, zIndex: 1400, cursor: "pointer",
-        background: "rgba(190,40,40,0.96)", color: "#fff", borderRadius: 12, padding: "10px 14px",
-        fontSize: 13, fontWeight: 600, boxShadow: "0 6px 24px rgba(0,0,0,0.45)" }}>
-      {saveError} <span style={{ opacity: 0.75, fontWeight: 400 }}>(tap to dismiss)</span>
-    </div>
-  ) : null;
-
   // \u2500\u2500\u2500 SESSION MODE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   if (sessionMode && currentExercise) {
     const peSets = sets[currentExercise.id] || [];
@@ -1472,7 +1503,6 @@ export default function WorkoutLogger({
           <div className="h-full rounded-full transition-all duration-500"
             style={{ width: `${progressPct}%`, background: "var(--brand-primary)" }} />
         </div>
-        {saveErrorBanner}
 
         {/* Exercise header (V6 micro-pill) — one compact row: small video thumb + name +
             inline History/Swap. Meta as micro-pills, cue collapsed behind an info toggle to
@@ -1624,7 +1654,7 @@ export default function WorkoutLogger({
             <span className="px-2 text-[11px] font-semibold whitespace-nowrap" style={{ color: "rgba(255,255,255,0.7)" }}>{peSets.length} sets</span>
             <button type="button" onClick={() => addSetRow(currentExercise.id)} aria-label="Add set" className="w-9 h-10 flex items-center justify-center text-lg" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.85)" }}>&#65291;</button>
           </div>
-          <button type="button" onClick={logAllCurrentSets} disabled={saving} className="flex-1 h-10 rounded-xl text-sm font-semibold text-white disabled:opacity-60" style={{ background: "var(--brand-primary)" }}>Check all</button>
+          <button type="button" onClick={logAllCurrentSets} className="flex-1 h-10 rounded-xl text-sm font-semibold text-white" style={{ background: "var(--brand-primary)" }}>Check all</button>
           {isTrainerSession && (
             <button type="button" onClick={() => setShowAiNote(true)} className="flex items-center gap-1 px-3 h-10 rounded-xl text-xs font-semibold flex-shrink-0" style={{ background: "rgba(139,92,246,0.16)", color: "#b79cf7", border: "1px solid rgba(139,92,246,0.3)" }}>
               <i className="ti ti-brain text-sm" /> AI note
@@ -1732,7 +1762,6 @@ export default function WorkoutLogger({
       {showTimer && <TimerWheel onClose={() => setShowTimer(false)} />}
         {timePick && <TimePickerSheet initial={parseTimeToSecs(sets[timePick.peId]?.[timePick.si]?.time || "") || 0} onSet={(secs) => { updateSet(timePick.peId, timePick.si, "time", fmtSecs(secs)); setTimePick(null); }} onClose={() => setTimePick(null)} />}
       {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
-      {saveErrorBanner}
 
       {isTrainerSession && clientName && (
         <div className="flex items-center gap-2 px-4 py-2 text-xs font-medium" style={{ background: "#f59e0b", color: "white" }}>

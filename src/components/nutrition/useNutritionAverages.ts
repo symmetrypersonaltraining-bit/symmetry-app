@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { computeDayTotals, adherencePct, isExtraLog, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
+import { computeDayTotals, adherencePct, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
 
 export type RangeKey = "1w" | "2w" | "4w" | "8w" | "custom";
 
@@ -93,31 +93,11 @@ export function useNutritionAverages(
     for (const l of logs) (byDate[l.log_date] ||= []).push(l);
     let kcal = 0, p = 0, c = 0, f = 0, adhSum = 0, adhDays = 0;
     const days = Object.keys(byDate);
-    // A date can hold rows without anything actually being logged: reordering meals writes
-    // __unlogged placeholders, deleting writes __removed, swap/copy write __custom.unlogged.
-    // Counting those dates as logged days inflated the logging rate AND divided the calorie
-    // average by too many days. computeDayTotals already reports loggedCount for exactly this
-    // reason; the server-side twin (lib/ai/coach-context) filters on it, this hook never did.
-    let realDays = 0;
     for (const d of days) {
       const t = computeDayTotals(byDate[d], pseudoMeals);
-      if (t.loggedCount > 0) {
-        realDays++;
-        kcal += t.kcal; p += t.protein; c += t.carbs; f += t.fats;
-      }
-      // adherence: avg proration across the day's PLAN meals only.
-      // `meal_position <= 20` alone is not the plan band: v3 moved quick-add extras out of the
-      // legacy 101+ range into EXTRA_POSITIONS [6, 7], and those rows are written with
-      // adherence "Off-plan", which scores 0.75. So every snack landed inside the adherence
-      // denominator and pulled the number down — log all 6 meals Full, add one Diet Coke, and
-      // the card reported (6 + 0.75) / 7 = 96% instead of 100%. Confirmed on live data.
-      // Reuse the canonical isExtraLog so this agrees with how extras are rendered. Plan
-      // positions for the day are the ones carrying a real meal_id (or an inserted custom meal).
-      const dayLogs = byDate[d];
-      const planPositions = new Set<number>(
-        dayLogs.filter((l) => !!l.meal_id || !!l.item_overrides?.__custom).map((l) => l.meal_position),
-      );
-      const planLogs = dayLogs.filter((l) => l.meal_position <= 20 && !isExtraLog(l, planPositions) && !l.item_overrides?.__removed && !l.item_overrides?.__unlogged && !l.item_overrides?.__custom?.unlogged && l.adherence);
+      kcal += t.kcal; p += t.protein; c += t.carbs; f += t.fats;
+      // adherence: avg proration across the day's plan-band logs (positions ≤ 20).
+      const planLogs = byDate[d].filter((l) => l.meal_position <= 20 && !l.item_overrides?.__removed && !l.item_overrides?.__unlogged && !l.item_overrides?.__custom?.unlogged && l.adherence);
       if (planLogs.length) {
         let s = 0;
         for (const l of planLogs) s += l.adherence === "Off-plan" ? 0.75 : (adherencePct(l.adherence) ?? 0);
@@ -125,10 +105,10 @@ export function useNutritionAverages(
         adhDays++;
       }
     }
-    const denom = realDays || 1;
+    const denom = days.length || 1;
     const tRow = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
     setResult({
-      loggedDays: realDays,
+      loggedDays: days.length,
       totalDays: diffDays(start, end) + 1,
       kcal: kcal / denom, p: p / denom, c: c / denom, f: f / denom,
       adherence: adhDays ? adhSum / adhDays : null,

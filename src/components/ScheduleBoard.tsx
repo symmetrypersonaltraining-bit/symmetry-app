@@ -82,9 +82,7 @@ export default function ScheduleBoard({
     (async () => {
       try {
         const supabase: any = createClient();
-        // Shared library only: client-owned AI workouts must not be swappable onto anyone else,
-        // and they would otherwise crowd real workouts out of the 400-row window.
-        const { data } = await supabase.from("days").select("id, label").is("client_owner_id", null).order("label").limit(400);
+        const { data } = await supabase.from("days").select("id, label").order("label").limit(400);
         setLibDays((data as { id: string; label: string }[]) || []);
       } catch { setLibDays([]); }
     })();

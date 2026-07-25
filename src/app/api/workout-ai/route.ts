@@ -81,7 +81,7 @@ async function buildContext(db: Db, clientId: string, dayId: string | null): Pro
   const [clientRes, apRes, upcomingRes, recentRes, notesRes, replacingRes] = await Promise.all([
     db.from("clients").select("name, primary_goal").eq("id", clientId).maybeSingle(),
     db.from("program_assignments").select("program_id, programs(name, phases(id, label, position))").eq("client_id", clientId).eq("active", true).limit(1).maybeSingle(),
-    (db as Db).from("scheduled_workouts").select("scheduled_date, status, days(label)").eq("client_id", clientId).gte("scheduled_date", today).is("deleted_at", null).order("scheduled_date").limit(12),
+    (db as Db).from("scheduled_workouts").select("scheduled_date, status, days(label)").eq("client_id", clientId).gte("scheduled_date", today).order("scheduled_date").limit(12),
     db.from("workout_logs").select("log_date, day_id, days(label)").eq("client_id", clientId).order("log_date", { ascending: false }).limit(6),
     db.from("trainer_notes").select("note, created_at, exercises(name)").eq("client_id", clientId).order("created_at", { ascending: false }).limit(12),
     dayId ? db.from("days").select("label, phase_id").eq("id", dayId).maybeSingle() : Promise.resolve({ data: null } as { data: null }),
@@ -176,19 +176,6 @@ export async function POST(req: NextRequest) {
   if (!scope.clientId) return NextResponse.json({ error: "No client selected" }, { status: 400 });
   const clientId = scope.clientId;
 
-  // Server-side feature gate. Until now the workout_ai flag was checked ONLY in the UI
-  // (OffPlanBanner), so the endpoint itself would build and persist a workout for any
-  // authenticated client regardless of the flag - i.e. turning the flag off could not
-  // actually turn the feature off. Fail open only if the settings row is unreadable, so a
-  // settings outage can't lock everyone out mid-workout.
-  {
-    const { data: flagRow, error: flagErr } = await (createAdminClient() as unknown as Db)
-      .from("client_app_settings").select("workout_ai").eq("client_id", clientId).maybeSingle();
-    if (!flagErr && flagRow && (flagRow as { workout_ai: boolean | null }).workout_ai === false) {
-      return NextResponse.json({ error: "This feature isn't enabled for your account yet." }, { status: 403 });
-    }
-  }
-
   const gate = await enforceMeter(clientId, "workout_build");
   if (gate) return gate;
 
@@ -262,17 +249,11 @@ export async function POST(req: NextRequest) {
   try {
     if (mode === "activity") {
       // Already done → log a COMPLETED session so it counts immediately.
-      // The insert error MUST be read: it used to be discarded and `logged` set to true
-      // unconditionally, so a failed insert still told the client "✓ Logged - it counts"
-      // while leaving a completed scheduled_workouts row pointing at no log. Streaks and
-      // session counts read workout_logs, the weekly done-count reads scheduled_workouts,
-      // so the two disagreed permanently with no error surfaced anywhere.
-      const { data: wl, error: wlErr } = await admin.from("workout_logs").insert({
+      const { data: wl } = await admin.from("workout_logs").insert({
         client_id: clientId, day_id: dayIdNew, log_date: today, started_at: new Date().toISOString(),
         completed: true, completed_at: new Date().toISOString(), status: "Done as planned", source: "client",
         note: workout.focus || null,
       }).select("id").single();
-      if (wlErr) throw wlErr;
       await admin.from("scheduled_workouts").insert({
         client_id: clientId, day_id: dayIdNew, scheduled_date: today, status: "completed",
         workout_log_id: wl ? (wl as { id: string }).id : null, source: "client_self_assign",
@@ -281,27 +262,12 @@ export async function POST(req: NextRequest) {
     } else {
       // Replacement → schedule the new workout for today so it appears + counts when logged,
       // and mark the original scheduled workout as skipped (replaced).
-      //
-      // Retire any AI replacement already scheduled for today first. Generating a second
-      // replacement (the client taps Back and tries again, or the request retries after a
-      // timeout) used to leave every previous one scheduled: 3 attempts + 1 completed read as
-      // 1/4 = 25% adherence for the week instead of 1/1.
-      const { data: priorAiDays } = await admin.from("days")
-        .select("id").eq("client_owner_id", clientId).neq("id", dayIdNew);
-      const priorAiDayIds = ((priorAiDays as { id: string }[] | null) || []).map((d) => d.id);
-      if (priorAiDayIds.length) {
-        await admin.from("scheduled_workouts").update({ status: "skipped" })
-          .eq("client_id", clientId).eq("scheduled_date", today).eq("status", "scheduled")
-          .eq("source", "client_self_assign").is("deleted_at", null)
-          .in("day_id", priorAiDayIds);
-      }
       await admin.from("scheduled_workouts").insert({
         client_id: clientId, day_id: dayIdNew, scheduled_date: today, status: "scheduled", source: "client_self_assign",
       });
       if (body.dayId) {
         await admin.from("scheduled_workouts").update({ status: "skipped" })
-          .eq("client_id", clientId).eq("day_id", body.dayId).eq("scheduled_date", today).eq("status", "scheduled")
-          .is("deleted_at", null);
+          .eq("client_id", clientId).eq("day_id", body.dayId).eq("scheduled_date", today).eq("status", "scheduled");
       }
     }
   } catch (e) { console.error("workout-ai schedule error", e); }

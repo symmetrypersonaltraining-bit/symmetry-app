@@ -76,7 +76,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
       const today = CT_TODAY();
       const { data: origRows } = await (supabase as any).from("scheduled_workouts")
         .select("id, position").eq("client_id", clientId).eq("day_id", dayId)
-        .eq("scheduled_date", today).eq("status", "scheduled").is("deleted_at", null).order("id");
+        .eq("scheduled_date", today).eq("status", "scheduled").order("id");
       const orig = origRows && origRows[0] ? origRows[0] : null;
       await (supabase as any).from("scheduled_workouts").insert({
         client_id: clientId, day_id: target.id, scheduled_date: today,
@@ -98,8 +98,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
       if (data) setPendingRows((prev) => [...prev, data as OffPlanRow]);
       try {
         await (supabase as any).from("scheduled_workouts").update({ status: "skipped" })
-          .eq("client_id", clientId).eq("day_id", dayId).eq("scheduled_date", today).eq("status", "scheduled")
-          .is("deleted_at", null);
+          .eq("client_id", clientId).eq("day_id", dayId).eq("scheduled_date", today).eq("status", "scheduled");
       } catch { /* off-plan log still saved even if this fails */ }
       setTyped(""); setDetails(""); setMode("closed");
     } finally { setBusy(false); }
