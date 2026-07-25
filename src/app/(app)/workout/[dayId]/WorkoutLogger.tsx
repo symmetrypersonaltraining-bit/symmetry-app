@@ -1165,6 +1165,45 @@ export default function WorkoutLogger({
     finally { setSaving(false); }
   }
 
+  // Cancel = discard the session. Previously this only cleared the localStorage draft, so every
+  // set already logged stayed in set_logs and the workout_logs row stayed open forever - the
+  // screen emptied but the data did not (10 abandoned sessions were left stranded that way,
+  // one holding 28 sets). Now it deletes this session's rows for real.
+  const [discarding, setDiscarding] = useState(false);
+  async function discardSession() {
+    if (discarding) return;
+    const hasLogged = Object.values(sets).some(arr => arr.some(s => s.done));
+    const msg = hasLogged
+      ? "Discard this workout? Any sets you've already logged will be deleted."
+      : "Discard this workout and exit?";
+    if (typeof window !== "undefined" && !window.confirm(msg)) return;
+    setDiscarding(true);
+    try {
+      if (workoutLogId) {
+        const { error: slErr } = await supabase.from("set_logs").delete().eq("workout_log_id", workoutLogId);
+        if (slErr) throw slErr;
+        // completed=false guard: a finished workout must never be deletable from here, even if
+        // this component somehow still holds its id.
+        const { error: wlErr } = await supabase.from("workout_logs").delete()
+          .eq("id", workoutLogId).eq("completed", false);
+        if (wlErr) throw wlErr;
+      }
+      // The scheduled_workouts row is deliberately left alone: cancelling a session does not
+      // unschedule the workout - it stays on the calendar to be done later.
+      __clearDraft();
+      setWorkoutLogId(null);
+      setSets(buildInitialSets());
+      setSessionNote("");
+      setSessionCancelled(true);
+      setSessionMode(false);
+    } catch (e) {
+      console.error(e);
+      // Do NOT exit on failure - leaving the session open means the sets are still there to
+      // retry, rather than the screen clearing while the rows survive (the old behaviour).
+      if (typeof window !== "undefined") window.alert("Couldn't discard the workout - check your connection and try again.");
+    } finally { setDiscarding(false); }
+  }
+
   function addSetRow(peId: string) {
     setSets(prev => ({ ...prev, [peId]: [...(prev[peId] || []), { weight: "", reps: "", time: "", speed: "", hr: "", done: false }] }));
     if (navigator.vibrate) navigator.vibrate(20);
@@ -1468,7 +1507,7 @@ export default function WorkoutLogger({
         {/* Top bar */}
         <div className="flex items-center justify-between px-3 pt-2 pb-2 flex-shrink-0 gap-2">
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            <button onClick={() => { __clearDraft(); setSessionCancelled(true); setSessionMode(false); }}
+            <button onClick={discardSession} disabled={discarding}
               className="flex items-center gap-1 px-2.5 h-9 rounded-full"
               style={{ background: "rgba(255,90,90,0.16)", border: "1px solid rgba(255,90,90,0.4)" }}>
               <i className="ti ti-x text-sm" style={{ color: "#ff8a8a" }} />
