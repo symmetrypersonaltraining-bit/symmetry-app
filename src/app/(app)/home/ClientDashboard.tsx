@@ -11,8 +11,6 @@ import PrankInvoice from "@/components/PrankInvoice";
 import PaymentDueBanner from "@/components/PaymentDueBanner";
 import MilestoneBadges from "@/components/MilestoneBadges";
 import ClientWeekSummary from "@/components/ClientWeekSummary";
-import Leaderboard from "@/components/Leaderboard";
-import { RestDaySlip } from "@/components/FunMoments";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
 
 interface MetricPoint {
@@ -647,9 +645,11 @@ export default function ClientDashboard({
 
         {/* Today's Workout — 0 workouts: rest day | 1 workout: single card | 2+: picker */}
         {_todayWorkouts.length === 0 ? (
-          // Rest day gets the signed permission slip (2026-07-25) — makes resting
-          // feel prescribed rather than skipped, and it's shareable to the group.
-          <RestDaySlip firstName={firstName} />
+          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
+            <i className="ti ti-moon text-4xl mb-2 block cw-float" style={{ color: "var(--brand-text-secondary)" }} />
+            <p className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Rest Day</p>
+            <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>Recovery is part of the program 💪</p>
+          </div>
         ) : _todayWorkouts.length === 1 ? (
           // Single workout — original branded card
           <Link href={`${basePath}/workout/${_todayWorkouts[0].id}`}>
@@ -718,11 +718,6 @@ export default function ClientDashboard({
         <HomeMacrosCard />
 
         <MilestoneBadges />
-
-        {/* Community consistency board (2026-07-25). Opt-in — renders its own
-            "nobody's on the board yet" state until clients turn it on, so it is
-            safe to mount before anyone has opted in. */}
-        <Leaderboard />
         {/* Quick Actions */}
         <div>
           <h2 className="text-base font-bold mb-2.5" style={{ color: "var(--brand-text)" }}>Quick Actions</h2>
