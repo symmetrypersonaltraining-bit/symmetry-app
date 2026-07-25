@@ -205,6 +205,33 @@ export default function NutritionV3Client(props: Props) {
   const planMeals = useMemo(() => [...(activePlan?.meals || [])].sort((a, b) => a.position - b.position), [activePlan]);
   const planPositions = useMemo(() => new Set(planMeals.map((m) => m.position)), [planMeals]);
 
+  // ---- daily macro TARGET -------------------------------------------------
+  // DAY-GROUP: when the plan governing the VIEWED date is a day-group menu
+  // (non-empty day_group), the day's TARGET is that menu's own totals — the
+  // menus intentionally sum to different macros per day-type (training vs rest).
+  // Sum the prescribed menu using the SAME per-meal summation as the "515 kcal"
+  // figures (planMealMacros → 4/4/9 kcal), one meal per position (the first
+  // option, matching computeDayTotals' position fallback). Recomputes with the
+  // date because planMeals derives from activePlan (pickPlanForDate per date).
+  // For a NORMAL client (null/empty day_group) this is null → we keep using the
+  // passed macroTarget prop exactly as today (byte-for-byte unchanged).
+  const dayGroupTarget = useMemo<MacroTarget | null>(() => {
+    const dg = activePlan?.day_group;
+    const isDayGroup = Array.isArray(dg) && dg.length > 0;
+    if (!isDayGroup || !planMeals.length) return null;
+    const byPos = new Map<number, PlanMeal>();
+    for (const m of planMeals) if (!byPos.has(m.position)) byPos.set(m.position, m);
+    let calories = 0, protein = 0, carbs = 0, fats = 0;
+    for (const m of byPos.values()) {
+      const mm = planMealMacros(m);
+      calories += mm.kcal; protein += mm.protein; carbs += mm.carbs; fats += mm.fats;
+    }
+    return { calories, protein, carbs, fats };
+  }, [activePlan, planMeals]);
+  // The effective daily target for the viewed date: day-group menu total when
+  // this is a day-group plan, else the client's macro_targets (unchanged).
+  const dailyTarget = dayGroupTarget ?? macroTarget;
+
   // ---- data loading -------------------------------------------------------
   useEffect(() => {
     let on = true;
@@ -889,7 +916,7 @@ export default function NutritionV3Client(props: Props) {
   const coach = useMemo(() => {
     if (!coachOn || coachDismissed) return null;
     if (coachApi) return { kind: coachApi.kind === "push" ? "push" : "good", html: coachApi.message };
-    const tg = macroTarget;
+    const tg = dailyTarget;
     const loggedCount = totals.loggedCount;
     if (tg && loggedCount >= 2 && totals.protein < 0.45 * tg.protein && totals.kcal > 0.5 * tg.calories) {
       return { kind: "push", html: `Protein is trailing today — ${r(totals.protein)}g of ${r(tg.protein)}g with most of your calories in. Front-load protein in your remaining meals (egg whites, whey, lean meat).` };
@@ -902,7 +929,7 @@ export default function NutritionV3Client(props: Props) {
       return { kind: "good", html: `You've logged ${r(totals.kcal).toLocaleString()} cal so far (${r(totals.protein)}P). Keep building each slot — a full day makes your baseline report solid.` };
     }
     return { kind: "good", html: openMode ? "Tap a slot to build your first meal — search the food database, snap a photo, or type what you ate." : "Tap the circle on your first meal when it's down — one tap logs it Full." };
-  }, [coachOn, coachDismissed, coachApi, macroTarget, totals, openMode]);
+  }, [coachOn, coachDismissed, coachApi, dailyTarget, totals, openMode]);
 
   // ---- versions -----------------------------------------------------------
   async function openVersions() {
@@ -986,7 +1013,8 @@ export default function NutritionV3Client(props: Props) {
   // =========================================================================
   // RENDER
   // =========================================================================
-  const tg = macroTarget;
+  // Macro-bar target: day-group menu total for the viewed date, else macro_targets.
+  const tg = dailyTarget;
   const over = tg ? totals.kcal > tg.calories : false;
   const pctK = tg && tg.calories > 0 ? Math.min(100, (totals.kcal / tg.calories) * 100) : 0;
 
