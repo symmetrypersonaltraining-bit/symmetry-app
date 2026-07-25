@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { sendMessage } from "@/app/(app)/home/messageActions";
+import { fx } from "@/lib/fx";
 
 /**
  * AttentionFeed — "Who needs you today". Trainer home, 2026-07-25.
@@ -14,8 +16,18 @@ import Link from "next/link";
  * focus editing; this is the short "act on these first" strip, ranked by
  * severity. Collapsed to the top 3 until tapped.
  *
- * SAFETY: read-only. It never writes, never messages anyone, and if the fetch
- * fails for any reason it renders nothing at all rather than an error state.
+ * ONE-TAP DRAFTS (2026-07-25): each row can open three ready-to-send messages
+ * written for that person's specific situation from their real numbers, in
+ * Dustin's voice. Tap one to send it; tap ✎ to tweak it first; tap Handled to
+ * dismiss the row when you already know why they're out.
+ *
+ * Drafts are generated on tap, never on page load, so a feed nobody touches
+ * costs nothing. Sending goes through the existing sendMessage server action,
+ * so the message lands in the normal thread with the normal push — this screen
+ * doesn't invent a second way to message people.
+ *
+ * SAFETY: nothing is ever sent without an explicit tap on a specific draft.
+ * The API only returns text; it has no send path of its own.
  */
 
 interface Row {
@@ -42,10 +54,36 @@ const TAG_ICON: Record<string, string> = {
   nutrition: "ti-salad",
 };
 
+interface DraftState {
+  loading: boolean;
+  drafts: string[];
+  ai: boolean;
+  editing: number | null;
+  editText: string;
+  sending: boolean;
+  sent: boolean;
+  error: string | null;
+}
+
+const EMPTY_DRAFT: DraftState = {
+  loading: true,
+  drafts: [],
+  ai: false,
+  editing: null,
+  editText: "",
+  sending: false,
+  sent: false,
+  error: null,
+};
+
+const ANGLE = ["Warm check-in", "Practical", "Direct"];
+
 export default function AttentionFeed() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [done, setDone] = useState<string[]>([]);
+  const [open, setOpen] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
 
   useEffect(() => {
     let alive = true;
@@ -90,6 +128,60 @@ export default function AttentionFeed() {
       }
       return next;
     });
+  }
+
+  function patch(id: string, p: Partial<DraftState>) {
+    setDrafts((prev) => ({ ...prev, [id]: { ...(prev[id] || EMPTY_DRAFT), ...p } }));
+  }
+
+  async function toggleDrafts(row: Row) {
+    if (open === row.id) {
+      setOpen(null);
+      return;
+    }
+    setOpen(row.id);
+    fx("tap");
+    // Already fetched this session — don't spend a second call on it.
+    if (drafts[row.id] && !drafts[row.id].loading && drafts[row.id].drafts.length) return;
+
+    patch(row.id, { ...EMPTY_DRAFT, loading: true });
+    try {
+      const res = await fetch("/api/attention-drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: row.id, tag: row.tag }),
+      });
+      const j = await res.json();
+      const list = Array.isArray(j?.drafts) ? (j.drafts as string[]) : [];
+      if (!list.length) {
+        patch(row.id, { loading: false, error: "Couldn't write drafts — open the thread and message them directly." });
+        return;
+      }
+      patch(row.id, { loading: false, drafts: list, ai: j?.ai === true });
+    } catch {
+      patch(row.id, { loading: false, error: "Couldn't write drafts — open the thread and message them directly." });
+    }
+  }
+
+  async function send(row: Row, text: string) {
+    const t = (text || "").trim();
+    const st = drafts[row.id];
+    if (!t || (st && st.sending)) return;
+    patch(row.id, { sending: true, error: null });
+    try {
+      await sendMessage(row.id, t);
+      patch(row.id, { sending: false, sent: true, editing: null });
+      fx("complete");
+      // A sent message IS handling it — clear the row after a beat so he sees
+      // the confirmation land first.
+      window.setTimeout(() => {
+        markHandled(row.id);
+        setOpen(null);
+      }, 1100);
+    } catch {
+      patch(row.id, { sending: false, error: "Didn't send — try again, or open the thread." });
+      fx("error");
+    }
   }
 
   if (!rows) return null;
@@ -146,13 +238,22 @@ export default function AttentionFeed() {
                 <div style={{ fontSize: 11.5, color: "var(--brand-text-secondary)", marginTop: 2, lineHeight: 1.35 }}>
                   {r.detail}
                 </div>
-                <div style={{ display: "flex", gap: 12, marginTop: 7 }}>
-                  <Link
-                    href={"/messages?client=" + r.id}
-                    style={{ fontSize: 11.5, fontWeight: 800, color: "var(--brand-primary)", textDecoration: "none" }}
+                <div style={{ display: "flex", gap: 12, marginTop: 7, alignItems: "center", flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => toggleDrafts(r)}
+                    data-fx-own
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      color: "var(--brand-primary)",
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                    }}
                   >
-                    Message →
-                  </Link>
+                    {open === r.id ? "Hide drafts ▴" : "Draft a message ▾"}
+                  </button>
                   <Link
                     href={"/clients/" + r.id}
                     style={{ fontSize: 11.5, fontWeight: 800, color: "var(--brand-text-secondary)", textDecoration: "none" }}
@@ -175,6 +276,8 @@ export default function AttentionFeed() {
                     Handled ✓
                   </button>
                 </div>
+
+                {open === r.id && <DraftPanel row={r} state={drafts[r.id] || EMPTY_DRAFT} patch={patch} send={send} />}
               </div>
             </div>
           );
@@ -199,6 +302,166 @@ export default function AttentionFeed() {
           {expanded ? "Show less ▴" : "Show all " + live.length + " ▾"}
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * DraftPanel — the three one-tap messages under a row.
+ *
+ * A module-level component (not an inline arrow inside the map) so it keeps its
+ * own identity across renders and the textarea doesn't lose focus mid-edit.
+ *
+ * Tapping a draft SENDS it. That's the point of the feature — but each one is
+ * fully visible before the tap, and ✎ opens it for editing instead, so nothing
+ * goes out that hasn't been read.
+ */
+function DraftPanel({
+  row,
+  state,
+  patch,
+  send,
+}: {
+  row: Row;
+  state: DraftState;
+  patch: (id: string, p: Partial<DraftState>) => void;
+  send: (row: Row, text: string) => void;
+}) {
+  if (state.sent) {
+    return (
+      <div style={{ marginTop: 8, fontSize: 11.5, fontWeight: 800, color: "var(--brand-success, #3fb950)" }}>
+        Sent to {row.name} ✓
+      </div>
+    );
+  }
+
+  if (state.loading) {
+    return (
+      <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--brand-text-secondary)" }}>
+        Writing three options for {row.name}…
+      </div>
+    );
+  }
+
+  if (state.error) {
+    return (
+      <div style={{ marginTop: 8, fontSize: 11.5, color: "#ef4444" }}>{state.error}</div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+      {state.drafts.map((d, i) => {
+        const isEditing = state.editing === i;
+        return (
+          <div
+            key={i}
+            style={{
+              border: "1px solid var(--brand-border)",
+              borderRadius: 11,
+              background: "var(--brand-surface)",
+              padding: "8px 9px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: 800,
+                  letterSpacing: 0.5,
+                  textTransform: "uppercase",
+                  color: "var(--brand-text-secondary)",
+                }}
+              >
+                {ANGLE[i] || "Option " + (i + 1)}
+              </span>
+              <button
+                onClick={() => patch(row.id, { editing: isEditing ? null : i, editText: d })}
+                aria-label={isEditing ? "Cancel edit" : "Edit before sending"}
+                title={isEditing ? "Cancel edit" : "Edit before sending"}
+                style={{
+                  marginLeft: "auto",
+                  fontSize: 11,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--brand-text-secondary)",
+                  padding: 0,
+                }}
+              >
+                {isEditing ? "✕" : "✎"}
+              </button>
+            </div>
+
+            {isEditing ? (
+              <>
+                <textarea
+                  value={state.editText}
+                  onChange={(e) => patch(row.id, { editText: e.target.value })}
+                  rows={3}
+                  style={{
+                    width: "100%",
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                    padding: 7,
+                    borderRadius: 8,
+                    border: "1px solid var(--brand-border)",
+                    background: "var(--brand-bg)",
+                    color: "var(--brand-text)",
+                    resize: "vertical",
+                    fontFamily: "inherit",
+                  }}
+                />
+                <button
+                  onClick={() => send(row, state.editText)}
+                  disabled={state.sending || !state.editText.trim()}
+                  data-fx-own
+                  style={{
+                    marginTop: 6,
+                    width: "100%",
+                    padding: "7px",
+                    borderRadius: 9,
+                    border: "none",
+                    background: "var(--brand-primary)",
+                    color: "#fff",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    opacity: state.sending ? 0.6 : 1,
+                  }}
+                >
+                  {state.sending ? "Sending…" : "Send this"}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => send(row, d)}
+                disabled={state.sending}
+                data-fx-own
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: state.sending ? "default" : "pointer",
+                  fontSize: 12,
+                  lineHeight: 1.42,
+                  color: "var(--brand-text)",
+                  opacity: state.sending ? 0.5 : 1,
+                }}
+              >
+                {d}
+              </button>
+            )}
+          </div>
+        );
+      })}
+
+      <div style={{ fontSize: 10, color: "var(--brand-text-secondary)", lineHeight: 1.35 }}>
+        Tap one to send it as-is · ✎ to tweak first
+        {state.ai ? "" : " · written from a template, AI is off or capped"}
+      </div>
     </div>
   );
 }
