@@ -8,6 +8,7 @@
 // Auth-checked, client-scoped, metered (feature 'chat', default 15/day), Haiku.
 
 import { NextRequest, NextResponse } from "next/server";
+import { CT_TODAY, ctShiftDays } from "@/lib/ai/coach-context";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { validateCoachReply } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
@@ -37,10 +38,9 @@ interface DayTotal {
 // logs may reference archived plan versions, so plan items are fetched per
 // meal_id (same pattern as AveragesStrip).
 async function fetchDailyTotals(db: Db, clientId: string, days: number): Promise<DayTotal[]> {
-  const end = new Date().toISOString().slice(0, 10);
-  const startDate = new Date();
-  startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
-  const start = startDate.toISOString().slice(0, 10);
+  // Central time, never UTC — see coach-context.ts for the full note.
+  const end = CT_TODAY();
+  const start = ctShiftDays(end, -(days - 1));
 
   const { data: logs } = await db
     .from("meal_adherence_logs")
@@ -86,7 +86,7 @@ async function fetchDailyTotals(db: Db, clientId: string, days: number): Promise
 }
 
 async function assembleContext(db: Db, clientId: string): Promise<string> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = CT_TODAY();
   const [dailyTotals, targetRes, metricsRes] = await Promise.all([
     fetchDailyTotals(db, clientId, 14),
     db

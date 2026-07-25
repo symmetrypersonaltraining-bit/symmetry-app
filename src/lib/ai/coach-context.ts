@@ -11,6 +11,16 @@
 import { Db } from "@/lib/ai/scope";
 import { computeDayTotals, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
 
+// All date logic here is America/Chicago — log_date is written in Central time, so any UTC
+// "today" is a day ahead for the whole evening, which is exactly when clients log.
+export const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+export function ctShiftDays(iso: string, delta: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return dt.toISOString().slice(0, 10);
+}
+
 export const COACH_SYSTEM_PROMPT = `You are the nutrition coach assistant inside the Symmetry Personal Training app (physique coaching, trainer: Dustin). You speak directly to the client: encouraging, honest, specific, brief — no fluff, no lecture. Ground every statement in the context data provided; never invent numbers. If the data is sparse (few logged days), say so and keep advice modest. You may suggest small macro adjustments, but frame them as suggestions for the client to discuss with Dustin — plan changes are his call.
 
 Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
@@ -33,10 +43,10 @@ interface DayTotal {
 // reference archived plan versions, so plan items are fetched per meal_id
 // (same pattern as AveragesStrip and coach/route.ts).
 async function fetchDailyTotals(db: Db, clientId: string, days: number): Promise<DayTotal[]> {
-  const end = new Date().toISOString().slice(0, 10);
-  const startDate = new Date();
-  startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
-  const start = startDate.toISOString().slice(0, 10);
+  // Central time, never UTC. log_date is written in America/Chicago, so after 7pm CDT a UTC
+  // "today" is already tomorrow: the window ran a day ahead, silently dropping the oldest day.
+  const end = CT_TODAY();
+  const start = ctShiftDays(end, -(days - 1));
 
   const { data: logs } = await db
     .from("meal_adherence_logs")
@@ -82,7 +92,7 @@ async function fetchDailyTotals(db: Db, clientId: string, days: number): Promise
 }
 
 export async function assembleCoachContext(db: Db, clientId: string): Promise<string> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = CT_TODAY();
   const [dailyTotals, targetRes, metricsRes] = await Promise.all([
     fetchDailyTotals(db, clientId, 14),
     db
