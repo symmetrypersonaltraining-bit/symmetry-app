@@ -1328,3 +1328,146 @@ button:disabled:active { transform: none; }
   }
   .card-hover:hover { transform: none; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   VISUAL LAYER 3 — 2026-07-25 · the "expensive" pass
+   Additive, appended last. Revert = delete from this banner to the end.
+
+   IMPORTANT — why nothing here redefines --brand-bg / --brand-surface:
+   the 21 themes are declared as `:root, [data-theme="navy"]` and
+   `[data-theme="…"]`, all at the SAME specificity. A trailing `:root` block
+   redefining a base token would win the tie against EVERY theme and collapse
+   all 21 to one palette. So depth is added by DERIVING new tokens with
+   color-mix() and applying them at the point of use, where var(--brand-*)
+   still resolves per-theme.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Deeper scheme, derived per theme ───────────────────────────────────
+     Each of these reads the theme's OWN primary, so every scheme gains the
+     same depth while keeping its character. */
+
+  /* Page: a soft column of the theme's colour falling from the top, instead of
+     one flat fill. This is most of the "it has depth now" feeling. */
+  --brand-bg-deep:
+    radial-gradient(1100px 620px at 50% -12%,
+      color-mix(in srgb, var(--brand-primary) 13%, var(--brand-bg)) 0%,
+      color-mix(in srgb, var(--brand-primary) 4%, var(--brand-bg)) 46%,
+      var(--brand-bg) 78%);
+
+  /* Surfaces: a barely-there vertical grade so a card isn't a flat rectangle. */
+  --surface-deep:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--brand-surface) 99%, white) 0%,
+      color-mix(in srgb, var(--brand-surface) 96%, var(--brand-primary)) 100%);
+
+  /* Borders tinted toward the theme rather than a neutral grey line. */
+  --hairline: color-mix(in srgb, var(--brand-border) 72%, var(--brand-primary));
+  --hairline-soft: color-mix(in srgb, var(--brand-border) 86%, transparent);
+
+  /* Frosted chrome */
+  --glass-bg: color-mix(in srgb, var(--brand-surface) 72%, transparent);
+  --glass-edge: color-mix(in srgb, white 26%, transparent);
+}
+
+/* ── UPGRADE 1 · Frosted glass chrome ──────────────────────────────────────
+   Headers, bottom nav and sheets stop being opaque slabs and let the content
+   blur through them. This is the single strongest "premium mobile app" signal
+   there is, and it costs one property.
+
+   Guarded by @supports: a browser without backdrop-filter keeps the solid
+   background it has today rather than getting a see-through bar.
+
+   DELIBERATELY NOT ON THE STICKY HEADERS. backdrop-filter makes an element a
+   containing block for position:fixed descendants, and both headers contain
+   fixed popovers — HeaderAssist's tip panel and the NotificationCenter
+   dropdown. Frosting them would anchor those panels to a ~40px-tall bar
+   instead of the viewport and clip them. The bottom nav has no fixed children,
+   so it takes the effect safely. Anything frosted in future must be checked
+   for fixed descendants first. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .cw-glass {
+    background: var(--glass-bg) !important;
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
+    backdrop-filter: saturate(180%) blur(18px);
+  }
+  /* A hairline of light on the edge facing the content — what sells it as
+     glass rather than just transparency. */
+  .cw-glass-top { box-shadow: inset 0 1px 0 var(--glass-edge); }
+  .cw-glass-bottom { box-shadow: inset 0 -1px 0 var(--glass-edge); }
+}
+
+/* ── UPGRADE 2 · Numeric typography ────────────────────────────────────────
+   tabular-nums is the difference between a dashboard and a spreadsheet-shaped
+   web page. Digits get identical widths, so a counting-up number stops
+   jittering, columns of stats line up, and a weight going 197.0 -> 198.0 no
+   longer nudges the layout sideways.
+
+   Applied app-wide because this product is mostly numbers. */
+body {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Large type gets optical tightening. Display sizes set at default tracking
+   always read slightly loose — the bigger the text, the tighter it wants to be. */
+h1, .text-2xl, .text-3xl, .text-4xl { letter-spacing: -0.021em; }
+h2, .text-xl { letter-spacing: -0.014em; }
+h3, .text-lg { letter-spacing: -0.008em; }
+
+/* Headings break across lines evenly instead of leaving one orphan word. */
+h1, h2, h3 { text-wrap: balance; }
+
+/* ── UPGRADE 3 · Specular card edge ────────────────────────────────────────
+   The detail that separates expensive UI from adequate UI: a 1px highlight
+   along the top edge, as if a light source sits above the screen. Combined
+   with the elevation shadows already in place, a card reads as a physical
+   surface catching light rather than a div with a border.
+
+   Layered as inset box-shadows so it composes with the elevation tokens
+   instead of replacing them. */
+.card,
+.cw-surface {
+  background-image: var(--surface-deep);
+  border-color: var(--hairline-soft);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    var(--shadow-1);
+}
+.card-hover:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    var(--shadow-2);
+}
+.card-elevated {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    var(--shadow-3);
+}
+
+/* On a dark appearance a white highlight is wrong — light catches an edge far
+   more faintly, and the border does more of the work. */
+[data-appearance="dark"] .card,
+[data-appearance="dark"] .cw-surface {
+  background-image: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    var(--shadow-1);
+}
+[data-appearance="dark"] .card-hover:hover {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.09), var(--shadow-2);
+}
+[data-appearance="dark"] .card-elevated {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), var(--shadow-3);
+}
+[data-appearance="dark"] .cw-glass { --glass-edge: rgba(255,255,255,0.09); }
+
+/* Selection and focus follow the theme instead of the browser default blue. */
+::selection {
+  background: color-mix(in srgb, var(--brand-primary) 28%, transparent);
+  color: var(--brand-text);
+}
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand-primary) 70%, transparent);
+  outline-offset: 2px;
+}

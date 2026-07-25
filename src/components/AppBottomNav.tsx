@@ -30,7 +30,7 @@ export default function AppBottomNav({ items }: { items: NavItem[] }) {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 flex border-t z-50"
+      className="fixed bottom-0 left-0 right-0 flex border-t z-50 cw-glass cw-glass-top"
       style={{
         background: "var(--brand-surface)",
         borderColor: "var(--brand-border)",

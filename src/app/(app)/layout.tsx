@@ -39,7 +39,7 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--brand-bg)" }}>
+    <div className="min-h-screen" style={{ background: "var(--brand-bg-deep, var(--brand-bg))", backgroundAttachment: "fixed" }}>
       <RealtimeScheduleSync />
       {/* Clients register for push AND get the in-app new-message banner too. */}
       <PushRegister />

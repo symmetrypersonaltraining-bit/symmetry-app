@@ -75,7 +75,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
   // ── CLIENT MODE ───────────────────────────────────────────────────────────
   if (clientMode) {
     return (
-      <div className="flex flex-col min-h-screen" style={{ background: "var(--brand-bg)" }}>
+      <div className="flex flex-col min-h-screen" style={{ background: "var(--brand-bg-deep, var(--brand-bg))", backgroundAttachment: "fixed" }}>
 
         {/* Top bar — mirrors what a client would see on mobile */}
         <div className="flex items-center gap-3 px-4 pb-3 sticky top-0 z-40 shadow-sm"
@@ -114,7 +114,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
 
   // ── TRAINER MODE ───────────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-screen" style={{ background: "var(--brand-bg)" }}>
+    <div className="flex min-h-screen" style={{ background: "var(--brand-bg-deep, var(--brand-bg))", backgroundAttachment: "fixed" }}>
       <TrainerSidebar
         clientMode={clientMode}
         onToggleClientMode={handleToggleMode}
