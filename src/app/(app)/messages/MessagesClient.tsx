@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { sendMessage, sendClientMessage, sendGroupMessage, sendBroadcastMessage, deleteMessage, deleteThread } from "../home/messageActions";
 import { createClient } from "@/lib/supabase/client";
+import MessageReactions from "@/components/MessageReactions";
+import GroupChallenge from "@/components/GroupChallenge";
 
 interface Message {
   id: string;
@@ -187,6 +189,10 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
   };
   const ThreadPanel = () => (
     <div className="flex flex-col h-full">
+      {/* Pinned above the scroll area so it doesn't disappear as the thread
+          grows. Renders nothing when no challenge is running (clients) or
+          collapses to a single "start one" line (trainer). */}
+      {isGroup && <GroupChallenge isTrainer={isTrainer} />}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {thread.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full min-h-40 text-center pt-16">
@@ -226,6 +232,9 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                         {isMe && <span className="text-[10px]" style={{ color: m.read_at ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)" }}>{m.read_at ? "✓✓" : "✓"}</span>}
                         <button onClick={() => handleDeleteMessage(m.id)} disabled={deletingId === m.id} title="Delete message" aria-label="Delete message" className="text-xs leading-none" style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 4px", opacity: deletingId === m.id ? 0.4 : 0.75, color: isMe ? "rgba(255,255,255,0.9)" : "var(--brand-text-secondary)" }}><i className="ti ti-trash" /></button>
                       </div>
+                      {/* Kudos — group thread only. A DM with the coach stays a
+                          plain conversation; reactions are a community thing. */}
+                      {isGroup && <MessageReactions messageId={m.id} userId={currentUserId} align={isMe ? "right" : "left"} />}
                     </div>
                   </div>
                 );
