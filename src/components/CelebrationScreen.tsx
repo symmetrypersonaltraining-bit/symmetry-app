@@ -108,11 +108,14 @@ export default function CelebrationScreen({
   const setCount = Number(doneSets) || 0;
   const min = Number(minutes) || 0;
   const prCount = Number(prs) || 0;
+  // Denominator for the Full Send rings; falls back to the done count so the
+  // ring reads as complete rather than dividing by zero.
+  const totalSetsForRings = setCount > 0 ? setCount : 1;
   const firstName = ((clientName || "").split(" ")[0] || "Champion").trim();
 
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const seed = hashStr(String(clientId || "") + today);
-  const variant = seed % 25;
+  const variant = seed % 27;  // 25 original concepts + The Ledger (24) + Full Send (25)
 
   const [tapIdx, setTapIdx] = useState(0);
   const [reroll, setReroll] = useState(0);
@@ -610,6 +613,97 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
+  } else if (variant === 24) {
+    // ── The Ledger — stats type out like a receipt, then stamp PAID IN FULL.
+    // The calm, premium alternative to confetti. Pure CSS animation.
+    const rows: [string, string][] = [
+      ["Sets completed", String(setCount)],
+      ["Total volume", `${vStr} lb`],
+      ...(min > 0 ? ([["Session time", `${min} min`]] as [string, string][]) : []),
+      ...(prCount > 0 ? ([["Personal records", String(prCount)]] as [string, string][]) : []),
+      ["Status", "Complete"],
+    ];
+    content = (
+      <div style={{ ...bigCard, background: "#0b1220", justifyContent: "flex-start", padding: 20 }}>
+        <div style={{ width: "100%", maxWidth: 300, fontFamily: "ui-monospace, Menlo, monospace" }}>
+          <div style={{ textAlign: "center", letterSpacing: 4, fontSize: 10, color: "#7f8ea3", marginBottom: 16 }}>
+            SYMMETRY · RECEIPT
+          </div>
+          {rows.map(([k, v], i) => (
+            <div
+              key={k}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "8px 0",
+                borderBottom: "1px dashed rgba(255,255,255,.14)",
+                fontSize: 12.5,
+                opacity: 0,
+                animation: `cs-ledger .34s ${i * 0.28}s both`,
+              }}
+            >
+              <span style={{ color: "#8ea0b8" }}>{k}</span>
+              <span style={{ fontWeight: 800, color: "#fff" }}>{v}</span>
+            </div>
+          ))}
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 22 }}>
+            <div
+              style={{
+                border: "3px solid #e0a83e",
+                color: "#e0a83e",
+                padding: "7px 18px",
+                borderRadius: 8,
+                fontWeight: 900,
+                letterSpacing: 3,
+                fontSize: 12,
+                animation: `cs-stamp .42s ${rows.length * 0.28 + 0.15}s both`,
+                transform: "rotate(-8deg)",
+              }}
+            >
+              PAID IN FULL
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  } else if (variant === 25) {
+    // ── Full Send — three rings close one after another.
+    const rings: [string, string, number][] = [
+      ["Sets", "#3fb950", totalSetsForRings > 0 ? Math.min(1, setCount / totalSetsForRings) : 1],
+      ["Volume", "#79C0FF", Math.min(1, volume / 15000)],
+      ["Session", "#e0a83e", min > 0 ? Math.min(1, min / 45) : 1],
+    ];
+    content = (
+      <div style={{ ...bigCard, background: "#04121a" }}>
+        <div style={{ display: "flex", gap: 16, justifyContent: "center" }}>
+          {rings.map(([label, col, pct], i) => (
+            <div key={label} style={{ textAlign: "center" }}>
+              <svg width="76" height="76" aria-hidden>
+                <circle cx="38" cy="38" r="31" fill="none" stroke="rgba(255,255,255,.10)" strokeWidth="7" />
+                <circle
+                  cx="38"
+                  cy="38"
+                  r="31"
+                  fill="none"
+                  stroke={col}
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                  strokeDasharray={195}
+                  strokeDashoffset={195}
+                  transform="rotate(-90 38 38)"
+                  style={{ animation: `cs-ring .9s ${0.25 + i * 0.4}s both`, ["--ring-to" as string]: String(195 * (1 - pct)) }}
+                />
+              </svg>
+              <div style={{ fontSize: 10, color: "#8ea0b8", marginTop: 4, letterSpacing: 1 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 20, fontSize: 20, fontWeight: 900, color: "#fff" }}>Full send, {firstName}.</div>
+        <div style={{ marginTop: 6, fontSize: 12.5, color: "#9db4d4", maxWidth: 280 }}>
+          {setCount} sets · {vStr} lb moved. Every ring closed.
+        </div>
+      </div>
+    );
   } else {
     content = (
       <div style={{ ...bigCard, background: "#20304a" }}>
@@ -738,4 +832,4 @@ const doneBtn: React.CSSProperties = { textAlign: "center", background: "var(--b
 // PR plate + AI line (2026-07-25). Additive styles only.
 const prPlate: React.CSSProperties = { background: "linear-gradient(150deg,#3a2a12,#6b5227)", border: "2px solid #e0a83e", borderRadius: 16, padding: "16px 18px", textAlign: "center", boxShadow: "0 0 34px rgba(224,168,62,.35)" };
 const aiLineBox: React.CSSProperties = { background: "var(--brand-surface)", border: "1px solid var(--brand-border)", borderLeft: "3px solid var(--brand-primary)", borderRadius: 12, padding: "11px 14px", fontSize: 13.5, lineHeight: 1.55, color: "var(--brand-text)", fontStyle: "italic" };
-const CSS = "@keyframes cs-fall{to{transform:translateY(760px) rotate(720deg)}}@keyframes cs-blink{50%{opacity:.3}}@keyframes cs-xp{from{width:6%}to{width:85%}}@keyframes cs-credits{from{transform:translateY(100%)}to{transform:translateY(-100%)}}@keyframes cs-stamp{from{transform:rotate(12deg) scale(3);opacity:0}to{transform:rotate(12deg) scale(1);opacity:.9}}@keyframes cs-shimmer{0%{background-position:0% 0}100%{background-position:300% 0}}@keyframes cs-ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}";
+const CSS = "@keyframes cs-ledger{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}@keyframes cs-ring{to{stroke-dashoffset:var(--ring-to,0)}}@media (prefers-reduced-motion:reduce){[style*='cs-ledger'],[style*='cs-ring'],[style*='cs-stamp']{animation:none!important;opacity:1!important}}@keyframes cs-fall{to{transform:translateY(760px) rotate(720deg)}}@keyframes cs-blink{50%{opacity:.3}}@keyframes cs-xp{from{width:6%}to{width:85%}}@keyframes cs-credits{from{transform:translateY(100%)}to{transform:translateY(-100%)}}@keyframes cs-stamp{from{transform:rotate(12deg) scale(3);opacity:0}to{transform:rotate(12deg) scale(1);opacity:.9}}@keyframes cs-shimmer{0%{background-position:0% 0}100%{background-position:300% 0}}@keyframes cs-ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}";
