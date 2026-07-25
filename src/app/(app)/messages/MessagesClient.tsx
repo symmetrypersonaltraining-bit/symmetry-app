@@ -232,9 +232,14 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                         {isMe && <span className="text-[10px]" style={{ color: m.read_at ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)" }}>{m.read_at ? "✓✓" : "✓"}</span>}
                         <button onClick={() => handleDeleteMessage(m.id)} disabled={deletingId === m.id} title="Delete message" aria-label="Delete message" className="text-xs leading-none" style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 4px", opacity: deletingId === m.id ? 0.4 : 0.75, color: isMe ? "rgba(255,255,255,0.9)" : "var(--brand-text-secondary)" }}><i className="ti ti-trash" /></button>
                       </div>
-                      {/* Kudos — group thread only. A DM with the coach stays a
-                          plain conversation; reactions are a community thing. */}
-                      {isGroup && <MessageReactions messageId={m.id} userId={currentUserId} align={isMe ? "right" : "left"} />}
+                      {/* Kudos on every thread, not just the group (#82).
+                          On a DM this is the one-tap reply: acknowledging a
+                          client's message with a 👊 beats typing "nice work"
+                          for the thirtieth time this week, and they still get
+                          the acknowledgement. RLS already allows reactions on
+                          any message you can see, so nothing changed server
+                          side. */}
+                      <MessageReactions messageId={m.id} userId={currentUserId} align={isMe ? "right" : "left"} />
                     </div>
                   </div>
                 );

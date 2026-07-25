@@ -4,6 +4,8 @@ import MetricCards from "@/components/MetricCards";
 import ClientSelector from "@/components/ClientSelector";
 import ConsistencyCalendar from "@/components/ConsistencyCalendar";
 import AchievementCard from "@/components/AchievementCard";
+import PersonalBests from "@/components/PersonalBests";
+import ThenVsNow from "@/components/ThenVsNow";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -71,6 +73,8 @@ export default async function ProgressPage({
           <>
             <AchievementCard clientId={clientId} name={clientName} />
             <ConsistencyCalendar clientId={clientId} />
+            <ThenVsNow clientId={clientId} />
+            <PersonalBests clientId={clientId} />
             <MetricCards clientId={clientId} />
           </>
         ) : (

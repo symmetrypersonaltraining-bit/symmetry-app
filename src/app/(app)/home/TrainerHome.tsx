@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import TrainerWeekDigest from "@/components/TrainerWeekDigest";
 import AttentionFeed from "@/components/AttentionFeed";
+import LiveSessions from "@/components/LiveSessions";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
 
@@ -175,6 +176,10 @@ export default function TrainerHome({
             {dateLabel}
           </p>
         </div>
+
+        {/* Anyone training this minute outranks anyone who went quiet last
+            week, so this sits first. Renders nothing when the gym is empty. */}
+        <LiveSessions />
 
         {/* Short "act on these first" strip. Renders nothing when nobody is
             flagged, so a clean week costs zero screen space. */}

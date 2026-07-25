@@ -5,6 +5,7 @@ import Link from "next/link";
 import NewClientModal from "./NewClientModal";
 import { createClient } from "@/lib/supabase/client";
 import ClientStatusDot from "@/components/ClientStatusDot";
+import ClientSparkline from "@/components/ClientSparkline";
 import Avatar from "@/components/Avatar";
 
 const AVATAR_COLORS = [
@@ -56,6 +57,49 @@ export default function ClientsListClient({ clients }: Props) {
   const [showNewClient, setShowNewClient] = useState(false);
 
   const [statusMap, setStatusMap] = useState<Record<string, "green" | "amber" | "red">>({});
+
+  // Eight weeks of completed sessions, bucketed per client per week (#81).
+  // ONE query for the whole roster, not one per row.
+  const [sparks, setSparks] = useState<Record<string, number[]>>({});
+  useEffect(() => {
+    let off = false;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+        const today = new Date(todayStr + "T00:00:00");
+        // Bucket 7 is the current week; bucket 0 is seven weeks before it.
+        const start = new Date(today);
+        start.setDate(start.getDate() - (today.getDay() + 7 * 7));
+        const startStr = start.toLocaleDateString("en-CA");
+        const { data } = await supabase
+          .from("workout_logs")
+          .select("client_id, log_date")
+          .eq("completed", true)
+          .gte("log_date", startStr);
+        const startMs = start.getTime();
+        const map: Record<string, number[]> = {};
+        const seen: Record<string, Set<string>> = {};
+        for (const r of ((data || []) as { client_id: string; log_date: string }[])) {
+          if (!r || !r.client_id || !r.log_date) continue;
+          const idx = Math.floor((new Date(r.log_date + "T00:00:00").getTime() - startMs) / (7 * 86400000));
+          if (idx < 0 || idx > 7) continue;
+          // Distinct DAYS per week, so two sessions in one day count once —
+          // same rule the consistency board and challenges use.
+          const key = r.client_id + "|" + r.log_date;
+          if (!seen[r.client_id]) seen[r.client_id] = new Set();
+          if (seen[r.client_id].has(key)) continue;
+          seen[r.client_id].add(key);
+          if (!map[r.client_id]) map[r.client_id] = [0, 0, 0, 0, 0, 0, 0, 0];
+          map[r.client_id][idx]++;
+        }
+        if (!off) setSparks(map);
+      } catch {
+        /* non-fatal: rows simply render without a trend */
+      }
+    })();
+    return () => { off = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -195,6 +239,10 @@ export default function ClientsListClient({ clients }: Props) {
                     {client.activeProgram || "No active program"}
                   </div>
                 </div>
+
+                {client.hasAppAccess && sparks[client.id] && (
+                  <ClientSparkline weeks={sparks[client.id]} />
+                )}
 
                 {client.hasAppAccess && statusMap[client.id] && (
                   <ClientStatusDot status={statusMap[client.id]} />
