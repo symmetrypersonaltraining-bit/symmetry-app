@@ -1,12 +1,25 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { startDictation, type DictationHandle } from "@/lib/dictation";
 
 export default function FeedbackButton() {
   const [open, setOpen] = useState(false);
   const [msg, setMsg] = useState("");
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
+  const [listening, setListening] = useState(false);
+  const dictRef = useRef<DictationHandle | null>(null);
+
+  function toggleMic() {
+    if (listening) { dictRef.current?.stop(); setListening(false); return; }
+    dictRef.current = startDictation({
+      onResult: (t) => setMsg(m => (m ? m.trim() + " " : "") + t),
+      onStart: () => setListening(true),
+      onEnd: () => setListening(false),
+      onUnavailable: () => { setListening(false); alert("Voice input isn't available on this device — you can type your feedback."); },
+    });
+  }
 
   async function submit() {
     if (!msg.trim()) return;
@@ -65,18 +78,32 @@ export default function FeedbackButton() {
                   color: "#2a3147", background: "#f4f6fb",
                 }}
               />
-              <button
-                onClick={submit}
-                disabled={sending || !msg.trim()}
-                style={{
-                  marginTop: 10, width: "100%", background: "var(--brand-primary,#7c9cf5)",
-                  color: "#fff", border: "none", borderRadius: 10, padding: "10px 0",
-                  fontWeight: 700, fontSize: 14, cursor: sending || !msg.trim() ? "default" : "pointer",
-                  opacity: sending || !msg.trim() ? 0.6 : 1,
-                }}
-              >
-                {sending ? "Sending…" : "Send"}
-              </button>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button
+                  onClick={toggleMic}
+                  aria-label={listening ? "Stop dictation" : "Dictate feedback"}
+                  style={{
+                    flex: "0 0 44px", width: 44, background: listening ? "#e5393518" : "#f4f6fb",
+                    color: listening ? "#e53935" : "#7c9cf5", border: "1px solid #e3e9f3",
+                    borderRadius: 10, fontSize: 18, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  <i className={`ti ${listening ? "ti-player-stop-filled" : "ti-microphone"}`} />
+                </button>
+                <button
+                  onClick={submit}
+                  disabled={sending || !msg.trim()}
+                  style={{
+                    flex: 1, background: "var(--brand-primary,#7c9cf5)",
+                    color: "#fff", border: "none", borderRadius: 10, padding: "10px 0",
+                    fontWeight: 700, fontSize: 14, cursor: sending || !msg.trim() ? "default" : "pointer",
+                    opacity: sending || !msg.trim() ? 0.6 : 1,
+                  }}
+                >
+                  {sending ? "Sending…" : listening ? "Listening…" : "Send"}
+                </button>
+              </div>
             </>
           )}
         </div>
