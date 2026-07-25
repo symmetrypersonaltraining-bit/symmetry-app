@@ -16,10 +16,11 @@ import { fx } from "@/lib/fx";
  * focus editing; this is the short "act on these first" strip, ranked by
  * severity. Collapsed to the top 3 until tapped.
  *
- * ONE-TAP DRAFTS (2026-07-25): each row can open three ready-to-send messages
+ * ONE-TAP DRAFTS (2026-07-25): each row can open five ready-to-send messages
  * written for that person's specific situation from their real numbers, in
- * Dustin's voice. Tap one to send it; tap ✎ to tweak it first; tap Handled to
- * dismiss the row when you already know why they're out.
+ * Dustin's voice — warm, practical, straight up, and two that lean on humour.
+ * Tap one to send it; tap ✎ to tweak it first; tap Handled to dismiss the row
+ * when you already know why they're out.
  *
  * Drafts are generated on tap, never on page load, so a feed nobody touches
  * costs nothing. Sending goes through the existing sendMessage server action,
@@ -76,7 +77,8 @@ const EMPTY_DRAFT: DraftState = {
   error: null,
 };
 
-const ANGLE = ["Warm check-in", "Practical", "Direct"];
+// Fixed order, matching the five the API is prompted to return.
+const ANGLE = ["Warm check-in", "Practical", "Straight up", "Funny", "Funnier"];
 
 export default function AttentionFeed() {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -338,7 +340,7 @@ function DraftPanel({
   if (state.loading) {
     return (
       <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--brand-text-secondary)" }}>
-        Writing three options for {row.name}…
+        Writing five options for {row.name}…
       </div>
     );
   }
@@ -350,7 +352,20 @@ function DraftPanel({
   }
 
   return (
-    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+    <div
+      style={{
+        marginTop: 8,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        // Five options is a tall panel on a phone. Cap it and let it scroll so
+        // the rows underneath stay reachable.
+        maxHeight: 340,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        overscrollBehavior: "contain",
+      }}
+    >
       {state.drafts.map((d, i) => {
         const isEditing = state.editing === i;
         return (

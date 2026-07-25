@@ -1,8 +1,15 @@
 // POST /api/attention-drafts
 // Body: { clientId: string, tag?: string }
 //
-// Three ready-to-send message drafts for one row of the trainer attention feed,
+// Five ready-to-send message drafts for one row of the trainer attention feed,
 // written in Dustin's voice from that client's ACTUAL numbers.
+//
+// The five angles are fixed: warm check-in, practical, straight up, and two
+// funny ones. The humour is bounded by explicit rules in the prompt — jokes aim
+// at the situation, the gym or Dustin himself, never at the person. On the
+// escalate and onboard segments both funny drafts are held gentle, because
+// nobody knows yet WHY someone went quiet and a joke that assumes laziness
+// would be brutal if the answer is illness or a death in the family.
 //
 // TRAINER ONLY. This never sends anything — it only returns text. The send is a
 // separate, explicit tap in the UI using the existing sendMessage action, so
@@ -17,7 +24,7 @@
 //
 //  2. There is ALWAYS a fallback. If the API key is missing, the meter is
 //     tripped, the model errors, or it returns something malformed, this returns
-//     three written drafts for that situation instead. The button must never
+//     five written drafts for that situation instead. The button must never
 //     dead-end — a trainer tapping "draft a message" and getting an error is
 //     worse than a slightly generic message.
 //
@@ -50,22 +57,36 @@ type Tag = (typeof TAGS)[number];
 const SYSTEM = `You draft short messages that Dustin, a personal trainer, sends to one client in his own app. You are writing AS Dustin, first person.
 
 Respond with ONLY valid JSON, no markdown, no fences:
-{"drafts": [string, string, string]}
+{"drafts": [string, string, string, string, string]}
 
 Hard rules:
-- Exactly 3 drafts. Each is 1-2 sentences, under 220 characters.
-- The three must take DIFFERENT angles. Use these three, in this order:
-    1. Warm check-in — no ask, just noticing them as a person.
-    2. Practical — a specific, small, concrete next step or a logistics offer.
-    3. Direct — honest accountability, still kind. This is the one he sends when he knows they can take it.
+- Exactly 5 drafts. Each is 1-2 sentences, under 220 characters.
+- The five take DIFFERENT angles, in this exact order:
+    1. Warm check-in — no ask at all, just noticing them as a person.
+    2. Practical — one specific, small, concrete next step or a logistics offer.
+    3. Straight up — honest accountability, still kind. The one he sends when he knows they can take it.
+    4. Funny — light, warm humour that gets the same point across sideways.
+    5. Funnier — a bolder joke. Still kind, still lands the point.
 - Ground them in the FACTS given. NEVER invent a number, a date, a lift or an event.
 - Use their first name at most once, and only where it sounds natural.
 - NEVER mention body weight, body fat, size or appearance. Behaviour only.
 - NEVER guilt-trip, shame, or imply they let him down. No "disappointed", no "you promised".
 - No motivational-poster language. No "crush it", no "no excuses", no "beast mode".
-- At most one emoji across all three drafts, and only if it genuinely earns it.
-- Write like a text message from a person, not a CRM. Contractions are good.
-- If the client is a rehab or injury case, be gentler and never push intensity.
+- At most two emoji across all five drafts, and only where they genuinely earn it.
+- If the client is a rehab or injury case, be gentler everywhere and never push intensity.
+
+HUMOUR RULES — the funny two have to be safe to send to a paying client:
+- Joke about the SITUATION, the gym, the calendar, Dustin himself. Never about the person's
+  body, discipline, character or worth.
+- Playful exaggeration is good. Sarcasm aimed at them is not.
+- Mock-formal, mock-dramatic and deadpan all work. "Missing person report", "the dumbbells
+  asked about you", "I checked the parking lot" — that register.
+- It must still be obvious he is glad to hear from them. Warmth first, joke second.
+- If the situation is ESCALATE (gone quiet 10+ days) or ONBOARD (never started), keep BOTH
+  funny ones gentle and low-stakes. He does not know why they went quiet — it could be
+  illness, money, a death in the family. A joke that assumes laziness would be brutal if so.
+  Aim the humour at himself or at the silence, never at their reason.
+- For a rehab or injury client, humour stays soft and never references pushing harder.
 
 DUSTIN'S VOICE — match this, it is the whole point.
 These are real lines Dustin has written to his clients. Study the rhythm, not the words:
@@ -87,6 +108,21 @@ What that voice actually is:
 - No corporate softeners: no "just checking in to see if", no "I wanted to reach out", no "circle back".
 - Does not sign off, does not open with "Hi [name],". It is a text, mid-conversation.
 
+CASUAL AND DIRECT — lean further this way than you think:
+- Text-message casual. Fragments are fine. "Where you been?" beats "I noticed you have been absent."
+- Contractions always. "you've", "let's", "I'm", "gonna" is fine occasionally.
+- Say the thing in the first six words. No throat-clearing, no wind-up.
+- Casual does NOT mean vague. He is still telling them exactly what to do.
+- Fewer words is always better. If a draft can lose three words, lose them.
+
+PERSONAL — use what you actually know about them:
+- Reach for the specific detail over the generic one. Their last workout by name, the weight
+  they hit, how long they have been training with him, the exact number of days.
+- One concrete detail beats three vague compliments. "Your last one was Push Day, 6 sets" is
+  worth more than "you've been doing great".
+- Only use details present in the FACTS. If a detail is null or missing, do not reach for it
+  and do not invent a substitute.
+
 Write these as if Dustin typed them himself on his phone between sessions.`;
 
 interface Facts {
@@ -101,6 +137,12 @@ interface Facts {
   daysSinceSignup: number | null;
   goal: string | null;
   isRehab: boolean;
+  // Personal detail. One real specific beats three vague compliments, so these
+  // give the model something true to actually reach for. Null when unknown —
+  // the prompt forbids inventing a substitute.
+  lastWorkoutName: string | null;
+  lastWorkoutSets: number | null;
+  heaviestRecentLift: { name: string; weight: number } | null;
 }
 
 // What each tag actually means, in words, so the model isn't guessing from a slug.
@@ -113,39 +155,53 @@ const SITUATION: Record<Tag, string> = {
   nutrition: "They are training hard but have stopped logging food, which they used to do. Nutrition, not training, is the gap.",
 };
 
-// Written fallbacks — same voice rules as the prompt above, so a client can
-// never tell whether a message was AI-drafted or came from this list. Good
-// enough to send as-is.
+// Written fallbacks — same voice and same five angles as the prompt above, so
+// a client can never tell whether a message was AI-drafted or came from this
+// list. Good enough to send as-is. Slots 4 and 5 are the funny ones; for the
+// escalate and onboard situations they stay deliberately gentle, because
+// nobody knows yet why that person went quiet.
 const FALLBACK: Record<Tag, (n: string) => string[]> = {
   escalate: (n) => [
     `${n}, been a minute — how are you doing?`,
     `Let's just reset, ${n}. Tell me what days actually work right now and I'll rebuild the week around them.`,
     `${n}, you've been off the app a while and I'd rather hear from you than guess. What's going on?`,
+    `${n}, checking you're alive over there. No pressure — just say hey.`,
+    `Filing a missing person report on you, ${n}. Reply and I'll call it off.`,
   ],
   onboard: (n) => [
     `${n}, how are you finding the app so far?`,
     `${n}, let's walk through your first workout together — I'll pull it up and show you how logging works. Five minutes, tops.`,
     `${n}, I don't see a session logged yet — is something not working, or has life just been busy? Either way I can help.`,
+    `${n}, your first workout's just sitting there getting lonely. Want me to walk you through it?`,
+    `${n}, I built you a whole program and it's currently undefeated. Let's give it a fight.`,
   ],
   rest: (n) => [
     `${n}, you've been in there every single day. How's the body feeling?`,
     `Take a rest day this week, ${n} — a real one. Recovery is when the work actually lands.`,
     `${n}, the effort is there but you're training too often to recover from it. Take a day off — that's the assignment.`,
+    `${n}, this is me officially prescribing you a couch. Doctor's orders.`,
+    `${n}, if you show up tomorrow I'm hiding the dumbbells. Take the day.`,
   ],
   quiet: (n) => [
     `${n}, how's the week treating you?`,
     `${n}, want me to move this week's sessions to days that fit better? Easy to shuffle.`,
     `${n}, you've been quiet a few days — let's get one in before the week gets away from us.`,
+    `${n}, the gym asked about you. I told it you're busy.`,
+    `${n}, few days off the grid. Everything good, or did the couch win?`,
   ],
   slipping: (n) => [
     `${n}, how's everything going?`,
     `Let's get one more session in this week than last, ${n} — pick the day and I'll have it ready for you.`,
     `${n}, you've dropped off your normal pace a bit. Nothing dramatic — I just want to catch it before it turns into a habit.`,
+    `${n}, your usual pace called. It misses you.`,
+    `${n}, you've slowed down a step. Let's fix that before it becomes a personality trait.`,
   ],
   nutrition: (n) => [
     `${n}, the training has been solid lately — nice work.`,
     `${n}, log just your meals for the next three days. Not perfect, just honest — it tells me a lot.`,
     `${n}, you're putting in the work in the gym but the food logging stopped. That's the piece holding your results back right now.`,
+    `${n}, training's on point, food log's a ghost town. Let's get it populated.`,
+    `${n}, I can see every set you've done and zero of your meals. I have questions.`,
   ],
 };
 
@@ -156,8 +212,8 @@ function validate(raw: unknown): { drafts: string[] } | null {
   const out = d
     .filter((x): x is string => typeof x === "string" && !!x.trim())
     .map((x) => x.trim().slice(0, 320));
-  if (out.length < 3) return null;
-  return { drafts: out.slice(0, 3) };
+  if (out.length < 5) return null;
+  return { drafts: out.slice(0, 5) };
 }
 
 export async function POST(req: NextRequest) {
@@ -190,10 +246,20 @@ export async function POST(req: NextRequest) {
   let facts: Facts | null = null;
 
   try {
-    const [cRes, wRes, mRes] = await Promise.all([
+    const [cRes, wRes, mRes, lastRes] = await Promise.all([
       admin.from("clients").select("name, primary_goal, created_at").eq("id", clientId).maybeSingle(),
       admin.from("workout_logs").select("log_date").eq("client_id", clientId).eq("completed", true),
       admin.from("meal_adherence_logs").select("log_date").eq("client_id", clientId).not("adherence", "is", null),
+      // The most recent completed session, by name — the single most personal
+      // detail available, and the one that makes a message sound like it came
+      // from someone who was actually paying attention.
+      admin
+        .from("workout_logs")
+        .select("id, log_date, days(label)")
+        .eq("client_id", clientId)
+        .eq("completed", true)
+        .order("log_date", { ascending: false })
+        .limit(1),
     ]);
 
     const c = cRes.data as { name: string | null; primary_goal: string | null; created_at: string | null } | null;
@@ -205,6 +271,34 @@ export async function POST(req: NextRequest) {
     const lastM = m.length ? m.slice().sort().at(-1)! : null;
     const goal = c?.primary_goal || null;
     const joined = c?.created_at ? String(c.created_at).slice(0, 10) : null;
+
+    // Name + shape of their last session. Best-effort: if the set rows can't be
+    // read we still send the workout name, and if that's missing too the prompt
+    // simply has one fewer detail to work with.
+    const lastRow = ((lastRes.data as { id: string; days?: { label?: string } | null }[]) || [])[0] || null;
+    let lastWorkoutName: string | null = lastRow?.days?.label || null;
+    let lastWorkoutSets: number | null = null;
+    let heaviestRecentLift: { name: string; weight: number } | null = null;
+    if (lastRow?.id) {
+      try {
+        const { data: sl } = await admin
+          .from("set_logs")
+          .select("weight_lbs, exercises(name)")
+          .eq("workout_log_id", lastRow.id)
+          .eq("completed", true);
+        const rows = (sl as Record<string, unknown>[]) || [];
+        lastWorkoutSets = rows.length || null;
+        for (const r of rows) {
+          const wt = Number(r.weight_lbs) || 0;
+          const nm = ((r.exercises as { name?: string } | null)?.name) || "";
+          if (nm && wt > 0 && (!heaviestRecentLift || wt > heaviestRecentLift.weight)) {
+            heaviestRecentLift = { name: nm, weight: wt };
+          }
+        }
+      } catch {
+        lastWorkoutName = lastWorkoutName || null;
+      }
+    }
 
     facts = {
       firstName,
@@ -218,6 +312,9 @@ export async function POST(req: NextRequest) {
       daysSinceSignup: joined ? daysBetween(joined, today) : null,
       goal,
       isRehab: /rehab|pain|injur/i.test(goal || ""),
+      lastWorkoutName,
+      lastWorkoutSets,
+      heaviestRecentLift,
     };
   } catch {
     return NextResponse.json({ drafts: FALLBACK[tag](firstName), ai: false, tag, name: firstName });
@@ -250,11 +347,11 @@ export async function POST(req: NextRequest) {
       apiKey: process.env.ANTHROPIC_API_KEY,
       model: HAIKU_MODEL,
       system: SYSTEM,
-      maxTokens: 500,
+      maxTokens: 900,
       messages: [
         {
           role: "user",
-          content: `FACTS:\n${JSON.stringify(facts)}\n\nWrite the three drafts as strict JSON.`,
+          content: `FACTS:\n${JSON.stringify(facts)}\n\nWrite the five drafts as strict JSON.`,
         },
       ],
       validate,
@@ -267,7 +364,7 @@ export async function POST(req: NextRequest) {
     }
 
     const drafts = value?.drafts;
-    if (!drafts || drafts.length < 3) {
+    if (!drafts || drafts.length < 5) {
       return NextResponse.json({ drafts: FALLBACK[tag](firstName), ai: false, tag, name: firstName });
     }
     return NextResponse.json({ drafts, ai: true, tag, name: firstName });
