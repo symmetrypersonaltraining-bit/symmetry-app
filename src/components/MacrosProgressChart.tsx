@@ -32,11 +32,21 @@ export default function MacrosProgressChart({ clientId }: { clientId: string | n
       // this chart, the macro bar and the averages strips always agree —
       // adherence is properly prorated, Skipped counts 0, item overrides and
       // the v3 log protocol (custom meals, placeholders) are all respected.
+      // Bounded to the widest range this chart can display (8wk) plus headroom, and ordered
+      // NEWEST first. Unbounded + ascending was a silent-truncation trap: PostgREST caps a
+      // response at 1000 rows, so once a client passed ~1000 meal logs the cap would keep the
+      // OLDEST rows and recent weeks would quietly vanish from the chart with no error. The
+      // busiest client is at 416 rows today, so this lands before it could bite.
+      const sinceDate = new Date();
+      sinceDate.setUTCDate(sinceDate.getUTCDate() - 400);
+      const since = sinceDate.toISOString().slice(0, 10);
       const { data: logs } = await (supabase as any)
         .from("meal_adherence_logs")
         .select("*")
         .eq("client_id", clientId)
-        .order("log_date");
+        .gte("log_date", since)
+        .order("log_date", { ascending: false })
+        .limit(2000);
       const rows = (logs || []) as (LogRow & { log_date: string })[];
       const mealIds = Array.from(new Set(rows.map(r => r.meal_id).filter(Boolean)));
       const pseudoMeals: PlanMeal[] = [];
