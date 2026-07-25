@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import MetricCards from "@/components/MetricCards";
 import ClientSelector from "@/components/ClientSelector";
 import ConsistencyCalendar from "@/components/ConsistencyCalendar";
+import AchievementCard from "@/components/AchievementCard";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -68,6 +69,7 @@ export default async function ProgressPage({
       <div className="px-4 py-4">
         {clientId ? (
           <>
+            <AchievementCard clientId={clientId} name={clientName} />
             <ConsistencyCalendar clientId={clientId} />
             <MetricCards clientId={clientId} />
           </>

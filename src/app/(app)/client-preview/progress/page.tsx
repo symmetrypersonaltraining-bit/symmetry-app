@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import MetricCards from "@/components/MetricCards";
 import ConsistencyCalendar from "@/components/ConsistencyCalendar";
+import AchievementCard from "@/components/AchievementCard";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -35,6 +36,7 @@ export default async function ClientPreviewProgressPage() {
         <p className="text-white/60 text-sm">{clientName}</p>
       </div>
       <div className="px-4 py-4">
+        <AchievementCard clientId={clientId} name={clientName} />
         <ConsistencyCalendar clientId={clientId} />
         <MetricCards clientId={clientId} />
       </div>
