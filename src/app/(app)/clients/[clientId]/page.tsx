@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import ClientProfileTabs from "./ClientProfileTabs";
+import PlateauSpotter from "@/components/PlateauSpotter";
 import InviteClientButton from "./InviteClientButton";
 import ResetCredentialsButton from "./ResetCredentialsButton";
 
@@ -134,6 +135,9 @@ export default async function ClientProfilePage({
           ))}
         </div>
       </div>
+
+      {/* Trainer-only coaching hint. Renders nothing when nothing is flagged. */}
+      <PlateauSpotter clientId={clientId} />
 
       <ClientProfileTabs
         client={client as any}
