@@ -9,6 +9,7 @@
 // Auth-checked, client-scoped, metered (feature 'plan_build', default 1/day).
 
 import { NextRequest, NextResponse } from "next/server";
+import { CT_TODAY } from "@/lib/ai/coach-context";
 import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { validatePlanDraft } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
@@ -48,7 +49,7 @@ function cleanTargets(t: unknown): Targets | null {
 
 async function consultContext(db: Db, clientId: string | null): Promise<string> {
   if (!clientId) return "No client profile data available.";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = CT_TODAY();
   const [clientRes, metricsRes, targetRes] = await Promise.all([
     db.from("clients").select("name, primary_goal").eq("id", clientId).maybeSingle(),
     db
