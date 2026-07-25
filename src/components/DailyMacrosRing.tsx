@@ -114,9 +114,9 @@ export default function DailyMacrosRing() {
         </div>
         <div className="flex items-end justify-around">
           <Ring value={dd.cal} goal={dd.calGoal} color="#0EA5E9" size={46} stroke={5} showNum sub="kcal" label="Cal" />
-          <Ring value={dd.p} goal={dd.pGoal} color="var(--brand-success)" size={34} stroke={4} label={"P " + dd.p} />
-          <Ring value={dd.c} goal={dd.cGoal} color="var(--brand-warn)" size={34} stroke={4} label={"C " + dd.c} />
-          <Ring value={dd.f} goal={dd.fGoal} color="var(--brand-danger)" size={34} stroke={4} label={"F " + dd.f} />
+          <Ring value={dd.p} goal={dd.pGoal} color="#22c55e" size={34} stroke={4} label={"P " + dd.p} />
+          <Ring value={dd.c} goal={dd.cGoal} color="#f59e0b" size={34} stroke={4} label={"C " + dd.c} />
+          <Ring value={dd.f} goal={dd.fGoal} color="#e84e4e" size={34} stroke={4} label={"F " + dd.f} />
         </div>
       </div>
 
@@ -128,9 +128,9 @@ export default function DailyMacrosRing() {
             <p className="text-xs" style={{ color: "var(--brand-text-secondary)", marginBottom: 16 }}>Consumed vs assigned</p>
             <div className="flex items-start justify-around" style={{ marginBottom: 18, gap: 4 }}>
               <Ring value={dd.cal} goal={dd.calGoal} color="#0EA5E9" size={70} stroke={7} showNum sub="kcal" label={dd.cal + " / " + dd.calGoal} />
-              <Ring value={dd.p} goal={dd.pGoal} color="var(--brand-success)" size={70} stroke={7} showNum sub="g" label={"Protein " + dd.p + "/" + dd.pGoal} />
-              <Ring value={dd.c} goal={dd.cGoal} color="var(--brand-warn)" size={70} stroke={7} showNum sub="g" label={"Carbs " + dd.c + "/" + dd.cGoal} />
-              <Ring value={dd.f} goal={dd.fGoal} color="var(--brand-danger)" size={70} stroke={7} showNum sub="g" label={"Fat " + dd.f + "/" + dd.fGoal} />
+              <Ring value={dd.p} goal={dd.pGoal} color="#22c55e" size={70} stroke={7} showNum sub="g" label={"Protein " + dd.p + "/" + dd.pGoal} />
+              <Ring value={dd.c} goal={dd.cGoal} color="#f59e0b" size={70} stroke={7} showNum sub="g" label={"Carbs " + dd.c + "/" + dd.cGoal} />
+              <Ring value={dd.f} goal={dd.fGoal} color="#e84e4e" size={70} stroke={7} showNum sub="g" label={"Fat " + dd.f + "/" + dd.fGoal} />
             </div>
             <Link href="/nutrition?viewAsClient=true" className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold" style={{ background: "var(--brand-primary)", color: "white" }}>
               <i className="ti ti-salad" /> Log nutrition

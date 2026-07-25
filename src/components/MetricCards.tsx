@@ -45,18 +45,18 @@ interface MetricConfig {
 
 const METRIC_CONFIGS: MetricConfig[] = [
   { key: 'weight',       label: 'Weight',    unit: 'lbs', color: 'var(--brand-primary)', lowerIsBetter: true,  canLog: true  },
-  { key: 'body_fat_pct', label: 'Body Fat',  unit: '%',   color: 'var(--chart-2)', lowerIsBetter: true,  canLog: true  },
-  { key: 'lean_mass',    label: 'Lean Mass', unit: 'lbs', color: 'var(--brand-success)', lowerIsBetter: false, canLog: false },
-  { key: 'fat_mass',     label: 'Fat Mass',  unit: 'lbs', color: 'var(--brand-danger)', lowerIsBetter: true,  canLog: false },
-  { key: 'workouts',     label: 'Workouts',  unit: '',    color: 'var(--chart-3)', lowerIsBetter: false, canLog: false },
-  { key: 'streak',       label: 'Streak',    unit: 'days',color: 'var(--brand-warn)', lowerIsBetter: false, canLog: false },
+  { key: 'body_fat_pct', label: 'Body Fat',  unit: '%',   color: '#e87c3e', lowerIsBetter: true,  canLog: true  },
+  { key: 'lean_mass',    label: 'Lean Mass', unit: 'lbs', color: '#22c55e', lowerIsBetter: false, canLog: false },
+  { key: 'fat_mass',     label: 'Fat Mass',  unit: 'lbs', color: '#e84e4e', lowerIsBetter: true,  canLog: false },
+  { key: 'workouts',     label: 'Workouts',  unit: '',    color: '#8b5cf6', lowerIsBetter: false, canLog: false },
+  { key: 'streak',       label: 'Streak',    unit: 'days',color: '#f59e0b', lowerIsBetter: false, canLog: false },
 ];
 
 const MACRO_SERIES = [
   { key: 'kcal',    label: 'Calories', unit: '',  color: 'var(--brand-primary)' },
-  { key: 'protein', label: 'Protein',  unit: 'g', color: 'var(--brand-success)' },
-  { key: 'carbs',   label: 'Carbs',    unit: 'g', color: 'var(--brand-warn)' },
-  { key: 'fats',    label: 'Fat',      unit: 'g', color: 'var(--brand-danger)' },
+  { key: 'protein', label: 'Protein',  unit: 'g', color: '#22c55e' },
+  { key: 'carbs',   label: 'Carbs',    unit: 'g', color: '#f59e0b' },
+  { key: 'fats',    label: 'Fat',      unit: 'g', color: '#e84e4e' },
 ] as const;
 
 const RANGES = [
@@ -73,9 +73,15 @@ function centralToday(): string {
 }
 
 function isoDaysAgo(base: string, n: number): string {
-  const d = new Date(base + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() - n);
-  return d.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  // Pure calendar maths on the yyyy-mm-dd string. Do NOT build a Date from
+  // base + 'T00:00:00Z' and read it back with timeZone: 'America/Chicago' —
+  // midnight UTC is still the previous evening in Central, so that returned
+  // YESTERDAY for n = 0. Day 0 then never matched a session logged today and
+  // every streak in the app read 0. Fixed 2026-07-25.
+  const [y, m, d] = base.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - n);
+  return dt.toISOString().slice(0, 10);
 }
 
 // ─── Animated SVG Sparkline ───────────────────────────────────────────────────
@@ -104,8 +110,8 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 
   if (data.length < 2) {
     return (
-      <svg width="120" height="40" viewBox="0 0 120 40">
-        <line x1="0" y1="20" x2="120" y2="20" stroke={color} strokeWidth="1.5" strokeDasharray="4,4" opacity="0.3" />
+      <svg width="120" height="40" viewBox="0 0 120 40" style={{ color }}>
+        <line x1="0" y1="20" x2="120" y2="20" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.3" />
       </svg>
     );
   }
@@ -130,14 +136,20 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
     d += ` Q ${cpx.toFixed(1)} ${curr.y.toFixed(1)} ${curr.x.toFixed(1)} ${curr.y.toFixed(1)}`;
   }
 
-  const gradId = `g${color.replace('#', '')}`;
+  // Sanitised so it is always a valid id — see the note above about black fills.
+  const gradId = `sp${color.replace(/[^a-zA-Z0-9]/g, '')}`;
 
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible' }}>
+    <svg
+      width={W}
+      height={H}
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ overflow: 'visible', color }}
+    >
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.15" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.15" />
+          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
         </linearGradient>
       </defs>
       <path
@@ -268,9 +280,9 @@ function MacrosCard({ data, onClose, targets }: { data: DailyMacro[]; onClose: (
 
       <div style={{ display: 'flex', gap: 6, justifyContent: 'space-around' }}>
         <RingGauge value={avg('kcal')} goal={targets ? targets.kcal : 0} color="#0EA5E9" label="Calories" unit="" />
-        <RingGauge value={avg('protein')} goal={targets ? targets.protein : 0} color="var(--brand-success)" label="Protein" unit="g" />
-        <RingGauge value={avg('carbs')} goal={targets ? targets.carbs : 0} color="var(--brand-warn)" label="Carbs" unit="g" />
-        <RingGauge value={avg('fats')} goal={targets ? targets.fats : 0} color="var(--brand-danger)" label="Fat" unit="g" />
+        <RingGauge value={avg('protein')} goal={targets ? targets.protein : 0} color="#22c55e" label="Protein" unit="g" />
+        <RingGauge value={avg('carbs')} goal={targets ? targets.carbs : 0} color="#f59e0b" label="Carbs" unit="g" />
+        <RingGauge value={avg('fats')} goal={targets ? targets.fats : 0} color="#e84e4e" label="Fat" unit="g" />
       </div>
     </div>
   );
@@ -431,7 +443,7 @@ function ExpandedPanel({
             </span>
           )}
           {delta != null && (
-            <span style={{ fontSize: 12, fontWeight: 600, color: deltaGood ? 'var(--brand-success)' : 'var(--brand-danger)' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: deltaGood ? '#22c55e' : '#ef4444' }}>
               {deltaSign}{delta.toFixed(1)}{cfg.unit}
             </span>
           )}
@@ -470,7 +482,8 @@ function ExpandedPanel({
         !showLog
           ? <button onClick={() => (cfg.key === "body_fat_pct" ? (window.location.href = "/log-bodyfat?clientId=" + clientId) : setShowLog(true))} style={{
               width: '100%', padding: '10px', borderRadius: 10,
-              border: `1.5px dashed ${cfg.color}`, background: cfg.color + '10',
+              border: `1.5px dashed ${cfg.color}`,
+              background: `color-mix(in srgb, ${cfg.color} 8%, transparent)`,
               color: cfg.color, fontWeight: 700, fontSize: 13, cursor: 'pointer',
             }}>
               + Log {cfg.label}
@@ -575,11 +588,23 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
       const uniqueDates = [
         ...new Set((wDates as any[]).filter((w: any) => w.completed || w.status).map((w: any) => w.log_date).filter(Boolean)),
       ].sort().reverse() as string[];
+      // Anchor on today if they've already trained today, otherwise on
+      // yesterday. Without this, a real run reads as 0 every morning until the
+      // day's session is logged — which is exactly when someone opens the app
+      // to see their streak. Matches how the home-screen flame already counts.
+      const todayStr = centralToday();
+      const yesterdayStr = isoDaysAgo(todayStr, 1);
+      const anchor =
+        uniqueDates[0] === todayStr ? todayStr
+        : uniqueDates[0] === yesterdayStr ? yesterdayStr
+        : null;
+
       let streak = 0;
-      for (let i = 0; i < uniqueDates.length; i++) {
-        const expected = isoDaysAgo(centralToday(), i);
-        if (uniqueDates[i] === expected) streak++;
-        else break;
+      if (anchor) {
+        for (let i = 0; i < uniqueDates.length; i++) {
+          if (uniqueDates[i] === isoDaysAgo(anchor, i)) streak++;
+          else break;
+        }
       }
       setStreakDays(streak);
     } else {
@@ -750,6 +775,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
               padding: '12px 14px',
               borderTop: '3px solid #0EA5E9',
               border: expandedKey === 'macros' ? '1.5px solid #0EA5E9' : '1.5px solid #0EA5E966',
+              boxShadow: '0 3px 12px color-mix(in srgb, #0EA5E9 15%, transparent)',
               borderTopWidth: 3,
               cursor: 'pointer',
               transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.15s',
@@ -765,9 +791,9 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
             <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 5 }}>
               {([
                 { k: 'kcal', label: 'Cal', color: '#0EA5E9', unit: '' },
-                { k: 'protein', label: 'P', color: 'var(--brand-success)', unit: 'g' },
-                { k: 'carbs', label: 'C', color: 'var(--brand-warn)', unit: 'g' },
-                { k: 'fats', label: 'F', color: 'var(--brand-danger)', unit: 'g' },
+                { k: 'protein', label: 'P', color: '#22c55e', unit: 'g' },
+                { k: 'carbs', label: 'C', color: '#f59e0b', unit: 'g' },
+                { k: 'fats', label: 'F', color: '#e84e4e', unit: 'g' },
               ] as const).map(b => {
                 const avgv = macrosInWindow.length ? macrosInWindow.reduce((s, dm) => s + (dm[b.k] as number), 0) / macrosInWindow.length : 0;
                 const tgt = targets ? (targets[b.k as 'kcal' | 'protein' | 'carbs' | 'fats'] || 0) : 0;
@@ -801,12 +827,18 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
                 borderRadius: 12,
                 padding: '12px 14px',
                 borderTop: `3px solid ${cfg.color}`,
-                border: isActive ? `1.5px solid ${cfg.color}` : `1.5px solid ${cfg.color}66`,
+                border: isActive
+                  ? `1.5px solid ${cfg.color}`
+                  : `1.5px solid color-mix(in srgb, ${cfg.color} 42%, transparent)`,
                 borderTopWidth: 3,
                 cursor: 'pointer',
                 transform: isActive ? 'scale(1.01)' : undefined,
                 transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.15s',
-                boxShadow: isActive ? `0 4px 20px ${cfg.color}25` : undefined,
+                // Every tile keeps a soft tinted glow, not just the open one — this is
+                // the coloured depth behind the charts. Stronger when active.
+                boxShadow: isActive
+                  ? `0 6px 22px color-mix(in srgb, ${cfg.color} 26%, transparent)`
+                  : `0 3px 12px color-mix(in srgb, ${cfg.color} 15%, transparent)`,
                 animationName: 'mcFadeUp',
                 animationDuration: '0.4s',
                 animationTimingFunction: 'ease',
@@ -824,7 +856,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
                 )}
               </div>
               {change && changeNum != null && (
-                <div style={{ fontSize: 11, fontWeight: 600, marginTop: 3, color: deltaGood ? 'var(--brand-success)' : 'var(--brand-danger)' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, marginTop: 3, color: deltaGood ? '#22c55e' : '#ef4444' }}>
                   {change}{cfg.unit ? ' ' + cfg.unit : ''}
                 </div>
               )}
