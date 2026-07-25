@@ -287,6 +287,7 @@ export default function AchievementCard({ clientId, name }: { clientId: string; 
                 onClick={nativeShare}
                 disabled={busy}
                 data-fx-own
+                className="cw-sweep"
                 style={{
                   flex: 1,
                   padding: "12px",

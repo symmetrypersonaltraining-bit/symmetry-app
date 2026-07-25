@@ -6,6 +6,7 @@ import Link from "next/link";
 import { dismissClientNotification } from "./notifActions";
 import HomeMacrosCard from "@/components/HomeMacrosCard";
 import CountUp from "@/components/CountUp";
+import StreakFlame from "@/components/StreakFlame";
 import MilestoneToast from "@/components/MilestoneToast";
 import PrankInvoice from "@/components/PrankInvoice";
 import PaymentDueBanner from "@/components/PaymentDueBanner";
@@ -617,7 +618,7 @@ export default function ClientDashboard({
           {streakDays > 0 && (
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${isMilestone ? "animate-pulse" : ""}`}
               style={{ background: isMilestone ? "#f59e0b20" : "var(--brand-surface)", border: `1px solid ${isMilestone ? "#f59e0b" : "var(--brand-border)"}` }}>
-              <span className="text-base" style={{ display: "inline-block", animation: "cw-flame-flicker 1.4s ease-in-out infinite" }}>{isMilestone ? "🎉" : "🔥"}</span>
+              <StreakFlame days={streakDays} milestone={isMilestone} />
               <div>
                 <span className="text-sm font-bold" style={{ color: isMilestone ? "#f59e0b" : "var(--brand-text)" }}><CountUp end={streakDays} duration={800} /></span>
                 <span className="text-xs ml-0.5" style={{ color: "var(--brand-text-secondary)" }}>day{streakDays !== 1 ? "s" : ""}</span>

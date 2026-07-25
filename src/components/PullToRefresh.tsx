@@ -282,45 +282,65 @@ export default function PullToRefresh() {
     >
       <div
         style={{
-          width: 34,
-          height: 34,
+          width: 38,
+          height: 38,
           borderRadius: 999,
           background: "var(--brand-surface)",
           border: "1px solid var(--brand-border)",
-          boxShadow: "0 4px 14px rgba(20,30,55,0.18)",
+          boxShadow: "var(--shadow-2)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          position: "relative",
         }}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" style={{ display: "block" }}>
+        {/* The Symmetry mark, revealed as you pull (#9). It scales and fades in
+            with the gesture, so the brand shows up at the moment of the action
+            rather than sitting there as decoration. */}
+        <img
+          src="/symmetry-corrective-logo.png"
+          alt=""
+          width={20}
+          height={20}
+          style={{
+            width: 20,
+            height: 20,
+            objectFit: "contain",
+            opacity: Math.min(1, progress * 1.15),
+            transform: "scale(" + (0.55 + progress * 0.45) + ") rotate(" + (refreshing ? 0 : progress * 180) + "deg)",
+            transition: dragging ? "none" : "transform .2s ease, opacity .2s ease",
+            animation: refreshing ? "cw-ptr-spin 1.1s linear infinite" : undefined,
+          }}
+          onError={(e) => {
+            // The mark is a nicety. If it 404s, the ring alone still reads as
+            // a refresh control — never leave a broken image icon on screen.
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+
+        {/* Progress ring around the mark */}
+        <svg
+          width="38"
+          height="38"
+          viewBox="0 0 38 38"
+          style={{ position: "absolute", inset: 0, display: "block" }}
+        >
           <circle
-            cx="12"
-            cy="12"
-            r="9"
+            cx="19"
+            cy="19"
+            r="16"
             fill="none"
-            stroke="var(--brand-border)"
-            strokeWidth="2.5"
-          />
-          <circle
-            cx="12"
-            cy="12"
-            r="9"
-            fill="none"
-            stroke={ready ? "var(--brand-primary)" : "var(--brand-text-secondary)"}
-            strokeWidth="2.5"
+            stroke={ready ? "var(--brand-primary)" : "var(--brand-border)"}
+            strokeWidth="2"
             strokeLinecap="round"
-            strokeDasharray={2 * Math.PI * 9}
-            strokeDashoffset={2 * Math.PI * 9 * (1 - progress)}
-            transform="rotate(-90 12 12)"
-            style={{
-              transformOrigin: "12px 12px",
-              animation: refreshing ? "cw-ptr-spin .8s linear infinite" : undefined,
-            }}
+            strokeDasharray={2 * Math.PI * 16}
+            strokeDashoffset={2 * Math.PI * 16 * (1 - progress)}
+            transform="rotate(-90 19 19)"
+            style={{ transition: dragging ? "none" : "stroke-dashoffset .2s ease" }}
           />
         </svg>
       </div>
-      <style>{"@keyframes cw-ptr-spin{to{transform:rotate(270deg)}}"}</style>
+      <style>{"@keyframes cw-ptr-spin{to{transform:rotate(360deg)}}"}</style>
     </div>
   );
 }

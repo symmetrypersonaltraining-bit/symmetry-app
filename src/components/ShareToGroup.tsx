@@ -58,7 +58,12 @@ export default function ShareToGroup({
       onClick={share}
       disabled={state === "sending" || state === "sent"}
       data-fx-own
-      className={className}
+      className={[
+        "cw-sweep",
+        state === "sent" ? "is-success" : "",
+        state === "error" ? "cw-shake" : "",
+        className || "",
+      ].filter(Boolean).join(" ")}
       style={{
         border: 0,
         borderRadius: 24,

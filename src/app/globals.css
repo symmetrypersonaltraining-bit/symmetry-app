@@ -1246,3 +1246,85 @@ button:disabled:active { transform: none; }
 }
 /* Native controls (date pickers, scrollbars) follow too */
 [data-appearance="dark"] { color-scheme: dark; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   VISUAL LAYER 2 — 2026-07-25
+   Additive only, appended last so it wins on equal specificity without editing
+   any rule above. Revert = delete from this banner to the end of the file.
+
+   Note on #47/#48: the --shadow-* and --chart-* tokens were already defined in
+   the polish layer above but nothing ever USED them — .card still carried
+   hardcoded shadows and charts still had hardcoded hex. This block is the
+   wiring, which is where the visible difference actually comes from.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── #48 Elevation, applied ────────────────────────────────────────────────
+   Three deliberate levels instead of every card carrying the same flat pair of
+   shadows. The tokens are theme-aware and already have dark-mode variants, so
+   this follows the appearance setting for free. */
+.card            { box-shadow: var(--shadow-1); }
+.card-hover:hover{ box-shadow: var(--shadow-2); transform: translateY(-2px); }
+.card-elevated   { box-shadow: var(--shadow-3); }
+
+.elev-0 { box-shadow: none; }
+.elev-1 { box-shadow: var(--shadow-1); }
+.elev-2 { box-shadow: var(--shadow-2); }
+.elev-3 { box-shadow: var(--shadow-3); }
+
+/* Anything that floats over the page sits at the top level, so a sheet reads
+   as being above the content rather than pasted onto it. */
+[role="dialog"], .cw-sheet { box-shadow: var(--shadow-3); }
+
+/* ── #5 Gold sweep on success ──────────────────────────────────────────────
+   A Symmetry-gold shine crosses the control when an action actually lands.
+   Opt-in per element: add .cw-sweep, then toggle .is-success when it succeeds.
+   The sweep is a pseudo-element, so it never disturbs layout or the label. */
+.cw-sweep { position: relative; overflow: hidden; }
+.cw-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-130%);
+  background: linear-gradient(
+    105deg,
+    transparent 32%,
+    rgba(255, 214, 138, 0.62) 50%,
+    transparent 68%
+  );
+}
+.cw-sweep.is-success::after { animation: cw-sweep 0.8s cubic-bezier(.25,.8,.3,1) 1; }
+@keyframes cw-sweep { to { transform: translateX(130%); } }
+
+/* ── #6 Error shake ────────────────────────────────────────────────────────
+   A failed save used to do nothing at all, which reads as "the button is
+   broken". A short shake says the tap registered and the action didn't. */
+@keyframes cw-shake {
+  10%, 90% { transform: translateX(-1.5px); }
+  20%, 80% { transform: translateX(3px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
+.cw-shake { animation: cw-shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+
+/* ── #61 Streak flame ──────────────────────────────────────────────────────
+   Flicker speed and glow scale with the streak; the tiers are set inline by
+   <StreakFlame/>. Kept here so the keyframes exist once, not per element. */
+@keyframes cw-flame-rise {
+  0%, 100% { transform: scale(1) translateY(0) rotate(-1.5deg); }
+  35%      { transform: scale(1.09) translateY(-1px) rotate(1.5deg); }
+  70%      { transform: scale(0.97) translateY(0.5px) rotate(-1deg); }
+}
+
+/* ── Accessibility ─────────────────────────────────────────────────────────
+   Every effect above is decoration. Someone who asked their device for less
+   motion gets the end state instantly, not a softened version of the animation. */
+@media (prefers-reduced-motion: reduce) {
+  .cw-sweep.is-success::after,
+  .cw-shake,
+  [style*="cw-flame-rise"],
+  [style*="cw-flame-flicker"] {
+    animation: none !important;
+  }
+  .card-hover:hover { transform: none; }
+}

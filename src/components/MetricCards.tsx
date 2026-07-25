@@ -45,18 +45,18 @@ interface MetricConfig {
 
 const METRIC_CONFIGS: MetricConfig[] = [
   { key: 'weight',       label: 'Weight',    unit: 'lbs', color: 'var(--brand-primary)', lowerIsBetter: true,  canLog: true  },
-  { key: 'body_fat_pct', label: 'Body Fat',  unit: '%',   color: '#e87c3e', lowerIsBetter: true,  canLog: true  },
-  { key: 'lean_mass',    label: 'Lean Mass', unit: 'lbs', color: '#22c55e', lowerIsBetter: false, canLog: false },
-  { key: 'fat_mass',     label: 'Fat Mass',  unit: 'lbs', color: '#e84e4e', lowerIsBetter: true,  canLog: false },
-  { key: 'workouts',     label: 'Workouts',  unit: '',    color: '#8b5cf6', lowerIsBetter: false, canLog: false },
-  { key: 'streak',       label: 'Streak',    unit: 'days',color: '#f59e0b', lowerIsBetter: false, canLog: false },
+  { key: 'body_fat_pct', label: 'Body Fat',  unit: '%',   color: 'var(--chart-2)', lowerIsBetter: true,  canLog: true  },
+  { key: 'lean_mass',    label: 'Lean Mass', unit: 'lbs', color: 'var(--brand-success)', lowerIsBetter: false, canLog: false },
+  { key: 'fat_mass',     label: 'Fat Mass',  unit: 'lbs', color: 'var(--brand-danger)', lowerIsBetter: true,  canLog: false },
+  { key: 'workouts',     label: 'Workouts',  unit: '',    color: 'var(--chart-3)', lowerIsBetter: false, canLog: false },
+  { key: 'streak',       label: 'Streak',    unit: 'days',color: 'var(--brand-warn)', lowerIsBetter: false, canLog: false },
 ];
 
 const MACRO_SERIES = [
   { key: 'kcal',    label: 'Calories', unit: '',  color: 'var(--brand-primary)' },
-  { key: 'protein', label: 'Protein',  unit: 'g', color: '#22c55e' },
-  { key: 'carbs',   label: 'Carbs',    unit: 'g', color: '#f59e0b' },
-  { key: 'fats',    label: 'Fat',      unit: 'g', color: '#e84e4e' },
+  { key: 'protein', label: 'Protein',  unit: 'g', color: 'var(--brand-success)' },
+  { key: 'carbs',   label: 'Carbs',    unit: 'g', color: 'var(--brand-warn)' },
+  { key: 'fats',    label: 'Fat',      unit: 'g', color: 'var(--brand-danger)' },
 ] as const;
 
 const RANGES = [
@@ -268,9 +268,9 @@ function MacrosCard({ data, onClose, targets }: { data: DailyMacro[]; onClose: (
 
       <div style={{ display: 'flex', gap: 6, justifyContent: 'space-around' }}>
         <RingGauge value={avg('kcal')} goal={targets ? targets.kcal : 0} color="#0EA5E9" label="Calories" unit="" />
-        <RingGauge value={avg('protein')} goal={targets ? targets.protein : 0} color="#22c55e" label="Protein" unit="g" />
-        <RingGauge value={avg('carbs')} goal={targets ? targets.carbs : 0} color="#f59e0b" label="Carbs" unit="g" />
-        <RingGauge value={avg('fats')} goal={targets ? targets.fats : 0} color="#e84e4e" label="Fat" unit="g" />
+        <RingGauge value={avg('protein')} goal={targets ? targets.protein : 0} color="var(--brand-success)" label="Protein" unit="g" />
+        <RingGauge value={avg('carbs')} goal={targets ? targets.carbs : 0} color="var(--brand-warn)" label="Carbs" unit="g" />
+        <RingGauge value={avg('fats')} goal={targets ? targets.fats : 0} color="var(--brand-danger)" label="Fat" unit="g" />
       </div>
     </div>
   );
@@ -431,7 +431,7 @@ function ExpandedPanel({
             </span>
           )}
           {delta != null && (
-            <span style={{ fontSize: 12, fontWeight: 600, color: deltaGood ? '#22c55e' : '#ef4444' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: deltaGood ? 'var(--brand-success)' : 'var(--brand-danger)' }}>
               {deltaSign}{delta.toFixed(1)}{cfg.unit}
             </span>
           )}
@@ -501,7 +501,7 @@ function ExpandedPanel({
                 }}>Cancel</button>
                 <button onClick={handleLog} disabled={saving || saveSuccess || !logValue} style={{
                   flex: 2, padding: 9, borderRadius: 9, border: 'none',
-                  background: saveSuccess ? '#22c55e' : cfg.color,
+                  background: saveSuccess ? 'var(--brand-success)' : cfg.color,
                   color: 'white', fontWeight: 700, fontSize: 13, cursor: !logValue ? 'default' : 'pointer',
                   opacity: !logValue ? 0.5 : 1, transition: 'background 0.2s',
                 }}>
@@ -765,9 +765,9 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
             <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 5 }}>
               {([
                 { k: 'kcal', label: 'Cal', color: '#0EA5E9', unit: '' },
-                { k: 'protein', label: 'P', color: '#22c55e', unit: 'g' },
-                { k: 'carbs', label: 'C', color: '#f59e0b', unit: 'g' },
-                { k: 'fats', label: 'F', color: '#e84e4e', unit: 'g' },
+                { k: 'protein', label: 'P', color: 'var(--brand-success)', unit: 'g' },
+                { k: 'carbs', label: 'C', color: 'var(--brand-warn)', unit: 'g' },
+                { k: 'fats', label: 'F', color: 'var(--brand-danger)', unit: 'g' },
               ] as const).map(b => {
                 const avgv = macrosInWindow.length ? macrosInWindow.reduce((s, dm) => s + (dm[b.k] as number), 0) / macrosInWindow.length : 0;
                 const tgt = targets ? (targets[b.k as 'kcal' | 'protein' | 'carbs' | 'fats'] || 0) : 0;
@@ -824,7 +824,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
                 )}
               </div>
               {change && changeNum != null && (
-                <div style={{ fontSize: 11, fontWeight: 600, marginTop: 3, color: deltaGood ? '#22c55e' : '#ef4444' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, marginTop: 3, color: deltaGood ? 'var(--brand-success)' : 'var(--brand-danger)' }}>
                   {change}{cfg.unit ? ' ' + cfg.unit : ''}
                 </div>
               )}

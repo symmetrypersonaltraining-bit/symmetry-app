@@ -431,6 +431,7 @@ function DraftPanel({
                   onClick={() => send(row, state.editText)}
                   disabled={state.sending || !state.editText.trim()}
                   data-fx-own
+                  className={"cw-sweep" + (state.error ? " cw-shake" : "")}
                   style={{
                     marginTop: 6,
                     width: "100%",

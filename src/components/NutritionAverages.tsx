@@ -126,9 +126,9 @@ export default function NutritionAverages({ clientId, today }: { clientId: strin
             {isToday ? "Today" : labelDate(result.start) + " - " + labelDate(result.end)}{" · "}{isToday ? "" : "avg/day · "}logged {result.loggedDays} of {result.totalDays}
           </div>
           <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center" }}>
-            <Ring label="PROTEIN" value={result.p} target={result.target ? result.target.p : null} color="var(--brand-primary, #7c9cf5)" />
-            <Ring label="CARBS" value={result.c} target={result.target ? result.target.c : null} color="#5ec9a3" />
-            <Ring label="FATS" value={result.f} target={result.target ? result.target.f : null} color="#f59e0b" />
+            <Ring label="PROTEIN" value={result.p} target={result.target ? result.target.p : null} color="var(--brand-success)" />
+            <Ring label="CARBS" value={result.c} target={result.target ? result.target.c : null} color="var(--brand-warn)" />
+            <Ring label="FATS" value={result.f} target={result.target ? result.target.f : null} color="var(--brand-danger)" />
           </div>
           <div style={{ textAlign: "center", marginTop: 10 }}>
             <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{Math.round(result.kcal)}</div>
