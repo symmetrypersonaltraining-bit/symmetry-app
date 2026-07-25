@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Confetti from "./Confetti";
 import Link from "next/link";
 import CountUp from "@/components/CountUp";
+import ShareToGroup from "@/components/ShareToGroup";
+import { fx } from "@/lib/fx";
 
 /**
  * CelebrationScreen — workout-complete celebration (20 rotating concepts,
@@ -115,6 +117,48 @@ export default function CelebrationScreen({
   const [tapIdx, setTapIdx] = useState(0);
   const [reroll, setReroll] = useState(0);
   const [cracked, setCracked] = useState(false);
+
+  // ── AI personalisation (2026-07-25) ──────────────────────────────────────
+  // Fetches one personal line + real PR detection from /api/celebration. Purely
+  // additive: it renders ABOVE the existing concept, so all 25 rotating
+  // concepts gain personalisation without any of them being rewritten. Every
+  // failure path leaves aiLine null and the screen behaves exactly as before.
+  const [aiLine, setAiLine] = useState<string | null>(null);
+  const [aiPrs, setAiPrs] = useState<{ movement: string; weight: number; reps: number; previous: number | null }[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/celebration", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId: clientId ?? null }),
+        });
+        if (!res.ok) return;
+        const j = (await res.json()) as {
+          line?: string | null;
+          prs?: { movement: string; weight: number; reps: number; previous: number | null }[];
+        };
+        if (cancelled) return;
+        if (j.line) setAiLine(j.line);
+        if (Array.isArray(j.prs) && j.prs.length) {
+          setAiPrs(j.prs.slice(0, 3));
+          fx("pr");
+        }
+      } catch {
+        /* celebration must never break on a failed fetch */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
+
+  const topPr = aiPrs[0] || null;
+  const shareText = topPr
+    ? `🏆 ${firstName} just hit a PR — ${topPr.movement} ${topPr.weight} lb × ${topPr.reps}` +
+      (topPr.previous ? ` (previous best ${topPr.previous} lb)` : "")
+    : `💪 ${firstName} just finished ${dayLabel || "a session"} — ${setCount} sets, ${volume.toLocaleString()} lb moved.`;
 
   const vStr = volume.toLocaleString();
   const unit = UNITS[(seed + reroll) % UNITS.length];
@@ -626,8 +670,36 @@ export default function CelebrationScreen({
         ✓ WORKOUT COMPLETE
       </div>
       {dayLabel ? <div style={{ fontSize: 12, color: "var(--brand-text-secondary)" }}>{dayLabel}</div> : null}
+
+      {/* PR plate ("The Forge") — only ever renders on a genuine personal
+          record, so it stays rare and keeps its impact. */}
+      {topPr ? (
+        <div style={prPlate}>
+          <div style={{ fontSize: 9.5, letterSpacing: 3, color: "#e0a83e", fontWeight: 900 }}>NEW PERSONAL RECORD</div>
+          <div style={{ fontSize: 27, fontWeight: 900, color: "#ffe9b0", margin: "6px 0", letterSpacing: -0.5 }}>
+            {topPr.weight} lb
+          </div>
+          <div style={{ fontSize: 12.5, color: "#d9c18a" }}>
+            {topPr.movement} × {topPr.reps}
+          </div>
+          {topPr.previous ? (
+            <div style={{ marginTop: 8, fontSize: 10.5, color: "#b9a071" }}>previous best · {topPr.previous} lb</div>
+          ) : null}
+          {aiPrs.length > 1 ? (
+            <div style={{ marginTop: 8, fontSize: 10.5, color: "#b9a071" }}>+{aiPrs.length - 1} more today</div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* One personal sentence from the AI, grounded in tonight's numbers. */}
+      {aiLine ? <div style={aiLineBox}>{aiLine}</div> : null}
+
       {StatRow}
       {content}
+
+      {/* Community: push the win into the group chat. */}
+      <ShareToGroup text={shareText} label={topPr ? "Share this PR" : "Share to group"} />
+
       <Link href={doneHref} style={doneBtn}>
         Done ✓
       </Link>
@@ -663,4 +735,7 @@ const poster: React.CSSProperties = { background: "#f7ecd8", border: "6px double
 const fortuneCard: React.CSSProperties = { background: "#fff", border: "1px solid var(--brand-border)", borderRadius: 4, padding: "12px 16px", fontSize: 13, color: "var(--brand-text)", boxShadow: "0 8px 26px rgba(20,30,55,.08)", maxWidth: 280, lineHeight: 1.6 };
 const ghostBtn: React.CSSProperties = { marginTop: 14, border: "1px solid var(--brand-border)", background: "var(--brand-surface)", color: "var(--brand-text)", borderRadius: 999, padding: "10px 16px", fontSize: 12, fontWeight: 800, cursor: "pointer" };
 const doneBtn: React.CSSProperties = { textAlign: "center", background: "var(--brand-primary)", color: "#fff", borderRadius: 999, padding: "13px 0", fontSize: 14, fontWeight: 800, textDecoration: "none" };
+// PR plate + AI line (2026-07-25). Additive styles only.
+const prPlate: React.CSSProperties = { background: "linear-gradient(150deg,#3a2a12,#6b5227)", border: "2px solid #e0a83e", borderRadius: 16, padding: "16px 18px", textAlign: "center", boxShadow: "0 0 34px rgba(224,168,62,.35)" };
+const aiLineBox: React.CSSProperties = { background: "var(--brand-surface)", border: "1px solid var(--brand-border)", borderLeft: "3px solid var(--brand-primary)", borderRadius: 12, padding: "11px 14px", fontSize: 13.5, lineHeight: 1.55, color: "var(--brand-text)", fontStyle: "italic" };
 const CSS = "@keyframes cs-fall{to{transform:translateY(760px) rotate(720deg)}}@keyframes cs-blink{50%{opacity:.3}}@keyframes cs-xp{from{width:6%}to{width:85%}}@keyframes cs-credits{from{transform:translateY(100%)}to{transform:translateY(-100%)}}@keyframes cs-stamp{from{transform:rotate(12deg) scale(3);opacity:0}to{transform:rotate(12deg) scale(1);opacity:.9}}@keyframes cs-shimmer{0%{background-position:0% 0}100%{background-position:300% 0}}@keyframes cs-ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}";
