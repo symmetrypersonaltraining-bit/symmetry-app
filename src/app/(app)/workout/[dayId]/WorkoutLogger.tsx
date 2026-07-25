@@ -9,6 +9,7 @@ import OffPlanBanner from "@/components/OffPlanBanner";
 import CelebrationScreen from "@/components/CelebrationScreen";
 import SetFeedback from "@/components/SetFeedback";
 import WakeLock from "@/components/WakeLock";
+import { fx } from "@/lib/fx";
 
 interface Exercise {
   id: string;
@@ -903,6 +904,19 @@ export default function WorkoutLogger({
   const totalSets = Object.values(sets).reduce((a, arr) => a + arr.length, 0);
   const doneSets = Object.values(sets).reduce((a, arr) => a + arr.filter(s => s.done).length, 0);
   const progressPct = totalSets > 0 ? Math.round((doneSets / totalSets) * 100) : 0;
+  // Live session volume — every logged set adds to it, so progress is visible as
+  // a number and not just a bar. Read-only derivation from state already held;
+  // guarded so a junk input can never produce NaN on screen.
+  const sessionVolume = Object.entries(sets).reduce((total, [peId, arr]) => {
+    const isCardio = isCardioEx(allFlat.find(p => p.id === peId));
+    if (isCardio) return total;
+    return total + arr.reduce((a, s) => {
+      if (!s.done) return a;
+      const w = parseFloat(String(s.weight ?? "")) || 0;
+      const r = parseInt(String(s.reps ?? ""), 10) || 0;
+      return a + w * r;
+    }, 0);
+  }, 0);
   const currentSection = localSections[activeSectionIdx];
   const currentExercise = currentSection?.prescribed_exercises[activeExerciseIdx];
   // Load prior notes for THIS movement so client + trainer see what was flagged before,
@@ -1557,9 +1571,20 @@ export default function WorkoutLogger({
         </div>
 
         {/* Progress bar */}
-        <div className="mx-4 h-0.5 rounded-full mb-4" style={{ background: "rgba(255,255,255,0.08)" }}>
+        <div className="mx-4 h-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
           <div className="h-full rounded-full transition-all duration-500"
             style={{ width: `${progressPct}%`, background: "var(--brand-primary)" }} />
+        </div>
+        {/* Live session volume. Sits in the existing gap under the progress bar,
+            so it adds no height and moves nothing. Hidden until the first set is
+            logged so an empty session doesn't show "0 lb". */}
+        <div className="mx-4 mb-4 flex justify-end" style={{ height: 14 }}>
+          {sessionVolume > 0 ? (
+            <span className="text-[10px] font-bold tracking-wide"
+              style={{ color: "rgba(255,255,255,0.34)", fontVariantNumeric: "tabular-nums" }}>
+              {Math.round(sessionVolume).toLocaleString()} LB MOVED
+            </span>
+          ) : null}
         </div>
 
         {/* Exercise header (V6 micro-pill) — one compact row: small video thumb + name +
@@ -1697,11 +1722,22 @@ export default function WorkoutLogger({
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="numeric" />)}
-              <button onClick={() => { if (setEntry.done) { updateSet(currentExercise.id, si, "done", false); } else { logSet(currentExercise.id, si); } }}
+              <button onClick={() => { if (setEntry.done) { updateSet(currentExercise.id, si, "done", false); } else { fx("log"); logSet(currentExercise.id, si); } }}
                 disabled={saving}
+                data-fx-own
                 className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}>
-                <i className={`ti ${setEntry.done ? "ti-check" : "ti-player-play"} text-lg text-white`} />
+                {/* Logged sets draw the tick rather than snapping to it — reads as
+                    "recorded", not merely "highlighted". Falls back to the plain
+                    icon under prefers-reduced-motion via the .cw-check rules. */}
+                {setEntry.done ? (
+                  <svg className="cw-check" width="22" height="22" viewBox="0 0 52 52" aria-hidden>
+                    <circle cx="26" cy="26" r="24" fill="none" stroke="#fff" strokeWidth="4" opacity="0.55" />
+                    <path d="M14 27l8 8 16-17" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : (
+                  <i className="ti ti-player-play text-lg text-white" />
+                )}
               </button>
             </div>
           ))}
