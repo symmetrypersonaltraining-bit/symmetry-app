@@ -107,7 +107,10 @@ function validate(raw: unknown): { body: string } | null {
 
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as { send?: boolean };
-  const wantSend = body?.send === true;
+  // Two locks, both must be open. The caller has to ASK to send, and the
+  // trainer-controlled master switch (Settings → Experience → Automation) has
+  // to be on. Either one off means preview.
+  let wantSend = body?.send === true;
 
   // ── auth: trainer session OR the cron secret ──
   const secret = req.headers.get("x-cron-secret");
@@ -126,6 +129,16 @@ export async function POST(req: NextRequest) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return NextResponse.json({ error: "Not configured" }, { status: 500 });
   const admin = createAdminClient(url, key, { auth: { persistSession: false } }) as unknown as Db;
+
+  // Master switch. Absent or false => preview, whatever the caller asked for.
+  if (wantSend) {
+    try {
+      const { data: flag } = await admin.from("app_flags").select("enabled").eq("key", "nudges_live").maybeSingle();
+      if ((flag as { enabled: boolean } | null)?.enabled !== true) wantSend = false;
+    } catch {
+      wantSend = false;
+    }
+  }
 
   const today = CT_TODAY();
   const since30 = shiftDays(today, -29);
