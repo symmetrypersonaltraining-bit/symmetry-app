@@ -19,6 +19,7 @@ import {
   kcalOf, EXTRA_POSITIONS, INSERT_POSITION_MIN, INSERT_POSITION_MAX,
 } from "@/lib/nutrition/dailyTotals";
 import { parseFoodText } from "@/lib/nutrition/parseClient";
+import { pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 import Sheet from "./Sheet";
 import FoodSearchSheet from "./FoodSearchSheet";
 import ComposerSheet from "./ComposerSheet";
@@ -36,6 +37,7 @@ interface MealPlanShape {
   version_number: number;
   effective_date?: string | null;
   title?: string | null;
+  day_group?: number[] | null;
   meals: PlanMeal[];
 }
 interface MacroTarget { calories: number; protein: number; carbs: number; fats: number; }
@@ -45,6 +47,11 @@ interface Props {
   clientId: string;
   clientName: string;
   mealPlan: MealPlanShape | null;
+  // DAY-GROUP: the FULL set of the client's currently-live plans (day-group
+  // tagged + the everyday one), each with meals/items + day_group. The logger
+  // picks the right menu for whatever date is viewed via pickPlanForDate, so
+  // date navigation is instant and correct. Optional → old callers still work.
+  livePlans?: MealPlanShape[];
   incomingPlan: { id: string; version_number: number | null; effective_date: string | null; change_reason?: string | null; title?: string | null } | null;
   todayLogs: DbLog[];
   macroTarget: MacroTarget | null;
@@ -153,9 +160,8 @@ async function compressPhoto(file: File): Promise<{ base64: string; blob: Blob }
 // ---------------------------------------------------------------------------
 
 export default function NutritionV3Client(props: Props) {
-  const { clientId, clientName, mealPlan, incomingPlan, todayLogs, macroTarget, today } = props;
+  const { clientId, clientName, mealPlan, livePlans, incomingPlan, todayLogs, macroTarget, today } = props;
   const supabase = useMemo(() => createClient(), []);
-  const openMode = !mealPlan || !(mealPlan.meals || []).length;
 
   const [selectedDate, setSelectedDate] = useState(() => {
     try {
@@ -166,6 +172,18 @@ export default function NutritionV3Client(props: Props) {
       return today;
     } catch { return today; }
   });
+
+  // DAY-GROUP: the menu shown MUST match the VIEWED date's weekday. When the
+  // full live set is passed, pick the governing plan for selectedDate (instant,
+  // client-side, TZ-safe via pickPlanForDate). Fall back to the server-resolved
+  // `mealPlan` (today's) when no set is provided. For a client with a single
+  // null-day_group plan this always yields that plan → zero behavior change.
+  const activePlan = useMemo<MealPlanShape | null>(() => {
+    const set = livePlans && livePlans.length ? livePlans : (mealPlan ? [mealPlan] : []);
+    if (!set.length) return mealPlan ?? null;
+    return pickPlanForDate(set, selectedDate) ?? mealPlan ?? null;
+  }, [livePlans, mealPlan, selectedDate]);
+  const openMode = !activePlan || !(activePlan.meals || []).length;
   const [logs, setLogs] = useState<DbLog[]>(todayLogs);
   const [sheetStack, setSheetStack] = useState<NonNullable<SheetState>[]>([]);
   const sheet = sheetStack.length ? sheetStack[sheetStack.length - 1] : null;
@@ -184,7 +202,7 @@ export default function NutritionV3Client(props: Props) {
   const [customStart, setCustomStart] = useState(shiftDate(today, -6));
   const [customEnd, setCustomEnd] = useState(today);
 
-  const planMeals = useMemo(() => [...(mealPlan?.meals || [])].sort((a, b) => a.position - b.position), [mealPlan]);
+  const planMeals = useMemo(() => [...(activePlan?.meals || [])].sort((a, b) => a.position - b.position), [activePlan]);
   const planPositions = useMemo(() => new Set(planMeals.map((m) => m.position)), [planMeals]);
 
   // ---- data loading -------------------------------------------------------
@@ -1374,11 +1392,11 @@ export default function NutritionV3Client(props: Props) {
 
       {/* ==================== SHEETS ==================== */}
       {sheet && renderSheet(sheet)}
-      {showGrocery && mealPlan && (
+      {showGrocery && activePlan && (
         <GroceryPrepSheet
           clientId={clientId}
           clientName={clientName}
-          planLabel={`plan v${mealPlan.version_number}`}
+          planLabel={`plan v${activePlan.version_number}`}
           meals={planMeals}
           target={macroTarget ? { calories: macroTarget.calories, protein: macroTarget.protein, carbs: macroTarget.carbs, fats: macroTarget.fats } : null}
           onClose={() => setShowGrocery(false)}
@@ -1963,12 +1981,12 @@ export default function NutritionV3Client(props: Props) {
       </button>
     );
     return (
-      <Sheet title="Plan menu" subtitle={`${clientName}${mealPlan ? ` · plan v${mealPlan.version_number} (live)` : " · open plan"}`} onClose={closeAllSheets}>
-        {mealPlan && rowBtn("🛒", "Grocery & Prep", "Shopping list + prep sheet · Grocery PDF / Meal Prep PDF to send", () => { closeAllSheets(); setShowGrocery(true); })}
-        {rowBtn("✦", "Build my own plan with AI", mealPlan ? "Switch to your own plan — your current one is saved to history" : "Design your plan from scratch", () => replaceSheet({ kind: "buildplan" }))}
+      <Sheet title="Plan menu" subtitle={`${clientName}${activePlan ? ` · plan v${activePlan.version_number} (live)` : " · open plan"}`} onClose={closeAllSheets}>
+        {activePlan && rowBtn("🛒", "Grocery & Prep", "Shopping list + prep sheet · Grocery PDF / Meal Prep PDF to send", () => { closeAllSheets(); setShowGrocery(true); })}
+        {rowBtn("✦", "Build my own plan with AI", activePlan ? "Switch to your own plan — your current one is saved to history" : "Design your plan from scratch", () => replaceSheet({ kind: "buildplan" }))}
         {rowBtn("📈", "Trends", "Averages + the same charts as today's progress page", () => replaceSheet({ kind: "trends" }))}
         {rowBtn("🗂", "Plan versions", "Current live + staged incoming — flips at midnight CT", () => { backSheet(); openVersions(); })}
-        {mealPlan && rowBtn("📅", "Week ahead", "Forward view · 1w / 4w / 8w / custom", () => replaceSheet({ kind: "forward" }))}
+        {activePlan && rowBtn("📅", "Week ahead", "Forward view · 1w / 4w / 8w / custom", () => replaceSheet({ kind: "forward" }))}
         {rowBtn("⭐", "My Meals", "Saved custom meals — reuse in any slot", () => replaceSheet({ kind: "mymeals", at: rows.length }))}
         {rowBtn("✦", `Coach: ${coachOn ? "ON" : "OFF"}`, "Insight cards, celebrations & nudges — toggle anytime", () => { setCoachOn(!coachOn); setCoachDismissed(false); toast(coachOn ? "Coach off" : "Coach on"); })}
       </Sheet>
@@ -2004,8 +2022,11 @@ export default function NutritionV3Client(props: Props) {
         </button>
         {versions.length === 0 && <p className="text-sm py-3 text-center" style={{ color: "var(--brand-text-secondary)" }}>Loading…</p>}
         {versions.map((v) => {
-          const isLive = v.status === "live" && mealPlan?.id === v.id;
+          // With day-groups a client can have MULTIPLE live plans (one per
+          // weekday set), so LIVE = any live plan already in effect, not just
+          // the one governing today.
           const pending = (v.effective_date || "") > today;
+          const isLive = v.status === "live" && !pending;
           return (
             <div key={v.id} className="rounded-2xl p-3 mb-2" style={{ background: "var(--brand-bg)", border: `1px solid ${isLive ? "rgba(34,197,94,0.5)" : "var(--brand-border)"}` }}>
               <div className="flex items-center justify-between gap-2">
@@ -2038,10 +2059,10 @@ export default function NutritionV3Client(props: Props) {
       </button>
     );
     return (
-      <Sheet title="Build my own plan" subtitle={mealPlan ? "Switch to a plan you build — current plan saved to history" : "Design your plan"} onClose={closeAllSheets} onBack={backSheet}>
-        {mealPlan && (
+      <Sheet title="Build my own plan" subtitle={activePlan ? "Switch to a plan you build — current plan saved to history" : "Design your plan"} onClose={closeAllSheets} onBack={backSheet}>
+        {activePlan && (
           <div className="rounded-xl p-2.5 mb-3 text-xs leading-relaxed" style={{ background: "rgba(66,165,245,0.08)", border: "1px solid rgba(66,165,245,0.35)", color: "var(--brand-text)" }}>
-            Your current plan (<b>{mealPlan.title || `v${mealPlan.version_number}`}</b>) is <b>archived, not deleted</b> — it stays in Plan versions and can be restored anytime.
+            Your current plan (<b>{activePlan.title || `v${activePlan.version_number}`}</b>) is <b>archived, not deleted</b> — it stays in Plan versions and can be restored anytime.
           </div>
         )}
         {rowBtn("✦", "Recommend my targets", "3 quick questions → coach picks your macros, then builds 5 meals", () => replaceSheet({ kind: "aiplan", mode: "consult" }), true)}
@@ -2061,7 +2082,7 @@ export default function NutritionV3Client(props: Props) {
       <ForwardSheet
         clientId={clientId}
         today={today}
-        mealPlan={mealPlan}
+        mealPlan={activePlan}
         macroTarget={macroTarget}
         onClose={closeAllSheets}
         onBack={backSheet}

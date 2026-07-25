@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { computeDayTotals, PlanMeal, PlanItem, LogRow } from "@/lib/nutrition/dailyTotals";
+import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -42,16 +43,18 @@ export default function HomeMacrosCard() {
       // canonical calc). Fetch the same inputs and — when the v3 flag is on —
       // run the same function so the numbers never diverge. Non-v3 clients keep
       // the legacy inline proration below.
-      const [logsRes, mtRes, mpRes, settingsRes] = await Promise.all([
+      const [logsRes, mtRes, livePlans, settingsRes] = await Promise.all([
         supabase.from("meal_adherence_logs").select("*").eq("client_id", clientId).eq("log_date", today),
         supabase.from("macro_targets").select("*").eq("client_id", clientId).lte("effective_date", today).order("effective_date", { ascending: false }).limit(1),
-        supabase.from("meal_plans").select("id, meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, position))").eq("client_id", clientId).eq("status", "live").lte("effective_date", today).order("effective_date", { ascending: false }).limit(1),
+        // DAY-GROUP: resolve today's governing menu. One null-day_group plan →
+        // same plan as before (behavior unchanged for existing clients).
+        fetchLivePlans(supabase, clientId, today),
         // Tolerates the column not existing yet (flag stays off → legacy calc).
         supabase.from("client_app_settings").select("nutrition_v3").eq("client_id", clientId).maybeSingle(),
       ]);
       if (!on) return;
       const mt = (mtRes.data || [])[0] as TargetState | undefined;
-      const plan = (mpRes.data || [])[0] as {
+      const plan = (pickPlanForDate(livePlans, today) || undefined) as {
         meals?: { id: string; name?: string | null; timing?: string | null; position?: number | null; swaps?: string | null;
           meal_items?: Array<Record<string, unknown>> }[];
       } | undefined;

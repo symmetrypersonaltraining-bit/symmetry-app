@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { PlanMeal } from "@/lib/nutrition/dailyTotals";
 import { buildPrintDocument, PrintKind, esc } from "@/lib/nutrition/printHtml";
+import { resolveLivePlanForDate } from "@/lib/nutrition/resolvePlan";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -34,21 +35,19 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const [clientRes, planRes, targetRes] = await Promise.all([
+  // DAY-GROUP: resolve the menu governing the sheet's start date. For a client
+  // with a single null-day_group plan this is unchanged. (Multi-menu week
+  // grocery/prep spanning several day-groups is a documented follow-up.)
+  const [clientRes, plan, targetRes] = await Promise.all([
     supabase.from("clients").select("name").eq("id", clientId).maybeSingle(),
-    supabase
-      .from("meal_plans")
-      .select("id, version_number, effective_date, meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, position))")
-      .eq("client_id", clientId).eq("status", "live").lte("effective_date", today)
-      .order("effective_date", { ascending: false }).limit(1).maybeSingle(),
+    resolveLivePlanForDate(supabase, clientId, start),
     supabase.from("macro_targets").select("calories, protein, carbs, fats").eq("client_id", clientId)
       .lte("effective_date", today).order("effective_date", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   const clientName = (clientRes.data as { name?: string } | null)?.name || "Client";
-  const plan = planRes.data as { id: string; version_number: number | null; meals: PlanMeal[] } | null;
   const target = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
-  const meals: PlanMeal[] = [...(plan?.meals || [])].sort((a, b) => a.position - b.position);
+  const meals: PlanMeal[] = [...((plan?.meals || []) as PlanMeal[])].sort((a, b) => a.position - b.position);
 
   // Toolbar: prominent Back + tab nav + day-range links + Share — never a dead end.
   const nav = (k: string, lab: string) =>

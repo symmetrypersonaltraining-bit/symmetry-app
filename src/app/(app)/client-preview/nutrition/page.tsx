@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import MealPlanClient from "../../nutrition/MealPlanClient";
 import NutritionV3Client from "../../nutrition/v3/NutritionV3Client";
+import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -40,16 +41,10 @@ export default async function ClientPreviewNutritionPage() {
     nutritionV3 = (settings as any)?.nutrition_v3 === true;
   } catch { nutritionV3 = false; }
 
-  const [mpRes, tlRes, mtRes, wlRes] = await Promise.all([
-    supabase
-      .from("meal_plans")
-      .select("id, version_number, title, meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, position))")
-      .eq("client_id", clientId)
-      .eq("status", "live")
-      .lte("effective_date", today)
-      .order("effective_date", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+  const [livePlans, tlRes, mtRes, wlRes] = await Promise.all([
+    // Full live-plan SET (day-group tagged + everyday). pickPlanForDate resolves
+    // the governing menu; one null-day_group plan → today's behavior unchanged.
+    fetchLivePlans(supabase, clientId, today),
     supabase
       .from("meal_adherence_logs")
       .select("*")
@@ -71,6 +66,8 @@ export default async function ClientPreviewNutritionPage() {
       .order("log_date", { ascending: false }),
   ]);
 
+  const mealPlanToday = pickPlanForDate(livePlans, today);
+
   if (nutritionV3) {
     const { data: inc } = await supabase
       .from("meal_plans")
@@ -85,7 +82,8 @@ export default async function ClientPreviewNutritionPage() {
       <NutritionV3Client
         clientId={clientId}
         clientName={clientName}
-        mealPlan={mpRes.data as any}
+        mealPlan={mealPlanToday as any}
+        livePlans={livePlans as any}
         incomingPlan={(inc || null) as any}
         todayLogs={tlRes.data || []}
         macroTarget={mtRes.data as any}
@@ -104,7 +102,7 @@ export default async function ClientPreviewNutritionPage() {
       <MealPlanClient
         clientId={clientId}
         clientName={clientName}
-        mealPlan={mpRes.data as any}
+        mealPlan={mealPlanToday as any}
         todayLogs={tlRes.data || []}
         macroTarget={mtRes.data as any}
         weekLogs={wlRes.data || []}

@@ -15,6 +15,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { PlanMeal } from "@/lib/nutrition/dailyTotals";
 import { PdfCtx } from "@/lib/nutrition/pdf";
 import { buildAndUploadPdf, StorageLike } from "@/lib/nutrition/pdfExport";
+import { resolveLivePlanForDate } from "@/lib/nutrition/resolvePlan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,21 +47,19 @@ export async function POST(req: NextRequest) {
 
     // Service-role client for data + storage (bypasses RLS).
     const admin = createAdminClient();
-    const [clientRes, planRes, targetRes] = await Promise.all([
+    // DAY-GROUP: resolve the menu governing the sheet's start date. For a client
+    // with a single null-day_group plan this is unchanged. (Multi-menu week
+    // grocery/prep spanning several day-groups is a documented follow-up.)
+    const [clientRes, plan, targetRes] = await Promise.all([
       admin.from("clients").select("name").eq("id", clientId).maybeSingle(),
-      admin
-        .from("meal_plans")
-        .select("id, version_number, effective_date, meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, position))")
-        .eq("client_id", clientId).eq("status", "live").lte("effective_date", today)
-        .order("effective_date", { ascending: false }).limit(1).maybeSingle(),
+      resolveLivePlanForDate(admin, clientId, startISO),
       admin.from("macro_targets").select("calories, protein, carbs, fats").eq("client_id", clientId)
         .lte("effective_date", today).order("effective_date", { ascending: false }).limit(1).maybeSingle(),
     ]);
 
     const clientName = (clientRes.data as { name?: string } | null)?.name || "Client";
-    const plan = planRes.data as { id: string; version_number: number | null; meals: PlanMeal[] } | null;
     const target = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
-    const meals: PlanMeal[] = [...(plan?.meals || [])].sort((a, b) => a.position - b.position);
+    const meals: PlanMeal[] = [...((plan?.meals || []) as PlanMeal[])].sort((a, b) => a.position - b.position);
 
     const ctx: PdfCtx = {
       clientName,

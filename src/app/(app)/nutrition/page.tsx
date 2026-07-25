@@ -5,6 +5,7 @@ import MealPlanClient from "./MealPlanClient";
 import NutritionV3Client from "./v3/NutritionV3Client";
 import NutritionAverages from "@/components/NutritionAverages";
 import ClientSelector from "@/components/ClientSelector";
+import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -80,6 +81,7 @@ export default async function NutritionPage({
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 
   let mealPlan: any = null;
+  let livePlans: any[] = [];
   let todayLogs: any[] = [];
   let macroTarget: any = null;
   let weekLogs: any[] = [];
@@ -98,16 +100,11 @@ export default async function NutritionPage({
       nutritionV3 = (settings as any)?.nutrition_v3 === true;
     } catch { nutritionV3 = false; }
 
-    const [mpRes, tlRes, mtRes, wlRes] = await Promise.all([
-      supabase
-        .from("meal_plans")
-        .select("id, version_number, title, meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, position))")
-        .eq("client_id", clientId)
-        .eq("status", "live")
-        .lte("effective_date", today)
-        .order("effective_date", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+    const [lpRows, tlRes, mtRes, wlRes] = await Promise.all([
+      // Full live-plan SET (day-group tagged + everyday). resolveLivePlanForDate
+      // logic: pickPlanForDate returns the right menu for a given date. For a
+      // client with one null-day_group plan this is exactly today's behavior.
+      fetchLivePlans(supabase, clientId, today),
       supabase
         .from("meal_adherence_logs")
         .select("*")
@@ -129,7 +126,8 @@ export default async function NutritionPage({
         .order("log_date", { ascending: false }),
     ]);
 
-    mealPlan = mpRes.data;
+    livePlans = lpRows || [];
+    mealPlan = pickPlanForDate(livePlans, today); // today's governing menu
     todayLogs = tlRes.data || [];
     macroTarget = mtRes.data;
     weekLogs = wlRes.data || [];
@@ -183,6 +181,7 @@ export default async function NutritionPage({
           clientId={clientId!}
           clientName={clientName}
           mealPlan={mealPlan as any}
+          livePlans={livePlans as any}
           incomingPlan={incomingPlan as any}
           todayLogs={todayLogs}
           macroTarget={macroTarget as any}

@@ -40,3 +40,47 @@ Local copies: /home/claude/nutrition-mockups/SPEC.md (+ V2 addendum) and the app
 - Photo/off-plan single-write: v3 keeps the approved analyze-BEFORE-commit UX (spec: Analyzing… → EST card → confirm), so the commit itself is the ONE write: est_* + off_plan_macros (the analyze route's structured object verbatim, incl. source/restaurant) + analysis_status='complete' land together in a single upsert. The route's logId persistence path stays for server-driven flows (e.g. future re-analysis of pending rows) — no v3 UI path double-writes anymore (openslot photo_url second update merged into patchCustom).
 - Extras verified: writes only positions 6/7 (freeExtraPosition; ≥101 rows are read-only legacy rendering).
 - Placeholder rows vs engagement counters: TrainerWeekDigest + ClientWeekSummary now exclude rows with no adherence or __unlogged/__removed/__custom.unlogged (and the digest's "ever logs food" query filters null/Skipped adherence server-side). NOT touched (document-only): SlackerScreen (last-activity date — a placeholder still is app activity), MetricCards nutrition chart + old NutritionAverages (v2 calc, flag-off clients only — replaced by dailyTotals consumers for v3 clients).
+
+## DAY-GROUP MEAL PLANS — menus that vary by weekday (Jul 25, 2026)
+Capability so a client can have different menus by day of week (gym-owner plans, e.g. Tyler Dorsett: "Week 23 – Days 1,4,6" / "Days 2,5" / "Days 3,7"). ADDITIVE + SAFE: untagged plans behave EXACTLY as before for every existing client.
+
+### Schema (already applied to prod + dev)
+- `meal_plans.day_group smallint[]` — nullable. ISO weekday numbers the menu applies to, **1=Mon .. 7=Sun** (America/Chicago). `NULL` (or empty array) = applies EVERY day = the everyday/legacy plan (default, current behavior). No other schema change; existing grants/RLS untouched.
+
+### Selection logic (code)
+- `src/lib/nutrition/weekday.ts` → `isoWeekdayFromDateStr('YYYY-MM-DD'): 1..7`. TZ-SAFE: reads Y-M-D and evaluates via `Date.UTC(...).getUTCDay()` (0→7). Never `new Date('YYYY-MM-DD')`. Unit-tested (tests/unit/weekday.test.ts).
+- `src/lib/nutrition/resolvePlan.ts`:
+  - `pickPlanForDate(candidates, dateStr)` (pure, unit-tested): first candidate whose `day_group` CONTAINS the date's weekday → else first with NULL/empty `day_group` (everyday) → else null.
+  - `fetchLivePlans(supabase, clientId, dateStr, selectExtra?)`: all live plans with `effective_date <= dateStr`, ordered `effective_date desc, created_at desc`, selecting the standard meals/meal_items PLUS `day_group, effective_date`.
+  - `resolveLivePlanForDate(...)` = fetch + pick. A client with one null-day_group live plan resolves to it for EVERY weekday → zero behavior change.
+
+### Fetch sites routed through the resolver
+- `src/app/(app)/nutrition/page.tsx` (main logger) — fetches the FULL live set, passes today's resolved plan as `mealPlan` + the whole set as `livePlans` to NutritionV3Client.
+- `src/app/(app)/client-preview/nutrition/page.tsx` — same (Dustin's Client View).
+- `src/components/HomeMacrosCard.tsx` (home "Today's Nutrition" ring) — resolves today's plan.
+- `src/app/api/nutrition/pdf/route.ts` and `src/app/(app)/nutrition/print/route.ts` — resolve the menu for the sheet's start date.
+- Date-nav correctness: NutritionV3Client is client-side date nav. It holds `livePlans` and derives `activePlan = pickPlanForDate(livePlans, selectedDate)` in a useMemo, so scrubbing dates instantly shows the right weekday's menu with no refetch. `planMeals`, `computeDayTotals`, grocery/prep sheet, plan-menu, versions, build-plan and forward all read `activePlan`. Logs are per-date, so a meal logged on a Tue prorates against the Tue menu.
+- Incoming/staged banner unchanged: "incoming" = a plan with `effective_date > today` only. Same-week day-group menus (effective in the past) are NOT mislabeled incoming.
+- Plan versions sheet: LIVE = any live plan already in effect (day-group clients have several live plans at once); pending = `effective_date > today`.
+
+### NOT changed this pass (documented follow-ups, normal clients unaffected)
+- Grocery/Prep + PDF/print span a multi-day range but currently render the SINGLE menu governing the range's start date. For a day-group client a full-week grocery list ideally unions each day's resolved menu across the range (loop `resolveLivePlanForDate` per date). Follow-up; normal (null) clients are unchanged.
+- PlanRangeView "Week ahead" forward projection maps FUTURE plan versions by effective_date (not day-of-week). Day-group weekday variation in the forward view is a follow-up.
+- adoptPlan (client builds own plan) archives ALL current live plans and inserts one null-day_group live plan — correct/safe for day-group clients too.
+
+### RECIPE for the other chat — populate Tyler's 3 day-group plans (SQL)
+A day-group plan is a NORMAL `meal_plans` row (status 'live', an `effective_date <= today`, a descriptive `title`) PLUS `day_group` set to the ISO weekday array, with its `meals` + `meal_items` inserted exactly as usual. Tyler = 3 live plans collectively covering all 7 weekdays:
+
+1. Insert plan rows (one per day-group). Example shape per row:
+   ```sql
+   insert into meal_plans (client_id, version_number, status, effective_date, title, day_group)
+   values
+     ('<tyler_client_id>', 23, 'live', '2026-07-01', 'Week 23 — Days 1,4,6', '{1,4,6}'),
+     ('<tyler_client_id>', 23, 'live', '2026-07-01', 'Week 23 — Days 2,5',   '{2,5}'),
+     ('<tyler_client_id>', 23, 'live', '2026-07-01', 'Week 23 — Days 3,7',   '{3,7}');
+   ```
+   - `day_group` is a smallint[] literal `'{1,4,6}'` — ISO Mon..Sun. Together {1,4,6}∪{2,5}∪{3,7} = all 7 days.
+   - `effective_date` must be on/before the day it should apply (past date = live now).
+2. For EACH plan row, insert its `meals` (name, timing, position, swaps) and each meal's `meal_items` (food, amount, unit, is_unlimited, basis, protein, carbs, fats, position) — identical to a normal plan. The three plans have DIFFERENT meals (that's the point).
+3. Optional everyday fallback: a client may ALSO keep one plan with `day_group = NULL` — it applies on any weekday not covered by a day-group plan. Tyler's three cover all 7, so no fallback is needed; a normal client just has the single NULL plan (unchanged).
+4. Verify: `select id, title, day_group, effective_date, status from meal_plans where client_id='<tyler_client_id>' and status='live' order by effective_date desc, created_at desc;` — expect the three rows with day_group {1,4,6}/{2,5}/{3,7}. In the app, scrubbing the logger date Mon→Sun shows the matching menu each day.
