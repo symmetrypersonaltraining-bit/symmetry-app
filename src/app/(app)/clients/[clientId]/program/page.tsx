@@ -335,9 +335,13 @@ function WorkoutEditor({
         for (let ei = 0; ei < sec.exercises.length; ei++) {
           const ex = sec.exercises[ei];
           if (!ex.name.trim()) continue;
+          // Must exclude client-owned rows: otherwise a name the AI builder already created for
+          // one client is reused here, wiring a SHARED program's prescribed_exercises at a
+          // private, client-owned exercise that other clients may not even be able to read.
           let { data: exRow } = await supabase
             .from("exercises")
             .select("id")
+            .is("client_owner_id", null)
             .ilike("name", ex.name.trim())
             .maybeSingle();
           if (!exRow) {

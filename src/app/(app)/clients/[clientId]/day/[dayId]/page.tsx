@@ -77,9 +77,11 @@ export default async function WorkoutDayEditPage({
     );
   }
 
+  // Shared "Add Exercise" picker: exclude AI-generated, client-owned exercises.
   const { data: exercisesRaw } = await supabase
     .from("exercises")
     .select("id, name, modality, muscle_group")
+    .is("client_owner_id", null)
     .order("name");
 
   const d = day as any;

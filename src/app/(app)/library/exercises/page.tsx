@@ -7,9 +7,12 @@ export default async function ExerciseLibraryPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Client-owned exercises are invented by the AI workout builder for a single client and must
+  // not appear in the shared library (the logger's Swap modal already filters this way).
   const { data: exercises } = await supabase
     .from("exercises")
     .select("id, name, muscle_group, modality, equipment_required, video_url, availability_status")
+    .is("client_owner_id", null)
     .order("name");
 
   const list = (exercises || []).map((e: any) => ({
