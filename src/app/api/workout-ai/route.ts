@@ -81,7 +81,7 @@ async function buildContext(db: Db, clientId: string, dayId: string | null): Pro
   const [clientRes, apRes, upcomingRes, recentRes, notesRes, replacingRes] = await Promise.all([
     db.from("clients").select("name, primary_goal").eq("id", clientId).maybeSingle(),
     db.from("program_assignments").select("program_id, programs(name, phases(id, label, position))").eq("client_id", clientId).eq("active", true).limit(1).maybeSingle(),
-    (db as Db).from("scheduled_workouts").select("scheduled_date, status, days(label)").eq("client_id", clientId).gte("scheduled_date", today).order("scheduled_date").limit(12),
+    (db as Db).from("scheduled_workouts").select("scheduled_date, status, days(label)").eq("client_id", clientId).gte("scheduled_date", today).is("deleted_at", null).order("scheduled_date").limit(12),
     db.from("workout_logs").select("log_date, day_id, days(label)").eq("client_id", clientId).order("log_date", { ascending: false }).limit(6),
     db.from("trainer_notes").select("note, created_at, exercises(name)").eq("client_id", clientId).order("created_at", { ascending: false }).limit(12),
     dayId ? db.from("days").select("label, phase_id").eq("id", dayId).maybeSingle() : Promise.resolve({ data: null } as { data: null }),
@@ -267,7 +267,8 @@ export async function POST(req: NextRequest) {
       });
       if (body.dayId) {
         await admin.from("scheduled_workouts").update({ status: "skipped" })
-          .eq("client_id", clientId).eq("day_id", body.dayId).eq("scheduled_date", today).eq("status", "scheduled");
+          .eq("client_id", clientId).eq("day_id", body.dayId).eq("scheduled_date", today).eq("status", "scheduled")
+          .is("deleted_at", null);
       }
     }
   } catch (e) { console.error("workout-ai schedule error", e); }

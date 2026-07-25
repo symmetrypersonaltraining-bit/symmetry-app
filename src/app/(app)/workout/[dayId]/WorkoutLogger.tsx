@@ -1139,12 +1139,16 @@ export default function WorkoutLogger({
         // workout was scheduled for a prior day and never moved, fall back to the
         // most recent still-scheduled instance on/before today so make-up logs
         // still show as completed on the schedule.
+        // deleted_at + status guards: without them this could pick a soft-deleted or already
+        // skipped row and flip it to "completed", resurrecting a workout the client deleted.
         const { data: __todayRow } = await (supabase as any)
           .from("scheduled_workouts")
           .select("id")
           .eq("client_id", clientId)
           .eq("day_id", day.id)
           .eq("scheduled_date", __today)
+          .is("deleted_at", null)
+          .neq("status", "skipped")
           .order("id")
           .limit(1);
         let __swId: string | null =
@@ -1156,6 +1160,7 @@ export default function WorkoutLogger({
             .eq("client_id", clientId)
             .eq("day_id", day.id)
             .eq("status", "scheduled")
+            .is("deleted_at", null)
             .lte("scheduled_date", __today)
             .order("scheduled_date", { ascending: false })
             .limit(1);
