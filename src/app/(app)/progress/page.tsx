@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import MetricCards from "@/components/MetricCards";
 import ClientSelector from "@/components/ClientSelector";
+import ConsistencyCalendar from "@/components/ConsistencyCalendar";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -66,7 +67,10 @@ export default async function ProgressPage({
 
       <div className="px-4 py-4">
         {clientId ? (
-          <MetricCards clientId={clientId} />
+          <>
+            <ConsistencyCalendar clientId={clientId} />
+            <MetricCards clientId={clientId} />
+          </>
         ) : (
           <p className="text-center py-12" style={{ color: "var(--brand-text-secondary)" }}>
             Select a client above to view their progress.
