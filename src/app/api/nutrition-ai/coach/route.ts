@@ -8,7 +8,7 @@
 // Auth-checked, client-scoped, metered (feature 'chat', default 15/day), Haiku.
 
 import { NextRequest, NextResponse } from "next/server";
-import { CT_TODAY, ctShiftDays } from "@/lib/ai/coach-context";
+import { CT_TODAY, ctShiftDays, splitTodayFromCompleted } from "@/lib/ai/coach-context";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { validateCoachReply } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
@@ -22,6 +22,7 @@ Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
 
 Rules:
 - "message": 2-5 sentences max, plain text.
+- The current day may be IN PROGRESS. NEVER describe today (todaySoFar) as "under" or "over" budget or as a full/complete day — it isn't finished. Base ALL averages, trends, and consistency judgments ONLY on completedDays. You may reference todaySoFar only as progress (e.g. "you're on pace" / "X left today"), never as a deficit/surplus verdict.
 - "suggestions": 0-3 concrete, actionable tweaks (e.g. {"label":"Add a scoop of whey at breakfast","delta":{"p":25,"c":2,"f":1,"kcal":117}}). deltas are the daily macro change in grams / kcal (negative = reduce). Omit the array or leave it empty when nothing concrete applies.`;
 
 interface DayTotal {
@@ -118,10 +119,20 @@ async function assembleContext(db: Db, clientId: string): Promise<string> {
   );
   if (latestWeight) lines.push(`Latest weight: ${latestWeight.weight} lbs (${latestWeight.metric_date}).`);
   if (latestBf) lines.push(`Latest body fat: ${latestBf.body_fat_pct}% (${latestBf.metric_date}).`);
+
+  // Separate the in-progress current day from finished days so the model never
+  // scores a partial day as a deficit/surplus or averages it in. (Kept in sync
+  // with coach-context.ts — shared splitTodayFromCompleted helper.)
+  const { todaySoFar, completedDays } = splitTodayFromCompleted(dailyTotals, today);
   lines.push(
-    dailyTotals.length
-      ? `Daily totals for the last 14 days (only days with logs; "logged" = meals logged that day):\n${JSON.stringify(dailyTotals)}`
-      : "No meals logged in the last 14 days."
+    completedDays.length
+      ? `completedDays — FINISHED days over the last 14 days (only days with logs; "logged" = meals logged that day). Use ONLY these for averages, trends and consistency:\n${JSON.stringify(completedDays)}`
+      : "completedDays: none (no finished logged days in the last 14 days)."
+  );
+  lines.push(
+    todaySoFar
+      ? `todaySoFar — the CURRENT day, IN PROGRESS and NOT finished. Do NOT judge it as under/over budget or include it in averages; reference it only as progress:\n${JSON.stringify(todaySoFar)}`
+      : "todaySoFar: nothing logged yet today."
   );
   return lines.join("\n");
 }

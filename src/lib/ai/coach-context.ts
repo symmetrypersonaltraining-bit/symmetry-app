@@ -28,9 +28,10 @@ Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
 
 Rules:
 - "message": 2-5 sentences max, plain text.
+- The current day may be IN PROGRESS. NEVER describe today (todaySoFar) as "under" or "over" budget or as a full/complete day — it isn't finished. Base ALL averages, trends, and consistency judgments ONLY on completedDays. You may reference todaySoFar only as progress (e.g. "you're on pace" / "X left today"), never as a deficit/surplus verdict.
 - "suggestions": 0-3 concrete, actionable tweaks (e.g. {"label":"Add a scoop of whey at breakfast","delta":{"p":25,"c":2,"f":1,"kcal":117}}). deltas are the daily macro change in grams / kcal (negative = reduce). Omit the array or leave it empty when nothing concrete applies.`;
 
-interface DayTotal {
+export interface DayTotal {
   date: string;
   kcal: number;
   p: number;
@@ -38,6 +39,26 @@ interface DayTotal {
   f: number;
   logged: number;
 }
+
+export interface TodaySoFar extends DayTotal {
+  inProgress: true;
+}
+
+// Separate the still-in-progress current day from finished days. The coach must
+// judge averages/trends/consistency ONLY on completedDays — a partial current
+// day (e.g. 515 of 1963 kcal logged this morning) must never be scored as a
+// deficit/surplus or dragged into averages. Pure + unit-tested.
+export function splitTodayFromCompleted(
+  dailyTotals: DayTotal[],
+  today: string,
+): { todaySoFar: TodaySoFar | null; completedDays: DayTotal[] } {
+  const t = dailyTotals.find((d) => d.date === today);
+  return {
+    todaySoFar: t ? { ...t, inProgress: true } : null,
+    completedDays: dailyTotals.filter((d) => d.date !== today),
+  };
+}
+
 
 // Daily totals through the canonical shared calculator — historical logs may
 // reference archived plan versions, so plan items are fetched per meal_id
@@ -122,10 +143,19 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
   );
   if (latestWeight) lines.push(`Latest weight: ${latestWeight.weight} lbs (${latestWeight.metric_date}).`);
   if (latestBf) lines.push(`Latest body fat: ${latestBf.body_fat_pct}% (${latestBf.metric_date}).`);
+
+  // Separate the in-progress current day from finished days so the model never
+  // scores a partial day as a deficit/surplus or averages it in.
+  const { todaySoFar, completedDays } = splitTodayFromCompleted(dailyTotals, today);
   lines.push(
-    dailyTotals.length
-      ? `Daily totals for the last 14 days (only days with logs; "logged" = meals logged that day):\n${JSON.stringify(dailyTotals)}`
-      : "No meals logged in the last 14 days."
+    completedDays.length
+      ? `completedDays — FINISHED days over the last 14 days (only days with logs; "logged" = meals logged that day). Use ONLY these for averages, trends and consistency:\n${JSON.stringify(completedDays)}`
+      : "completedDays: none (no finished logged days in the last 14 days)."
+  );
+  lines.push(
+    todaySoFar
+      ? `todaySoFar — the CURRENT day, IN PROGRESS and NOT finished. Do NOT judge it as under/over budget or include it in averages; reference it only as progress:\n${JSON.stringify(todaySoFar)}`
+      : "todaySoFar: nothing logged yet today."
   );
   return lines.join("\n");
 }
