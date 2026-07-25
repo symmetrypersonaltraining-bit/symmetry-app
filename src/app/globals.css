@@ -1219,3 +1219,30 @@ button:disabled:active { transform: none; }
   .cw-check circle, .cw-check path { stroke-dashoffset: 0; }
   .cw-ripple { display: none; }
 }
+
+/* ── Auto dark mode (2026-07-25) ───────────────────────────────────────────
+   Applied by <AutoDark/> ONLY when the active theme is genuinely light — it
+   measures --brand-bg luminance at runtime, so already-dark themes (midnight,
+   carbonneon, berry…) are never double-darkened, and a new theme needs no
+   change here. Surfaces are derived from the theme's own primary so each
+   theme keeps its character instead of collapsing to the same grey.
+   Revert = delete this block + the AutoDark mount. */
+[data-appearance="dark"] {
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 14%, #0c0f14);
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 18%, #141922);
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 24%, #1b212c);
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 34%, #2a3140);
+  --brand-text:           #E6EDF3;
+  --brand-text-secondary: #93A1B1;
+  --brand-sidebar: color-mix(in srgb, var(--brand-primary) 22%, #0a0d12);
+
+  /* Elevation reads as lift, not shadow, on a dark surface */
+  --brand-elev-1: color-mix(in srgb, var(--brand-surface) 94%, white);
+  --brand-elev-2: color-mix(in srgb, var(--brand-surface) 88%, white);
+  --brand-elev-3: color-mix(in srgb, var(--brand-surface) 82%, white);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.5);
+  --shadow-2: 0 4px 12px rgba(0,0,0,.55);
+  --shadow-3: 0 14px 34px rgba(0,0,0,.65);
+}
+/* Native controls (date pickers, scrollbars) follow too */
+[data-appearance="dark"] { color-scheme: dark; }

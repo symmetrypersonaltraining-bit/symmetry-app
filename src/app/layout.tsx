@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import HapticTap from "@/components/HapticTap";
 import InteractionFX from "@/components/InteractionFX";
+import AutoDark from "@/components/AutoDark";
 import EasterEgg from "@/components/EasterEgg";
 import VersionWatcher from "@/components/VersionWatcher";
 import BackButtonGuard from "@/components/BackButtonGuard";
@@ -49,6 +50,7 @@ export default function RootLayout({
       <body>
         <HapticTap />
         <InteractionFX />
+        <AutoDark />
         <EasterEgg />
         <VersionWatcher />
         <BackButtonGuard />
