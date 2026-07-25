@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { computeDayTotals, LogRow, PlanMeal } from '@/lib/nutrition/dailyTotals';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -561,7 +562,7 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
         .eq('client_id', clientId)
         .order('log_date', { ascending: false }),
       supabase.from('meal_adherence_logs')
-        .select('log_date, adherence, meal_id, est_kcal, est_protein, est_carbs, est_fats, trainer_macro_override')
+        .select('*')
         .eq('client_id', clientId)
         .gte('log_date', wideSince)
         .order('log_date', { ascending: true }),
@@ -585,61 +586,36 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
       setStreakDays(0);
     }
 
-    const logs = (logData as any[]) || [];
+    const logs = (logData as (LogRow & { log_date: string })[]) || [];
     const mealIds = [...new Set(logs.map(l => l.meal_id).filter(Boolean))] as string[];
 
-    const plannedByMeal: Record<string, { kcal: number; protein: number; carbs: number; fats: number }> = {};
+    // Use THE canonical calculator (lib/nutrition/dailyTotals), exactly as
+    // MacrosProgressChart and useNutritionAverages do. This rollup used to
+    // re-implement the macro math inline and never read item_overrides, so a
+    // client who adjusted her portions (rice 1 cup -> 1/2) saw 560 kcal on her
+    // screen while the trainer's card showed the full 700, and foods she ADDED
+    // were invisible to the trainer entirely. Same inputs, same function, same
+    // numbers everywhere.
+    const pseudoMeals: PlanMeal[] = [];
     if (mealIds.length > 0) {
       const { data: items } = await supabase
         .from('meal_items')
-        .select('meal_id, protein, carbs, fats')
+        .select('id, meal_id, food, amount, unit, is_unlimited, protein, carbs, fats, position')
         .in('meal_id', mealIds);
+      const byMeal: Record<string, PlanMeal> = {};
       for (const it of (items as any[]) || []) {
-        const p = Number(it.protein) || 0, c = Number(it.carbs) || 0, f = Number(it.fats) || 0;
-        const cur = plannedByMeal[it.meal_id] || { kcal: 0, protein: 0, carbs: 0, fats: 0 };
-        cur.protein += p; cur.carbs += c; cur.fats += f; cur.kcal += 4 * p + 4 * c + 9 * f;
-        plannedByMeal[it.meal_id] = cur;
+        const m = byMeal[it.meal_id] || (byMeal[it.meal_id] = { id: String(it.meal_id), name: '', timing: null, position: 0, meal_items: [] });
+        m.meal_items.push({ id: String(it.id), food: String(it.food || ''), amount: it.amount, unit: it.unit, is_unlimited: !!it.is_unlimited, protein: it.protein, carbs: it.carbs, fats: it.fats, position: Number(it.position) || 0 });
       }
+      pseudoMeals.push(...Object.values(byMeal));
     }
 
-    const macroForLog = (l: any) => {
-      const ov = l.trainer_macro_override;
-      if (ov && (ov.protein != null || ov.carbs != null || ov.fats != null || ov.kcal != null)) {
-        const p = Number(ov.protein) || 0, c = Number(ov.carbs) || 0, f = Number(ov.fats) || 0;
-        return { kcal: ov.kcal != null ? Number(ov.kcal) : 4 * p + 4 * c + 9 * f, protein: p, carbs: c, fats: f };
-      }
-      const hasEst = l.est_protein != null || l.est_carbs != null || l.est_fats != null || l.est_kcal != null;
-      if (hasEst) {
-        const p = Number(l.est_protein) || 0, c = Number(l.est_carbs) || 0, f = Number(l.est_fats) || 0;
-        return { kcal: l.est_kcal != null ? Number(l.est_kcal) : 4 * p + 4 * c + 9 * f, protein: p, carbs: c, fats: f };
-      }
-      const frac = (() => {
-        switch (String(l.adherence || '').toLowerCase()) {
-          case 'full': return 1;
-          case '3/4': return 0.75;
-          case '1/2': return 0.5;
-          case 'partial': return 0.5;
-          case 'skipped': return 0;
-          case 'off-plan': return 0;
-          default: return 1;
-        }
-      })();
-      if (frac > 0 && l.meal_id && plannedByMeal[l.meal_id]) {
-        const pl = plannedByMeal[l.meal_id];
-        const p = pl.protein * frac, c = pl.carbs * frac, f = pl.fats * frac;
-        return { kcal: 4 * p + 4 * c + 9 * f, protein: p, carbs: c, fats: f };
-      }
-      return { kcal: 0, protein: 0, carbs: 0, fats: 0 };
-    };
-
+    const logsByDate: Record<string, (LogRow & { log_date: string })[]> = {};
+    for (const l of logs) { if (l.log_date) (logsByDate[l.log_date] ||= []).push(l); }
     const byDate: Record<string, DailyMacro> = {};
-    for (const l of logs) {
-      const dt = l.log_date;
-      if (!dt) continue;
-      const m = macroForLog(l);
-      const cur = byDate[dt] || { date: dt, kcal: 0, protein: 0, carbs: 0, fats: 0 };
-      cur.kcal += m.kcal; cur.protein += m.protein; cur.carbs += m.carbs; cur.fats += m.fats;
-      byDate[dt] = cur;
+    for (const dt of Object.keys(logsByDate)) {
+      const t = computeDayTotals(logsByDate[dt], pseudoMeals);
+      byDate[dt] = { date: dt, kcal: t.kcal, protein: t.protein, carbs: t.carbs, fats: t.fats };
     }
     const daily = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
     daily.forEach(dd => {
