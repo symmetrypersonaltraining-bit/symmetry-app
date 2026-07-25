@@ -46,7 +46,7 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
       onResult: (t) => setMsg((m) => (m ? m + " " : "") + t),
       onStart: () => setListening(true),
       onEnd: () => setListening(false),
-      onUnavailable: () => { setListening(false); alert("Voice dictation isn't available here yet. You can type instead."); },
+      onUnavailable: (reason) => { setListening(false); console.error("dictation unavailable:", reason); alert("Voice input couldn't start — " + reason + "\n\nTap the mic again; if it keeps failing, tell Dustin this message."); },
     });
   }
 

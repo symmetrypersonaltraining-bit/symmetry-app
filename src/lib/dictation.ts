@@ -39,12 +39,17 @@ export function startDictation(cb: Callbacks): DictationHandle {
           } catch { /* assume available; start() will error if not */ }
           if (!ok) { cb.onUnavailable?.("native-unavailable"); return; }
           try { if (native.requestPermissions) await native.requestPermissions(); } catch { /* start() surfaces denial */ }
+          // Release any prior recognition session that may still be bound (Android allows
+          // only one recognizer at a time — a stuck session from an earlier mic makes
+          // start() fail with BUSY). Best-effort; ignored if nothing is active.
+          try { await native.stop?.(); } catch { /* nothing to stop */ }
           cb.onStart?.();
           const res = await native.start!({ language: "en-US", maxResults: 1, partialResults: false, popup: false });
           const text = (res && res.matches && res.matches[0]) || "";
           if (!stopped && text) cb.onResult(text);
-        } catch {
-          if (!stopped) cb.onUnavailable?.("native-error");
+        } catch (e) {
+          const detail = e && (e as { message?: string }).message ? (e as { message?: string }).message : String(e);
+          if (!stopped) cb.onUnavailable?.("native-error: " + detail);
         } finally {
           cb.onEnd?.();
         }
