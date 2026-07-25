@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useNutritionAverages } from "@/components/nutrition/useNutritionAverages";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -28,8 +29,11 @@ function fmtRange(a: string, b: string): string {
 }
 
 interface Summary {
-  done: number; total: number; thisWeekCount: number;
-  nutritionPct: number | null; weightDelta: number | null; streak: number;
+  // THIS week (matches the header + top schedule widget)
+  doneThis: number; totalThis: number;
+  // LAST week (the once-weekly full-screen review only)
+  doneLast: number; totalLast: number;
+  weightDelta: number | null; streak: number;
   focus: string | null; firstName: string;
   lastWkStart: string; lastWkEnd: string; thisWk: string; thisWkEnd: string;
 }
@@ -37,65 +41,69 @@ interface Summary {
 export default function ClientWeekSummary() {
   const [s, setS] = useState<Summary | null>(null);
   const [showBrief, setShowBrief] = useState(false);
+  const [clientId, setClientId] = useState<string | null>(null);
+  // Deterministic Central-time date + week bounds (no async needed → stable for
+  // the canonical adherence hooks below).
+  const today = useMemo(() => todayCT(), []);
+  const thisWk = useMemo(() => weekStartOf(today), [today]);
+  const lastWkStart = useMemo(() => addDays(thisWk, -7), [thisWk]);
+  const lastWkEnd = useMemo(() => addDays(thisWk, -1), [thisWk]);
+
+  // CANONICAL nutrition adherence — the EXACT same source + method the logger's
+  // AveragesStrip uses (computeDayTotals + plan-meal proration). Reusing the
+  // hook means the home tile can never diverge from "adherence · 7d" in the app.
+  // "1w" = last 7 days ending today (America/Chicago). Last-week uses a custom
+  // range so the weekly review tile is canonical too.
+  const weekAdh = useNutritionAverages(clientId || "", today, "1w", today, today, clientId);
+  const lastWkAdh = useNutritionAverages(clientId || "", today, "custom", lastWkStart, lastWkEnd, clientId);
+
+  const nutritionPctThis = weekAdh.result && weekAdh.result.adherence != null ? Math.round(weekAdh.result.adherence) : null;
+  const nutritionPctLast = lastWkAdh.result && lastWkAdh.result.adherence != null ? Math.round(lastWkAdh.result.adherence) : null;
 
   useEffect(() => {
     let on = true;
     (async () => {
       try {
         const supabase: any = createClient();
-        const today = todayCT();
-        let clientId: string | null = null;
+        let cid: string | null = null;
         let clientName = "";
         let focus: string | null = null;
-        try { clientId = new URLSearchParams(window.location.search).get("forClient"); } catch { clientId = null; }
-        if (!clientId) {
+        try { cid = new URLSearchParams(window.location.search).get("forClient"); } catch { cid = null; }
+        if (!cid) {
           const { data: userData } = await supabase.auth.getUser();
           const user = userData ? userData.user : null;
           if (!user) return;
           const col = "id, name, weekly_focus";
           if ((user.email || "") === TRAINER_EMAIL) {
             const { data: c } = await supabase.from("clients").select(col).ilike("name", "%Dustin%").limit(1);
-            if (c && c[0]) { clientId = c[0].id; clientName = c[0].name; focus = c[0].weekly_focus; }
+            if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = c[0].weekly_focus; }
           } else {
             const { data: c } = await supabase.from("clients").select(col).eq("auth_user_id", user.id).limit(1);
-            if (c && c[0]) { clientId = c[0].id; clientName = c[0].name; focus = c[0].weekly_focus; }
+            if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = c[0].weekly_focus; }
           }
         } else {
-          const { data: c } = await supabase.from("clients").select("id, name, weekly_focus").eq("id", clientId).limit(1);
+          const { data: c } = await supabase.from("clients").select("id, name, weekly_focus").eq("id", cid).limit(1);
           if (c && c[0]) { clientName = c[0].name; focus = c[0].weekly_focus; }
         }
-        if (!clientId || !on) return;
+        if (!cid || !on) return;
+        if (on) setClientId(cid);
 
-        const thisWk = weekStartOf(today);
-        const lastWkStart = addDays(thisWk, -7);
-        const lastWkEnd = addDays(thisWk, -1);
         const thisWkEnd = addDays(thisWk, 6);
         const metricWindow = addDays(today, -21);
 
-        const [swLast, swThis, mealsLast, metricsRows, wlogs] = await Promise.all([
-          supabase.from("scheduled_workouts").select("status, scheduled_date").is("deleted_at", null).eq("client_id", clientId).gte("scheduled_date", lastWkStart).lte("scheduled_date", lastWkEnd),
-          supabase.from("scheduled_workouts").select("id").is("deleted_at", null).eq("client_id", clientId).gte("scheduled_date", thisWk).lte("scheduled_date", thisWkEnd),
-          supabase.from("meal_adherence_logs").select("adherence, log_date, item_overrides").eq("client_id", clientId).gte("log_date", lastWkStart).lte("log_date", lastWkEnd),
-          supabase.from("metrics").select("metric_date, weight").eq("client_id", clientId).gte("metric_date", metricWindow).order("metric_date", { ascending: true }),
-          supabase.from("workout_logs").select("log_date, completed, status").eq("client_id", clientId).gte("log_date", addDays(today, -60)).order("log_date", { ascending: false }),
+        const [swLast, swThis, metricsRows, wlogs] = await Promise.all([
+          supabase.from("scheduled_workouts").select("status, scheduled_date").is("deleted_at", null).eq("client_id", cid).gte("scheduled_date", lastWkStart).lte("scheduled_date", lastWkEnd),
+          supabase.from("scheduled_workouts").select("status, scheduled_date").is("deleted_at", null).eq("client_id", cid).gte("scheduled_date", thisWk).lte("scheduled_date", thisWkEnd),
+          supabase.from("metrics").select("metric_date, weight").eq("client_id", cid).gte("metric_date", metricWindow).order("metric_date", { ascending: true }),
+          supabase.from("workout_logs").select("log_date, completed, status").eq("client_id", cid).gte("log_date", addDays(today, -60)).order("log_date", { ascending: false }),
         ]);
 
         const lastRows = swLast.data || [];
-        const total = lastRows.length;
-        const done = lastRows.filter((r: any) => r.status === "completed").length;
-        const thisWeekCount = (swThis.data || []).length;
-
-        // v3 placeholder rows (unlogged/removed stubs, ordering-only rows with
-        // no adherence) aren't real logs — exclude them from the counts.
-        const meals = (mealsLast.data || []).filter((m: any) => {
-          const ov = m.item_overrides || {};
-          return m.adherence && !ov.__unlogged && !ov.__removed && !ov.__custom?.unlogged;
-        });
-        let nutritionPct: number | null = null;
-        if (meals.length) {
-          const onplan = meals.filter((m: any) => { const a = (m.adherence || "").toLowerCase(); return a === "full" || a === "partial" || a === "on-plan" || a === "on plan"; }).length;
-          nutritionPct = Math.round((onplan / meals.length) * 100);
-        }
+        const totalLast = lastRows.length;
+        const doneLast = lastRows.filter((r: any) => r.status === "completed").length;
+        const thisRows = swThis.data || [];
+        const totalThis = thisRows.length;
+        const doneThis = thisRows.filter((r: any) => r.status === "completed").length;
 
         const mts = (metricsRows.data || []).filter((r: any) => r.weight != null);
         let weightDelta: number | null = null;
@@ -108,19 +116,28 @@ export default function ClientWeekSummary() {
 
         const firstName = (clientName || "").split(" ")[0] || "there";
         if (!on) return;
-        setS({ done, total, thisWeekCount, nutritionPct, weightDelta, streak, focus: focus || null, firstName, lastWkStart, lastWkEnd, thisWk, thisWkEnd });
-
-        const hasActivity = total > 0 || meals.length > 0 || streak > 0 || thisWeekCount > 0;
-        try {
-          const key = "symmetry_weekbrief_v1_" + clientId + "_" + today;
-          let isPreview = false;
-          try { isPreview = !!new URLSearchParams(window.location.search).get("forClient"); } catch { isPreview = false; }
-          if (hasActivity && !isPreview && !localStorage.getItem(key)) { try { localStorage.setItem(key, "1"); } catch { /* ignore */ } setShowBrief(true); }
-        } catch { /* ignore */ }
+        setS({ doneThis, totalThis, doneLast, totalLast, weightDelta, streak, focus: focus || null, firstName, lastWkStart, lastWkEnd, thisWk, thisWkEnd });
       } catch { /* fail silent -> render nothing */ }
     })();
     return () => { on = false; };
-  }, []);
+  }, [today, thisWk, lastWkStart, lastWkEnd]);
+
+  // Once-weekly full-screen review trigger (shown once/day-guarded). Fires when
+  // the summary + last-week nutrition (canonical) have loaded and there's real
+  // activity. Not shown in trainer preview (?forClient=…).
+  useEffect(() => {
+    if (!s || !clientId) return;
+    try {
+      const hasActivity = s.totalLast > 0 || s.doneLast > 0 || s.streak > 0 || s.totalThis > 0 || (lastWkAdh.result?.loggedDays || 0) > 0;
+      let isPreview = false;
+      try { isPreview = !!new URLSearchParams(window.location.search).get("forClient"); } catch { isPreview = false; }
+      const key = "symmetry_weekbrief_v1_" + clientId + "_" + today;
+      if (hasActivity && !isPreview && !localStorage.getItem(key)) {
+        try { localStorage.setItem(key, "1"); } catch { /* ignore */ }
+        setShowBrief(true);
+      }
+    } catch { /* ignore */ }
+  }, [s, clientId, today, lastWkAdh.result]);
 
   if (!s) return null;
 
@@ -139,37 +156,39 @@ export default function ClientWeekSummary() {
 
   return (
     <>
-      {/* C2 — always-on "This Week" home card */}
+      {/* C2 — always-on "This Week" home card. Every tile = THIS week, matching
+          the header range + the top schedule widget. */}
       <div style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", borderRadius: 18, padding: 14, boxShadow: "0 8px 26px rgba(20,30,55,0.08)", marginBottom: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <div style={{ fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>📋 This week</div>
           <div style={{ fontSize: 11, color: "var(--brand-text-secondary)" }}>{fmtRange(s.thisWk, s.thisWkEnd)}</div>
         </div>
-        <div style={{ display: "flex", gap: 6, marginBottom: focusText || s.thisWeekCount ? 10 : 0 }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: focusText || s.totalThis ? 10 : 0 }}>
           <div style={{ flex: 1, textAlign: "center", background: "var(--brand-card)", borderRadius: 11, padding: 7 }}>
-            <div style={{ fontWeight: 800, color: "var(--brand-text)" }}>{s.done}/{s.total || 0}</div>
-            <div style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>last wk</div>
+            <div style={{ fontWeight: 800, color: "var(--brand-text)" }}>{s.doneThis}/{s.totalThis || 0}</div>
+            <div style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>workouts this wk</div>
           </div>
           <div style={{ flex: 1, textAlign: "center", background: "var(--brand-card)", borderRadius: 11, padding: 7 }}>
-            <div style={{ fontWeight: 800, color: "var(--brand-text)" }}>{s.nutritionPct != null ? s.nutritionPct + "%" : "—"}</div>
-            <div style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>nutrition</div>
+            <div style={{ fontWeight: 800, color: "var(--brand-text)" }}>{nutritionPctThis != null ? nutritionPctThis + "%" : "—"}</div>
+            <div style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>nutrition · 7d</div>
           </div>
           <div style={{ flex: 1, textAlign: "center", background: "var(--brand-card)", borderRadius: 11, padding: 7 }}>
             <div style={{ fontWeight: 800, color: "var(--brand-text)" }}>{s.streak}🔥</div>
             <div style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>streak</div>
           </div>
         </div>
-        {(focusText || s.thisWeekCount > 0) && (
+        {(focusText || s.totalThis > 0) && (
           <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "#eef2ff", border: "1px solid #dbe4ff", borderRadius: 14, padding: 9 }}>
             <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,var(--brand-primary),#6366f1)", color: "#fff", fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>DG</div>
             <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
-              <b>Focus:</b> {focusText || (s.thisWeekCount + " session" + (s.thisWeekCount === 1 ? "" : "s") + " on the calendar this week — let's go.")}
+              <b>Focus:</b> {focusText || (s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " on the calendar this week — let's go.")}
             </div>
           </div>
         )}
       </div>
 
-      {/* C1 — once-weekly full-screen briefing */}
+      {/* C1 — once-weekly full-screen briefing: a review of LAST week (header +
+          all tiles = last week; nutrition uses the SAME canonical adherence). */}
       {showBrief && (
         <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--brand-bg)", display: "flex", flexDirection: "column", overflowY: "auto" }}>
           <div style={{ background: "linear-gradient(135deg,#7c9cf5,#8b6ff0)", color: "#fff", padding: "20px 18px 18px" }}>
@@ -178,8 +197,8 @@ export default function ClientWeekSummary() {
           </div>
           <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              {stat(<span>{s.done}<span style={{ fontSize: 14, color: "var(--brand-text-secondary)" }}>/{s.total || 0}</span></span>, "workouts done")}
-              {stat(s.nutritionPct != null ? s.nutritionPct + "%" : "—", "nutrition on-plan")}
+              {stat(<span>{s.doneLast}<span style={{ fontSize: 14, color: "var(--brand-text-secondary)" }}>/{s.totalLast || 0}</span></span>, "workouts done")}
+              {stat(nutritionPctLast != null ? nutritionPctLast + "%" : "—", "nutrition adherence")}
               {stat(s.weightDelta != null ? (s.weightDelta > 0 ? "+" : "") + s.weightDelta + " lb" : "—", "body weight", s.weightDelta != null && s.weightDelta < 0 ? "▼ trending down" : undefined)}
               {stat(<span>{s.streak}🔥</span>, "day streak")}
             </div>
@@ -187,7 +206,7 @@ export default function ClientWeekSummary() {
             <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "#eef2ff", border: "1px solid #dbe4ff", borderRadius: 14, padding: 11 }}>
               <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,var(--brand-primary),#6366f1)", color: "#fff", fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>DG</div>
               <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
-                <b>Dustin:</b> {focusText || ("You've got " + s.thisWeekCount + " session" + (s.thisWeekCount === 1 ? "" : "s") + " scheduled this week. Show up and stack another good one.")}
+                <b>Dustin:</b> {focusText || ("You've got " + s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " scheduled this week. Show up and stack another good one.")}
               </div>
             </div>
             <button onClick={dismissBrief} style={{ display: "block", textAlign: "center", background: "var(--brand-primary)", color: "#fff", fontWeight: 800, padding: 14, borderRadius: 15, fontSize: 15, border: "none", width: "100%", cursor: "pointer", marginTop: "auto" }}>
