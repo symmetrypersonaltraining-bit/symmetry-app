@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import HapticTap from "@/components/HapticTap";
+import InteractionFX from "@/components/InteractionFX";
 import VersionWatcher from "@/components/VersionWatcher";
 import BackButtonGuard from "@/components/BackButtonGuard";
 import FloatingDock from "@/components/FloatingDock";
@@ -46,6 +47,7 @@ export default function RootLayout({
       </head>
       <body>
         <HapticTap />
+        <InteractionFX />
         <VersionWatcher />
         <BackButtonGuard />
         <FloatingDock />
