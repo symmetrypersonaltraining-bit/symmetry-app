@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useNutritionAverages } from "@/components/nutrition/useNutritionAverages";
+import CoachBadge from "@/components/CoachBadge";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -182,7 +183,7 @@ export default function ClientWeekSummary() {
         </div>
         {(focusText || s.totalThis > 0) && (
           <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "#eef2ff", border: "1px solid #dbe4ff", borderRadius: 14, padding: 9 }}>
-            <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,var(--brand-primary),#6366f1)", color: "#fff", fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>DG</div>
+            <CoachBadge size={30} />
             <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
               <b>Focus:</b> {focusText || (s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " on the calendar this week — let's go.")}
             </div>
@@ -207,7 +208,7 @@ export default function ClientWeekSummary() {
             </div>
             <div style={{ fontWeight: 800, fontSize: 14, color: "var(--brand-text)", marginTop: 2 }}>This week's focus</div>
             <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "#eef2ff", border: "1px solid #dbe4ff", borderRadius: 14, padding: 11 }}>
-              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,var(--brand-primary),#6366f1)", color: "#fff", fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>DG</div>
+              <CoachBadge size={30} />
               <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
                 <b>Dustin:</b> {focusText || ("You've got " + s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " scheduled this week. Show up and stack another good one.")}
               </div>

@@ -1,0 +1,45 @@
+"use client";
+
+// The coach's badge (Dustin) shown on client-facing coaching surfaces — Coach's
+// Read, the weekly Focus callout, etc. Renders his profile photo (clients
+// .avatar_url for the trainer account) with the "DG" gradient monogram as a
+// fallback. Resolved once per mount; the trainer row rarely changes.
+
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+
+// Module-level cache so multiple badges on one screen don't each hit the DB.
+let cachedUrl: string | null | undefined; // undefined = not fetched, null = none
+
+export default function CoachBadge({ size = 30, initials = "DG" }: { size?: number; initials?: string }) {
+  const [url, setUrl] = useState<string | null | undefined>(cachedUrl);
+
+  useEffect(() => {
+    if (cachedUrl !== undefined) { setUrl(cachedUrl); return; }
+    let on = true;
+    (async () => {
+      try {
+        const supabase: any = createClient();
+        const { data } = await supabase
+          .from("clients")
+          .select("avatar_url")
+          .eq("email", TRAINER_EMAIL)
+          .limit(1);
+        const u = (data && data[0]?.avatar_url) || null;
+        cachedUrl = u;
+        if (on) setUrl(u);
+      } catch { if (on) setUrl(null); }
+    })();
+    return () => { on = false; };
+  }, []);
+
+  if (url) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt="Coach" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flex: "0 0 auto" }} />;
+  }
+  return (
+    <div style={{ width: size, height: size, borderRadius: "50%", background: "linear-gradient(135deg,var(--brand-primary),#6366f1)", color: "#fff", fontWeight: 800, fontSize: Math.round(size * 0.4), display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>{initials}</div>
+  );
+}

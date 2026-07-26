@@ -24,6 +24,14 @@ function weekStartOf(dateStr: string): string {
   const dt = new Date(y, m - 1, d);
   return addDays(dateStr, -dt.getDay());
 }
+// The NEXT Sunday strictly after `dateStr` (if today is Sunday → the following
+// Sunday). Used to clear a focused/dismissed client until the weekly reset.
+function nextSunday(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dow = new Date(y, m - 1, d).getDay(); // 0 = Sunday
+  const until = (7 - dow) % 7 || 7;
+  return addDays(dateStr, until);
+}
 function prettyDate(dateStr: string): string {
   const [, m, d] = dateStr.split("-").map(Number);
   return MON[m - 1] + " " + d;
@@ -173,9 +181,9 @@ export default function TrainerWeekDigest() {
       const val = draft.trim();
       const update: Record<string, string | null> = { weekly_focus: val || null };
       // Setting a focus "handles" this client for the week: clear them from the
-      // Week Ahead for 7 days, then they pop back in when it's time to set the
-      // next one. Clearing a focus (empty) leaves them in the list.
-      if (val) update.digest_snoozed_until = addDays(todayCT(), 7);
+      // Week Ahead until the next Sunday, then they pop back in for the weekly
+      // reset. Clearing a focus (empty) leaves them in the list.
+      if (val) update.digest_snoozed_until = nextSunday(todayCT());
       await supabase.from("clients").update(update).eq("id", id);
       if (val) setRows((rs) => (rs ? rs.filter((r) => r.id !== id) : rs));
       else setRows((rs) => (rs ? rs.map((r) => (r.id === id ? { ...r, focus: null } : r)) : rs));
@@ -208,7 +216,7 @@ export default function TrainerWeekDigest() {
     if (opening) loadAiOptions(r.id);
   }
   async function dismissClient(id: string) {
-    const until = addDays(todayCT(), 7);
+    const until = nextSunday(todayCT());
     setRows((rs) => (rs ? rs.filter((r) => r.id !== id) : rs));
     if (editing === id) { setEditing(null); setDraft(""); }
     try {

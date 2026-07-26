@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from "react";
 import { sendClientMessage } from "@/app/(app)/home/messageActions";
+import CoachBadge from "@/components/CoachBadge";
 
 interface FocusData { message: string; question: string | null; }
 
@@ -95,7 +96,7 @@ export default function CoachFocusCard() {
       </div>
 
       <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "#eef2ff", border: "1px solid #dbe4ff", borderRadius: 14, padding: 11 }}>
-        <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,var(--brand-primary),#6366f1)", color: "#fff", fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>DG</div>
+        <CoachBadge size={30} />
         <div style={{ fontSize: 12.5, lineHeight: 1.55, color: "var(--brand-text)" }}>{data.message}</div>
       </div>
 
