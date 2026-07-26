@@ -6,6 +6,7 @@ import ConsistencyCalendar from "@/components/ConsistencyCalendar";
 import AchievementCard from "@/components/AchievementCard";
 import PersonalBests from "@/components/PersonalBests";
 import ThenVsNow from "@/components/ThenVsNow";
+import ProgressPhotos from "@/components/ProgressPhotos";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
@@ -72,6 +73,7 @@ export default async function ProgressPage({
         {clientId ? (
           <>
             <AchievementCard clientId={clientId} name={clientName} />
+            <ProgressPhotos clientId={clientId} clientName={clientName} />
             <ConsistencyCalendar clientId={clientId} />
             <ThenVsNow clientId={clientId} />
             <PersonalBests clientId={clientId} />
