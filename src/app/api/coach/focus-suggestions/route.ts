@@ -21,9 +21,10 @@ You know THIS client from the context (name, goal, workout adherence, streak, we
 
 Give exactly 3 DIFFERENT options, each a distinct angle drawn from the data:
 - One that names their single biggest lever this week (a slipped streak, an overdue weigh-in, finishing all scheduled sessions, protecting a hot streak).
-- One that celebrates/encourages a real win or trend in the data.
+- One that celebrates/encourages a real win or trend in the data — congratulate something specific they actually did.
 - One that's a concrete, simple action for the week.
-Rules: each option is 1-2 sentences, plain text, speaks TO the client (second person), grounded in the real numbers (never invent data), no hashtags, no emojis unless natural, no NASM/clinical jargon. A little humor is fine if it fits. Do NOT address them as "client" — use their first name if provided.
+Make it land by citing the ACTUAL numbers from the context whenever you can — "that 5-day streak," "3 of your 4 sessions," "9 days since your last weigh-in," "down 4 lbs this month." Specificity is exactly what separates this from a generic app nudge; a client can tell you actually looked.
+Rules: each option is 1-2 sentences, plain text, speaks TO the client (second person), grounded in the real numbers (never invent data), no hashtags, no emojis unless natural, no NASM/clinical jargon. A little humor is welcome when it fits. Do NOT address them as "client" — use their first name if provided.
 
 Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
 {"options":[string,string,string]}`;

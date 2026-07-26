@@ -171,8 +171,14 @@ export default function TrainerWeekDigest() {
     try {
       const supabase: any = createClient();
       const val = draft.trim();
-      await supabase.from("clients").update({ weekly_focus: val || null }).eq("id", id);
-      setRows((rs) => (rs ? rs.map((r) => (r.id === id ? { ...r, focus: val || null } : r)) : rs));
+      const update: Record<string, string | null> = { weekly_focus: val || null };
+      // Setting a focus "handles" this client for the week: clear them from the
+      // Week Ahead for 7 days, then they pop back in when it's time to set the
+      // next one. Clearing a focus (empty) leaves them in the list.
+      if (val) update.digest_snoozed_until = addDays(todayCT(), 7);
+      await supabase.from("clients").update(update).eq("id", id);
+      if (val) setRows((rs) => (rs ? rs.filter((r) => r.id !== id) : rs));
+      else setRows((rs) => (rs ? rs.map((r) => (r.id === id ? { ...r, focus: null } : r)) : rs));
       setEditing(null); setDraft("");
     } catch { /* ignore */ }
     finally { setSaving(false); }
