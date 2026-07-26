@@ -744,7 +744,13 @@ export default function NutritionV3Client(props: Props) {
     for (const p of EXTRA_POSITIONS) {
       if (!planPositions.has(p) && !logs.some((l) => l.meal_position === p)) return p;
     }
-    return EXTRA_POSITIONS[EXTRA_POSITIONS.length - 1];
+    // The fixed extras band is exhausted (e.g. a plan that already uses positions 6/7 as
+    // real meals). Fall back to the 101+ quick-log band and pick the next free slot so an
+    // extra can NEVER overwrite a planned meal. (Previously returned the last band value,
+    // which collided with M6/M7 on 6- and 7-meal plans.)
+    let p = 101;
+    while (planPositions.has(p) || logs.some((l) => l.meal_position === p)) p++;
+    return p;
   }
 
   async function insertCustomMeal(at: number, meta: CustomMeta, logNow: boolean) {
