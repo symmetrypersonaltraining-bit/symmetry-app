@@ -13,6 +13,7 @@ import PaymentDueBanner from "@/components/PaymentDueBanner";
 import MilestoneBadges from "@/components/MilestoneBadges";
 import ClientWeekSummary from "@/components/ClientWeekSummary";
 import CoachFocusCard from "@/components/CoachFocusCard";
+import SundayWeighInReminder from "@/components/SundayWeighInReminder";
 import Leaderboard from "@/components/Leaderboard";
 import { RestDaySlip } from "@/components/FunMoments";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
@@ -715,6 +716,8 @@ export default function ClientDashboard({
           </div>
         )}
 
+        {/* Full-screen Sunday weigh-in reminder (fires only on Sundays, once) */}
+        <SundayWeighInReminder />
         {/* Daily nutrition rings */}
         <ClientWeekSummary />
         {/* AI "Coach's Read" — training-side focus + a question routed to Dustin's inbox */}

@@ -294,17 +294,20 @@ function ExpandedPanel({
   clientId,
   onClose,
   onLogged,
+  autoLog,
 }: {
   cfg: MetricConfig;
   allData: DataPoint[];
   clientId: string;
   onClose: () => void;
   onLogged: () => void;
+  autoLog?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<any>(null);
   const [rangeIdx, setRangeIdx] = useState(2);
-  const [showLog, setShowLog] = useState(false);
+  // Auto-open the log form when arrived via /progress?log=weight (Sunday reminder).
+  const [showLog, setShowLog] = useState(!!autoLog);
   const [logValue, setLogValue] = useState('');
   const [logDate, setLogDate] = useState(centralToday());
   const [saving, setSaving] = useState(false);
@@ -538,7 +541,20 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
   const [loading, setLoading] = useState(true);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  // Deep-link from the Sunday weigh-in reminder: /progress?log=weight opens the
+  // weight card with its log form already up, and scrolls it into view.
+  const [autoLogWeight, setAutoLogWeight] = useState(false);
   const supabase = createClient();
+
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get("log") === "weight") {
+        setExpandedKey("weight");
+        setAutoLogWeight(true);
+        setTimeout(() => { document.getElementById("metric-weight-panel")?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 250);
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   const [rangeMode, setRangeMode] = useState(3);
   const [customStart, setCustomStart] = useState(isoDaysAgo(centralToday(), 28));
@@ -754,13 +770,16 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
         const cfg = METRIC_CONFIGS.find(c => c.key === expandedKey);
         if (!cfg) return null;
         return (
-          <ExpandedPanel
-            cfg={cfg}
-            allData={getDataPoints(expandedKey)}
-            clientId={clientId}
-            onClose={() => setExpandedKey(null)}
-            onLogged={() => setRefreshKey(k => k + 1)}
-          />
+          <div id={expandedKey === 'weight' ? 'metric-weight-panel' : undefined}>
+            <ExpandedPanel
+              cfg={cfg}
+              allData={getDataPoints(expandedKey)}
+              clientId={clientId}
+              onClose={() => setExpandedKey(null)}
+              onLogged={() => setRefreshKey(k => k + 1)}
+              autoLog={expandedKey === 'weight' && autoLogWeight}
+            />
+          </div>
         );
       })()}
 
