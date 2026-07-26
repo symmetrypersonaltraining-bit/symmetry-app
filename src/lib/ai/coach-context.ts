@@ -23,19 +23,23 @@ export function ctShiftDays(iso: string, delta: number): string {
 
 export const COACH_SYSTEM_PROMPT = `You are the personal nutrition coach inside the Symmetry Personal Training app (physique coaching, trainer: Dustin). You are not a generic chatbot — you know THIS client: their name, their goal, their body-composition trend, their actual meal plan, and exactly how they've been eating. Speak to them by first name, like a coach who has watched their numbers all week. Be encouraging, honest, specific, and brief — no fluff, no lecture, no hedging platitudes. Ground every statement in the context data provided; never invent numbers. If the data is sparse (few logged days), say so plainly and keep advice modest. You may suggest small macro adjustments, but frame them as suggestions for the client to run by Dustin — plan changes are his call.
 
-What makes your coaching stand out (do this every time there's data for it):
+What makes your coaching stand out — the best AI coach in any fitness app (do this every time there's data for it):
 - Tie advice to their SPECIFIC goal and trend. A fat-loss client who's stalled hears something different from one dropping fast; a client above their protein target hears something different from one below it.
-- Connect the dots: link their eating pattern to their weight/body-fat trajectory when both are present (e.g. "protein's been landing ~30g short and the scale's flat — let's shore that up before we touch calories").
-- Name the single most useful thing right now. Don't list five observations; find the one that matters and be specific about it.
-- Reference real meals from their plan by name when suggesting where to add or cut, instead of speaking in abstract macros.
+- Give EXACT numbers to hit a goal. When they ask (or when it's the useful thing to say) how to hit a target like "lose 2 lbs this week," use the ENERGY BALANCE block: tell them the precise daily calorie total to eat and compare it to what they've actually been averaging ("you've been at ~1,900 — drop to ~1,650 and that's your 2 lb week"). Real numbers from their own data, never a generic formula, never invented. If the block says maintenance can't be estimated yet, say what you'd need (a week of logging, a fresh weigh-in) instead of guessing.
+- Connect the dots: link their eating pattern to their weight/body-fat trajectory when both are present ("protein's landing ~30g short and the scale's flat — let's shore that up before we touch calories").
+- Name the single most useful thing right now. Don't list five observations; find the one that matters and be specific.
+- Reference real meals from their plan by name when suggesting where to add or cut, instead of abstract macros.
+- Coach like a human who's in their corner: CONGRATULATE real wins specifically (a logging streak, hitting protein all week, the scale moving the right way), ENCOURAGE when it's grindy, and be honest when something's off — without scolding.
+- When you need info the data can't give you (energy, sleep, hunger, why a stretch of days went off-plan), ASK ONE pointed question and tell them to send the answer to Dustin ("How are your afternoons feeling energy-wise? Shoot Dustin a message — if you're dragging we may shift carbs earlier."). One question, not an interrogation.
+- Land light humor here and there — a quick, warm one-liner, never forced, never at their expense, never in a genuinely tough moment. You're a sharp coach with a personality, not a stiff report.
 
 Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
 {"message":string,"suggestions":[{"label":string,"delta":{"p":number,"c":number,"f":number,"kcal":number}}]}
 
 Rules:
-- "message": 2-5 sentences max, plain text. Personal and specific to the data — never generic.
+- "message": up to ~6 sentences, plain text. Personal and specific to the data — never generic, never a wall of text.
 - The current day may be IN PROGRESS. NEVER describe today (todaySoFar) as "under" or "over" budget or as a full/complete day — it isn't finished. Base ALL averages, trends, and consistency judgments ONLY on completedDays. You may reference todaySoFar only as progress (e.g. "you're on pace" / "X left today"), never as a deficit/surplus verdict.
-- Trends: use the signed AVERAGES deltas and the weight/body-fat trajectory lines exactly as given — they are the source of truth for direction. Do NOT recompute above/below or up/down yourself.
+- Trends & targets: use the signed AVERAGES deltas, the weight/body-fat trajectory lines, and the ENERGY BALANCE calorie numbers exactly as given — they are the source of truth. Do NOT recompute above/below, up/down, or any calorie target yourself.
 - "suggestions": 0-3 concrete, actionable tweaks (e.g. {"label":"Add a scoop of whey at breakfast","delta":{"p":25,"c":2,"f":1,"kcal":117}}). deltas are the daily macro change in grams / kcal (negative = reduce). Prefer tweaks that map to a real meal on their plan. Omit the array or leave it empty when nothing concrete applies.`;
 
 export interface DayTotal {
@@ -223,6 +227,57 @@ export function trajectoryLines(
   return out;
 }
 
+// The differentiator: ADAPTIVE energy balance computed from THIS client's own
+// logged intake and weigh-ins — not a Mifflin/Harris formula. If over the window
+// they averaged X kcal and their weight moved Y lb/wk, their true maintenance is
+// X + (weekly lb change × 3500 / 7). From that we hand the model an exact
+// calorie ladder ("to lose 2 lb/wk, eat ~N kcal/day") so it states real numbers
+// specific to this person and never has to guess or do the arithmetic itself.
+export function energyBalanceLines(
+  completedDays: DayTotal[],
+  metrics: { metric_date: string; weight: number | null }[],
+  target: { calories: number } | null,
+): string[] {
+  const avgIntake = completedDays.length
+    ? Math.round(completedDays.reduce((a, d) => a + d.kcal, 0) / completedDays.length)
+    : null;
+  if (!completedDays.length || completedDays.length < 4 || avgIntake == null) {
+    return ["ENERGY BALANCE: not enough finished logged days yet (need ~4+ with real intake) to estimate maintenance from this client's own data. Tell them logging consistently for a week lets you dial in exact calorie targets — don't invent a maintenance number before then."];
+  }
+  // Weigh-ins within the intake window (aligns the two so the estimate is honest);
+  // fall back to all weigh-ins if fewer than two land inside the window.
+  const startDate = completedDays.map((d) => d.date).sort()[0];
+  const allW = metrics.filter((m) => m.weight != null).map((m) => ({ date: m.metric_date, w: m.weight as number }));
+  let pts = allW.filter((m) => m.date >= startDate).sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (pts.length < 2) pts = allW.slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (pts.length < 2) {
+    return [`ENERGY BALANCE: avg intake over ${completedDays.length} completed days is ~${avgIntake} kcal/day, but only one weigh-in is on file — can't estimate maintenance from real data yet. Ask them to log a current weight so you can compute exact goal targets; until then use their macro target${target ? ` (${target.calories} kcal)` : ""} as the reference.`];
+  }
+  const first = pts[0], last = pts[pts.length - 1];
+  const spanDays = Math.max(1, (Date.parse(last.date) - Date.parse(first.date)) / 86400000);
+  const lbPerDay = (last.w - first.w) / spanDays; // negative = losing
+  const lbPerWeek = Number((lbPerDay * 7).toFixed(2));
+  const maintenance = Math.round(avgIntake - lbPerDay * 3500);
+  const eatFor = (ratePerWeek: number) => Math.round(maintenance - (ratePerWeek * 3500) / 7); // + = lose, - = gain
+  const rough = spanDays < 7 || pts.length < 2 || Math.abs(lbPerWeek) > 4;
+  const dir = lbPerWeek < 0 ? "losing" : lbPerWeek > 0 ? "gaining" : "holding";
+  return [
+    `ENERGY BALANCE — computed from THIS client's REAL logged intake + weigh-ins (adaptive maintenance, not a formula). These are the source of truth; state them as real numbers, do NOT recompute:
+- Avg intake: ~${avgIntake} kcal/day over ${completedDays.length} completed days.
+- Weight is ${dir} ~${Math.abs(lbPerWeek)} lb/wk (${first.w}→${last.w} lb over ${Math.round(spanDays)} days).
+- Estimated maintenance at current activity: ~${maintenance} kcal/day.${rough ? " (ROUGH — short/noisy weigh-in span; call it an estimate and lean on more data.)" : ""}
+- Exact daily calories to hit a goal from here (protein${target ? "" : ""} held near their target):
+  · maintain weight → ~${maintenance} kcal
+  · lose 0.5 lb/wk → ~${eatFor(0.5)} kcal
+  · lose 1 lb/wk → ~${eatFor(1)} kcal
+  · lose 1.5 lb/wk → ~${eatFor(1.5)} kcal
+  · lose 2 lb/wk → ~${eatFor(2)} kcal (aggressive — fine short-term, run long stretches past Dustin)
+  · gain 0.25 lb/wk (lean) → ~${eatFor(-0.25)} kcal
+  · gain 0.5 lb/wk → ~${eatFor(-0.5)} kcal
+When they ask "what do I eat to lose 2 lbs this week," give the exact number above and compare it to their ~${avgIntake} current average (e.g. "you're already close" or "trim ~${Math.max(0, avgIntake - eatFor(2))} kcal/day"). Estimate sharpens as they log more.`,
+  ];
+}
+
 export async function assembleCoachContext(db: Db, clientId: string): Promise<string> {
   const today = CT_TODAY();
   const [dailyTotals, targetRes, metricsRes, planSummary, profile] = await Promise.all([
@@ -271,6 +326,7 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
   const { todaySoFar, completedDays } = splitTodayFromCompleted(dailyTotals, today);
   const avgLine = averagesVsTargetsLine(completedDays, target);
   if (avgLine) lines.push(avgLine);
+  for (const l of energyBalanceLines(completedDays, metrics, target)) lines.push(l);
   lines.push(
     completedDays.length
       ? `completedDays — FINISHED days over the last 14 days (only days with logs; "logged" = meals logged that day). Use ONLY these for averages, trends and consistency:\n${JSON.stringify(completedDays)}`

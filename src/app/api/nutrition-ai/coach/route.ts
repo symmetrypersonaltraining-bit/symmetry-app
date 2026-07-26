@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       apiKey,
       model: HAIKU_MODEL,
       system: COACH_SYSTEM_PROMPT,
-      maxTokens: 700,
+      maxTokens: 900,
       messages: [{ role: "user", content: userText }],
       validate: validateCoachReply,
     });

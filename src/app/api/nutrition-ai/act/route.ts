@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
       apiKey,
       model: HAIKU_MODEL,
       system: COACH_SYSTEM_PROMPT,
-      maxTokens: 700,
+      maxTokens: 900,
       messages: [{
         role: "user",
         content: `CONTEXT (server-assembled, trusted):\n${context}\n\nTODAY'S MEALS:\n${JSON.stringify(day)}\n\nCLIENT QUESTION:\n${message}`,
