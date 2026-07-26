@@ -8,7 +8,7 @@
 // Auth-checked, client-scoped, metered (feature 'chat', default 15/day), Haiku.
 
 import { NextRequest, NextResponse } from "next/server";
-import { CT_TODAY, ctShiftDays, splitTodayFromCompleted, fetchMealPlanSummary } from "@/lib/ai/coach-context";
+import { CT_TODAY, ctShiftDays, splitTodayFromCompleted, fetchMealPlanSummary, averagesVsTargetsLine } from "@/lib/ai/coach-context";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { validateCoachReply } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
@@ -130,6 +130,8 @@ async function assembleContext(db: Db, clientId: string): Promise<string> {
   // scores a partial day as a deficit/surplus or averages it in. (Kept in sync
   // with coach-context.ts — shared splitTodayFromCompleted helper.)
   const { todaySoFar, completedDays } = splitTodayFromCompleted(dailyTotals, today);
+  const avgLine = averagesVsTargetsLine(completedDays, target);
+  if (avgLine) lines.push(avgLine);
   lines.push(
     completedDays.length
       ? `completedDays — FINISHED days over the last 14 days (only days with logs; "logged" = meals logged that day). Use ONLY these for averages, trends and consistency:\n${JSON.stringify(completedDays)}`

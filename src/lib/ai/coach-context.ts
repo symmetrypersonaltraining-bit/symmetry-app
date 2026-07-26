@@ -60,6 +60,22 @@ export function splitTodayFromCompleted(
 }
 
 
+// Pre-computed averages vs targets with the direction spelled out, so the model
+// never has to do arithmetic on the raw daily JSON (it was flipping above/below —
+// e.g. calling carbs "below target" when the average was well above).
+export function averagesVsTargetsLine(
+  completedDays: DayTotal[],
+  target: { calories: number; protein: number; carbs: number; fats: number } | null,
+): string | null {
+  if (!completedDays.length) return null;
+  const n = completedDays.length;
+  const s = completedDays.reduce((a, d) => ({ k: a.k + d.kcal, p: a.p + d.p, c: a.c + d.c, f: a.f + d.f }), { k: 0, p: 0, c: 0, f: 0 });
+  const avg = { k: Math.round(s.k / n), p: Math.round(s.p / n), c: Math.round(s.c / n), f: Math.round(s.f / n) };
+  if (!target) return `AVERAGES over ${n} completed days: ${avg.k} kcal, ${avg.p}g protein, ${avg.c}g carbs, ${avg.f}g fat (no targets set).`;
+  const d = (a: number, t: number) => { const x = a - t; return `${x >= 0 ? "+" : ""}${x}g (${x > 0 ? "ABOVE" : x < 0 ? "BELOW" : "on"} target)`; };
+  return `AVERAGES over ${n} completed days vs targets — these signed deltas are the SOURCE OF TRUTH for above/below; state them exactly, do NOT recompute the direction:\n- calories: avg ${avg.k} vs target ${target.calories} → ${avg.k - target.calories >= 0 ? "+" : ""}${avg.k - target.calories} (${avg.k > target.calories ? "ABOVE" : avg.k < target.calories ? "BELOW" : "on"})\n- protein: avg ${avg.p} vs target ${target.protein} → ${d(avg.p, target.protein)}\n- carbs: avg ${avg.c} vs target ${target.carbs} → ${d(avg.c, target.carbs)}\n- fat: avg ${avg.f} vs target ${target.fats} → ${d(avg.f, target.fats)}`;
+}
+
 // Daily totals through the canonical shared calculator — historical logs may
 // reference archived plan versions, so plan items are fetched per meal_id
 // (same pattern as AveragesStrip and coach/route.ts).
@@ -182,6 +198,8 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
   // Separate the in-progress current day from finished days so the model never
   // scores a partial day as a deficit/surplus or averages it in.
   const { todaySoFar, completedDays } = splitTodayFromCompleted(dailyTotals, today);
+  const avgLine = averagesVsTargetsLine(completedDays, target);
+  if (avgLine) lines.push(avgLine);
   lines.push(
     completedDays.length
       ? `completedDays — FINISHED days over the last 14 days (only days with logs; "logged" = meals logged that day). Use ONLY these for averages, trends and consistency:\n${JSON.stringify(completedDays)}`
