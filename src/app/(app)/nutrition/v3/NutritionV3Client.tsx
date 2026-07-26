@@ -894,7 +894,11 @@ export default function NutritionV3Client(props: Props) {
   useEffect(() => {
     if (!coachOn || selectedDate !== today) return;
     let on = true;
-    const cacheKey = "sym:v3:coach:" + clientId + ":" + today;
+    // Cache key version bumped to v2 (2026-07-25): invalidates insights cached by
+    // the pre-fix context (which could report a macro direction backwards, e.g.
+    // "carbs below" when the average was above). Forces one fresh generation with
+    // the corrected server-computed averages.
+    const cacheKey = "sym:v3:coach:v2:" + clientId + ":" + today;
     try {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) { setCoachApi(JSON.parse(cached)); return; }
