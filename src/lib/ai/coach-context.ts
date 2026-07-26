@@ -244,37 +244,74 @@ export function energyBalanceLines(
   if (!completedDays.length || completedDays.length < 4 || avgIntake == null) {
     return ["ENERGY BALANCE: not enough finished logged days yet (need ~4+ with real intake) to estimate maintenance from this client's own data. Tell them logging consistently for a week lets you dial in exact calorie targets — don't invent a maintenance number before then."];
   }
-  // Weigh-ins within the intake window (aligns the two so the estimate is honest);
-  // fall back to all weigh-ins if fewer than two land inside the window.
+
+  // Surplus/deficit vs the trainer's target is ALWAYS accurate — it's just
+  // measured intake vs a set number. This is the safe anchor when the weight
+  // data is too thin/noisy to trust an adaptive maintenance estimate.
+  const targetLine = target
+    ? `- Avg intake ~${avgIntake} kcal/day vs their set target of ${target.calories} → ${avgIntake - target.calories >= 0 ? "+" : ""}${avgIntake - target.calories} kcal/day (${avgIntake > target.calories ? "OVER" : avgIntake < target.calories ? "UNDER" : "on"} target). This is exact — state it as-is.`
+    : `- Avg intake ~${avgIntake} kcal/day over ${completedDays.length} completed days (no set target on file).`;
+
+  // Adaptive maintenance = avgIntake − (weekly lb change × 3500 / 7). Only
+  // TRUSTWORTHY when the weigh-ins are numerous and span enough time that the
+  // trend isn't dominated by a single water-weight spike. A least-squares slope
+  // over weigh-ins INSIDE the intake window keeps intake and weight aligned.
   const startDate = completedDays.map((d) => d.date).sort()[0];
-  const allW = metrics.filter((m) => m.weight != null).map((m) => ({ date: m.metric_date, w: m.weight as number }));
-  let pts = allW.filter((m) => m.date >= startDate).sort((a, b) => (a.date < b.date ? -1 : 1));
-  if (pts.length < 2) pts = allW.slice().sort((a, b) => (a.date < b.date ? -1 : 1));
-  if (pts.length < 2) {
-    return [`ENERGY BALANCE: avg intake over ${completedDays.length} completed days is ~${avgIntake} kcal/day, but only one weigh-in is on file — can't estimate maintenance from real data yet. Ask them to log a current weight so you can compute exact goal targets; until then use their macro target${target ? ` (${target.calories} kcal)` : ""} as the reference.`];
+  // Widen slightly (7 days before the intake window) so a client who weighs
+  // weekly still gets 3+ points, without reaching back to a stale month-old bulk.
+  const trendStart = ctShiftDays(startDate, -7);
+  const pts = metrics
+    .filter((m) => m.weight != null && m.metric_date >= trendStart)
+    .map((m) => ({ t: (Date.parse(m.metric_date) - Date.parse(trendStart)) / 86400000, w: m.weight as number }))
+    .sort((a, b) => a.t - b.t);
+  const spanDays = pts.length ? pts[pts.length - 1].t - pts[0].t : 0;
+
+  // Require ≥3 recent weigh-ins spanning ≥10 days for a reliable rate.
+  let reliable = pts.length >= 3 && spanDays >= 10;
+  let lbPerWeek = 0, maintenance = 0;
+  if (reliable) {
+    const n = pts.length;
+    const mt = pts.reduce((a, p) => a + p.t, 0) / n;
+    const mw = pts.reduce((a, p) => a + p.w, 0) / n;
+    let num = 0, den = 0;
+    for (const p of pts) { num += (p.t - mt) * (p.w - mw); den += (p.t - mt) ** 2; }
+    const slope = den ? num / den : 0; // lb/day
+    lbPerWeek = Number((slope * 7).toFixed(2));
+    maintenance = Math.round(avgIntake - slope * 3500);
+    // Sanity: reject physiologically implausible results (a single water-weight
+    // spike or a logging gap can still sneak through even a regression). Real
+    // maintenance sits in a sane absolute band AND within ~10–19× bodyweight in
+    // lb (below that floor means a spike is masquerading as a fast gain), and a
+    // real weekly trend is modest.
+    const latestW = metrics.find((m) => m.weight != null)?.weight ?? null;
+    const belowWeightFloor = latestW != null && (maintenance < latestW * 10 || maintenance > latestW * 19);
+    if (maintenance < 1400 || maintenance > 4500 || Math.abs(lbPerWeek) > 2.5 || belowWeightFloor) reliable = false;
   }
-  const first = pts[0], last = pts[pts.length - 1];
-  const spanDays = Math.max(1, (Date.parse(last.date) - Date.parse(first.date)) / 86400000);
-  const lbPerDay = (last.w - first.w) / spanDays; // negative = losing
-  const lbPerWeek = Number((lbPerDay * 7).toFixed(2));
-  const maintenance = Math.round(avgIntake - lbPerDay * 3500);
+
+  if (!reliable) {
+    return [
+      `ENERGY BALANCE — anchor to the TARGET (the weight data is too thin/noisy right now for a trustworthy maintenance estimate — needs ≥3 weigh-ins over ≥10 days without a big water swing):
+${targetLine}
+- Do NOT state a specific maintenance or "eat N kcal to lose X" number this time — it would be a guess. Coach from the target instead: if they're over, closing that gap is the move; the trainer's target already has the intended deficit built in.
+- Naturally encourage more consistent weigh-ins (same time, same conditions) so an exact, personalized maintenance can be computed soon.`,
+    ];
+  }
+
   const eatFor = (ratePerWeek: number) => Math.round(maintenance - (ratePerWeek * 3500) / 7); // + = lose, - = gain
-  const rough = spanDays < 7 || pts.length < 2 || Math.abs(lbPerWeek) > 4;
   const dir = lbPerWeek < 0 ? "losing" : lbPerWeek > 0 ? "gaining" : "holding";
   return [
-    `ENERGY BALANCE — computed from THIS client's REAL logged intake + weigh-ins (adaptive maintenance, not a formula). These are the source of truth; state them as real numbers, do NOT recompute:
-- Avg intake: ~${avgIntake} kcal/day over ${completedDays.length} completed days.
-- Weight is ${dir} ~${Math.abs(lbPerWeek)} lb/wk (${first.w}→${last.w} lb over ${Math.round(spanDays)} days).
-- Estimated maintenance at current activity: ~${maintenance} kcal/day.${rough ? " (ROUGH — short/noisy weigh-in span; call it an estimate and lean on more data.)" : ""}
-- Exact daily calories to hit a goal from here (protein${target ? "" : ""} held near their target):
+    `ENERGY BALANCE — computed from THIS client's REAL logged intake + weigh-in TREND (adaptive maintenance, not a formula). Source of truth; state as real numbers, do NOT recompute:
+${targetLine}
+- Weight trend: ${dir} ~${Math.abs(lbPerWeek)} lb/wk (least-squares over ${pts.length} weigh-ins across ${Math.round(spanDays)} days).
+- Estimated maintenance at current activity: ~${maintenance} kcal/day.
+- Exact daily calories to hit a goal from here (keep protein near target):
   · maintain weight → ~${maintenance} kcal
   · lose 0.5 lb/wk → ~${eatFor(0.5)} kcal
   · lose 1 lb/wk → ~${eatFor(1)} kcal
   · lose 1.5 lb/wk → ~${eatFor(1.5)} kcal
-  · lose 2 lb/wk → ~${eatFor(2)} kcal (aggressive — fine short-term, run long stretches past Dustin)
+  · lose 2 lb/wk → ~${eatFor(2)} kcal (aggressive — fine short-term, clear long stretches with Dustin)
   · gain 0.25 lb/wk (lean) → ~${eatFor(-0.25)} kcal
-  · gain 0.5 lb/wk → ~${eatFor(-0.5)} kcal
-When they ask "what do I eat to lose 2 lbs this week," give the exact number above and compare it to their ~${avgIntake} current average (e.g. "you're already close" or "trim ~${Math.max(0, avgIntake - eatFor(2))} kcal/day"). Estimate sharpens as they log more.`,
+When they ask "what do I eat to lose 2 lbs this week," give the exact number above and compare it to their ~${avgIntake} average (e.g. "trim ~${Math.max(0, avgIntake - eatFor(2))} kcal/day"). Estimate sharpens as they log more.`,
   ];
 }
 

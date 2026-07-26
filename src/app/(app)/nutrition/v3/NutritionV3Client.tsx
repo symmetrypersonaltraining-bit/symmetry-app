@@ -894,11 +894,11 @@ export default function NutritionV3Client(props: Props) {
   useEffect(() => {
     if (!coachOn || selectedDate !== today) return;
     let on = true;
-    // Cache key version bumped to v2 (2026-07-25): invalidates insights cached by
-    // the pre-fix context (which could report a macro direction backwards, e.g.
-    // "carbs below" when the average was above). Forces one fresh generation with
-    // the corrected server-computed averages.
-    const cacheKey = "sym:v3:coach:v2:" + clientId + ":" + today;
+    // Cache key version (2026-07-25): v2 fixed a backwards macro direction;
+    // v3 fixes the adaptive-maintenance calc (thin/noisy weigh-ins were producing
+    // absurd calorie targets like "eat 177 kcal to lose 1 lb"). Bumping the version
+    // invalidates stale insights so they regenerate with the corrected math.
+    const cacheKey = "sym:v3:coach:v3:" + clientId + ":" + today;
     try {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) { setCoachApi(JSON.parse(cached)); return; }
