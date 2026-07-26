@@ -75,6 +75,8 @@ workflows:
               s = s.replace("<application", '<application android:enableOnBackInvokedCallback="false"', 1)
           if "android.permission.RECORD_AUDIO" not in s:
               s = s.replace("<application", '<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <application', 1)
+          if "android.permission.CAMERA" not in s:
+              s = s.replace("<application", '<uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n    <application', 1)
           if "android.speech.RecognitionService" not in s:
               s = s.replace("<application", '<queries><intent><action android:name="android.speech.RecognitionService" /></intent></queries>\n    <application', 1)
           open(p, "w").write(s)
