@@ -56,7 +56,14 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(300);
-      const direct = (raw as RawUnread[]) || [];
+      let direct = (raw as RawUnread[]) || [];
+      // In client mode the trainer account is acting as a regular client — only
+      // their OWN thread's messages + broadcasts belong here. Incoming
+      // client→trainer messages (other client_ids) are trainer business and must
+      // not cross over into the client notification center. Mirrors MessagesBell.
+      if (isClientMode) {
+        direct = direct.filter((m) => m.is_broadcast || (!!m.client_id && m.client_id === myClientId));
+      }
       // Fold in per-user GROUP unread (group_reads watermark) as synthetic rows
       // so a new group message shows a "Group" row routing to /messages?client=group.
       // In client mode (Dustin's own client app) include his OWN trainer-sent
