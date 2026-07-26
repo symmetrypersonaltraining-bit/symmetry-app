@@ -341,7 +341,13 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                 <div key={c.id} className="relative border-b" style={{ borderColor: "var(--brand-border)" }}>
                 <Link onClick={() => setReadClients((prev) => new Set(prev).add(c.id))} href={"/messages?client=" + c.id}
                   className="flex items-center gap-3 px-4 py-3.5 pr-11 transition-colors"
-                  style={{ background: isSel ? "color-mix(in srgb, var(--brand-primary) 10%, transparent)" : "transparent", borderLeft: isSel ? "3px solid var(--brand-primary)" : "3px solid transparent" }}>
+                  style={
+                    isSel
+                      ? { background: "color-mix(in srgb, var(--brand-primary) 10%, transparent)", borderLeft: "3px solid var(--brand-primary)" }
+                      : unread > 0
+                        ? { borderLeft: "3px solid #ef4444", animation: "sym-unread-row 1.6s ease-in-out infinite" }
+                        : { background: "transparent", borderLeft: "3px solid transparent" }
+                  }>
                   <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
                     style={{ background: isSel ? "var(--brand-primary)" : "color-mix(in srgb, var(--brand-primary) 20%, transparent)", color: isSel ? "white" : "var(--brand-primary)" }}>
                     {getInitials(c.name)}
@@ -350,7 +356,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold truncate flex items-center min-w-0" style={{ color: isSel ? "var(--brand-primary)" : "var(--brand-text)" }}>
                         <span className="truncate">{c.name}</span>
-                        {unread > 0 ? <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 999, background: "#ef4444", marginLeft: 6, flexShrink: 0, animation: "cw-pulse 1.2s ease-in-out infinite" }} /> : null}
+                        {unread > 0 ? <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 999, background: "#ef4444", marginLeft: 7, flexShrink: 0, animation: "sym-unread-dot 1.2s ease-in-out infinite" }} /> : null}
                       </p>
                       {last && <span className="text-[10px] flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }}>{fmtDay(last.created_at)}</span>}
                     </div>
@@ -359,7 +365,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                         {last ? (last.from_id === currentUserId ? "You: " : "") + last.body.replace(/\n/g, " ") : "No messages yet"}
                       </p>
                       {unread > 0 && (
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{ background: "var(--brand-primary)", color: "white" }}>
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{ background: "#ef4444", color: "white", animation: "sym-unread-dot 1.2s ease-in-out infinite" }}>
                           {unread > 9 ? "9+" : unread}
                         </div>
                       )}
