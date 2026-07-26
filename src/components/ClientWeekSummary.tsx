@@ -46,8 +46,11 @@ export default function ClientWeekSummary() {
   // the canonical adherence hooks below).
   const today = useMemo(() => todayCT(), []);
   const thisWk = useMemo(() => weekStartOf(today), [today]);
-  const lastWkStart = useMemo(() => addDays(thisWk, -7), [thisWk]);
-  const lastWkEnd = useMemo(() => addDays(thisWk, -1), [thisWk]);
+  // "Week in review" = the trailing 7 days ending today (rolling window), matching the
+  // nutrition "7d" tile — NOT the prior Sun–Sat calendar week. This also stops sessions
+  // that were never started (past rows still in "scheduled") from padding the total.
+  const lastWkStart = useMemo(() => addDays(today, -6), [today]);
+  const lastWkEnd = useMemo(() => today, [today]);
 
   // CANONICAL nutrition adherence — the EXACT same source + method the logger's
   // AveragesStrip uses (computeDayTotals + plan-meal proration). Reusing the
