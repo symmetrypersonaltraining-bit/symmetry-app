@@ -72,12 +72,12 @@ export default async function ProgressPage({
       <div className="px-4 py-4">
         {clientId ? (
           <>
+            <MetricCards clientId={clientId} />
+            <ConsistencyCalendar clientId={clientId} />
             <AchievementCard clientId={clientId} name={clientName} />
             <ProgressPhotos clientId={clientId} clientName={clientName} />
-            <ConsistencyCalendar clientId={clientId} />
             <ThenVsNow clientId={clientId} />
             <PersonalBests clientId={clientId} />
-            <MetricCards clientId={clientId} />
           </>
         ) : (
           <p className="text-center py-12" style={{ color: "var(--brand-text-secondary)" }}>

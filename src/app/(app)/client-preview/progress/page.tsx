@@ -39,12 +39,12 @@ export default async function ClientPreviewProgressPage() {
         <p className="text-white/60 text-sm">{clientName}</p>
       </div>
       <div className="px-4 py-4">
+        <MetricCards clientId={clientId} />
+        <ConsistencyCalendar clientId={clientId} />
         <AchievementCard clientId={clientId} name={clientName} />
         <ProgressPhotos clientId={clientId} clientName={clientName} />
-        <ConsistencyCalendar clientId={clientId} />
         <ThenVsNow clientId={clientId} />
         <PersonalBests clientId={clientId} />
-        <MetricCards clientId={clientId} />
       </div>
     </>
   );
