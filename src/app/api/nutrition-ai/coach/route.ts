@@ -8,7 +8,7 @@
 // Auth-checked, client-scoped, metered (feature 'chat', default 15/day), Haiku.
 
 import { NextRequest, NextResponse } from "next/server";
-import { CT_TODAY, ctShiftDays, splitTodayFromCompleted } from "@/lib/ai/coach-context";
+import { CT_TODAY, ctShiftDays, splitTodayFromCompleted, fetchMealPlanSummary } from "@/lib/ai/coach-context";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { validateCoachReply } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
@@ -88,7 +88,7 @@ async function fetchDailyTotals(db: Db, clientId: string, days: number): Promise
 
 async function assembleContext(db: Db, clientId: string): Promise<string> {
   const today = CT_TODAY();
-  const [dailyTotals, targetRes, metricsRes] = await Promise.all([
+  const [dailyTotals, targetRes, metricsRes, planSummary] = await Promise.all([
     fetchDailyTotals(db, clientId, 14),
     db
       .from("macro_targets")
@@ -104,6 +104,7 @@ async function assembleContext(db: Db, clientId: string): Promise<string> {
       .eq("client_id", clientId)
       .order("metric_date", { ascending: false })
       .limit(10),
+    fetchMealPlanSummary(db, clientId),
   ]);
 
   const target = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
@@ -119,6 +120,11 @@ async function assembleContext(db: Db, clientId: string): Promise<string> {
   );
   if (latestWeight) lines.push(`Latest weight: ${latestWeight.weight} lbs (${latestWeight.metric_date}).`);
   if (latestBf) lines.push(`Latest body fat: ${latestBf.body_fat_pct}% (${latestBf.metric_date}).`);
+  lines.push(
+    planSummary
+      ? `The client's ACTUAL current meal plan (their planned meals + foods — use this when they ask about their plan, a specific meal, or what to eat):\n${planSummary}`
+      : "No structured meal plan on file (open/awareness plan)."
+  );
 
   // Separate the in-progress current day from finished days so the model never
   // scores a partial day as a deficit/surplus or averages it in. (Kept in sync

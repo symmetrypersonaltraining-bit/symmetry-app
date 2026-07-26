@@ -110,9 +110,38 @@ async function fetchDailyTotals(db: Db, clientId: string, days: number): Promise
     .filter((d) => d.logged > 0);
 }
 
+// The client's ACTUAL live meal plan (meals + foods), so the coach knows what's
+// on the plan when asked "what's my meal plan / what should I eat for M3". Without
+// this the model only sees macro totals and can't reference real meals.
+export async function fetchMealPlanSummary(db: Db, clientId: string): Promise<string | null> {
+  const { data: plan } = await db
+    .from("meal_plans").select("id")
+    .eq("client_id", clientId).eq("status", "live")
+    .order("effective_date", { ascending: false }).limit(1).maybeSingle();
+  const planId = (plan as { id: string } | null)?.id;
+  if (!planId) return null;
+  const { data: meals } = await db
+    .from("meals")
+    .select("name, timing, position, meal_items(food, amount, unit, is_unlimited, protein, carbs, fats, position)")
+    .eq("meal_plan_id", planId).order("position");
+  const list = (meals as unknown as { name: string; timing: string | null; meal_items: { food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number | null }[] }[]) || [];
+  if (!list.length) return null;
+  return list.map((m) => {
+    const its = (m.meal_items || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+    const foods = its.map((it) => {
+      const amt = it.is_unlimited ? "" : (it.amount != null ? `${it.amount}${it.unit ? " " + it.unit : ""} ` : "");
+      return `${amt}${it.food}${it.is_unlimited ? " (unlimited)" : ""}`;
+    });
+    let p = 0, c = 0, f = 0;
+    for (const it of its) { p += Number(it.protein) || 0; c += Number(it.carbs) || 0; f += Number(it.fats) || 0; }
+    const macro = (p || c || f) ? ` [~${Math.round(4 * p + 4 * c + 9 * f)} kcal · ${Math.round(p)}P/${Math.round(c)}C/${Math.round(f)}F]` : "";
+    return `- ${m.name}${m.timing ? " (" + m.timing + ")" : ""}: ${foods.join(", ") || "—"}${macro}`;
+  }).join("\n");
+}
+
 export async function assembleCoachContext(db: Db, clientId: string): Promise<string> {
   const today = CT_TODAY();
-  const [dailyTotals, targetRes, metricsRes] = await Promise.all([
+  const [dailyTotals, targetRes, metricsRes, planSummary] = await Promise.all([
     fetchDailyTotals(db, clientId, 14),
     db
       .from("macro_targets")
@@ -128,6 +157,7 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
       .eq("client_id", clientId)
       .order("metric_date", { ascending: false })
       .limit(10),
+    fetchMealPlanSummary(db, clientId),
   ]);
 
   const target = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
@@ -143,6 +173,11 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
   );
   if (latestWeight) lines.push(`Latest weight: ${latestWeight.weight} lbs (${latestWeight.metric_date}).`);
   if (latestBf) lines.push(`Latest body fat: ${latestBf.body_fat_pct}% (${latestBf.metric_date}).`);
+  lines.push(
+    planSummary
+      ? `The client's ACTUAL current meal plan (their planned meals + foods — use this when they ask about their plan, a specific meal, or what to eat):\n${planSummary}`
+      : "No structured meal plan on file (open/awareness plan)."
+  );
 
   // Separate the in-progress current day from finished days so the model never
   // scores a partial day as a deficit/surplus or averages it in.
