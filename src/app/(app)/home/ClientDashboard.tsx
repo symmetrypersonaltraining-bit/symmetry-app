@@ -12,6 +12,7 @@ import PrankInvoice from "@/components/PrankInvoice";
 import PaymentDueBanner from "@/components/PaymentDueBanner";
 import MilestoneBadges from "@/components/MilestoneBadges";
 import ClientWeekSummary from "@/components/ClientWeekSummary";
+import CoachFocusCard from "@/components/CoachFocusCard";
 import Leaderboard from "@/components/Leaderboard";
 import { RestDaySlip } from "@/components/FunMoments";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
@@ -716,6 +717,8 @@ export default function ClientDashboard({
 
         {/* Daily nutrition rings */}
         <ClientWeekSummary />
+        {/* AI "Coach's Read" — training-side focus + a question routed to Dustin's inbox */}
+        <CoachFocusCard />
         <HomeMacrosCard />
 
         <MilestoneBadges />

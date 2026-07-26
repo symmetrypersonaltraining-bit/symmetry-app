@@ -78,6 +78,9 @@ export default function TrainerWeekDigest() {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  // AI-generated focus options per client (fetched on demand when the editor opens).
+  const [aiOpts, setAiOpts] = useState<Record<string, string[]>>({});
+  const [aiLoading, setAiLoading] = useState<string | null>(null);
 
   useEffect(() => {
     let on = true;
@@ -174,6 +177,30 @@ export default function TrainerWeekDigest() {
     } catch { /* ignore */ }
     finally { setSaving(false); }
   }
+  // Fetch AI-driven focus options for a client. Falls back silently to the
+  // rule-based suggestFocus() if the call fails. `force` regenerates fresh ideas.
+  async function loadAiOptions(id: string, force = false) {
+    if ((!force && aiOpts[id]) || aiLoading === id) return;
+    setAiLoading(id);
+    try {
+      const res = await fetch("/api/coach/focus-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: id }),
+      });
+      if (res.ok) {
+        const j = await res.json();
+        if (Array.isArray(j?.options) && j.options.length) setAiOpts((m) => ({ ...m, [id]: j.options }));
+      }
+    } catch { /* fall back to rule-based options */ }
+    finally { setAiLoading((v) => (v === id ? null : v)); }
+  }
+  function openFocusEditor(r: Row) {
+    const opening = editing !== r.id;
+    setEditing(opening ? r.id : null);
+    setDraft(r.focus || "");
+    if (opening) loadAiOptions(r.id);
+  }
   async function dismissClient(id: string) {
     const until = addDays(todayCT(), 7);
     setRows((rs) => (rs ? rs.filter((r) => r.id !== id) : rs));
@@ -204,7 +231,7 @@ export default function TrainerWeekDigest() {
               <div style={{ fontSize: 11, color: dotColor(r.risk) }}>{r.status}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "0 0 auto" }}>
-              <button onClick={() => { setEditing(editing === r.id ? null : r.id); setDraft(r.focus || ""); }} style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-primary)", background: "none", border: "1px dashed var(--brand-primary)", borderRadius: 9, padding: "4px 8px", cursor: "pointer" }}>{r.focus ? "Focus ✎" : "+ focus"}</button>
+              <button onClick={() => openFocusEditor(r)} style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-primary)", background: "none", border: "1px dashed var(--brand-primary)", borderRadius: 9, padding: "4px 8px", cursor: "pointer" }}>{r.focus ? "Focus ✎" : "+ focus"}</button>
               <button onClick={() => dismissClient(r.id)} title="Dismiss — temporarily out (hides from Week ahead for a week)" style={{ fontSize: 14, fontWeight: 700, lineHeight: 1, color: "var(--brand-text-secondary)", background: "none", border: "1px solid var(--brand-border)", borderRadius: 999, width: 24, height: 24, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
             </div>
           </div>
@@ -213,10 +240,17 @@ export default function TrainerWeekDigest() {
           )}
           {editing === r.id && (
             <div style={{ marginLeft: 54, marginTop: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-text-secondary)", marginBottom: 5 }}>Suggested — tap to use, then tweak:</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-text-secondary)" }}>
+                  {aiLoading === r.id ? "✨ Writing options…" : aiOpts[r.id] ? "✨ AI options — tap to use, then tweak:" : "Suggested — tap to use, then tweak:"}
+                </div>
+                {aiOpts[r.id] && aiLoading !== r.id && (
+                  <button onClick={() => loadAiOptions(r.id, true)} style={{ fontSize: 10.5, fontWeight: 700, color: "var(--brand-primary)", background: "none", border: "none", cursor: "pointer" }}>↻ New ideas</button>
+                )}
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
-                {suggestFocus(r).map((sug, i) => (
-                  <button key={i} onClick={() => setDraft(sug)} style={{ textAlign: "left", fontSize: 12, lineHeight: 1.4, color: "var(--brand-text)", background: "var(--brand-bg)", border: "1px solid var(--brand-border)", borderRadius: 10, padding: "8px 10px", cursor: "pointer" }}>{sug}</button>
+                {(aiOpts[r.id] ?? suggestFocus(r)).map((sug, i) => (
+                  <button key={i} onClick={() => setDraft(sug)} style={{ textAlign: "left", fontSize: 12, lineHeight: 1.4, color: "var(--brand-text)", background: "var(--brand-bg)", border: "1px solid var(--brand-border)", borderRadius: 10, padding: "8px 10px", cursor: "pointer", opacity: aiLoading === r.id && !aiOpts[r.id] ? 0.55 : 1 }}>{sug}</button>
                 ))}
               </div>
               <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder="Pick one above or write your own…" style={{ width: "100%", fontSize: 12.5, padding: 8, borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-bg)", color: "var(--brand-text)", resize: "vertical" }} />

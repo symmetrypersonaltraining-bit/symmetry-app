@@ -278,6 +278,80 @@ When they ask "what do I eat to lose 2 lbs this week," give the exact number abo
   ];
 }
 
+// TRAINING-side context (workout adherence, streak, weigh-in cadence, body-comp
+// trend, logging consistency) — the non-nutrition picture. Shared by the
+// client-facing "Coach's Read" card and the trainer's AI focus-option suggester.
+export async function assembleTrainingContext(db: Db, clientId: string): Promise<string> {
+  const today = CT_TODAY();
+  const win30 = ctShiftDays(today, -29);
+  const win7 = ctShiftDays(today, -6);
+  const win14 = ctShiftDays(today, -13);
+
+  const [profile, swRes, metricsRes, adherenceRes] = await Promise.all([
+    fetchClientProfile(db, clientId),
+    db
+      .from("scheduled_workouts")
+      .select("scheduled_date, status")
+      .eq("client_id", clientId)
+      .is("deleted_at", null)
+      .gte("scheduled_date", win30)
+      .lte("scheduled_date", today)
+      .order("scheduled_date", { ascending: true }),
+    db
+      .from("metrics")
+      .select("metric_date, weight, body_fat_pct")
+      .eq("client_id", clientId)
+      .order("metric_date", { ascending: false })
+      .limit(10),
+    db
+      .from("meal_adherence_logs")
+      .select("log_date")
+      .eq("client_id", clientId)
+      .gte("log_date", win14)
+      .lte("log_date", today),
+  ]);
+
+  const sw = (swRes.data as { scheduled_date: string; status: string | null }[]) || [];
+  const done = (s: string) => s === "completed";
+  const total30 = sw.length;
+  const done30 = sw.filter((w) => done(w.status || "")).length;
+  const in7 = sw.filter((w) => w.scheduled_date >= win7);
+  const total7 = in7.length;
+  const done7 = in7.filter((w) => done(w.status || "")).length;
+
+  const completedDates = Array.from(new Set(sw.filter((w) => done(w.status || "")).map((w) => w.scheduled_date))).sort();
+  let streak = 0;
+  if (completedDates.length) {
+    let cursor = today;
+    const setD = new Set(completedDates);
+    if (!setD.has(cursor)) cursor = ctShiftDays(cursor, -1);
+    while (setD.has(cursor)) { streak++; cursor = ctShiftDays(cursor, -1); }
+  }
+
+  const metrics = (metricsRes.data as { metric_date: string; weight: number | null; body_fat_pct: number | null }[]) || [];
+  const latestWeighIn = metrics.find((m) => m.weight != null || m.body_fat_pct != null);
+  const daysSinceWeighIn = latestWeighIn
+    ? Math.round((Date.parse(today) - Date.parse(latestWeighIn.metric_date)) / 86400000)
+    : null;
+
+  const adh = (adherenceRes.data as { log_date: string }[]) || [];
+  const loggedDays14 = new Set(adh.map((a) => a.log_date)).size;
+
+  const lines: string[] = [`Today's date: ${today}`];
+  if (profile?.line) lines.push(profile.line);
+  lines.push(
+    `WORKOUT ADHERENCE: last 30 days ${done30}/${total30} scheduled sessions completed; last 7 days ${done7}/${total7} completed. Current completed-session streak: ${streak} day${streak === 1 ? "" : "s"}.`
+  );
+  for (const t of trajectoryLines(metrics)) lines.push(t);
+  lines.push(
+    daysSinceWeighIn == null
+      ? "WEIGH-INS: none on file yet — a first weigh-in would let Dustin track progress."
+      : `WEIGH-INS: last one was ${daysSinceWeighIn} day${daysSinceWeighIn === 1 ? "" : "s"} ago (${latestWeighIn!.metric_date}).${daysSinceWeighIn >= 10 ? " That's getting stale — a fresh weigh-in would help." : ""}`
+  );
+  lines.push(`FOOD-LOGGING CONSISTENCY: logged on ${loggedDays14} of the last 14 days (context only — do not give a nutrition breakdown here).`);
+  return lines.join("\n");
+}
+
 export async function assembleCoachContext(db: Db, clientId: string): Promise<string> {
   const today = CT_TODAY();
   const [dailyTotals, targetRes, metricsRes, planSummary, profile] = await Promise.all([
