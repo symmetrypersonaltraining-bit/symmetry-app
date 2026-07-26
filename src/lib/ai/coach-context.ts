@@ -21,15 +21,22 @@ export function ctShiftDays(iso: string, delta: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-export const COACH_SYSTEM_PROMPT = `You are the nutrition coach assistant inside the Symmetry Personal Training app (physique coaching, trainer: Dustin). You speak directly to the client: encouraging, honest, specific, brief — no fluff, no lecture. Ground every statement in the context data provided; never invent numbers. If the data is sparse (few logged days), say so and keep advice modest. You may suggest small macro adjustments, but frame them as suggestions for the client to discuss with Dustin — plan changes are his call.
+export const COACH_SYSTEM_PROMPT = `You are the personal nutrition coach inside the Symmetry Personal Training app (physique coaching, trainer: Dustin). You are not a generic chatbot — you know THIS client: their name, their goal, their body-composition trend, their actual meal plan, and exactly how they've been eating. Speak to them by first name, like a coach who has watched their numbers all week. Be encouraging, honest, specific, and brief — no fluff, no lecture, no hedging platitudes. Ground every statement in the context data provided; never invent numbers. If the data is sparse (few logged days), say so plainly and keep advice modest. You may suggest small macro adjustments, but frame them as suggestions for the client to run by Dustin — plan changes are his call.
+
+What makes your coaching stand out (do this every time there's data for it):
+- Tie advice to their SPECIFIC goal and trend. A fat-loss client who's stalled hears something different from one dropping fast; a client above their protein target hears something different from one below it.
+- Connect the dots: link their eating pattern to their weight/body-fat trajectory when both are present (e.g. "protein's been landing ~30g short and the scale's flat — let's shore that up before we touch calories").
+- Name the single most useful thing right now. Don't list five observations; find the one that matters and be specific about it.
+- Reference real meals from their plan by name when suggesting where to add or cut, instead of speaking in abstract macros.
 
 Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
 {"message":string,"suggestions":[{"label":string,"delta":{"p":number,"c":number,"f":number,"kcal":number}}]}
 
 Rules:
-- "message": 2-5 sentences max, plain text.
+- "message": 2-5 sentences max, plain text. Personal and specific to the data — never generic.
 - The current day may be IN PROGRESS. NEVER describe today (todaySoFar) as "under" or "over" budget or as a full/complete day — it isn't finished. Base ALL averages, trends, and consistency judgments ONLY on completedDays. You may reference todaySoFar only as progress (e.g. "you're on pace" / "X left today"), never as a deficit/surplus verdict.
-- "suggestions": 0-3 concrete, actionable tweaks (e.g. {"label":"Add a scoop of whey at breakfast","delta":{"p":25,"c":2,"f":1,"kcal":117}}). deltas are the daily macro change in grams / kcal (negative = reduce). Omit the array or leave it empty when nothing concrete applies.`;
+- Trends: use the signed AVERAGES deltas and the weight/body-fat trajectory lines exactly as given — they are the source of truth for direction. Do NOT recompute above/below or up/down yourself.
+- "suggestions": 0-3 concrete, actionable tweaks (e.g. {"label":"Add a scoop of whey at breakfast","delta":{"p":25,"c":2,"f":1,"kcal":117}}). deltas are the daily macro change in grams / kcal (negative = reduce). Prefer tweaks that map to a real meal on their plan. Omit the array or leave it empty when nothing concrete applies.`;
 
 export interface DayTotal {
   date: string;
@@ -155,9 +162,70 @@ export async function fetchMealPlanSummary(db: Db, clientId: string): Promise<st
   }).join("\n");
 }
 
+// Who the client is — name, goal, experience, cadence, injuries — so the coach
+// speaks to a real person with a real objective instead of a generic "client".
+// Returns both a context line and the first name for addressing them.
+export async function fetchClientProfile(
+  db: Db,
+  clientId: string,
+): Promise<{ line: string; firstName: string | null } | null> {
+  const { data } = await db
+    .from("clients")
+    .select("name, primary_goal, secondary_goals, experience_level, training_frequency, days_per_week, injuries_limitations, injuries, start_date")
+    .eq("id", clientId)
+    .maybeSingle();
+  const c = data as {
+    name: string | null; primary_goal: string | null; secondary_goals: string | null;
+    experience_level: string | null; training_frequency: number | null; days_per_week: number | null;
+    injuries_limitations: string | null; injuries: string | null; start_date: string | null;
+  } | null;
+  if (!c) return null;
+  const firstName = (c.name || "").trim().split(/\s+/)[0] || null;
+  const parts: string[] = [];
+  if (c.name) parts.push(`Name: ${c.name}`);
+  if (c.primary_goal) parts.push(`Primary goal: ${c.primary_goal}`);
+  if (c.secondary_goals) parts.push(`Secondary goals: ${c.secondary_goals}`);
+  if (c.experience_level) parts.push(`Experience: ${c.experience_level}`);
+  const freq = c.days_per_week ?? c.training_frequency;
+  if (freq) parts.push(`Trains ${freq}x/week`);
+  const inj = [c.injuries_limitations, c.injuries].filter(Boolean).join("; ");
+  if (inj) parts.push(`Injuries/limitations: ${inj}`);
+  if (c.start_date) parts.push(`Coaching since: ${c.start_date}`);
+  if (!parts.length) return { line: "", firstName };
+  return { line: `CLIENT PROFILE — coach this person specifically, by name, toward their goal:\n- ${parts.join("\n- ")}`, firstName };
+}
+
+// Body-composition trajectory (not just the latest point) so the coach can say
+// "down 4.2 lbs over 3 weeks, ~1.4/wk" and tie eating to results. metrics arrive
+// newest-first; we walk oldest→newest and report first vs latest with a weekly rate.
+export function trajectoryLines(
+  metrics: { metric_date: string; weight: number | null; body_fat_pct: number | null }[],
+): string[] {
+  const out: string[] = [];
+  const asc = metrics.slice().reverse(); // oldest → newest
+  const trend = (key: "weight" | "body_fat_pct", label: string, unit: string) => {
+    const pts = asc.filter((m) => m[key] != null) as { metric_date: string; weight: number; body_fat_pct: number }[];
+    if (pts.length < 2) {
+      if (pts.length === 1) out.push(`${label}: ${pts[0][key]}${unit} (${pts[0].metric_date}) — only one data point, no trend yet.`);
+      return;
+    }
+    const first = pts[0], last = pts[pts.length - 1];
+    const delta = Number((last[key] - first[key]).toFixed(1));
+    const days = Math.max(1, (Date.parse(last.metric_date) - Date.parse(first.metric_date)) / 86400000);
+    const perWeek = Number(((delta / days) * 7).toFixed(2));
+    const dir = delta < 0 ? "down" : delta > 0 ? "up" : "flat";
+    out.push(
+      `${label} trajectory: ${first[key]}${unit} (${first.metric_date}) → ${last[key]}${unit} (${last.metric_date}) = ${dir} ${Math.abs(delta)}${unit} over ${Math.round(days)} days (~${perWeek >= 0 ? "+" : ""}${perWeek}${unit}/wk). This direction is the source of truth — do NOT recompute it.`
+    );
+  };
+  trend("weight", "Weight", " lb");
+  trend("body_fat_pct", "Body fat", "%");
+  return out;
+}
+
 export async function assembleCoachContext(db: Db, clientId: string): Promise<string> {
   const today = CT_TODAY();
-  const [dailyTotals, targetRes, metricsRes, planSummary] = await Promise.all([
+  const [dailyTotals, targetRes, metricsRes, planSummary, profile] = await Promise.all([
     fetchDailyTotals(db, clientId, 14),
     db
       .from("macro_targets")
@@ -174,6 +242,7 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
       .order("metric_date", { ascending: false })
       .limit(10),
     fetchMealPlanSummary(db, clientId),
+    fetchClientProfile(db, clientId),
   ]);
 
   const target = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
@@ -182,6 +251,7 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
   const latestBf = metrics.find((m) => m.body_fat_pct != null);
 
   const lines: string[] = [`Today's date: ${today}`];
+  if (profile?.line) lines.push(profile.line);
   lines.push(
     target
       ? `Daily macro targets: ${target.calories} kcal, ${target.protein}g protein, ${target.carbs}g carbs, ${target.fats}g fat.`
@@ -189,6 +259,7 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
   );
   if (latestWeight) lines.push(`Latest weight: ${latestWeight.weight} lbs (${latestWeight.metric_date}).`);
   if (latestBf) lines.push(`Latest body fat: ${latestBf.body_fat_pct}% (${latestBf.metric_date}).`);
+  for (const t of trajectoryLines(metrics)) lines.push(t);
   lines.push(
     planSummary
       ? `The client's ACTUAL current meal plan (their planned meals + foods — use this when they ask about their plan, a specific meal, or what to eat):\n${planSummary}`
