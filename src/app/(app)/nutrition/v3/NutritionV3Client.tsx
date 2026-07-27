@@ -1742,15 +1742,29 @@ export default function NutritionV3Client(props: Props) {
           Or press-and-hold the ⠿ handle on the row (~half a second) and drag to reorder. Deleting only affects today — the plan is untouched.
         </p>
         <p className="text-xs font-bold uppercase tracking-widest mt-4 mb-1" style={{ color: "var(--brand-text-secondary)" }}>What&apos;s in this meal</p>
-        {row.kind === "plan" && row.chosen && (row.chosen.meal_items || []).map((it) => (
-          <div key={it.id} className="flex justify-between py-1.5 text-xs" style={{ color: "var(--brand-text-secondary)", borderBottom: "1px dashed var(--brand-border)" }}>
-            <span>
-              {it.food}{it.amount != null ? ` · ${it.amount}${it.unit ? " " + it.unit : ""}` : ""}
-              {it.is_unlimited && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, background: "rgba(34,197,94,0.15)", color: GREEN, padding: "2px 6px", borderRadius: 5 }}>FREE · UNLIMITED</span>}
-            </span>
-            <b style={{ color: "var(--brand-text)" }}>{it.is_unlimited ? "—" : `${r(kcalOf(it.protein || 0, it.carbs || 0, it.fats || 0))} cal`}</b>
-          </div>
-        ))}
+        {row.kind === "plan" && row.chosen && (() => {
+          // Apply this row's item overrides so the sheet mirrors the card + macros.
+          const ov = row.log?.item_overrides || null;
+          const hasOv = !!(ov && Object.keys(ov).some((k) => !k.startsWith("__")));
+          return (row.chosen.meal_items || []).map((it) => {
+            const oAmt = hasOv ? (ov![it.id] as { amount?: number } | undefined)?.amount : undefined;
+            const amt = oAmt != null ? oAmt : it.amount;
+            let scale = 1;
+            if (oAmt != null && it.amount) scale = oAmt / it.amount;
+            else if (oAmt === 0) scale = 0;
+            const removed = oAmt === 0;
+            return (
+              <div key={it.id} className="flex justify-between py-1.5 text-xs" style={{ color: "var(--brand-text-secondary)", borderBottom: "1px dashed var(--brand-border)", textDecoration: removed ? "line-through" : "none", opacity: removed ? 0.6 : 1 }}>
+                <span style={{ textDecoration: "none" }}>
+                  <span style={{ textDecoration: removed ? "line-through" : "none" }}>{it.food}{amt != null ? ` · ${amt}${it.unit ? " " + it.unit : ""}` : ""}</span>
+                  {removed && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, background: "rgba(148,163,184,0.2)", color: "var(--brand-text-secondary)", padding: "2px 6px", borderRadius: 5 }}>removed</span>}
+                  {it.is_unlimited && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, background: "rgba(34,197,94,0.15)", color: GREEN, padding: "2px 6px", borderRadius: 5 }}>FREE · UNLIMITED</span>}
+                </span>
+                <b style={{ color: "var(--brand-text)" }}>{it.is_unlimited ? "—" : `${r(kcalOf((it.protein || 0) * scale, (it.carbs || 0) * scale, (it.fats || 0) * scale))} cal`}</b>
+              </div>
+            );
+          });
+        })()}
         {row.kind === "custom" && row.meta?.items.map((it, j) => (
           <div key={j} className="flex justify-between py-1.5 text-xs" style={{ color: "var(--brand-text-secondary)", borderBottom: "1px dashed var(--brand-border)" }}>
             <span>{it.n}{it.a ? ` · ${it.a}` : ""}{it.free && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, background: "rgba(34,197,94,0.15)", color: GREEN, padding: "2px 6px", borderRadius: 5 }}>FREE</span>}</span>
