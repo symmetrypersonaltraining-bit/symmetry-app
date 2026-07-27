@@ -27,15 +27,23 @@ const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "Ameri
 
 const CF_TO_INTERNAL: Record<string, string> = { "Warm-Up": "Corrective Warm-Up", "Strength": "Primary Strength", "Accessory": "Accessory Strength", "Cardio": "Cardio" };
 
-const SYSTEM_PROMPT = `You are Dustin's in-app workout assistant for Symmetry Personal Training (corrective + physique coaching). Dustin (the trainer) is asking you to review or ADJUST a SPECIFIC client's currently-scheduled workouts — most often because the client is in pain or hit a limitation. You only ever change THIS client's scheduled sessions; you never touch a shared template.
+const SYSTEM_PROMPT = `You are Dustin's in-app programming partner for Symmetry Personal Training (corrective + physique coaching). Dustin (the trainer) works with you exactly like he would in a normal programming chat — the difference is you can also WRITE the change straight into a client's scheduled workouts. You only ever change THIS client's scheduled sessions; you never touch a shared template/library.
 
-You are given the client's upcoming scheduled workouts. Each workout has an id (SW-id), each section a section_id, each exercise a pe_id. When you propose changes you MUST reference those exact ids.
+You have the SAME capabilities as chatting through programming with him:
+- Answer questions about what the client is doing.
+- Diagnose a problem (pain, a plateau, a limitation) and TALK THROUGH reprogramming ideas — offer 1-3 concrete options in the reply, with your reasoning, before/besides proposing the write.
+- Swap or regress a movement to a pain-free / better-fit alternative that keeps the session's intent.
+- Adjust sets, reps, load, tempo, rest, or cues.
+- ADD extra rehab / mobility / corrective work (e.g. a corrective warm-up drill, band work, a mobility hold) into the appropriate section — program it just like Dustin would.
+- Remove a movement that's causing a problem.
 
-Decide between:
-- Just answering (a question like "what's Robert doing Thursday?") → return {"reply": string}.
-- Proposing an adjustment to ONE scheduled workout → return {"reply": string, "proposal": {...}}.
+You are given the client's upcoming scheduled workouts. Each workout has an id (SW-id), each section a section_id, each exercise a pe_id. When you propose changes you MUST reference those exact ids. Put a change into a sensible section (rehab/mobility/corrective → the Warm-Up section; strength work → Strength/Accessory).
 
-When the client has pain or a limitation: swap or regress the offending movement to a pain-free alternative that keeps the session's intent (same muscle group / pattern where safe), or reduce load/range. Explain briefly in the reply.
+Return one of:
+- {"reply": string} — for a question or when you're just talking through ideas and want Dustin to steer before you write.
+- {"reply": string, "proposal": {...}} — when you're proposing a concrete write. Lead the reply with your reasoning / options, THEN the proposal is the change to commit. Dustin will choose whether it applies to just that one session or all upcoming sessions of that workout, so write the change to make sense either way.
+
+When the client has pain or a limitation: name the likely culprit, give the fix, and (when useful) suggest rehab/mobility to add alongside the swap.
 
 HARD RULES (never violate):
 - NEVER program Olympic or power lifts (cleans, snatches, jerks, high pulls, push press) or strongman.
@@ -161,8 +169,15 @@ async function buildContext(db: Db, clientId: string): Promise<string> {
   return lines.join("\n");
 }
 
-// ── APPLY: clone-if-library then apply changes ──
-async function applyProposal(db: Db, clientId: string, proposal: Proposal): Promise<{ ok: boolean; message: string }> {
+// Count / list this client's upcoming sessions that use a given day (the "series").
+async function upcomingSessionsForDay(db: Db, clientId: string, dayId: string): Promise<string[]> {
+  const today = CT_TODAY();
+  const { data } = await db.from("scheduled_workouts").select("id").eq("client_id", clientId).eq("day_id", dayId).eq("status", "scheduled").is("deleted_at", null).gte("scheduled_date", today);
+  return ((data as { id: string }[]) || []).map((s) => s.id);
+}
+
+// ── APPLY: clone-if-needed then apply changes, scoped to one session or the series ──
+async function applyProposal(db: Db, clientId: string, proposal: Proposal, scope: "one" | "series"): Promise<{ ok: boolean; message: string }> {
   // Verify the scheduled workout belongs to this client.
   const { data: swRow } = await db.from("scheduled_workouts").select("id, day_id, client_id").eq("id", proposal.scheduled_workout_id).maybeSingle();
   const sw = swRow as { id: string; day_id: string; client_id: string } | null;
@@ -171,14 +186,23 @@ async function applyProposal(db: Db, clientId: string, proposal: Proposal): Prom
   const orig = await loadDayTree(db, sw.day_id);
   if (!orig) return { ok: false, message: "Couldn't load the workout to adjust." };
 
-  // Map original section/pe ids → the ids we'll actually edit (identity if already
-  // client-owned; freshly-cloned ids if it was a shared library day).
+  // Which of this client's upcoming sessions should receive the change.
+  const seriesIds = await upcomingSessionsForDay(db, clientId, sw.day_id);
+  const targetSwIds = scope === "series" ? (seriesIds.length ? seriesIds : [sw.id]) : [sw.id];
+
+  const isLibrary = orig.client_owner_id !== clientId;
+  // Clone when the day is a shared library day (never edit it), OR when editing a
+  // single session whose (client-owned) day is shared by other upcoming sessions
+  // — otherwise an in-place edit would leak into those other sessions.
+  const mustClone = isLibrary || (scope === "one" && seriesIds.filter((id) => id !== sw.id).length > 0);
+
+  // Map original section/pe ids → the ids we'll actually edit (identity if editing
+  // the day in place; freshly-cloned ids if we cloned it).
   const secMap = new Map<string, string>();
   const peMap = new Map<string, string>();
   let targetDayId = orig.id;
 
-  if (orig.client_owner_id !== clientId) {
-    // CLONE the library day into a client-owned copy; never edit the shared day.
+  if (mustClone) {
     const { data: dayRow, error: dayErr } = await db.from("days").insert({
       phase_id: orig.phase_id, label: (orig.label || "Workout") + " (adjusted)", position: orig.position ?? 1,
       swappable: false, client_owner_id: clientId, created_by: "trainer_ai", origin: "ai_adjust",
@@ -201,9 +225,11 @@ async function applyProposal(db: Db, clientId: string, proposal: Proposal): Prom
         if (peRow) peMap.set(pe.id, (peRow as { id: string }).id);
       }
     }
-    // Repoint ONLY this scheduled workout at the client-owned copy.
-    await db.from("scheduled_workouts").update({ day_id: targetDayId }).eq("id", sw.id);
+    // Repoint the in-scope sessions at the client-owned copy.
+    await db.from("scheduled_workouts").update({ day_id: targetDayId }).in("id", targetSwIds);
   } else {
+    // Editing the client-owned day in place already affects every session pointing
+    // at it (which, for "series", is exactly the set we want).
     for (const s of orig.sections || []) { secMap.set(s.id, s.id); for (const pe of s.prescribed_exercises || []) peMap.set(pe.id, pe.id); }
   }
 
@@ -242,13 +268,15 @@ async function applyProposal(db: Db, clientId: string, proposal: Proposal): Prom
     } catch (e) { console.error("workout-assist apply change error", e); }
   }
   if (!applied) return { ok: false, message: "No changes could be applied — the workout may have changed. Try again." };
-  return { ok: true, message: proposal.summary || `Applied ${applied} change${applied === 1 ? "" : "s"} to this client's scheduled workout.` };
+  const nSessions = targetSwIds.length;
+  const where = scope === "series" && nSessions > 1 ? ` across all ${nSessions} upcoming sessions of this workout` : " for this session";
+  return { ok: true, message: (proposal.summary ? proposal.summary + " —" : `Applied ${applied} change${applied === 1 ? "" : "s"}`) + ` done${where}. The library is untouched.` };
 }
 
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) return missingKeyResponse();
 
-  let body: { clientId?: string | null; message?: string; apply?: Proposal };
+  let body: { clientId?: string | null; message?: string; apply?: Proposal; applyScope?: "one" | "series" };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
 
   const scoped = await resolveAiScope(body.clientId ?? null);
@@ -264,7 +292,7 @@ export async function POST(req: NextRequest) {
 
   // ── Apply phase ──
   if (body.apply && body.apply.scheduled_workout_id && Array.isArray(body.apply.changes)) {
-    const res = await applyProposal(admin, clientId, body.apply);
+    const res = await applyProposal(admin, clientId, body.apply, body.applyScope === "series" ? "series" : "one");
     return NextResponse.json(res, { status: res.ok ? 200 : 400 });
   }
 
@@ -287,7 +315,19 @@ export async function POST(req: NextRequest) {
   await logUsage(clientId, "chat", result.tokensIn, result.tokensOut, HAIKU_MODEL);
 
   if (!result.value) return NextResponse.json({ error: "Couldn't process that — try rephrasing." }, { status: 502 });
-  return NextResponse.json(result.value);
+
+  // If the AI proposed a write, tell the UI how many upcoming sessions use this
+  // same workout so Dustin can choose "just this session" vs "all upcoming ones".
+  const out = result.value as Reply & { series?: { count: number; label: string; date: string } };
+  if (out.proposal?.scheduled_workout_id) {
+    const { data: swRow } = await admin.from("scheduled_workouts").select("day_id, scheduled_date, days(label)").eq("id", out.proposal.scheduled_workout_id).maybeSingle();
+    const sw = swRow as { day_id: string; scheduled_date: string; days?: { label?: string } } | null;
+    if (sw) {
+      const ids = await upcomingSessionsForDay(admin, clientId, sw.day_id);
+      out.series = { count: ids.length || 1, label: sw.days?.label || "this workout", date: sw.scheduled_date };
+    }
+  }
+  return NextResponse.json(out);
 }
 
 export const dynamic = "force-dynamic";

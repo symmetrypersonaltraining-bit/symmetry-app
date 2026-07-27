@@ -10,7 +10,13 @@ import { useState } from "react";
 
 interface Change { op: string; to_exercise?: string; exercise?: string; }
 interface Proposal { scheduled_workout_id: string; reason: string; summary: string; changes: Change[]; }
-interface Turn { role: "you" | "ai"; text: string; proposal?: Proposal; applied?: boolean; }
+interface Series { count: number; label: string; date: string }
+interface Turn { role: "you" | "ai"; text: string; proposal?: Proposal; series?: Series; applied?: boolean; }
+
+function prettyDate(iso: string): string {
+  const [, m, d] = iso.split("-").map(Number);
+  return ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1] + " " + d;
+}
 
 export default function ClientWorkoutAI({ clientId, clientName }: { clientId: string; clientName?: string }) {
   const [open, setOpen] = useState(false);
@@ -35,20 +41,20 @@ export default function ClientWorkoutAI({ clientId, clientName }: { clientId: st
       if (!res.ok || !j) {
         setTurns((t) => [...t, { role: "ai", text: (j && j.error) || "Something went wrong — try again." }]);
       } else {
-        setTurns((t) => [...t, { role: "ai", text: j.reply || "(no reply)", proposal: j.proposal || undefined }]);
+        setTurns((t) => [...t, { role: "ai", text: j.reply || "(no reply)", proposal: j.proposal || undefined, series: j.series || undefined }]);
       }
     } catch {
       setTurns((t) => [...t, { role: "ai", text: "Network error — try again." }]);
     } finally { setBusy(false); }
   }
 
-  async function apply(idx: number, proposal: Proposal) {
+  async function apply(idx: number, proposal: Proposal, applyScope: "one" | "series") {
     if (applyingIdx != null) return;
     setApplyingIdx(idx);
     try {
       const res = await fetch("/api/workout-assist", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, apply: proposal }),
+        body: JSON.stringify({ clientId, apply: proposal, applyScope }),
       });
       const j = await res.json().catch(() => null);
       if (res.ok && j?.ok) {
@@ -92,9 +98,17 @@ export default function ClientWorkoutAI({ clientId, clientName }: { clientId: st
                       {t.proposal.reason && <div style={{ fontSize: 11.5, color: "var(--brand-text-secondary)", marginBottom: 10 }}>Why: {t.proposal.reason}</div>}
                       {t.applied ? (
                         <div style={{ fontSize: 12.5, fontWeight: 800, color: "#16A34A" }}>✓ Applied to {first}&rsquo;s workout</div>
+                      ) : t.series && t.series.count > 1 ? (
+                        <div>
+                          <div style={{ fontSize: 11.5, color: "var(--brand-text-secondary)", marginBottom: 7 }}>Apply to just this session, or all {t.series.count} upcoming {t.series.label} sessions?</div>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button onClick={() => apply(i, t.proposal!, "one")} disabled={applyingIdx != null} style={{ fontSize: 12.5, fontWeight: 800, padding: "9px 14px", borderRadius: 10, border: "1px solid var(--brand-primary)", background: "var(--brand-surface)", color: "var(--brand-primary)", cursor: "pointer", opacity: applyingIdx != null ? 0.6 : 1 }}>{applyingIdx === i ? "…" : `Just ${prettyDate(t.series.date)}`}</button>
+                            <button onClick={() => apply(i, t.proposal!, "series")} disabled={applyingIdx != null} style={{ fontSize: 12.5, fontWeight: 800, padding: "9px 14px", borderRadius: 10, border: "none", background: "var(--brand-primary)", color: "#fff", cursor: "pointer", opacity: applyingIdx != null ? 0.6 : 1 }}>{applyingIdx === i ? "Applying…" : `All ${t.series.count} sessions`}</button>
+                          </div>
+                        </div>
                       ) : (
                         <div style={{ display: "flex", gap: 8 }}>
-                          <button onClick={() => apply(i, t.proposal!)} disabled={applyingIdx != null} style={{ fontSize: 13, fontWeight: 800, padding: "9px 16px", borderRadius: 10, border: "none", background: "var(--brand-primary)", color: "#fff", cursor: "pointer", opacity: applyingIdx != null ? 0.6 : 1 }}>{applyingIdx === i ? "Applying…" : "Apply to " + first + "'s workout"}</button>
+                          <button onClick={() => apply(i, t.proposal!, "one")} disabled={applyingIdx != null} style={{ fontSize: 13, fontWeight: 800, padding: "9px 16px", borderRadius: 10, border: "none", background: "var(--brand-primary)", color: "#fff", cursor: "pointer", opacity: applyingIdx != null ? 0.6 : 1 }}>{applyingIdx === i ? "Applying…" : "Apply to " + first + "'s workout"}</button>
                         </div>
                       )}
                     </div>
