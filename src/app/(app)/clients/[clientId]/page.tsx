@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import ClientProfileTabs from "./ClientProfileTabs";
 import PlateauSpotter from "@/components/PlateauSpotter";
+import ClientWorkoutAI from "@/components/ClientWorkoutAI";
 import InviteClientButton from "./InviteClientButton";
 import ResetCredentialsButton from "./ResetCredentialsButton";
 
@@ -138,6 +139,11 @@ export default async function ClientProfilePage({
 
       {/* Trainer-only coaching hint. Renders nothing when nothing is flagged. */}
       <PlateauSpotter clientId={clientId} />
+
+      {/* AI workout assist — review/adjust this client's scheduled sessions */}
+      <div className="px-4 pt-4">
+        <ClientWorkoutAI clientId={clientId} clientName={client.name} />
+      </div>
 
       <ClientProfileTabs
         client={client as any}
