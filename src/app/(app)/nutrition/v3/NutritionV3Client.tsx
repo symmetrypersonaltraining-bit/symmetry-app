@@ -1301,16 +1301,28 @@ export default function NutritionV3Client(props: Props) {
             : "var(--brand-border)";
           // Full itemized contents for this row — every item on its own line
           // (plan meal's items, or the active custom/option/built-slot items).
-          const itemList: { label: string; free?: boolean }[] =
+          // Apply this row's per-item amount overrides so the displayed amount
+          // matches the macros (which planMealMacros already scales by the same
+          // overrides). Without this the line showed the plan amount while the
+          // subtotal used the edited amount — e.g. rice set to 0 read "67.5 g"
+          // with 0C. An override of 0 = the item was removed for this day.
+          const rowOv = row.log?.item_overrides || null;
+          const rowHasOv = !!(rowOv && Object.keys(rowOv).some((k) => !k.startsWith("__")));
+          const itemList: { label: string; free?: boolean; removed?: boolean }[] =
             row.kind === "plan" && row.chosen
-              ? [...(row.chosen.meal_items || [])].sort((a, b) => a.position - b.position).map((it) => ({
-                  label: it.food + (it.is_unlimited
-                    ? ""
-                    : it.amount != null
-                    ? ` — ${it.amount}${it.unit ? " " + it.unit : ""}`
-                    : it.unit ? ` — ${it.unit}` : ""),
-                  free: it.is_unlimited,
-                }))
+              ? [...(row.chosen.meal_items || [])].sort((a, b) => a.position - b.position).map((it) => {
+                  const oAmt = rowHasOv ? (rowOv![it.id] as { amount?: number } | undefined)?.amount : undefined;
+                  const amt = oAmt != null ? oAmt : it.amount;
+                  return {
+                    label: it.food + (it.is_unlimited
+                      ? ""
+                      : amt != null
+                      ? ` — ${amt}${it.unit ? " " + it.unit : ""}`
+                      : it.unit ? ` — ${it.unit}` : ""),
+                    free: it.is_unlimited,
+                    removed: oAmt === 0,
+                  };
+                })
               : row.meta?.items?.length
               ? row.meta.items.map((it) => ({ label: it.n + (it.free ? "" : it.a ? ` — ${it.a}` : ""), free: it.free }))
               : [];
@@ -1343,8 +1355,9 @@ export default function NutritionV3Client(props: Props) {
                   ) : row.kind === "openslot" && !built ? null : itemList.length ? (
                     <div className="mt-1" style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                       {itemList.map((it, k) => (
-                        <p key={k} style={{ fontSize: 12.5, lineHeight: 1.35, color: "var(--brand-text-secondary)" }}>
+                        <p key={k} style={{ fontSize: 12.5, lineHeight: 1.35, color: "var(--brand-text-secondary)", textDecoration: it.removed ? "line-through" : "none", opacity: it.removed ? 0.6 : 1 }}>
                           {it.label}
+                          {it.removed && <span style={{ marginLeft: 5, fontSize: 8.5, fontWeight: 800, background: "rgba(148,163,184,0.2)", color: "var(--brand-text-secondary)", padding: "1px 5px", borderRadius: 4, verticalAlign: "middle", textDecoration: "none" }}>removed</span>}
                           {it.free && <span style={{ marginLeft: 5, fontSize: 8.5, fontWeight: 800, background: "rgba(34,197,94,0.15)", color: GREEN, padding: "1px 5px", borderRadius: 4, verticalAlign: "middle" }}>FREE</span>}
                         </p>
                       ))}
