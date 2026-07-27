@@ -168,9 +168,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.email !== TRAINER_EMAIL) {
-    return NextResponse.json({ error: "Trainer only" }, { status: 403 });
-  }
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = admin();
   if (!db) return NextResponse.json({ error: "Not configured" }, { status: 500 });
@@ -180,6 +178,26 @@ export async function POST(req: NextRequest) {
     body = (await req.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "Bad request" }, { status: 400 });
+  }
+
+  // "join" is client-accessible: opt the caller into the named board so they
+  // show up in the challenge standings. (Everything else is trainer-only.)
+  if (body.action === "join") {
+    let cid: string | null = null;
+    const { data: c } = await supabase.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
+    cid = (c as { id: string } | null)?.id ?? null;
+    if (!cid && user.email) {
+      const { data: c2 } = await supabase.from("clients").select("id").eq("email", user.email).maybeSingle();
+      cid = (c2 as { id: string } | null)?.id ?? null;
+    }
+    if (!cid) return NextResponse.json({ error: "No client profile" }, { status: 400 });
+    await db.from("client_app_settings").upsert({ client_id: cid, leaderboard_opt_in: true }, { onConflict: "client_id" });
+    return NextResponse.json({ ok: true, optedIn: true });
+  }
+
+  // Create / end are trainer-only.
+  if (user.email !== TRAINER_EMAIL) {
+    return NextResponse.json({ error: "Trainer only" }, { status: 403 });
   }
 
   const today = CT_TODAY();

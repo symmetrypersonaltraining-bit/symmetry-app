@@ -45,11 +45,19 @@ export default function MessageNotifier() {
         const c = direct + grp;
         if (!on) return;
         if (prev.current != null && c > prev.current) {
-          const delta = c - prev.current;
-          // If the whole increase came from the group chat, deep-link to Group.
-          const groupOnly = prevGroup.current != null && grp > prevGroup.current && (grp - prevGroup.current) >= delta;
-          setText(groupOnly ? (delta > 1 ? `${delta} new group messages` : "New group message") : (delta > 1 ? `${delta} new messages` : "New message"));
-          setHref(groupOnly ? (isClientMode ? "/messages?client=group&as=client" : "/messages?client=group") : (isClientMode ? "/messages?as=client" : "/messages"));
+          // Split the increase into its group vs direct parts so a group message
+          // always deep-links to the GROUP thread, even when a direct message
+          // arrives in the same poll window (the old "entire delta must be group"
+          // rule mis-routed group notifications into the private trainer thread).
+          const prevGrp = prevGroup.current ?? 0;
+          const prevDirect = (prev.current ?? 0) - prevGrp;
+          const groupDelta = grp - prevGrp;
+          const directDelta = direct - prevDirect;
+          // Route to Group when group got new messages and they're at least as
+          // many as any new direct ones (community messages win ties).
+          const toGroup = groupDelta > 0 && groupDelta >= directDelta;
+          setText(toGroup ? (groupDelta > 1 ? `${groupDelta} new group messages` : "New group message") : (directDelta > 1 ? `${directDelta} new messages` : "New message"));
+          setHref(toGroup ? (isClientMode ? "/messages?client=group&as=client" : "/messages?client=group") : (isClientMode ? "/messages?as=client" : "/messages"));
           setShow(true);
           if (hideTimer.current) clearTimeout(hideTimer.current);
           hideTimer.current = setTimeout(() => setShow(false), 6000);

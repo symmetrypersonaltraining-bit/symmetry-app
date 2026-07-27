@@ -463,8 +463,12 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
     // bottom while only the message list scrolls between them. Previously the
     // root was height:100% with no bounded parent, so the whole page scrolled
     // and the toggle scrolled out of reach.
-    <div style={{ background: "var(--brand-bg)", height: "calc(100dvh - 150px)", minHeight: 320, display: "flex", flexDirection: "column" }}>
-      <div style={{ flexShrink: 0, display: "flex", gap: 8, padding: "8px 12px 10px", borderBottom: "1px solid var(--brand-border)", background: "var(--brand-bg)" }}>
+    <div style={{ background: "var(--brand-bg)", height: "calc(100dvh - 150px - env(safe-area-inset-bottom, 0px))", maxHeight: "calc(100dvh - 150px - env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column" }}>
+      {/* Toggle pinned at the very top of the pane. sticky top:0 keeps it visible
+          even if a short viewport causes any page scroll (previously minHeight:320
+          forced the pane taller than small screens and slid this row up under the
+          app's sticky header). */}
+      <div style={{ position: "sticky", top: 0, zIndex: 6, flexShrink: 0, display: "flex", gap: 8, padding: "8px 12px 10px", borderBottom: "1px solid var(--brand-border)", background: "var(--brand-bg)" }}>
         {/* Carry ?as=client + disable prefetch so the SERVER renders the client
             branch (not the trainer inbox) on first render, and Next can't serve
             a stale prefetched trainer-mode render. */}
