@@ -1,0 +1,139 @@
+// Shared workout-adjustment engine. Used by /api/workout-assist and the
+// in-app agent (/api/agent) so a client's SCHEDULED workout can be changed
+// (swap / modify / remove / add) without ever touching the master library:
+// when the target day is a shared library day it is cloned into a client-owned
+// copy (days.client_owner_id) and only that client's scheduled_workouts row(s)
+// are repointed at the clone.
+
+import { Db } from "@/lib/ai/scope";
+
+export const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+
+export interface Change {
+  op: string; // swap | modify | remove | add
+  pe_id?: string; section_id?: string;
+  to_exercise?: string; exercise?: string; type?: string;
+  sets?: number | null; reps?: string | null; load?: string | null; duration?: string | null; note?: string | null;
+}
+export interface Proposal { scheduled_workout_id: string; reason: string; summary: string; changes: Change[]; }
+
+export interface PeRow { id: string; position: number; sets: number | null; volume_type: string | null; volume_value: string | null; unilateral: boolean | null; tempo: string | null; load_descriptor: string | null; cue: string | null; rest: string | null; superset_group: string | null; tracked_fields: string[] | null; exercise_id: string; exercises?: { name?: string } | null; }
+export interface SecRow { id: string; internal_name: string | null; client_facing_name: string | null; position: number; prescribed_exercises: PeRow[]; }
+export interface DayRow { id: string; phase_id: string | null; label: string | null; position: number | null; client_owner_id: string | null; sections: SecRow[]; }
+
+export async function loadDayTree(db: Db, dayId: string): Promise<DayRow | null> {
+  const { data } = await db.from("days").select(`
+    id, phase_id, label, position, client_owner_id,
+    sections(id, internal_name, client_facing_name, position,
+      prescribed_exercises(id, position, sets, volume_type, volume_value, unilateral, tempo, load_descriptor, cue, rest, superset_group, tracked_fields, exercise_id, exercises(name)))
+  `).eq("id", dayId).maybeSingle();
+  return (data as unknown as DayRow) || null;
+}
+
+export async function resolveExerciseId(db: Db, clientId: string, name: string): Promise<string | null> {
+  const { data: found } = await db.from("exercises").select("id").ilike("name", name).limit(1);
+  if (found && found[0]) return (found[0] as { id: string }).id;
+  const { data: ins } = await db.from("exercises").insert({ name, client_owner_id: clientId, created_by: "trainer_ai", availability_status: "available" }).select("id").single();
+  if (ins) return (ins as { id: string }).id;
+  const { data: again } = await db.from("exercises").select("id").ilike("name", name).limit(1);
+  return again && again[0] ? (again[0] as { id: string }).id : null;
+}
+
+export function trackingFor(type: string | undefined, reps: string | null, duration: string | null): { tracked: string[]; volume_type: string; volume_value: string | null } {
+  if (type === "time") return { tracked: ["time"], volume_type: "duration", volume_value: duration || "1 min" };
+  if (type === "reps") return { tracked: ["reps"], volume_type: (reps || "").includes("-") ? "rep_range" : "reps", volume_value: reps || "10" };
+  return { tracked: ["weight", "reps"], volume_type: (reps || "").includes("-") ? "rep_range" : "reps", volume_value: reps || "8-12" };
+}
+
+export async function upcomingSessionsForDay(db: Db, clientId: string, dayId: string): Promise<string[]> {
+  const today = CT_TODAY();
+  const { data } = await db.from("scheduled_workouts").select("id").eq("client_id", clientId).eq("day_id", dayId).eq("status", "scheduled").is("deleted_at", null).gte("scheduled_date", today);
+  return ((data as { id: string }[]) || []).map((s) => s.id);
+}
+
+// Apply a proposal, scoped to one session or the whole series. Never edits a
+// shared library day: clones it into a client-owned copy first.
+export async function applyProposal(db: Db, clientId: string, proposal: Proposal, scope: "one" | "series"): Promise<{ ok: boolean; message: string }> {
+  const { data: swRow } = await db.from("scheduled_workouts").select("id, day_id, client_id").eq("id", proposal.scheduled_workout_id).maybeSingle();
+  const sw = swRow as { id: string; day_id: string; client_id: string } | null;
+  if (!sw || sw.client_id !== clientId) return { ok: false, message: "That scheduled workout wasn't found for this client." };
+
+  const orig = await loadDayTree(db, sw.day_id);
+  if (!orig) return { ok: false, message: "Couldn't load the workout to adjust." };
+
+  const seriesIds = await upcomingSessionsForDay(db, clientId, sw.day_id);
+  const targetSwIds = scope === "series" ? (seriesIds.length ? seriesIds : [sw.id]) : [sw.id];
+
+  const isLibrary = orig.client_owner_id !== clientId;
+  const mustClone = isLibrary || (scope === "one" && seriesIds.filter((id) => id !== sw.id).length > 0);
+
+  const secMap = new Map<string, string>();
+  const peMap = new Map<string, string>();
+  let targetDayId = orig.id;
+
+  if (mustClone) {
+    const { data: dayRow, error: dayErr } = await db.from("days").insert({
+      phase_id: orig.phase_id, label: (orig.label || "Workout") + " (adjusted)", position: orig.position ?? 1,
+      swappable: false, client_owner_id: clientId, created_by: "trainer_ai", origin: "ai_adjust",
+    }).select("id").single();
+    if (dayErr || !dayRow) return { ok: false, message: "Couldn't create the client copy to adjust." };
+    targetDayId = (dayRow as { id: string }).id;
+    for (const s of (orig.sections || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0))) {
+      const { data: secRow } = await db.from("sections").insert({
+        day_id: targetDayId, internal_name: s.internal_name, client_facing_name: s.client_facing_name, position: s.position,
+      }).select("id").single();
+      if (!secRow) continue;
+      const newSecId = (secRow as { id: string }).id;
+      secMap.set(s.id, newSecId);
+      for (const pe of (s.prescribed_exercises || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0))) {
+        const { data: peRow } = await db.from("prescribed_exercises").insert({
+          section_id: newSecId, exercise_id: pe.exercise_id, position: pe.position, sets: pe.sets,
+          volume_type: pe.volume_type, volume_value: pe.volume_value, unilateral: pe.unilateral, tempo: pe.tempo,
+          load_descriptor: pe.load_descriptor, cue: pe.cue, rest: pe.rest, superset_group: pe.superset_group, tracked_fields: pe.tracked_fields,
+        }).select("id").single();
+        if (peRow) peMap.set(pe.id, (peRow as { id: string }).id);
+      }
+    }
+    await db.from("scheduled_workouts").update({ day_id: targetDayId }).in("id", targetSwIds);
+  } else {
+    for (const s of orig.sections || []) { secMap.set(s.id, s.id); for (const pe of s.prescribed_exercises || []) peMap.set(pe.id, pe.id); }
+  }
+
+  let applied = 0;
+  for (const ch of proposal.changes) {
+    try {
+      if (ch.op === "remove" && ch.pe_id) {
+        const id = peMap.get(ch.pe_id); if (!id) continue;
+        await db.from("prescribed_exercises").delete().eq("id", id); applied++;
+      } else if (ch.op === "modify" && ch.pe_id) {
+        const id = peMap.get(ch.pe_id); if (!id) continue;
+        const upd: Record<string, unknown> = {};
+        if (ch.sets != null) upd.sets = ch.sets;
+        if (ch.reps) { upd.volume_value = ch.reps; upd.volume_type = ch.reps.includes("-") ? "rep_range" : "reps"; }
+        if (ch.load) upd.load_descriptor = ch.load;
+        if (ch.note) upd.cue = ch.note;
+        if (Object.keys(upd).length) { await db.from("prescribed_exercises").update(upd).eq("id", id); applied++; }
+      } else if (ch.op === "swap" && ch.pe_id && ch.to_exercise) {
+        const id = peMap.get(ch.pe_id); if (!id) continue;
+        const exId = await resolveExerciseId(db, clientId, ch.to_exercise); if (!exId) continue;
+        const upd: Record<string, unknown> = { exercise_id: exId };
+        if (ch.sets != null) upd.sets = ch.sets;
+        if (ch.reps) { upd.volume_value = ch.reps; upd.volume_type = ch.reps.includes("-") ? "rep_range" : "reps"; }
+        if (ch.note) upd.cue = ch.note;
+        await db.from("prescribed_exercises").update(upd).eq("id", id); applied++;
+      } else if (ch.op === "add" && ch.section_id && ch.exercise) {
+        const secId = secMap.get(ch.section_id); if (!secId) continue;
+        const exId = await resolveExerciseId(db, clientId, ch.exercise); if (!exId) continue;
+        const { data: posRow } = await db.from("prescribed_exercises").select("position").eq("section_id", secId).order("position", { ascending: false }).limit(1);
+        const nextPos = ((posRow && posRow[0] ? (posRow[0] as { position: number }).position : 0) || 0) + 1;
+        const t = trackingFor(ch.type, ch.reps ?? null, ch.duration ?? null);
+        await db.from("prescribed_exercises").insert({ section_id: secId, exercise_id: exId, position: nextPos, sets: ch.sets ?? 3, volume_type: t.volume_type, volume_value: t.volume_value, tracked_fields: t.tracked, cue: ch.note });
+        applied++;
+      }
+    } catch (e) { console.error("workoutAdjust apply change error", e); }
+  }
+  if (!applied) return { ok: false, message: "No changes could be applied — the workout may have changed. Try again." };
+  const nSessions = targetSwIds.length;
+  const where = scope === "series" && nSessions > 1 ? ` across all ${nSessions} upcoming sessions of this workout` : " for this session";
+  return { ok: true, message: (proposal.summary ? proposal.summary + " —" : `Applied ${applied} change${applied === 1 ? "" : "s"}`) + ` done${where}. The library is untouched.` };
+}

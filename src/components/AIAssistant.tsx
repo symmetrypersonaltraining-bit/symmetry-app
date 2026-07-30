@@ -81,37 +81,30 @@ export default function AIAssistant() {
     setLoading(true);
 
     try {
-      if (focusWorkoutId) {
-        // Workout-aware: pulls the workout Dustin is viewing + its client, can adjust it.
-        const res = await fetch("/api/workout-assist", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text.trim(), focusWorkoutId }),
-        });
-        const data = await res.json().catch(() => null);
-        if (!res.ok || !data) { setError((data && data.error) || "AI assistant unavailable. Try again."); return; }
-        if (data.error) setError(data.error);
-        else setMessages(prev => [...prev, { role: "assistant", content: data.reply || "(no reply)", proposal: data.proposal || undefined, series: data.series || undefined }]);
-      } else {
-        const res = await fetch("/api/ai-assistant", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: updated, context: getContext() }),
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          setError(errData.error || "AI assistant unavailable. Please try again later.");
-          return;
-        }
-        const data = await res.json();
-        if (data.error) setError(data.error);
-        else setMessages(prev => [...prev, { role: "assistant", content: data.message }]);
+      // Full agent for the trainer: can look up any client and read/adjust
+      // anything (esp. programming) via tools. Passes what he's currently
+      // viewing so it can act on the workout/page in front of him.
+      const endpoint = isTrainer ? "/api/agent" : "/api/ai-assistant";
+      const pageContext = `Current page: ${pathname}.` + (focusWorkoutId ? ` Currently viewing scheduled workout id ${focusWorkoutId}.` : "");
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(isTrainer ? { messages: updated, pageContext } : { messages: updated, context: getContext() }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || "AI assistant unavailable. Please try again later.");
+        return;
       }
+      const data = await res.json();
+      if (data.error) setError(data.error);
+      else setMessages(prev => [...prev, { role: "assistant", content: data.message }]);
     } catch {
       setError("Connection error. Try again.");
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, getContext, focusWorkoutId]);
+  }, [messages, loading, getContext, focusWorkoutId, isTrainer, pathname]);
 
   const applyChange = useCallback(async (idx: number, proposal: Proposal, applyScope: "one" | "series") => {
     if (applyingIdx != null) return;
