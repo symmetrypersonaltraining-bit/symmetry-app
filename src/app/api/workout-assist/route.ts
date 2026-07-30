@@ -137,25 +137,36 @@ async function loadDayTree(db: Db, dayId: string): Promise<DayRow | null> {
   return (data as unknown as DayRow) || null;
 }
 
-async function buildContext(db: Db, clientId: string): Promise<string> {
+async function buildContext(db: Db, clientId: string, focusSwId?: string | null): Promise<string> {
   const today = CT_TODAY();
   const [clientRes, swRes] = await Promise.all([
     db.from("clients").select("name, primary_goal, injuries_limitations, injuries").eq("id", clientId).maybeSingle(),
     db.from("scheduled_workouts").select("id, scheduled_date, status, day_id").eq("client_id", clientId).is("deleted_at", null).eq("status", "scheduled").gte("scheduled_date", today).order("scheduled_date").limit(8),
   ]);
   const c = clientRes.data as { name?: string; primary_goal?: string; injuries_limitations?: string; injuries?: string } | null;
-  const sws = (swRes.data as { id: string; scheduled_date: string; day_id: string }[]) || [];
+  let sws = (swRes.data as { id: string; scheduled_date: string; day_id: string }[]) || [];
+
+  // The workout Dustin is currently viewing — pull it in even if it isn't in the
+  // upcoming window (e.g. today's in-progress session), and float it to the top.
+  if (focusSwId) {
+    if (!sws.some((s) => s.id === focusSwId)) {
+      const { data: f } = await db.from("scheduled_workouts").select("id, scheduled_date, status, day_id").eq("id", focusSwId).eq("client_id", clientId).maybeSingle();
+      if (f) sws.unshift(f as { id: string; scheduled_date: string; day_id: string });
+    }
+    sws = [...sws.filter((s) => s.id === focusSwId), ...sws.filter((s) => s.id !== focusSwId)];
+  }
 
   const lines: string[] = [`Today: ${today}`];
   if (c?.name) lines.push(`Client: ${c.name}${c.primary_goal ? ` — goal: ${c.primary_goal}` : ""}`);
   const inj = [c?.injuries_limitations, c?.injuries].filter(Boolean).join("; ");
   if (inj) lines.push(`Known injuries/limitations: ${inj}`);
+  if (focusSwId) lines.push(`Dustin is CURRENTLY VIEWING the workout marked 👉 below — default to acting on THAT workout unless he says otherwise.`);
   if (!sws.length) { lines.push("No upcoming scheduled workouts on file."); return lines.join("\n"); }
 
-  lines.push("\nUPCOMING SCHEDULED WORKOUTS (reference these exact ids in any proposal):");
+  lines.push("\nSCHEDULED WORKOUTS (reference these exact ids in any proposal):");
   for (const sw of sws) {
     const day = await loadDayTree(db, sw.day_id);
-    lines.push(`\n[SW-id ${sw.id}] ${sw.scheduled_date} — ${day?.label || "workout"}`);
+    lines.push(`\n${sw.id === focusSwId ? "👉 CURRENTLY VIEWING — " : ""}[SW-id ${sw.id}] ${sw.scheduled_date} — ${day?.label || "workout"}`);
     const secs = (day?.sections || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0));
     for (const s of secs) {
       lines.push(`  Section "${s.client_facing_name || s.internal_name}" (section_id ${s.id}):`);
@@ -276,19 +287,27 @@ async function applyProposal(db: Db, clientId: string, proposal: Proposal, scope
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) return missingKeyResponse();
 
-  let body: { clientId?: string | null; message?: string; apply?: Proposal; applyScope?: "one" | "series" };
+  let body: { clientId?: string | null; message?: string; apply?: Proposal; applyScope?: "one" | "series"; focusWorkoutId?: string | null };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
 
   const scoped = await resolveAiScope(body.clientId ?? null);
   if (!scoped.ok) return scoped.response;
   const { scope } = scoped;
   if (!scope.isTrainer) return NextResponse.json({ error: "Trainer only" }, { status: 403 });
-  if (!scope.clientId) return NextResponse.json({ error: "Pick a client first." }, { status: 400 });
-  const clientId = scope.clientId;
 
   // Writes use the admin client (RLS-exempt), scoped explicitly to this client.
   const admin = createAdminClient() as unknown as Db;
   if (!admin) return NextResponse.json({ error: "Not configured" }, { status: 500 });
+
+  // When the trainer is viewing a specific workout (header AI on /workout/<id>),
+  // derive the client from that scheduled workout so no client picker is needed.
+  let clientId = scope.clientId;
+  if (body.focusWorkoutId) {
+    const { data: fsw } = await admin.from("scheduled_workouts").select("client_id").eq("id", body.focusWorkoutId).maybeSingle();
+    const fc = (fsw as { client_id?: string } | null)?.client_id;
+    if (fc) clientId = fc;
+  }
+  if (!clientId) return NextResponse.json({ error: "Pick a client first — or open a client's workout so I know who this is for." }, { status: 400 });
 
   // ── Apply phase ──
   if (body.apply && body.apply.scheduled_workout_id && Array.isArray(body.apply.changes)) {
@@ -303,7 +322,7 @@ export async function POST(req: NextRequest) {
   const metered = await enforceMeter(clientId, "chat");
   if (metered) return metered;
 
-  const context = await buildContext(admin, clientId);
+  const context = await buildContext(admin, clientId, body.focusWorkoutId ?? null);
   const result = await callClaudeJson({
     apiKey: process.env.ANTHROPIC_API_KEY,
     model: HAIKU_MODEL,

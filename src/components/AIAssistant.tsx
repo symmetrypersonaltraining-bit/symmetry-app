@@ -5,9 +5,20 @@ import { startDictation } from "@/lib/dictation";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 
+interface Change { op: string }
+interface Proposal { scheduled_workout_id: string; reason: string; summary: string; changes: Change[] }
+interface Series { count: number; label: string; date: string }
 interface Message {
   role: "user" | "assistant";
   content: string;
+  proposal?: Proposal;
+  series?: Series;
+  applied?: boolean;
+}
+
+function prettyDate(iso: string): string {
+  const p = iso.split("-").map(Number);
+  return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][p[1] - 1] + " " + p[2];
 }
 
 // Extend Window for Web Speech API
@@ -40,10 +51,14 @@ export default function AIAssistant() {
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [applyingIdx, setApplyingIdx] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const pathname = usePathname();
+  // On a workout page (/workout/<scheduled-workout-id>) the assistant becomes a
+  // workout-aware programming partner scoped to THAT workout + its client.
+  const focusWorkoutId = (() => { const m = (pathname || "").match(/^\/workout\/([^/?#]+)/); return m ? m[1] : null; })();
 
   useEffect(() => {
     if (open) {
@@ -66,28 +81,57 @@ export default function AIAssistant() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/ai-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: updated, context: getContext() }),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        setError(errData.error || "AI assistant unavailable. Please try again later.");
-        return;
-      }
-      const data = await res.json();
-      if (data.error) {
-        setError(data.error);
+      if (focusWorkoutId) {
+        // Workout-aware: pulls the workout Dustin is viewing + its client, can adjust it.
+        const res = await fetch("/api/workout-assist", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text.trim(), focusWorkoutId }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data) { setError((data && data.error) || "AI assistant unavailable. Try again."); return; }
+        if (data.error) setError(data.error);
+        else setMessages(prev => [...prev, { role: "assistant", content: data.reply || "(no reply)", proposal: data.proposal || undefined, series: data.series || undefined }]);
       } else {
-        setMessages(prev => [...prev, { role: "assistant", content: data.message }]);
+        const res = await fetch("/api/ai-assistant", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: updated, context: getContext() }),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          setError(errData.error || "AI assistant unavailable. Please try again later.");
+          return;
+        }
+        const data = await res.json();
+        if (data.error) setError(data.error);
+        else setMessages(prev => [...prev, { role: "assistant", content: data.message }]);
       }
     } catch {
       setError("Connection error. Try again.");
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, getContext]);
+  }, [messages, loading, getContext, focusWorkoutId]);
+
+  const applyChange = useCallback(async (idx: number, proposal: Proposal, applyScope: "one" | "series") => {
+    if (applyingIdx != null) return;
+    setApplyingIdx(idx);
+    try {
+      const res = await fetch("/api/workout-assist", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apply: proposal, applyScope, focusWorkoutId }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.ok) {
+        setMessages(prev => prev.map((m, i) => (i === idx ? { ...m, applied: true } : m)));
+        setMessages(prev => [...prev, { role: "assistant", content: "✅ " + (data.message || "Applied.") }]);
+      } else {
+        setMessages(prev => [...prev, { role: "assistant", content: (data && data.message) || "Couldn't apply that — try again." }]);
+      }
+    } catch {
+      setMessages(prev => [...prev, { role: "assistant", content: "Network error applying the change — try again." }]);
+    } finally { setApplyingIdx(null); }
+  }, [applyingIdx, focusWorkoutId]);
 
   const startVoice = useCallback(() => {
     // Unified dictation: works in the native app (Capacitor speech plugin) AND
@@ -224,26 +268,48 @@ export default function AIAssistant() {
               )}
 
               {messages.map((m, i) => (
-                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  {m.role === "assistant" && (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center mr-2 mt-1 flex-shrink-0"
-                      style={{ background: "var(--brand-primary)" }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
-                        <path d="M12 16v-4M12 8h.01"/>
-                      </svg>
+                <div key={i}>
+                  <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                    {m.role === "assistant" && (
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center mr-2 mt-1 flex-shrink-0"
+                        style={{ background: "var(--brand-primary)" }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                          <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
+                          <path d="M12 16v-4M12 8h.01"/>
+                        </svg>
+                      </div>
+                    )}
+                    <div
+                      className="max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap leading-relaxed"
+                      style={{
+                        background: m.role === "user" ? "var(--brand-primary)" : "var(--brand-card)",
+                        color: m.role === "user" ? "white" : "var(--brand-text)",
+                        borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "4px 18px 18px 18px",
+                      }}
+                    >
+                      {m.content}
+                    </div>
+                  </div>
+                  {m.proposal && (
+                    <div className="ml-9 mt-2 rounded-xl p-3" style={{ background: "color-mix(in srgb, var(--brand-primary) 7%, transparent)", border: "1px solid var(--brand-primary)" }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 800, color: "var(--brand-primary)", letterSpacing: 0.3, marginBottom: 4 }}>PROPOSED CHANGE</div>
+                      <div style={{ fontSize: 12.5, color: "var(--brand-text)", lineHeight: 1.5, marginBottom: 4 }}>{m.proposal.summary}</div>
+                      {m.proposal.reason && <div style={{ fontSize: 11, color: "var(--brand-text-secondary)", marginBottom: 9 }}>Why: {m.proposal.reason}</div>}
+                      {m.applied ? (
+                        <div style={{ fontSize: 12, fontWeight: 800, color: "#16A34A" }}>✓ Applied</div>
+                      ) : m.series && m.series.count > 1 ? (
+                        <div>
+                          <div style={{ fontSize: 11, color: "var(--brand-text-secondary)", marginBottom: 6 }}>Just this session, or all {m.series.count} upcoming {m.series.label} sessions?</div>
+                          <div className="flex gap-2 flex-wrap">
+                            <button onClick={() => applyChange(i, m.proposal!, "one")} disabled={applyingIdx != null} style={{ fontSize: 12, fontWeight: 800, padding: "8px 12px", borderRadius: 9, border: "1px solid var(--brand-primary)", background: "var(--brand-surface)", color: "var(--brand-primary)", cursor: "pointer" }}>{applyingIdx === i ? "…" : `Just ${prettyDate(m.series.date)}`}</button>
+                            <button onClick={() => applyChange(i, m.proposal!, "series")} disabled={applyingIdx != null} style={{ fontSize: 12, fontWeight: 800, padding: "8px 12px", borderRadius: 9, border: "none", background: "var(--brand-primary)", color: "#fff", cursor: "pointer" }}>{applyingIdx === i ? "Applying…" : `All ${m.series.count} sessions`}</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => applyChange(i, m.proposal!, "one")} disabled={applyingIdx != null} style={{ fontSize: 12.5, fontWeight: 800, padding: "8px 14px", borderRadius: 9, border: "none", background: "var(--brand-primary)", color: "#fff", cursor: "pointer" }}>{applyingIdx === i ? "Applying…" : "Apply change"}</button>
+                      )}
                     </div>
                   )}
-                  <div
-                    className="max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap leading-relaxed"
-                    style={{
-                      background: m.role === "user" ? "var(--brand-primary)" : "var(--brand-card)",
-                      color: m.role === "user" ? "white" : "var(--brand-text)",
-                      borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "4px 18px 18px 18px",
-                    }}
-                  >
-                    {m.content}
-                  </div>
                 </div>
               ))}
 
@@ -284,7 +350,7 @@ export default function AIAssistant() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-                placeholder="Ask anything about trainingÃ¢ÂÂ¦"
+                placeholder={focusWorkoutId ? "Ask or adjust this workout…" : "Ask anything about training…"}
                 className="flex-1 text-sm px-3.5 py-2.5 rounded-xl outline-none"
                 style={{
                   background: "var(--brand-bg)",
