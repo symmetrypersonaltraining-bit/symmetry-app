@@ -406,7 +406,7 @@ function SwapModal({ pe, onClose, onSwap }: { pe: PrescribedExercise; onClose: (
       setLoading(true);
       const { data } = await supabase
         .from("exercises")
-        .select("id, name, modality, muscle_group, equipment_required")
+        .select("id, name, modality, muscle_group, equipment_required, video_url")
         .ilike("name", `%${query}%`)
         .is("client_owner_id", null)
         .limit(30);
