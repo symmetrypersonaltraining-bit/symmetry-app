@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import GroceryListSheet from "./GroceryListSheet";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 import { useKeyboardInset, scrollFocusedIntoView } from "@/lib/useKeyboardInset";
+import { adherencePct } from "@/lib/nutrition/dailyTotals";
 
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
@@ -12,13 +13,16 @@ interface MealPlan { id: string; version_number: number; meals: Meal[]; }
 interface AdherenceLog { id: string; meal_id: string | null; meal_position: number; adherence: string; off_plan_details: string | null; notes: string | null; est_kcal: number | null; est_protein: number | null; est_carbs: number | null; est_fats: number | null; food_id?: string | null; servings?: number | null; macros_pending?: boolean | null; item_overrides?: Record<string, any> | null; photo_url?: string | null; }
 interface MacroTarget { calories: number; protein: number; carbs: number; fats: number; }
 
+// The chip row only. Deliberately carries NO pct \u2014 proration comes from
+// adhMeta() below, which reads the canonical weights. A second set of numbers
+// here is exactly how the totals drifted before.
 const ADHERENCE_OPTIONS = [
-  { key: "1/4",        label: "\u00bc",        color: "#ef4444", pct: 0.25 },
-  { key: "1/2",           label: "\u00bd",        color: "#f59e0b", pct: 0.5  },
-  { key: "3/4", label: "\u00be",        color: "#84cc16", pct: 0.75 },
-  { key: "Full",           label: "Full",     color: "#22c55e", pct: 1.0  },
-    { key: "Skipped",  label: "Skip",     color: "#6b7280", pct: 0    },
-{ key: "Off-plan",       label: "Off Plan", color: "#8b5cf6", pct: null },
+  { key: "1/4",      label: "\u00bc",    color: "#ef4444" },
+  { key: "1/2",      label: "\u00bd",    color: "#f59e0b" },
+  { key: "3/4",      label: "\u00be",    color: "#84cc16" },
+  { key: "Full",     label: "Full",      color: "#22c55e" },
+  { key: "Skipped",  label: "Skip",      color: "#6b7280" },
+  { key: "Off-plan", label: "Off Plan",  color: "#8b5cf6" },
 ];
 
 // Robust lookup for a log's adherence. Covers EVERY value the DB `adherence` CHECK
@@ -26,15 +30,22 @@ const ADHERENCE_OPTIONS = [
 // Claude or the legacy rollup) — and never returns null, so a logged meal can never
 // render as "unlogged" or drop out of the macro totals. Keep this aligned with the
 // DB constraint (Full/3-4/1-2/1-4/Partial/Off-plan/Skipped).
-const ADHERENCE_META: Record<string, { label: string; color: string; pct: number | null }> = {
-  "1/4":     { label: "¼",       color: "#ef4444", pct: 0.25 },
-  "1/2":     { label: "½",       color: "#f59e0b", pct: 0.5  },
-  "3/4":     { label: "¾",       color: "#84cc16", pct: 0.75 },
-  "Full":    { label: "Full",     color: "#22c55e", pct: 1.0  },
-  "Partial": { label: "Partial",  color: "#eab308", pct: 0.5  },
-  "Skipped": { label: "Skip",     color: "#6b7280", pct: 0    },
-  "Off-plan":{ label: "Off Plan", color: "#8b5cf6", pct: null },
+// The weights come from ADH_PCT in lib/nutrition/dailyTotals — the one place
+// adherence proration is defined. Only label + colour live here, so this table
+// can never drift away from the totals calculator.
+const ADHERENCE_LOOK: Record<string, { label: string; color: string }> = {
+  "1/4":     { label: "¼",        color: "#ef4444" },
+  "1/2":     { label: "½",        color: "#f59e0b" },
+  "3/4":     { label: "¾",        color: "#84cc16" },
+  "Full":    { label: "Full",     color: "#22c55e" },
+  "Partial": { label: "Partial",  color: "#eab308" },
+  "Skipped": { label: "Skip",     color: "#6b7280" },
+  "Off-plan":{ label: "Off Plan", color: "#8b5cf6" },
 };
+const ADHERENCE_META: Record<string, { label: string; color: string; pct: number | null }> =
+  Object.fromEntries(
+    Object.entries(ADHERENCE_LOOK).map(([k, v]) => [k, { ...v, pct: adherencePct(k) }]),
+  );
 function adhMeta(key: string | null | undefined): { label: string; color: string; pct: number | null } {
   return (key && ADHERENCE_META[key]) || { label: key || "Logged", color: "#8b5cf6", pct: null };
 }

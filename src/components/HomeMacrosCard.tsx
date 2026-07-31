@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { computeDayTotals, PlanMeal, PlanItem, LogRow } from "@/lib/nutrition/dailyTotals";
+import { computeDayTotals, adherencePct, PlanMeal, PlanItem, LogRow } from "@/lib/nutrition/dailyTotals";
 import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -94,14 +94,16 @@ export default function HomeMacrosCard() {
           }
           mealMacros[meal.id] = { p, c, f };
         }
-        const PCT: Record<string, number> = { "1/4": 0.25, "1/2": 0.5, "3/4": 0.75, "Full": 1, "Partial": 0.5, "Skipped": 0 };
+        // Weights come from the canonical ADH_PCT (via adherencePct) rather than a
+        // second copy of the numbers — an inline map here is how "1/4" once went
+        // missing and a quarter-eaten meal counted as a whole one.
         let p = 0, c = 0, f = 0, k = 0;
         for (const log of logs) {
           if (log.adherence === "Off-plan") {
             p += log.est_protein || 0; c += log.est_carbs || 0; f += log.est_fats || 0;
             k += log.est_kcal != null ? log.est_kcal : hmKcal(log.est_protein || 0, log.est_carbs || 0, log.est_fats || 0);
           } else {
-            const pct = PCT[log.adherence];
+            const pct = adherencePct(log.adherence) ?? 0;
             if (pct && log.meal_id && mealMacros[log.meal_id]) {
               const m = mealMacros[log.meal_id];
               p += m.p * pct; c += m.c * pct; f += m.f * pct; k += hmKcal(m.p, m.c, m.f) * pct;
