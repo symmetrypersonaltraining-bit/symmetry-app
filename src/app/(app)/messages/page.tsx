@@ -56,25 +56,16 @@ export default async function MessagesPage(props: {
       .not("auth_user_id", "is", null)
       .order("name");
 
-    // Only a client the trainer EXPLICITLY opened (?client=…) is "read". A
-    // client auto-selected below (latest-unread) is shown but stays UNREAD so
-    // the bell/badge stays accurate until it's actually opened.
+    // INBOX-FIRST. Only a client the trainer EXPLICITLY opened (?client=…) is
+    // selected (and marked read). We used to auto-select the latest-unread
+    // client here, which on a phone hid the conversation list entirely (it's
+    // `hidden lg:flex` as soon as something is selected) and dropped Dustin
+    // straight into a thread whose header links to the client PROFILE — so
+    // tapping "Messages" felt like it landed on the clients list instead of his
+    // message list. Unread threads already rise to the top of the list with a
+    // pulsing red row, so nothing gets missed by showing the list first.
     const explicitClientId = searchParams.client || null;
-    let selectedClientId = explicitClientId;
-  if (!selectedClientId) {
-    const { data: __latestUnread } = await supabase
-      .from("messages")
-      .select("client_id")
-      .eq("to_id", user.id)
-      .is("read_at", null)
-      .eq("is_broadcast", false)
-      .eq("is_group", false)
-      .not("client_id", "is", null)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1);
-    if (__latestUnread && __latestUnread[0] && __latestUnread[0].client_id) selectedClientId = __latestUnread[0].client_id;
-  }
+    const selectedClientId = explicitClientId;
 
     let thread: any[] = [];
   if (selectedClientId === "broadcast") {

@@ -523,7 +523,14 @@ function TimePickerSheet({ initial, onSet, onClose }: { initial: number; onSet: 
 
 const SIDE_NAME_RE = /single[\s-]?(arm|leg)|one[\s-]?(arm|leg)|1[\s-]?(arm|leg)|\bunilateral\b|each side|split squat|\bpistol\b|bulgarian|\blunges?\b|step[\s-]?up/i;
 const TIMED_NAME_RE = /plank|\bhold\b|stretch|foam roll|lacrosse ball|dead hang|wall sit|\bcarry\b|treadmill|\bbike\b|rower|elliptical|stair/i;
-const BW_NAME_RE = /push[\s-]?up|pull[\s-]?up|chin[\s-]?up|\bdips?\b|bird ?dog|dead ?bug|air squat|bodyweight|\bband\b|mini[- ]?band|mobility|superman|inchworm|bear crawl/i;
+// Movements loaded by bodyweight (or a band) that should default to REPS ONLY
+// — never a weight box. Now covers the corrective/activation menu (bridges,
+// hinges, clamshells, pelvic tilts, wall slides, quadruped drills) that Dustin
+// was having to re-set to reps by hand on every prescription.
+const BW_NAME_RE = /push[\s-]?up|pull[\s-]?up|chin[\s-]?up|\bdips?\b|bird ?dog|dead ?bug|air squat|body ?weight|\bbw\b|\bband\b|mini[- ]?band|mobility|superman|inchworm|bear crawl|bridge|hip hinge|clam ?shell|pelvic tilt|wall slide|wall angel|glute march|fire hydrant|donkey kick|hollow|sit[\s-]?up|leg raise|scapular|cat[\s-]?cow|thoracic rotation|ankle rock|activation/i;
+// A weight-bearing movement whose NAME matches BW_NAME_RE anyway (e.g.
+// "Barbell Hip Bridge", "Dumbbell Hip Hinge") must keep its weight box.
+const LOADED_NAME_RE = /barbell|dumbbell|\bdb\b|\bbb\b|kettlebell|\bkb\b|cable|machine|smith|plate|weighted|loaded|trap bar|landmine/i;
 
 function defaultTrackedFields(pe: any): string[] {
   const raw = pe?.tracked_fields;
@@ -535,7 +542,7 @@ function defaultTrackedFields(pe: any): string[] {
   let base: string[];
   if (pe?.volume_type === "duration") base = ["time"];
   else if (TIMED_NAME_RE.test(nm)) base = ["time"];
-  else if (BW_NAME_RE.test(nm)) base = ["reps"];
+  else if (BW_NAME_RE.test(nm) && !LOADED_NAME_RE.test(nm)) base = ["reps"];
   else base = ["weight", "reps"];
   return eachSide ? [...base, "each_side"] : base;
 }
@@ -1139,9 +1146,25 @@ export default function WorkoutLogger({
     });
   }, []);
 
-  const saveCardioFields = async (peId: string, nf: string[]) => {
-    setFieldCfg(prev => ({ ...prev, [peId]: nf }));
+  // Save a field config for ONE prescription, then make it the DEFAULT for this
+  // movement everywhere: every other prescription of the same exercise that has
+  // never had its fields set (tracked_fields IS NULL) inherits it. Deliberate
+  // per-prescription choices are never overwritten. This is what "default
+  // bridges to reps only" means — fix it once, it stays fixed library-wide.
+  const persistFields = async (peId: string, exerciseId: string | undefined, nf: string[]) => {
     try { await supabase.from("prescribed_exercises").update({ tracked_fields: nf }).eq("id", peId); } catch {}
+    if (!exerciseId) return;
+    try {
+      await supabase.from("prescribed_exercises")
+        .update({ tracked_fields: nf })
+        .eq("exercise_id", exerciseId)
+        .is("tracked_fields", null);
+    } catch { /* best-effort: the single-row update above already succeeded */ }
+  };
+
+  const saveCardioFields = async (peId: string, nf: string[], exerciseId?: string) => {
+    setFieldCfg(prev => ({ ...prev, [peId]: nf }));
+    await persistFields(peId, exerciseId, nf);
   };
 
   async function logSet(peId: string, si: number) {
@@ -1453,7 +1476,7 @@ export default function WorkoutLogger({
   if (sessionMode && currentExercise) {
     const peSets = sets[currentExercise.id] || [];
     const xFields = fieldCfg[currentExercise.id] || defaultTrackedFields(currentExercise);
-    const saveFields = async (nf: string[]) => { setFieldCfg(prev => ({ ...prev, [currentExercise.id]: nf })); try { await supabase.from("prescribed_exercises").update({ tracked_fields: nf }).eq("id", currentExercise.id); } catch {} };
+    const saveFields = async (nf: string[]) => { setFieldCfg(prev => ({ ...prev, [currentExercise.id]: nf })); await persistFields(currentExercise.id, (currentExercise as any).exercise_id, nf); };
     // Chip list matches the white preview: cardio gets Time/Speed/HR, strength gets
     // Weight/Reps/Time/Each side — plus any field already tracked on this exercise,
     // so the session view always shows the same fields as the edit/preview screen.
@@ -1982,7 +2005,7 @@ export default function WorkoutLogger({
                       &ldquo;{pe.cue}&rdquo;
                     </p>
                   )}
-                  {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f]); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} disabled={setEntry.done} placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} disabled={setEntry.done} placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} disabled={setEntry.done} placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { updateSet(pe.id, si, "done", false); } else { logSet(pe.id, si); } }} disabled={saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="flex items-center gap-1.5 mb-1 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["weight","Weight"],["reps","Reps"],["time","Time"],["each_side","Each side"]] as [string,string][]).map(([f, lab]) => { const on = sFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? sFields.filter((x: string) => x !== f) : [...sFields, f]); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div><div className="grid mb-2" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
+                  {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f], (pe as any).exercise_id); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} disabled={setEntry.done} placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} disabled={setEntry.done} placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} disabled={setEntry.done} placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { updateSet(pe.id, si, "done", false); } else { logSet(pe.id, si); } }} disabled={saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="flex items-center gap-1.5 mb-1 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["weight","Weight"],["reps","Reps"],["time","Time"],["each_side","Each side"]] as [string,string][]).map(([f, lab]) => { const on = sFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? sFields.filter((x: string) => x !== f) : [...sFields, f], (pe as any).exercise_id); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div><div className="grid mb-2" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
                     <div />
                     {sFields.includes("weight") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>{isPerHandLoad(pe) ? "LBS/HAND" : "LBS"}</div>}
                     {sFields.includes("reps") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>REPS</div>}
