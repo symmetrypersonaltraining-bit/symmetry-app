@@ -2,6 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getValidAccessToken, gcalFetch } from '@/lib/gcal';
+import { isCronRequest } from '@/lib/cron-auth';
+import { createClient as createServerClient } from '@/lib/supabase/server';
+import { TRAINER_EMAIL } from '@/lib/ai/scope';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -9,7 +12,6 @@ export const maxDuration = 60;
 const COLOR_CANCELLED = '6';   // orange = full cancel (cancelled_client)
 const COLOR_HALF = '3';        // grape/purple = half / vacation credit (cancelled_half) — ready, unused until Dustin uses it
 const COLOR_PAYMENT = '11';
-const CRON_SECRET = process.env.CRON_SECRET;
 
 function getAnonClient() {
   return createClient(
@@ -181,9 +183,20 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  if (CRON_SECRET && authHeader !== 'Bearer ' + CRON_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // This guard used to be `if (CRON_SECRET && authHeader !== ...)`, which fails
+  // OPEN: CRON_SECRET is unset on this project, so the check was skipped and the
+  // whole sync — which writes appointments and payment rows — was callable by
+  // anyone who knew the URL. isCronRequest fails closed instead.
+  //
+  // GcalSyncButton hits this with a plain browser GET and no secret, so a
+  // signed-in trainer is accepted too. That is not a loosening: the button
+  // already reaches the same code through POST, which has no auth of its own.
+  if (!isCronRequest(req)) {
+    const supabase = await createServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || user.email !== TRAINER_EMAIL) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
   return POST(new NextRequest(req.url, { method: 'POST', headers: req.headers }));
 }

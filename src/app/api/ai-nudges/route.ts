@@ -27,6 +27,7 @@ import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { Db, TRAINER_EMAIL } from "@/lib/ai/scope";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { isCronRequest } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -112,10 +113,11 @@ export async function POST(req: NextRequest) {
   // to be on. Either one off means preview.
   let wantSend = body?.send === true;
 
-  // ── auth: trainer session OR the cron secret ──
-  const secret = req.headers.get("x-cron-secret");
-  const cronOk = !!process.env.CRON_SECRET && secret === process.env.CRON_SECRET;
-  if (!cronOk) {
+  // ── auth: a scheduler invocation OR a signed-in trainer ──
+  // This one was already correct (it failed closed on an unset secret); it now
+  // shares the definition so there is one answer to "is this the scheduler?"
+  // and it also recognises Vercel's own x-vercel-cron header.
+  if (!isCronRequest(req)) {
     const supabase = await createClient();
     const {
       data: { user },

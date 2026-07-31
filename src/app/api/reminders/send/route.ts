@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isCronRequest } from "@/lib/cron-auth";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 const RESEND_API_URL = "https://api.resend.com/emails";
@@ -118,9 +119,15 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  // Vercel Cron endpoint (disabled for now — activate in Settings)
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Vercel Cron endpoint (still a stub — the daily 0 14 * * * entry in
+  // vercel.json hits this and gets the message below; activate in Settings).
+  //
+  // This used to compare against `Bearer ${process.env.CRON_SECRET}`. CRON_SECRET
+  // is unset on this project, so that compared against the literal string
+  // "Bearer undefined" — meaning anyone sending exactly that header
+  // authenticated, while Vercel's real scheduler did not. isCronRequest fails
+  // closed and recognises the platform's own x-vercel-cron header.
+  if (!isCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return NextResponse.json({ message: "Cron disabled — activate in Settings" });

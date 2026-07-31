@@ -28,6 +28,7 @@ import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { fetchWeeklyComparison } from "@/lib/ai/weekly-context";
 import { resolveAiScope } from "@/lib/ai/scope";
+import { isCronRequest } from "@/lib/cron-auth";
 import { WEEKLY_WRITER_RULES, weekStartOf } from "@/lib/ai/weekly-numbers";
 
 export const dynamic = "force-dynamic";
@@ -184,27 +185,9 @@ async function runSweep(opts: { onlyClientId?: string | null; today?: string }):
   return { week, today, results };
 }
 
-function authorised(req: NextRequest): boolean {
-  // A genuine Vercel cron invocation. Vercel strips client-supplied x-vercel-*
-  // headers at the edge, so this header cannot be forged from outside — it is
-  // the documented way to recognise the platform's own scheduler.
-  //
-  // This branch exists because the secret-only version was a foot-gun: when
-  // CRON_SECRET is unset, `if (!secret) return false` 401s EVERY caller,
-  // including Vercel's scheduler. The weekly sweep would have sat there every
-  // Sunday returning 401 to itself, silently, with nothing in the app to show
-  // for it. Dustin's whole ask was "i dont want to have to check on these" — a
-  // sweep that depends on someone remembering to set an env var fails that.
-  if (req.headers.get("x-vercel-cron")) return true;
-
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const auth = req.headers.get("authorization") || "";
-  if (auth === `Bearer ${secret}`) return true;
-  // Vercel cron also sends the bearer form when the secret IS set; the query
-  // form is for a manual curl.
-  return new URL(req.url).searchParams.get("secret") === secret;
-}
+// Scheduler auth lives in one place now — see src/lib/cron-auth.ts for why all
+// four cron-gated routes had four different (and two wrong) answers to it.
+const authorised = isCronRequest;
 
 export async function GET(req: NextRequest) {
   if (!authorised(req)) {
