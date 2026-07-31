@@ -33,6 +33,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [gcalBanner, setGcalBanner] = useState<string | null>(gcalStatus ?? null);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
     if (gcalBanner) {
@@ -170,9 +171,9 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
                   </a>
                 )}
               </div>
-              {gcalConnected && gcalSync && (
-                <div className="mt-3 flex gap-2">
-                  <button
+              {gcalConnected && (
+                <div className="mt-3 flex gap-2 flex-wrap">
+                  {gcalSync && <button
                     onClick={async () => {
                       const res = await fetch('/api/gcal-sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
                       const j = await res.json();
@@ -182,8 +183,8 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
                     style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", cursor: "pointer" }}
                   >
                     Sync Now
-                  </button>
-                  <button
+                  </button>}
+                  {gcalSync && <button
                     onClick={async () => {
                       if (!confirm('This will delete all app calendar events and re-sync from Google Calendar. Continue?')) return;
                       const res = await fetch('/api/gcal-sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reset: true }) });
@@ -194,6 +195,29 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
                     style={{ background: "rgba(248,113,113,.1)", border: "1px solid #f87171", color: "#f87171", cursor: "pointer" }}
                   >
                     Reset &amp; Re-sync
+                  </button>}
+                  {/* Rotating the Google credential used to mean finding this
+                      app by name on Google's Linked apps page, which never had
+                      a name to find. This revokes the grant at Google and
+                      clears the stored tokens in one action. */}
+                  <button
+                    onClick={async () => {
+                      if (!confirm('Disconnect Google Calendar?\n\nThis revokes the app\'s access at Google and deletes the stored token. Existing appointments stay in the app, but nothing will sync until you reconnect.')) return;
+                      setDisconnecting(true);
+                      try {
+                        const res = await fetch('/api/auth/google/disconnect', { method: 'POST' });
+                        const j = await res.json();
+                        if (j.ok) { alert('Disconnected. Tap Connect to authorize again with a fresh token.'); router.refresh(); }
+                        else { alert('Disconnect failed: ' + (j.error ?? 'unknown error')); }
+                      } finally {
+                        setDisconnecting(false);
+                      }
+                    }}
+                    disabled={disconnecting}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                    style={{ background: "transparent", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)", cursor: "pointer", opacity: disconnecting ? 0.5 : 1 }}
+                  >
+                    {disconnecting ? 'Disconnecting…' : 'Disconnect'}
                   </button>
                 </div>
               )}
