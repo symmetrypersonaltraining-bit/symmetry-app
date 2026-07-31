@@ -15,7 +15,16 @@ interface SidebarItem {
 
 const TRAINER_NAV: SidebarItem[] = [
   { href: "/home", label: "Home", icon: "ti-home" },
-  { href: "/schedule", label: "Schedule", icon: "ti-calendar" },
+  {
+    label: "Schedule",
+    icon: "ti-calendar",
+    children: [
+      { href: "/schedule", label: "Calendar", icon: "ti-calendar" },
+      // The detector has been filing proposals every 12h with no way to read
+      // them outside a SQL query. 80 had accumulated unseen.
+      { href: "/schedule/proposals", label: "Proposals", icon: "ti-git-pull-request" },
+    ],
+  },
   { href: "/clients", label: "Clients", icon: "ti-users" },
   { href: "/movement/testers", label: "Movement", icon: "ti-scan" },
   { href: "/messages", label: "Messages", icon: "ti-message-circle" },
