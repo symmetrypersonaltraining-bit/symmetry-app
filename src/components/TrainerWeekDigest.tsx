@@ -179,7 +179,15 @@ export default function TrainerWeekDigest() {
     try {
       const supabase: any = createClient();
       const val = draft.trim();
-      const update: Record<string, string | null> = { weekly_focus: val || null };
+      // Stamp provenance: a focus Dustin typed is marked 'trainer' for THIS week,
+      // and the Sunday AI sweep (/api/cron/weekly-ai) leaves it alone. Clearing
+      // the box hands the slot back to the AI.
+      const wk = weekStartOf(todayCT());
+      const update: Record<string, string | null> = {
+        weekly_focus: val || null,
+        weekly_focus_week: val ? wk : null,
+        weekly_focus_source: val ? "trainer" : null,
+      };
       // Setting a focus "handles" this client for the week: clear them from the
       // Week Ahead until the next Sunday, then they pop back in for the weekly
       // reset. Clearing a focus (empty) leaves them in the list.

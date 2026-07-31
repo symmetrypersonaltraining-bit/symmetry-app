@@ -1,15 +1,16 @@
 // Shared coach context assembly for the nutrition AI chat endpoints.
-// Extracted so /api/nutrition-ai/act can fall through to the exact coach
-// behavior (/api/nutrition-ai/coach keeps its own in-file copy tonight — the
-// two must stay in sync; migrate coach/route.ts onto this module when that
-// file is next touched).
+// /api/nutrition-ai/coach, /api/nutrition-ai/act and /api/coach/focus all
+// assemble through this module, so every AI surface sees identical numbers.
 //
 // The context is the client's last 14 days of daily totals computed through
 // the canonical dailyTotals module (same numbers as the macro bar / charts /
-// averages strip), plus current macro targets and latest weight / body fat.
+// averages strip), plus current macro targets and latest weight / body fat,
+// plus the week-over-week block from weekly-context.ts (last complete week vs
+// this week so far) — which is what the weekly copy is written from.
 
 import { Db } from "@/lib/ai/scope";
 import { computeDayTotals, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
+import { weeklyNumbersBlockSafe } from "@/lib/ai/weekly-context";
 
 // Every date the AI sees must be America/Chicago. log_date is written in Central time, so a
 // UTC "today" is already tomorrow from ~7pm CDT — the exact hours clients log their food.
@@ -324,7 +325,7 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
   const win7 = ctShiftDays(today, -6);
   const win14 = ctShiftDays(today, -13);
 
-  const [profile, swRes, metricsRes, adherenceRes] = await Promise.all([
+  const [profile, swRes, metricsRes, adherenceRes, weekBlock] = await Promise.all([
     fetchClientProfile(db, clientId),
     db
       .from("scheduled_workouts")
@@ -346,6 +347,7 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
       .eq("client_id", clientId)
       .gte("log_date", win14)
       .lte("log_date", today),
+    weeklyNumbersBlockSafe(db, clientId),
   ]);
 
   const sw = (swRes.data as { scheduled_date: string; status: string | null }[]) || [];
@@ -386,12 +388,13 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
       : `WEIGH-INS: last one was ${daysSinceWeighIn} day${daysSinceWeighIn === 1 ? "" : "s"} ago (${latestWeighIn!.metric_date}).${daysSinceWeighIn >= 10 ? " That's getting stale — a fresh weigh-in would help." : ""}`
   );
   lines.push(`FOOD-LOGGING CONSISTENCY: logged on ${loggedDays14} of the last 14 days (context only — do not give a nutrition breakdown here).`);
+  if (weekBlock) lines.push(weekBlock);
   return lines.join("\n");
 }
 
 export async function assembleCoachContext(db: Db, clientId: string): Promise<string> {
   const today = CT_TODAY();
-  const [dailyTotals, targetRes, metricsRes, planSummary, profile] = await Promise.all([
+  const [dailyTotals, targetRes, metricsRes, planSummary, profile, weekBlock] = await Promise.all([
     fetchDailyTotals(db, clientId, 14),
     db
       .from("macro_targets")
@@ -409,6 +412,7 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
       .limit(10),
     fetchMealPlanSummary(db, clientId),
     fetchClientProfile(db, clientId),
+    weeklyNumbersBlockSafe(db, clientId),
   ]);
 
   const target = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
@@ -448,5 +452,9 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
       ? `todaySoFar — the CURRENT day, IN PROGRESS and NOT finished. Do NOT judge it as under/over budget or include it in averages; reference it only as progress:\n${JSON.stringify(todaySoFar)}`
       : "todaySoFar: nothing logged yet today."
   );
+  // Calendar-week view on top of the rolling 14-day one. The rolling window
+  // answers "how are they doing"; this answers "how did LAST week go and what
+  // should this week be about" — which is what the weekly copy is written from.
+  if (weekBlock) lines.push(weekBlock);
   return lines.join("\n");
 }

@@ -195,6 +195,12 @@ export default function NutritionV3Client(props: Props) {
   const [coachDismissed, setCoachDismissed] = useState(false);
   const [coachOn, setCoachOn] = useState(true);
   const [coachApi, setCoachApi] = useState<{ message: string; kind?: string } | null>(null);
+  // The WEEKLY read (clients.ai_food_focus), written every Sunday by
+  // /api/cron/weekly-ai from last week vs this week. Separate from the daily
+  // coach card above it: that one is about today, this one is "here's how last
+  // week went and what this week is about."
+  const [weekFood, setWeekFood] = useState<string | null>(null);
+  const [weekFoodDismissed, setWeekFoodDismissed] = useState(false);
   const [versions, setVersions] = useState<{ id: string; version_number: number | null; effective_date: string | null; status: string | null; change_reason: string | null; title?: string | null; created_by_client?: boolean | null }[]>([]);
   const [optSel, setOptSel] = useState<Record<number, string>>({}); // position → meal_id (option slots, pre-log)
   const [popKey, setPopKey] = useState<string | null>(null);
@@ -933,6 +939,36 @@ export default function NutritionV3Client(props: Props) {
     };
   });
 
+  // ---- weekly food read ---------------------------------------------------
+  useEffect(() => {
+    if (!coachOn || selectedDate !== today) return;
+    let on = true;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("clients")
+          .select("ai_food_focus, ai_food_focus_week")
+          .eq("id", clientId)
+          .maybeSingle();
+        const row = data as { ai_food_focus: string | null; ai_food_focus_week: string | null } | null;
+        if (!on || !row?.ai_food_focus) return;
+        // Only the CURRENT week's read. A stale one would be talking about a
+        // week that has already been reviewed.
+        const [y, m, d] = today.split("-").map(Number);
+        const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+        const dt = new Date(Date.UTC(y, m - 1, d));
+        dt.setUTCDate(dt.getUTCDate() - dow);
+        const thisWeek = dt.toISOString().slice(0, 10);
+        if (row.ai_food_focus_week !== thisWeek) return;
+        try {
+          if (sessionStorage.getItem("sym:v3:weekfood:" + clientId + ":" + thisWeek) === "x") return;
+        } catch { /* noop */ }
+        setWeekFood(row.ai_food_focus);
+      } catch { /* noop — the daily card still stands on its own */ }
+    })();
+    return () => { on = false; };
+  }, [clientId, selectedDate, today, coachOn, supabase]);
+
   // ---- coach card ---------------------------------------------------------
   useEffect(() => {
     if (!coachOn || selectedDate !== today) return;
@@ -1294,6 +1330,32 @@ export default function NutritionV3Client(props: Props) {
           </div>
         );
       })()}
+
+      {/* weekly read — last week vs this week, refreshed every Sunday */}
+      {weekFood && !weekFoodDismissed && coachOn && !coachDismissed && (
+        <div className="mx-4 mt-2.5 p-3" style={{ ...CARD, borderLeft: "3px solid var(--brand-primary)", animation: "v3fadeup 0.35s ease" }}>
+          <div className="flex items-start gap-2.5">
+            <span className="flex-shrink-0 flex items-center justify-center" style={{ width: 24, height: 24, borderRadius: 8, background: "var(--brand-bg)", color: "var(--brand-primary)", fontSize: 13 }}>✦</span>
+            <div className="flex-1">
+              <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.1, color: "var(--brand-primary)", marginBottom: 4 }}>YOUR WEEK</p>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--brand-text-secondary)" }}>{weekFood}</p>
+            </div>
+            <button
+              onClick={() => {
+                setWeekFoodDismissed(true);
+                try {
+                  const [y, m, d] = today.split("-").map(Number);
+                  const dt = new Date(Date.UTC(y, m - 1, d));
+                  dt.setUTCDate(dt.getUTCDate() - dt.getUTCDay());
+                  sessionStorage.setItem("sym:v3:weekfood:" + clientId + ":" + dt.toISOString().slice(0, 10), "x");
+                } catch { /* noop */ }
+              }}
+              aria-label="dismiss"
+              style={{ color: "var(--brand-text-secondary)", fontSize: 12, padding: "2px 6px" }}
+            >✕</button>
+          </div>
+        </div>
+      )}
 
       {/* coach card */}
       {coach && (

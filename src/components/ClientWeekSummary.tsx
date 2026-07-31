@@ -29,6 +29,20 @@ function fmtRange(a: string, b: string): string {
   return MON[pa[1] - 1] + " " + pa[2] + " – " + MON[pb[1] - 1] + " " + pb[2];
 }
 
+/**
+ * A focus only shows if it belongs to the CURRENT week. Rows written before the
+ * provenance columns existed carry no weekly_focus_week, so those are honoured
+ * as-is rather than vanishing; anything stamped with an older Sunday is stale
+ * and stays hidden until the Sunday sweep (/api/cron/weekly-ai) or Dustin
+ * replaces it.
+ */
+function currentWeekFocus(row: { weekly_focus?: string | null; weekly_focus_week?: string | null }): string | null {
+  const wk = row.weekly_focus_week;
+  const thisWeek = weekStartOf(todayCT());
+  if (wk && wk !== thisWeek) return null;
+  return row.weekly_focus || null;
+}
+
 interface Summary {
   // THIS week (matches the header + top schedule widget)
   doneThis: number; totalThis: number;
@@ -77,17 +91,17 @@ export default function ClientWeekSummary() {
           const { data: userData } = await supabase.auth.getUser();
           const user = userData ? userData.user : null;
           if (!user) return;
-          const col = "id, name, weekly_focus";
+          const col = "id, name, weekly_focus, weekly_focus_week";
           if ((user.email || "") === TRAINER_EMAIL) {
             const { data: c } = await supabase.from("clients").select(col).ilike("name", "%Dustin%").limit(1);
-            if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = c[0].weekly_focus; }
+            if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = currentWeekFocus(c[0]); }
           } else {
             const { data: c } = await supabase.from("clients").select(col).eq("auth_user_id", user.id).limit(1);
-            if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = c[0].weekly_focus; }
+            if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = currentWeekFocus(c[0]); }
           }
         } else {
-          const { data: c } = await supabase.from("clients").select("id, name, weekly_focus").eq("id", cid).limit(1);
-          if (c && c[0]) { clientName = c[0].name; focus = c[0].weekly_focus; }
+          const { data: c } = await supabase.from("clients").select("id, name, weekly_focus, weekly_focus_week").eq("id", cid).limit(1);
+          if (c && c[0]) { clientName = c[0].name; focus = currentWeekFocus(c[0]); }
         }
         if (!cid || !on) return;
         if (on) setClientId(cid);
