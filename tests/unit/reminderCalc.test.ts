@@ -133,9 +133,22 @@ test("the send-anchored cycle window is unchanged", () => {
   assert.equal(r.cycleStart, "2026-06-25", "starts at the previous cycle's send date");
 });
 
-test("a later prior-approval date wins as the window start", () => {
-  const r = calcReminder(base({ lastCycleApprovedOn: "2026-07-05" }));
-  assert.equal(r.cycleStart, "2026-07-05");
+test("the prior-approval date must NOT move the window start", () => {
+  // Regression: it used to, and that dropped real sessions out of every cycle.
+  // Todd Prine's prior reminder was approved 2026-07-03, which pushed the start
+  // past the session he trained that day — the previous cycle had already closed
+  // on 07-02, so it was billed by nobody. Cycles must tile: (prev send, this send].
+  const withApproval = calcReminder(base({ lastCycleApprovedOn: "2026-07-05" }));
+  const without = calcReminder(base());
+  assert.equal(withApproval.cycleStart, without.cycleStart);
+  assert.equal(withApproval.cycleStart, "2026-06-25");
+});
+
+test("consecutive cycles tile the timeline with no gap and no overlap", () => {
+  const july = calcReminder(base({ dueDate: "2026-07-09" }));
+  const august = calcReminder(base({ dueDate: "2026-08-09" }));
+  assert.equal(july.cycleEnd, august.cycleStart,
+    "August opens exactly where July closed, so no session falls between them");
 });
 
 test("cadence arithmetic still round-trips", () => {

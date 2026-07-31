@@ -122,11 +122,19 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
   const billingType = resolveBillingType(i);
   const sessionsTrained = Math.max(0, Number(i.sessionsTrained) || 0);
 
-  // Window closes 7 days before due (send-anchored). Start of the look-back is
-  // the previous cycle's send date, unless the prior reminder was approved later.
-  const baseStart = reminderSendDate(previousDueDate(i.dueDate, i.cadence));
-  const cycleStart =
-    i.lastCycleApprovedOn && i.lastCycleApprovedOn < i.dueDate ? i.lastCycleApprovedOn : baseStart;
+  // Window closes 7 days before due (send-anchored), and opens at the PREVIOUS
+  // cycle's send date. Cycles must tile the timeline exactly:
+  // (previous send date, this send date]. No gaps, no overlaps.
+  //
+  // This used to start at `lastCycleApprovedOn` when the prior reminder was
+  // approved later than the cadence date. Under the old credit-based rule that
+  // was conservative -- it could only reduce credits. Under sessions-trained it
+  // silently DROPS SESSIONS: Todd Prine's previous reminder was approved on
+  // 2026-07-03, so the window opened at 07-03 exclusive and the session he
+  // trained that day fell into no cycle at all. Six clients, $467.50 unbilled.
+  // When a reminder happened to be approved is a fact about Dustin's Tuesday,
+  // not about when a client trained.
+  const cycleStart = reminderSendDate(previousDueDate(i.dueDate, i.cadence));
   const cycleEnd = reminderSendDate(i.dueDate);
 
   const base = {

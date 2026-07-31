@@ -128,11 +128,11 @@ export default function ReminderEditor() {
             .sort()
             .pop() || null;
           // Send-anchored cycle: window closes 7 days before due, so sessions in
-          // the final week roll to the next cycle. Start = previous cycle's send
-          // date (or the prior approval date if later); end = this cycle's send
-          // date. UNCHANGED — do not touch this math.
-          const baseStart = reminderSendDate(previousDueDate(r.due_date, cad));
-          const start = la && la < r.due_date ? la : baseStart;
+          // the final week roll to the next cycle. It OPENS at the previous
+          // cycle's send date so the cycles tile exactly — see the note in
+          // reminder-calc.ts on why the prior-approval date must not move the
+          // start (it dropped real sessions out of every cycle).
+          const start = reminderSendDate(previousDueDate(r.due_date, cad));
           const end = reminderSendDate(r.due_date);
 
           let trained = 0, full = 0, half = 0;

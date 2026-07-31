@@ -22,6 +22,19 @@ function getAnonClient() {
 }
 
 export async function POST(req: NextRequest) {
+  // POST had no auth of its own. GET was hardened in a691c73 while this sat
+  // open: a route that writes appointments, payment rows AND now recalculates
+  // reminder amounts was callable by anyone who knew the URL, and `?reset=true`
+  // would clear the appointment table first. Same rule as GET now — a genuine
+  // scheduler, or a signed-in trainer (which is how GcalSyncButton calls it).
+  if (!isCronRequest(req)) {
+    const authClient = await createServerClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    if (!user || user.email !== TRAINER_EMAIL) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
   const body = await req.json().catch(() => ({}));
   const resetFirst = body.reset === true;
 
@@ -172,12 +185,32 @@ export async function POST(req: NextRequest) {
       else reconciledPayments = (rcp as any)?.removed || 0;
     }
 
+    // Appointments have just moved, so every pending payment reminder derived
+    // from them is now stale. Recalculate here rather than leaving it to whenever
+    // someone next opens the editor: amount = sessions_trained x session_rate is
+    // only as true as the appointment rows behind it.
+    //
+    // The function is scoped to notification_status='pending' AND email_sent_at
+    // IS NULL AND sms_sent_at IS NULL. Anything already sent to a client is a
+    // statement of record and is never rewritten.
+    let remindersRecalculated = 0;
+    let remindersChanged = 0;
+    const { data: rr, error: rrErr } = await supabase.rpc('recalc_pending_payment_reminders');
+    if (rrErr) errors.push('reminder_recalc: ' + rrErr.message);
+    else {
+      const list = (rr as any[]) || [];
+      remindersRecalculated = list.length;
+      remindersChanged = list.filter((x: any) => x.changed).length;
+      list.filter((x: any) => x.blocked_reason)
+        .forEach((x: any) => errors.push('reminder_blocked: ' + x.client_name + ' — ' + x.blocked_reason));
+    }
+
     await supabase.rpc('gcal_generate_payment_notifications');
 
     const dollarEvents = allEvents.filter((e: any) => /\$\s?\d/.test(e.summary || ''));
     const clientDollar = dollarEvents.filter((e: any) => matchClient(e.summary || ''));
     const laurenEvents = allEvents.filter((e: any) => (e.summary || '').toLowerCase().includes('lauren')).slice(0, 4);
-    return NextResponse.json({ ok: true, synced, payments, reconciled, reconciled_payments: reconciledPayments, total: allEvents.length, dollar_events: dollarEvents.length, client_dollar: clientDollar.length, client_dollar_samples: clientDollar.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), lauren_samples: laurenEvents.map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), dollar_samples: dollarEvents.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | start:' + JSON.stringify(e.start || {})), errors: errors.slice(0, 10) });
+    return NextResponse.json({ ok: true, synced, payments, reconciled, reconciled_payments: reconciledPayments, reminders_recalculated: remindersRecalculated, reminders_changed: remindersChanged, total: allEvents.length, dollar_events: dollarEvents.length, client_dollar: clientDollar.length, client_dollar_samples: clientDollar.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), lauren_samples: laurenEvents.map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), dollar_samples: dollarEvents.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | start:' + JSON.stringify(e.start || {})), errors: errors.slice(0, 10) });
   } catch (e: any) {
     const msg = e.message || String(e);
     if (msg.includes('disabled') || msg.includes('not connected')) {
