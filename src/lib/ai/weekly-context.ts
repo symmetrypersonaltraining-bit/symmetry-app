@@ -89,6 +89,9 @@ function factsFor(
   pseudoMeals: PlanMeal[],
   workouts: { scheduled_date: string; status: string | null }[],
   weighIns: { metric_date: string; weight: number | null }[],
+  // The target in force during THIS window. Adherence is now consistency ×
+  // accuracy against target, so each week must be scored on its own.
+  target: MacroTarget | null,
   // The day still in progress. Left out of the averages (never out of
   // loggedDays) so a half-eaten day can't understate the week.
   inProgressDate?: string,
@@ -102,6 +105,8 @@ function factsFor(
   const wLogs = inWin(logs, "log_date");
   const sum = summariseLogRange(wLogs, pseudoMeals, {
     excludeDates: inProgressDate ? [inProgressDate] : [],
+    target,
+    windowDays: window.days,
   });
   const sw = inWin(workouts, "scheduled_date");
   const wi = inWin(weighIns, "metric_date")
@@ -114,6 +119,9 @@ function factsFor(
     avgDays: sum.avgDays,
     avg: sum.loggedDays ? { kcal: sum.kcal, p: sum.p, c: sum.c, f: sum.f } : null,
     adherence: sum.adherence,
+    consistency: sum.consistency,
+    accuracy: sum.accuracy,
+    adherenceBasis: sum.adherenceBasis,
     workoutsScheduled: sw.length,
     workoutsCompleted: sw.filter((w) => w.status === "completed").length,
     weightStart: wi.length ? Number(wi[0].weight) : null,
@@ -204,8 +212,10 @@ export async function fetchWeeklyComparison(db: Db, clientId: string, today = CT
   // rather than printing no comparison at all.
   const target = toTarget(lastTargetRes.data) ?? currentTarget;
 
-  const lastFacts = factsFor(last, logs, pseudoMeals, workouts, weighIns);
-  const currentFacts = factsFor(current, logs, pseudoMeals, workouts, weighIns, today);
+  // Each week is graded against the target that was in force during it — the
+  // same reason the two target queries are bounded separately.
+  const lastFacts = factsFor(last, logs, pseudoMeals, workouts, weighIns, target);
+  const currentFacts = factsFor(current, logs, pseudoMeals, workouts, weighIns, currentTarget, today);
 
   return {
     today,

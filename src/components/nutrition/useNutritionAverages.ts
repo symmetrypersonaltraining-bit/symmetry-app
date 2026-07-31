@@ -25,7 +25,18 @@ export interface AveragesResult {
   loggedDays: number;
   totalDays: number;
   kcal: number; p: number; c: number; f: number;
-  adherence: number | null; // avg % across days with plan logs
+  /**
+   * Logging consistency × macro accuracy, 0-100. Dustin, 2026-07-31:
+   * "adherence should be based on consistently logging and hitting macros n
+   * calories." Falls back to the old meal-status average when the client has no
+   * macro target on file — `adherenceBasis` says which one ran.
+   */
+  adherence: number | null;
+  /** Days logged ÷ days in the range, 0-100. */
+  consistency: number | null;
+  /** How close the logged days landed to target across cals/P/C/F, 0-100. */
+  accuracy: number | null;
+  adherenceBasis: "logging+macros" | "meal-status";
   target: { kcal: number; p: number; c: number; f: number } | null;
 }
 
@@ -92,13 +103,29 @@ export function useNutritionAverages(
     }
     // Averages + adherence come from the single canonical implementation so
     // this strip, the week card and the weekly AI context can never disagree.
-    const sum = summariseLogRange(logs, pseudoMeals);
+    // The target and the window length go in because adherence is now
+    // consistency × accuracy, not a meal-status average.
     const tRow = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
+    const totalDays = diffDays(start, end) + 1;
+    const sum = summariseLogRange(logs, pseudoMeals, {
+      target: tRow
+        ? {
+            calories: Number(tRow.calories) || 0,
+            protein: Number(tRow.protein) || 0,
+            carbs: Number(tRow.carbs) || 0,
+            fats: Number(tRow.fats) || 0,
+          }
+        : null,
+      windowDays: totalDays,
+    });
     setResult({
       loggedDays: sum.loggedDays,
-      totalDays: diffDays(start, end) + 1,
+      totalDays,
       kcal: sum.kcal, p: sum.p, c: sum.c, f: sum.f,
       adherence: sum.adherence,
+      consistency: sum.consistency,
+      accuracy: sum.accuracy,
+      adherenceBasis: sum.adherenceBasis,
       target: tRow ? { kcal: Number(tRow.calories) || 0, p: Number(tRow.protein) || 0, c: Number(tRow.carbs) || 0, f: Number(tRow.fats) || 0 } : null,
     });
     setLoading(false);

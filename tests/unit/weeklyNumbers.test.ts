@@ -138,8 +138,46 @@ test("averages are reported per logged day and compared to target with the direc
   assert.match(lines, /calories \+210 \(ABOVE target\)/);
   assert.match(lines, /protein -8 \(BELOW target\)/);
   assert.match(lines, /carbs \+10 \(ABOVE target\)/);
-  assert.match(lines, /Meal-plan adherence: 92%/);
+  // This fixture leaves adherenceBasis at its "meal-status" default, so the copy
+  // has to admit the number is the old average and not a macro-scored one.
+  assert.match(lines, /Adherence: 92% — meal-status average only/);
   assert.match(lines, /do NOT recompute the direction/);
+});
+
+test("scored adherence is described as consistency × accuracy, not a checkbox score", () => {
+  // Dustin, 2026-07-31: "adherence should be based on consistently logging and
+  // hitting macros n calories." The AI must never call this a meal-plan score.
+  const lines = weekFactsLines(
+    facts({
+      loggedDays: 5, avgDays: 5, avg: { kcal: 2200, p: 190, c: 210, f: 65 },
+      adherence: 65.3, consistency: 71.4, accuracy: 91.5, adherenceBasis: "logging+macros",
+    }),
+    "LAST WEEK",
+    { calories: 2200, protein: 190, carbs: 210, fats: 65 },
+  ).join("\n");
+
+  assert.match(lines, /Adherence: 65%/);
+  assert.match(lines, /logging consistency × macro accuracy/);
+  assert.match(lines, /consistency 71%/);
+  assert.match(lines, /accuracy 92%/);
+  assert.match(lines, /ALL FOUR of calories, protein, carbs and fat/);
+  assert.match(lines, /A day nobody logged counts as a miss/);
+  assert.ok(!/meal-status average only/.test(lines), "a scored week must not be hedged as status-only");
+  // loggedDays === avgDays here, so there is no in-progress day to caveat.
+  assert.ok(!/in-progress day is left out/.test(lines), "no caveat when nothing was excluded");
+});
+
+test("the in-progress-day caveat only appears when a day was actually excluded", () => {
+  const lines = weekFactsLines(
+    { ...facts({
+        loggedDays: 6, avgDays: 5, avg: { kcal: 2200, p: 190, c: 210, f: 65 },
+        adherence: 70, consistency: 83.3, accuracy: 84, adherenceBasis: "logging+macros",
+      }),
+      window: { start: "2026-07-26", end: "2026-07-31", days: 6, complete: false } },
+    "THIS WEEK SO FAR",
+    { calories: 2200, protein: 190, carbs: 210, fats: 65 },
+  ).join("\n");
+  assert.match(lines, /the in-progress day is left out of both sides of consistency/);
 });
 
 test("training and weight lines degrade honestly when data is thin", () => {
@@ -185,7 +223,7 @@ test("the block carries both weeks, the movement and the do-not-recompute framin
   assert.match(block, /THIS WEEK SO FAR \(2026-07-26 → 2026-07-29, PARTIAL/);
   assert.match(block, /Days logged: 6 days last week → 2 days this week = -4 days DOWN/);
   assert.match(block, /Avg protein: 190g last week → 150g this week = -40g DOWN/);
-  assert.match(block, /Meal-plan adherence: 95% last week → 78% this week = -17% DOWN/);
+  assert.match(block, /Adherence \(logging × macro accuracy\): 95% last week → 78% this week = -17% DOWN/);
   assert.match(block, /Sessions completed: 4 last week → 1 this week = -3 DOWN/);
   assert.match(block, /this week is still partial, so these are early reads/);
   assert.match(block, /do NOT recompute/);

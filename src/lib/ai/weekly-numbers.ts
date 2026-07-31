@@ -81,8 +81,19 @@ export interface WeekFacts {
   avgDays: number;
   /** Average per averaged day, or null when nothing was logged. */
   avg: MacroSet | null;
-  /** Average % adherence across days with plan meals logged. */
+  /**
+   * Adherence, 0-100. Dustin, 2026-07-31: "adherence should be based on
+   * consistently logging and hitting macros n calories." So it is
+   * consistency × accuracy — see rangeAverages.ts for the full definition.
+   * Falls back to the old meal-status average when there's no target on file.
+   */
   adherence: number | null;
+  /** Days logged ÷ days in the window, 0-100. */
+  consistency: number | null;
+  /** How close the logged days landed to target across all four macros, 0-100. */
+  accuracy: number | null;
+  /** Which calculation produced `adherence`, so the copy describes it honestly. */
+  adherenceBasis: "logging+macros" | "meal-status";
   workoutsScheduled: number;
   workoutsCompleted: number;
   /** First and last weigh-in inside the window. */
@@ -103,6 +114,9 @@ export const EMPTY_WEEK = (window: WeekWindow): WeekFacts => ({
   avgDays: 0,
   avg: null,
   adherence: null,
+  consistency: null,
+  accuracy: null,
+  adherenceBasis: "meal-status",
   workoutsScheduled: 0,
   workoutsCompleted: 0,
   weightStart: null,
@@ -179,7 +193,25 @@ export function weekFactsLines(f: WeekFacts, label: string, target: MacroTarget 
         `  vs targets (${target.calories} kcal / ${target.protein}P / ${target.carbs}C / ${target.fats}F) — these signed deltas are the SOURCE OF TRUTH, do NOT recompute the direction: calories ${d(f.avg.kcal, target.calories)}, protein ${d(f.avg.p, target.protein)}, carbs ${d(f.avg.c, target.carbs)}, fat ${d(f.avg.f, target.fats)}.`,
       );
     }
-    if (f.adherence != null) out.push(`- Meal-plan adherence: ${r0(f.adherence)}%.`);
+    // Adherence is no longer "how did they tag their meals" — it is logging
+    // consistency × macro accuracy. The model has to be told what the number
+    // MEANS or it will keep calling it meal-plan adherence and coach the wrong
+    // behaviour off it.
+    if (f.adherence != null) {
+      if (f.adherenceBasis === "logging+macros" && f.consistency != null && f.accuracy != null) {
+        const caveat =
+          f.avgDays !== f.loggedDays
+            ? " (the in-progress day is left out of both sides of consistency)"
+            : "";
+        out.push(
+          `- Adherence: ${r0(f.adherence)}%. This is logging consistency × macro accuracy, NOT a meal checkbox score: consistency ${r0(f.consistency)}% — how much of the window they logged at all${caveat} — times accuracy ${r0(f.accuracy)}% — how close the days they did log landed to target across ALL FOUR of calories, protein, carbs and fat. A day nobody logged counts as a miss. Within 10% of a target is a full hit.`,
+        );
+      } else {
+        out.push(
+          `- Adherence: ${r0(f.adherence)}% — meal-status average only, because there is no macro target on file to score accuracy against. Treat it as a rough read.`,
+        );
+      }
+    }
   }
 
   out.push(
@@ -245,7 +277,9 @@ export function weeklyNumbersBlock(
   push(deltaLine("Days logged", last.loggedDays, current.loggedDays, " days", "higher"));
   push(deltaLine("Avg calories", last.avg?.kcal ?? null, current.avg?.kcal ?? null, " kcal", "neither"));
   push(deltaLine("Avg protein", last.avg?.p ?? null, current.avg?.p ?? null, "g", "higher"));
-  push(deltaLine("Meal-plan adherence", last.adherence, current.adherence, "%", "higher"));
+  push(deltaLine("Adherence (logging × macro accuracy)", last.adherence, current.adherence, "%", "higher"));
+  push(deltaLine("  ↳ logging consistency", last.consistency, current.consistency, "%", "higher"));
+  push(deltaLine("  ↳ macro accuracy on logged days", last.accuracy, current.accuracy, "%", "higher"));
   push(
     deltaLine(
       "Sessions completed",

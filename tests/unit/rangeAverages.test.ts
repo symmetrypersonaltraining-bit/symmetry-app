@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { summariseLogRange } from "../../src/lib/nutrition/rangeAverages";
+import { summariseLogRange, macroHitScore, dayHitScore } from "../../src/lib/nutrition/rangeAverages";
 import { LogRow, PlanMeal } from "../../src/lib/nutrition/dailyTotals";
 
 /**
@@ -263,4 +263,138 @@ test("adherence averages across days, not across meals", () => {
   );
   assert.equal(s.loggedDays, 2);
   assert.equal(Math.round(s.adherence!), 50);
+});
+
+// ── Adherence redefined, 2026-07-31 ─────────────────────────────────────────
+//
+// Dustin: "adherence should be based on consistently logging and hitting macros
+// n calories." adherence = consistency × accuracy. Every test above passes no
+// target, so they still exercise the meal-status fallback — these pin the new
+// behaviour.
+
+const DAY_KCAL = M1_KCAL + M2_KCAL; // 1078
+const ON_TARGET = { calories: DAY_KCAL, protein: 90, carbs: 130, fats: 22 };
+
+test("macroHitScore: full credit inside 10%, straight-line falloff, zero at 50% off", () => {
+  assert.equal(macroHitScore(2000, 2000), 1, "dead on target");
+  assert.equal(macroHitScore(2200, 2000), 1, "+10% is still a full hit");
+  assert.equal(macroHitScore(1800, 2000), 1, "-10% is still a full hit");
+  assert.equal(macroHitScore(2600, 2000), 0.5, "30% off sits halfway down the ramp");
+  assert.equal(macroHitScore(3000, 2000), 0, "50% off scores nothing");
+  assert.equal(macroHitScore(9000, 2000), 0, "and it never goes negative");
+  assert.equal(macroHitScore(2000, 0), null, "no target = nothing to be accurate against");
+  assert.equal(macroHitScore(2000, null), null);
+});
+
+test("dayHitScore scores ALL FOUR macros, not just calories and protein", () => {
+  // Dustin's call when asked which macros count: "All four — cals, P, C, F."
+  const perfect = dayHitScore({ kcal: 2000, protein: 180, carbs: 200, fats: 60 }, {
+    calories: 2000, protein: 180, carbs: 200, fats: 60,
+  });
+  assert.equal(perfect, 1);
+
+  // Calories on the nose but the split is wildly off: fat 50% over (0), carbs
+  // 30% under (0.5). A calories-only score would call this a perfect day.
+  const wrongSplit = dayHitScore({ kcal: 2000, protein: 180, carbs: 140, fats: 90 }, {
+    calories: 2000, protein: 180, carbs: 200, fats: 60,
+  });
+  assert.equal(wrongSplit, (1 + 1 + 0.5 + 0) / 4);
+
+  assert.equal(dayHitScore({ kcal: 2000, protein: 1, carbs: 1, fats: 1 }, null), null);
+});
+
+test("adherence is consistency MULTIPLIED by accuracy — an unlogged day is a miss", () => {
+  // Two perfect days inside a seven-day window. Nailing what you log does not
+  // erase the five days you didn't: 2/7 × 100% = 29%, not 100%.
+  const logs = [
+    planLog("2026-07-20", 1, "m1", "Full"),
+    planLog("2026-07-20", 2, "m2", "Full"),
+    planLog("2026-07-22", 1, "m1", "Full"),
+    planLog("2026-07-22", 2, "m2", "Full"),
+  ];
+  const s = summariseLogRange(logs, PLAN, { target: ON_TARGET, windowDays: 7 });
+  assert.equal(s.adherenceBasis, "logging+macros");
+  assert.equal(Math.round(s.accuracy!), 100, "both logged days landed on target");
+  assert.equal(Math.round(s.consistency!), 29, "2 of 7 days");
+  assert.equal(Math.round(s.adherence!), 29);
+});
+
+test("logging every day but eating well off target does not read as adherence", () => {
+  // The mirror image: perfect consistency, poor accuracy. Under the old
+  // meal-status average both of these clients scored 100%.
+  const logs = [
+    planLog("2026-07-20", 1, "m1", "Full"),
+    planLog("2026-07-20", 2, "m2", "Full"),
+  ];
+  // Target set 30% below what they actually ate → every macro scores 0.5.
+  const low = { calories: Math.round(DAY_KCAL / 1.3), protein: Math.round(90 / 1.3), carbs: Math.round(130 / 1.3), fats: Math.round(22 / 1.3) };
+  const s = summariseLogRange(logs, PLAN, { target: low, windowDays: 1 });
+  assert.equal(Math.round(s.consistency!), 100);
+  assert.ok(s.accuracy! > 45 && s.accuracy! < 55, `accuracy ~50%, got ${s.accuracy}`);
+  assert.ok(s.adherence! > 45 && s.adherence! < 55, `adherence ~50%, got ${s.adherence}`);
+});
+
+test("the Claudine case: logging everything Off-plan no longer freezes adherence at 75%", () => {
+  // Claudine tags every meal "Off-plan", which the status weights score 0.75 —
+  // so her adherence read exactly 75% every day of every week no matter what she
+  // ate. A number that cannot move cannot coach anyone. Scored on what she
+  // actually ate against her target, a day on target is a day on target.
+  const offPlanDay = (date: string) => [
+    { ...planLog(date, 1, "m1", "Off-plan"), est_kcal: 540, est_protein: 45, est_carbs: 65, est_fats: 11 },
+    { ...planLog(date, 2, "m2", "Off-plan"), est_kcal: 538, est_protein: 45, est_carbs: 65, est_fats: 11 },
+  ];
+  const logs = [...offPlanDay("2026-07-20"), ...offPlanDay("2026-07-21")];
+
+  const old = summariseLogRange(logs, PLAN);
+  assert.equal(Math.round(old.adherence!), 75, "the frozen number, for the record");
+  assert.equal(old.adherenceBasis, "meal-status");
+
+  const now = summariseLogRange(logs, PLAN, { target: ON_TARGET, windowDays: 2 });
+  assert.equal(now.adherenceBasis, "logging+macros");
+  assert.equal(Math.round(now.adherence!), 100, "logged both days, both on target");
+});
+
+test("the in-progress day comes out of BOTH sides of consistency", () => {
+  // Today being half eaten is not the same as today being skipped. Charging
+  // someone for a day that hasn't finished is exactly the wrong number this
+  // module exists to stop.
+  const logs = [
+    planLog("2026-07-20", 1, "m1", "Full"),
+    planLog("2026-07-20", 2, "m2", "Full"),
+    planLog("2026-07-21", 1, "m1", "Full"),
+    planLog("2026-07-21", 2, "m2", "Full"),
+    planLog("2026-07-22", 1, "m1", "Full"), // today, breakfast only
+  ];
+  const s = summariseLogRange(logs, PLAN, {
+    target: ON_TARGET,
+    windowDays: 3,
+    excludeDates: ["2026-07-22"],
+  });
+  assert.equal(s.loggedDays, 3, "they did log today");
+  assert.equal(s.avgDays, 2);
+  assert.equal(Math.round(s.consistency!), 100, "2 finished days out of 2 finished days");
+  assert.equal(Math.round(s.adherence!), 100);
+});
+
+test("consistency never exceeds 100% even if the window length is understated", () => {
+  const s = summariseLogRange(
+    [planLog("2026-07-20", 1, "m1", "Full"), planLog("2026-07-21", 1, "m1", "Full")],
+    PLAN,
+    { target: ON_TARGET, windowDays: 1 },
+  );
+  assert.equal(Math.round(s.consistency!), 100);
+});
+
+test("with no target on file the old meal-status average still runs", () => {
+  // Nothing to be accurate against, so the legacy number is better than none —
+  // and adherenceBasis says so, so the copy can describe it honestly.
+  const s = summariseLogRange(
+    [planLog("2026-07-20", 1, "m1", "Full"), planLog("2026-07-20", 2, "m2", "Skipped")],
+    PLAN,
+    { windowDays: 7 },
+  );
+  assert.equal(s.adherenceBasis, "meal-status");
+  assert.equal(Math.round(s.adherence!), 50);
+  assert.equal(s.accuracy, null);
+  assert.equal(Math.round(s.consistency!), 14, "consistency is still reported on its own");
 });

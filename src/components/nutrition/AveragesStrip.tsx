@@ -52,7 +52,13 @@ export default function AveragesStrip({ clientId, today }: { clientId: string; t
             {stat("FAT", Math.round(result.f) + "g", result.target ? `of ${Math.round(result.target.f)}g` : undefined)}
           </div>
           <div className="flex items-center mt-3 pt-3" style={{ borderTop: "1px dashed var(--brand-border)" }}>
-            {stat("ADHERENCE", result.adherence != null ? Math.round(result.adherence) + "%" : "—", "plan meals")}
+            {stat(
+              "ADHERENCE",
+              result.adherence != null ? Math.round(result.adherence) + "%" : "—",
+              // Logging consistency × macro accuracy. Only reads "plan meals"
+              // when there's no target on file and the old average had to run.
+              result.adherenceBasis === "meal-status" ? "plan meals" : "logging × macros",
+            )}
             {stat("LOGGING RATE", Math.round((result.loggedDays / result.totalDays) * 100) + "%", `${result.loggedDays} of ${result.totalDays} days`)}
           </div>
         </>

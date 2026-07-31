@@ -1317,7 +1317,13 @@ export default function NutritionV3Client(props: Props) {
                   {avgResult && avgResult.adherence != null ? Math.round(avgResult.adherence) + "%" : "—"}
                 </p>
                 <p style={{ color: "var(--brand-text-secondary)", fontSize: 9, fontWeight: 700, letterSpacing: 0.8 }}>ADHERENCE</p>
-                <p style={{ color: "var(--brand-text-secondary)", fontSize: 9 }}>plan meals{isToday ? " · 7d" : ""}</p>
+                {/* Adherence = logging consistency × macro accuracy (Dustin,
+                    2026-07-31). It only reads "plan meals" when the client has
+                    no macro target and the old meal-status average had to run. */}
+                <p style={{ color: "var(--brand-text-secondary)", fontSize: 9 }}>
+                  {avgResult?.adherenceBasis === "meal-status" ? "plan meals" : "logging × macros"}
+                  {isToday ? " · 7d" : ""}
+                </p>
               </div>
               <div className="text-center flex-1">
                 <p className="font-extrabold" style={{ color: "var(--brand-text)", fontSize: 16, lineHeight: 1.1 }}>

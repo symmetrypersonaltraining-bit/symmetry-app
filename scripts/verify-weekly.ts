@@ -46,14 +46,32 @@ const win = (w: { start: string; end: string }) =>
 const last = lastWeekWindow(TODAY);
 const cur = thisWeekWindow(TODAY);
 
-const exclude = (w: { end: string }) => (w.end === TODAY ? { excludeDates: [TODAY] } : {});
+// Targets as-of each window, exactly as fetchWeeklyComparison does.
+type T = { effective_date: string; calories: number; protein: number; carbs: number; fats: number };
+const asOf = (iso: string) => {
+  const rows = (payload.targets as T[] | undefined) || (payload.target ? [payload.target as T] : []);
+  const hit = rows.filter((r) => r.effective_date <= iso)
+    .sort((a, b) => (a.effective_date < b.effective_date ? 1 : -1))[0];
+  return hit ? { calories: +hit.calories, protein: +hit.protein, carbs: +hit.carbs, fats: +hit.fats } : null;
+};
+
+// Adherence is consistency × accuracy now, so each window has to carry its own
+// target and its own day count into the summariser.
+const opts = (w: { end: string; days: number }) => ({
+  ...(w.end === TODAY ? { excludeDates: [TODAY] } : {}),
+  target: asOf(w.end) ?? asOf(TODAY),
+  windowDays: w.days,
+});
 
 for (const [label, w] of [["LAST", last], ["CURRENT", cur]] as const) {
   const rows = win(w);
-  const s = summariseLogRange(rows, pseudoMeals, exclude(w));
+  const s = summariseLogRange(rows, pseudoMeals, opts(w));
   console.log(`\n${label} ${w.start}..${w.end} (${w.days}d)  loggedDays=${s.loggedDays} avgDays=${s.avgDays}` +
     `  avg ${Math.round(s.kcal)}kcal ${Math.round(s.p)}P/${Math.round(s.c)}C/${Math.round(s.f)}F` +
-    `  adherence ${s.adherence == null ? "n/a" : Math.round(s.adherence) + "%"}`);
+    `  adherence ${s.adherence == null ? "n/a" : Math.round(s.adherence) + "%"}` +
+    ` (${s.adherenceBasis}` +
+    (s.consistency == null ? "" : `, consistency ${Math.round(s.consistency)}%`) +
+    (s.accuracy == null ? "" : `, accuracy ${Math.round(s.accuracy)}%`) + ")");
   const byDate: Record<string, LogRow[]> = {};
   for (const l of rows) (byDate[l.log_date] ||= []).push(l);
   for (const d of Object.keys(byDate).sort()) {
@@ -66,17 +84,10 @@ for (const [label, w] of [["LAST", last], ["CURRENT", cur]] as const) {
 }
 
 const facts = (w: typeof last) => {
-  const s = summariseLogRange(win(w), pseudoMeals, exclude(w));
+  const s = summariseLogRange(win(w), pseudoMeals, opts(w));
   return { ...EMPTY_WEEK(w), loggedDays: s.loggedDays, avgDays: s.avgDays,
-    avg: s.loggedDays ? { kcal: s.kcal, p: s.p, c: s.c, f: s.f } : null, adherence: s.adherence };
-};
-// Targets as-of each window, exactly as fetchWeeklyComparison now does.
-type T = { effective_date: string; calories: number; protein: number; carbs: number; fats: number };
-const asOf = (iso: string) => {
-  const rows = (payload.targets as T[] | undefined) || (payload.target ? [payload.target as T] : []);
-  const hit = rows.filter((r) => r.effective_date <= iso)
-    .sort((a, b) => (a.effective_date < b.effective_date ? 1 : -1))[0];
-  return hit ? { calories: +hit.calories, protein: +hit.protein, carbs: +hit.carbs, fats: +hit.fats } : null;
+    avg: s.loggedDays ? { kcal: s.kcal, p: s.p, c: s.c, f: s.f } : null, adherence: s.adherence,
+    consistency: s.consistency, accuracy: s.accuracy, adherenceBasis: s.adherenceBasis };
 };
 console.log("\n--- block the AI is handed ---\n");
 console.log(weeklyNumbersBlock(facts(last), facts(cur), asOf(last.end) ?? asOf(TODAY), asOf(TODAY)));

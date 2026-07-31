@@ -26,6 +26,73 @@
 
 import { computeDayTotals, adherencePct, isExtraLog, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
 
+/** Structural shape of a macro target. Kept local so this module never imports from ai/. */
+export interface MacroTargetLike {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+}
+
+// ── What "adherence" means, as of 2026-07-31 ────────────────────────────────
+//
+// Dustin: "adherence should be based on consistently logging and hitting
+// macros n calories."
+//
+// It used to be the average of the per-meal status weights (Full 1, ½ 0.5,
+// Off-plan 0.75 …). That measured how someone TAGGED their meals, not how they
+// ate. Claudine logs everything "Off-plan", which scores 0.75, so her adherence
+// read exactly 75% every single day of every week no matter what she put in her
+// mouth — a number that could never move, and therefore never coach anyone.
+//
+// It is now two real things multiplied:
+//
+//   consistency = days logged ÷ days in the window
+//   accuracy    = how close those days landed to target, across ALL FOUR of
+//                 calories, protein, carbs and fat
+//   adherence   = consistency × accuracy
+//
+// Multiplied, not blended, at Dustin's call: a day nobody logged is a miss,
+// because it is one. Logging 5 of 7 days and nailing every one of them reads
+// 71%, not 100% — and it moves the moment either half moves.
+//
+// Within 10% of a target is full credit (2000 kcal → 1800–2200 all score 1.0).
+// Past that the score falls off in a straight line and reaches zero at 50% off,
+// so one bad day dents the week instead of wrecking it.
+//
+// With no macro target on file there is nothing to be accurate against, so the
+// old meal-status average is still used — `adherenceBasis` says which ran.
+
+/** Inside this fraction of target = full credit. */
+export const FULL_CREDIT_BAND = 0.1;
+/** At or past this fraction off target = no credit. Linear ramp between the two. */
+export const ZERO_CREDIT_BAND = 0.5;
+
+/** How close one macro landed to its target, 0..1. null when there's no target to hit. */
+export function macroHitScore(actual: number, target: number | null | undefined): number | null {
+  if (!target || target <= 0) return null;
+  const rel = Math.abs(actual - target) / target;
+  if (rel <= FULL_CREDIT_BAND) return 1;
+  if (rel >= ZERO_CREDIT_BAND) return 0;
+  return 1 - (rel - FULL_CREDIT_BAND) / (ZERO_CREDIT_BAND - FULL_CREDIT_BAND);
+}
+
+/** One day's accuracy, 0..1 — the mean across calories, protein, carbs and fat. */
+export function dayHitScore(
+  totals: { kcal: number; protein: number; carbs: number; fats: number },
+  target: MacroTargetLike | null | undefined,
+): number | null {
+  if (!target) return null;
+  const parts = [
+    macroHitScore(totals.kcal, target.calories),
+    macroHitScore(totals.protein, target.protein),
+    macroHitScore(totals.carbs, target.carbs),
+    macroHitScore(totals.fats, target.fats),
+  ].filter((x): x is number => x != null);
+  if (!parts.length) return null;
+  return parts.reduce((a, b) => a + b, 0) / parts.length;
+}
+
 export interface RangeSummary {
   /** Distinct dates carrying at least one real log row. */
   loggedDays: number;
@@ -36,8 +103,14 @@ export interface RangeSummary {
   p: number;
   c: number;
   f: number;
-  /** Average % adherence across days that have plan meals logged. null = no plan logs. */
+  /** consistency × accuracy, 0-100. Falls back to the meal-status average with no target. */
   adherence: number | null;
+  /** Days logged ÷ days in the window, 0-100. null when the caller gave no window length. */
+  consistency: number | null;
+  /** How close the logged days landed to target, 0-100. null when there's no target. */
+  accuracy: number | null;
+  /** Which calculation produced `adherence` — so copy can describe it honestly. */
+  adherenceBasis: "logging+macros" | "meal-status";
 }
 
 export interface SummariseOpts {
@@ -48,6 +121,14 @@ export interface SummariseOpts {
    * nothing to average.
    */
   excludeDates?: string[];
+  /** The macro target in force for this window. Without it, accuracy can't be scored. */
+  target?: MacroTargetLike | null;
+  /**
+   * Calendar days in the window — the denominator for consistency. Without it
+   * there is no honest "of how many days", so consistency stays null and
+   * adherence falls back to the meal-status average.
+   */
+  windowDays?: number;
 }
 
 export function summariseLogRange(
@@ -88,13 +169,19 @@ export function summariseLogRange(
   let avgDates = realDays.filter((d) => !excluded.has(d));
   // Never trade a real average for an empty one (first day of the week, or a
   // client whose only logged day is today).
-  if (!avgDates.length) avgDates = realDays;
+  const fellBack = !avgDates.length;
+  if (fellBack) avgDates = realDays;
 
   let kcal = 0, p = 0, c = 0, f = 0, adhSum = 0, adhDays = 0;
+  let hitSum = 0, hitDays = 0;
 
   for (const d of avgDates) {
     const t = totalsByDate[d];
     kcal += t.kcal; p += t.protein; c += t.carbs; f += t.fats;
+
+    // Accuracy half of adherence: how close this day landed to target.
+    const hit = dayHitScore(t, opts.target);
+    if (hit != null) { hitSum += hit; hitDays++; }
 
     // Adherence: average proration across the day's PLAN meals only.
     // "meal_position <= 20" alone is NOT the plan band. v3 moved quick-add snacks out of
@@ -123,6 +210,22 @@ export function summariseLogRange(
   }
 
   const denom = avgDates.length || 1;
+
+  // Consistency: logged days over days in the window. A date deliberately kept
+  // out of the averages comes out of the denominator too — today being half
+  // eaten is not the same as today being skipped, and charging someone for a
+  // day that hasn't finished yet is exactly the kind of wrong number this
+  // module exists to stop.
+  const excludedInWindow = fellBack ? 0 : realDays.filter((d) => excluded.has(d)).length;
+  const windowDays = opts.windowDays == null ? null : Math.max(1, opts.windowDays - excludedInWindow);
+  const consistency = windowDays == null ? null : Math.min(1, avgDates.length / windowDays);
+  const accuracy = hitDays ? hitSum / hitDays : null;
+
+  // Meal-status average — the legacy measure, still the fallback when there is
+  // no target to be accurate against.
+  const statusAdherence = adhDays ? adhSum / adhDays : null;
+
+  const scored = consistency != null && accuracy != null;
   return {
     loggedDays: realDays.length,
     avgDays: avgDates.length,
@@ -130,6 +233,9 @@ export function summariseLogRange(
     p: p / denom,
     c: c / denom,
     f: f / denom,
-    adherence: adhDays ? adhSum / adhDays : null,
+    adherence: scored ? consistency * accuracy * 100 : statusAdherence,
+    consistency: consistency == null ? null : consistency * 100,
+    accuracy: accuracy == null ? null : accuracy * 100,
+    adherenceBasis: scored ? "logging+macros" : "meal-status",
   };
 }
