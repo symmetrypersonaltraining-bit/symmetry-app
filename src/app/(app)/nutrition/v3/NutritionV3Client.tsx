@@ -18,6 +18,7 @@ import {
   computeDayTotals, planMealMacros, customMealMacros, adherencePct,
   kcalOf, EXTRA_POSITIONS, INSERT_POSITION_MIN, INSERT_POSITION_MAX,
 } from "@/lib/nutrition/dailyTotals";
+import { planItemsToCustom } from "@/lib/nutrition/mealToCustom";
 import { parseFoodText } from "@/lib/nutrition/parseClient";
 import { pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 import Sheet from "./Sheet";
@@ -261,17 +262,60 @@ export default function NutritionV3Client(props: Props) {
   }, [supabase, clientId]);
   useEffect(() => { loadMyMeals(); }, [loadMyMeals]);
 
-  async function saveMyMeal(name: string, items: CustomItem[]) {
-    if (!myMealsOk) return;
+  // Save a meal to the client's reusable library.
+  //
+  // Returns what actually happened so the caller can tell the truth in its
+  // toast — this used to return void and swallow every failure, so a save that
+  // never landed still showed "saved ✓".
+  //
+  // Saving a name that's already in the library OVERWRITES it rather than
+  // adding a second copy. Re-saving "Breakfast (Robert)" after tweaking the
+  // oats is the common case, and it should leave one up-to-date entry, not a
+  // stack of near-identical ones.
+  async function saveMyMeal(name: string, items: CustomItem[]): Promise<"saved" | "updated" | "error"> {
+    if (!myMealsOk) return "error";
     try {
       const t = customMealMacros({ name, items });
-      const { data } = await supabase
+      const totals = { kcal: r(t.kcal), protein: r(t.protein), carbs: r(t.carbs), fats: r(t.fats) };
+      const existing = myMeals.find((m) => m.name.trim().toLowerCase() === name.trim().toLowerCase());
+      if (existing) {
+        const { error } = await supabase.from("my_meals").update({ items, totals }).eq("id", existing.id);
+        if (error) throw error;
+        setMyMeals((prev) => [{ id: existing.id, name, items }, ...prev.filter((m) => m.id !== existing.id)]);
+        return "updated";
+      }
+      const { data, error } = await supabase
         .from("my_meals")
-        .insert({ client_id: clientId, name, items, totals: { kcal: r(t.kcal), protein: r(t.protein), carbs: r(t.carbs), fats: r(t.fats) } })
+        .insert({ client_id: clientId, name, items, totals })
         .select()
         .single();
-      if (data) setMyMeals((prev) => [{ id: String((data as { id: string }).id), name, items }, ...prev]);
-    } catch { /* table not ready — non-fatal */ }
+      if (error || !data) throw error || new Error("no row");
+      setMyMeals((prev) => [{ id: String((data as { id: string }).id), name, items }, ...prev]);
+      return "saved";
+    } catch {
+      // Storage isn't reachable — stop offering the button rather than failing
+      // silently every time.
+      setMyMealsOk(false);
+      return "error";
+    }
+  }
+  // Remove a saved meal from the library. Undoable — the restore re-inserts the
+  // same name/items (a new id; nothing references my_meals rows by id).
+  async function deleteMyMeal(m: { id: string; name: string; items: CustomItem[] }) {
+    const snapshot = { name: m.name, items: JSON.parse(JSON.stringify(m.items)) as CustomItem[] };
+    setMyMeals((prev) => prev.filter((x) => x.id !== m.id));
+    const { error } = await supabase.from("my_meals").delete().eq("id", m.id);
+    if (error) { await loadMyMeals(); toast.error("Couldn't remove that one"); return; }
+    undoToast(`“${m.name}” removed`, async () => {
+      await saveMyMeal(snapshot.name, snapshot.items);
+    });
+  }
+  // Shared by every "Save to My Meals" entry point so the wording is identical.
+  async function saveMyMealWithToast(name: string, items: CustomItem[]) {
+    if (!items.length) { toast("Nothing in this meal yet"); return; }
+    const res = await saveMyMeal(name, items);
+    if (res === "error") { toast.error("Couldn't save to My Meals"); return; }
+    toast.success(res === "updated" ? `“${name}” updated in My Meals ✓` : `“${name}” saved to My Meals ✓`);
   }
 
   // ---- day rows -----------------------------------------------------------
@@ -809,15 +853,14 @@ export default function NutritionV3Client(props: Props) {
     if (!row) throw new Error("that meal isn't on today's list anymore");
     return row;
   }
+  // What "Copy to slot…" and "Save to My Meals" carry away. The plan branch
+  // goes through planItemsToCustom so today's edits ride along — stepping an
+  // item down, removing one, or adding a food all used to be silently dropped
+  // here, so the copy didn't match the macros on the card you copied it from.
   function rowItemsForCopy(rw: Row): CustomItem[] {
     return rw.kind === "custom" && rw.meta
       ? (JSON.parse(JSON.stringify(rw.meta.items)) as CustomItem[])
-      : (rw.chosen?.meal_items || []).map((it) => ({
-          n: it.food, a: it.amount != null ? `${it.amount}${it.unit ? " " + it.unit : ""}` : null,
-          p: Number(it.protein) || 0, c: Number(it.carbs) || 0, f: Number(it.fats) || 0,
-          k: kcalOf(Number(it.protein) || 0, Number(it.carbs) || 0, Number(it.fats) || 0),
-          free: it.is_unlimited, fac: 1,
-        }));
+      : planItemsToCustom(rw.chosen, rw.log?.item_overrides);
   }
   const coachActions: CoachActions = {
     // Same write as the composer swap path: custom meta (kind 'swap'), landed
@@ -1685,11 +1728,8 @@ export default function NutritionV3Client(props: Props) {
           )}
           <p className="text-xs font-bold uppercase tracking-widest mt-4 mb-2" style={{ color: "var(--brand-text-secondary)" }}>Slot actions</p>
           <div className="grid grid-cols-2 gap-1.5">
-            {actionBtn("⭐", "Save to My Meals", async () => {
-              if (!row.meta?.items?.length) { toast("Nothing in this slot yet"); return; }
-              await saveMyMeal(`${label} (${clientName.split(" ")[0]})`, row.meta.items);
-              toast.success(`“${label}” saved to My Meals ✓`);
-            })}
+            {actionBtn("⭐", "Save to My Meals", () =>
+              saveMyMealWithToast(`${label} (${clientName.split(" ")[0]})`, row.meta?.items || []))}
             {actionBtn("↺", "Clear items", async () => {
               if (row.log) await deleteLogRow(row.log.id);
               closeAllSheets();
@@ -1730,6 +1770,13 @@ export default function NutritionV3Client(props: Props) {
           {actionBtn("⇄", "Swap for custom", () => replaceSheet({ kind: "composer", mode: "swap", rowKey }))}
           {actionBtn("▤", "Replace…", () => replaceSheet({ kind: "replace", rowKey }))}
           {actionBtn("⧉", "Copy to slot…", () => replaceSheet({ kind: "copyto", rowKey }))}
+          {/* 4a7256d2: "Ability to save a meal to library to use in future."
+              The library (My Meals) already existed and open slots could save
+              into it — but a meal that was ALREADY on the plan, i.e. every meal
+              you'd actually want to keep, had no way in. Saves what's in the
+              meal right now, today's adjustments included. */}
+          {myMealsOk && actionBtn("⭐", "Save to My Meals", () =>
+            saveMyMealWithToast(rowName(row) || label, rowItemsForCopy(row)))}
           {actionBtn("✎", "Edit items", () => replaceSheet({ kind: "adjust", rowKey }))}
           {actionBtn("↑", "Move up", () => moveRow(rowKey, -1))}
           {actionBtn("↓", "Move down", () => moveRow(rowKey, 1))}
@@ -2021,6 +2068,10 @@ export default function NutritionV3Client(props: Props) {
                   toast.success(`“${mm2.name}” added ✓`);
                 }} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white flex-shrink-0" style={{ background: "var(--brand-primary)" }}>Add here</button>
               )}
+              {/* A library you can only add to fills up with junk. Delete is
+                  undoable (same pattern as deleting a meal from the day). */}
+              <button onClick={() => deleteMyMeal(mm2)} aria-label={`Remove ${mm2.name} from My Meals`}
+                className="flex-shrink-0" style={{ color: "var(--brand-text-secondary)", padding: 6, fontSize: 13 }}>✕</button>
             </div>
           );
         })}
