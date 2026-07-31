@@ -283,12 +283,20 @@ function WorkoutEditor({
           .single();
         programId = (prog as any)?.id;
         if (programId) {
-          await supabase.from("program_assignments").insert({
+          // program_assignments has NO start_date column — the assignment date IS
+          // assigned_at (the clients page reads it aliased as `start_date:assigned_at`).
+          // Writing start_date failed the whole insert with PGRST204, and since the
+          // error was never checked the client silently ended up with a program and
+          // no assignment — so the next save created ANOTHER orphan "Custom Workouts"
+          // program. Only reachable for a client with no active assignment yet, which
+          // is why no orphan rows exist in production.
+          const { error: paErr } = await supabase.from("program_assignments").insert({
             client_id: clientId,
             program_id: programId,
             active: true,
-            start_date: new Date().toISOString().split("T")[0],
+            assigned_at: new Date().toISOString(),
           });
+          if (paErr) { console.error("program assignment failed:", paErr.message); setSaving(false); return; }
         }
       }
 

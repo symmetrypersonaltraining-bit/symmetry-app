@@ -38,13 +38,19 @@ export default function AssignProgramModal({ clientId, clientName, programs, cur
         .eq("client_id", clientId)
         .eq("active", true);
 
-      // Create new assignment
+      // Create new assignment.
+      // program_assignments has NO start_date column — the assignment date IS
+      // assigned_at (the client page reads it aliased as `start_date:assigned_at`).
+      // Writing start_date failed the insert with PGRST204, which threw here and
+      // showed "Could not find the 'start_date' column" — after the old
+      // assignment had already been deactivated, leaving the client with none.
+      // Noon UTC keeps the picked calendar day intact when read back in Central.
       const { error: insertErr } = await supabase
         .from("program_assignments")
         .insert({
           client_id: clientId,
           program_id: selectedProgramId,
-          start_date: startDate,
+          assigned_at: new Date(`${startDate}T12:00:00Z`).toISOString(),
           active: true,
         });
 

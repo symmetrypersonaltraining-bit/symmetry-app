@@ -88,6 +88,7 @@ async function notifyTrainerPaused(db: Db, monthToDateUsd: number): Promise<void
 
   const { error: insErr } = await db.from("ai_usage_log").insert({
     client_id: null,
+    used_on: today,
     feature: PAUSE_NOTICE_FEATURE,
     model: "none",
     tokens_in: 0,
@@ -203,8 +204,12 @@ export async function logUsage(
   try {
     const db = admin();
     if (!db) return cost;
+    // used_on is what the ai_usage_daily / ai_usage_monthly rollup views group
+    // by, and it has no meaningful default for a Chicago day — set it here so
+    // the spend reports aren't one big NULL bucket.
     const { error } = await db.from("ai_usage_log").insert({
       client_id: clientId,
+      used_on: chicagoToday(),
       feature,
       model,
       tokens_in: Math.max(0, Math.round(tokensIn)),
