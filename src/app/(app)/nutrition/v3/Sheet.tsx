@@ -3,6 +3,7 @@
 // Nutrition v3 — generic bottom sheet (backdrop + slide-up), house style.
 
 import { useEffect, useState } from "react";
+import { useKeyboardInset, scrollFocusedIntoView } from "@/lib/useKeyboardInset";
 
 export default function Sheet({
   title,
@@ -18,6 +19,8 @@ export default function Sheet({
   children: React.ReactNode;
 }) {
   const [shown, setShown] = useState(false);
+  // Lift the whole sheet clear of the soft keyboard (feedback 602efaf8).
+  const kb = useKeyboardInset();
   useEffect(() => {
     const raf = requestAnimationFrame(() => setShown(true));
     return () => cancelAnimationFrame(raf);
@@ -25,20 +28,20 @@ export default function Sheet({
   return (
     <div
       className="fixed inset-0 z-[1200] flex items-end"
-      style={{ background: shown ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0)", transition: "background 0.2s" }}
+      style={{ background: shown ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0)", transition: "background 0.2s", bottom: kb, transitionProperty: "background, bottom" }}
       onClick={onClose}
     >
       <div
         className="w-full rounded-t-3xl"
         style={{
           background: "var(--brand-surface)",
-          maxHeight: "88vh",
+          maxHeight: kb ? `calc(100vh - ${kb + 24}px)` : "88vh",
           display: "flex",
           flexDirection: "column",
           borderTop: "1px solid var(--brand-border)",
           transform: shown ? "translateY(0)" : "translateY(102%)",
           transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1)",
-          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingBottom: kb ? 8 : "env(safe-area-inset-bottom)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -63,7 +66,7 @@ export default function Sheet({
             ✕
           </button>
         </div>
-        <div className="px-5 pb-7" style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain" }}>
+        <div className="px-5 pb-7" onFocus={scrollFocusedIntoView} style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain" }}>
           {children}
         </div>
       </div>

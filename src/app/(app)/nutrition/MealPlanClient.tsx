@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import GroceryListSheet from "./GroceryListSheet";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
+import { useKeyboardInset, scrollFocusedIntoView } from "@/lib/useKeyboardInset";
 
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
@@ -581,6 +582,9 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
   // Multi-option bottom sheet (Mockup B). Only used for slots that have >1 option;
   // single-option plans (e.g. Dustin's) never open this and render exactly as before.
+  // Keyboard-safe sheets (feedback 602efaf8): every bottom sheet below lifts by
+  // `kb` so the soft keyboard can't cover the field being typed into.
+  const kb = useKeyboardInset();
   const [slotSheet, setSlotSheet] = useState<{ position: number; timing: string; extra?: boolean } | null>(null);
   const [sheetOptId, setSheetOptId] = useState<string>("");
   const [sheetAdh, setSheetAdh] = useState<string>("Full");
@@ -1157,9 +1161,9 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
       {/* Off-Plan Modal */}
       {offPlanModal && (
-        <div className="fixed inset-0 z-[1100] flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
+        <div className="fixed inset-0 z-[1100] flex items-end" style={{ background: "rgba(0,0,0,0.7)", bottom: kb }}
           onClick={() => setOffPlanModal(null)}>
-          <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)", maxHeight: "85vh", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: "calc(28px + env(safe-area-inset-bottom))" }}
+          <div className="w-full rounded-t-3xl p-5" onFocus={scrollFocusedIntoView} style={{ background: "var(--brand-surface)", maxHeight: kb ? `calc(100vh - ${kb + 24}px)` : "85vh", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: kb ? 12 : "calc(28px + env(safe-area-inset-bottom))" }}
             onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
             <div className="flex items-center justify-between mb-1">
@@ -1231,9 +1235,9 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
 
       {/* Adjust-amounts sheet (per-day override; the trainer's plan is never edited) */}
       {amountsModal && (
-        <div className="fixed inset-0 z-[1100] flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
+        <div className="fixed inset-0 z-[1100] flex items-end" style={{ background: "rgba(0,0,0,0.7)", bottom: kb }}
           onClick={() => setAmountsModal(null)}>
-          <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)", maxHeight: "85vh", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: "calc(28px + env(safe-area-inset-bottom))" }}
+          <div className="w-full rounded-t-3xl p-5" onFocus={scrollFocusedIntoView} style={{ background: "var(--brand-surface)", maxHeight: kb ? `calc(100vh - ${kb + 24}px)` : "85vh", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: kb ? 12 : "calc(28px + env(safe-area-inset-bottom))" }}
             onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
             <div className="flex items-center justify-between mb-1">
@@ -1313,9 +1317,9 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         const draft = chosen ? draftOptionMacros(chosen) : { kcal: 0, protein: 0, carbs: 0, fats: 0 };
         const existingLog = !slotSheet.extra ? logs.find(l => l.meal_position === slotSheet.position) : undefined;
         return (
-          <div className="fixed inset-0 z-[1100] flex items-end" style={{ background: "rgba(0,0,0,0.7)" }}
+          <div className="fixed inset-0 z-[1100] flex items-end" style={{ background: "rgba(0,0,0,0.7)", bottom: kb }}
             onClick={closeSlotSheet}>
-            <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)", maxHeight: "88vh", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: "calc(28px + env(safe-area-inset-bottom))" }}
+            <div className="w-full rounded-t-3xl p-5" onFocus={scrollFocusedIntoView} style={{ background: "var(--brand-surface)", maxHeight: kb ? `calc(100vh - ${kb + 24}px)` : "88vh", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: kb ? 12 : "calc(28px + env(safe-area-inset-bottom))" }}
               onClick={e => e.stopPropagation()}>
               <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
               <div className="flex items-center justify-between mb-3">
