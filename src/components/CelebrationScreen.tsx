@@ -8,8 +8,9 @@ import ShareToGroup from "@/components/ShareToGroup";
 import { fx } from "@/lib/fx";
 
 /**
- * CelebrationScreen — workout-complete celebration (20 rotating concepts,
- * chosen per client+day). Fully self-contained and presentational: it
+ * CelebrationScreen — workout-complete celebration (28 rotating concepts,
+ * chosen per client+day, plus one PR-gated takeover that sits outside the
+ * rotation — see "The Apparition"). Fully self-contained and presentational: it
  * computes volume from the raw sets object with defensive guards and never
  * fetches or mutates data, so it is safe to overlay on the existing
  * "Session done" screen. Mounted as a fixed overlay in WorkoutLogger; the
@@ -64,6 +65,18 @@ const FORTUNES: string[] = [
 
 const LUCKY = ["Incline DB Press", "Goblet Squat", "Lat Pulldown", "Face Pull", "Romanian Deadlift"];
 
+// Speech-bubble lines for Coach Mode (variant 26). His voice — short, dry, no
+// exclamation marks — rerolled by tapping the figure, same interaction as the
+// newspaper headline and the fortune cookie.
+const COACH_LINES: string[] = [
+  "{S} sets. Every one of them logged. That's the whole job.",
+  "{V} lb moved. I counted. It counted.",
+  "You didn't negotiate with the last set. I noticed.",
+  "Good. Now go eat something with protein in it.",
+  "That's the one I wanted. Same again next week.",
+  "Nothing fancy. Just done. That's how this actually works.",
+];
+
 function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) {
@@ -115,7 +128,10 @@ export default function CelebrationScreen({
 
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const seed = hashStr(String(clientId || "") + today);
-  const variant = seed % 27;  // 25 original concepts + The Ledger (24) + Full Send (25)
+  // 25 original concepts + The Ledger (24) + Full Send (25) + Coach Mode (26);
+  // the terminal else (Gains Facts) catches 27. Every earlier concept stays in
+  // the rotation exactly as it was — this only widens the wheel.
+  const variant = seed % 28;
 
   const [tapIdx, setTapIdx] = useState(0);
   const [reroll, setReroll] = useState(0);
@@ -166,6 +182,18 @@ export default function CelebrationScreen({
 
   const topPr = aiPrs[0] || null;
 
+  // A "big" PR, for the floating-head takeover below. Deliberately strict: a
+  // first-ever lift on a movement has no previous best to beat, so it isn't
+  // one, and neither is nudging 100 lb to 102.5. Ten pounds up, or five
+  // percent up, is the bar. That keeps the head rare on its own — no extra
+  // dice roll needed, because big PRs are already occasional.
+  const bigPr = !!(
+    topPr &&
+    topPr.previous &&
+    topPr.previous > 0 &&
+    (topPr.weight - topPr.previous >= 10 || topPr.weight >= topPr.previous * 1.05)
+  );
+
   const vStr = volume.toLocaleString();
 
   // "How many coach Dustins did you lift?" — one decimal, because 4.7 Dustins
@@ -190,6 +218,9 @@ export default function CelebrationScreen({
   const headline = HEADLINES[(seed + tapIdx) % HEADLINES.length];
   const fortune = FORTUNES[(seed + tapIdx) % FORTUNES.length];
   const lucky = LUCKY[seed % LUCKY.length];
+  const coachLine = COACH_LINES[(seed + tapIdx) % COACH_LINES.length]
+    .replace("{S}", String(setCount))
+    .replace("{V}", vStr);
 
   const confetti = (n: number) =>
     Array.from({ length: n }).map((_, i) => (
@@ -725,6 +756,44 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
+  } else if (variant === 26) {
+    // ── Coach Mode — the man himself, flexing, with something to say about the
+    // session. Tap him to hear a different opinion. The card is hardcoded dark
+    // because the artwork is a cutout on a gym-wall backdrop, so every colour
+    // inside it is hardcoded too (the fortune-slip rule, below).
+    content = (
+      <div style={{ ...bigCard, background: "radial-gradient(120% 90% at 50% 8%, #2b3550 0%, #131a2b 55%, #0a0e18 100%)", justifyContent: "flex-end", padding: "16px 14px 0" }}>
+        {/* gym-wall spotlight + floor line, so he's standing somewhere */}
+        <div aria-hidden style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(90deg,rgba(255,255,255,.028) 0 1px,transparent 1px 26px)" }} />
+        <div aria-hidden style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 78, background: "linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.55))" }} />
+
+        <button
+          type="button"
+          onClick={() => {
+            setTapIdx((n) => n + 1);
+            fx("tap");
+          }}
+          style={{ all: "unset", cursor: "pointer", width: "100%", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", zIndex: 1 }}
+          aria-label="Tap coach for another line"
+        >
+          <div style={coachBubble}>
+            <span style={{ display: "block" }}>&ldquo;{coachLine}&rdquo;</span>
+            <span style={coachBubbleTail} aria-hidden />
+          </div>
+
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/coach-flex.webp"
+            alt="Coach Dustin, flexing"
+            style={{ width: 168, height: "auto", display: "block", marginTop: 10, filter: "drop-shadow(0 14px 22px rgba(0,0,0,.5))", animation: "cs-flex 2.6s ease-in-out .4s 3", transformOrigin: "50% 100%" }}
+          />
+        </button>
+
+        <div style={{ position: "relative", zIndex: 1, background: "#E53935", color: "#fff", fontSize: 9.5, fontWeight: 900, letterSpacing: 2.5, padding: "5px 14px", borderRadius: "8px 8px 0 0" }}>
+          COACH APPROVED
+        </div>
+      </div>
+    );
   } else {
     content = (
       <div style={{ ...bigCard, background: "#20304a" }}>
@@ -772,6 +841,37 @@ export default function CelebrationScreen({
             </span>
           </div>
           <div style={{ fontSize: 8.5, paddingTop: 4, lineHeight: 1.35 }}>*Percent Daily Gains based on a diet of consistently showing up. Not a substitute for leg day.</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── The Apparition — big PRs only ────────────────────────────────────────
+  // Not part of the rotation on purpose. This one OVERRIDES whichever concept
+  // rolled today, and only when the PR is genuinely big (see `bigPr` above),
+  // so it stays a thing that happens to you a few times a year rather than a
+  // card you get bored of. The PR plate above already carries the numbers, so
+  // this card is the reaction, not a second scoreboard.
+  if (bigPr && topPr) {
+    const jump = Math.round(topPr.weight - (topPr.previous || 0));
+    content = (
+      <div style={{ ...bigCard, background: "radial-gradient(100% 80% at 50% 34%, #3a2c10 0%, #150f04 62%, #080602 100%)", padding: "22px 16px" }}>
+        <div aria-hidden style={rays} />
+        <div style={{ position: "relative", zIndex: 1, fontSize: 9.5, letterSpacing: 3.5, fontWeight: 900, color: "#e0a83e" }}>
+          A DISTURBANCE IN THE GYM
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/coach-head.webp"
+          alt="Coach Dustin has appeared"
+          style={{ width: 132, height: "auto", display: "block", margin: "14px 0 4px", position: "relative", zIndex: 1, filter: "drop-shadow(0 0 26px rgba(224,168,62,.55))", animation: "cs-bob 3.4s ease-in-out .3s infinite" }}
+        />
+        <div style={{ position: "relative", zIndex: 1, fontSize: 18.5, fontWeight: 900, color: "#ffe9b0", lineHeight: 1.25, marginTop: 8 }}>
+          {firstName} put {jump} more pound{jump === 1 ? "" : "s"} on {topPr.movement}.
+        </div>
+        <div style={{ position: "relative", zIndex: 1, fontSize: 12.5, color: "#d9c18a", marginTop: 8, maxWidth: 270, lineHeight: 1.55 }}>
+          Coach Dustin has materialised. He only does this for the big ones. He
+          will not be answering questions.
         </div>
       </div>
     );
@@ -885,5 +985,42 @@ const dustinBox: React.CSSProperties = {
   color: "var(--brand-text)",
 };
 
+// Coach Mode + The Apparition (2026-07-31). Both cards hardcode a dark
+// background, so — per the fortune-slip rule above — they hardcode every text
+// colour that sits on them too. Nothing here reads var(--brand-text).
+const coachBubble: React.CSSProperties = {
+  position: "relative",
+  background: "#fdfaf3",
+  color: "#23201a",
+  borderRadius: 14,
+  padding: "11px 14px",
+  fontSize: 12.5,
+  lineHeight: 1.5,
+  fontWeight: 600,
+  maxWidth: 268,
+  boxShadow: "0 10px 24px rgba(0,0,0,.4)",
+};
+const coachBubbleTail: React.CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  bottom: -9,
+  marginLeft: -8,
+  width: 0,
+  height: 0,
+  borderLeft: "8px solid transparent",
+  borderRight: "8px solid transparent",
+  borderTop: "10px solid #fdfaf3",
+};
+const rays: React.CSSProperties = {
+  position: "absolute",
+  top: "-40%",
+  left: "-40%",
+  width: "180%",
+  height: "180%",
+  background:
+    "repeating-conic-gradient(from 0deg at 50% 50%, rgba(224,168,62,.16) 0deg 7deg, transparent 7deg 20deg)",
+  animation: "cs-rays 26s linear infinite",
+};
+
 const aiLineBox: React.CSSProperties = { background: "var(--brand-surface)", border: "1px solid var(--brand-border)", borderLeft: "3px solid var(--brand-primary)", borderRadius: 12, padding: "11px 14px", fontSize: 13.5, lineHeight: 1.55, color: "var(--brand-text)", fontStyle: "italic" };
-const CSS = "@keyframes cs-ledger{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}@keyframes cs-ring{to{stroke-dashoffset:var(--ring-to,0)}}@media (prefers-reduced-motion:reduce){[style*='cs-ledger'],[style*='cs-ring'],[style*='cs-stamp']{animation:none!important;opacity:1!important}}@keyframes cs-fall{to{transform:translateY(760px) rotate(720deg)}}@keyframes cs-blink{50%{opacity:.3}}@keyframes cs-xp{from{width:6%}to{width:85%}}@keyframes cs-credits{from{transform:translateY(100%)}to{transform:translateY(-100%)}}@keyframes cs-stamp{from{transform:rotate(12deg) scale(3);opacity:0}to{transform:rotate(12deg) scale(1);opacity:.9}}@keyframes cs-shimmer{0%{background-position:0% 0}100%{background-position:300% 0}}@keyframes cs-ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}";
+const CSS = "@keyframes cs-ledger{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}@keyframes cs-ring{to{stroke-dashoffset:var(--ring-to,0)}}@keyframes cs-flex{0%,100%{transform:scale(1) rotate(0)}42%{transform:scale(1.045) rotate(-1.1deg)}70%{transform:scale(1.02) rotate(.7deg)}}@keyframes cs-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}@keyframes cs-rays{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){[style*='cs-ledger'],[style*='cs-ring'],[style*='cs-stamp'],[style*='cs-flex'],[style*='cs-bob'],[style*='cs-rays']{animation:none!important;opacity:1!important}}@keyframes cs-fall{to{transform:translateY(760px) rotate(720deg)}}@keyframes cs-blink{50%{opacity:.3}}@keyframes cs-xp{from{width:6%}to{width:85%}}@keyframes cs-credits{from{transform:translateY(100%)}to{transform:translateY(-100%)}}@keyframes cs-stamp{from{transform:rotate(12deg) scale(3);opacity:0}to{transform:rotate(12deg) scale(1);opacity:.9}}@keyframes cs-shimmer{0%{background-position:0% 0}100%{background-position:300% 0}}@keyframes cs-ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}";
