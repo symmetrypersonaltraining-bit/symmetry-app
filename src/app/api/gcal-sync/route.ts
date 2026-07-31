@@ -209,10 +209,22 @@ export async function POST(req: NextRequest) {
     // statement of record and is never rewritten.
     let remindersRecalculated = 0;
     let remindersChanged = 0;
+    let workoutsFollowed = 0;
     const svc = getServiceClient();
     if (!svc) {
       errors.push('reminder_recalc: SUPABASE_SERVICE_ROLE_KEY is not set - reminders were NOT recalculated');
     } else {
+      // The calendar decides WHEN a supervised session happens, so supervised
+      // workouts follow their linked appointment automatically -- no proposal,
+      // no approval. It will not touch solo work, anything already logged,
+      // anything in the past, anything moved by hand, or a day that is already
+      // occupied. Runs BEFORE the billing recalc: the reminder counts read the
+      // same rows this just corrected.
+      const { data: mv, error: mvErr } = await svc.rpc('sync_supervised_workouts_to_appointments', { p_dry_run: false });
+      if (mvErr) errors.push('workout_follow: ' + mvErr.message);
+      else workoutsFollowed = ((mv as any[]) || []).length;
+    }
+    if (svc) {
       const { data: rr, error: rrErr } = await svc.rpc('recalc_pending_payment_reminders');
       if (rrErr) errors.push('reminder_recalc: ' + rrErr.message);
       else {
@@ -229,7 +241,7 @@ export async function POST(req: NextRequest) {
     const dollarEvents = allEvents.filter((e: any) => /\$\s?\d/.test(e.summary || ''));
     const clientDollar = dollarEvents.filter((e: any) => matchClient(e.summary || ''));
     const laurenEvents = allEvents.filter((e: any) => (e.summary || '').toLowerCase().includes('lauren')).slice(0, 4);
-    return NextResponse.json({ ok: true, synced, payments, reconciled, reconciled_payments: reconciledPayments, reminders_recalculated: remindersRecalculated, reminders_changed: remindersChanged, total: allEvents.length, dollar_events: dollarEvents.length, client_dollar: clientDollar.length, client_dollar_samples: clientDollar.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), lauren_samples: laurenEvents.map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), dollar_samples: dollarEvents.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | start:' + JSON.stringify(e.start || {})), errors: errors.slice(0, 10) });
+    return NextResponse.json({ ok: true, synced, payments, reconciled, reconciled_payments: reconciledPayments, workouts_followed: workoutsFollowed, reminders_recalculated: remindersRecalculated, reminders_changed: remindersChanged, total: allEvents.length, dollar_events: dollarEvents.length, client_dollar: clientDollar.length, client_dollar_samples: clientDollar.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), lauren_samples: laurenEvents.map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), dollar_samples: dollarEvents.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | start:' + JSON.stringify(e.start || {})), errors: errors.slice(0, 10) });
   } catch (e: any) {
     const msg = e.message || String(e);
     if (msg.includes('disabled') || msg.includes('not connected')) {
