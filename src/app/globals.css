@@ -1482,3 +1482,35 @@ h1, h2, h3 { text-wrap: balance; }
   outline: 2px solid color-mix(in srgb, var(--brand-primary) 70%, transparent);
   outline-offset: 2px;
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   NATIVE CONTROLS IN DARK THEMES — feedback f6d884cd, 2026-07-31
+   "Dark mode issue, white background with white text" (reported from /home).
+
+   The culprit was never app CSS — it was the browser's own widgets. A <select>
+   is styled by us (dark background, --brand-text foreground), but the DROPDOWN
+   the OS opens is drawn by the UA: white background, colour INHERITED from the
+   select. In a dark theme that inherited colour is #E6EDF3, so the client list
+   on /home opened as white text on a white sheet. Same story for the native
+   date/time picker panels and the scrollbars.
+
+   `color-scheme` is the real switch for that, and it was only ever set under
+   [data-appearance="dark"] — the override AutoDark applies to LIGHT themes on a
+   dark phone. Themes that are dark by design (midnight, carbonneon, berry,
+   plumdusk, lagoon, orchid, slatepop) never got it, so they were the only ones
+   showing the bug. AutoDark now sets color-scheme from the measured --brand-bg
+   luminance, so every dark theme gets it with no hardcoded theme list.
+
+   The option/optgroup rules below are the belt-and-braces half: some Android
+   WebView builds ignore color-scheme for the select popup specifically.
+   ════════════════════════════════════════════════════════════════════════════ */
+option,
+optgroup {
+  background-color: var(--brand-surface);
+  color: var(--brand-text);
+}
+option:checked,
+option:hover {
+  background-color: color-mix(in srgb, var(--brand-primary) 30%, var(--brand-surface));
+  color: var(--brand-text);
+}

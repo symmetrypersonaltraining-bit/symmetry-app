@@ -318,7 +318,7 @@ export default function CelebrationScreen({
           <>
             <div style={fortuneCard}>
               &ldquo;{fortune}&rdquo;
-              <div style={{ fontSize: 11, color: "var(--brand-text-secondary)", marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 8 }}>
                 🍀 Lucky exercise tomorrow: <b>{lucky}</b>
               </div>
             </div>
@@ -826,7 +826,11 @@ const lever: React.CSSProperties = { width: 54, height: 54, borderRadius: "50%",
 const letter: React.CSSProperties = { background: "#fdfaf3", border: "1px solid #e8e0cc", borderRadius: 6, padding: "18px 16px", textAlign: "left", fontFamily: "Georgia, serif", color: "#3b3629", fontSize: 12.5, lineHeight: 1.7, boxShadow: "0 8px 26px rgba(20,30,55,.08)", transform: "rotate(-.6deg)" };
 const stamp: React.CSSProperties = { position: "absolute", top: 14, right: 14, border: "3px solid #c0111f", color: "#c0111f", fontWeight: 900, fontSize: 11, padding: "4px 8px", borderRadius: 6, transform: "rotate(12deg)", letterSpacing: 1, opacity: 0.9, animation: "cs-stamp .4s .6s both" };
 const poster: React.CSSProperties = { background: "#f7ecd8", border: "6px double #a4443c", color: "#5b2b26" };
-const fortuneCard: React.CSSProperties = { background: "#fff", border: "1px solid var(--brand-border)", borderRadius: 4, padding: "12px 16px", fontSize: 13, color: "var(--brand-text)", boxShadow: "0 8px 26px rgba(20,30,55,.08)", maxWidth: 280, lineHeight: 1.6 };
+// The fortune slip is a PROP — a paper strip out of a cookie — so it keeps its
+// hardcoded paper white in every theme. It used to pair that white with
+// color:var(--brand-text), which in a dark theme is #E6EDF3: white on white.
+// Both halves are hardcoded now, like the `letter` and `poster` props above.
+const fortuneCard: React.CSSProperties = { background: "#fff", border: "1px solid #dfe3ea", borderRadius: 4, padding: "12px 16px", fontSize: 13, color: "#1a2233", boxShadow: "0 8px 26px rgba(20,30,55,.08)", maxWidth: 280, lineHeight: 1.6 };
 const ghostBtn: React.CSSProperties = { marginTop: 14, border: "1px solid var(--brand-border)", background: "var(--brand-surface)", color: "var(--brand-text)", borderRadius: 999, padding: "10px 16px", fontSize: 12, fontWeight: 800, cursor: "pointer" };
 const doneBtn: React.CSSProperties = { textAlign: "center", background: "var(--brand-primary)", color: "#fff", borderRadius: 999, padding: "13px 0", fontSize: 14, fontWeight: 800, textDecoration: "none" };
 // PR plate + AI line (2026-07-25). Additive styles only.

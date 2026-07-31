@@ -56,8 +56,11 @@ export default function FeedbackButton() {
       {open && (
         <div style={{
           position: "fixed", bottom: 134, right: 16, zIndex: 9001,
-          background: "#fff", borderRadius: 18, padding: 18, width: 270,
-          boxShadow: "0 8px 30px rgba(0,0,0,0.18)", border: "1px solid #e3e9f3",
+          // Themed rather than hardcoded white (f6d884cd sweep): this popover
+          // sits on top of every page, so in a dark theme a stark white card
+          // was the brightest thing on screen at 5am.
+          background: "var(--brand-surface,#fff)", borderRadius: 18, padding: 18, width: 270,
+          boxShadow: "0 8px 30px rgba(0,0,0,0.18)", border: "1px solid var(--brand-border,#e3e9f3)",
         }}>
           {sent ? (
             <div style={{ textAlign: "center", padding: "12px 0", fontWeight: 700, color: "#5ec9a3", fontSize: 15 }}>
@@ -65,17 +68,17 @@ export default function FeedbackButton() {
             </div>
           ) : (
             <>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: "#2a3147" }}>Send feedback to Dustin</div>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: "var(--brand-text,#2a3147)" }}>Send feedback to Dustin</div>
               <textarea
                 value={msg}
                 onChange={e => setMsg(e.target.value)}
                 placeholder="Tell us what\'s working or what needs fixing…"
                 rows={4}
                 style={{
-                  width: "100%", border: "1px solid #e3e9f3", borderRadius: 10,
+                  width: "100%", border: "1px solid var(--brand-border,#e3e9f3)", borderRadius: 10,
                   padding: "8px 10px", fontSize: 13, resize: "none",
                   fontFamily: "inherit", boxSizing: "border-box",
-                  color: "#2a3147", background: "#f4f6fb",
+                  color: "var(--brand-text,#2a3147)", background: "var(--brand-bg,#f4f6fb)",
                 }}
               />
               <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
@@ -83,8 +86,8 @@ export default function FeedbackButton() {
                   onClick={toggleMic}
                   aria-label={listening ? "Stop dictation" : "Dictate feedback"}
                   style={{
-                    flex: "0 0 44px", width: 44, background: listening ? "#e5393518" : "#f4f6fb",
-                    color: listening ? "#e53935" : "#7c9cf5", border: "1px solid #e3e9f3",
+                    flex: "0 0 44px", width: 44, background: listening ? "#e5393518" : "var(--brand-bg,#f4f6fb)",
+                    color: listening ? "#e53935" : "var(--brand-primary,#7c9cf5)", border: "1px solid var(--brand-border,#e3e9f3)",
                     borderRadius: 10, fontSize: 18, cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}

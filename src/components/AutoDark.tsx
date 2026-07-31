@@ -62,6 +62,18 @@ export default function AutoDark() {
         // Never re-darken a theme that is already dark.
         if (wantDark && themeIsLight()) root.setAttribute("data-appearance", "dark");
         else root.removeAttribute("data-appearance");
+
+        // Feedback f6d884cd — "white background with white text". Tell the
+        // browser how dark the surface actually is so IT draws its own widgets
+        // to match: the <select> dropdown sheet, the date/time picker panels,
+        // scrollbars. Without this a dark theme renders those popups white
+        // while inheriting our near-white --brand-text — invisible text.
+        //
+        // Derived from the SAME luminance measurement as above rather than a
+        // theme-name list, so it stays correct as themes are added, and it
+        // covers BOTH cases the block above splits apart: a light theme being
+        // overridden dark, and a theme that was dark to begin with.
+        root.style.colorScheme = wantDark || !themeIsLight() ? "dark" : "light";
       } catch {
         /* an appearance tweak must never break the app */
       }
