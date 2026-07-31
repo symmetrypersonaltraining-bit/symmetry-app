@@ -46,8 +46,10 @@ const isLockedDate = (d: string) => d >= LOCKED_START && d <= LOCKED_END;
  * ScheduleBoard — compact scrollable schedule board. ~5-7 days visible on mobile.
  * Reschedule two ways: (1) PRESS-AND-HOLD a workout tile (~250ms) then drag it
  * onto another day — the target day highlights; release to drop. (2) tap the
- * "Move" button on a tile to pick a date. Both honor guardrails (block before
- * today, Peak Week Aug 3-9 locked, never move completed). A move updates
+ * "Move" button on a tile to pick a date. Missed (past, not-yet-completed)
+ * sessions also get a one-tap "→ Today". Both honor guardrails (no destination
+ * more than 7 days back, Peak Week Aug 3-9 locked, never move completed;
+ * a workout sitting on a past date is NOT locked — see 6e90c584). A move updates
  * scheduled_workouts + router.refresh() so every calendar reflects it (realtime
  * covers other devices). Additive/isolated.
  */
@@ -74,6 +76,23 @@ export default function ScheduleBoard({
   const [movePick, setMovePick] = useState<{ id: string; label: string } | null>(null);
   const [pickDate, setPickDate] = useState<string>(today);
   const [showPast, setShowPast] = useState(false);
+  // Feedback 6e90c584: "ability to move past workouts forwards". A workout that
+  // sits on a past date used to be frozen — no drag handle, no Move button — so
+  // a session you missed on Tuesday was stuck on Tuesday forever. Only two
+  // things should actually freeze a tile: it's already COMPLETED (history), or
+  // it's Peak Week (locked by design). Being in the past just means you missed
+  // it, and missing it is exactly when you need to move it.
+  const missed = useMemo(
+    () => workouts.filter((w) => w.date < today && w.status !== "completed" && !isLockedDate(w.date)),
+    [workouts, today],
+  );
+  // Auto-open the past section when something was missed — a workout you need
+  // to reschedule shouldn't be hidden behind a collapsed toggle.
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (autoOpenedRef.current) return;
+    if (missed.length > 0) { autoOpenedRef.current = true; setShowPast(true); }
+  }, [missed.length]);
   // Full workout library for swap-in (Dustin 7/13: clients can move/add/swap from full library)
   const [libDays, setLibDays] = useState<{ id: string; label: string }[] | null>(null);
   const [libQ, setLibQ] = useState("");
@@ -315,16 +334,33 @@ export default function ScheduleBoard({
       {pastDays.length > 0 && (
         <button
           onClick={() => setShowPast((s) => !s)}
-          style={{ width: "100%", marginBottom: 6, padding: "6px 10px", borderRadius: 10, border: "1px dashed var(--brand-border)", background: "transparent", color: "var(--brand-text-secondary)", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}
+          style={{
+            width: "100%", marginBottom: 6, padding: "6px 10px", borderRadius: 10,
+            border: !showPast && missed.length > 0 ? "1px solid #f59e0b" : "1px dashed var(--brand-border)",
+            background: !showPast && missed.length > 0 ? "color-mix(in srgb, #f59e0b 12%, transparent)" : "transparent",
+            color: !showPast && missed.length > 0 ? "#b45309" : "var(--brand-text-secondary)",
+            fontSize: 11.5, fontWeight: 700, cursor: "pointer",
+          }}
         >
-          {showPast ? "▴ Hide past workouts" : "▾ Show past workouts (" + pastDays.length + " days)"}
+          {showPast
+            ? "▴ Hide past workouts"
+            : missed.length > 0
+              ? "▾ " + missed.length + " missed workout" + (missed.length === 1 ? "" : "s") + " — move " + (missed.length === 1 ? "it" : "them") + " forward"
+              : "▾ Show past workouts (" + pastDays.length + " days)"}
         </button>
       )}
       <div>
         {[...(showPast ? pastDays : []), ...upcomingDays].map((k) => {
           const isToday = k === today;
           const isPast = k < today;
-          const locked = isPast || isLockedDate(k);
+          // 6e90c584: `locked` used to be `isPast || isLockedDate(k)`, which froze
+          // every past tile — no drag handle, no Move, no Remove. A session you
+          // missed on Tuesday was stuck on Tuesday forever, which is the one case
+          // you MOST need to reschedule. Only Peak Week freezes a date now;
+          // `isPast` stays purely cosmetic (the dimming and the "past" label).
+          // The per-tile `movable` below still excludes completed workouts, so
+          // history is never editable.
+          const locked = isLockedDate(k);
           const items = byDate[k] || [];
           const empty = items.length === 0;
           const isOver = overDate === k;
@@ -337,7 +373,9 @@ export default function ScheduleBoard({
                 borderRadius: 11,
                 marginBottom: 6,
                 background: isOver ? "color-mix(in srgb, var(--brand-primary) 10%, var(--brand-surface))" : "var(--brand-surface)",
-                opacity: locked && !isOver ? 0.7 : 1,
+                // Past days still read as "behind you" even though they're now
+                // movable — the dimming is cosmetic, not a lock indicator.
+                opacity: (locked || isPast) && !isOver ? 0.7 : 1,
                 overflow: "hidden",
               }}
             >
@@ -356,7 +394,15 @@ export default function ScheduleBoard({
                   {isToday ? <span style={{ color: "var(--brand-primary)", fontWeight: 800 }}> · Today</span> : null}
                 </span>
                 <span style={{ fontSize: 10.5, color: "var(--brand-text-secondary)" }}>
-                  {isLockedDate(k) ? "🔒 Peak Week" : empty ? "Rest" : isPast ? "past" : ""}
+                  {isLockedDate(k)
+                    ? "🔒 Peak Week"
+                    : empty
+                      ? "Rest"
+                      : isPast
+                        ? items.some((w) => w.status !== "completed")
+                          ? "missed"
+                          : "past"
+                        : ""}
                 </span>
               </div>
               {!empty && (
@@ -365,6 +411,11 @@ export default function ScheduleBoard({
                     const t = typeOf(w.label);
                     const done = w.status === "completed";
                     const movable = !done && !locked;
+                    // A missed session's overwhelmingly common fix is "do it
+                    // today instead", so that gets a one-tap button rather than
+                    // making Dustin open the Move sheet and pick a date. Hidden
+                    // once today is already Peak Week (moveWorkout would refuse).
+                    const canPullForward = movable && isPast && !isLockedDate(today);
                     return (
                       <div
                         key={w.id}
@@ -405,6 +456,16 @@ export default function ScheduleBoard({
                         >
                           {done ? "View" : "▶ Start"}
                         </button>
+                        {canPullForward ? (
+                          <button
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); moveWorkout(w.id, today); }}
+                            title="Move this missed workout to today"
+                            style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, padding: "4px 9px", borderRadius: 8, border: "1px solid #f59e0b", background: "color-mix(in srgb, #f59e0b 14%, transparent)", color: "#b45309", cursor: "pointer" }}
+                          >
+                            → Today
+                          </button>
+                        ) : null}
                         {movable ? (
                           <button
                             onPointerDown={(e) => e.stopPropagation()}
