@@ -987,7 +987,7 @@ export default function ProgramPage() {
   })();
 
   useEffect(() => {
-    supabase.from("clients").select("id, name").order("name")
+    supabase.from("clients").select("id, name").is("archived_at", null).order("name")
       .then(({ data }) => setClients((data || []) as ClientRow[]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

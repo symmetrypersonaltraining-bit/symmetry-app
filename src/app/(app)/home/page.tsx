@@ -36,6 +36,7 @@ export default async function HomePage(props: {
     const { data: clients } = await supabase
       .from("clients")
       .select("id, name")
+      .is("archived_at", null)
       .order("name");
 
     const todayStrCT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });

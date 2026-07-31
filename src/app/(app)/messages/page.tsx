@@ -33,7 +33,7 @@ export default async function MessagesPage(props: {
     // group_reads watermark) so the badge / bell / banner clear.
     const __nowIso = new Date().toISOString();
     await supabase.from("group_reads").upsert({ user_id: user.id, last_read_at: __nowIso, updated_at: __nowIso }, { onConflict: "user_id" });
-    const { data: allClients } = await supabase.from("clients").select("*").not("auth_user_id", "is", null).order("name");
+    const { data: allClients } = await supabase.from("clients").select("*").not("auth_user_id", "is", null).is("archived_at", null).order("name");
     const senderNames: Record<string, string> = {};
     for (const cc of (allClients || []) as any[]) { if (cc.auth_user_id) senderNames[cc.auth_user_id] = String(cc.name || "").trim().split(" ")[0]; }
     return (
@@ -50,10 +50,13 @@ export default async function MessagesPage(props: {
   }
 
   if (isTrainer) {
+    // Archived clients drop off the inbox list. Their history is still there —
+    // /messages?client=<id> opens the thread — it just isn't in the roster.
     const { data: clients } = await supabase
       .from("clients")
       .select("id, name, auth_user_id")
       .not("auth_user_id", "is", null)
+      .is("archived_at", null)
       .order("name");
 
     // INBOX-FIRST. Only a client the trainer EXPLICITLY opened (?client=…) is

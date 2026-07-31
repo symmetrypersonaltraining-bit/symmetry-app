@@ -22,6 +22,7 @@ export default async function ClientsPage() {
       email,
       phone,
       auth_user_id,
+      archived_at,
       program_assignments!left(
         active,
         programs(name)
@@ -39,6 +40,7 @@ export default async function ClientsPage() {
       email: c.email || "",
       phone: c.phone || "",
       hasAppAccess: !!c.auth_user_id,
+      archived: !!c.archived_at,
       activeProgram: activeAssignment?.programs?.name || null,
     };
   });
@@ -49,7 +51,7 @@ export default async function ClientsPage() {
         <div>
           <h1 className="text-2xl font-bold gradient-text">Clients</h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-            {clientList.length} clients
+            {clientList.filter((c) => !c.archived).length} clients
           </p>
         </div>
         <Link

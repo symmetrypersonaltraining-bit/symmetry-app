@@ -15,6 +15,7 @@ export default async function PaymentsPage() {
   const { data: clientRows } = await supabase
     .from("clients")
     .select("id, name, email, current_fees, training_frequency")
+    .is("archived_at", null)
     .order("name");
 
   // All payment reminders (newest first per client for history)

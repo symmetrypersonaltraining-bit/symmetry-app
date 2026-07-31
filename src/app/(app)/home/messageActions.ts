@@ -98,10 +98,12 @@ export async function sendBroadcastMessage(body: string, imageUrl?: string | nul
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || user.email !== 'symmetrypersonaltraining@gmail.com') return 0;
+  // Archived clients are off the roster — a broadcast never reaches them.
   const { data: clients } = await supabase
     .from('clients')
     .select('id, auth_user_id')
-    .not('auth_user_id', 'is', null);
+    .not('auth_user_id', 'is', null)
+    .is('archived_at', null);
   const rows = (clients || [])
     .filter((c: any) => c.auth_user_id && c.auth_user_id !== user.id)
     .map((c: any) => ({ from_id: user.id, to_id: c.auth_user_id, client_id: c.id, body, image_url: imageUrl || null, is_broadcast: true }));
@@ -137,7 +139,7 @@ export async function sendGroupMessage(body: string, imageUrl?: string | null): 
   try {
     const admin: any = createAdminClient();
     const [{ data: members }, { data: trainerId }] = await Promise.all([
-      admin.from('clients').select('auth_user_id').not('auth_user_id', 'is', null),
+      admin.from('clients').select('auth_user_id').not('auth_user_id', 'is', null).is('archived_at', null),
       supabase.rpc('trainer_user_id'),
     ]);
     const targets = new Set<string>();

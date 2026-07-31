@@ -6,6 +6,7 @@ import PlateauSpotter from "@/components/PlateauSpotter";
 import ClientWorkoutAI from "@/components/ClientWorkoutAI";
 import InviteClientButton from "./InviteClientButton";
 import ResetCredentialsButton from "./ResetCredentialsButton";
+import ArchiveClientButton from "./ArchiveClientButton";
 
 export default async function ClientProfilePage({
   params,
@@ -20,7 +21,7 @@ export default async function ClientProfilePage({
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, name, email, phone, auth_user_id, created_at, payment_reminders_enabled, injuries_limitations, primary_goal, secondary_goals, experience_level, training_frequency, current_weight, current_body_fat_pct, date_of_birth, start_date, notes, current_fees, is_self_coached")
+    .select("id, name, email, phone, auth_user_id, created_at, payment_reminders_enabled, injuries_limitations, primary_goal, secondary_goals, experience_level, training_frequency, current_weight, current_body_fat_pct, date_of_birth, start_date, notes, current_fees, is_self_coached, archived_at")
     .eq("id", clientId)
     .maybeSingle();
   if (!client) notFound();
@@ -105,8 +106,13 @@ export default async function ClientProfilePage({
                 </span>
               )}
               <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                style={{ background: client.auth_user_id ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.15)", color: "white" }}>
-                {client.auth_user_id ? "Active" : "Pending"}
+                style={{
+                  background: (client as any).archived_at
+                    ? "rgba(120,113,108,0.55)"
+                    : client.auth_user_id ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.15)",
+                  color: "white",
+                }}>
+                {(client as any).archived_at ? "Archived" : client.auth_user_id ? "Active" : "Pending"}
               </span>
               {!client.auth_user_id && client.email && (
                 <InviteClientButton clientId={client.id} clientName={client.name} />
@@ -114,6 +120,7 @@ export default async function ClientProfilePage({
               {client.auth_user_id && client.email && (
                 <ResetCredentialsButton clientId={client.id} />
               )}
+              <ArchiveClientButton clientId={client.id} archived={!!(client as any).archived_at} />
             </div>
           </div>
           <div className="text-right">

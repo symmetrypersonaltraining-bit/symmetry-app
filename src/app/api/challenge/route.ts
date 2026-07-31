@@ -84,7 +84,7 @@ export async function GET() {
     // Demo/test accounts are dropped from BOTH the named standings and the
     // anonymous group total — an inflated total is just as misleading to the
     // people reading it as a fake name on the board would be.
-    const { data: allClients } = await db.from("clients").select("id, name, email");
+    const { data: allClients } = await db.from("clients").select("id, name, email").is("archived_at", null);
     const excluded = excludedClientIds(allClients as { id: string; name: string | null; email: string | null }[] | null);
     const rankIds = ids.filter((id) => !excluded.has(id));
 

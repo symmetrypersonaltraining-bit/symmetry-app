@@ -63,8 +63,8 @@ async function execTool(db: Db, name: string, input: Record<string, unknown>): P
   try {
     if (name === "find_clients") {
       const q = typeof input.query === "string" ? input.query.trim() : "";
-      let query = db.from("clients").select("id, name, primary_goal").order("name").limit(60);
-      if (q) query = db.from("clients").select("id, name, primary_goal").ilike("name", `%${q}%`).order("name").limit(60);
+      let query = db.from("clients").select("id, name, primary_goal").is("archived_at", null).order("name").limit(60);
+      if (q) query = db.from("clients").select("id, name, primary_goal").ilike("name", `%${q}%`).is("archived_at", null).order("name").limit(60);
       const { data } = await query;
       return JSON.stringify(data || []);
     }

@@ -82,7 +82,7 @@ export async function GET() {
     // Full history, not a window. Both tables are small (hundreds of rows), and
     // a window is exactly what makes "never trained" lie about a lapsed client.
     const [clientsRes, wlRes, mealRes] = await Promise.all([
-      admin.from("clients").select("id, name, email, primary_goal, created_at").not("auth_user_id", "is", null),
+      admin.from("clients").select("id, name, email, primary_goal, created_at").not("auth_user_id", "is", null).is("archived_at", null),
       admin.from("workout_logs").select("client_id, log_date").eq("completed", true),
       admin.from("meal_adherence_logs").select("client_id, log_date").not("adherence", "is", null),
     ]);

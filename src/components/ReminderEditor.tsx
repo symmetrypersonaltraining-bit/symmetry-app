@@ -55,7 +55,8 @@ export default function ReminderEditor() {
         .order("due_date");
       const { data: clients } = await sup
         .from("clients")
-        .select("id, name, current_fees, session_rate, flat_billing");
+        .select("id, name, current_fees, session_rate, flat_billing")
+        .is("archived_at", null);
       const { data: pays } = await sup
         .from("calendar_payments")
         .select("client_id, amount, payment_date, cadence")

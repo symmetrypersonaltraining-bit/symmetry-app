@@ -30,6 +30,7 @@ export default async function ProgressPage({
     const { data: clientList } = await supabase
       .from("clients")
       .select("id, name")
+      .is("archived_at", null)
       .order("name");
     allClients = clientList || [];
 

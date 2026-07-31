@@ -25,6 +25,7 @@ interface Client {
   email: string;
   phone: string;
   hasAppAccess: boolean;
+  archived?: boolean;
   activeProgram: string | null;
 }
 
@@ -55,6 +56,9 @@ export default function ClientsListClient({ clients }: Props) {
 
   const [search, setSearch] = useState("");
   const [showNewClient, setShowNewClient] = useState(false);
+  // Archived clients are off the roster, not gone — this flips the list over to
+  // show them so they can be found and restored.
+  const [showArchived, setShowArchived] = useState(false);
 
   const [statusMap, setStatusMap] = useState<Record<string, "green" | "amber" | "red">>({});
 
@@ -136,10 +140,12 @@ export default function ClientsListClient({ clients }: Props) {
     };
   }, []);
 
+  const archivedCount = clients.filter((c) => c.archived).length;
   const filtered = clients.filter(
     (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.email.toLowerCase().includes(search.toLowerCase())
+      !!c.archived === showArchived &&
+      (c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.email.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -184,12 +190,36 @@ export default function ClientsListClient({ clients }: Props) {
         )}
       </div>
 
+      {/* Active / Archived toggle. Hidden entirely until something is archived,
+          so the roster stays a plain list for as long as it is one. */}
+      {archivedCount > 0 && (
+        <div className="flex gap-2 mb-3">
+          {[
+            { label: `Active (${clients.length - archivedCount})`, on: !showArchived, v: false },
+            { label: `Archived (${archivedCount})`, on: showArchived, v: true },
+          ].map((t) => (
+            <button
+              key={t.label}
+              onClick={() => setShowArchived(t.v)}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+              style={
+                t.on
+                  ? { background: "var(--brand-primary)", color: "#fff" }
+                  : { background: "var(--brand-surface)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }
+              }
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Client list */}
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {filtered.length === 0 ? (
           <div className="py-12 text-center" style={{ color: "var(--brand-text-secondary)" }}>
             <i className="ti ti-users text-3xl mb-2 block" />
-            <p className="text-sm">No clients found</p>
+            <p className="text-sm">{showArchived ? "No archived clients" : "No clients found"}</p>
           </div>
         ) : (
           filtered.map((client, i) => {
@@ -225,7 +255,11 @@ export default function ClientsListClient({ clients }: Props) {
                     <span className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>
                       {client.name}
                     </span>
-                    {client.hasAppAccess ? (
+                    {client.archived ? (
+                      <span className="tag-gray text-[10px] px-1.5 py-0.5 rounded-full font-medium">
+                        Archived
+                      </span>
+                    ) : client.hasAppAccess ? (
                       <span className="tag-green text-[10px] px-1.5 py-0.5 rounded-full font-medium">
                         Active
                       </span>
@@ -261,7 +295,7 @@ export default function ClientsListClient({ clients }: Props) {
 
       {search && filtered.length > 0 && (
         <p className="text-xs text-center mt-2" style={{ color: "var(--brand-text-secondary)" }}>
-          {filtered.length} of {clients.length} clients
+          {filtered.length} of {showArchived ? archivedCount : clients.length - archivedCount} clients
         </p>
       )}
     </>

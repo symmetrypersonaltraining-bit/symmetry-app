@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     if (!ids.length) return NextResponse.json({ rows: [], me: null, optedIn, window: win });
 
     const [namesRes, logRes] = await Promise.all([
-      admin.from("clients").select("id, name, email").in("id", ids),
+      admin.from("clients").select("id, name, email").in("id", ids).is("archived_at", null),
       admin
         .from("workout_logs")
         .select("client_id, log_date")

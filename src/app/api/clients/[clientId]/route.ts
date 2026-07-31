@@ -15,8 +15,11 @@ export async function PATCH(
 
   const body = await req.json();
 
+  // archived_at is a soft roster state: an ISO timestamp takes the client off
+  // the roster, null puts them back. Nothing is ever deleted either way.
   const allowed = ["payment_reminders_enabled", "current_fees", "notes",
-    "session_rate", "billing_cadence", "training_frequency", "days_per_week", "training_days"];
+    "session_rate", "billing_cadence", "training_frequency", "days_per_week", "training_days",
+    "archived_at"];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];
