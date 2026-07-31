@@ -360,15 +360,12 @@ function SessionDetailPopup({ ev, clients, workoutMap, onClose, onSaved }: {
     setUpdating(true);
     const supabase = createClient();
     await supabase.from("appointments").update({ status }).eq("id", ev.id);
-    if (status === "cancelled" && ev.clientId) {
-      const { data: cl } = await supabase.from("clients").select("current_fees,training_frequency").eq("id", ev.clientId).single();
-      if (cl?.current_fees && cl?.training_frequency) {
-        const rate = parseFloat(String(cl.current_fees)) / ((cl.training_frequency as number) * 4);
-        const credit = Math.round(rate * 50) / 100;
-        const d = new Date(ev.scheduledAt);
-        await supabase.from("billing_adjustments").insert({ client_id: ev.clientId, appointment_id: ev.id, amount: credit, reason: "Cancelled session \u2014 half-price credit", apply_to_month: new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split("T")[0], applied: false });
-      }
-    }
+    // A half-price credit used to be written to billing_adjustments here, priced
+    // off a THIRD rate formula (current_fees / (training_frequency * 4)) that
+    // disagreed with both clients.session_rate and the reminder calculation.
+    // Under the sessions-trained rule a cancelled session is simply not billed,
+    // so there is no credit to record \u2014 and nothing ever read billing_adjustments.
+    // Removed rather than corrected: the row was the bug, not the arithmetic.
     // Two-way sync: push the cancel to Google Calendar (orange), or clear it on un-cancel.
     try {
       if (status === "cancelled") await setGCalEventColor({ appointmentId: ev.id, colorId: "6" });
@@ -682,19 +679,13 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
               setBulkCancelling(true);
               const supabase = createClient();
               const ids = Array.from(selectedIds);
-              const { data: appts } = await supabase.from("appointments").select("id,client_id,scheduled_at").in("id", ids);
               await supabase.from("appointments").update({ status: "cancelled" }).in("id", ids);
               // Two-way sync: push each cancel to Google Calendar (orange).
               for (const id of ids) { try { await setGCalEventColor({ appointmentId: id, colorId: "6" }); } catch {} }
-              for (const appt of appts ?? []) {
-                const { data: cl } = await supabase.from("clients").select("current_fees,training_frequency").eq("id", appt.client_id).single();
-                if (cl?.current_fees && cl?.training_frequency) {
-                  const rate = parseFloat(String(cl.current_fees)) / ((cl.training_frequency as number) * 4);
-                  const credit = Math.round(rate * 50) / 100;
-                  const d = new Date(appt.scheduled_at);
-                  await supabase.from("billing_adjustments").insert({ client_id: appt.client_id, appointment_id: appt.id, amount: credit, reason: "Bulk cancel \u2014 half-price credit", apply_to_month: new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split("T")[0], applied: false });
-                }
-              }
+              // The per-appointment billing_adjustments credit loop that used to
+              // run here is gone for the same reason as the single-cancel path:
+              // cancelled sessions are not billed, so there is no credit, and the
+              // third rate formula it used contradicted clients.session_rate.
               setBulkCancelling(false);
               close();
             }}

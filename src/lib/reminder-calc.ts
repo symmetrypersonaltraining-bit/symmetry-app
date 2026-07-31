@@ -1,30 +1,68 @@
 // Pure reminder calculation + verification logic. No I/O.
-// Rules (Dustin, 2026-07-03): amount is DERIVED from fee + cadence, minus
-// session credits for cancelled (orange = full rate) and vacation (half rate)
-// appointments inside the billing cycle (previous due date -> due date).
-// Any mismatch BLOCKS the draft until Dustin edits or overrides.
+//
+// THE RULE (Dustin, 2026-07-31):  amount = sessions_trained x session_rate
+//
+//   "8 sessions at $75 = $600, plain and simple."
+//
+// We count what actually happened. A session that happened is billed; a session
+// that did not happen is not billed. That is the whole model.
+//
+// This REPLACES the 2026-07-03 rule, which started from a fee on file and
+// subtracted credits for cancellations. That model had to guess at a monthly
+// fee and then reconcile it against reality, and the two drifted apart -- Todd's
+// calendar says $900/mo while he averages 2 sessions/week, and that gap was
+// real overbilling. Counting forward from sessions removes the guess.
+//
+// Cancellations are DISPLAY ONLY. They are shown so Dustin can see the shape of
+// the cycle, but they are not deducted from anything, because there is nothing
+// to deduct them from -- an uncancelled session was never added in the first
+// place. `cancelledFull` / `cancelledHalf` survive on the RESULT for rendering
+// and are absent from every arithmetic path below.
+//
+// Billing type is authoritative on `clients.billing_type`:
+//   per_session  amount = sessionsTrained * session_rate
+//   flat         amount = current_fees, every cycle, regardless of anything
+//   none         no reminder is ever generated or shown (couples who pay
+//                together: Troy/Krysta, Celeste/Greg)
 
 export type Cadence = "monthly" | "biweekly" | "weekly" | "quarterly";
+export type BillingType = "per_session" | "flat" | "none";
 
 export interface ReminderCalcInput {
   fee: number | null;
   sessionRate: number | null;
   cadence: Cadence | null;
   dueDate: string; // YYYY-MM-DD
-  cancelledFull: number; // cancelled_client appointments in cycle
-  cancelledHalf: number; // cancelled_half (vacation) appointments in cycle
-  manualCredits: number; // extra credits Dustin typed in the editor
-  lastPaymentAmount: number | null;
-  lastCycleApprovedOn?: string | null; // CT date the PREVIOUS round was approved - anchors the look-back so post-approval cancels are never missed
+  /** Appointments with status='scheduled' inside the cycle. The billable count. */
+  sessionsTrained: number;
+  /** clients.billing_type. Falls back to flatBilling for older callers. */
+  billingType?: BillingType | null;
+  cancelledFull: number; // cancelled_client in cycle -- DISPLAY ONLY
+  cancelledHalf: number; // cancelled_half in cycle -- DISPLAY ONLY
+  /** @deprecated Removed from the UI; never affects the amount. Kept so older callers still typecheck. */
+  manualCredits?: number;
+  /** @deprecated Retained for callers; no longer produces a warning. */
+  lastPaymentAmount?: number | null;
+  lastCycleApprovedOn?: string | null; // CT date the PREVIOUS round was approved
   draftAmount: number; // current amount_due on the reminder row
   override: boolean; // Dustin explicitly accepted a non-calculated amount
-  flatBilling?: boolean; // client is flat-billed: NEVER deduct cancellation credits (always full fee)
+  /** @deprecated Use billingType. true is read as 'flat'. */
+  flatBilling?: boolean;
 }
 
 export interface ReminderCalcResult {
   cycleStart: string; // start of the look-back window (previous cycle's send date)
-  cycleEnd: string;   // send date for THIS cycle = due date minus 7 days (window close)
+  cycleEnd: string;   // send date for THIS cycle = due date minus 7 days
+  billingType: BillingType;
+  /** true when billing_type='none' -- caller must not render or send anything. */
+  notApplicable: boolean;
+  sessionsTrained: number;
+  rate: number | null;
+  cancelledFull: number; // display only
+  cancelledHalf: number; // display only
+  /** Always 0. Cancellations are not deducted. Kept so existing render code compiles. */
   autoCredits: number;
+  /** Always 0. See autoCredits. */
   totalCredits: number;
   expected: number;
   blocking: string[];
@@ -53,7 +91,7 @@ export function nextDueDate(dueDate: string, cadence: Cadence | null): string {
 
 // Send-anchored billing cycle (Dustin, 2026-07-09, LIVE):
 // The reminder is prepared 7 days before the due date, and the billing cycle
-// CLOSES on that send date rather than on the due date. A cancel that lands in
+// CLOSES on that send date rather than on the due date. A session that lands in
 // the final 7 days (between send and due) therefore rolls onto the NEXT cycle
 // instead of retroactively changing an amount that was already locked in.
 // The lead is a fixed 7 days for every cadence (it is the reminder window, not
@@ -68,38 +106,85 @@ export function reminderSendDate(dueDate: string): string {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+export function resolveBillingType(i: {
+  billingType?: BillingType | null;
+  flatBilling?: boolean;
+}): BillingType {
+  if (i.billingType === "per_session" || i.billingType === "flat" || i.billingType === "none") {
+    return i.billingType;
+  }
+  return i.flatBilling === true ? "flat" : "per_session";
+}
+
 export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
   const blocking: string[] = [];
   const warnings: string[] = [];
-  const rate = i.sessionRate ?? 0;
-  const flat = i.flatBilling === true;
-  const autoCredits = flat ? 0 : round2(i.cancelledFull * rate + i.cancelledHalf * rate * 0.5);
-  const totalCredits = flat ? 0 : round2(autoCredits + (i.manualCredits || 0));
-
-  if (flat && (i.cancelledFull > 0 || i.cancelledHalf > 0)) {
-    warnings.push("Flat billing: " + i.cancelledFull + " full / " + i.cancelledHalf + " half cancels ignored - full fee billed");
-  }
-  if (!flat && (i.cancelledFull > 0 || i.cancelledHalf > 0) && !i.sessionRate) {
-    blocking.push("Cancelled sessions in this cycle but no session rate on file");
-  }
-  if (i.fee == null) blocking.push("No fee on file - set the client fee first");
-  if (!i.cadence) warnings.push("No payment cadence found in calendar history - assuming monthly");
-
-  const expected = round2(Math.max(0, (i.fee ?? 0) - totalCredits));
-
-  if (i.fee != null && i.lastPaymentAmount != null && Number(i.lastPaymentAmount) !== Number(i.fee)) {
-    warnings.push("Last actual payment $" + i.lastPaymentAmount + " differs from fee on file $" + i.fee + " - verify the rate is current");
-  }
-  if (i.fee != null && Math.abs(i.draftAmount - expected) > 0.009) {
-    const msg = "Draft $" + i.draftAmount + " does not match calculated $" + expected + " (fee $" + i.fee + " minus credits $" + totalCredits + ")";
-    if (i.override) warnings.push(msg + " - OVERRIDDEN by trainer");
-    else blocking.push(msg);
-  }
+  const billingType = resolveBillingType(i);
+  const sessionsTrained = Math.max(0, Number(i.sessionsTrained) || 0);
 
   // Window closes 7 days before due (send-anchored). Start of the look-back is
   // the previous cycle's send date, unless the prior reminder was approved later.
   const baseStart = reminderSendDate(previousDueDate(i.dueDate, i.cadence));
-  const cycleStart = i.lastCycleApprovedOn && i.lastCycleApprovedOn < i.dueDate ? i.lastCycleApprovedOn : baseStart;
+  const cycleStart =
+    i.lastCycleApprovedOn && i.lastCycleApprovedOn < i.dueDate ? i.lastCycleApprovedOn : baseStart;
   const cycleEnd = reminderSendDate(i.dueDate);
-  return { cycleStart, cycleEnd, autoCredits, totalCredits, expected, blocking, warnings };
+
+  const base = {
+    cycleStart,
+    cycleEnd,
+    billingType,
+    sessionsTrained,
+    rate: i.sessionRate ?? null,
+    cancelledFull: i.cancelledFull || 0,
+    cancelledHalf: i.cancelledHalf || 0,
+    autoCredits: 0,
+    totalCredits: 0,
+  };
+
+  // billing_type='none': these clients pay together with a partner and are never
+  // billed individually. Nothing is generated, nothing is shown, nothing blocks.
+  if (billingType === "none") {
+    return { ...base, notApplicable: true, expected: 0, blocking: [], warnings: [] };
+  }
+
+  if (!i.cadence) warnings.push("No payment cadence found in calendar history - assuming monthly");
+
+  let expected: number;
+
+  if (billingType === "flat") {
+    // Flat clients pay current_fees per cycle regardless of what they trained.
+    if (i.fee == null) blocking.push("Flat billing but no fee on file - set the client fee first");
+    expected = round2(Math.max(0, i.fee ?? 0));
+    if (i.cancelledFull > 0 || i.cancelledHalf > 0) {
+      warnings.push(
+        "Flat billing: " + i.cancelledFull + " full / " + i.cancelledHalf +
+        " cancels shown for reference only - full fee billed"
+      );
+    }
+  } else {
+    // per_session: count what happened. No fee-on-file check -- current_fees is
+    // irrelevant here and blocking on it was stopping valid drafts.
+    if (i.sessionRate == null) {
+      // The rate on file is the truth and there is no safe substitute. Deriving
+      // it from the calendar payment total is circular -- that total is the
+      // stale number we are replacing.
+      blocking.push("Per-session billing but no session rate on file - set the client's session rate");
+    }
+    expected = round2(sessionsTrained * (i.sessionRate ?? 0));
+    if (i.sessionRate != null && sessionsTrained === 0) {
+      warnings.push("No sessions trained in this cycle - amount is $0");
+    }
+  }
+
+  if (Math.abs(i.draftAmount - expected) > 0.009) {
+    const basis =
+      billingType === "flat"
+        ? "flat fee $" + (i.fee ?? 0)
+        : sessionsTrained + " sessions x $" + (i.sessionRate ?? 0);
+    const msg = "Draft $" + i.draftAmount + " does not match calculated $" + expected + " (" + basis + ")";
+    if (i.override) warnings.push(msg + " - OVERRIDDEN by trainer");
+    else blocking.push(msg);
+  }
+
+  return { ...base, notApplicable: false, expected, blocking, warnings };
 }

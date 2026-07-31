@@ -22,9 +22,14 @@ export async function markClientPaid(reminderId: string): Promise<void> {
   // payment_reminders has no client_name column, so this insert was failing with
   // PGRST204 — unchecked — right after the current reminder had been deleted.
   // Marking a client paid quietly wiped their billing schedule.
+  // Seed amount_due at 0, NOT the previous cycle's amount. Under the
+  // sessions-trained rule (amount = sessions_trained x session_rate) next
+  // cycle's amount is not knowable at roll-forward time — it is whatever they
+  // actually train. Copying the old amount forward is how a stale number
+  // survived from cycle to cycle. The editor computes it at send time.
   const { error: insErr } = await supabase.from('payment_reminders').insert({
     client_id: reminder.client_id,
-    amount_due: reminder.amount_due,
+    amount_due: 0,
     billing_credits: 0,
     due_date: nextDueStr,
     notification_status: 'pending',

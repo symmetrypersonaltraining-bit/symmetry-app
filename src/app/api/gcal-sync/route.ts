@@ -90,7 +90,12 @@ export async function POST(req: NextRequest) {
       const colorId = event.colorId || null;
       const summary = event.summary || '';
       const isPayment = colorId === COLOR_PAYMENT || /\$\s?\d/.test(summary);
-      if (!isPayment && colorId !== null && colorId !== COLOR_CANCELLED && colorId !== COLOR_HALF) continue;
+      // The colour filter that used to sit here dropped every event carrying an
+      // explicit colour other than cancelled/half — Peacock, Blueberry, anything
+      // Dustin had tinted for his own reasons. Under the sessions-trained rule a
+      // dropped event is an UNBILLED SESSION, so the filter is gone entirely:
+      // a session is a session whatever colour it happens to be.
+      // COLOR_CANCELLED / COLOR_HALF still decide status below, untouched.
 
       const clientId = matchClient(summary);
       if (!clientId) continue;
