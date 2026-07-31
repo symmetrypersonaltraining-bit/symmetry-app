@@ -9,15 +9,36 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { fetchGroupUnread } from "@/lib/groupUnread";
+import { bannersForDelta, type Banner } from "@/lib/messageBanners";
 
 export default function MessageNotifier() {
   const router = useRouter();
-  const [show, setShow] = useState(false);
-  const [text, setText] = useState("New message");
-  const [href, setHref] = useState("/messages");
+  // A QUEUE, not a single slot (626775f9 verification, 2026-07-31). The old
+  // version compared groupDelta against directDelta and rendered whichever won,
+  // so a poll window containing 1 group message and 2 direct messages showed
+  // only "2 new messages" pointing at the private trainer thread — the group
+  // message was silently dropped AND the watermark advanced past it, so it was
+  // never announced again. Group and direct are different threads; one can't
+  // stand in for the other. Now each gets its own banner, shown in turn.
+  const [banner, setBanner] = useState<Banner | null>(null);
+  const [tick, setTick] = useState(0);
+  const queue = useRef<Banner[]>([]);
   const prev = useRef<number | null>(null);
   const prevGroup = useRef<number | null>(null);
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Show the next queued banner as soon as the slot is free.
+  useEffect(() => {
+    if (banner) return;
+    const next = queue.current.shift();
+    if (next) setBanner(next);
+  }, [banner, tick]);
+
+  // Each banner gets its own 6s on screen.
+  useEffect(() => {
+    if (!banner) return;
+    const t = setTimeout(() => setBanner(null), 6000);
+    return () => clearTimeout(t);
+  }, [banner]);
 
   useEffect(() => {
     let on = true;
@@ -45,22 +66,21 @@ export default function MessageNotifier() {
         const c = direct + grp;
         if (!on) return;
         if (prev.current != null && c > prev.current) {
-          // Split the increase into its group vs direct parts so a group message
-          // always deep-links to the GROUP thread, even when a direct message
-          // arrives in the same poll window (the old "entire delta must be group"
-          // rule mis-routed group notifications into the private trainer thread).
+          // Split the increase into its group vs direct parts and queue a banner
+          // for EACH thread that actually gained messages. Group is queued first
+          // (community posts are the ones a client is most likely to want) but
+          // neither is ever discarded in favour of the other.
           const prevGrp = prevGroup.current ?? 0;
           const prevDirect = (prev.current ?? 0) - prevGrp;
           const groupDelta = grp - prevGrp;
           const directDelta = direct - prevDirect;
-          // Route to Group when group got new messages and they're at least as
-          // many as any new direct ones (community messages win ties).
-          const toGroup = groupDelta > 0 && groupDelta >= directDelta;
-          setText(toGroup ? (groupDelta > 1 ? `${groupDelta} new group messages` : "New group message") : (directDelta > 1 ? `${directDelta} new messages` : "New message"));
-          setHref(toGroup ? (isClientMode ? "/messages?client=group&as=client" : "/messages?client=group") : (isClientMode ? "/messages?as=client" : "/messages"));
-          setShow(true);
-          if (hideTimer.current) clearTimeout(hideTimer.current);
-          hideTimer.current = setTimeout(() => setShow(false), 6000);
+          const queued = bannersForDelta({ groupDelta, directDelta, isClientMode });
+          if (queued.length) {
+            // Cap the backlog: if the app sat in the background through several
+            // polls we want the latest counts, not a parade of stale banners.
+            queue.current = [...queue.current, ...queued].slice(-2);
+            setTick((t) => t + 1);
+          }
         }
         prev.current = c;
         prevGroup.current = grp;
@@ -68,13 +88,13 @@ export default function MessageNotifier() {
     }
     load();
     const iv = setInterval(load, 15000);
-    return () => { on = false; clearInterval(iv); if (hideTimer.current) clearTimeout(hideTimer.current); };
+    return () => { on = false; clearInterval(iv); };
   }, []);
 
-  if (!show) return null;
+  if (!banner) return null;
   return (
     <button
-      onClick={() => { setShow(false); router.push(href); }}
+      onClick={() => { const to = banner.href; setBanner(null); router.push(to); }}
       style={{
         position: "fixed", top: "calc(env(safe-area-inset-top) + 8px)", left: 12, right: 12, zIndex: 3000,
         display: "flex", alignItems: "center", gap: 12, textAlign: "left",
@@ -85,7 +105,7 @@ export default function MessageNotifier() {
       }}
     >
       <i className="ti ti-bell" style={{ fontSize: 20 }} />
-      <span style={{ flex: 1, fontWeight: 800, fontSize: 14 }}>{text} — tap to read</span>
+      <span style={{ flex: 1, fontWeight: 800, fontSize: 14 }}>{banner.text} — tap to read</span>
       <i className="ti ti-chevron-right" style={{ fontSize: 18 }} />
     </button>
   );
