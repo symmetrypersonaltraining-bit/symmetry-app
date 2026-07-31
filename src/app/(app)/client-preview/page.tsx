@@ -83,11 +83,15 @@ export default async function ClientPreviewPage() {
     }
   }
 
-  const todayDow = new Date().getDay();
-  const weekStart = new Date();
-  weekStart.setDate(weekStart.getDate() - todayDow);
-  const weekStartStr = weekStart.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-  const weekEndStr = new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  // Central, not UTC: after 7pm Central the UTC weekday/date is already tomorrow's.
+  const todayCentral = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const [wy, wm, wd] = todayCentral.split("-").map(Number);
+  const weekStart = new Date(Date.UTC(wy, wm - 1, wd));
+  weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
+  const weekStartStr = weekStart.toISOString().slice(0, 10);
+  const weekEnd = new Date(weekStart.getTime());
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+  const weekEndStr = weekEnd.toISOString().slice(0, 10);
   const weekWorkouts = (recentScheduled || [])
     .filter((w: any) => w.scheduled_date >= weekStartStr && w.scheduled_date <= weekEndStr)
     .map((w: any) => ({ date: w.scheduled_date, completed: w.status === "completed" }));

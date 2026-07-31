@@ -159,8 +159,12 @@ export default async function HomePage(props: {
       .from("scheduled_workouts")
       .select("id, day_id, client_id, scheduled_date, status, days(id, label), clients(id, name)")
       .is("deleted_at", null)
-      .gte("scheduled_date", new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
-        .toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
+      // Central, not UTC: derive the month floor from the Central date, not the UTC year/month.
+      .gte("scheduled_date", (() => {
+        const [y, m] = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }).split("-").map(Number);
+        const dt = new Date(Date.UTC(y, m - 2, 1));
+        return dt.toISOString().slice(0, 10);
+      })())
       .lte("scheduled_date", workoutRangeEnd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
       .order("scheduled_date");
 

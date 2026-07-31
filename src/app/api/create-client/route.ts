@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       email,
       phone: phone || null,
       date_of_birth: date_of_birth || null,
-      start_date: start_date || new Date().toISOString().split("T")[0],
+      start_date: start_date || new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }), // Central, not UTC: after 7pm Central the UTC date is already tomorrow
       experience_level: experience_level || null,
       primary_goal: primary_goal || null,
       injuries_limitations: injuries_limitations || null,
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
   let reminderCreated = false;
   const feeNum = current_fees ? Number(current_fees) : null;
   if (feeNum && feeNum > 0) {
-    const dueDate = first_payment_date || new Date().toISOString().split("T")[0];
+    const dueDate = first_payment_date || new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }); // Central, not UTC: after 7pm Central the UTC date is already tomorrow
     const { error: rErr } = await admin.from("payment_reminders").insert({
       client_id: clientRow.id,
       due_date: dueDate,

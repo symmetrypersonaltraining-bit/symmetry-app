@@ -38,8 +38,9 @@ export default async function ClientProfilePage({
     .select("id, scheduled_date, status, day_id, days(id, label, position)")
     .is("deleted_at", null)
     .eq("client_id", clientId)
-    .gte("scheduled_date", rangeStart.toISOString().split("T")[0])
-    .lte("scheduled_date", rangeEnd.toISOString().split("T")[0])
+    // Central, not UTC: after 7pm Central the UTC date is already tomorrow.
+    .gte("scheduled_date", rangeStart.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
+    .lte("scheduled_date", rangeEnd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
     .order("scheduled_date", { ascending: true });
 
   const { data: latestMetrics } = await supabase

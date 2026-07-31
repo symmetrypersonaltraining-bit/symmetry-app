@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       const admin = createAdminClient();
       await admin.from("metrics").insert({
         client_id: clientRec.id,
-        metric_date: new Date().toISOString().split("T")[0],
+        metric_date: new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }), // Central, not UTC: after 7pm Central the UTC date is already tomorrow
         weight: w, body_fat_pct: bf, lean_mass: lean, fat_mass: fat,
       });
     }

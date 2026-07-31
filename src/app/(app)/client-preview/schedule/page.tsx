@@ -19,18 +19,18 @@ export default async function ClientPreviewSchedulePage() {
   if (!clientRecord) redirect("/client-preview");
 
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const today = now.getDate();
+  // Central, not UTC: server runs UTC, so after 7pm Central the UTC date is already tomorrow.
+  const todayStr = now.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const [year, month1, today] = todayStr.split("-").map(Number);
+  const month = month1 - 1;
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const monthName = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthName = now.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "America/Chicago" });
   const monthStart = `${year}-${String(month + 1).padStart(2, "0")}-01`;
   const monthEnd = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
-  const todayStr = now.toISOString().split("T")[0];
-  const futureEnd = new Date(now);
-  futureEnd.setDate(futureEnd.getDate() + 60);
-  const futureEndStr = futureEnd.toISOString().split("T")[0];
+  const futureEnd = new Date(Date.UTC(year, month, today));
+  futureEnd.setUTCDate(futureEnd.getUTCDate() + 60);
+  const futureEndStr = futureEnd.toISOString().slice(0, 10);
 
   const { data: monthWorkouts } = await supabase
     .from("scheduled_workouts")

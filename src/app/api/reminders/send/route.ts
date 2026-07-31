@@ -51,7 +51,7 @@ function reminderEmailHtml(clientName: string, amountDue: number, dueDate: strin
     </p>
   </div>
   <p style="color:#4E6080;font-size:12px;text-align:center;margin:16px 0 0">
-    © ${new Date().getFullYear()} Symmetry Corrective
+    © ${new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }).slice(0, 4)} Symmetry Corrective
   </p>
 </div>`;
 }
@@ -87,8 +87,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Client has no email address" }, { status: 400 });
   }
 
-  const dueDate = new Date(reminder.due_date).toLocaleDateString("en-US", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  // Central, not UTC: a date-only string parses as midnight UTC, which renders as the previous day in Central.
+  const dueDate = new Date(reminder.due_date + "T12:00:00Z").toLocaleDateString("en-US", {
+    timeZone: "America/Chicago", weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
   // amount_due is the FINAL amount the client owes — cancellation/flat credits are already
   // baked into it by the reminder editor. Do NOT subtract billing_credits again here (that
@@ -97,7 +98,7 @@ export async function POST(request: Request) {
 
   const sent = await sendEmail(
     client.email,
-    `Payment Reminder — $${netDue.toFixed(2)} due ${new Date(reminder.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
+    `Payment Reminder — $${netDue.toFixed(2)} due ${new Date(reminder.due_date + "T12:00:00Z").toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric" })}`,
     reminderEmailHtml(client.name, netDue, dueDate, reminder.notes)
   );
 

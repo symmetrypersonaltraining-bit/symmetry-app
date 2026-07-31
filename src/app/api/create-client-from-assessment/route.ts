@@ -95,14 +95,14 @@ export async function POST(req: NextRequest) {
   const feeNum = (fee === "" || fee == null) ? null : Number(fee);
   const sessionRateNum = (data.session_rate === "" || data.session_rate == null) ? null : Number(data.session_rate);
   const trainingDays = Array.isArray(data.training_days) ? data.training_days.join(",") : nn(data.training_days);
-  const firstDue = nn(data.first_payment_date) || new Date().toISOString().split("T")[0];
+  const firstDue = nn(data.first_payment_date) || new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }); // Central, not UTC: after 7pm Central the UTC date is already tomorrow
   const cadence = nn(data.billing_cadence) || "monthly";
 
   // 3) Create the client profile with all assessment info
   const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
   const { data: clientRow, error: cErr } = await admin.from("clients").insert({
     name, email, phone: nn(data.phone), date_of_birth: nn(data.date_of_birth),
-    start_date: new Date().toISOString().split("T")[0],
+    start_date: new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }), // Central, not UTC: after 7pm Central the UTC date is already tomorrow
     experience_level: nn(data.experience_level), primary_goal: nn(data.primary_goal),
     days_per_week: daysPerWeek, training_frequency: daysPerWeek,
     training_days: trainingDays, current_fees: feeNum, session_rate: sessionRateNum,

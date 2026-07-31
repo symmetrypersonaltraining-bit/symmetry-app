@@ -24,7 +24,7 @@ export default function NewClientModal({ onClose }: Props) {
     email: "",
     phone: "",
     date_of_birth: "",
-    start_date: new Date().toISOString().split("T")[0],
+    start_date: new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }), // Central, not UTC: after 7pm Central the UTC date is already tomorrow
     experience_level: "",
     primary_goal: "",
     injuries_limitations: "",

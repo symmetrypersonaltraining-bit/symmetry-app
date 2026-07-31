@@ -79,6 +79,13 @@ export default async function NutritionPage({
   }
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  // Central, not UTC: derive the 7-day floor from the Central date, not Date.now() in UTC.
+  const weekFloor = (() => {
+    const [y, m, d] = today.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    dt.setUTCDate(dt.getUTCDate() - 7);
+    return dt.toISOString().slice(0, 10);
+  })();
 
   let mealPlan: any = null;
   let livePlans: any[] = [];
@@ -122,7 +129,7 @@ export default async function NutritionPage({
         .from("meal_adherence_logs")
         .select("log_date, adherence")
         .eq("client_id", clientId)
-        .gte("log_date", new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0])
+        .gte("log_date", weekFloor)
         .order("log_date", { ascending: false }),
     ]);
 

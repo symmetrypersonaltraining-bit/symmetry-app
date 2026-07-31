@@ -89,14 +89,17 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
 }) {
   const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
-  const last7Start = new Date(); last7Start.setDate(last7Start.getDate() - 7);
-  const last7Str = last7Start.toISOString().split("T")[0];
-  const last30Start = new Date(); last30Start.setDate(last30Start.getDate() - 30);
-  const last30Str = last30Start.toISOString().split("T")[0];
-  const nextWeekStart = new Date(); nextWeekStart.setDate(nextWeekStart.getDate() + 1);
-  const nextWeekEnd = new Date(); nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
-  const nextWeekStartStr = nextWeekStart.toISOString().split("T")[0];
-  const nextWeekEndStr = nextWeekEnd.toISOString().split("T")[0];
+  // Central, not UTC: shift off the Central todayStr so the bounds match the day the trainer sees.
+  const shift = (n: number) => {
+    const [y, m, d] = todayStr.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    dt.setUTCDate(dt.getUTCDate() + n);
+    return dt.toISOString().slice(0, 10);
+  };
+  const last7Str = shift(-7);
+  const last30Str = shift(-30);
+  const nextWeekStartStr = shift(1);
+  const nextWeekEndStr = shift(7);
 
   const last7 = allWorkouts.filter(w => w.scheduled_date >= last7Str && w.scheduled_date <= todayStr);
   const last30 = allWorkouts.filter(w => w.scheduled_date >= last30Str && w.scheduled_date <= todayStr);

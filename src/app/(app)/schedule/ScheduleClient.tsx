@@ -3,6 +3,7 @@
 import { useState, useMemo, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { updateGCalEvent, deleteGCalEvent } from "./scheduleActions";
+import { centralIso } from "@/lib/central-time";
 import { logCardioSession, logStrengthSession } from "./actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -110,8 +111,13 @@ function EditDrawer({ appt, onClose, onSaved }: DrawerProps) {
     let startIso: string | undefined;
     let endIso: string | undefined;
     if (startTime && endTime) {
-      startIso = `${appt.date}T${startTime}:00-05:00`;
-      endIso = `${appt.date}T${endTime}:00-05:00`;
+      // Was hardcoded -05:00, which is CDT — so every winter (CST) edit wrote an
+      // hour early. A naive string is not the fix either: scheduleActions also
+      // writes this into appointments.scheduled_at, a timestamptz column, which
+      // Postgres would resolve as UTC and land 5-6 hours off. centralIso asks
+      // Intl for the correct offset on that specific date.
+      startIso = centralIso(appt.date, startTime);
+      endIso = centralIso(appt.date, endTime);
     }
 
     startTransition(async () => {

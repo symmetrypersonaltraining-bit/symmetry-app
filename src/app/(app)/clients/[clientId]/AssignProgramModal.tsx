@@ -20,7 +20,7 @@ interface Props {
 
 export default function AssignProgramModal({ clientId, clientName, programs, currentProgramId, onClose }: Props) {
   const [selectedProgramId, setSelectedProgramId] = useState(currentProgramId || "");
-  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [startDate, setStartDate] = useState(new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" })); // Central, not UTC: after 7pm Central the UTC date is already tomorrow
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -65,7 +65,7 @@ export default function AssignProgramModal({ clientId, clientName, programs, cur
     }
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }); // Central, not UTC: after 7pm Central the UTC date is already tomorrow
 
   return (
     <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"

@@ -1796,12 +1796,13 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
               <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--brand-text-secondary)" }}>This Week</p>
               <div className="flex gap-2 flex-wrap">
                 {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day, i) => {
-                  const d = new Date();
-                  const dow = d.getDay();
+                  // Central, not UTC: seed the Mon-Sun strip from the Central `today` prop, not the UTC weekday.
+                  const [ty, tm, td] = today.split("-").map(Number);
+                  const clone = new Date(Date.UTC(ty, tm - 1, td));
+                  const dow = clone.getUTCDay();
                   const diff = i + 1 - (dow === 0 ? 7 : dow);
-                  const clone = new Date(d);
-                  clone.setDate(d.getDate() + diff);
-                  const dateStr = clone.toISOString().split("T")[0];
+                  clone.setUTCDate(clone.getUTCDate() + diff);
+                  const dateStr = clone.toISOString().slice(0, 10);
                   const dayLogs = weekLogs.filter(l => l.log_date === dateStr);
                   const hasLog  = dayLogs.length > 0;
                   const allFull = hasLog && dayLogs.every(l => l.adherence === "Full");
