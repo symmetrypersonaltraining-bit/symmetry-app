@@ -104,6 +104,10 @@ export default async function WorkoutDayPage({
   const { data: swInst } = await supabase
     .from("scheduled_workouts")
     .select("id")
+    // Soft-deleted rows are still in the table; every other call site filters
+    // them out and this one didn't, so a removed session could still hand back
+    // a scheduledWorkoutId and get logged against.
+    .is("deleted_at", null)
     .eq("day_id", resolvedDayId)
     .eq("client_id", clientId || "")
     .eq("scheduled_date", new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }))

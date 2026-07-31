@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { sendClientMessage } from "@/app/(app)/home/messageActions";
 import Link from "next/link";
 import OffPlanBanner from "@/components/OffPlanBanner";
+import WeeklyBriefCard from "@/components/WeeklyBriefCard";
 import CelebrationScreen from "@/components/CelebrationScreen";
 import SetFeedback from "@/components/SetFeedback";
 import WakeLock from "@/components/WakeLock";
@@ -54,6 +55,8 @@ interface Props {
   isTrainerSession?: boolean;
   existingLogId: string | null;
   existingSetLogs: any[];
+  /** The scheduled_workouts row this session came from, when it was on the calendar. */
+  scheduledWorkoutId?: string | null;
 }
 
 type SetData = { weight: string; reps: string; time: string; speed: string; hr: string; done: boolean };
@@ -1883,6 +1886,11 @@ export default function WorkoutLogger({
       {showTimer && <TimerWheel onClose={() => setShowTimer(false)} />}
         {timePick && <TimePickerSheet initial={parseTimeToSecs(sets[timePick.peId]?.[timePick.si]?.time || "") || 0} onSet={(secs) => { updateSet(timePick.peId, timePick.si, "time", fmtSecs(secs)); setTimePick(null); }} onClose={() => setTimePick(null)} />}
       {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
+
+      {/* 117353cd: the week's programming brief, on his first session with this
+          client each week. Trainer-only and inline — never a blocking overlay,
+          because he opens this standing in front of the client. */}
+      {isTrainerSession && clientId && <WeeklyBriefCard clientId={clientId} />}
 
       {isTrainerSession && clientName && (
         <div className="flex items-center gap-2 px-4 py-2 text-xs font-medium" style={{ background: "#f59e0b", color: "white" }}>
