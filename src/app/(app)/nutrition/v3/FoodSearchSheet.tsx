@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CustomItem, kcalOf } from "@/lib/nutrition/dailyTotals";
+import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 import Sheet from "./Sheet";
 import BarcodeScanner from "./BarcodeScanner";
 
@@ -63,7 +64,14 @@ export default function FoodSearchSheet({
   const [tab, setTab] = useState<"all" | "mine">("all");
   const [results, setResults] = useState<CatalogFood[]>([]);
   const [picked, setPicked] = useState<CatalogFood | null>(null);
-  const [qty, setQty] = useState(1);
+  // Feedback b534996d / f949f793: the serving picker used to be a ±0.25 stepper
+  // over WHOLE servings, so a food stored as "25 g" (chili crisp oil) couldn't
+  // be logged at 5 g. Now you TYPE the amount and pick the UNIT — grams, oz,
+  // tsp, whatever is dimensionally compatible with the food's base serving —
+  // and the multiplier is derived with servingsFor(). Same engine the legacy
+  // meal-plan adjust-amounts sheet already uses, so both paths agree.
+  const [amt, setAmt] = useState("1");
+  const [unit, setUnit] = useState("serving");
   const [creating, setCreating] = useState(false);
   const [cf, setCf] = useState({ name: "", serving: "1 serving", p: "", c: "", f: "" });
   const [busy, setBusy] = useState(false);
@@ -111,13 +119,55 @@ export default function FoodSearchSheet({
     return <span style={{ color: "#f59e0b", fontSize: 9, fontWeight: 800 }}>UNVERIFIED</span>;
   }
 
-  function pickItem(f: CatalogFood, mult: number) {
-    const p = n(f.protein) * mult, c = n(f.carbs) * mult, ft = n(f.fats) * mult;
+  // Open the amount picker for a food, seeded with its own base serving so the
+  // default ("25 g") is what the trainer wrote — then it's freely editable.
+  function openPicked(f: CatalogFood) {
+    const ps = parseServing(f.serving);
+    setPicked(f);
+    setAmt(String(ps.amount));
+    setUnit(ps.unit);
+  }
+
+  // Step size that suits the unit: 5 for g/ml (nobody nudges oil by 0.25 g),
+  // 0.1 for the big mass/volume units, 0.25 for counts and servings.
+  function stepFor(u: string): number {
+    const k = u.toLowerCase();
+    if (k === "g" || k === "ml") return 5;
+    if (k === "mg") return 50;
+    if (k === "kg" || k === "lb" || k === "l") return 0.1;
+    return 0.25;
+  }
+
+  const amtNum = (() => { const x = parseFloat(amt); return isFinite(x) && x > 0 ? x : 0; })();
+  const mult = picked ? servingsFor(amtNum, unit, picked.serving) : 0;
+  const unitOptions = picked ? unitsForServing(picked.serving) : ["serving"];
+
+  function bumpAmt(dir: 1 | -1) {
+    const s = stepFor(unit);
+    const next = Math.round(((amtNum || 0) + dir * s) * 1000) / 1000;
+    setAmt(String(Math.max(s, next)));
+  }
+
+  // Switching units keeps the SAME real quantity where the dimensions allow it
+  // (25 g → 0.882 oz), so changing the unit never silently changes the food.
+  function changeUnit(next: string) {
+    const converted = servingsFor(amtNum, unit, `1 ${next}`);
+    if (isFinite(converted) && converted > 0 && next !== unit) {
+      setAmt(String(Math.round(converted * 1000) / 1000));
+    }
+    setUnit(next);
+  }
+
+  function pickItem(f: CatalogFood, m: number) {
+    const p = n(f.protein) * m, c = n(f.carbs) * m, ft = n(f.fats) * m;
+    // Label the item in the units the client actually entered ("5 g"), not as a
+    // fraction of a serving ("0.2 × 25 g") — that's what they'll recognise later.
+    const label = amtNum > 0 ? `${amtNum} ${unit}` : `${m} × ${f.serving || "serving"}`;
     onPick({
       n: f.name,
-      a: `${mult} × ${f.serving || "serving"}`,
+      a: label,
       p, c, f: ft,
-      k: f.kcal != null ? n(f.kcal) * mult : kcalOf(p, c, ft),
+      k: f.kcal != null ? n(f.kcal) * m : kcalOf(p, c, ft),
       db: !!f.verified,
       food_id: f.id,
       fac: 1,
@@ -141,8 +191,7 @@ export default function FoodSearchSheet({
         .limit(1)
         .maybeSingle();
       if (data) {
-        setPicked(mapRow(data as Record<string, unknown>, true));
-        setQty(1);
+        openPicked(mapRow(data as Record<string, unknown>, true));
         setScanBusy(false);
         return;
       }
@@ -164,8 +213,7 @@ export default function FoodSearchSheet({
       const json = await res.json().catch(() => ({}));
       if (res.ok && json?.found && json?.food) {
         setScanStage(null);
-        setPicked(mapRow(json.food as Record<string, unknown>, true));
-        setQty(1);
+        openPicked(mapRow(json.food as Record<string, unknown>, true));
         setScanBusy(false);
         return;
       }
@@ -247,7 +295,7 @@ export default function FoodSearchSheet({
             ))}
           </div>
           {results.map((f) => (
-            <button key={f.id} onClick={() => { setPicked(f); setQty(1); }}
+            <button key={f.id} onClick={() => openPicked(f)}
               className="w-full flex items-center justify-between py-2.5 text-left"
               style={{ borderBottom: "1px solid var(--brand-border)" }}>
               <div className="min-w-0">
@@ -318,15 +366,30 @@ export default function FoodSearchSheet({
           <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
             {(picked.brand ? picked.brand + " · " : "")}base: {picked.serving || "1 serving"}
           </p>
-          <div className="flex items-center justify-center gap-4 mb-2">
-            <button onClick={() => setQty(Math.max(0.25, Math.round((qty - 0.25) * 100) / 100))} className="w-10 h-10 rounded-xl font-bold text-lg" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>−</button>
-            <span className="text-xl font-extrabold text-center" style={{ color: "var(--brand-text)", minWidth: 64 }}>{qty}</span>
-            <button onClick={() => setQty(Math.round((qty + 0.25) * 100) / 100)} className="w-10 h-10 rounded-xl font-bold text-lg" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>＋</button>
+          <p className="text-xs font-bold uppercase tracking-widest mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>How much?</p>
+          <div className="flex items-center gap-2 mb-2">
+            <button onClick={() => bumpAmt(-1)} aria-label="Less" className="w-11 h-11 rounded-xl font-bold text-lg flex-shrink-0" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>−</button>
+            <input
+              value={amt}
+              onChange={(e) => setAmt(e.target.value.replace(/[^0-9.]/g, ""))}
+              inputMode="decimal"
+              aria-label="Amount"
+              style={{ ...inputStyle, flex: 1, minWidth: 0, textAlign: "center", fontSize: 18, fontWeight: 800, padding: "10px 8px" }}
+            />
+            <select
+              value={unit}
+              onChange={(e) => changeUnit(e.target.value)}
+              aria-label="Unit"
+              style={{ ...inputStyle, width: "auto", flex: "0 0 auto", fontWeight: 700, padding: "12px 10px" }}
+            >
+              {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+            <button onClick={() => bumpAmt(1)} aria-label="More" className="w-11 h-11 rounded-xl font-bold text-lg flex-shrink-0" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>＋</button>
           </div>
           <p className="text-center text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
-            {qty} × {picked.serving || "serving"} · P{Math.round(n(picked.protein) * qty)} C{Math.round(n(picked.carbs) * qty)} F{Math.round(n(picked.fats) * qty)} · {picked.kcal != null ? Math.round(n(picked.kcal) * qty) : kcalOf(n(picked.protein) * qty, n(picked.carbs) * qty, n(picked.fats) * qty)} cal
+            {amtNum > 0 ? `${amtNum} ${unit}` : "—"} · P{Math.round(n(picked.protein) * mult)} C{Math.round(n(picked.carbs) * mult)} F{Math.round(n(picked.fats) * mult)} · {picked.kcal != null ? Math.round(n(picked.kcal) * mult) : kcalOf(n(picked.protein) * mult, n(picked.carbs) * mult, n(picked.fats) * mult)} cal
           </p>
-          <button onClick={() => pickItem(picked, qty)} className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>
+          <button onClick={() => pickItem(picked, mult)} disabled={amtNum <= 0} className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)", opacity: amtNum > 0 ? 1 : 0.5 }}>
             Add it ✓
           </button>
           <button onClick={() => setPicked(null)} className="w-full mt-2 py-2.5 rounded-2xl text-sm font-semibold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)", background: "transparent" }}>

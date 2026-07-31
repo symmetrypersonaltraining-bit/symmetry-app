@@ -216,7 +216,11 @@ function QuickLog({ clientId, selectedDate, logs, setLogs }: { clientId: string;
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Food[]>([]);
   const [picked, setPicked] = useState<Food | null>(null);
-  const [serv, setServ] = useState(1);
+  // Feedback b534996d / f949f793: quick-log used to be a ±0.5 SERVINGS stepper,
+  // so a food stored as "25 g" couldn't be logged at 5 g. Type the amount, pick
+  // the unit; `serv` (the macro multiplier) is derived via servingsFor().
+  const [qAmt, setQAmt] = useState("1");
+  const [qUnit, setQUnit] = useState("serving");
   const [typed, setTyped] = useState("");
   const [showPortions, setShowPortions] = useState(false);
   const [portions, setPortions] = useState({ p: 0, c: 0, f: 0, v: 0 });
@@ -297,6 +301,29 @@ function QuickLog({ clientId, selectedDate, logs, setLogs }: { clientId: string;
     } finally { setBusy(false); }
   }
 
+  // Amount/unit → servings multiplier for the quick-log picker.
+  const qAmtNum = (() => { const x = parseFloat(qAmt); return isFinite(x) && x > 0 ? x : 0; })();
+  const serv = picked ? servingsFor(qAmtNum, qUnit, picked.serving) : 0;
+  function qStepFor(u: string): number {
+    const k = u.toLowerCase();
+    if (k === "g" || k === "ml") return 5;
+    if (k === "mg") return 50;
+    if (k === "kg" || k === "lb" || k === "l") return 0.1;
+    return 0.25;
+  }
+  function bumpQAmt(dir: 1 | -1) {
+    const st = qStepFor(qUnit);
+    setQAmt(String(Math.max(st, Math.round(((qAmtNum || 0) + dir * st) * 1000) / 1000)));
+  }
+  // Switching units preserves the real quantity where dimensions allow (25 g -> 0.882 oz).
+  function changeQUnit(next: string) {
+    if (next !== qUnit) {
+      const conv = servingsFor(qAmtNum, qUnit, `1 ${next}`);
+      if (isFinite(conv) && conv > 0) setQAmt(String(Math.round(conv * 1000) / 1000));
+    }
+    setQUnit(next);
+  }
+
   async function logRecent(r: RecentEntry) {
     await insertQuick({ food_id: r.food_id, servings: r.food_id ? 1 : null, off_plan_details: r.label, est_protein: r.p, est_carbs: r.c, est_fats: r.f, est_kcal: quickKcal(r.p, r.c, r.f), macros_pending: false });
   }
@@ -304,7 +331,7 @@ function QuickLog({ clientId, selectedDate, logs, setLogs }: { clientId: string;
     if (!picked) return;
     const p = (picked.protein || 0) * serv, c = (picked.carbs || 0) * serv, f = (picked.fats || 0) * serv;
     await insertQuick({ food_id: picked.id, servings: serv, off_plan_details: picked.name, est_protein: p, est_carbs: c, est_fats: f, est_kcal: quickKcal(p, c, f), macros_pending: false });
-    setPicked(null); setServ(1); setQ(""); setResults([]);
+    setPicked(null); setQAmt("1"); setQUnit("serving"); setQ(""); setResults([]);
   }
   async function logTyped() {
     if (!typed.trim()) return;
@@ -362,7 +389,7 @@ function QuickLog({ clientId, selectedDate, logs, setLogs }: { clientId: string;
         {results.length > 0 && !picked && (
           <div className="mt-2">
             {results.map((f) => (
-              <button key={f.id} onClick={() => { setPicked(f); setServ(1); }} className="w-full flex items-center justify-between py-2.5 text-left" style={{ borderBottom: "1px solid var(--brand-border)" }}>
+              <button key={f.id} onClick={() => { const ps = parseServing(f.serving); setPicked(f); setQAmt(String(ps.amount)); setQUnit(ps.unit); }} className="w-full flex items-center justify-between py-2.5 text-left" style={{ borderBottom: "1px solid var(--brand-border)" }}>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{f.name}{f.verified ? " ✓" : ""}</p>
                   <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{f.serving || "1 serving"} · P{Math.round(f.protein || 0)} C{Math.round(f.carbs || 0)} F{Math.round(f.fats || 0)} · {quickKcal(f.protein || 0, f.carbs || 0, f.fats || 0)} cal</p>
@@ -375,13 +402,20 @@ function QuickLog({ clientId, selectedDate, logs, setLogs }: { clientId: string;
         {picked && (
           <div className="mt-3 rounded-2xl p-3" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
             <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>{picked.name}</p>
-            <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>{serv} × {picked.serving || "serving"} · P{Math.round((picked.protein || 0) * serv)} C{Math.round((picked.carbs || 0) * serv)} F{Math.round((picked.fats || 0) * serv)} · {quickKcal((picked.protein || 0) * serv, (picked.carbs || 0) * serv, (picked.fats || 0) * serv)} cal</p>
-            <div className="flex items-center justify-center gap-4 mb-2">
-              <button onClick={() => setServ(Math.max(0.5, serv - 0.5))} className="w-9 h-9 rounded-xl font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>-</button>
-              <span className="text-lg font-extrabold text-center" style={{ color: "var(--brand-text)", minWidth: 48 }}>{serv}</span>
-              <button onClick={() => setServ(serv + 0.5)} className="w-9 h-9 rounded-xl font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>+</button>
+            <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>{qAmtNum > 0 ? `${qAmtNum} ${qUnit}` : "\u2014"} · P{Math.round((picked.protein || 0) * serv)} C{Math.round((picked.carbs || 0) * serv)} F{Math.round((picked.fats || 0) * serv)} · {quickKcal((picked.protein || 0) * serv, (picked.carbs || 0) * serv, (picked.fats || 0) * serv)} cal</p>
+            <div className="flex items-center gap-2 mb-2">
+              <button onClick={() => bumpQAmt(-1)} aria-label="Less" className="w-10 h-10 rounded-xl font-bold flex-shrink-0" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>-</button>
+              <input value={qAmt} onChange={(e) => setQAmt(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" aria-label="Amount"
+                className="flex-1 min-w-0 rounded-xl px-2 py-2.5 text-center text-base font-extrabold outline-none"
+                style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} />
+              <select value={qUnit} onChange={(e) => changeQUnit(e.target.value)} aria-label="Unit"
+                className="rounded-xl px-2 py-2.5 text-sm font-bold outline-none"
+                style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>
+                {unitsForServing(picked.serving).map((u) => <option key={u} value={u}>{u}</option>)}
+              </select>
+              <button onClick={() => bumpQAmt(1)} aria-label="More" className="w-10 h-10 rounded-xl font-bold flex-shrink-0" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>+</button>
             </div>
-            <button onClick={logPicked} disabled={busy} className="w-full py-2.5 rounded-full text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>{busy ? "Logging..." : "Log it"}</button>
+            <button onClick={logPicked} disabled={busy || qAmtNum <= 0} className="w-full py-2.5 rounded-full text-sm font-bold text-white" style={{ background: "var(--brand-primary)", opacity: qAmtNum > 0 ? 1 : 0.5 }}>{busy ? "Logging..." : "Log it"}</button>
           </div>
         )}
       </div>
