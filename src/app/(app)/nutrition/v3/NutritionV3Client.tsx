@@ -16,6 +16,7 @@ import Confetti from "@/components/Confetti";
 import {
   PlanMeal, LogRow, CustomMeta, CustomItem, ItemOverrides, Macros,
   computeDayTotals, planMealMacros, customMealMacros, adherencePct,
+  customMealNutrients, hasAnyNutrient,
   kcalOf, EXTRA_POSITIONS, INSERT_POSITION_MIN, INSERT_POSITION_MAX,
 } from "@/lib/nutrition/dailyTotals";
 import { planItemsToCustom } from "@/lib/nutrition/mealToCustom";
@@ -191,6 +192,7 @@ export default function NutritionV3Client(props: Props) {
   const [myMeals, setMyMeals] = useState<{ id: string; name: string; items: CustomItem[] }[]>([]);
   const [myMealsOk, setMyMealsOk] = useState(true);
   const [showGrocery, setShowGrocery] = useState(false);
+  const [showNutrients, setShowNutrients] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
   const [coachDismissed, setCoachDismissed] = useState(false);
   const [coachOn, setCoachOn] = useState(true);
@@ -428,6 +430,22 @@ export default function NutritionV3Client(props: Props) {
     const payload: Record<string, unknown> = {
       client_id: clientId, log_date: selectedDate, meal_position: position, source: "client", ...patch,
     };
+
+    // Derive the nutrient columns from the itemised meal here rather than at
+    // each of the ~12 call sites that write est_*. Doing it per-site is how the
+    // macros drifted between paths before; one place means a food picked from
+    // the catalog carries its sodium no matter which sheet logged it.
+    // Explicit values in `patch` still win (the AI path sets its own).
+    const custom = (patch.item_overrides as ItemOverrides | undefined)?.__custom;
+    if (custom?.items?.length && patch.est_fiber === undefined && patch.est_sodium === undefined) {
+      const nut = customMealNutrients(custom);
+      if (hasAnyNutrient(nut)) {
+        payload.est_fiber = nut.fiber == null ? null : Math.round(nut.fiber * 10) / 10;
+        payload.est_sugar = nut.sugar == null ? null : Math.round(nut.sugar * 10) / 10;
+        payload.est_sodium = nut.sodium == null ? null : Math.round(nut.sodium);
+        payload.est_sat_fat = nut.satFat == null ? null : Math.round(nut.satFat * 10) / 10;
+      }
+    }
     const { data, error } = await supabase
       .from("meal_adherence_logs")
       .upsert(payload, { onConflict: "client_id,log_date,meal_position" })
@@ -1122,6 +1140,21 @@ export default function NutritionV3Client(props: Props) {
     );
   }
 
+  // One nutrient cell. An em dash for null is deliberate: the plan-meal path has
+  // no nutrient source, and printing "0 mg" for a day of unlogged sodium would
+  // be indistinguishable from a genuinely sodium-free day.
+  function nutrientRow(lab: string, val: number | null, unit: string) {
+    const known = val != null;
+    return (
+      <div className="flex items-baseline justify-between rounded-lg px-2 py-1" style={{ background: "var(--brand-bg)" }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.4, color: "var(--brand-text-secondary)" }}>{lab}</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: known ? "var(--brand-text)" : "var(--brand-text-secondary)" }}>
+          {known ? `${unit === "mg" ? Math.round(val) : Math.round(val * 10) / 10} ${unit}` : "—"}
+        </span>
+      </div>
+    );
+  }
+
   function circleFor(row: Row, idx: number) {
     const l = row.log;
     const logged = isLogged(row);
@@ -1297,6 +1330,38 @@ export default function NutritionV3Client(props: Props) {
                   {pill("CARBS", cVal, tgt ? tgt.c : null, "#5ec9a3")}
                   {pill("FAT", fVal, tgt ? tgt.f : null, BLUE)}
                 </div>
+                {/* Nutrients beyond the macros. Collapsed by default so the card
+                    still reads at a glance; the coverage line is not optional —
+                    a partial sodium total looks identical to a complete one
+                    without it, and the plan-meal path has no nutrient source at
+                    all. */}
+                {!showAvg && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => setShowNutrients((v) => !v)}
+                      className="w-full flex items-center justify-center gap-1"
+                      style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: "var(--brand-text-secondary)", background: "none", border: "none", cursor: "pointer", padding: "4px 0" }}
+                    >
+                      {showNutrients ? "HIDE NUTRIENTS" : "ALL NUTRIENTS"}
+                      <i className={"ti ti-chevron-" + (showNutrients ? "up" : "down")} style={{ fontSize: 12 }} />
+                    </button>
+                    {showNutrients && (
+                      <div className="mt-1 pt-2" style={{ borderTop: "1px dashed var(--brand-border)" }}>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                          {nutrientRow("Fiber", totals.nutrients.fiber, "g")}
+                          {nutrientRow("Sugar", totals.nutrients.sugar, "g")}
+                          {nutrientRow("Sodium", totals.nutrients.sodium, "mg")}
+                          {nutrientRow("Sat. fat", totals.nutrients.satFat, "g")}
+                        </div>
+                        <p className="mt-2" style={{ fontSize: 10, color: "var(--brand-text-secondary)", lineHeight: 1.35 }}>
+                          {totals.nutrientKnownCount === 0
+                            ? "No nutrient data for today's meals yet — foods logged from the database or a photo carry it; plan meals don't."
+                            : `From ${totals.nutrientKnownCount} of ${totals.loggedCount} logged meal${totals.loggedCount === 1 ? "" : "s"}${totals.nutrientKnownCount < totals.loggedCount ? " — the rest have no nutrient source, so this is a floor, not the day's total." : "."}`}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {!showAvg && totals.pendingCount > 0 && (
                   <p className="mt-2 text-center" style={{ fontSize: 10, color: "#b45309" }}>
                     {totals.pendingCount} entr{totals.pendingCount === 1 ? "y" : "ies"} pending AI macros — totals update tonight

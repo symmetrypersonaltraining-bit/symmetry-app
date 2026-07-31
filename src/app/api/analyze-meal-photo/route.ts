@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: media as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data: imageBase64 } },
-          { type: 'text', text: 'Analyze this food photo and estimate the macros as accurately as possible. Use official nutrition data, not just visual estimation, whenever possible. If the photo or the accompanying text contains a receipt, packaging, a menu, or food from an identifiable restaurant or chain (for example Wing Snob, Buffalo Wild Wings, Chipotle, or anything ordered via UberEats or DoorDash), IDENTIFY THE RESTAURANT and the specific items, then base the macros on that chain\'s OFFICIAL published nutrition for those exact items and quantities rather than guessing visually. Count discrete items precisely (for example the number of wings, tenders, or slices) and multiply by the known per-item macros. Wings from wing chains are commonly OVER-estimated on calories and fat, so anchor to official per-wing values (a typical bone-in wing is about 80 to 100 kcal plain) rather than inflating. Only fall back to pure visual estimation when no brand or chain is identifiable. Respond with JSON only: { "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number, "description": "what you see, including the restaurant or item and whether macros came from official data or a visual estimate", "restaurant": string or null (the identified chain/restaurant name), "source": "restaurant_official" when the macros come from a chain\'s official published nutrition, otherwise "visual_estimate" }' + extraText }
+          { type: 'text', text: 'Analyze this food photo and estimate the macros as accurately as possible. Use official nutrition data, not just visual estimation, whenever possible. If the photo or the accompanying text contains a receipt, packaging, a menu, or food from an identifiable restaurant or chain (for example Wing Snob, Buffalo Wild Wings, Chipotle, or anything ordered via UberEats or DoorDash), IDENTIFY THE RESTAURANT and the specific items, then base the macros on that chain\'s OFFICIAL published nutrition for those exact items and quantities rather than guessing visually. Count discrete items precisely (for example the number of wings, tenders, or slices) and multiply by the known per-item macros. Wings from wing chains are commonly OVER-estimated on calories and fat, so anchor to official per-wing values (a typical bone-in wing is about 80 to 100 kcal plain) rather than inflating. Only fall back to pure visual estimation when no brand or chain is identifiable. Respond with JSON only: { "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number, "description": "what you see, including the restaurant or item and whether macros came from official data or a visual estimate", "restaurant": string or null (the identified chain/restaurant name), "source": "restaurant_official" when the macros come from a chain\'s official published nutrition, otherwise "visual_estimate", "fiber_g": number or null, "sugar_g": number or null, "sodium_mg": number or null, "sat_fat_g": number or null }. For the four nutrient fields: give a real number when the item is identifiable enough to look up (a named chain item, a packaged product, or a plain whole food), and null when it genuinely is not — a null is far more useful than a guess, because these totals are used to watch blood pressure and fiber intake. Sodium especially: restaurant and packaged food sodium is not visually estimable, so return it only from official or reference data.' + extraText }
         ]
       }]
     });
@@ -94,6 +94,22 @@ export async function POST(req: NextRequest) {
     const description = typeof result.description === 'string' && result.description ? result.description : 'Photo meal';
     const source = result.source === 'restaurant_official' ? 'restaurant_official' : 'visual_estimate';
 
+    // Nutrients. Unlike the macros above these do NOT coerce missing to 0 —
+    // the model is told to return null when it cannot look the item up, and a
+    // null has to survive to the column. Zeroing an unknown sodium would make a
+    // day of restaurant food read as a low-sodium day.
+    const nutOrNull = (v: unknown, dp: number): number | null => {
+      if (v == null) return null;
+      const x = Number(v);
+      if (!Number.isFinite(x) || x < 0) return null;
+      const f = Math.pow(10, dp);
+      return Math.round(x * f) / f;
+    };
+    const fiber = nutOrNull(result.fiber_g, 1);
+    const sugar = nutOrNull(result.sugar_g, 1);
+    const sodium = nutOrNull(result.sodium_mg, 0);
+    const satFat = nutOrNull(result.sat_fat_g, 1);
+
     // Structured JSONB for the nightly rollup / charts / AI — the est_* fields
     // and this object are ALWAYS written together so they can never disagree.
     const offPlanMacros: Record<string, unknown> = {
@@ -101,6 +117,10 @@ export async function POST(req: NextRequest) {
       protein,
       carbs,
       fats,
+      fiber,
+      sugar,
+      sodium,
+      sat_fat: satFat,
       description,
       estimated: true,
       source,
@@ -124,6 +144,10 @@ export async function POST(req: NextRequest) {
             est_protein: protein,
             est_carbs: carbs,
             est_fats: fats,
+            est_fiber: fiber,
+            est_sugar: sugar,
+            est_sodium: sodium,
+            est_sat_fat: satFat,
             analysis_status: 'complete',
             macros_pending: false,
           })

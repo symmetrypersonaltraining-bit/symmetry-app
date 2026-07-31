@@ -81,6 +81,15 @@ export interface CustomItem {
   db?: boolean;         // from food_catalog (verified-ish)
   food_id?: string | null;
   fac?: number;         // per-item multiplier (steppers)
+  // Nutrients beyond the macros. Short keys to match the existing style — these
+  // ride inside item_overrides.__custom jsonb on every log row, so the names are
+  // paid for on every write. Units follow food_catalog exactly: sodium in
+  // MILLIGRAMS, everything else in GRAMS. Undefined means unknown, which is a
+  // different fact from zero and has to survive the round trip.
+  fi?: number | null;   // fiber, g
+  su?: number | null;   // sugar, g
+  so?: number | null;   // sodium, mg
+  sf?: number | null;   // saturated fat, g
 }
 
 export interface CustomMeta {
@@ -121,6 +130,11 @@ export interface LogRow {
   est_protein?: number | null;
   est_carbs?: number | null;
   est_fats?: number | null;
+  // Nutrients. Sodium in mg, the rest in g. NULL = unknown, never zero.
+  est_fiber?: number | null;
+  est_sugar?: number | null;
+  est_sodium?: number | null;
+  est_sat_fat?: number | null;
   macros_pending?: boolean | null;
   item_overrides?: ItemOverrides | null;
   photo_url?: string | null;
@@ -201,6 +215,113 @@ export function planMealMacros(meal: PlanMeal, overrides?: ItemOverrides | null)
   return { kcal: kcalOf(p, c, f), protein: p, carbs: c, fats: f };
 }
 
+// ─── Nutrients beyond the macros ─────────────────────────────────────────────
+//
+// food_catalog has carried fiber, sugar, sodium and saturated fat since the
+// Open Food Facts / USDA import, but nothing ever displayed them and
+// meal_adherence_logs did not persist them, so they were discarded at log time.
+//
+// The hard part is not the arithmetic, it is honesty about coverage. A plan meal
+// has NO nutrient source at all — meal_items stores protein/carbs/fats and
+// nothing else — so a day assembled from plan meals genuinely does not know its
+// sodium. Reporting that as 0 mg would be a lie the UI could not detect, so
+// every accessor here returns null for unknown and the day total carries a
+// count of how many logged meals actually contributed.
+
+export interface Nutrients {
+  fiber: number | null;   // g
+  sugar: number | null;   // g
+  sodium: number | null;  // mg
+  satFat: number | null;  // g
+}
+
+export const NUTRIENTS_UNKNOWN: Nutrients = { fiber: null, sugar: null, sodium: null, satFat: null };
+
+export function hasAnyNutrient(n: Nutrients | null | undefined): boolean {
+  if (!n) return false;
+  return n.fiber != null || n.sugar != null || n.sodium != null || n.satFat != null;
+}
+
+function numOrNull(v: unknown): number | null {
+  if (v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Scale a nutrient by a factor, preserving null. 0.75 of an unknown is still
+// unknown, not 0.
+function scaleN(n: Nutrients, pct: number): Nutrients {
+  return {
+    fiber: n.fiber == null ? null : n.fiber * pct,
+    sugar: n.sugar == null ? null : n.sugar * pct,
+    sodium: n.sodium == null ? null : n.sodium * pct,
+    satFat: n.satFat == null ? null : n.satFat * pct,
+  };
+}
+
+// Sum across items. A field stays null only if EVERY contributing item was null;
+// once one item knows its sodium, the sum is a real (if partial) number.
+function addN(a: Nutrients, b: Nutrients): Nutrients {
+  const add = (x: number | null, y: number | null) =>
+    x == null && y == null ? null : (x ?? 0) + (y ?? 0);
+  return {
+    fiber: add(a.fiber, b.fiber),
+    sugar: add(a.sugar, b.sugar),
+    sodium: add(a.sodium, b.sodium),
+    satFat: add(a.satFat, b.satFat),
+  };
+}
+
+function estNutrients(log: LogRow): Nutrients {
+  return {
+    fiber: numOrNull(log.est_fiber),
+    sugar: numOrNull(log.est_sugar),
+    sodium: numOrNull(log.est_sodium),
+    satFat: numOrNull(log.est_sat_fat),
+  };
+}
+
+export function customMealNutrients(meta: CustomMeta): Nutrients {
+  let out = { ...NUTRIENTS_UNKNOWN };
+  for (const it of meta.items || []) {
+    const fac = it.fac ?? 1;
+    out = addN(out, scaleN({
+      fiber: numOrNull(it.fi),
+      sugar: numOrNull(it.su),
+      sodium: numOrNull(it.so),
+      satFat: numOrNull(it.sf),
+    }, fac));
+  }
+  return out;
+}
+
+// What a single log row contributed in nutrients. Mirrors logConsumedMacros'
+// precedence so the two can never disagree about which row counted.
+export function logConsumedNutrients(log: LogRow): Nutrients {
+  const ov = log.item_overrides || null;
+  if (ov?.__removed || ov?.__unlogged || ov?.__custom?.unlogged) return NUTRIENTS_UNKNOWN;
+  if (log.macros_pending) return NUTRIENTS_UNKNOWN;
+
+  const fromCols = estNutrients(log);
+  if (hasAnyNutrient(fromCols)) {
+    // Off-plan/est rows are absolute, not prorated — same rule as est_*.
+    if (log.adherence === "Off-plan" || !log.adherence) return fromCols;
+    const pct = adherencePct(log.adherence);
+    return pct == null ? fromCols : scaleN(fromCols, pct);
+  }
+
+  if (ov?.__custom) {
+    const n = customMealNutrients(ov.__custom);
+    if (!hasAnyNutrient(n)) return NUTRIENTS_UNKNOWN;
+    if (log.adherence === "Off-plan" || !log.adherence) return n;
+    const pct = adherencePct(log.adherence);
+    return pct == null ? n : scaleN(n, pct);
+  }
+
+  // Plan meal with no itemised source: genuinely unknown.
+  return NUTRIENTS_UNKNOWN;
+}
+
 // Macros for a day-custom (itemized) meal.
 export function customMealMacros(meta: CustomMeta): Macros {
   let p = 0, c = 0, f = 0;
@@ -278,6 +399,12 @@ export function logConsumedMacros(
 export interface DayTotals extends Macros {
   loggedCount: number;   // rows that represent an actual log (not placeholders)
   pendingCount: number;  // rows awaiting AI/trainer macros
+  nutrients: Nutrients;  // fiber/sugar/satFat in g, sodium in mg; null = unknown
+  // How many of the day's logged meals actually carried nutrient data. The UI
+  // MUST show this next to the numbers: "820 mg sodium" from 2 of 5 meals is a
+  // very different statement from 820 mg for the day, and without the
+  // denominator a partial total reads as a complete one.
+  nutrientKnownCount: number;
 }
 
 // THE canonical function. logs = all meal_adherence_logs rows for one client+date;
@@ -291,7 +418,8 @@ export function computeDayTotals(logs: LogRow[], planMeals: PlanMeal[]): DayTota
     if (!mealByPos.has(m.position)) mealByPos.set(m.position, m);
   }
   let kcal = 0, protein = 0, carbs = 0, fats = 0;
-  let loggedCount = 0, pendingCount = 0;
+  let loggedCount = 0, pendingCount = 0, nutrientKnownCount = 0;
+  let nutrients: Nutrients = { ...NUTRIENTS_UNKNOWN };
   for (const log of logs || []) {
     const ov = log.item_overrides || null;
     if (ov?.__removed) continue;
@@ -300,8 +428,10 @@ export function computeDayTotals(logs: LogRow[], planMeals: PlanMeal[]): DayTota
     if (log.macros_pending && !placeholder) pendingCount++;
     const m = logConsumedMacros(log, mealById, mealByPos);
     kcal += m.kcal; protein += m.protein; carbs += m.carbs; fats += m.fats;
+    const n = logConsumedNutrients(log);
+    if (hasAnyNutrient(n)) { nutrients = addN(nutrients, n); nutrientKnownCount++; }
   }
-  return { kcal, protein, carbs, fats, loggedCount, pendingCount };
+  return { kcal, protein, carbs, fats, loggedCount, pendingCount, nutrients, nutrientKnownCount };
 }
 
 // Adherence score for a day: average proration across PLAN meal slots

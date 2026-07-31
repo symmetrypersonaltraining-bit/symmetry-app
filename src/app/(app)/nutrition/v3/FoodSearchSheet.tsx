@@ -23,9 +23,23 @@ export interface CatalogFood {
   verified?: boolean | null;
   source?: string | null; // usda | brand | restaurant | client | ...
   client_id?: string | null;
+  // food_catalog has carried these since the OFF/USDA import and nothing ever
+  // read them. Sodium in mg, the rest in g. null = the source did not publish
+  // it, which has to stay distinct from zero all the way to the day total.
+  fiber?: number | null;
+  sugar?: number | null;
+  sodium?: number | null;
+  sat_fat?: number | null;
 }
 
 function n(v: unknown): number { const x = Number(v); return isFinite(x) ? x : 0; }
+
+// Unlike n(), this keeps "missing" as null instead of collapsing it to 0.
+function nOrNull(v: unknown): number | null {
+  if (v == null) return null;
+  const x = Number(v);
+  return isFinite(x) ? x : null;
+}
 
 function mapRow(raw: Record<string, unknown>, fromCatalog: boolean): CatalogFood {
   return {
@@ -41,6 +55,12 @@ function mapRow(raw: Record<string, unknown>, fromCatalog: boolean): CatalogFood
     verified: (raw.verified as boolean) ?? null,
     source: (raw.source as string) ?? (fromCatalog ? null : "foods"),
     client_id: (raw.created_by_client_id as string) ?? (raw.client_id as string) ?? null,
+    // The legacy `foods` table has no nutrient columns at all, so these stay
+    // null for those rows rather than reading as zero.
+    fiber: nOrNull(raw.fiber),
+    sugar: nOrNull(raw.sugar),
+    sodium: nOrNull(raw.sodium),
+    sat_fat: nOrNull(raw.sat_fat),
   };
 }
 
@@ -163,6 +183,10 @@ export default function FoodSearchSheet({
     // Label the item in the units the client actually entered ("5 g"), not as a
     // fraction of a serving ("0.2 × 25 g") — that's what they'll recognise later.
     const label = amtNum > 0 ? `${amtNum} ${unit}` : `${m} × ${f.serving || "serving"}`;
+    // Nutrients scale by the same multiplier as the macros. null stays null —
+    // 0.4 of an unknown sodium is still unknown, and writing 0 here would make
+    // the day total silently understate itself with no way to tell.
+    const scale = (v: number | null | undefined) => (v == null ? null : Math.round(v * m * 100) / 100);
     onPick({
       n: f.name,
       a: label,
@@ -171,6 +195,10 @@ export default function FoodSearchSheet({
       db: !!f.verified,
       food_id: f.id,
       fac: 1,
+      fi: scale(f.fiber),
+      su: scale(f.sugar),
+      so: f.sodium == null ? null : Math.round(f.sodium * m),
+      sf: scale(f.sat_fat),
     });
   }
 
