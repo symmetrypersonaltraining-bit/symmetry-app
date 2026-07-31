@@ -128,6 +128,11 @@ export default function CelebrationScreen({
   // failure path leaves aiLine null and the screen behaves exactly as before.
   const [aiLine, setAiLine] = useState<string | null>(null);
   const [aiPrs, setAiPrs] = useState<{ movement: string; weight: number; reps: number; previous: number | null }[]>([]);
+  // 80f43c91: "Add how many coach Dustin's you lifted for workout celebrations."
+  // His real weigh-in, served by /api/celebration, so the joke tracks his cut
+  // instead of quietly drifting out of date. null until it lands (or forever,
+  // if he hasn't weighed in) — every use below is guarded.
+  const [coachWeight, setCoachWeight] = useState<number | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -141,9 +146,11 @@ export default function CelebrationScreen({
         const j = (await res.json()) as {
           line?: string | null;
           prs?: { movement: string; weight: number; reps: number; previous: number | null }[];
+          coachWeight?: number | null;
         };
         if (cancelled) return;
         if (j.line) setAiLine(j.line);
+        if (typeof j.coachWeight === "number" && j.coachWeight > 0) setCoachWeight(j.coachWeight);
         if (Array.isArray(j.prs) && j.prs.length) {
           setAiPrs(j.prs.slice(0, 3));
           fx("pr");
@@ -158,14 +165,28 @@ export default function CelebrationScreen({
   }, [clientId]);
 
   const topPr = aiPrs[0] || null;
+
+  const vStr = volume.toLocaleString();
+
+  // "How many coach Dustins did you lift?" — one decimal, because 4.7 Dustins
+  // is funnier and more honest than a rounded 5. Only meaningful once there's
+  // actual volume AND a real weigh-in to divide by.
+  const dustins = coachWeight && volume > 0 ? Math.round((volume / coachWeight) * 10) / 10 : null;
+
+  // The slot machine gets him too. Appended rather than folded into the UNITS
+  // constant so the list stays a plain module constant and the coach entry only
+  // exists on the sessions where we actually know his weight.
+  const units: [string, number, string][] = coachWeight
+    ? [...UNITS, ["coach Dustins (" + coachWeight + " lb, and cutting)", coachWeight, "🧍‍♂️"]]
+    : UNITS;
+  const unit = units[(seed + reroll) % units.length];
+  const unitCount = Math.max(1, Math.round(volume / unit[1]));
+
   const shareText = topPr
     ? `🏆 ${firstName} just hit a PR — ${topPr.movement} ${topPr.weight} lb × ${topPr.reps}` +
       (topPr.previous ? ` (previous best ${topPr.previous} lb)` : "")
-    : `💪 ${firstName} just finished ${dayLabel || "a session"} — ${setCount} sets, ${volume.toLocaleString()} lb moved.`;
-
-  const vStr = volume.toLocaleString();
-  const unit = UNITS[(seed + reroll) % UNITS.length];
-  const unitCount = Math.max(1, Math.round(volume / unit[1]));
+    : `💪 ${firstName} just finished ${dayLabel || "a session"} — ${setCount} sets, ${vStr} lb moved` +
+      (dustins ? ` — that's ${dustins} coach Dustin${dustins === 1 ? "" : "s"}.` : ".");
   const headline = HEADLINES[(seed + tapIdx) % HEADLINES.length];
   const fortune = FORTUNES[(seed + tapIdx) % FORTUNES.length];
   const lucky = LUCKY[seed % LUCKY.length];
@@ -789,6 +810,23 @@ export default function CelebrationScreen({
       {aiLine ? <div style={aiLineBox}>{aiLine}</div> : null}
 
       {StatRow}
+
+      {/* 80f43c91 — the coach-as-a-unit-of-measure line. Sits under the stats on
+          every variant so it shows up regardless of which concept rolled, and
+          disappears entirely if we couldn't read his weight. */}
+      {dustins ? (
+        <div style={dustinBox}>
+          <span style={{ fontSize: 20, lineHeight: 1 }}>🧍‍♂️</span>
+          <span style={{ flex: 1, lineHeight: 1.45 }}>
+            That&rsquo;s <b style={{ color: "var(--brand-primary)", fontSize: 15 }}>{dustins}</b> coach Dustin
+            {dustins === 1 ? "" : "s"} lifted today.
+            <span style={{ display: "block", fontSize: 10.5, color: "var(--brand-text-secondary)", marginTop: 2 }}>
+              He weighs {coachWeight} lb. He did not consent to this.
+            </span>
+          </span>
+        </div>
+      ) : null}
+
       {content}
 
       {/* Community: push the win into the group chat. */}
@@ -835,5 +873,17 @@ const ghostBtn: React.CSSProperties = { marginTop: 14, border: "1px solid var(--
 const doneBtn: React.CSSProperties = { textAlign: "center", background: "var(--brand-primary)", color: "#fff", borderRadius: 999, padding: "13px 0", fontSize: 14, fontWeight: 800, textDecoration: "none" };
 // PR plate + AI line (2026-07-25). Additive styles only.
 const prPlate: React.CSSProperties = { background: "linear-gradient(150deg,#3a2a12,#6b5227)", border: "2px solid #e0a83e", borderRadius: 16, padding: "16px 18px", textAlign: "center", boxShadow: "0 0 34px rgba(224,168,62,.35)" };
+const dustinBox: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  background: "var(--brand-surface)",
+  border: "1px solid var(--brand-border)",
+  borderRadius: 12,
+  padding: "10px 13px",
+  fontSize: 12.5,
+  color: "var(--brand-text)",
+};
+
 const aiLineBox: React.CSSProperties = { background: "var(--brand-surface)", border: "1px solid var(--brand-border)", borderLeft: "3px solid var(--brand-primary)", borderRadius: 12, padding: "11px 14px", fontSize: 13.5, lineHeight: 1.55, color: "var(--brand-text)", fontStyle: "italic" };
 const CSS = "@keyframes cs-ledger{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}@keyframes cs-ring{to{stroke-dashoffset:var(--ring-to,0)}}@media (prefers-reduced-motion:reduce){[style*='cs-ledger'],[style*='cs-ring'],[style*='cs-stamp']{animation:none!important;opacity:1!important}}@keyframes cs-fall{to{transform:translateY(760px) rotate(720deg)}}@keyframes cs-blink{50%{opacity:.3}}@keyframes cs-xp{from{width:6%}to{width:85%}}@keyframes cs-credits{from{transform:translateY(100%)}to{transform:translateY(-100%)}}@keyframes cs-stamp{from{transform:rotate(12deg) scale(3);opacity:0}to{transform:rotate(12deg) scale(1);opacity:.9}}@keyframes cs-shimmer{0%{background-position:0% 0}100%{background-position:300% 0}}@keyframes cs-ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}";

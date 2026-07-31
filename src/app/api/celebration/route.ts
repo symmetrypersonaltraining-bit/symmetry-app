@@ -2,10 +2,15 @@
 // Body: { clientId?: string, dayId?: string }
 //
 // Returns the data behind a workout-complete celebration:
-//   { stats, prs, line }
-// - stats : today's sets / volume / streak / sessions this week
-// - prs   : movements where today beat every previous session's best weight
-// - line  : ONE personal sentence written by Haiku from those numbers
+//   { stats, prs, line, coachWeight }
+// - stats       : today's sets / volume / streak / sessions this week
+// - prs         : movements where today beat every previous session's best weight
+// - line        : ONE personal sentence written by Haiku from those numbers
+// - coachWeight : Dustin's most recent logged body weight, so the celebration
+//                 screen can express volume as "how many coach Dustins you
+//                 lifted" (feedback 80f43c91). Read live from metrics rather
+//                 than hardcoded — he's mid-cut, and a stale number would make
+//                 the joke quietly wrong. null if he hasn't weighed in.
 //
 // Everything degrades safely. If the model call fails, is metered out, or the
 // API key is missing, `line` comes back null and the celebration screen falls
@@ -24,6 +29,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 export const dynamic = "force-dynamic";
 
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+const COACH_EMAIL = "symmetrypersonaltraining@gmail.com";
 function shiftDays(iso: string, delta: number): string {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
@@ -77,14 +83,40 @@ export async function POST(req: NextRequest) {
   const scoped = await resolveAiScope((await req.json().catch(() => ({}) as Body))?.clientId ?? null);
   if (!scoped.ok) return scoped.response;
   const clientId = scoped.scope.clientId;
-  if (!clientId) return NextResponse.json({ stats: null, prs: [], line: null });
+  if (!clientId) return NextResponse.json({ stats: null, prs: [], line: null, coachWeight: null });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return NextResponse.json({ stats: null, prs: [], line: null });
+  if (!url || !key) return NextResponse.json({ stats: null, prs: [], line: null, coachWeight: null });
   const admin = createAdminClient(url, key, { auth: { persistSession: false } }) as unknown as Db;
 
   const today = CT_TODAY();
+
+  // Dustin's latest weigh-in, for the "coach Dustins lifted" unit. Looked up by
+  // email so it survives any client-row rebuild, and wrapped so a miss here can
+  // never take the celebration down with it.
+  const coachWeight = await (async (): Promise<number | null> => {
+    try {
+      const { data: coach } = await admin
+        .from("clients")
+        .select("id")
+        .eq("email", COACH_EMAIL)
+        .maybeSingle();
+      const coachId = (coach as { id?: string } | null)?.id;
+      if (!coachId) return null;
+      const { data: m } = await admin
+        .from("metrics")
+        .select("weight")
+        .eq("client_id", coachId)
+        .not("weight", "is", null)
+        .order("metric_date", { ascending: false })
+        .limit(1);
+      const w = Number(((m as { weight?: number | string }[]) || [])[0]?.weight);
+      return Number.isFinite(w) && w > 0 ? Math.round(w * 10) / 10 : null;
+    } catch {
+      return null;
+    }
+  })();
 
   try {
     const [clientRes, logRes, weekRes, monthRes, mealRes] = await Promise.all([
@@ -243,9 +275,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ stats, prs, line });
+    return NextResponse.json({ stats, prs, line, coachWeight });
   } catch {
     // Never surface an error to a celebration screen.
-    return NextResponse.json({ stats: null, prs: [], line: null });
+    return NextResponse.json({ stats: null, prs: [], line: null, coachWeight });
   }
 }
