@@ -13,21 +13,33 @@ const COLOR_CANCELLED = '6';   // orange = full cancel (cancelled_client)
 const COLOR_HALF = '3';        // grape/purple = half / vacation credit (cancelled_half) — ready, unused until Dustin uses it
 const COLOR_PAYMENT = '11';
 
-function getAnonClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-}
-
-// Service-role client, for the one call that must NOT be reachable with the
-// public key. recalc_pending_payment_reminders is SECURITY DEFINER and rewrites
-// billing amounts; EXECUTE on it is revoked from PUBLIC and anon, so it is
-// callable only from here. Server-side only — this key never reaches a browser.
+// Service-role client. This route drives every SECURITY DEFINER function the
+// calendar sync owns, and it used to drive them with the ANON key — the key
+// that ships in the JavaScript bundle of every client's app.
+//
+// That made the following callable by anyone on the internet, no login:
+//   • gcal_clear_appointments()  — deletes every appointment in the table
+//   • gcal_get_clients()         — returns the full client roster
+//   • gcal_sync_appointments()   — writes arbitrary appointments
+//   • gcal_reconcile_*()         — cancels appointments by id
+//
+// The route's own POST/GET guard never helped: the guard protects the HTTP
+// endpoint, and the attack does not go through the endpoint. It goes straight
+// to /rest/v1/rpc/gcal_clear_appointments with the public key. The only fix is
+// to stop the public key from being able to execute them at all, which means
+// this route has to hold the service role instead.
+//
+// Throws rather than falling back. A silent fallback to the anon key is how
+// this survived the last hardening pass.
 function getServiceClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key) return null;
+  if (!key) {
+    throw new Error(
+      'SUPABASE_SERVICE_ROLE_KEY is not set. The calendar sync RPCs are no ' +
+      'longer executable with the anon key. Set the variable in Vercel ' +
+      '(Production) and redeploy.'
+    );
+  }
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     key,
@@ -54,7 +66,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { token } = await getValidAccessToken();
-    const supabase = getAnonClient();
+    const supabase = getServiceClient();
 
     const { data: clientRows } = await supabase.rpc('gcal_get_clients');
     const clients = clientRows as Array<{id: string; name: string}> | null;
@@ -210,10 +222,11 @@ export async function POST(req: NextRequest) {
     let remindersRecalculated = 0;
     let remindersChanged = 0;
     let workoutsFollowed = 0;
-    const svc = getServiceClient();
-    if (!svc) {
-      errors.push('reminder_recalc: SUPABASE_SERVICE_ROLE_KEY is not set - reminders were NOT recalculated');
-    } else {
+    // Same client as everything else in this route now — getServiceClient()
+    // throws when the key is missing, so there is no null branch to handle and
+    // no path where this silently degrades to the public key.
+    const svc = supabase;
+    {
       // The calendar decides WHEN a supervised session happens, so supervised
       // workouts follow their linked appointment automatically -- no proposal,
       // no approval. It will not touch solo work, anything already logged,
@@ -224,7 +237,7 @@ export async function POST(req: NextRequest) {
       if (mvErr) errors.push('workout_follow: ' + mvErr.message);
       else workoutsFollowed = ((mv as any[]) || []).length;
     }
-    if (svc) {
+    {
       const { data: rr, error: rrErr } = await svc.rpc('recalc_pending_payment_reminders');
       if (rrErr) errors.push('reminder_recalc: ' + rrErr.message);
       else {

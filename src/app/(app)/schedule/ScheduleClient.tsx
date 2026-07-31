@@ -38,7 +38,11 @@ interface Props {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const HOUR_START = 6;   // 6 AM
+// The grid started at 6 AM, and anything outside the window was returned as
+// null rather than drawn — so every 4:30 and 5 AM client was invisible on the
+// trainer calendar, silently. That is 336 appointments in the last 30 days
+// alone. 4 AM is the real start of the training day.
+const HOUR_START = 4;   // 4 AM
 const HOUR_END = 21;    // 9 PM
 const PX_PER_HOUR = 64; // pixels per hour row
 
@@ -482,9 +486,18 @@ function WeekGrid({ weekStart, todayStr, appointments, isTrainer, onClickAppt }:
                 {timedAppts.map((appt) => {
                   const startMins = timeToMinutes(appt.startTime!);
                   const endMins = appt.endTime ? timeToMinutes(appt.endTime) : startMins + 60;
-                  const topPx = (startMins - HOUR_START * 60) * (PX_PER_HOUR / 60);
-                  const heightPx = Math.max((endMins - startMins) * (PX_PER_HOUR / 60), 24);
-                  if (startMins < HOUR_START * 60 || startMins >= HOUR_END * 60) return null;
+                  // Clamp instead of dropping. Returning null here is how the
+                  // 5 AM sessions disappeared for months: an appointment
+                  // outside the window vanished with nothing to indicate it
+                  // existed. Anything outside now pins to the nearest edge and
+                  // still shows its real time in the label, so the calendar can
+                  // never again be quietly wrong about what is on the day.
+                  const outOfRange = startMins < HOUR_START * 60 || startMins >= HOUR_END * 60;
+                  const clampedStart = Math.min(Math.max(startMins, HOUR_START * 60), HOUR_END * 60 - 30);
+                  const topPx = (clampedStart - HOUR_START * 60) * (PX_PER_HOUR / 60);
+                  const heightPx = outOfRange
+                    ? 24
+                    : Math.max((endMins - startMins) * (PX_PER_HOUR / 60), 24);
                   const shortLabel = appt.label.split(" — ")[0];
                   const timeLabel = appt.endTime
                     ? `${formatTime12(appt.startTime!)}–${formatTime12(appt.endTime)}`
@@ -493,11 +506,11 @@ function WeekGrid({ weekStart, todayStr, appointments, isTrainer, onClickAppt }:
                     <div
                       key={appt.id}
                       onClick={() => isTrainer && onClickAppt(appt)}
-                      className={`absolute left-0.5 right-0.5 rounded bg-indigo-600 text-white text-xs overflow-hidden shadow-sm ${isTrainer ? "cursor-pointer hover:bg-indigo-700 hover:shadow-md" : "cursor-default"} transition-all`}
+                      className={`absolute left-0.5 right-0.5 rounded text-white text-xs overflow-hidden shadow-sm ${outOfRange ? "bg-amber-600" : "bg-indigo-600"} ${isTrainer ? "cursor-pointer hover:opacity-90 hover:shadow-md" : "cursor-default"} transition-all`}
                       style={{ top: topPx, height: heightPx, zIndex: 2 }}
-                      title={`${appt.label}\n${timeLabel}`}
+                      title={outOfRange ? `${appt.label}\n${timeLabel} — outside the ${formatHour(HOUR_START)}–${formatHour(HOUR_END)} grid` : `${appt.label}\n${timeLabel}`}
                     >
-                      <div className="px-1.5 pt-0.5 font-medium leading-tight truncate">{shortLabel}</div>
+                      <div className="px-1.5 pt-0.5 font-medium leading-tight truncate">{outOfRange ? `${timeLabel} ${shortLabel}` : shortLabel}</div>
                       {heightPx > 28 && <div className="px-1.5 text-indigo-200 leading-tight truncate">{timeLabel}</div>}
                     </div>
                   );
