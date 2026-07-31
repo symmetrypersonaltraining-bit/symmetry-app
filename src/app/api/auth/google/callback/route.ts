@@ -33,11 +33,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(APP_URL + '/settings?gcal=error&reason=token_exchange');
   }
 
-  // Use anon key + SECURITY DEFINER RPC to bypass RLS
-  // (service role key in env is misconfigured; this is the safe workaround)
+  // Service role, not the anon key. save_google_tokens WRITES the trainer's
+  // Google refresh token, and the anon key is published in every client's
+  // browser bundle — anyone could have called this and replaced the stored
+  // credentials with their own, pointing the whole sync at a calendar they
+  // control. EXECUTE is now revoked from PUBLIC and anon.
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) {
+    console.error('[gcal-cb] SUPABASE_SERVICE_ROLE_KEY is not set');
+    return NextResponse.redirect(APP_URL + '/settings?gcal=error&reason=missing_service_key');
+  }
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    serviceKey,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 

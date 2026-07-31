@@ -1,16 +1,44 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Use anon key + SECURITY DEFINER RPCs — service role key in Vercel is misconfigured
-function getAnonClient() {
+// Google OAuth tokens are read and written through SECURITY DEFINER RPCs. Those
+// used to be called with the ANON key, on the note that "service role key in
+// Vercel is misconfigured".
+//
+// That combination is the problem, not a workaround for it. The anon key is
+// published — it ships in the JavaScript bundle of every client's app. So
+// `gcal_get_tokens()`, which returns the trainer's Google ACCESS AND REFRESH
+// TOKENS in plaintext, was callable by anyone who opened devtools. A refresh
+// token does not expire on its own; whoever held it had read and write access
+// to the trainer's entire Google Calendar until it was manually revoked.
+//
+// There is no way to fix this at the database layer alone: a request from our
+// own server carrying the anon key is indistinguishable from an attacker's.
+// The credential has to change. These calls now use the service-role key, which
+// is server-only and never reaches a browser, and EXECUTE on the token RPCs is
+// revoked from PUBLIC and anon.
+//
+// If SUPABASE_SERVICE_ROLE_KEY really is missing or wrong, this throws with a
+// message that says exactly that, rather than falling back to the anon key and
+// quietly leaving the hole open.
+function getServiceClient() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) {
+    throw new Error(
+      'SUPABASE_SERVICE_ROLE_KEY is not set. Google Calendar tokens are only ' +
+      'readable with the service role — the anon key is public and its access ' +
+      'to these RPCs has been revoked. Set the variable in Vercel (Production) ' +
+      'and redeploy.'
+    );
+  }
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    key,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }
 
 export async function getValidAccessToken(): Promise<{ token: string; userId: string }> {
-  const supabase = getAnonClient();
+  const supabase = getServiceClient();
 
   const { data: rows, error: rpcErr } = await supabase.rpc('gcal_get_tokens');
   const settings = Array.isArray(rows) ? rows[0] : null;
