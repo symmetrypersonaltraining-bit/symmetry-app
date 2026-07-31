@@ -21,6 +21,20 @@ function getAnonClient() {
   );
 }
 
+// Service-role client, for the one call that must NOT be reachable with the
+// public key. recalc_pending_payment_reminders is SECURITY DEFINER and rewrites
+// billing amounts; EXECUTE on it is revoked from PUBLIC and anon, so it is
+// callable only from here. Server-side only — this key never reaches a browser.
+function getServiceClient() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) return null;
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    key,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
+
 export async function POST(req: NextRequest) {
   // POST had no auth of its own. GET was hardened in a691c73 while this sat
   // open: a route that writes appointments, payment rows AND now recalculates
@@ -195,14 +209,19 @@ export async function POST(req: NextRequest) {
     // statement of record and is never rewritten.
     let remindersRecalculated = 0;
     let remindersChanged = 0;
-    const { data: rr, error: rrErr } = await supabase.rpc('recalc_pending_payment_reminders');
-    if (rrErr) errors.push('reminder_recalc: ' + rrErr.message);
-    else {
-      const list = (rr as any[]) || [];
-      remindersRecalculated = list.length;
-      remindersChanged = list.filter((x: any) => x.changed).length;
-      list.filter((x: any) => x.blocked_reason)
-        .forEach((x: any) => errors.push('reminder_blocked: ' + x.client_name + ' — ' + x.blocked_reason));
+    const svc = getServiceClient();
+    if (!svc) {
+      errors.push('reminder_recalc: SUPABASE_SERVICE_ROLE_KEY is not set - reminders were NOT recalculated');
+    } else {
+      const { data: rr, error: rrErr } = await svc.rpc('recalc_pending_payment_reminders');
+      if (rrErr) errors.push('reminder_recalc: ' + rrErr.message);
+      else {
+        const list = (rr as any[]) || [];
+        remindersRecalculated = list.length;
+        remindersChanged = list.filter((x: any) => x.changed).length;
+        list.filter((x: any) => x.blocked_reason)
+          .forEach((x: any) => errors.push('reminder_blocked: ' + x.client_name + ' — ' + x.blocked_reason));
+      }
     }
 
     await supabase.rpc('gcal_generate_payment_notifications');
