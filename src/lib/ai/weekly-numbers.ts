@@ -73,7 +73,13 @@ export interface WeekFacts {
   window: WeekWindow;
   /** Days in the window with at least one food log. */
   loggedDays: number;
-  /** Average per logged day, or null when nothing was logged. */
+  /**
+   * Days actually behind `avg`. Lower than loggedDays when the in-progress day
+   * is left out — half a day of food would drag the average down and the model
+   * is told to state these figures as fact.
+   */
+  avgDays: number;
+  /** Average per averaged day, or null when nothing was logged. */
   avg: MacroSet | null;
   /** Average % adherence across days with plan meals logged. */
   adherence: number | null;
@@ -94,6 +100,7 @@ export interface MacroTarget {
 export const EMPTY_WEEK = (window: WeekWindow): WeekFacts => ({
   window,
   loggedDays: 0,
+  avgDays: 0,
   avg: null,
   adherence: null,
   workoutsScheduled: 0,
@@ -156,8 +163,15 @@ export function weekFactsLines(f: WeekFacts, label: string, target: MacroTarget 
   if (!f.avg || !f.loggedDays) {
     out.push(`- Nutrition: nothing logged (${loggingLine(f)}).`);
   } else {
+    // When today is left out of the averages, say so in the same breath as the
+    // numbers — otherwise "logged 6 of 6 days" next to a 5-day average reads
+    // like an arithmetic error to anyone checking it.
+    const basis =
+      f.avgDays && f.avgDays !== f.loggedDays
+        ? ` averages across the ${f.avgDays} completed logged day${f.avgDays === 1 ? "" : "s"} (today is still in progress and is deliberately excluded)`
+        : " averages per logged day";
     out.push(
-      `- Nutrition: ${loggingLine(f)}; averages per logged day ${r0(f.avg.kcal)} kcal, ${r0(f.avg.p)}g protein, ${r0(f.avg.c)}g carbs, ${r0(f.avg.f)}g fat.`,
+      `- Nutrition: ${loggingLine(f)};${basis} ${r0(f.avg.kcal)} kcal, ${r0(f.avg.p)}g protein, ${r0(f.avg.c)}g carbs, ${r0(f.avg.f)}g fat.`,
     );
     if (target) {
       const d = (a: number, t: number) => `${signed(r0(a - t))} (${dirWord(r0(a - t), "ABOVE", "BELOW", "on")} target)`;
@@ -190,14 +204,39 @@ export function weekFactsLines(f: WeekFacts, label: string, target: MacroTarget 
  * The full block handed to the model. Last week's finished numbers, this week
  * so far, and the week-over-week movement — all pre-computed.
  */
-export function weeklyNumbersBlock(last: WeekFacts, current: WeekFacts, target: MacroTarget | null): string {
+export function weeklyNumbersBlock(
+  last: WeekFacts,
+  current: WeekFacts,
+  target: MacroTarget | null,
+  // Each week is judged against the target that was actually in force during
+  // it. Judging a finished week against a target set after it ended is how
+  // Dustin's last week reported protein +1 ABOVE when it was really 29g BELOW —
+  // his numbers were measured against a target that took effect five days after
+  // the week closed. Defaults to `target` so single-target callers are unchanged.
+  currentTarget: MacroTarget | null = target,
+): string {
   const lines: string[] = [
     "WEEK-OVER-WEEK NUMBERS — computed from this client's real logs. Every figure and direction below is already worked out; state them as given and do NOT recompute any of them.",
     "",
     ...weekFactsLines(last, "LAST WEEK", target),
     "",
-    ...weekFactsLines(current, "THIS WEEK SO FAR", target),
+    ...weekFactsLines(current, "THIS WEEK SO FAR", currentTarget),
   ];
+
+  // A mid-window target change is the single most useful thing a coach can be
+  // told, and it silently explains why the deltas jumped.
+  const changed =
+    target && currentTarget &&
+    (target.calories !== currentTarget.calories ||
+      target.protein !== currentTarget.protein ||
+      target.carbs !== currentTarget.carbs ||
+      target.fats !== currentTarget.fats);
+  if (changed) {
+    lines.push(
+      "",
+      `TARGETS CHANGED between the two weeks — last week is measured against ${target!.calories} kcal / ${target!.protein}P / ${target!.carbs}C / ${target!.fats}F, this week against ${currentTarget!.calories} kcal / ${currentTarget!.protein}P / ${currentTarget!.carbs}C / ${currentTarget!.fats}F. Each week is compared to the target that was actually in force during it; do not treat the change as the client slipping.`,
+    );
+  }
 
   const moves: string[] = [];
   const push = (s: string | null) => {

@@ -199,6 +199,73 @@ test("with nothing logged in either week the block forbids inventing a trend", (
   assert.ok(!/Avg protein:/.test(block), "no protein delta may appear when neither week has logs");
 });
 
+test("when today is left out of the averages the basis is spelled out beside the numbers", () => {
+  // "logged food on 6 of 6 days" printed next to a 5-day average reads like an
+  // arithmetic error to anyone checking it — and Dustin checks.
+  const lines = weekFactsLines(
+    { ...facts({ loggedDays: 6, avgDays: 5, avg: { kcal: 2713, p: 295, c: 58, f: 145 } }),
+      window: { start: "2026-07-26", end: "2026-07-31", days: 6, complete: false } },
+    "THIS WEEK SO FAR", null,
+  ).join("\n");
+  assert.match(lines, /logged food on 6 of 6 days/);
+  assert.match(lines, /averages across the 5 completed logged days/);
+  assert.match(lines, /today is still in progress and is deliberately excluded/);
+  assert.match(lines, /2713 kcal, 295g protein/);
+});
+
+test("with nothing excluded the wording stays the plain per-logged-day one", () => {
+  const lines = weekFactsLines(
+    facts({ loggedDays: 6, avgDays: 6, avg: { kcal: 2293, p: 264, c: 32, f: 124 } }),
+    "LAST WEEK", null,
+  ).join("\n");
+  assert.match(lines, /averages per logged day/);
+  assert.ok(!/deliberately excluded/.test(lines), "nothing was excluded, so don't say it was");
+});
+
+test("each week is graded against the target that was actually in force during it", () => {
+  // The live bug on 2026-07-31: last week (closed 07-25) was measured against a
+  // target effective 07-30 — five days AFTER the week ended — turning "29g
+  // BELOW protein" into "1g ABOVE" and pointing the coaching the wrong way.
+  const LAST = { calories: 1963, protein: 293, carbs: 120, fats: 34 };
+  const NOW = { calories: 1388, protein: 263, carbs: 12, fats: 32 };
+  const block = weeklyNumbersBlock(
+    facts({ loggedDays: 6, avgDays: 6, avg: { kcal: 2293, p: 264, c: 32, f: 124 } }),
+    { ...facts({ loggedDays: 5, avgDays: 5, avg: { kcal: 2713, p: 295, c: 58, f: 145 } }),
+      window: { start: "2026-07-26", end: "2026-07-31", days: 6, complete: false } },
+    LAST,
+    NOW,
+  );
+
+  assert.match(block, /vs targets \(1963 kcal \/ 293P \/ 120C \/ 34F\)/);
+  assert.match(block, /vs targets \(1388 kcal \/ 263P \/ 12C \/ 32F\)/);
+  // 264 vs 293 is 29 BELOW — the figure the old single-target query got wrong.
+  assert.match(block, /protein -29 \(BELOW target\)/);
+  // And this week, 295 vs 263, is genuinely above.
+  assert.match(block, /protein \+32 \(ABOVE target\)/);
+  // The change itself has to be surfaced or the jump reads as the client slipping.
+  assert.match(block, /TARGETS CHANGED between the two weeks/);
+  assert.match(block, /do not treat the change as the client slipping/);
+});
+
+test("an unchanged target produces no TARGETS CHANGED noise", () => {
+  const T = { calories: 2200, protein: 190, carbs: 210, fats: 65 };
+  const block = weeklyNumbersBlock(
+    facts({ loggedDays: 5, avgDays: 5, avg: { kcal: 2200, p: 190, c: 210, f: 65 } }),
+    facts({ loggedDays: 3, avgDays: 3, avg: { kcal: 2100, p: 180, c: 200, f: 60 } }),
+    T,
+    { ...T },
+  );
+  assert.ok(!/TARGETS CHANGED/.test(block));
+});
+
+test("a single-target caller is unchanged — currentTarget defaults to target", () => {
+  const T = { calories: 2200, protein: 190, carbs: 210, fats: 65 };
+  const one = weeklyNumbersBlock(facts({ loggedDays: 5, avg: { kcal: 2200, p: 190, c: 210, f: 65 } }), facts(), T);
+  const two = weeklyNumbersBlock(facts({ loggedDays: 5, avg: { kcal: 2200, p: 190, c: 210, f: 65 } }), facts(), T, T);
+  assert.equal(one, two);
+  assert.ok(!/TARGETS CHANGED/.test(one));
+});
+
 test("sessions are only compared when both weeks actually had something scheduled", () => {
   const block = weeklyNumbersBlock(
     facts({ workoutsScheduled: 0, workoutsCompleted: 0 }),

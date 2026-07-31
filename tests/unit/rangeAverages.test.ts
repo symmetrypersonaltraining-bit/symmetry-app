@@ -138,6 +138,117 @@ test("days with only quick-adds count as logged days but carry no plan adherence
   assert.equal(s.adherence, null, "no plan meals were logged, so there is no adherence figure to state");
 });
 
+test("a date holding only structural rows is NOT a logged day", () => {
+  // THE 2026-07-31 bug. Dustin's only row that day was a meal deleted for today
+  // ({__removed: true}) — no food. Counting that date as a logged day put a
+  // phantom 0 kcal day into the divisor: 5 real days of food divided by 6,
+  // reporting 2261 kcal / 246g protein instead of 2713 / 295. That understated
+  // protein by ~50g and flipped it from ABOVE target to BELOW, which is the
+  // direction the AI would then have coached toward.
+  const logs = [
+    planLog("2026-07-20", 1, "m1", "Full"),
+    planLog("2026-07-20", 2, "m2", "Full"),
+    { ...planLog("2026-07-21", 1, "m1", "Skipped"), item_overrides: { __removed: true } },
+  ];
+  const s = summariseLogRange(logs, PLAN);
+  assert.equal(s.loggedDays, 1, "the __removed-only date is structure, not food");
+  assert.equal(s.avgDays, 1);
+  assert.equal(Math.round(s.kcal), M1_KCAL + M2_KCAL, "the phantom day must not halve the average");
+});
+
+test("an unlogged placeholder day is also not a logged day", () => {
+  const s = summariseLogRange(
+    [
+      planLog("2026-07-20", 1, "m1", "Full"),
+      planLog("2026-07-20", 2, "m2", "Full"),
+      { ...planLog("2026-07-21", 1, "m1", "Full"), item_overrides: { __unlogged: true } },
+    ],
+    PLAN,
+  );
+  assert.equal(s.loggedDays, 1);
+  assert.equal(Math.round(s.kcal), M1_KCAL + M2_KCAL);
+});
+
+test("excludeDates keeps the in-progress day out of the averages but still counts it as logged", () => {
+  // Half a day of food is not a data point about how someone is eating, and the
+  // AI is told to state these averages as fact.
+  const logs = [
+    planLog("2026-07-20", 1, "m1", "Full"),
+    planLog("2026-07-20", 2, "m2", "Full"),
+    planLog("2026-07-21", 1, "m1", "Full"), // today, only breakfast in so far
+  ];
+  const s = summariseLogRange(logs, PLAN, { excludeDates: ["2026-07-21"] });
+  assert.equal(s.loggedDays, 2, "they did log today — that stays true");
+  assert.equal(s.avgDays, 1, "but today is not averaged as a finished day");
+  assert.equal(Math.round(s.kcal), M1_KCAL + M2_KCAL);
+});
+
+test("excluding the only logged day falls back rather than reporting nothing", () => {
+  // Sunday morning: the week's one logged day IS today. An empty average is
+  // worse than a partial one.
+  const s = summariseLogRange([planLog("2026-07-26", 1, "m1", "Full")], PLAN, {
+    excludeDates: ["2026-07-26"],
+  });
+  assert.equal(s.loggedDays, 1);
+  assert.equal(s.avgDays, 1);
+  assert.equal(Math.round(s.kcal), M1_KCAL);
+});
+
+test("a plan meal at an EXTRA position logged Off-plan stays in the adherence average", () => {
+  // Dustin's plan genuinely has 7 meals, and EXTRA_POSITIONS is [6, 7]. An
+  // off-plan row carries no meal_id, so inferring plan positions from meal_id
+  // alone reclassified his M5 as a quick-add snack and dropped it out of
+  // adherence entirely on every day he ate off plan. The live plan's own
+  // positions are what make it a plan slot.
+  const PLAN6: PlanMeal[] = [
+    ...PLAN,
+    {
+      id: "m6", name: "Evening", timing: null, position: 6,
+      meal_items: [{ id: "i6", food: "Casein", amount: 1, unit: "scoop", is_unlimited: false, protein: 25, carbs: 5, fats: 2, position: 1 }],
+    },
+  ];
+  const offPlanAtSix = {
+    log_date: "2026-07-20", meal_id: null, meal_position: 6, adherence: "Off-plan",
+    est_kcal: 300, est_protein: 20, est_carbs: 25, est_fats: 12,
+  } as LogRow & { log_date: string };
+
+  const s = summariseLogRange(
+    [planLog("2026-07-20", 1, "m1", "Full"), planLog("2026-07-20", 2, "m2", "Full"), offPlanAtSix],
+    PLAN6,
+  );
+  // Three plan slots logged: 100% + 100% + 75% = 91.67%.
+  assert.equal(Math.round(s.adherence!), 92, "the off-plan slot is a plan meal, not a snack");
+
+  // And with no plan meal at position 6 it really is a quick-add, unchanged.
+  const asSnack = summariseLogRange(
+    [planLog("2026-07-20", 1, "m1", "Full"), planLog("2026-07-20", 2, "m2", "Full"), offPlanAtSix],
+    PLAN,
+  );
+  assert.equal(Math.round(asSnack.adherence!), 100);
+});
+
+test("plan positions are decided once for the range, not rediscovered per day", () => {
+  // Monday the client logs M6 on plan (meal_id present); Tuesday they eat it
+  // off plan (no meal_id). Per-day inference made Tuesday's slot a snack and
+  // reported a perfect Tuesday, hiding the swap.
+  const PLAN6: PlanMeal[] = [
+    ...PLAN,
+    {
+      id: "m6", name: "Evening", timing: null, position: 6,
+      meal_items: [{ id: "i6", food: "Casein", amount: 1, unit: "scoop", is_unlimited: false, protein: 25, carbs: 5, fats: 2, position: 1 }],
+    },
+  ];
+  const s = summariseLogRange(
+    [
+      planLog("2026-07-20", 6, "m6", "Full"),
+      { log_date: "2026-07-21", meal_id: null, meal_position: 6, adherence: "Off-plan", est_kcal: 300, est_protein: 20, est_carbs: 25, est_fats: 12 } as LogRow & { log_date: string },
+    ],
+    PLAN6,
+  );
+  // Day 1 = 100%, day 2 = 75% → 87.5%.
+  assert.equal(Math.round(s.adherence!), 88);
+});
+
 test("adherence averages across days, not across meals", () => {
   // Day A: 1 plan meal, Skipped (0%). Day B: 2 plan meals, both Full (100%).
   // Per-day averaging gives 50%. Pooling all meals would give 67% and quietly
