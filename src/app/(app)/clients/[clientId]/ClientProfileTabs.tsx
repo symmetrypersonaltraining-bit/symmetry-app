@@ -5,6 +5,7 @@ import { useState, useMemo, useCallback } from "react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import AssignProgramModal from "./AssignProgramModal";
+import AssessmentTab from "./AssessmentTab";
 import MetricCards from "@/components/MetricCards";
 import PrivateProfilePanel from "@/components/PrivateProfilePanel";
 import AssessmentPanel from "@/components/AssessmentPanel";
@@ -910,13 +911,14 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
 // ---- Main component ----
 export default function ClientProfileTabs({ client, metrics, allWorkouts, clientId, programs, currentProgramId }: Props) {
   const searchParams = useSearchParams();
-  const initialTab = (searchParams.get("tab") as "overview" | "training" | "metrics" | "info") ?? "overview";
-  const [tab, setTab] = useState<"overview" | "training" | "metrics" | "info">(initialTab);
+  const initialTab = (searchParams.get("tab") as "overview" | "training" | "assessment" | "metrics" | "info") ?? "overview";
+  const [tab, setTab] = useState<"overview" | "training" | "assessment" | "metrics" | "info">(initialTab);
   const [showAssignModal, setShowAssignModal] = useState(false);
 
   const TABS = [
     { id: "overview" as const, label: "Overview", icon: "ti-layout-dashboard" },
     { id: "training" as const, label: "Training", icon: "ti-calendar" },
+    { id: "assessment" as const, label: "Assessment", icon: "ti-clipboard-heart" },
     { id: "metrics" as const, label: "Progress", icon: "ti-chart-line" },
     { id: "info" as const, label: "Info", icon: "ti-user" },
   ];
@@ -953,6 +955,7 @@ export default function ClientProfileTabs({ client, metrics, allWorkouts, client
             </div>
           </>
         )}
+        {tab === "assessment" && <AssessmentTab clientId={clientId} clientName={client.name} />}
         {tab === "metrics" && <MetricCards clientId={clientId} />}
         {tab === "info" && (
           <InfoTab client={client} programs={programs} currentProgramId={currentProgramId}
