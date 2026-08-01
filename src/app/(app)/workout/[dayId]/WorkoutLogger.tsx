@@ -1648,7 +1648,7 @@ export default function WorkoutLogger({
 
             Nothing here is conditioned on the keyboard. Keyboard-conditioned
             layout has caused roughly twenty bugs in this file and is banned. */}
-        <div className="flex-1 min-h-0 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+        <div className="min-h-0 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch", flexGrow: 0, flexShrink: 1, flexBasis: "auto" }}>
 
         {/* Exercise header (V6 micro-pill) — one compact row: small video thumb + name +
             inline History/Swap. Meta as micro-pills, cue collapsed behind an info toggle to
@@ -1855,6 +1855,15 @@ export default function WorkoutLogger({
 
         </div>
 
+        {/* Spacer. The scroll box above is flex: 0 1 auto — it takes its NATURAL
+            height and only shrinks (into scrolling) when the content genuinely
+            does not fit. Making it flex-1 instead made it eat every spare pixel
+            and shove the sets to the bottom of the screen, hundreds of px below
+            the exercise they belong to. This absorbs the slack instead, so the
+            sets sit directly under the header where they have always been and
+            the footer still holds the bottom. */}
+        <div className="flex-1 min-h-0" />
+
         {/* Bottom controls (Prev/Next/Complete). */}
         <div className="flex-shrink-0 px-5 pb-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           <div className="flex gap-3">
@@ -1881,14 +1890,34 @@ export default function WorkoutLogger({
             )}
           </div>
         </div>
-        {/* The app tab bar used to render here, inside the session view.
-            It cost ~140px of a screen that has to fit a header, four set rows,
-            a footer AND a soft keyboard — and it was the reason there was no
-            room left for the sets. A full-screen logging session does not need
-            app-level navigation in it; leaving is Cancel or the back arrow in
-            the header, both of which are pinned and always visible, so nothing
-            about escaping the screen changed. */}
-        <div style={{ paddingBottom: "env(safe-area-inset-bottom)" }} />
+        {/* App tabs. Removed briefly on 8/1 to buy back height for the sets;
+            put straight back at Dustin's request — he uses them mid-session.
+            They are affordable again because of the restructure above: the sets
+            are flex-shrink-0 OUTSIDE the scroll box now, so when the keyboard
+            opens it is the header box and the spacer that give up height, never
+            the set rows. Removing the tabs was solving the symptom; pinning the
+            sets was the actual fix. */}
+        <div className="flex-shrink-0 flex" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0c1626", paddingBottom: "env(safe-area-inset-bottom)" }}>
+          {(isTrainerSession
+            ? [
+                { href: "/home", icon: "ti-home", label: "Home" },
+                { href: clientId ? `/nutrition?clientId=${clientId}` : "/nutrition", icon: "ti-salad", label: "Nutrition" },
+                { href: clientId ? `/progress?clientId=${clientId}` : "/progress", icon: "ti-chart-line", label: "Progress" },
+                { href: clientId ? `/clients/${clientId}` : "/clients", icon: "ti-user", label: clientName ? clientName.split(" ")[0] : "Client" },
+              ]
+            : [
+                { href: "/home", icon: "ti-home", label: "Home" },
+                { href: "/nutrition", icon: "ti-salad", label: "Nutrition" },
+                { href: "/progress", icon: "ti-chart-line", label: "Progress" },
+                { href: "/settings", icon: "ti-settings", label: "Settings" },
+              ]
+          ).map((tab) => (
+            <Link key={tab.href} href={tab.href} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2" style={{ color: "rgba(255,255,255,0.6)" }}>
+              <i className={`ti ${tab.icon} text-lg`} />
+              <span style={{ fontSize: 10, fontWeight: 600 }}>{tab.label}</span>
+            </Link>
+          ))}
+        </div>
       </div>
     );
   }
