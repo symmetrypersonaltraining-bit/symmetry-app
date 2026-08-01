@@ -15,7 +15,7 @@ import ClientWeekSummary from "@/components/ClientWeekSummary";
 import ProgrammingQuestion from "@/components/ProgrammingQuestion";
 import SundayWeighInReminder from "@/components/SundayWeighInReminder";
 import CommunityPair from "@/components/CommunityPair";
-import ChallengeTakeover from "@/components/ChallengeTakeover";
+import ClientTakeovers from "@/components/ClientTakeovers";
 import { RestDaySlip } from "@/components/FunMoments";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
 
@@ -592,9 +592,11 @@ export default function ClientDashboard({
 
   return (
     <>
-      {/* One-time full-screen challenge announcement. Renders nothing once the
-          client has seen it, and nothing at all when no challenge is live. */}
-      <ChallengeTakeover basePath={basePath} />
+      {/* Full-screen announcements — challenge invite, winner celebration, or
+          a broadcast from Dustin. ONE component so at most one can ever be on
+          screen; see ClientTakeovers for the priority rule. Renders nothing
+          once each has been seen, and nothing at all when there is none. */}
+      <ClientTakeovers basePath={basePath} />
 
       {activeMetric && activeMetricConfig && (
         <MetricModal
