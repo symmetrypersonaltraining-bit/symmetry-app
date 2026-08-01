@@ -75,7 +75,21 @@ export default function MessageNotifier() {
   if (!banner) return null;
   return (
     <button
-      onClick={() => { const to = banner.href; setBanner(null); router.push(to); }}
+      onClick={() => {
+        // Same hard-navigation fallback as the bell. In a WebView a client-side
+        // push that silently does nothing looks identical to a dead button, and
+        // the banner has already dismissed itself by then so there is no second
+        // chance to tap it.
+        const to = banner.href;
+        setBanner(null);
+        router.push(to);
+        window.setTimeout(() => {
+          try {
+            const want = to.split("?")[0];
+            if (window.location.pathname !== want) window.location.assign(to);
+          } catch { /* noop */ }
+        }, 700);
+      }}
       style={{
         position: "fixed", top: "calc(env(safe-area-inset-top) + 8px)", left: 12, right: 12, zIndex: 3000,
         display: "flex", alignItems: "center", gap: 12, textAlign: "left",

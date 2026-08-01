@@ -38,10 +38,44 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
   // still showed three.
   const { items: rows, markRead, refresh: load } = useNotificationFeed();
 
-    async function openRow(row: NotifRow) {
+  // Navigate FIRST, mark read after.
+  //
+  // This used to be `setOpen(false); await markRead(row); router.push(...)`,
+  // so getting to the thread was gated on a network write completing. Any
+  // failure in markRead — a slow round trip, a rejected update, a transient
+  // socket — swallowed the navigation while the optimistic clear had ALREADY
+  // removed the notification. The tap then did exactly what Dustin reported:
+  // cleared the badge and went nowhere, with the message now marked read and no
+  // longer in the list to try again from.
+  //
+  // Reading a thread is the point of the tap. Marking it read is bookkeeping,
+  // and bookkeeping must never stand in front of the thing the user asked for.
+  function openRow(row: NotifRow) {
     setOpen(false);
-    await markRead(row);
-    router.push(row.href);
+    const href = row.href;
+    router.push(href);
+
+    // Belt and braces for the WebView. If the client router has not moved us
+    // shortly after the push — hydration not finished, a wedged transition, an
+    // aborted prefetch — fall back to a hard navigation. Going to the right
+    // place slightly late beats not going.
+    window.setTimeout(() => {
+      try {
+        const want = href.split("?")[0];
+        const params = new URLSearchParams(href.split("?")[1] || "");
+        const here = new URLSearchParams(window.location.search);
+        const samePath = window.location.pathname === want;
+        const sameClient = here.get("client") === params.get("client");
+        if (!samePath || !sameClient) window.location.assign(href);
+      } catch {
+        /* noop */
+      }
+    }, 700);
+
+    // Fire-and-forget. If it fails the notification comes back on the next
+    // poll, which is the correct outcome: an unread message that was never
+    // opened should still look unread.
+    void markRead(row);
   }
 
   async function markAll() {
