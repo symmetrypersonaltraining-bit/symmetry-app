@@ -1708,40 +1708,10 @@ export default function WorkoutLogger({
             <p className="text-xs mt-2 italic" style={{ color: "rgba(255,255,255,0.45)" }}>&ldquo;{currentExercise.cue}&rdquo;</p>
           )}
         </div>
-        {/* Per-exercise notes — client or trainer flags an issue with THIS movement
-            (pain, couldn't do it, form). Saved to exercise_notes keyed by exercise so
-            programming (app + chat) reads the history. Sits in the scroll area so it never
-            touches the sticky footer or keyboard chrome. Isolated; revert = remove block. */}
-        <div className="mb-4 rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)" }}>
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <i className="ti ti-message-report text-sm" style={{ color: "var(--brand-primary)" }} />
-            <p className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.75)" }}>Notes on this movement</p>
-          </div>
-          {exNotePrior.length > 0 && (
-            <div className="mb-2 space-y-1">
-              {exNotePrior.map(n => (
-                <div key={n.id} className="text-[11px] rounded-lg px-2 py-1" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)" }}>
-                  <span style={{ color: "var(--brand-primary)" }}>{n.author === "trainer" ? "You" : "Client"}: </span>{n.note}
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <input type="text" value={exNoteText} onChange={e => setExNoteText(e.target.value)}
-              onFocus={focusScroll} onBlur={focusBlur}
-              placeholder={'Pain, couldn\u2019t do it, form issue\u2026'}
-              className="flex-1 text-xs px-3 py-2 rounded-lg outline-none"
-              style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(255,255,255,0.15)" }} />
-            <button onClick={saveExerciseNote} disabled={savingExNote || !exNoteText.trim()}
-              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: exNoteSaved ? "#22c55e" : "var(--brand-primary)" }}>
-              <i className={`ti ${exNoteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
-            </button>
-          </div>
-
         </div>
-        </div>
-        {/* /scroll region — ONLY the exercise header and its notes live in here. */}
+        {/* /scroll region — the exercise HEADER only. It is the one part of this
+            screen whose height is unbounded (a long wrapped movement name), so
+            it is the one part allowed to scroll. */}
 
         {/* Sets — a PINNED sibling of the scroll region, not a child of it.
             Inside it they inherited the box's squeeze when the keyboard opened.
@@ -1852,6 +1822,46 @@ export default function WorkoutLogger({
             </button>
           )}
         </div>
+
+        </div>
+
+        {/* Per-exercise notes — client or trainer flags an issue with THIS movement
+            (pain, couldn't do it, form). Saved to exercise_notes keyed by exercise so
+            programming (app + chat) reads the history.
+
+            DELIBERATELY THE LAST THING ABOVE THE FOOTER. Dustin's rule for this
+            screen: when the keyboard comes up it may cover this card and
+            nothing else — every set row stays visible and nothing on screen
+            moves. That only works if the notes are BELOW the sets, so the
+            keyboard eats them from the bottom instead of eating a set row.
+            Putting them above the sets (8/1, briefly) pushed the sets down into
+            the keyboard, which is the whole problem this screen keeps having. */}
+        <div className="mb-4 rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)" }}>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <i className="ti ti-message-report text-sm" style={{ color: "var(--brand-primary)" }} />
+            <p className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.75)" }}>Notes on this movement</p>
+          </div>
+          {exNotePrior.length > 0 && (
+            <div className="mb-2 space-y-1" style={{ maxHeight: 96, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+              {exNotePrior.map(n => (
+                <div key={n.id} className="text-[11px] rounded-lg px-2 py-1" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)" }}>
+                  <span style={{ color: "var(--brand-primary)" }}>{n.author === "trainer" ? "You" : "Client"}: </span>{n.note}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input type="text" value={exNoteText} onChange={e => setExNoteText(e.target.value)}
+              onFocus={focusScroll} onBlur={focusBlur}
+              placeholder={'Pain, couldn\u2019t do it, form issue\u2026'}
+              className="flex-1 text-xs px-3 py-2 rounded-lg outline-none"
+              style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(255,255,255,0.15)" }} />
+            <button onClick={saveExerciseNote} disabled={savingExNote || !exNoteText.trim()}
+              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: exNoteSaved ? "#22c55e" : "var(--brand-primary)" }}>
+              <i className={`ti ${exNoteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
+            </button>
+          </div>
 
         </div>
 
