@@ -735,7 +735,35 @@ function TimeGrid({
     onTimeClick(day, e);
   }
 
-  const minContentWidth = TIME_COL_W + days.length * MIN_DAY_W;
+  // MIN_DAY_W was a hard 110px, so a 7-day week was always 822px wide no matter
+  // what it was rendered on. On a phone that is roughly two and a half visible
+  // columns, which is why the week view looked broken rather than scrollable.
+  //
+  // Measure instead: fill the container exactly when every day fits, and fall
+  // back to about four legible columns when it does not. 78px is the floor —
+  // below that a name and a time stop being readable and a narrower column buys
+  // nothing.
+  const [dayW, setDayW] = useState(MIN_DAY_W);
+  useEffect(() => {
+    const calc = () => {
+      const avail = (scrollRef.current?.clientWidth ?? 0) - TIME_COL_W;
+      if (avail <= 0 || days.length === 0) return;
+      const next =
+        avail >= days.length * MIN_DAY_W
+          ? avail / days.length              // everything fits — fill the width
+          : Math.max(78, avail / Math.min(days.length, 4));
+      setDayW(Math.floor(next));
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    window.addEventListener("orientationchange", calc);
+    return () => {
+      window.removeEventListener("resize", calc);
+      window.removeEventListener("orientationchange", calc);
+    };
+  }, [days.length, scrollRef]);
+
+  const minContentWidth = TIME_COL_W + days.length * dayW;
 
   return (
     <div className="flex flex-col" style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
@@ -753,7 +781,7 @@ function TimeGrid({
               return (
                 <div key={ds}
                   className="flex flex-col items-center py-2 border-l cursor-pointer active:opacity-70"
-                  style={{ width: MIN_DAY_W, flexShrink: 0, borderColor: "var(--brand-border)" }}
+                  style={{ width: dayW, flexShrink: 0, borderColor: "var(--brand-border)" }}
                   onClick={() => onDayHeaderClick(day)}>
                   <span className="text-[10px] font-semibold uppercase"
                     style={{ color: isToday ? "#E53935" : "var(--brand-text-secondary)" }}>{dow}</span>
@@ -797,7 +825,7 @@ function TimeGrid({
 
               return (
                 <div key={ds} className="relative border-l"
-                  style={{ width: MIN_DAY_W, flexShrink: 0, borderColor: "var(--brand-border)", background: isToday ? "rgba(229,57,53,0.02)" : "transparent" }}
+                  style={{ width: dayW, flexShrink: 0, borderColor: "var(--brand-border)", background: isToday ? "rgba(229,57,53,0.02)" : "transparent" }}
                   onClick={e => handleTimeGridClick(day, e)}>
                   {Array.from({ length: TOTAL_HOURS }, (_, i) => (
                     <div key={i} style={{

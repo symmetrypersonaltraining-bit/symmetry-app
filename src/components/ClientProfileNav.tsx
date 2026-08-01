@@ -29,7 +29,12 @@ export default function ClientProfileNav({
         const isActive = it.key === active;
         return (
           <Link key={it.key} href={it.href}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors"
+            // flex-shrink-0 on the CHILD. The container carried flexShrink:0,
+            // which stops the nav itself being squeezed by ITS parent but does
+            // nothing for the links inside it — they still compressed instead of
+            // overflowing, so the row never scrolled and the last items were
+            // unreachable.
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors"
             style={{
               background: isActive ? "var(--brand-primary)" : "var(--brand-bg)",
               color: isActive ? "white" : "var(--brand-text-secondary)",

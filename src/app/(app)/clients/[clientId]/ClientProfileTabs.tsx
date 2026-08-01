@@ -929,7 +929,12 @@ export default function ClientProfileTabs({ client, metrics, allWorkouts, client
         style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)" }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors"
+            // flex-shrink-0 is what makes the row scroll. Flex children default to
+            // flex-shrink:1, so instead of overflowing the container they squeezed
+            // until "Assessment" became "Assess" and "Info" became "Inf" — the row
+            // never became wider than the screen, so overflow-x-auto had nothing to
+            // scroll and the last tabs were simply unreachable on a phone.
+            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors"
             style={{ borderColor: tab === t.id ? "var(--brand-primary)" : "transparent", color: tab === t.id ? "var(--brand-primary)" : "var(--brand-text-secondary)", background: "transparent" }}>
             <i className={`ti ${t.icon} text-base`} />
             {t.label}
