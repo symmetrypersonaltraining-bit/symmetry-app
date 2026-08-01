@@ -1071,7 +1071,22 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
     return copy;
   }
 
+  // Week is the right default on a desktop and unusable on a phone: seven
+  // columns on a 360px screen leaves ~44px a day, so names and times both wrap
+  // and you can see about two and a half days. Day view is the same grid with
+  // days.length === 1 — full width per session, and every bit of the editing
+  // (drag to move, tap to open, series edit) and the Google Calendar sync comes
+  // along unchanged because it is the same component.
+  //
+  // Initialised from a function so the first client render matches the server's
+  // "week" and then corrects in the effect below, rather than mismatching.
   const [viewMode, setViewMode] = useState<ViewMode>("week");
+  const pickedInitialView = useRef(false);
+  useEffect(() => {
+    if (pickedInitialView.current) return;
+    pickedInitialView.current = true;
+    if (typeof window !== "undefined" && window.innerWidth < 820) setViewMode("day");
+  }, []);
   const [weekAnchor, setWeekAnchor] = useState(() => getSunday(today));
   const [dayAnchor, setDayAnchor] = useState(() => {
     const d = new Date(today);
@@ -1546,28 +1561,80 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
           />
         )}
         {viewMode === "day" && (
-          <TimeGrid
-            days={[dayAnchor]}
-            clients={clients}
-            getDayEvents={getDayEvents}
-            getDayWorkouts={getDayWorkouts}
-            today={today}
-            todayStr={todayStr}
-            onEventClick={setPopupEv}
-            onTimeClick={handleTimeGridClick}
-            onDayHeaderClick={(day) => setDayDrawer(day)}
-            scrollRef={scrollRef}
-            onApptDrop={handleRescheduleAppt}
-          />
+          <>
+            {/* Jump strip. Day view on its own means paging one day at a time to
+                reach Thursday, which is worse than the week grid it replaced.
+                Seven chips with session counts give back the shape of the week
+                and make any day one tap away. */}
+            <div style={{ display: "flex", gap: 3, padding: "8px 8px 0" }}>
+              {getWeekDays(getSunday(dayAnchor)).map((d) => {
+                const ds = dayStr(d);
+                const n = getDayEvents(d).filter(
+                  (e) => e.status !== "cancelled" && e.status !== "cancelled_client" && e.status !== "cancelled_trainer"
+                ).length;
+                const sel = ds === dayStr(dayAnchor);
+                const isToday = ds === todayStr;
+                return (
+                  <button
+                    key={ds}
+                    onClick={() => setDayAnchor(d)}
+                    style={{
+                      flex: 1, minWidth: 0, borderRadius: 9, padding: "5px 2px 6px",
+                      textAlign: "center", cursor: "pointer",
+                      background: sel ? "var(--brand-primary)" : "var(--brand-bg)",
+                      border: isToday && !sel ? "1px solid var(--brand-primary)" : "1px solid var(--brand-border)",
+                    }}
+                  >
+                    <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: .3,
+                      color: sel ? "rgba(255,255,255,.8)" : "var(--brand-text-secondary)" }}>
+                      {["SU","MO","TU","WE","TH","FR","SA"][d.getDay()]}
+                    </div>
+                    <div style={{ fontSize: 12.5, fontWeight: 800, lineHeight: 1.15,
+                      color: sel ? "#fff" : "var(--brand-text)" }}>{d.getDate()}</div>
+                    <div style={{ fontSize: 8.5, fontWeight: 800,
+                      color: sel ? "#fff" : n ? "var(--brand-primary)" : "var(--brand-text-secondary)" }}>
+                      {n || "—"}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <TimeGrid
+              days={[dayAnchor]}
+              clients={clients}
+              getDayEvents={getDayEvents}
+              getDayWorkouts={getDayWorkouts}
+              today={today}
+              todayStr={todayStr}
+              onEventClick={setPopupEv}
+              onTimeClick={handleTimeGridClick}
+              onDayHeaderClick={(day) => setDayDrawer(day)}
+              scrollRef={scrollRef}
+              onApptDrop={handleRescheduleAppt}
+            />
+          </>
         )}
         {viewMode === "agenda" && <AgendaView />}
       </div>
 
-      {/* Google Calendar-style FAB */}
+      {/* Add session.
+          This was `mt-4 mx-auto` inside the calendar's flex column, which on a
+          phone landed it on top of the Month / Week / Day toggle — the view
+          switcher was partly unreachable behind a red circle. Pinned to the
+          bottom-right instead, which is where a FAB belongs and where it cannot
+          collide with the toolbar at any width. The trainer layout has no bottom
+          nav, so 18px clears the safe area on its own. */}
       <button
         onClick={() => setAddModal({ date: today, timeStr: "09:00" })}
-        className="mt-4 mx-auto w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
-        style={{ background: "#E53935", boxShadow: "0 4px 16px rgba(229,57,53,0.4)" }}
+        className="w-14 h-14 rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+        style={{
+          background: "#E53935",
+          boxShadow: "0 4px 16px rgba(229,57,53,0.4)",
+          position: "fixed",
+          right: 18,
+          bottom: "calc(18px + env(safe-area-inset-bottom))",
+          zIndex: 30,
+        }}
         title="Add session"
       >
         <i className="ti ti-plus text-xl text-white" />
