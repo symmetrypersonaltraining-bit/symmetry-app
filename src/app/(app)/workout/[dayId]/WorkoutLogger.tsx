@@ -678,6 +678,9 @@ export default function WorkoutLogger({
   const [fbSent, setFbSent] = useState(false);
   const [fbSending, setFbSending] = useState(false);
   const [showAiNote, setShowAiNote] = useState(false);
+  const [trainerListening, setTrainerListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const trainerVoiceRef = useRef<{ stop?: () => void } | null>(null);
   const [showCue, setShowCue] = useState(false);
 
   // ── NO KEYBOARD-CONDITIONED LAYOUT. READ THIS BEFORE ADDING ANY. ──────────
@@ -1286,13 +1289,20 @@ export default function WorkoutLogger({
     } finally { setSaving(false); }
   }
 
+  // NOTE: nothing calls this. The session-note mic button was never mounted in
+  // the JSX, so `listening` and recognitionRef are only reachable from here.
+  // Left in place (and corrected alongside the AI-note mic) rather than deleted,
+  // because the session note itself is live and saved with the log — but if you
+  // are looking for "the mic in the logger", it is startTrainerVoice, not this.
   function startVoiceNote() {
     if (listening) { try { (recognitionRef.current as { stop?: () => void } | null)?.stop?.(); } catch { /* noop */ } setListening(false); return; }
     recognitionRef.current = startDictation({
       onResult: (t) => setSessionNote(prev => prev ? prev + " " + t : t),
       onStart: () => setListening(true),
       onEnd: () => setListening(false),
-      onUnavailable: () => { setListening(false); alert("Voice dictation isn't available here yet. You can type your note instead."); },
+      // No alert(). A modal dialog from inside a WebView overlay is ignored at
+      // best and wedges the page at worst; the message goes on screen instead.
+      onUnavailable: (why) => { setListening(false); setVoiceError(voiceMessage(why)); },
     }) as unknown as typeof recognitionRef.current;
   }
 
@@ -1366,10 +1376,50 @@ export default function WorkoutLogger({
     });
   }
 
+  // One place that turns a dictation failure reason into something Dustin can
+  // act on. "not-allowed" is a permission he can grant; "no-engine" is a device
+  // limit he cannot. Telling him the difference is the whole point.
+  function voiceMessage(why: string): string {
+    const w = String(why || "");
+    if (w === "no-engine") return "This device has no dictation engine — type it instead.";
+    if (w.includes("not-allowed") || w.includes("permission") || w.includes("denied")) {
+      return "Microphone permission is off for the app — turn it on in your phone's settings, then try again.";
+    }
+    if (w.includes("network")) return "Dictation needs a connection and couldn't reach the service.";
+    if (w.startsWith("native-")) return "Dictation didn't start (" + w.replace("native-error: ", "") + "). Type it instead.";
+    return "Dictation isn't available right now — type it instead.";
+  }
+
+  // The mic on the AI programming note.
+  //
+  // It looked dead because it gave no feedback of any kind. startDictation was
+  // called without onStart or onEnd, so the button never changed; the handle it
+  // returns was thrown away, so there was no way to stop it and a second tap
+  // just started a second recognizer (Android allows one at a time, so the
+  // second one fails and the first is orphaned). On Android native dictation we
+  // pass popup:false, so there is no system UI either — tap the mic, nothing
+  // happens on screen, and it reads as broken whether or not it is.
+  //
+  // And when it genuinely failed it called alert(), which in a WebView inside a
+  // fixed overlay is at best ignored and at worst freezes the extension bridge.
+  // The reason string is now shown inline instead, so "not working" is
+  // diagnosable — "no-engine" and "native-error: permission denied" are very
+  // different problems.
   function startTrainerVoice() {
-    startDictation({
+    if (trainerListening) {
+      try { trainerVoiceRef.current?.stop?.(); } catch { /* noop */ }
+      setTrainerListening(false);
+      return;
+    }
+    setVoiceError(null);
+    trainerVoiceRef.current = startDictation({
       onResult: (t) => setTrainerNoteText(prev => prev ? prev + " " + t : t),
-      onUnavailable: () => alert("Voice dictation isn't available here yet. You can type your note instead."),
+      onStart: () => setTrainerListening(true),
+      onEnd: () => setTrainerListening(false),
+      onUnavailable: (why) => {
+        setTrainerListening(false);
+        setVoiceError(voiceMessage(why));
+      },
     });
   }
 
@@ -1518,9 +1568,15 @@ export default function WorkoutLogger({
                   placeholder={"e.g. bump to 140 next week, elbows flaring…"}
                   className="flex-1 text-sm px-3 py-2.5 rounded-xl outline-none"
                   style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid rgba(139,92,246,0.3)" }} />
-                <button onClick={startTrainerVoice} className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.3)" }}>
-                  <i className="ti ti-microphone text-sm" style={{ color: "#8b5cf6" }} />
+                <button onClick={startTrainerVoice} aria-label={trainerListening ? "Stop dictation" : "Dictate note"}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{
+                    background: trainerListening ? "#ef4444" : "rgba(139,92,246,0.2)",
+                    border: "1px solid " + (trainerListening ? "#ef4444" : "rgba(139,92,246,0.3)"),
+                    animation: trainerListening ? "cw-pulse 1.2s ease-in-out infinite" : "none",
+                  }}>
+                  <i className={`ti ${trainerListening ? "ti-player-stop" : "ti-microphone"} text-sm`}
+                    style={{ color: trainerListening ? "#fff" : "#8b5cf6" }} />
                 </button>
                 <button onClick={saveTrainerNote} disabled={savingNote || !trainerNoteText.trim()}
                   className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -1528,6 +1584,10 @@ export default function WorkoutLogger({
                   <i className={`ti ${noteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
                 </button>
               </div>
+              {trainerListening && (
+                <p className="text-xs mt-2 font-semibold" style={{ color: "#ef4444" }}>🎙 Listening — tap the square to stop.</p>
+              )}
+              {voiceError && <p className="text-xs mt-2" style={{ color: "#f5b34a" }}>{voiceError}</p>}
               {noteSaved && <p className="text-xs mt-2" style={{ color: "#22c55e" }}>Saved to this client&apos;s programming notes.</p>}
             </div>
           </div>

@@ -68,7 +68,19 @@ export function startDictation(cb: Callbacks): DictationHandle {
     r.lang = "en-US"; r.interimResults = false; r.maxAlternatives = 1; r.continuous = false;
     r.onstart = () => cb.onStart?.();
     r.onend = () => cb.onEnd?.();
-    r.onerror = () => { cb.onEnd?.(); if (!stopped) cb.onUnavailable?.("error"); };
+    // Pass the real error code through. It used to report the bare string
+    // "error" for every failure, which turns "not-allowed" (the user denied the
+    // microphone), "no-speech" (they said nothing) and "network" into the same
+    // unactionable message — and "the mic doesn't work" with no way to tell
+    // which is exactly how this stayed broken.
+    r.onerror = (e: unknown) => {
+      const code = (e && typeof e === "object" && "error" in e ? String((e as { error: unknown }).error) : "") || "error";
+      cb.onEnd?.();
+      // "no-speech" and "aborted" are not failures — the user just stopped, or
+      // said nothing. Reporting them as unavailable makes a working mic look
+      // broken every time somebody taps it and pauses.
+      if (!stopped && code !== "no-speech" && code !== "aborted") cb.onUnavailable?.("browser-error: " + code);
+    };
     r.onresult = (e) => { try { const t = e.results[0]?.[0]?.transcript || ""; if (t && !stopped) cb.onResult(t); } catch { /* noop */ } };
     r.start();
     return { stop: () => { stopped = true; try { r.stop(); } catch { /* noop */ } } };
