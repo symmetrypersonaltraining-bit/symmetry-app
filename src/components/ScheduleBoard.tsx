@@ -86,13 +86,12 @@ export default function ScheduleBoard({
     () => workouts.filter((w) => w.date < today && w.status !== "completed" && !isLockedDate(w.date)),
     [workouts, today],
   );
-  // Auto-open the past section when something was missed — a workout you need
-  // to reschedule shouldn't be hidden behind a collapsed toggle.
-  const autoOpenedRef = useRef(false);
-  useEffect(() => {
-    if (autoOpenedRef.current) return;
-    if (missed.length > 0) { autoOpenedRef.current = true; setShowPast(true); }
-  }, [missed.length]);
+  // The past section used to auto-open whenever anything was missed, which meant
+  // the board almost always opened onto last week rather than today — you had to
+  // scroll down to find the day you were actually on. It stays collapsed now.
+  // Missed sessions are not hidden by that: the toggle itself turns amber and
+  // says how many there are and what to do with them, which is a louder signal
+  // than an expanded list you have to scroll past.
   // Full workout library for swap-in (Dustin 7/13: clients can move/add/swap from full library)
   const [libDays, setLibDays] = useState<{ id: string; label: string }[] | null>(null);
   const [libQ, setLibQ] = useState("");
@@ -369,10 +368,18 @@ export default function ScheduleBoard({
               key={k}
               data-board-date={k}
               style={{
-                border: isOver ? "1.5px solid var(--brand-primary)" : isToday ? "1px solid var(--brand-primary)" : "1px solid var(--brand-border)",
+                border: isOver ? "1.5px solid var(--brand-primary)" : isToday ? "2.5px solid var(--brand-primary)" : "1px solid var(--brand-border)",
                 borderRadius: 11,
                 marginBottom: 6,
                 background: isOver ? "color-mix(in srgb, var(--brand-primary) 10%, var(--brand-surface))" : "var(--brand-surface)",
+                // Today was a 1px border in the same colour as every other
+                // border — scrolling a month of days, nothing said "you are
+                // here". A thicker ring, a shadow and a lift make it findable
+                // without reading a single date.
+                boxShadow: isToday && !isOver
+                  ? "0 0 0 3px color-mix(in srgb, var(--brand-primary) 18%, transparent), 0 6px 18px rgba(0,0,0,.10)"
+                  : undefined,
+                transform: isToday && !isOver ? "scale(1.012)" : undefined,
                 // Past days still read as "behind you" even though they're now
                 // movable — the dimming is cosmetic, not a lock indicator.
                 opacity: (locked || isPast) && !isOver ? 0.7 : 1,
@@ -386,14 +393,14 @@ export default function ScheduleBoard({
                   justifyContent: "space-between",
                   padding: empty ? "5px 10px" : "4px 10px",
                   borderBottom: empty ? "none" : "1px solid var(--brand-border)",
-                  background: isToday ? "color-mix(in srgb, var(--brand-primary) 12%, transparent)" : "transparent",
+                  background: isToday ? "var(--brand-primary)" : "transparent",
                 }}
               >
-                <span style={{ fontWeight: 700, fontSize: 11.5, color: "var(--brand-text)" }}>
+                <span style={{ fontWeight: isToday ? 800 : 700, fontSize: isToday ? 12.5 : 11.5, color: isToday ? "#fff" : "var(--brand-text)" }}>
                   {shortLabel(k)}
-                  {isToday ? <span style={{ color: "var(--brand-primary)", fontWeight: 800 }}> · Today</span> : null}
+                  {isToday ? <span style={{ color: "#fff", fontWeight: 900 }}> · TODAY</span> : null}
                 </span>
-                <span style={{ fontSize: 10.5, color: "var(--brand-text-secondary)" }}>
+                <span style={{ fontSize: 10.5, color: isToday ? "rgba(255,255,255,.85)" : "var(--brand-text-secondary)" }}>
                   {isLockedDate(k)
                     ? "🔒 Peak Week"
                     : empty
@@ -410,7 +417,14 @@ export default function ScheduleBoard({
                   {items.map((w) => {
                     const t = typeOf(w.label);
                     const done = w.status === "completed";
-                    const movable = !done && !locked;
+                    // `!done` used to be part of this, on the reasoning that a
+                    // completed workout is history and history should not move.
+                    // In practice a session gets logged on the wrong day often
+                    // enough — logged today, actually trained yesterday — and
+                    // there was no way to correct it from here at all. Moving a
+                    // completed workout carries its log with it, so nothing is
+                    // lost. Peak Week is still the only genuine freeze.
+                    const movable = !locked;
                     // A missed session's overwhelmingly common fix is "do it
                     // today instead", so that gets a one-tap button rather than
                     // making Dustin open the Move sheet and pick a date. Hidden
