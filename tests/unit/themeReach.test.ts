@@ -249,7 +249,9 @@ test("no literal light background under var(--brand-text)", () => {
 test("the focus panel is derived, not a literal lavender", () => {
   const css = read("src/app/globals.css");
   assert.match(css, /\.focus-panel\s*\{/, "globals.css must define .focus-panel");
-  const rule = css.slice(css.indexOf(".focus-panel"));
+  // Anchor on the DEFINITION, not the first mention — the depth layer now
+  // lists .focus-panel among the surfaces it glows, and that appears first.
+  const rule = css.slice(css.indexOf(".focus-panel {"));
   assert.match(
     rule.slice(0, 500),
     /color-mix\(in srgb, var\(--brand-primary\)[^)]*, var\(--brand-surface\)\)/,

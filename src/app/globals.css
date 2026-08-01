@@ -1894,61 +1894,50 @@ option:hover {
 [data-deep="off"] { --block-glow: 0 0 0 transparent; }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   WHY THE TOKENS ARE REDEFINED ON `body` AND NOT ON `html`.
+   DEPTH & GLOW — off / 20 / 35 / 50.
 
-   First version of this feature only deepened --brand-bg-deep and
-   --surface-deep, and only put the glow on .card / .cw-surface / .rounded-2xl.
-   Dustin tested 35 vs 50 on his phone: "no difference in color depth at all
-   from 30-50. and I dont think glow changes either."
+   TWO ROUNDS OF THIS WERE INVISIBLE ON A REAL PHONE, for two different reasons,
+   and both times my verification was softer than reality.
 
-   He was right, and my verification was at fault: I rendered a harness page
-   built out of .card and .rounded-2xl, which is not what the app is made of.
-   The real surfaces — MetricCards, the progress tiles, most of the dashboard —
-   are inline-styled `background: var(--brand-surface)` with a numeric
-   borderRadius and no class at all. 274 of them. Every selector I had written
-   missed every one.
+   Round one only styled .card / .cw-surface / .rounded-2xl. The app's surfaces
+   are mostly inline `background: var(--brand-surface)` with a numeric
+   borderRadius and no class, so nothing on screen moved.
 
-   So the deepening now happens to --brand-surface / --brand-bg / --brand-card /
-   --brand-border THEMSELVES, which every one of those 274 inline styles already
-   reads. Nothing has to be tagged and nothing can be missed.
+   Round two deepened the tokens — right idea — but at 5/9/14% primary into the
+   surface. That reads clearly in a side-by-side render and not at all when you
+   flip between screens on a phone a minute apart. Colour vision is comparative,
+   not absolute: an effect that needs an A/B to notice does not exist in normal
+   use. And .metric-card, which draws the whole Progress grid, is a <button>,
+   caught by the blanket button exclusion that stops buttons glowing like a
+   focus ring.
 
-   It has to be on `body` rather than `html` because the right-hand side reads
-   the same token it defines:
+   So the steps are 10/20/30% now, and the selector names the surfaces this app
+   is actually built from, .metric-card by name.
 
-       --brand-surface: color-mix(in srgb, var(--brand-primary) 9%, var(--brand-surface))
-
-   On the same element that is a cycle and the whole declaration is invalid. On
-   a descendant, the var() on the right resolves against the INHERITED value
-   from html — the theme's own surface — and the result cascades down to
-   everything. Same trick, one level down.
-
-   This is also why the visual-layer-3 warning ("never redefine --brand-bg in a
-   trailing :root") is not violated: that rule is about a `:root` block beating
-   every [data-theme] on a specificity tie and collapsing all schemes into one.
-   These derive FROM the active theme instead of replacing it, and they sit on a
-   different element.
+   THE CEILING IS SET BY CONTRAST, NOT TASTE. Text sits on these surfaces and
+   mixing the primary in moves their luminance. Measured across all 30 schemes,
+   natively and under auto-dark, 30% leaves the worst case at 6.2:1 (carbon
+   neon) against a 4.5:1 floor. Do not raise these without re-running that.
    ════════════════════════════════════════════════════════════════════════════ */
 
 /* ── Level 20% ───────────────────────────────────────────────────────────── */
 [data-deep="20"] body {
-  --brand-surface: color-mix(in srgb, var(--brand-primary) 5%, var(--brand-surface));
-  --brand-bg:      color-mix(in srgb, var(--brand-primary) 4%, var(--brand-bg));
-  --brand-card:    color-mix(in srgb, var(--brand-primary) 6%, var(--brand-card));
-  --brand-border:  color-mix(in srgb, var(--brand-primary) 14%, var(--brand-border));
-
-  --hairline: color-mix(in srgb, var(--brand-border) 86%, var(--brand-primary));
+  /* On `body`, not `html`: the right-hand side reads the token it defines, and
+     on the same element that is a cycle and CSS drops the declaration. One
+     level down it resolves against the value inherited from the theme. */
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 10%, var(--brand-surface));
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 8%, var(--brand-bg));
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 12%, var(--brand-card));
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 28%, var(--brand-border));
+  --hairline: color-mix(in srgb, var(--brand-border) 60%, var(--brand-primary));
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
-
-  /* The gradient every surface gets, so a card is a graded field rather than a
-     flat fill. Strength tracks the level. */
   --surface-grade: linear-gradient(170deg,
     color-mix(in srgb, var(--brand-surface) 100%, transparent) 0%,
-    color-mix(in srgb, var(--brand-primary) 4%, var(--brand-surface)) 100%);
-
+    color-mix(in srgb, var(--brand-primary) 8%, var(--brand-surface)) 100%);
   --block-glow:
-    0 12px 24px -10px color-mix(in srgb, var(--glow-ink) 48%, transparent),
-    0 3px 9px -3px color-mix(in srgb, var(--brand-accent) 26%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--brand-primary) 10%, transparent);
+    0 12px 26px -10px color-mix(in srgb, var(--glow-ink) 55%, transparent),
+    0 3px 10px -3px color-mix(in srgb, var(--brand-accent) 30%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-primary) 14%, transparent);
 }
 [data-deep="20"][data-appearance="dark"] body,
 [data-deep="20"][data-theme="midnight"] body,
@@ -1959,30 +1948,41 @@ option:hover {
 [data-deep="20"][data-theme="midnightorchid"] body,
 [data-deep="20"][data-theme="deepreef"] body {
   --block-glow:
-    0 12px 26px -10px color-mix(in srgb,
-      color-mix(in srgb, var(--brand-accent) 62%, #000) 46%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--brand-accent) 15%, transparent);
+    0 12px 28px -10px color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 62%, #000) 52%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 18%, transparent);
 }
+[data-deep="20"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="20"] [style*="var(--brand-card)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="20"] .card,
+[data-deep="20"] .metric-card,
+[data-deep="20"] .cw-surface,
+[data-deep="20"] .focus-panel,
+[data-deep="20"] .rounded-2xl:not(button):not(a):not([role="button"]) {
+  background-image: var(--surface-grade) !important;
+  box-shadow: var(--block-glow), var(--shadow-1);
+}
+[data-deep="20"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
+[data-deep="20"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
+
 /* ── Level 35% ───────────────────────────────────────────────────────────── */
 [data-deep="35"] body {
-  --brand-surface: color-mix(in srgb, var(--brand-primary) 9%, var(--brand-surface));
-  --brand-bg:      color-mix(in srgb, var(--brand-primary) 7%, var(--brand-bg));
-  --brand-card:    color-mix(in srgb, var(--brand-primary) 11%, var(--brand-card));
-  --brand-border:  color-mix(in srgb, var(--brand-primary) 24%, var(--brand-border));
-
-  --hairline: color-mix(in srgb, var(--brand-border) 76%, var(--brand-primary));
+  /* On `body`, not `html`: the right-hand side reads the token it defines, and
+     on the same element that is a cycle and CSS drops the declaration. One
+     level down it resolves against the value inherited from the theme. */
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 20%, var(--brand-surface));
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 16%, var(--brand-bg));
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 22%, var(--brand-card));
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 48%, var(--brand-border));
+  --hairline: color-mix(in srgb, var(--brand-border) 60%, var(--brand-primary));
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
-
-  /* The gradient every surface gets, so a card is a graded field rather than a
-     flat fill. Strength tracks the level. */
   --surface-grade: linear-gradient(170deg,
     color-mix(in srgb, var(--brand-surface) 100%, transparent) 0%,
-    color-mix(in srgb, var(--brand-primary) 7%, var(--brand-surface)) 100%);
-
+    color-mix(in srgb, var(--brand-primary) 16%, var(--brand-surface)) 100%);
   --block-glow:
-    0 12px 24px -10px color-mix(in srgb, var(--glow-ink) 62%, transparent),
-    0 3px 9px -3px color-mix(in srgb, var(--brand-accent) 36%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--brand-primary) 15%, transparent);
+    0 12px 26px -10px color-mix(in srgb, var(--glow-ink) 72%, transparent),
+    0 3px 10px -3px color-mix(in srgb, var(--brand-accent) 44%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-primary) 22%, transparent);
 }
 [data-deep="35"][data-appearance="dark"] body,
 [data-deep="35"][data-theme="midnight"] body,
@@ -1993,30 +1993,41 @@ option:hover {
 [data-deep="35"][data-theme="midnightorchid"] body,
 [data-deep="35"][data-theme="deepreef"] body {
   --block-glow:
-    0 12px 26px -10px color-mix(in srgb,
-      color-mix(in srgb, var(--brand-accent) 62%, #000) 58%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--brand-accent) 22%, transparent);
+    0 12px 28px -10px color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 62%, #000) 68%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 28%, transparent);
 }
+[data-deep="35"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="35"] [style*="var(--brand-card)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="35"] .card,
+[data-deep="35"] .metric-card,
+[data-deep="35"] .cw-surface,
+[data-deep="35"] .focus-panel,
+[data-deep="35"] .rounded-2xl:not(button):not(a):not([role="button"]) {
+  background-image: var(--surface-grade) !important;
+  box-shadow: var(--block-glow), var(--shadow-1);
+}
+[data-deep="35"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
+[data-deep="35"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
+
 /* ── Level 50% ───────────────────────────────────────────────────────────── */
 [data-deep="50"] body {
-  --brand-surface: color-mix(in srgb, var(--brand-primary) 14%, var(--brand-surface));
-  --brand-bg:      color-mix(in srgb, var(--brand-primary) 11%, var(--brand-bg));
-  --brand-card:    color-mix(in srgb, var(--brand-primary) 17%, var(--brand-card));
-  --brand-border:  color-mix(in srgb, var(--brand-primary) 36%, var(--brand-border));
-
-  --hairline: color-mix(in srgb, var(--brand-border) 64%, var(--brand-primary));
+  /* On `body`, not `html`: the right-hand side reads the token it defines, and
+     on the same element that is a cycle and CSS drops the declaration. One
+     level down it resolves against the value inherited from the theme. */
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 30%, var(--brand-surface));
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 24%, var(--brand-bg));
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 32%, var(--brand-card));
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 68%, var(--brand-border));
+  --hairline: color-mix(in srgb, var(--brand-border) 60%, var(--brand-primary));
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
-
-  /* The gradient every surface gets, so a card is a graded field rather than a
-     flat fill. Strength tracks the level. */
   --surface-grade: linear-gradient(170deg,
     color-mix(in srgb, var(--brand-surface) 100%, transparent) 0%,
-    color-mix(in srgb, var(--brand-primary) 11%, var(--brand-surface)) 100%);
-
+    color-mix(in srgb, var(--brand-primary) 26%, var(--brand-surface)) 100%);
   --block-glow:
-    0 12px 24px -10px color-mix(in srgb, var(--glow-ink) 76%, transparent),
-    0 3px 9px -3px color-mix(in srgb, var(--brand-accent) 46%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--brand-primary) 22%, transparent);
+    0 12px 26px -10px color-mix(in srgb, var(--glow-ink) 90%, transparent),
+    0 3px 10px -3px color-mix(in srgb, var(--brand-accent) 58%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-primary) 32%, transparent);
 }
 [data-deep="50"][data-appearance="dark"] body,
 [data-deep="50"][data-theme="midnight"] body,
@@ -2027,54 +2038,16 @@ option:hover {
 [data-deep="50"][data-theme="midnightorchid"] body,
 [data-deep="50"][data-theme="deepreef"] body {
   --block-glow:
-    0 12px 26px -10px color-mix(in srgb,
-      color-mix(in srgb, var(--brand-accent) 62%, #000) 70%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--brand-accent) 30%, transparent);
+    0 12px 28px -10px color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 62%, #000) 85%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 40%, transparent);
 }
-
-/* ── Reaching the surfaces that have no class ───────────────────────────────
-   The app's cards are inline `background: var(--brand-surface)`. CSS cannot
-   select on a computed background, but it CAN select on the inline style's
-   text, and that string is exactly the marker we need — it appears on card
-   surfaces and essentially nowhere else.
-
-   Form controls and anything clickable are excluded: a glowing input reads as
-   focus and a glowing button reads as pressed, both of which would be lying
-   about state.
-
-   `background-image` carries !important because these elements set the
-   `background` SHORTHAND inline, which sets background-image: none at inline
-   specificity. This is the one case where !important is the correct tool
-   rather than a shortcut — there is no selector that outranks an inline
-   declaration. The colour still comes from the element's own inline
-   background-color underneath, so nothing is being overridden except "no
-   gradient". */
-[data-deep="20"],
-[data-deep="35"],
-[data-deep="50"] {
-  --deep-surface-sel: 1;
-}
-[data-deep="20"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
-[data-deep="20"] .card,
-[data-deep="20"] .cw-surface,
-[data-deep="20"] .rounded-2xl:not(button):not(a):not([role="button"]) {
-  background-image: var(--surface-grade) !important;
-  box-shadow: var(--block-glow), var(--shadow-1);
-}
-[data-deep="20"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
-[data-deep="20"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
-[data-deep="35"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
-[data-deep="35"] .card,
-[data-deep="35"] .cw-surface,
-[data-deep="35"] .rounded-2xl:not(button):not(a):not([role="button"]) {
-  background-image: var(--surface-grade) !important;
-  box-shadow: var(--block-glow), var(--shadow-1);
-}
-[data-deep="35"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
-[data-deep="35"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
 [data-deep="50"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="50"] [style*="var(--brand-card)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
 [data-deep="50"] .card,
+[data-deep="50"] .metric-card,
 [data-deep="50"] .cw-surface,
+[data-deep="50"] .focus-panel,
 [data-deep="50"] .rounded-2xl:not(button):not(a):not([role="button"]) {
   background-image: var(--surface-grade) !important;
   box-shadow: var(--block-glow), var(--shadow-1);
@@ -2115,7 +2088,6 @@ option:hover {
     var(--brand-accent) 70%,
     color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 90%, white) 100%);
 }
-
 
 /* Motion-sensitive users get the colour, not an animated bloom. Matches any
    on-level: [data-deep] is only ever "off" or a number. */
