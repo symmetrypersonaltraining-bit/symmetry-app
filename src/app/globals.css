@@ -101,7 +101,7 @@
   --brand-primary: #7c9cf5;
   --brand-accent: #5ec9a3;
   --brand-text: #2a3147;
-  --brand-text-secondary: #8893ab;
+  --brand-text-secondary: #6E7994;
   --brand-border: #e3e9f3;
   --brand-sidebar: #eef2fa;
 }
@@ -1057,7 +1057,7 @@ input, textarea, select{ border-radius:12px; transition:border-color .15s ease, 
   --brand-primary: #ff6b6b;
   --brand-accent: #ff9f5a;
   --brand-text: #2a1f26;
-  --brand-text-secondary: #9b8288;
+  --brand-text-secondary: #8a6a63;
   --brand-border: #f6e2dc;
   --brand-sidebar: #7c3048;
 }
@@ -1068,7 +1068,7 @@ input, textarea, select{ border-radius:12px; transition:border-color .15s ease, 
   --brand-primary: #3aa8c1;
   --brand-accent: #8b6ff0;
   --brand-text: #182233;
-  --brand-text-secondary: #7688a0;
+  --brand-text-secondary: #5f7488;
   --brand-border: #e2ecf3;
   --brand-sidebar: #26506e;
 }
@@ -1079,7 +1079,7 @@ input, textarea, select{ border-radius:12px; transition:border-color .15s ease, 
   --brand-primary: #5bbf3a;
   --brand-accent: #ff8f3f;
   --brand-text: #232a17;
-  --brand-text-secondary: #8a936f;
+  --brand-text-secondary: #5f7a52;
   --brand-border: #eaf0d8;
   --brand-sidebar: #2f5d1e;
 }
@@ -1230,6 +1230,163 @@ button:disabled:active { transform: none; }
   .cw-check circle, .cw-check path { stroke-dashoffset: 0; }
   .cw-ripple { display: none; }
 }
+/* MOVED HERE 2026-08-01, and the position is load-bearing.
+
+   These nine were appended at the END of the file, after the auto-dark block.
+   `[data-theme="blushcloud"]` and `[data-appearance="dark"]` are both single
+   attribute selectors on <html> — identical specificity — so the tie is broken
+   by SOURCE ORDER, and whichever comes last wins. The original 21 are declared
+   up here, before auto-dark, so auto-dark correctly overrides their surfaces on
+   a dark phone. The nine appended ones won the tie instead, which meant Violet
+   Dawn, Sunset Drift, Blush Cloud and Hot Pink kept WHITE cards on a dark phone
+   while the text tokens went near-white on top of them.
+
+   Found by the full-app audit: primary-coloured text at 1.2:1 on those four
+   under dark appearance. Not a colour-choice problem — a cascade-order one.
+   Anything added below the auto-dark block will break the same way. */
+
+/* ════════════════════════════════════════════════════════════════════════════
+   NINE SCHEMES ADDED 2026-08-01 — seven multicolour, two pink.
+   Revert = delete this block and the matching entries in ThemeProvider THEMES.
+
+   These are the first schemes with a THIRD colour. --brand-accent-2 is optional
+   everywhere: every derived token falls back to --brand-accent when it is
+   absent, so the original 21 two-colour schemes render byte-identically and
+   nothing had to be touched to add this.
+
+   Declared at the SAME specificity as the other themes ([data-theme="x"]) and
+   NOT under :root, for the reason written at the top of the visual-layer block:
+   a trailing :root that redefines a base token beats every theme on the tie and
+   collapses all of them into one palette.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ===== THEME: Midnight Aurora — midnight blue, cyan, violet ===== */
+[data-theme="midnightaurora"] {
+  --brand-bg: #0D1117;
+  --brand-surface: #161C26;
+  --brand-card: #1B2430;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #22D3EE;
+  --brand-accent-2: #A78BFA;
+  --brand-text: #E6EDF3;
+  --brand-text-secondary: #8B98A9;
+  --brand-border: #26303D;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Midnight Ember — midnight blue, coral, amber ===== */
+[data-theme="midnightember"] {
+  --brand-bg: #0B0E14;
+  --brand-surface: #151A22;
+  --brand-card: #1A212B;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #FB7185;
+  --brand-accent-2: #FBBF24;
+  --brand-text: #EDF1F7;
+  --brand-text-secondary: #94A0B0;
+  --brand-border: #242D3A;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Midnight Citrus — midnight blue, sky, lime ===== */
+[data-theme="midnightcitrus"] {
+  --brand-bg: #0D1117;
+  --brand-surface: #151B24;
+  --brand-card: #1A2230;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #38BDF8;
+  --brand-accent-2: #A3E635;
+  --brand-text: #E6EDF3;
+  --brand-text-secondary: #8D9AAB;
+  --brand-border: #253040;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Midnight Orchid — midnight blue, deep purple, orchid ===== */
+[data-theme="midnightorchid"] {
+  --brand-bg: #0C0F17;
+  --brand-surface: #151A24;
+  --brand-card: #1B2130;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #7C3AED;
+  --brand-accent-2: #E879F9;
+  --brand-text: #EDEFF7;
+  --brand-text-secondary: #939CB2;
+  --brand-border: #262E40;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Violet Dawn — midnight blue, deep purple, lilac — the light one ===== */
+[data-theme="violetdawn"] {
+  --brand-bg: #F4F3FC;
+  --brand-surface: #FFFFFF;
+  --brand-card: #E7E4FA;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #6D28D9;
+  --brand-accent-2: #C4B5FD;
+  --brand-text: #14102B;
+  --brand-text-secondary: #5F5B85;
+  --brand-border: #D5D0F2;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Sunset Drift — magenta, orange, gold ===== */
+[data-theme="sunsetdrift"] {
+  --brand-bg: #FFF6F2;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FFE8DC;
+  --brand-primary: #BE185D;
+  --brand-accent: #F97316;
+  --brand-accent-2: #FBBF24;
+  --brand-text: #2A0B14;
+  --brand-text-secondary: #8A5A61;
+  --brand-border: #F8CDB8;
+  --brand-sidebar: #BE185D;
+}
+
+/* ===== THEME: Deep Reef — teal, jade, purple ===== */
+[data-theme="deepreef"] {
+  --brand-bg: #0A1418;
+  --brand-surface: #121E24;
+  --brand-card: #17272E;
+  --brand-primary: #0E7490;
+  --brand-accent: #14B8A6;
+  --brand-accent-2: #A855F7;
+  --brand-text: #E4F2F5;
+  --brand-text-secondary: #86A3AC;
+  --brand-border: #1E323A;
+  --brand-sidebar: #0E7490;
+}
+
+/* ===== THEME: Blush Cloud — baby pink ===== */
+[data-theme="blushcloud"] {
+  --brand-bg: #FFF5F8;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FDE7EF;
+  --brand-primary: #E1789F;
+  --brand-accent: #F9A8D4;
+  --brand-accent-2: #FBCFE8;
+  --brand-text: #3A1225;
+  --brand-text-secondary: #9A6478;
+  --brand-border: #F7CEDD;
+  --brand-sidebar: #E1789F;
+}
+
+/* ===== THEME: Hot Pink — hot pink with a violet third ===== */
+[data-theme="hotpink"] {
+  --brand-bg: #FFF0F7;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FFD9EC;
+  --brand-primary: #FF1F8F;
+  --brand-accent: #FF6FB5;
+  --brand-accent-2: #7C3AED;
+  --brand-text: #2E0418;
+  --brand-text-secondary: #8E3563;
+  --brand-border: #FFC2DE;
+  --brand-sidebar: #FF1F8F;
+}
+
+
 
 /* ── Auto dark mode (2026-07-25) ───────────────────────────────────────────
    Applied by <AutoDark/> ONLY when the active theme is genuinely light — it
@@ -1599,147 +1756,6 @@ option:hover {
 
 
 /* ════════════════════════════════════════════════════════════════════════════
-   NINE SCHEMES ADDED 2026-08-01 — seven multicolour, two pink.
-   Revert = delete this block and the matching entries in ThemeProvider THEMES.
-
-   These are the first schemes with a THIRD colour. --brand-accent-2 is optional
-   everywhere: every derived token falls back to --brand-accent when it is
-   absent, so the original 21 two-colour schemes render byte-identically and
-   nothing had to be touched to add this.
-
-   Declared at the SAME specificity as the other themes ([data-theme="x"]) and
-   NOT under :root, for the reason written at the top of the visual-layer block:
-   a trailing :root that redefines a base token beats every theme on the tie and
-   collapses all of them into one palette.
-   ════════════════════════════════════════════════════════════════════════════ */
-
-/* ===== THEME: Midnight Aurora — midnight blue, cyan, violet ===== */
-[data-theme="midnightaurora"] {
-  --brand-bg: #0D1117;
-  --brand-surface: #161C26;
-  --brand-card: #1B2430;
-  --brand-primary: #1D4ED8;
-  --brand-accent: #22D3EE;
-  --brand-accent-2: #A78BFA;
-  --brand-text: #E6EDF3;
-  --brand-text-secondary: #8B98A9;
-  --brand-border: #26303D;
-  --brand-sidebar: #1D4ED8;
-}
-
-/* ===== THEME: Midnight Ember — midnight blue, coral, amber ===== */
-[data-theme="midnightember"] {
-  --brand-bg: #0B0E14;
-  --brand-surface: #151A22;
-  --brand-card: #1A212B;
-  --brand-primary: #1D4ED8;
-  --brand-accent: #FB7185;
-  --brand-accent-2: #FBBF24;
-  --brand-text: #EDF1F7;
-  --brand-text-secondary: #94A0B0;
-  --brand-border: #242D3A;
-  --brand-sidebar: #1D4ED8;
-}
-
-/* ===== THEME: Midnight Citrus — midnight blue, sky, lime ===== */
-[data-theme="midnightcitrus"] {
-  --brand-bg: #0D1117;
-  --brand-surface: #151B24;
-  --brand-card: #1A2230;
-  --brand-primary: #1D4ED8;
-  --brand-accent: #38BDF8;
-  --brand-accent-2: #A3E635;
-  --brand-text: #E6EDF3;
-  --brand-text-secondary: #8D9AAB;
-  --brand-border: #253040;
-  --brand-sidebar: #1D4ED8;
-}
-
-/* ===== THEME: Midnight Orchid — midnight blue, deep purple, orchid ===== */
-[data-theme="midnightorchid"] {
-  --brand-bg: #0C0F17;
-  --brand-surface: #151A24;
-  --brand-card: #1B2130;
-  --brand-primary: #1D4ED8;
-  --brand-accent: #7C3AED;
-  --brand-accent-2: #E879F9;
-  --brand-text: #EDEFF7;
-  --brand-text-secondary: #939CB2;
-  --brand-border: #262E40;
-  --brand-sidebar: #1D4ED8;
-}
-
-/* ===== THEME: Violet Dawn — midnight blue, deep purple, lilac — the light one ===== */
-[data-theme="violetdawn"] {
-  --brand-bg: #F4F3FC;
-  --brand-surface: #FFFFFF;
-  --brand-card: #E7E4FA;
-  --brand-primary: #1D4ED8;
-  --brand-accent: #6D28D9;
-  --brand-accent-2: #C4B5FD;
-  --brand-text: #14102B;
-  --brand-text-secondary: #5F5B85;
-  --brand-border: #D5D0F2;
-  --brand-sidebar: #1D4ED8;
-}
-
-/* ===== THEME: Sunset Drift — magenta, orange, gold ===== */
-[data-theme="sunsetdrift"] {
-  --brand-bg: #FFF6F2;
-  --brand-surface: #FFFFFF;
-  --brand-card: #FFE8DC;
-  --brand-primary: #BE185D;
-  --brand-accent: #F97316;
-  --brand-accent-2: #FBBF24;
-  --brand-text: #2A0B14;
-  --brand-text-secondary: #8A5A61;
-  --brand-border: #F8CDB8;
-  --brand-sidebar: #BE185D;
-}
-
-/* ===== THEME: Deep Reef — teal, jade, purple ===== */
-[data-theme="deepreef"] {
-  --brand-bg: #0A1418;
-  --brand-surface: #121E24;
-  --brand-card: #17272E;
-  --brand-primary: #0E7490;
-  --brand-accent: #14B8A6;
-  --brand-accent-2: #A855F7;
-  --brand-text: #E4F2F5;
-  --brand-text-secondary: #86A3AC;
-  --brand-border: #1E323A;
-  --brand-sidebar: #0E7490;
-}
-
-/* ===== THEME: Blush Cloud — baby pink ===== */
-[data-theme="blushcloud"] {
-  --brand-bg: #FFF5F8;
-  --brand-surface: #FFFFFF;
-  --brand-card: #FDE7EF;
-  --brand-primary: #E1789F;
-  --brand-accent: #F9A8D4;
-  --brand-accent-2: #FBCFE8;
-  --brand-text: #3A1225;
-  --brand-text-secondary: #9A6478;
-  --brand-border: #F7CEDD;
-  --brand-sidebar: #E1789F;
-}
-
-/* ===== THEME: Hot Pink — hot pink with a violet third ===== */
-[data-theme="hotpink"] {
-  --brand-bg: #FFF0F7;
-  --brand-surface: #FFFFFF;
-  --brand-card: #FFD9EC;
-  --brand-primary: #FF1F8F;
-  --brand-accent: #FF6FB5;
-  --brand-accent-2: #7C3AED;
-  --brand-text: #2E0418;
-  --brand-text-secondary: #8E3563;
-  --brand-border: #FFC2DE;
-  --brand-sidebar: #FF1F8F;
-}
-
-/* ════════════════════════════════════════════════════════════════════════════
    TRAINER CHROME FOLLOWS THE SCHEME — 2026-08-01
    Additive. Revert = delete from this banner to the end of the file, and put
    the three literal gradients back in TrainerSidebar/AppHeader.
@@ -1939,6 +1955,7 @@ option:hover {
    name, body derives the real token from that name. No property references
    itself, so nothing is cyclic. */
 [data-deep="20"] {
+  --secondary-base: var(--brand-text-secondary);
   --surface-base: var(--brand-surface);
   --bg-base:      var(--brand-bg);
   --card-base:    var(--brand-card);
@@ -1972,6 +1989,13 @@ option:hover {
   /* On `body`, not `html`: the right-hand side reads the token it defines, and
      on the same element that is a cycle and CSS drops the declaration. One
      level down it resolves against the value inherited from the theme. */
+  /* Secondary text has to keep up with the surface it sits on. As the
+     card deepens toward the primary, #8893ab-style greys close the gap
+     with it — Soft Pastel drops to 2.4:1 at level 50. Pulling secondary
+     toward the main text colour by the same rule keeps the hierarchy
+     (still visibly quieter than the heading) without letting it fade
+     into the card. */
+  --brand-text-secondary: color-mix(in srgb, var(--brand-text) 12%, var(--secondary-base));
   --brand-surface: color-mix(in srgb, var(--brand-primary) 10%, var(--surface-base));
   --brand-bg:      color-mix(in srgb, var(--brand-primary) 8%, var(--bg-base));
   --brand-card:    color-mix(in srgb, var(--brand-primary) 12%, var(--card-base));
@@ -2064,6 +2088,7 @@ option:hover {
 
 /* ── Level 35% ───────────────────────────────────────────────────────────── */
 [data-deep="35"] {
+  --secondary-base: var(--brand-text-secondary);
   --surface-base: var(--brand-surface);
   --bg-base:      var(--brand-bg);
   --card-base:    var(--brand-card);
@@ -2097,6 +2122,13 @@ option:hover {
   /* On `body`, not `html`: the right-hand side reads the token it defines, and
      on the same element that is a cycle and CSS drops the declaration. One
      level down it resolves against the value inherited from the theme. */
+  /* Secondary text has to keep up with the surface it sits on. As the
+     card deepens toward the primary, #8893ab-style greys close the gap
+     with it — Soft Pastel drops to 2.4:1 at level 50. Pulling secondary
+     toward the main text colour by the same rule keeps the hierarchy
+     (still visibly quieter than the heading) without letting it fade
+     into the card. */
+  --brand-text-secondary: color-mix(in srgb, var(--brand-text) 22%, var(--secondary-base));
   --brand-surface: color-mix(in srgb, var(--brand-primary) 20%, var(--surface-base));
   --brand-bg:      color-mix(in srgb, var(--brand-primary) 16%, var(--bg-base));
   --brand-card:    color-mix(in srgb, var(--brand-primary) 22%, var(--card-base));
@@ -2189,6 +2221,7 @@ option:hover {
 
 /* ── Level 50% ───────────────────────────────────────────────────────────── */
 [data-deep="50"] {
+  --secondary-base: var(--brand-text-secondary);
   --surface-base: var(--brand-surface);
   --bg-base:      var(--brand-bg);
   --card-base:    var(--brand-card);
@@ -2222,6 +2255,13 @@ option:hover {
   /* On `body`, not `html`: the right-hand side reads the token it defines, and
      on the same element that is a cycle and CSS drops the declaration. One
      level down it resolves against the value inherited from the theme. */
+  /* Secondary text has to keep up with the surface it sits on. As the
+     card deepens toward the primary, #8893ab-style greys close the gap
+     with it — Soft Pastel drops to 2.4:1 at level 50. Pulling secondary
+     toward the main text colour by the same rule keeps the hierarchy
+     (still visibly quieter than the heading) without letting it fade
+     into the card. */
+  --brand-text-secondary: color-mix(in srgb, var(--brand-text) 32%, var(--secondary-base));
   --brand-surface: color-mix(in srgb, var(--brand-primary) 30%, var(--surface-base));
   --brand-bg:      color-mix(in srgb, var(--brand-primary) 24%, var(--bg-base));
   --brand-card:    color-mix(in srgb, var(--brand-primary) 32%, var(--card-base));
@@ -2431,4 +2471,51 @@ option:hover {
    this only reinstates it where the element fills its container. */
 [data-deep]:not([data-deep="off"]) button[style*="var(--brand-bg)"][style*="width: 100%"] {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 26%, transparent);
+}
+
+/* ── Primary-coloured text, everywhere ─────────────────────────────────────
+   Found by the full-app audit, and it PRE-DATES the depth work — it fails with
+   depth off too. 141 places set `color: var(--brand-primary)` for a link or a
+   label, and the primary is chosen to look good as a FILL, not as text:
+
+     Deep Purple  #4A148C on a dark card   1.4:1
+     Charcoal     #2D2D2D on a dark card   1.2:1
+     Soft Pastel  #7c9cf5 on a white card  2.7:1
+     Citrus       #5bbf3a on a white card  2.3:1
+
+   Both directions are broken, and they need opposite corrections: on a dark
+   surface the primary has to be lifted toward white, on a light one pushed
+   toward black. CSS cannot branch on luminance, so the split is by appearance,
+   which is the thing that actually determines which way is wrong.
+
+   Matched on the inline style's own text so only the COLOUR property moves —
+   every place using the primary as a BACKGROUND keeps it exactly, buttons
+   included, which still need white text on the true primary. Both spellings of
+   the declaration are matched because the DOM serialises `color: var(...)` with
+   a space and hand-written markup often has none; missing one silently covers
+   half the cases, which is how the first attempt at this did nothing.
+
+   The result is still recognisably the scheme's colour — Forest reads as green,
+   Rose as pink — just at a weight you can actually read. */
+[style*="color: var(--brand-primary)"],
+[style*="color:var(--brand-primary)"] {
+  color: color-mix(in srgb, var(--brand-primary) 56%, #000) !important;
+}
+[data-appearance="dark"] [style*="color: var(--brand-primary)"],
+[data-appearance="dark"] [style*="color:var(--brand-primary)"],
+[data-theme="midnight"] [style*="color: var(--brand-primary)"],
+[data-theme="midnight"] [style*="color:var(--brand-primary)"],
+[data-theme="carbonneon"] [style*="color: var(--brand-primary)"],
+[data-theme="carbonneon"] [style*="color:var(--brand-primary)"],
+[data-theme="midnightaurora"] [style*="color: var(--brand-primary)"],
+[data-theme="midnightaurora"] [style*="color:var(--brand-primary)"],
+[data-theme="midnightember"] [style*="color: var(--brand-primary)"],
+[data-theme="midnightember"] [style*="color:var(--brand-primary)"],
+[data-theme="midnightcitrus"] [style*="color: var(--brand-primary)"],
+[data-theme="midnightcitrus"] [style*="color:var(--brand-primary)"],
+[data-theme="midnightorchid"] [style*="color: var(--brand-primary)"],
+[data-theme="midnightorchid"] [style*="color:var(--brand-primary)"],
+[data-theme="deepreef"] [style*="color: var(--brand-primary)"],
+[data-theme="deepreef"] [style*="color:var(--brand-primary)"] {
+  color: color-mix(in srgb, var(--brand-primary) 42%, white) !important;
 }
