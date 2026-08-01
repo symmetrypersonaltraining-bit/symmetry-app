@@ -139,30 +139,44 @@ export default async function WorkoutPage(props: {
         {todayScheduledList.length > 0 ? (
           <>
             {todayScheduledList.map((ts) => (
-            <div key={ts.id} className="card card-glow mb-4">
-              <p className="text-xs mb-1" style={{ color: "var(--brand-text-secondary)" }}>
-                Today &middot; {ts.phaseLabel}
-              </p>
-              <h2 className="text-lg font-medium mb-1" style={{ color: "var(--brand-text)" }}>
-                <i className={`ti ${/cardio/i.test(ts.dayLabel) ? "ti-run" : "ti-barbell"} mr-1.5`} style={{ color: "var(--brand-primary)" }} />
-                {ts.dayLabel}
-              </h2>
-              <p className="text-sm mb-4" style={{ color: "var(--brand-text-secondary)" }}>
-                {ts.programName}
-              </p>
-              {ts.status === "completed" ? (
-                <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "#22c55e" }}>
-                  <i className="ti ti-check" /> Completed
+            // Start moved onto the same row as the title instead of sitting on
+            // its own line under it. Two of these cards plus a full-width button
+            // each pushed My Schedule entirely below the fold, so clients never
+            // saw that the week strip and the board existed. The name still
+            // wraps to as many lines as it needs — nothing is truncated — the
+            // height saved is the button row and the padding around it.
+            <div key={ts.id} className="card card-glow mb-2.5" style={{ padding: 12 }}>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px]" style={{ color: "var(--brand-text-secondary)" }}>
+                    Today &middot; {ts.phaseLabel}
+                  </p>
+                  <h2 className="text-[15px] font-semibold leading-snug" style={{ color: "var(--brand-text)" }}>
+                    <i className={`ti ${/cardio/i.test(ts.dayLabel) ? "ti-run" : "ti-barbell"} mr-1.5`} style={{ color: "var(--brand-primary)" }} />
+                    {ts.dayLabel}
+                  </h2>
+                  <p className="text-[11px] truncate" style={{ color: "var(--brand-text-secondary)" }}>
+                    {ts.programName}
+                  </p>
                 </div>
-              ) : (
-                <Link href={"/workout/" + ts.dayId} className="btn btn-primary block text-center">
-                  Start workout
-                </Link>
-              )}
+                {ts.status === "completed" ? (
+                  <div className="flex items-center gap-1.5 text-xs font-semibold flex-shrink-0" style={{ color: "#22c55e" }}>
+                    <i className="ti ti-check" /> Done
+                  </div>
+                ) : (
+                  <Link
+                    href={"/workout/" + ts.dayId}
+                    className="btn btn-primary flex-shrink-0 flex items-center gap-1.5"
+                    style={{ padding: "9px 14px", fontSize: 13, whiteSpace: "nowrap" }}
+                  >
+                    <i className="ti ti-player-play" /> Start
+                  </Link>
+                )}
+              </div>
             </div>
             ))}
 
-            <div style={{ marginTop: "1.25rem" }}>
+            <div style={{ marginTop: "0.85rem" }}>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
               <ScheduleWeekBar workouts={calWorkouts} />
               <ScheduleBoard workouts={calWorkouts} />
