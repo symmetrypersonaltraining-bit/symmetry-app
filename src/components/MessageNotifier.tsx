@@ -7,8 +7,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useNotificationFeed } from "@/lib/useNotificationFeed";
-import { type Banner } from "@/lib/messageBanners";
+import { createClient } from "@/lib/supabase/client";
+import { fetchGroupUnread } from "@/lib/groupUnread";
+import { bannersForDelta, type Banner } from "@/lib/messageBanners";
 
 export default function MessageNotifier() {
   const router = useRouter();
@@ -22,6 +23,8 @@ export default function MessageNotifier() {
   const [banner, setBanner] = useState<Banner | null>(null);
   const [tick, setTick] = useState(0);
   const queue = useRef<Banner[]>([]);
+  const prev = useRef<number | null>(null);
+  const prevGroup = useRef<number | null>(null);
 
   // Show the next queued banner as soon as the slot is free.
   useEffect(() => {
@@ -37,40 +40,56 @@ export default function MessageNotifier() {
     return () => clearTimeout(t);
   }, [banner]);
 
-  // Driven by the shared feed, and by message IDENTITY rather than a count.
-  //
-  // The old gate was `if (c > prev.current)` on the SUM of direct + group. Read
-  // one message while another arrived inside the same 15s window and the total
-  // did not move — no banner — and the watermark advanced anyway, so that
-  // message was never announced again. It was lost permanently. freshIds is a
-  // set difference, so a read and an arrival cannot cancel out.
-  //
-  // It also carries the real destination: each banner now points at the item's
-  // own href, which includes ?m=<id>. The old one asked for a HEAD count and so
-  // never learned who sent anything — it could only ever route to /messages,
-  // which for the trainer is the inbox list rather than a thread.
-  const { items, freshIds } = useNotificationFeed();
-  const announced = useRef<Set<string>>(new Set());
-
   useEffect(() => {
-    if (!freshIds.length) return;
-    const unseen = freshIds.filter((id) => !announced.current.has(id));
-    if (!unseen.length) return;
-    unseen.forEach((id) => announced.current.add(id));
-
-    // One banner per SOURCE, not per message: three group posts is one "Group
-    // Chat" banner, not three. Sources are already grouped by the feed.
-    const queued: Banner[] = items.slice(0, 2).map((i) => ({
-      text: i.count > 1 ? `${i.count} new in ${i.title}` : `New message — ${i.title}`,
-      href: i.href,
-    }));
-    if (queued.length) {
-      // Cap the backlog. If the app sat in the background through several polls
-      // we want the current state, not a parade of stale banners.
-      queue.current = [...queue.current, ...queued].slice(-2);
-      setTick((t) => t + 1);
+    let on = true;
+    const supabase = createClient();
+    async function load() {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const user = data?.user;
+        if (!user) return;
+        const isClientMode = typeof document !== "undefined" && document.cookie.split("; ").some((x) => x === "symmetry_client_mode=1");
+        let scopeId: string | null = null;
+        if (isClientMode) {
+          const { data: myClient } = await supabase.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
+          scopeId = myClient ? (myClient as { id: string }).id : null;
+        }
+        let q = supabase.from("messages").select("id", { count: "exact", head: true })
+          .eq("to_id", user.id).is("read_at", null).is("deleted_at", null)
+          .eq("is_broadcast", false).eq("is_group", false);
+        if (scopeId) q = q.eq("client_id", scopeId);
+        // In client mode (Dustin's own client app) include his OWN trainer-sent
+        // group/announcement messages so the banner slides in like a real client.
+        const [{ count }, group] = await Promise.all([q, fetchGroupUnread(supabase, user.id, isClientMode)]);
+        const direct = count || 0;
+        const grp = group.count;
+        const c = direct + grp;
+        if (!on) return;
+        if (prev.current != null && c > prev.current) {
+          // Split the increase into its group vs direct parts and queue a banner
+          // for EACH thread that actually gained messages. Group is queued first
+          // (community posts are the ones a client is most likely to want) but
+          // neither is ever discarded in favour of the other.
+          const prevGrp = prevGroup.current ?? 0;
+          const prevDirect = (prev.current ?? 0) - prevGrp;
+          const groupDelta = grp - prevGrp;
+          const directDelta = direct - prevDirect;
+          const queued = bannersForDelta({ groupDelta, directDelta, isClientMode });
+          if (queued.length) {
+            // Cap the backlog: if the app sat in the background through several
+            // polls we want the latest counts, not a parade of stale banners.
+            queue.current = [...queue.current, ...queued].slice(-2);
+            setTick((t) => t + 1);
+          }
+        }
+        prev.current = c;
+        prevGroup.current = grp;
+      } catch { /* noop */ }
     }
-  }, [freshIds, items]);
+    load();
+    const iv = setInterval(load, 15000);
+    return () => { on = false; clearInterval(iv); };
+  }, []);
 
   if (!banner) return null;
   return (
