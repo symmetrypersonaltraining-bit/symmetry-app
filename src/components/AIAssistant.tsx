@@ -11,9 +11,39 @@ interface Series { count: number; label: string; date: string }
 interface Message {
   role: "user" | "assistant";
   content: string;
+  /** base64 data URL, session-only — see the note on persistence below. */
+  image?: string;
   proposal?: Proposal;
   series?: Series;
   applied?: boolean;
+}
+
+/**
+ * Shrink a photo before it leaves the phone.
+ *
+ * A modern phone camera produces 4-8MB. Sending that over a gym's wifi is slow
+ * enough to read as a hang, and the model gains nothing past about 1200px — it
+ * is looking at posture and barbell positions, not counting pores. This gets a
+ * typical photo to a couple of hundred KB.
+ */
+async function shrinkImage(file: File, maxDim = 1200, quality = 0.82): Promise<{ data: string; mediaType: string } | null> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const url = canvas.toDataURL("image/jpeg", quality);
+    const comma = url.indexOf(",");
+    if (comma < 0) return null;
+    return { data: url.slice(comma + 1), mediaType: "image/jpeg" };
+  } catch {
+    return null;
+  }
 }
 
 function prettyDate(iso: string): string {
@@ -52,6 +82,10 @@ export default function AIAssistant() {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [applyingIdx, setApplyingIdx] = useState<number | null>(null);
+  const [pendingImage, setPendingImage] = useState<{ data: string; mediaType: string } | null>(null);
+  const [attaching, setAttaching] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const restored = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -67,17 +101,67 @@ export default function AIAssistant() {
     }
   }, [open, messages]);
 
+  // Bring back the last conversation. The drawer used to hold it in React state
+  // only, so walking to the gym floor and coming back left Dustin with a blank
+  // box — for a tool used between clients that is the difference between a
+  // conversation and a series of unrelated questions. Server-side, so it also
+  // survives moving from his phone to a laptop.
+  useEffect(() => {
+    if (!open || !isTrainer || restored.current) return;
+    restored.current = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/agent/session", { cache: "no-store" });
+        if (!res.ok) return;
+        const j = await res.json();
+        const saved = Array.isArray(j?.messages) ? (j.messages as Message[]) : [];
+        if (saved.length) setMessages((cur) => (cur.length ? cur : saved));
+      } catch {
+        /* a missing memory is not a reason to break the drawer */
+      }
+    })();
+  }, [open, isTrainer]);
+
+  const clearThread = useCallback(async () => {
+    setMessages([]);
+    setPendingImage(null);
+    setError(null);
+    try { await fetch("/api/agent/session", { method: "DELETE" }); } catch { /* noop */ }
+  }, []);
+
+  const attachPhoto = useCallback(async (file: File | null) => {
+    if (!file) return;
+    setAttaching(true);
+    setError(null);
+    try {
+      const shrunk = await shrinkImage(file);
+      if (!shrunk) setError("Couldn't read that image — try a different one.");
+      else setPendingImage(shrunk);
+    } finally {
+      setAttaching(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }, []);
+
   const getContext = useCallback(() => {
     return `Current page: ${pathname}. Trainer mode: ${isTrainer}. Time: ${new Date().toLocaleTimeString()}.`;
   }, [pathname, isTrainer]);
 
   const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || loading) return;
+    // A photo on its own is a legitimate message — "what do you make of this?"
+    // is implied. Requiring text alongside it would be pedantry.
+    if ((!text.trim() && !pendingImage) || loading) return;
     setError(null);
-    const userMsg: Message = { role: "user", content: text.trim() };
+    const img = pendingImage;
+    const userMsg: Message = {
+      role: "user",
+      content: text.trim() || (img ? "What do you make of this?" : ""),
+      image: img ? `data:${img.mediaType};base64,${img.data}` : undefined,
+    };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setInput("");
+    setPendingImage(null);
     setLoading(true);
 
     try {
@@ -89,7 +173,26 @@ export default function AIAssistant() {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(isTrainer ? { messages: updated, pageContext } : { messages: updated, context: getContext() }),
+        // Turns with a photo go up as Anthropic content blocks; everything else
+        // stays a plain string, so nothing about the existing path changes.
+        body: JSON.stringify(
+          isTrainer
+            ? {
+                messages: updated.map((m) =>
+                  m.image
+                    ? {
+                        role: m.role,
+                        content: [
+                          { type: "image", source: { type: "base64", media_type: m.image.slice(5, m.image.indexOf(";")), data: m.image.slice(m.image.indexOf(",") + 1) } },
+                          { type: "text", text: m.content },
+                        ],
+                      }
+                    : { role: m.role, content: m.content },
+                ),
+                pageContext,
+              }
+            : { messages: updated, context: getContext() },
+        ),
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -104,7 +207,7 @@ export default function AIAssistant() {
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, getContext, focusWorkoutId, isTrainer, pathname]);
+  }, [messages, loading, getContext, focusWorkoutId, isTrainer, pathname, pendingImage]);
 
   const applyChange = useCallback(async (idx: number, proposal: Proposal, applyScope: "one" | "series") => {
     if (applyingIdx != null) return;
@@ -144,10 +247,9 @@ export default function AIAssistant() {
     setListening(false);
   }, []);
 
-  const clearChat = () => {
-    setMessages([]);
-    setError(null);
-  };
+  // Clearing has to reach the SERVER now, or the thread comes back on the next
+  // open and the bin button reads as broken.
+  const clearChat = () => { void clearThread(); };
 
   // Initial greeting
   const isEmpty = messages.length === 0;
@@ -280,6 +382,10 @@ export default function AIAssistant() {
                         borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "4px 18px 18px 18px",
                       }}
                     >
+                      {m.image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={m.image} alt="Sent" style={{ maxWidth: "100%", borderRadius: 10, marginBottom: m.content ? 6 : 0, display: "block" }} />
+                      )}
                       {m.content}
                     </div>
                   </div>
@@ -335,8 +441,29 @@ export default function AIAssistant() {
             </div>
 
             {/* Input */}
+            {pendingImage && (
+              <div className="flex items-center gap-2 px-3 pt-2 flex-shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`data:${pendingImage.mediaType};base64,${pendingImage.data}`} alt="Attached"
+                  style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8 }} />
+                <span className="text-xs flex-1" style={{ color: "var(--brand-text-secondary)" }}>Photo attached</span>
+                <button onClick={() => setPendingImage(null)} className="text-xs font-semibold" style={{ background: "none", border: "none", color: "var(--brand-primary)", cursor: "pointer" }}>Remove</button>
+              </div>
+            )}
             <div className="flex items-center gap-2 p-3 flex-shrink-0"
               style={{ borderTop: "1px solid var(--brand-border)" }}>
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }}
+                onChange={(e) => attachPhoto(e.target.files?.[0] ?? null)} />
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={loading || attaching}
+                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)" }}
+                title="Attach a photo"
+              >
+                <i className={`ti ${attaching ? "ti-loader-2" : "ti-photo"} text-base`}
+                  style={{ color: "var(--brand-text-secondary)", animation: attaching ? "spin 0.8s linear infinite" : "none" }} />
+              </button>
               <input
                 ref={inputRef}
                 type="text"
@@ -366,15 +493,15 @@ export default function AIAssistant() {
               </button>
               <button
                 onClick={() => sendMessage(input)}
-                disabled={!input.trim() || loading}
+                disabled={(!input.trim() && !pendingImage) || loading}
                 className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all"
                 style={{
-                  background: input.trim() && !loading ? "var(--brand-primary)" : "var(--brand-card)",
+                  background: (input.trim() || pendingImage) && !loading ? "var(--brand-primary)" : "var(--brand-card)",
                   border: "1px solid var(--brand-border)",
                 }}
               >
                 <i className="ti ti-send text-base"
-                  style={{ color: input.trim() && !loading ? "white" : "var(--brand-text-secondary)" }} />
+                  style={{ color: (input.trim() || pendingImage) && !loading ? "white" : "var(--brand-text-secondary)" }} />
               </button>
             </div>
           </div>

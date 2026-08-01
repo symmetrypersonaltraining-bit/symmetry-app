@@ -17,6 +17,7 @@ import { logUsage } from "@/lib/ai/meter";
 import { resolveAiScope, enforceMeter, missingKeyResponse, Db } from "@/lib/ai/scope";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TRAINER_TOOLS, execTrainerTool } from "@/lib/ai/agent-tools";
+import { CONTEXT_TYPE, MAX_TURNS } from "./session/route";
 
 export const runtime = "nodejs";
 
@@ -45,11 +46,56 @@ Keep replies tight. After a change, confirm exactly what you did in one or two s
 ${APP_GUIDE_TRAINER}
 `;
 
+/**
+ * Persist the conversation so the drawer still has it after a navigation.
+ *
+ * IMAGE PAYLOADS ARE STRIPPED. A few megabytes of base64 per turn, forty turns
+ * deep, in a jsonb column that is read on every drawer open, is not a memory —
+ * it is a liability. The turn is kept with a "[photo]" marker so the thread
+ * still reads correctly; the picture itself lives only for the session it was
+ * sent in. If he needs the model to look again, he sends it again.
+ *
+ * Never throws. A failure to remember must not fail the answer that was already
+ * produced.
+ */
+async function saveSession(db: Db, incoming: { role: string; content: unknown }[], reply: string): Promise<void> {
+  try {
+    const flat = [...incoming, { role: "assistant", content: reply }]
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => {
+        if (typeof m.content === "string") return { role: m.role, content: m.content };
+        if (!Array.isArray(m.content)) return null;
+        const parts = (m.content as { type?: string; text?: string }[])
+          .map((b) => (b?.type === "text" ? b.text || "" : b?.type === "image" ? "[photo]" : ""))
+          .filter(Boolean);
+        return parts.length ? { role: m.role, content: parts.join(" ") } : null;
+      })
+      .filter(Boolean)
+      .slice(-MAX_TURNS);
+
+    const { data: existing } = await db
+      .from("ai_chat_sessions").select("id").eq("context_type", CONTEXT_TYPE)
+      .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+    const id = (existing as { id: string } | null)?.id;
+
+    if (id) {
+      await db.from("ai_chat_sessions").update({ messages: flat, updated_at: new Date().toISOString() }).eq("id", id);
+    } else {
+      await db.from("ai_chat_sessions").insert({ context_type: CONTEXT_TYPE, messages: flat });
+    }
+  } catch (e) {
+    console.error("agent: session save failed", e);
+  }
+}
+
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return missingKeyResponse();
 
-  let body: { messages?: { role: string; content: string }[]; pageContext?: string };
+  // `content` is a string for an ordinary turn, or an array of Anthropic
+  // content blocks when the turn carries an image. Anything else is dropped.
+  type InBlock = { type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
+  let body: { messages?: { role: string; content: string | InBlock[] }[]; pageContext?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
 
   const scoped = await resolveAiScope(null);
@@ -65,10 +111,43 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient() as unknown as Db;
   if (!admin) return NextResponse.json({ error: "Not configured" }, { status: 500 });
 
+  const ALLOWED_IMAGE = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+  // ~5MB of base64 is roughly 3.7MB of image. Beyond that the request is slow
+  // enough on a phone that it reads as broken, and the model gains nothing from
+  // the extra pixels.
+  const MAX_IMAGE_B64 = 5_000_000;
+  const MAX_IMAGES = 4;
+  let imageCount = 0;
+
   const incoming = Array.isArray(body.messages) ? body.messages : [];
-  const messages: Anthropic.MessageParam[] = incoming
-    .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+  const messages: Anthropic.MessageParam[] = [];
+  for (const m of incoming) {
+    if (m.role !== "user" && m.role !== "assistant") continue;
+    const role = m.role as "user" | "assistant";
+
+    if (typeof m.content === "string") {
+      if (m.content.trim()) messages.push({ role, content: m.content });
+      continue;
+    }
+    if (!Array.isArray(m.content)) continue;
+
+    const blocks: Anthropic.ContentBlockParam[] = [];
+    for (const b of m.content) {
+      if (b && b.type === "text" && typeof b.text === "string" && b.text.trim()) {
+        blocks.push({ type: "text", text: b.text });
+      } else if (b && b.type === "image" && b.source?.type === "base64") {
+        // Validate rather than trust: an unbounded or wrong-typed image is a
+        // 400 from Anthropic that surfaces to Dustin as "Agent error", which
+        // tells him nothing about what to do differently.
+        if (imageCount >= MAX_IMAGES) continue;
+        if (!ALLOWED_IMAGE.has(b.source.media_type)) continue;
+        if (typeof b.source.data !== "string" || b.source.data.length > MAX_IMAGE_B64) continue;
+        imageCount++;
+        blocks.push({ type: "image", source: { type: "base64", media_type: b.source.media_type as "image/jpeg" | "image/png" | "image/webp" | "image/gif", data: b.source.data } });
+      }
+    }
+    if (blocks.length) messages.push({ role, content: blocks });
+  }
   if (!messages.length) return NextResponse.json({ error: "No message." }, { status: 400 });
 
   const system = body.pageContext ? `${SYSTEM}\n\nCurrent page context (what Dustin is looking at): ${body.pageContext}` : SYSTEM;
@@ -95,6 +174,7 @@ export async function POST(req: NextRequest) {
       }
 
       const text = resp.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
+      await saveSession(admin, incoming, text);
       // Unconditional. This used to be gated on `scope.clientId`, so if the
       // trainer had no clients row the entire agent's SONNET spend went
       // unlogged — invisible to the $95 monthly kill switch, which is the one
