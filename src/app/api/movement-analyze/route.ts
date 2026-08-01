@@ -12,6 +12,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { enforceMeter } from '@/lib/ai/scope';
+import { logUsage } from '@/lib/ai/meter';
 import { createClient } from '@/lib/supabase/server';
 import { analyze, type AnalyzeInput } from '@/lib/movement/analyze';
 import { buildProgram } from '@/lib/movement/program';
@@ -21,11 +23,21 @@ import { CHECKPOINT_LABELS, SURFACE_COPY, violatesSurfaceLanguage } from '@/lib/
 const TRAINER_EMAIL = 'symmetrypersonaltraining@gmail.com';
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// This route runs SONNET on every call and had no metering and no kill switch:
+// its spend was invisible to the $95 cap, which is the one control meant to
+// stop a runaway bill. It is authenticated, so this was a cost hole rather than
+// an open door — but the cap cannot work on a partial view of the spend.
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Honour the global kill switch. null client = no per-client daily cap,
+    // just the monthly ceiling.
+    const paused = await enforceMeter(null, 'chat');
+    if (paused) return paused;
 
     const body = (await req.json()) as {
       clientId: string;
@@ -164,6 +176,7 @@ Return STRICT JSON:
       max_tokens: 1600,
       messages: [{ role: 'user', content: prompt }],
     });
+    await logUsage(null, 'chat', msg.usage?.input_tokens ?? 0, msg.usage?.output_tokens ?? 0, 'claude-sonnet-4-6');
     const text = msg.content[0]?.type === 'text' ? msg.content[0].text : '';
     const m = text.match(/\{[\s\S]*\}/);
     const layers = (m ? JSON.parse(m[0]) : {}) as EducationLayers;

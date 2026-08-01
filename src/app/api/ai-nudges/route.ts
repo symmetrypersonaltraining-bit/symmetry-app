@@ -24,6 +24,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { logUsage } from "@/lib/ai/meter";
 import { Db, TRAINER_EMAIL } from "@/lib/ai/scope";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
@@ -268,7 +269,7 @@ export async function POST(req: NextRequest) {
 
       let text: string | null = null;
       try {
-        const { value } = await callClaudeJson<{ body: string }>({
+        const { value, tokensIn, tokensOut } = await callClaudeJson<{ body: string }>({
           apiKey: process.env.ANTHROPIC_API_KEY,
           model: HAIKU_MODEL,
           system: SYSTEM,
@@ -276,6 +277,10 @@ export async function POST(req: NextRequest) {
           messages: [{ role: "user", content: `CLIENT FACTS:\n${JSON.stringify(facts)}\n\nWrite the message as strict JSON.` }],
           validate,
         });
+        // This route writes messages to clients and never logged a token, so
+        // its spend did not count toward the $95 ceiling. It runs per client
+        // per sweep, which is exactly the shape that adds up unnoticed.
+        await logUsage(r.id, "chat", tokensIn, tokensOut, HAIKU_MODEL);
         text = value?.body ?? null;
       } catch {
         text = null;

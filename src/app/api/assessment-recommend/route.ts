@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { resolveAiScope, enforceMeter } from '@/lib/ai/scope';
+import { logUsage } from '@/lib/ai/meter';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
+  // This had NO auth check and NO metering: anyone who knew the URL could burn
+  // Dustin's Anthropic budget a request at a time, and none of it counted
+  // toward the $95 kill switch. It is reachable from the assessment page, so it
+  // was not even obscure.
+  const scoped = await resolveAiScope(null);
+  if (!scoped.ok) return scoped.response;
+  if (!scoped.scope.isTrainer) return NextResponse.json({ error: 'Trainer only' }, { status: 403 });
+  const paused = await enforceMeter(null, 'chat');
+  if (paused) return paused;
+
   const data = await req.json();
   
   const prompt = `You are Dustin Gautreaux's AI programming assistant for Symmetry Corrective. Based on this client assessment, recommend a starting program and write a brief assessment summary.
@@ -44,6 +56,8 @@ Respond with JSON only:
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
   });
+
+  await logUsage(null, 'chat', message.usage?.input_tokens ?? 0, message.usage?.output_tokens ?? 0, 'claude-haiku-4-5-20251001');
 
   const text = message.content[0].type === 'text' ? message.content[0].text : '';
   const jsonMatch = text.match(/\{[\s\S]*\}/);
