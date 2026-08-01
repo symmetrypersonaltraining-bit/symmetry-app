@@ -45,6 +45,11 @@ const EMPTY: NotificationFeed = {
 
 const Ctx = createContext<NotificationFeed>(EMPTY);
 
+// Inlined rather than imported from @/lib/ai/scope: that module pulls in
+// next/headers, which is server-only, and importing it here broke the build
+// outright. NotificationCenter keeps its own copy for the same reason.
+const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+
 const POLL_MS = 25000;
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
@@ -78,9 +83,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         typeof document !== "undefined" &&
         document.cookie.split("; ").some((x) => x === "symmetry_client_mode=1");
 
+      // Trainer-ness is decided by the ACCOUNT, not by whether a client record
+      // exists. Dustin has a client record too — he trains himself — so
+      // `!me` marked him as a client even in trainer view. Every thread then
+      // collapsed into a single "Trainer" row whose href is /messages, which is
+      // the inbox LIST. That is why tapping a notification landed on the client
+      // list instead of the conversation.
       const { data: me } = await supabase
         .from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
-      const isTrainer = !clientMode && !me;
+      const myClientId = (me as { id: string } | null)?.id ?? null;
+      const isTrainer = user.email === TRAINER_EMAIL && !clientMode;
 
       // ROWS, not a count. The banner needs to know WHICH messages are unread —
       // a HEAD count is why it could never route to the sender's thread.
@@ -92,7 +104,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(200);
-      const unread = (rows ?? []) as RawUnread[];
+      let unread = (rows ?? []) as RawUnread[];
+
+      // In Client View the trainer account is acting as an ordinary client, so
+      // only their OWN thread and announcements belong here. Incoming
+      // client-to-trainer messages are trainer business and must not leak into
+      // the client notification centre.
+      if (clientMode) {
+        unread = unread.filter((m) => m.is_broadcast === true || (!!m.client_id && m.client_id === myClientId));
+      }
 
       let clientNames: Record<string, string> = {};
       if (isTrainer) {
