@@ -623,7 +623,7 @@ function VideoModal({ url, onClose }: { url: string; onClose: () => void }) {
 
 export default function WorkoutLogger({
   day, phase, program, sections, clientId, clientName, isTrainerSession,
-  existingLogId, existingSetLogs,
+  existingLogId, existingSetLogs, scheduledWorkoutId,
 }: Props) {
   const supabase = createClient();
 
@@ -1427,6 +1427,44 @@ export default function WorkoutLogger({
   async function handleSwap(newExercise: Exercise) {
     if (!swapTargetPe) return;
     const peId = swapTargetPe.id;
+
+    // FORK BEFORE EDITING. This used to be a bare
+    //   update prescribed_exercises set exercise_id = … where id = peId
+    // with no ownership check, on a button that is NOT trainer-gated. Most
+    // scheduled workouts sit on shared library days by design — the isolation
+    // trigger only forks a day when a SECOND client lands on it — so that
+    // update was rewriting THE TEMPLATE. Nothing visibly broke, which is the
+    // problem: the next client scheduled on that day would silently inherit a
+    // substitution someone else made mid-session, with no record of why.
+    //
+    // The RPC forks the day when it is not already this client's, repoints only
+    // THIS session (scope 'one', same as workoutAdjust), and swaps inside the
+    // copy. A fork changes the ids the page is holding, so we reload.
+    if (scheduledWorkoutId) {
+      try {
+        const { data, error } = await supabase.rpc("swap_prescribed_exercise", {
+          p_scheduled_workout_id: scheduledWorkoutId,
+          p_pe_id: peId,
+          p_new_exercise_id: newExercise.id,
+        });
+        const res = data as { ok?: boolean; forked?: boolean } | null;
+        if (!error && res?.ok) {
+          if (res.forked) { window.location.reload(); return; }
+          setLocalSections(prev => prev.map(sec => ({
+            ...sec,
+            prescribed_exercises: sec.prescribed_exercises.map(pe =>
+              pe.id === peId ? { ...pe, exercises: newExercise } : pe),
+          })));
+          setSwapTargetPe(null);
+          return;
+        }
+      } catch { /* fall through to the direct write below */ }
+    }
+
+    // No scheduled_workouts row to repoint (opened straight from a day, not
+    // from the calendar) — there is nothing to fork ONTO, so this stays the old
+    // in-place edit. Trainer-side editing of a library day is legitimate; the
+    // hazard was only ever the client-facing session path above.
     await supabase.from("prescribed_exercises").update({ exercise_id: newExercise.id }).eq("id", peId);
     setLocalSections(prev => prev.map(sec => ({
       ...sec,
