@@ -391,12 +391,27 @@ export default function ScheduleBoard({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  padding: empty ? "5px 10px" : "4px 10px",
-                  borderBottom: empty ? "none" : "1px solid var(--brand-border)",
-                  background: isToday ? "var(--brand-primary)" : "transparent",
+                  padding: empty ? "6px 10px" : "5px 10px",
+                  // The date row is now a coloured band in the active scheme
+                  // rather than transparent. Reported while scrolling a month
+                  // of Peak Week days: every block looked the same, so the days
+                  // ran together and the date was the hardest thing on the card
+                  // to find. A tinted band with a stronger rule under it does
+                  // the separating, and it costs no vertical space.
+                  //
+                  // Derived from --brand-primary, so it is whatever scheme is
+                  // active — and it deepens with the depth level like every
+                  // other surface, instead of being a fixed colour that fights
+                  // the theme.
+                  borderBottom: empty
+                    ? "none"
+                    : "1.5px solid color-mix(in srgb, var(--brand-primary) 38%, var(--brand-border))",
+                  background: isToday
+                    ? "var(--brand-primary)"
+                    : "color-mix(in srgb, var(--brand-primary) 15%, var(--brand-surface))",
                 }}
               >
-                <span style={{ fontWeight: isToday ? 800 : 700, fontSize: isToday ? 12.5 : 11.5, color: isToday ? "#fff" : "var(--brand-text)" }}>
+                <span style={{ fontWeight: 800, fontSize: isToday ? 12.5 : 12, letterSpacing: "-0.01em", color: isToday ? "#fff" : "var(--brand-text)" }}>
                   {shortLabel(k)}
                   {isToday ? <span style={{ color: "#fff", fontWeight: 900 }}> · TODAY</span> : null}
                 </span>
@@ -442,11 +457,19 @@ export default function ScheduleBoard({
                           alignItems: "center",
                           flexWrap: "wrap",
                           gap: 7,
-                          background: "var(--brand-bg)",
-                          border: "1px solid var(--brand-border)",
-                          borderLeft: `4px solid ${TYPE_COLOR[t]}`,
-                          borderRadius: 8,
-                          padding: "6px 8px",
+                          // Each workout gets a full ring in its own type
+                          // colour, not just a left bar. On a day with a lift
+                          // AND a cardio session the two tiles sat on
+                          // near-identical backgrounds with a 1px neutral
+                          // border, so they read as one block with two lines of
+                          // text. The ring plus a tint of the same colour makes
+                          // each session a discrete object at a glance, and the
+                          // colour still says which kind it is.
+                          background: `color-mix(in srgb, ${TYPE_COLOR[t]} 9%, var(--brand-surface))`,
+                          border: `1.5px solid color-mix(in srgb, ${TYPE_COLOR[t]} 55%, transparent)`,
+                          borderLeft: `5px solid ${TYPE_COLOR[t]}`,
+                          borderRadius: 9,
+                          padding: "7px 8px",
                           cursor: movable ? "grab" : "default",
                           userSelect: "none",
                           WebkitUserSelect: "none",
