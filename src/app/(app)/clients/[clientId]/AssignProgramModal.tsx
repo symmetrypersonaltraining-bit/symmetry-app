@@ -107,7 +107,7 @@ export default function AssignProgramModal({ clientId, clientName, programs, cur
                   onClick={() => setSelectedProgramId(p.id)}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
                   style={{
-                    background: selectedProgramId === p.id ? "var(--brand-primary)15" : "var(--brand-bg)",
+                    background: selectedProgramId === p.id ? "color-mix(in srgb, var(--brand-primary) 8%, transparent)" : "var(--brand-bg)",
                     border: `1px solid ${selectedProgramId === p.id ? "var(--brand-primary)" : "var(--brand-border)"}`,
                   }}>
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"

@@ -154,7 +154,7 @@ function AddExerciseDrawer({
           {selectedEx && (
             <div className="space-y-3">
               <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-                style={{ background: "var(--brand-primary)15", border: "1px solid var(--brand-primary)40" }}>
+                style={{ background: "color-mix(in srgb, var(--brand-primary) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--brand-primary) 25%, transparent)" }}>
                 <div className="flex-1">
                   <p className="text-sm font-bold" style={{ color: "var(--brand-primary)" }}>{selectedEx.name}</p>
                   <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{selectedEx.muscle_group}</p>
@@ -399,7 +399,7 @@ export default function WorkoutDayEditor({ dayId, clientId, sections: initialSec
           <button
             onClick={() => setAddingToSection(section.id)}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border-2 border-dashed transition-colors"
-            style={{ borderColor: "var(--brand-primary)40", color: "var(--brand-primary)" }}>
+            style={{ borderColor: "color-mix(in srgb, var(--brand-primary) 25%, transparent)", color: "var(--brand-primary)" }}>
             <i className="ti ti-plus text-base" />
             Add Exercise to {section.client_facing_name || section.internal_name}
           </button>

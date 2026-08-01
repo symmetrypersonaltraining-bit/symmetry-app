@@ -107,7 +107,11 @@ export default function TrainerSidebar({
   }
 
   const sidebarContent = (
-    <div className="flex flex-col h-full" style={{ background: "linear-gradient(180deg, #0D3F6E 0%, #0F4C81 40%, #0A3A6B 100%)", color: "white" }}>
+    // --chrome-grad-v is derived from the ACTIVE theme's primary (globals.css,
+    // "TRAINER CHROME FOLLOWS THE SCHEME"). It used to be a literal navy pair,
+    // which is why trainer chrome stayed navy in all 21 schemes while Client
+    // View — which reads var(--brand-primary) — recoloured correctly.
+    <div className="flex flex-col h-full" style={{ background: "var(--chrome-grad-v)", color: "white" }}>
       {/* Logo */}
       <div className="flex items-center gap-3 px-3 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.15)", background: "rgba(0,0,0,0.15)" }}>
         <Link href="/home" className="flex items-center gap-2 flex-1 min-w-0">
@@ -222,7 +226,7 @@ export default function TrainerSidebar({
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-white truncate">{userName}</div>
-              <div className="text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }}>Trainer</div>
+              <div className="text-[10px] chrome-subtle">Trainer</div>
             </div>
           )}
         </Link>
@@ -234,7 +238,7 @@ export default function TrainerSidebar({
     <div>
       {/* Mobile top bar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center px-4 gap-3"
-        style={{ paddingTop: "calc(12px + env(safe-area-inset-top))", paddingBottom: "12px", background: "linear-gradient(135deg, #0D3F6E, #0F4C81)" }}>
+        style={{ paddingTop: "calc(12px + env(safe-area-inset-top))", paddingBottom: "12px", background: "var(--chrome-grad)" }}>
         <button onClick={() => setMobileOpen(true)}
           className="w-9 h-9 rounded-lg flex items-center justify-center"
           style={{ background: "rgba(255,255,255,0.15)" }}>

@@ -167,7 +167,7 @@ body {
   border-top: 3px solid var(--brand-primary);
 }
 .card-glow {
-  box-shadow: 0 0 0 1px var(--brand-primary)33, 0 4px 24px var(--brand-primary)22;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-primary) 20%, transparent), 0 4px 24px color-mix(in srgb, var(--brand-primary) 13%, transparent);
 }
 
 /* Gradient header backgrounds */
@@ -197,9 +197,9 @@ body {
   font-size: 14px;
   cursor: pointer;
   transition: opacity 0.15s, transform 0.1s, box-shadow 0.2s;
-  box-shadow: 0 2px 12px var(--brand-primary)44;
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--brand-primary) 27%, transparent);
 }
-.btn-primary:hover { opacity: 0.92; transform: translateY(-1px); box-shadow: 0 4px 16px var(--brand-primary)55; }
+.btn-primary:hover { opacity: 0.92; transform: translateY(-1px); box-shadow: 0 4px 16px color-mix(in srgb, var(--brand-primary) 33%, transparent); }
 .btn-primary:active { transform: translateY(0); }
 
 /* Tags / badges */
@@ -323,7 +323,7 @@ body {
 /* Input focus glow */
 input:focus, textarea:focus, select:focus {
   outline: none;
-  box-shadow: 0 0 0 2px var(--brand-primary)44;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 27%, transparent);
   border-color: var(--brand-primary) !important;
 }
 
@@ -1596,3 +1596,79 @@ option:hover {
     backdrop-filter: blur(6px);
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TRAINER CHROME FOLLOWS THE SCHEME — 2026-08-01
+   Additive. Revert = delete from this banner to the end of the file, and put
+   the three literal gradients back in TrainerSidebar/AppHeader.
+
+   THE BUG. The trainer sidebar and the trainer mobile top bar painted
+   themselves with a literal `linear-gradient(#0D3F6E, #0F4C81)` — the navy
+   theme's colours, frozen as hex. Client View's top bar used
+   `var(--brand-primary)` and always followed the scheme correctly. So picking
+   Forest or Rose recoloured the whole client side and left trainer chrome navy,
+   which is exactly how it was reported: "the top bar should be colour scheme,
+   client view is fine."
+
+   WHY THESE ARE TOKENS AND NOT INLINE color-mix() AT EACH SITE. Three separate
+   components were each carrying their own copy of the same navy. One token
+   means the next person recolours chrome in one place, and a literal hex
+   reappearing anywhere is now visibly the odd one out.
+
+   WHY NOT --brand-sidebar. Every theme declares it and NOTHING reads it, so it
+   has drifted: pastel's is #eef2fa, a near-white. The chrome it would paint
+   carries white text and white icons, so honouring that token would render the
+   trainer sidebar unreadable in at least one shipped theme. Deriving from
+   --brand-primary guarantees a dark enough field in all 21, because every
+   primary is already a colour we put white text on elsewhere.
+
+   The mix toward black is what keeps this from looking like a flat fill: it
+   gives the bar its own top-to-bottom fall of light, which is what the hand-
+   picked navy pair was doing. Deriving it reproduces that per theme. */
+/* WHY EVERY STOP IS MIXED TOWARD BLACK, INCLUDING THE MIDDLE ONE.
+   Chrome carries white text and white icons. Navy could afford a pure fill —
+   white on #0F4C81 is 8.9:1 — but nine of the 21 primaries cannot: pastel
+   #7c9cf5 is 2.7:1, carbonneon #00C2A8 is 2.3:1, citrus #5bbf3a is 2.3:1.
+   Those are unreadable, and a theme-derived bar that is unreadable in nine
+   themes is worse than the hardcoded navy it replaced.
+
+   CSS has no way to branch on luminance (color-contrast() is not shipped
+   broadly enough to rely on in a WebView), so instead of choosing an ink
+   colour per theme — a 21-entry list nobody would maintain, which is the exact
+   failure mode that produced this bug — every stop is floored by mixing toward
+   black. Measured across all 21 primaries the worst case is now 5.4:1
+   (carbonneon), and dark schemes simply get deeper rather than different.
+   Which is also what was asked for: "we went much deeper all around the app."
+
+   If you change these percentages, re-run the contrast check. Raising the
+   primary share above ~66% puts carbonneon, citrus and pastel back under 4.5:1. */
+:root {
+  /* Horizontal — top bars. Ends on a lean toward the theme's accent so the bar
+     carries two of the scheme's colours rather than one. */
+  --chrome-grad: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary) 46%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 62%, #000) 58%,
+    color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 42%, var(--brand-primary)) 62%, #000) 100%);
+
+  /* Vertical — the full-height desktop sidebar. Darker at both ends so the nav
+     items in the middle sit on the brightest part of the field. */
+  --chrome-grad-v: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-primary) 46%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 62%, #000) 40%,
+    color-mix(in srgb, var(--brand-primary) 54%, #000) 100%);
+}
+
+/* The sidebar's secondary label ("Trainer", under the name) was
+   rgba(255,255,255,0.5). Against navy that reads; against the lighter primaries
+   it disappears even with the floor above, because 50% white on a 5.4:1 field
+   is about 2:1. Raised to 0.72, which holds in every scheme and is still
+   clearly secondary to the name above it. */
+.chrome-subtle { color: rgba(255, 255, 255, 0.72); }
+
+/* Was `linear-gradient(135deg, #0D3F6E, #0F4C81)`. Currently unreferenced by
+   any component, but left correct so it cannot reintroduce the literal if
+   something starts using it again. */
+.page-header-home { background: var(--chrome-grad); }

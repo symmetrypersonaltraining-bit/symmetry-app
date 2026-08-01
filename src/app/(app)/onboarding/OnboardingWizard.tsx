@@ -124,7 +124,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
                 <div key={item.icon} className="flex items-center gap-3 p-3 rounded-xl"
                   style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
                   <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: "var(--brand-primary)22" }}>
+                    style={{ background: "color-mix(in srgb, var(--brand-primary) 13%, transparent)" }}>
                     <i className={`ti ${item.icon} text-sm`} style={{ color: "var(--brand-primary)" }} />
                   </div>
                   <span className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>{item.text}</span>
@@ -203,7 +203,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
                 <button key={lvl.val} onClick={() => set("experience_level", lvl.val)}
                   className="w-full p-4 rounded-xl text-left transition-all"
                   style={{
-                    background: form.experience_level === lvl.val ? "var(--brand-primary)15" : "var(--brand-surface)",
+                    background: form.experience_level === lvl.val ? "color-mix(in srgb, var(--brand-primary) 8%, transparent)" : "var(--brand-surface)",
                     border: `1.5px solid ${form.experience_level === lvl.val ? "var(--brand-primary)" : "var(--brand-border)"}`,
                   }}>
                   <p className="text-sm font-bold" style={{ color: form.experience_level === lvl.val ? "var(--brand-primary)" : "var(--brand-text)" }}>

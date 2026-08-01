@@ -86,7 +86,7 @@ function WorkoutChooserModal({
               >
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: w.isCardio ? "#22c55e20" : "var(--brand-primary)20" }}
+                  style={{ background: w.isCardio ? "#22c55e20" : "color-mix(in srgb, var(--brand-primary) 13%, transparent)" }}
                 >
                   <i
                     className={"ti " + (w.isCardio ? "ti-run" : "ti-barbell") + " text-lg"}
@@ -195,7 +195,7 @@ export default function TrainerHome({
             className="px-4 py-3 flex items-center gap-2"
             style={{
               borderBottom: "1px solid var(--brand-border)",
-              background: "var(--brand-primary)10",
+              background: "color-mix(in srgb, var(--brand-primary) 6%, transparent)",
             }}
           >
             <i
@@ -207,7 +207,7 @@ export default function TrainerHome({
             </span>
             <span
               className="text-xs px-2 py-0.5 rounded-full font-medium ml-auto"
-              style={{ background: "var(--brand-primary)20", color: "var(--brand-primary)" }}
+              style={{ background: "color-mix(in srgb, var(--brand-primary) 13%, transparent)", color: "var(--brand-primary)" }}
             >
               {scheduledCount + " scheduled"}
             </span>
@@ -249,7 +249,7 @@ export default function TrainerHome({
                           ? "#22c55e20"
                           : isCancelled
                           ? "#ef444420"
-                          : "var(--brand-primary)20",
+                          : "color-mix(in srgb, var(--brand-primary) 13%, transparent)",
                       }}
                     >
                       <i
@@ -292,7 +292,7 @@ export default function TrainerHome({
                       <span
                         className="text-xs px-2 py-1 rounded-lg font-medium flex-shrink-0"
                         style={{
-                          background: isDone ? "#22c55e20" : "var(--brand-primary)20",
+                          background: isDone ? "#22c55e20" : "color-mix(in srgb, var(--brand-primary) 13%, transparent)",
                           color: isDone ? "#22c55e" : "var(--brand-primary)",
                         }}
                       >

@@ -76,15 +76,35 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
 
   function setTheme(t: ThemeId) {
     applyTheme(t);
-    // Persist to the account so it survives logout/login on any device
+    // Persist to the account so it survives logout/login on any device.
+    //
+    // The `.then(() => {})` that used to be here threw the result away, and
+    // that is how this feature stayed broken for months: a CHECK constraint on
+    // client_app_settings.theme still listed a RETIRED set of theme ids
+    // ('steel_sky', 'iron_ember'…), so Postgres rejected every single write
+    // from this picker. All 35 rows were still the column default — nobody's
+    // theme had ever reached their account. The theme only lived in
+    // localStorage, which is why an app update wiped everyone back to default.
+    //
+    // The constraint is gone (migration 2026-08-01), but the reason this went
+    // unnoticed was the swallowed error, not the constraint. So the result is
+    // read now. This is a preference, not a transaction — a failed save must
+    // not throw a dialog at someone who just picked a colour — but it must not
+    // be invisible either.
     try {
       if (clientId) {
         const sb: any = createClient();
         sb.from("client_app_settings")
           .upsert({ client_id: clientId, theme: t }, { onConflict: "client_id" })
-          .then(() => {});
+          .then(({ error }: { error: unknown }) => {
+            if (error) {
+              console.error("[theme] save failed — theme is local-only on this device", error);
+            }
+          });
       }
-    } catch {}
+    } catch (err) {
+      console.error("[theme] save threw", err);
+    }
   }
 
   return (

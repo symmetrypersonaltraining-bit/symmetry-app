@@ -774,7 +774,7 @@ export default function ClientDashboard({
             <div className="flex items-center gap-2 mb-2">
               <i className="ti ti-brain text-base" style={{ color: "var(--brand-primary)" }} />
               <span className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>AI Insights</span>
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--brand-primary)20", color: "var(--brand-primary)" }}>Trainer View</span>
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "color-mix(in srgb, var(--brand-primary) 13%, transparent)", color: "var(--brand-primary)" }}>Trainer View</span>
             </div>
             <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
               AI-powered coaching insights will appear here when viewing a client&apos;s dashboard.

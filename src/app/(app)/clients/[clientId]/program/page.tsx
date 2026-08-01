@@ -883,8 +883,8 @@ function WorkoutChip({
       onClick={onEdit}
       className="rounded-lg px-2 py-1.5 mb-1 border cursor-grab active:cursor-grabbing relative group select-none transition-opacity"
       style={{
-        background: "var(--brand-primary)18",
-        borderColor: "var(--brand-primary)40",
+        background: "color-mix(in srgb, var(--brand-primary) 9%, transparent)",
+        borderColor: "color-mix(in srgb, var(--brand-primary) 25%, transparent)",
         opacity: isDragging ? 0.4 : 1,
       }}>
       <div className="flex items-start justify-between gap-1">
@@ -896,7 +896,7 @@ function WorkoutChip({
         <button
           onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); setConfirmDelete(false); }}
           className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center"
-          style={{ background: "var(--brand-primary)20" }}>
+          style={{ background: "color-mix(in srgb, var(--brand-primary) 13%, transparent)" }}>
           <i className="ti ti-dots text-[10px]" style={{ color: "var(--brand-primary)" }} />
         </button>
       </div>
@@ -1138,7 +1138,7 @@ export default function ProgramPage() {
                 <button key={c.id} onClick={() => router.push(`/clients/${c.id}/program`)}
                   className="w-full flex items-center gap-2 px-2 py-2 transition-all text-left"
                   style={{
-                    background: isSelected ? "var(--brand-primary)15" : "transparent",
+                    background: isSelected ? "color-mix(in srgb, var(--brand-primary) 8%, transparent)" : "transparent",
                     borderLeft: isSelected ? "3px solid var(--brand-primary)" : "3px solid transparent",
                   }}>
                   <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
@@ -1206,7 +1206,7 @@ export default function ProgramPage() {
           <button onClick={copyCurrentWeek} title="Copy this week"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-semibold hover:opacity-80 transition-colors"
             style={{
-              background: copiedWeek ? "var(--brand-primary)15" : "var(--brand-bg)",
+              background: copiedWeek ? "color-mix(in srgb, var(--brand-primary) 8%, transparent)" : "var(--brand-bg)",
               border: `1px solid ${copiedWeek ? "var(--brand-primary)" : "var(--brand-border)"}`,
               color: copiedWeek ? "var(--brand-primary)" : "var(--brand-text-secondary)",
             }}>
@@ -1251,7 +1251,7 @@ export default function ProgramPage() {
                       <button
                         onClick={() => { setSelectedDate(ds); setEditingWorkout(null); setEditorOpen(true); setLibraryOpen(false); }}
                         className={`w-5 h-5 rounded flex items-center justify-center transition-opacity ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                        style={{ background: "var(--brand-primary)20", color: "var(--brand-primary)" }}>
+                        style={{ background: "color-mix(in srgb, var(--brand-primary) 13%, transparent)", color: "var(--brand-primary)" }}>
                         <i className="ti ti-plus text-[10px]" />
                       </button>
                     </div>
@@ -1280,7 +1280,7 @@ export default function ProgramPage() {
                     className="border-r border-b min-h-[100px] p-1.5 relative transition-colors"
                     style={{
                       borderColor: "var(--brand-border)",
-                      background: isOver ? "var(--brand-primary)12" : isPasteMode ? "#7c3aed08" : "transparent",
+                      background: isOver ? "color-mix(in srgb, var(--brand-primary) 7%, transparent)" : isPasteMode ? "#7c3aed08" : "transparent",
                       cursor: isPasteMode ? "copy" : "default",
                     }}
                     onClick={() => { if (copiedWorkout) pasteWorkout(ds); }}
@@ -1329,7 +1329,7 @@ export default function ProgramPage() {
 
                     {isOver && (
                       <div className="absolute inset-0 pointer-events-none flex items-center justify-center rounded"
-                        style={{ border: "2px dashed var(--brand-primary)", background: "var(--brand-primary)08" }}>
+                        style={{ border: "2px dashed var(--brand-primary)", background: "color-mix(in srgb, var(--brand-primary) 3%, transparent)" }}>
                         {dragType === "library" && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded"
                             style={{ background: "var(--brand-primary)", color: "white" }}>

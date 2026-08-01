@@ -162,7 +162,7 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
             {(recentCompleted.days?.id || recentCompleted.day_id) ? (
               <Link href={`/workout/${recentCompleted.days?.id || recentCompleted.day_id}?forClient=${clientId}`}
                 className="text-[10px] font-semibold px-2 py-1 rounded-lg"
-                style={{ background: "var(--brand-primary)15", color: "var(--brand-primary)" }}>
+                style={{ background: "color-mix(in srgb, var(--brand-primary) 8%, transparent)", color: "var(--brand-primary)" }}>
                 View
               </Link>
             ) : null}
@@ -250,7 +250,7 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
           style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "var(--brand-primary)15" }}>
+              style={{ background: "color-mix(in srgb, var(--brand-primary) 8%, transparent)" }}>
               <i className="ti ti-trophy text-sm" style={{ color: "var(--brand-primary)" }} />
             </div>
             <div>
@@ -402,9 +402,9 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
         onClick={() => setSheetDate(openDate)}
         className="block w-full text-left rounded px-1.5 truncate"
         style={{
-          background: done ? "#22c55e20" : "var(--brand-primary)20",
+          background: done ? "#22c55e20" : "color-mix(in srgb, var(--brand-primary) 13%, transparent)",
           color: done ? "#16a34a" : "var(--brand-primary)",
-          border: `1px solid ${done ? "#22c55e40" : "var(--brand-primary)40"}`,
+          border: `1px solid ${done ? "#22c55e40" : "color-mix(in srgb, var(--brand-primary) 25%, transparent)"}`,
           fontSize: compact ? 9 : 11,
           lineHeight: compact ? "16px" : "20px",
           fontWeight: 500,
@@ -599,7 +599,7 @@ function CalendarLegend() {
   return (
     <div className="flex items-center gap-4 mt-3">
       <div className="flex items-center gap-1.5">
-        <div className="w-3 h-3 rounded" style={{ background: "var(--brand-primary)20", border: "1px solid var(--brand-primary)40" }} />
+        <div className="w-3 h-3 rounded" style={{ background: "color-mix(in srgb, var(--brand-primary) 13%, transparent)", border: "1px solid color-mix(in srgb, var(--brand-primary) 25%, transparent)" }} />
         <span className="text-[10px]" style={{ color: "var(--brand-text-secondary)" }}>Assigned</span>
       </div>
       <div className="flex items-center gap-1.5">
@@ -797,7 +797,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
       <div className="flex items-center justify-between px-4 py-3 rounded-xl"
         style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "var(--brand-primary)15" }}>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--brand-primary) 8%, transparent)" }}>
             <i className="ti ti-trophy text-base" style={{ color: "var(--brand-primary)" }} />
           </div>
           <div>

@@ -1484,7 +1484,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
           <p className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--brand-text-secondary)" }}>Clients</p>
           <button onClick={() => setSelectedClientId(null)}
             className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg mb-1 text-xs font-medium"
-            style={{ background: !selectedClientId ? "var(--brand-primary)20" : "transparent", color: !selectedClientId ? "var(--brand-primary)" : "var(--brand-text)" }}>
+            style={{ background: !selectedClientId ? "color-mix(in srgb, var(--brand-primary) 13%, transparent)" : "transparent", color: !selectedClientId ? "var(--brand-primary)" : "var(--brand-text)" }}>
             <div className="w-3 h-3 rounded-full" style={{ background: "var(--brand-primary)" }} /> All clients
           </button>
           {clients.map((c, idx) => {
