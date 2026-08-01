@@ -36,6 +36,14 @@ export const maxDuration = 300;
 
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
+/** ISO date + 1 day, no timezone arithmetic beyond the calendar. */
+function nextDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10);
+}
+
 const WEEKLY_SYSTEM_PROMPT = `You are the coach inside the Symmetry Personal Training app (trainer: Dustin), writing this client's week. You are handed their real numbers for last week and this week so far, already computed.
 
 ${WEEKLY_WRITER_RULES}
@@ -107,13 +115,27 @@ interface RunResult {
   detail?: string;
 }
 
-async function runSweep(opts: { onlyClientId?: string | null; today?: string }): Promise<{
+async function runSweep(opts: {
+  onlyClientId?: string | null;
+  today?: string;
+  /**
+   * Saturday mode. The focus goes to weekly_focus_drafts for Dustin to approve
+   * instead of straight onto the client's week card. Everything else (coach's
+   * read, food focus, the fortnightly question) still publishes directly —
+   * those are not what he asked to gate, and holding them back would mean the
+   * whole week's copy waits on one approval.
+   *
+   * `week` is the SUNDAY the copy is for. On a Saturday run that is tomorrow,
+   * not today, or the drafts would target the week that is already ending.
+   */
+  draftFocus?: boolean;
+}): Promise<{
   week: string;
   today: string;
   results: RunResult[];
 }> {
   const today = opts.today || CT_TODAY();
-  const week = weekStartOf(today);
+  const week = opts.draftFocus ? weekStartOf(nextDay(today)) : weekStartOf(today);
   const db = createAdminClient();
 
   let q = db
@@ -182,10 +204,34 @@ async function runSweep(opts: { onlyClientId?: string | null; today?: string }):
         ai_food_focus: result.value.foodFocus,
         ai_food_focus_week: week,
       };
-      if (!trainerOwnsFocus) {
+      if (!trainerOwnsFocus && !opts.draftFocus) {
         update.weekly_focus = result.value.focus;
         update.weekly_focus_week = week;
         update.weekly_focus_source = "ai";
+      }
+
+      if (opts.draftFocus) {
+        // Replace an unapproved draft for the same week (a re-run should give
+        // him the newest copy) but never touch one he has already approved or
+        // edited — that is his work, and clobbering it is worse than a stale
+        // draft.
+        const { data: existing } = await db
+          .from("weekly_focus_drafts")
+          .select("id, approved_at, edited_at")
+          .eq("client_id", c.id)
+          .eq("week_start", week)
+          .maybeSingle();
+        const ex = existing as { id: string; approved_at: string | null; edited_at: string | null } | null;
+        if (!ex) {
+          await db.from("weekly_focus_drafts").insert({
+            client_id: c.id, week_start: week,
+            focus: result.value.focus, focus_ai: result.value.focus,
+          });
+        } else if (!ex.approved_at && !ex.edited_at) {
+          await db.from("weekly_focus_drafts")
+            .update({ focus: result.value.focus, focus_ai: result.value.focus })
+            .eq("id", ex.id);
+        }
       }
 
       const { error: upErr } = await db.from("clients").update(update).eq("id", c.id);
@@ -229,7 +275,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const out = await runSweep({ onlyClientId: new URL(req.url).searchParams.get("clientId") });
+    // ?draft=1 on Saturday: write focus DRAFTS for Dustin to approve rather
+    // than publishing 35 lines of coaching copy nobody has read.
+    const sp = new URL(req.url).searchParams;
+    const out = await runSweep({
+      onlyClientId: sp.get("clientId"),
+      draftFocus: sp.get("draft") === "1",
+    });
     return NextResponse.json({ ok: true, ...out });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
@@ -254,6 +306,7 @@ export async function POST(req: NextRequest) {
     const out = await runSweep({
       onlyClientId: typeof body?.clientId === "string" ? body.clientId : null,
       today: typeof body?.today === "string" ? body.today : undefined,
+      draftFocus: body?.draft === true,
     });
     return NextResponse.json({ ok: true, ...out });
   } catch (e: unknown) {

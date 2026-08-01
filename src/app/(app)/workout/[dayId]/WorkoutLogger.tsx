@@ -1625,14 +1625,29 @@ export default function WorkoutLogger({
           ) : null}
         </div>
 
-        {/* Scroll region (7/31 fix). Everything between the progress bar and the bottom
-            controls lives in ONE flexible, scrollable column. Before this, the header and the
-            sets block were both flex-shrink-0 inside a `fixed inset-0 flex flex-col` root with
-            no overflow anywhere, so a tall exercise (long wrapped name + video thumb + chips +
-            4+ sets + prior notes) pushed the Prev/Next/Complete bar and the tab bar below the
-            viewport with no way to reach them — a hard lock with no exit. The footer and tab
-            bar are pinned siblings BELOW this box, so they are always on screen at any content
-            height; overflow scrolls here instead of off the screen. */}
+        {/* Scroll region — the exercise HEADER and its notes only.
+            
+            Two rules have to hold at once and they used to be traded off against
+            each other.
+
+            Gerard, 7/31: a tall exercise pushed the Prev/Next/Complete bar off
+            the bottom with nothing scrollable anywhere, so there was no way to
+            advance, finish or leave. The fix put the header AND the sets in one
+            flex-1 scroll box with the footer pinned below.
+
+            Dustin, 8/1: that made the keyboard case worse. With the sets inside
+            the flexible box, opening the keyboard squeezed that box to a sliver
+            — set 1 visible, set 2 sheared in half — because the footer and the
+            tab bar kept their full height in what was left.
+
+            So the split is by ROLE, not by "everything above the footer":
+              • header + notes  → scrollable. Unbounded content lives here.
+              • set rows        → PINNED. Never compress, never scroll, always
+                                  whole. They are the thing you came here to use.
+              • footer          → pinned. Always reachable, at any height.
+
+            Nothing here is conditioned on the keyboard. Keyboard-conditioned
+            layout has caused roughly twenty bugs in this file and is banned. */}
         <div className="flex-1 min-h-0 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
 
         {/* Exercise header (V6 micro-pill) — one compact row: small video thumb + name +
@@ -1693,10 +1708,44 @@ export default function WorkoutLogger({
             <p className="text-xs mt-2 italic" style={{ color: "rgba(255,255,255,0.45)" }}>&ldquo;{currentExercise.cue}&rdquo;</p>
           )}
         </div>
+        {/* Per-exercise notes — client or trainer flags an issue with THIS movement
+            (pain, couldn't do it, form). Saved to exercise_notes keyed by exercise so
+            programming (app + chat) reads the history. Sits in the scroll area so it never
+            touches the sticky footer or keyboard chrome. Isolated; revert = remove block. */}
+        <div className="mb-4 rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)" }}>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <i className="ti ti-message-report text-sm" style={{ color: "var(--brand-primary)" }} />
+            <p className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.75)" }}>Notes on this movement</p>
+          </div>
+          {exNotePrior.length > 0 && (
+            <div className="mb-2 space-y-1">
+              {exNotePrior.map(n => (
+                <div key={n.id} className="text-[11px] rounded-lg px-2 py-1" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)" }}>
+                  <span style={{ color: "var(--brand-primary)" }}>{n.author === "trainer" ? "You" : "Client"}: </span>{n.note}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input type="text" value={exNoteText} onChange={e => setExNoteText(e.target.value)}
+              onFocus={focusScroll} onBlur={focusBlur}
+              placeholder={'Pain, couldn\u2019t do it, form issue\u2026'}
+              className="flex-1 text-xs px-3 py-2 rounded-lg outline-none"
+              style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(255,255,255,0.15)" }} />
+            <button onClick={saveExerciseNote} disabled={savingExNote || !exNoteText.trim()}
+              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: exNoteSaved ? "#22c55e" : "var(--brand-primary)" }}>
+              <i className={`ti ${exNoteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
+            </button>
+          </div>
 
-        {/* Sets — flex-shrink-0 inside the scroll region above, so the sets themselves still
-            never compress on keyboard state; when the content is taller than the screen the
-            scroll region (not the set rows) absorbs it. */}
+        </div>
+        </div>
+        {/* /scroll region — ONLY the exercise header and its notes live in here. */}
+
+        {/* Sets — a PINNED sibling of the scroll region, not a child of it.
+            Inside it they inherited the box's squeeze when the keyboard opened.
+            Out here they hold their full height no matter what is on screen. */}
         <div className="flex-shrink-0 px-5">
           <div className="flex items-center gap-2 mb-1" style={{ flexWrap: "wrap" }}>
             <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>Track:</span>
@@ -1804,59 +1853,25 @@ export default function WorkoutLogger({
           )}
         </div>
 
-        {/* Per-exercise notes — client or trainer flags an issue with THIS movement
-            (pain, couldn't do it, form). Saved to exercise_notes keyed by exercise so
-            programming (app + chat) reads the history. Sits in the scroll area so it never
-            touches the sticky footer or keyboard chrome. Isolated; revert = remove block. */}
-        <div className="mb-4 rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)" }}>
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <i className="ti ti-message-report text-sm" style={{ color: "var(--brand-primary)" }} />
-            <p className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.75)" }}>Notes on this movement</p>
-          </div>
-          {exNotePrior.length > 0 && (
-            <div className="mb-2 space-y-1">
-              {exNotePrior.map(n => (
-                <div key={n.id} className="text-[11px] rounded-lg px-2 py-1" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)" }}>
-                  <span style={{ color: "var(--brand-primary)" }}>{n.author === "trainer" ? "You" : "Client"}: </span>{n.note}
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <input type="text" value={exNoteText} onChange={e => setExNoteText(e.target.value)}
-              onFocus={focusScroll} onBlur={focusBlur}
-              placeholder={'Pain, couldn\u2019t do it, form issue\u2026'}
-              className="flex-1 text-xs px-3 py-2 rounded-lg outline-none"
-              style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(255,255,255,0.15)" }} />
-            <button onClick={saveExerciseNote} disabled={savingExNote || !exNoteText.trim()}
-              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: exNoteSaved ? "#22c55e" : "var(--brand-primary)" }}>
-              <i className={`ti ${exNoteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
-            </button>
-          </div>
-        </div></div>
-
-        {/* /scroll region — the old flex-1 spacer that used to sit here is gone; the scroll
-            box itself is the flexible element that pushes the controls to the bottom. */}
         </div>
 
         {/* Bottom controls (Prev/Next/Complete). */}
-        <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="flex-shrink-0 px-5 pb-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           <div className="flex gap-3">
             <button onClick={() => navigateToGlobal(Math.max(0, globalIdx - 1))} disabled={globalIdx === 0}
-              className="flex-1 py-3.5 rounded-2xl text-sm font-semibold transition-all"
+              className="flex-1 py-3 rounded-2xl text-sm font-semibold transition-all"
               style={{ background: "rgba(255,255,255,0.06)", color: globalIdx === 0 ? "rgba(255,255,255,0.2)" : "white" }}>
               <i className="ti ti-arrow-left mr-1" /> Prev
             </button>
             {globalIdx < totalExercises - 1 ? (
               <button onClick={() => navigateToGlobal(globalIdx + 1)}
-                className="flex-1 py-3.5 rounded-2xl text-sm font-semibold text-white"
+                className="flex-1 py-3 rounded-2xl text-sm font-semibold text-white"
                 style={{ background: "var(--brand-primary)" }}>
                 Next <i className="ti ti-arrow-right ml-1" />
               </button>
             ) : (
               <button onClick={completeWorkout} disabled={saving}
-                className="flex-1 py-3.5 rounded-2xl text-sm font-semibold transition-all"
+                className="flex-1 py-3 rounded-2xl text-sm font-semibold transition-all"
                 style={{
                   background: progressPct === 100 ? "#22c55e" : "rgba(255,255,255,0.06)",
                   color: progressPct === 100 ? "white" : "rgba(255,255,255,0.3)",
@@ -1866,27 +1881,14 @@ export default function WorkoutLogger({
             )}
           </div>
         </div>
-        <div className="flex-shrink-0 flex" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0c1626", paddingBottom: "env(safe-area-inset-bottom)" }}>
-          {(isTrainerSession
-            ? [
-                { href: "/home", icon: "ti-home", label: "Home" },
-                { href: clientId ? `/nutrition?clientId=${clientId}` : "/nutrition", icon: "ti-salad", label: "Nutrition" },
-                { href: clientId ? `/progress?clientId=${clientId}` : "/progress", icon: "ti-chart-line", label: "Progress" },
-                { href: clientId ? `/clients/${clientId}` : "/clients", icon: "ti-user", label: clientName ? clientName.split(" ")[0] : "Client" },
-              ]
-            : [
-                { href: "/home", icon: "ti-home", label: "Home" },
-                { href: "/nutrition", icon: "ti-salad", label: "Nutrition" },
-                { href: "/progress", icon: "ti-chart-line", label: "Progress" },
-                { href: "/settings", icon: "ti-settings", label: "Settings" },
-              ]
-          ).map((tab) => (
-            <Link key={tab.href} href={tab.href} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5" style={{ color: "rgba(255,255,255,0.6)" }}>
-              <i className={`ti ${tab.icon} text-lg`} />
-              <span style={{ fontSize: 10, fontWeight: 600 }}>{tab.label}</span>
-            </Link>
-          ))}
-        </div>
+        {/* The app tab bar used to render here, inside the session view.
+            It cost ~140px of a screen that has to fit a header, four set rows,
+            a footer AND a soft keyboard — and it was the reason there was no
+            room left for the sets. A full-screen logging session does not need
+            app-level navigation in it; leaving is Cancel or the back arrow in
+            the header, both of which are pinned and always visible, so nothing
+            about escaping the screen changed. */}
+        <div style={{ paddingBottom: "env(safe-area-inset-bottom)" }} />
       </div>
     );
   }

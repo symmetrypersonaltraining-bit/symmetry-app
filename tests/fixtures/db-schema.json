@@ -884,5 +884,16 @@
     "started_at",
     "completed_at",
     "duration_minutes"
+  ],
+  "weekly_focus_drafts": [
+    "id",
+    "client_id",
+    "week_start",
+    "focus",
+    "focus_ai",
+    "edited_at",
+    "approved_at",
+    "published_at",
+    "created_at"
   ]
 }

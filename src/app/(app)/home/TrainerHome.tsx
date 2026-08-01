@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import TrainerWeekDigest from "@/components/TrainerWeekDigest";
 import CommunityPair from "@/components/CommunityPair";
+import SaturdayReview from "@/components/SaturdayReview";
 import LiveSessions from "@/components/LiveSessions";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
@@ -153,6 +154,11 @@ export default function TrainerHome({
 
   return (
     <>
+      {/* Saturday review of next week's focus. Full-screen and impossible to
+          miss when there is a batch waiting; renders nothing at all six days
+          out of seven. Dismissing it only silences it until noon, then 5pm. */}
+      <SaturdayReview />
+
       {chooserSession && (
         <WorkoutChooserModal
           session={chooserSession}
