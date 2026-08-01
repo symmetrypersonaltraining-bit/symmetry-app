@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import TrainerCalendar from "./TrainerCalendar";
+import TrainerCalendarPanel from "@/components/TrainerCalendarPanel";
 import ClientDashboard from "./ClientDashboard";
 import TrainerHome from "./TrainerHome";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
@@ -221,11 +221,10 @@ export default async function HomePage(props: {
           dateLabel={trainerDateLabel}
         />
         <PendingRemindersPanel reminders={reminders} />
-        <TrainerCalendar
+        <TrainerCalendarPanel
           clients={clients || []}
           appointmentMap={appointmentMap}
           workoutMap={workoutMap}
-          startDate=""
         />
       </div>
     );

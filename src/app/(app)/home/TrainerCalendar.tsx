@@ -48,7 +48,12 @@ const CHIP_BLUE = "#1A73E8";
 const CHIP_ORANGE = "#F97316";
 const CHIP_TEXT = "#ffffff";
 const HOUR_PX = 64;
-const DAY_START = 6;
+// 4 AM, not 6. Sessions before DAY_START are clamped to the top of the grid
+// (see `top` below), so a 4:30 and a 5:00 both drew on the 6 AM line, stacked
+// on top of each other — the trainer's earliest three slots were unreadable and
+// looked like a scheduling conflict that did not exist. 336 appointments in the
+// last thirty days start before 6.
+const DAY_START = 4;
 const DAY_END = 21;
 const TOTAL_HOURS = DAY_END - DAY_START;
 const TIME_COL_W = 52;
