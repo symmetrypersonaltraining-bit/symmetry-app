@@ -1514,3 +1514,45 @@ option:hover {
   background-color: color-mix(in srgb, var(--brand-primary) 30%, var(--brand-surface));
   color: var(--brand-text);
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TRAINER TOP STRIP — the row holding Client View + the notification bell.
+
+   It was `position: sticky; top: 0` inside `.flex-1.overflow-y-auto`. Sticky
+   resolves against the nearest SCROLLPORT, and that wrapper is one (overflow-y
+   is auto), but it has no height cap, so it never scrolls internally — the
+   strip therefore never stuck to anything. It just scrolled with the page and
+   slid up into the `fixed` mobile top bar, which is why the bell came back
+   half-cut after navigating to a notification and returning: the restored
+   scroll position parked it right through the header.
+
+   We cannot simply drop the wrapper's overflow to repair sticky, because that
+   would let wide children overflow the page horizontally. So on mobile the
+   strip becomes `fixed` and lives INSIDE the blue header bar, using the empty
+   space to the right of the logo. It can no longer collide with the header
+   because it is now part of it, and the bell is always on screen.
+
+   Desktop (>=1024px) has no fixed bar and no collision, so it keeps the
+   original in-flow sticky row.
+   ════════════════════════════════════════════════════════════════════════════ */
+.trainer-top-strip {
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 6px;
+  background: var(--brand-bg);
+}
+@media (max-width: 1023px) {
+  .trainer-top-strip {
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    right: 0;
+    left: auto;
+    background: transparent;
+    padding: 10px 12px;
+  }
+}

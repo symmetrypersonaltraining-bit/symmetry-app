@@ -122,10 +122,14 @@ export default function TrainerLayoutWrapper({ children }: Props) {
         userInitials="DG"
       />
       <div className="flex-1 min-w-0 overflow-y-auto">
-        <div className="lg:hidden h-14" />
-        {/* Docked strip: reserves its own row, so these buttons never cover content */}
-        <div style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, padding: "8px 14px 6px", background: "var(--brand-bg)" }}>
-          <button onClick={handleToggleMode} aria-label="Switch to client view" className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: "var(--brand-primary)", color: "white", border: "none", cursor: "pointer" }}><i className="ti ti-user text-sm" /> Client View</button>
+        {/* Spacer for the fixed mobile top bar. h-16, not h-14: the bar is
+            12 + 36 + 12 tall, and the strip below it no longer occupies a row
+            on mobile to absorb the difference. */}
+        <div className="lg:hidden h-16" />
+        {/* Desktop: an in-flow sticky row, so these buttons never cover content.
+            Mobile: fixed into the blue header bar — see .trainer-top-strip. */}
+        <div className="trainer-top-strip">
+          <button onClick={handleToggleMode} aria-label="Switch to client view" className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: "var(--brand-primary)", color: "white", border: "none", cursor: "pointer" }}><i className="ti ti-user text-sm" /><span className="hidden lg:inline">Client View</span></button>
           <HeaderAssist solid />
         </div>
         {children}
