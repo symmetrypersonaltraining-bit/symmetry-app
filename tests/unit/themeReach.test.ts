@@ -201,6 +201,69 @@ test("the third colour is optional — two-colour schemes must still resolve", (
   }
 });
 
+/* ────────────────────────────────────────────────────────────────────────────
+   RULE 5 · Theme-coloured text never sits on a hardcoded light panel.
+
+   Reported 2026-08-01 with a screenshot: "need to fix that can't read text."
+   The weekly-focus card was `background: "#eef2ff"` with
+   `color: "var(--brand-text)"` on the text inside it. Both are reasonable on
+   their own; together they are a dark-mode landmine, because --brand-text is
+   #E6EDF3 under a dark theme — near-white text on a near-white panel.
+
+   It reads perfectly in every light theme, which is why it shipped, and it is
+   invisible in the dark ones, which is what a client actually saw.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+function relLuminance(hex: string): number | null {
+  let h = hex.replace("#", "");
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  if (h.length < 6) return null;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+}
+
+test("no literal light background under var(--brand-text)", () => {
+  const offenders: string[] = [];
+  for (const file of walk("src")) {
+    if (!file.endsWith(".tsx")) continue;
+    const src = read(file);
+    for (const m of src.matchAll(/style=\{\{([^}]*)\}\}/g)) {
+      const body = m[1];
+      const bg = body.match(/background(?:Color)?:\s*"(#[0-9A-Fa-f]{3,8})"/);
+      if (!bg || !body.includes("var(--brand-text)")) continue;
+      const L = relLuminance(bg[1]);
+      if (L !== null && L > 0.8) {
+        offenders.push(`${file}: ${bg[1]} + var(--brand-text)`);
+      }
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    "A hardcoded light background with theme-coloured text on it is invisible " +
+      "in every dark theme. Derive the panel from var(--brand-surface) — see " +
+      ".focus-panel in globals.css:\n  " + offenders.join("\n  "),
+  );
+});
+
+test("the focus panel is derived, not a literal lavender", () => {
+  const css = read("src/app/globals.css");
+  assert.match(css, /\.focus-panel\s*\{/, "globals.css must define .focus-panel");
+  const rule = css.slice(css.indexOf(".focus-panel"));
+  assert.match(
+    rule.slice(0, 500),
+    /color-mix\(in srgb, var\(--brand-primary\)[^)]*, var\(--brand-surface\)\)/,
+    ".focus-panel's background must derive from --brand-surface so it is dark " +
+      "on dark themes and tinted toward whichever scheme is active.",
+  );
+  for (const file of ["src/components/ClientWeekSummary.tsx", "src/components/CoachFocusCard.tsx"]) {
+    assert.ok(
+      !/#eef2ff/i.test(code(read(file))),
+      `${file} still carries the literal #eef2ff focus panel. Use className="focus-panel".`,
+    );
+  }
+});
+
 test("text-clipped gradients are set with background-image, never the shorthand", () => {
   const css = read("src/app/globals.css");
   // .gradient-text and .stat-number paint their gradient INTO the glyphs via

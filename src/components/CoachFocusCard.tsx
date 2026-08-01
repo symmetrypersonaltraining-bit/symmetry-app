@@ -95,7 +95,7 @@ export default function CoachFocusCard() {
         <div style={{ fontSize: 10, color: "var(--brand-text-secondary)", fontWeight: 600, letterSpacing: 0.3 }}>TODAY</div>
       </div>
 
-      <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "#eef2ff", border: "1px solid #dbe4ff", borderRadius: 14, padding: 11 }}>
+      <div className="focus-panel" style={{ padding: 11 }}>
         <CoachBadge size={30} />
         <div style={{ fontSize: 12.5, lineHeight: 1.55, color: "var(--brand-text)" }}>{data.message}</div>
       </div>

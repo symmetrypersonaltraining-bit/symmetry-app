@@ -1924,3 +1924,27 @@ option:hover {
     transition: none;
   }
 }
+
+/* ── The focus panel — 2026-08-01 ───────────────────────────────────────────
+   Reported: "need to fix that can't read text." The weekly-focus card was
+   `background: #eef2ff` — a literal pale lavender — with its text set to
+   `color: var(--brand-text)`. Those two are fine together in a light theme and
+   catastrophic in a dark one, because --brand-text is #E6EDF3 there: near-white
+   text on a near-white panel, which is what the screenshot showed.
+
+   It also meant the panel was lavender in all 30 schemes, so Forest and Rose
+   had a blue box sitting in the middle of the dashboard.
+
+   Deriving it from --brand-surface fixes both at once: the panel is light on
+   light themes and dark on dark ones, always tinted toward the scheme, and
+   --brand-text is by definition readable on --brand-surface. Three components
+   had their own copy of the literal; they share this now. */
+.focus-panel {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--brand-primary) 9%, var(--brand-surface));
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 22%, var(--brand-border));
+  color: var(--brand-text);
+}

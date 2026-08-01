@@ -203,7 +203,7 @@ export default function ClientWeekSummary() {
           </div>
         </div>
         {(focusText || s.totalThis > 0) && (
-          <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "#eef2ff", border: "1px solid #dbe4ff", borderRadius: 14, padding: 9 }}>
+          <div className="focus-panel" style={{ padding: 9 }}>
             {focusIsAi ? <AiBadge size={30} /> : <CoachBadge size={30} />}
             <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
               <b>Focus:</b> {focusText || (s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " on the calendar this week — let's go.")}
@@ -228,7 +228,7 @@ export default function ClientWeekSummary() {
               {stat(<span>{s.streak}🔥</span>, "day streak")}
             </div>
             <div style={{ fontWeight: 800, fontSize: 14, color: "var(--brand-text)", marginTop: 2 }}>This week's focus</div>
-            <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "#eef2ff", border: "1px solid #dbe4ff", borderRadius: 14, padding: 11 }}>
+            <div className="focus-panel" style={{ padding: 11 }}>
               {focusIsAi ? <AiBadge size={30} /> : <CoachBadge size={30} />}
               <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
                 <b>{focusIsAi ? "Your focus:" : "Dustin:"}</b> {focusText || ("You've got " + s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " scheduled this week. Show up and stack another good one.")}
