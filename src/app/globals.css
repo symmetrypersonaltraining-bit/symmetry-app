@@ -1859,11 +1859,32 @@ option:hover {
    data-theme: one attribute, one CSS block, and no component in the app needs
    to know the setting exists.
 
-   "20% deeper" is literal — the existing visual-layer-3 mix shares scale by
-   1.2 and nothing else about them changes, so every scheme deepens by the same
-   rule and keeps its character. The glow is the part people will actually
-   notice: a halo of the theme's own primary behind each block, with a second
-   tighter pass in the accent so multicolour schemes glow in two colours.
+   RETUNED 2026-08-01 (second pass, after Dustin tested the first): "reset it to
+   about thirty five percent more deeper and also more of a distinct glow, maybe
+   just a little bit darker glow and a little more contrast on all of the
+   gradient boxes, a little more contrast where it switches colors."
+
+   So three things changed and the toggle itself did not — same setting, same
+   default, same attribute. Retuning constants beats adding a second switch:
+   nobody wants to choose between four glow intensities.
+
+   1. DEEPER: the visual-layer-3 mix shares now scale by 1.35 instead of 1.2.
+      Still literal, still one multiplier applied to every scheme, so no scheme
+      is hand-tuned and none of them drift apart.
+
+   2. DARKER, MORE DISTINCT GLOW: the halo colour is mixed toward black before
+      it is faded out, and the blur is tighter with a harder negative spread.
+      Blur radius is what makes a shadow read as vague; pulling it in while
+      raising opacity is what makes it read as deliberate. A 1px ring of the
+      primary was added underneath, which is what actually gives a block a
+      defined edge rather than a soft cloud around it.
+
+   3. GRADIENT CONTRAST: the three-colour runs now HOLD each colour for a
+      stretch before switching, instead of blending continuously across the
+      whole box. Two stops per colour rather than one. The ends are also pushed
+      apart — the primary end mixes toward black, the far end toward white — so
+      there is more range for the transition to happen across. This is what
+      makes a gradient read as three colours instead of one long smear.
 
    WHY THE GLOW SELECTOR IS SHAPED LIKE THAT. Only 38 places in the app use the
    .card class; the dashboard blocks are inline-styled divs with Tailwind's
@@ -1873,27 +1894,36 @@ option:hover {
 [data-deep="off"] { --block-glow: 0 0 0 transparent; }
 
 [data-deep="on"] {
+  /* 13% / 4% at baseline, x1.35. */
   --brand-bg-deep:
     radial-gradient(1100px 620px at 50% -12%,
-      color-mix(in srgb, var(--brand-primary) 16%, var(--brand-bg)) 0%,
-      color-mix(in srgb, var(--brand-primary) 5%, var(--brand-bg)) 46%,
+      color-mix(in srgb, var(--brand-primary) 17.5%, var(--brand-bg)) 0%,
+      color-mix(in srgb, var(--brand-primary) 5.5%, var(--brand-bg)) 46%,
       var(--brand-bg) 78%);
 
+  /* Baseline mixes the card bottom 4% toward the primary; x1.35 = 5.4%. */
   --surface-deep:
     linear-gradient(180deg,
       color-mix(in srgb, var(--brand-surface) 99%, white) 0%,
-      color-mix(in srgb, var(--brand-surface) 95%, var(--brand-primary)) 100%);
+      color-mix(in srgb, var(--brand-surface) 94.6%, var(--brand-primary)) 100%);
 
-  --hairline: color-mix(in srgb, var(--brand-border) 66%, var(--brand-primary));
+  --hairline: color-mix(in srgb, var(--brand-border) 62%, var(--brand-primary));
+
+  /* The halo is darkened BEFORE being faded, so it reads as a shadow the
+     scheme is tinting rather than a coloured light source. */
+  --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
 
   --block-glow:
-    0 10px 30px -12px color-mix(in srgb, var(--brand-primary) 45%, transparent),
-    0 2px 12px -4px color-mix(in srgb, var(--brand-accent) 28%, transparent);
+    0 12px 24px -10px color-mix(in srgb, var(--glow-ink) 62%, transparent),
+    0 3px 9px -3px color-mix(in srgb, var(--brand-accent) 36%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-primary) 15%, transparent);
 }
 
 /* On a dark surface a primary-tinted halo disappears into the background it is
    meant to lift off, so the accent carries it instead — the same reasoning as
-   the specular edge being faint in dark appearance. */
+   the specular edge being faint in dark appearance. Here the darkening applies
+   to the OUTER pass only; the ring stays at full accent, because on a dark
+   block the ring is doing all the edge definition. */
 [data-deep="on"][data-appearance="dark"],
 [data-deep="on"][data-theme="midnight"],
 [data-deep="on"][data-theme="carbonneon"],
@@ -1903,8 +1933,32 @@ option:hover {
 [data-deep="on"][data-theme="midnightorchid"],
 [data-deep="on"][data-theme="deepreef"] {
   --block-glow:
-    0 10px 32px -12px color-mix(in srgb, var(--brand-accent) 34%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--brand-accent) 12%, transparent);
+    0 12px 26px -10px color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 62%, #000) 58%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 22%, transparent);
+}
+
+/* ── Gradient contrast (toggle-on only) ─────────────────────────────────────
+   Each colour is held across a span before switching, instead of blending the
+   whole way. With --brand-accent-2 absent the fallback makes stops 3 and 4 the
+   same colour, so two-colour schemes get a hold-then-switch run rather than a
+   broken one. */
+[data-deep="on"] .gradient-text,
+[data-deep="on"] .stat-number {
+  background-image: linear-gradient(135deg,
+    color-mix(in srgb, var(--brand-primary) 88%, #000) 0%,
+    var(--brand-primary) 26%,
+    var(--brand-accent) 52%,
+    var(--brand-accent) 64%,
+    color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 88%, white) 100%);
+}
+[data-deep="on"] .progress-fill {
+  background-image: linear-gradient(90deg,
+    color-mix(in srgb, var(--brand-primary) 90%, #000) 0%,
+    var(--brand-primary) 30%,
+    var(--brand-accent) 58%,
+    var(--brand-accent) 70%,
+    color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 90%, white) 100%);
 }
 
 [data-deep="on"] .card,
