@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useTheme, THEMES } from "@/components/ThemeProvider";
+import { useTheme, THEMES, DEPTH_LEVELS } from "@/components/ThemeProvider";
 import { AvatarSelf } from "@/components/Avatar";
 import PaymentsSettingsCard from "@/components/PaymentsSettingsCard";
 import ExperienceSettings from "@/components/ExperienceSettings";
@@ -21,7 +21,7 @@ interface Props {
 
 export default function SettingsClient({ userEmail, userName, isTrainer,
   isInClientMode, userId, gcalSyncEnabled, gcalConnected, gcalStatus }: Props) {
-  const { theme, setTheme, deep, setDeep } = useTheme();
+  const { theme, setTheme, depth, setDepth } = useTheme();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
   const [gcalSync, setGcalSync] = useState(gcalSyncEnabled ?? false);
@@ -158,28 +158,47 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
             how whichever scheme is selected above looks — putting it in its own
             distant section would make it read as unrelated. */}
         <div className="card p-4 mt-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>
-                Depth &amp; glow
-              </p>
-              <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                Deepens your colour scheme and puts a soft glow behind each block.
-                Purely visual — nothing moves or changes place.
-              </p>
-            </div>
-            <div
-              role="switch"
-              aria-checked={deep}
-              aria-label="Depth and glow"
-              tabIndex={0}
-              onClick={() => setDeep(!deep)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDeep(!deep); } }}
-              className="w-11 h-6 rounded-full relative transition-colors flex-shrink-0"
-              style={{ background: deep ? "var(--brand-primary)" : "var(--brand-border)", cursor: "pointer" }}
-            >
-              <div className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all" style={{ left: deep ? "calc(100% - 20px)" : "4px" }} />
-            </div>
+          <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>
+            Depth &amp; glow
+          </p>
+          <p className="text-xs mt-0.5 mb-3" style={{ color: "var(--brand-text-secondary)" }}>
+            Deepens your colour scheme and puts a glow behind each block.
+            Purely visual — nothing moves or changes place.
+          </p>
+          {/* A segmented row rather than a slider: four named stops that each
+              mean something, on a control you can hit with a thumb. A slider
+              would imply values in between, and there are none. */}
+          <div
+            role="radiogroup"
+            aria-label="Depth and glow strength"
+            className="flex gap-1.5"
+          >
+            {DEPTH_LEVELS.map((lvl) => {
+              const on = depth === lvl.value;
+              return (
+                <button
+                  key={lvl.value}
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setDepth(lvl.value)}
+                  className="flex-1 rounded-xl py-2 px-1 transition-all"
+                  style={{
+                    background: on ? "var(--brand-primary)" : "var(--brand-bg)",
+                    border: "1px solid " + (on ? "var(--brand-primary)" : "var(--brand-border)"),
+                    color: on ? "#fff" : "var(--brand-text)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span className="block text-sm font-bold">{lvl.label}</span>
+                  <span
+                    className="block text-[10px] font-medium mt-0.5"
+                    style={{ color: on ? "rgba(255,255,255,0.78)" : "var(--brand-text-secondary)" }}
+                  >
+                    {lvl.hint}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>

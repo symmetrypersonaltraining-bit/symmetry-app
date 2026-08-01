@@ -186,7 +186,7 @@
   "nudges_enabled",
   "ai_daily_plan_build_limit",
   "ai_daily_verify_limit",
-  "depth_glow"
+  "depth_level"
  ],
  "client_assessments": [
   "id",

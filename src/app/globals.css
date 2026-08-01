@@ -1893,58 +1893,116 @@ option:hover {
    would be actively misleading. */
 [data-deep="off"] { --block-glow: 0 0 0 transparent; }
 
-[data-deep="on"] {
-  /* 13% / 4% at baseline, x1.35. */
+/* ── Level 20% (x1.2) ─────────────────────────────────────────────────────── */
+[data-deep="20"] {
+  --brand-bg-deep:
+    radial-gradient(1100px 620px at 50% -12%,
+      color-mix(in srgb, var(--brand-primary) 15.6%, var(--brand-bg)) 0%,
+      color-mix(in srgb, var(--brand-primary) 4.8%, var(--brand-bg)) 46%,
+      var(--brand-bg) 78%);
+  --surface-deep:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--brand-surface) 99%, white) 0%,
+      color-mix(in srgb, var(--brand-surface) 95.2%, var(--brand-primary)) 100%);
+  --hairline: color-mix(in srgb, var(--brand-border) 70%, var(--brand-primary));
+  --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
+  --block-glow:
+    0 12px 24px -10px color-mix(in srgb, var(--glow-ink) 48%, transparent),
+    0 3px 9px -3px color-mix(in srgb, var(--brand-accent) 26%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-primary) 10%, transparent);
+}
+[data-deep="20"][data-appearance="dark"],
+[data-deep="20"][data-theme="midnight"],
+[data-deep="20"][data-theme="carbonneon"],
+[data-deep="20"][data-theme="midnightaurora"],
+[data-deep="20"][data-theme="midnightember"],
+[data-deep="20"][data-theme="midnightcitrus"],
+[data-deep="20"][data-theme="midnightorchid"],
+[data-deep="20"][data-theme="deepreef"] {
+  --block-glow:
+    0 12px 26px -10px color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 62%, #000) 46%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 15%, transparent);
+}
+/* ── Level 35% (x1.35) ─────────────────────────────────────────────────────── */
+[data-deep="35"] {
   --brand-bg-deep:
     radial-gradient(1100px 620px at 50% -12%,
       color-mix(in srgb, var(--brand-primary) 17.5%, var(--brand-bg)) 0%,
       color-mix(in srgb, var(--brand-primary) 5.5%, var(--brand-bg)) 46%,
       var(--brand-bg) 78%);
-
-  /* Baseline mixes the card bottom 4% toward the primary; x1.35 = 5.4%. */
   --surface-deep:
     linear-gradient(180deg,
       color-mix(in srgb, var(--brand-surface) 99%, white) 0%,
       color-mix(in srgb, var(--brand-surface) 94.6%, var(--brand-primary)) 100%);
-
   --hairline: color-mix(in srgb, var(--brand-border) 62%, var(--brand-primary));
-
-  /* The halo is darkened BEFORE being faded, so it reads as a shadow the
-     scheme is tinting rather than a coloured light source. */
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
-
   --block-glow:
     0 12px 24px -10px color-mix(in srgb, var(--glow-ink) 62%, transparent),
     0 3px 9px -3px color-mix(in srgb, var(--brand-accent) 36%, transparent),
     0 0 0 1px color-mix(in srgb, var(--brand-primary) 15%, transparent);
 }
-
-/* On a dark surface a primary-tinted halo disappears into the background it is
-   meant to lift off, so the accent carries it instead — the same reasoning as
-   the specular edge being faint in dark appearance. Here the darkening applies
-   to the OUTER pass only; the ring stays at full accent, because on a dark
-   block the ring is doing all the edge definition. */
-[data-deep="on"][data-appearance="dark"],
-[data-deep="on"][data-theme="midnight"],
-[data-deep="on"][data-theme="carbonneon"],
-[data-deep="on"][data-theme="midnightaurora"],
-[data-deep="on"][data-theme="midnightember"],
-[data-deep="on"][data-theme="midnightcitrus"],
-[data-deep="on"][data-theme="midnightorchid"],
-[data-deep="on"][data-theme="deepreef"] {
+[data-deep="35"][data-appearance="dark"],
+[data-deep="35"][data-theme="midnight"],
+[data-deep="35"][data-theme="carbonneon"],
+[data-deep="35"][data-theme="midnightaurora"],
+[data-deep="35"][data-theme="midnightember"],
+[data-deep="35"][data-theme="midnightcitrus"],
+[data-deep="35"][data-theme="midnightorchid"],
+[data-deep="35"][data-theme="deepreef"] {
   --block-glow:
     0 12px 26px -10px color-mix(in srgb,
       color-mix(in srgb, var(--brand-accent) 62%, #000) 58%, transparent),
     0 0 0 1px color-mix(in srgb, var(--brand-accent) 22%, transparent);
 }
+/* ── Level 50% (x1.5) ─────────────────────────────────────────────────────── */
+[data-deep="50"] {
+  --brand-bg-deep:
+    radial-gradient(1100px 620px at 50% -12%,
+      color-mix(in srgb, var(--brand-primary) 19.5%, var(--brand-bg)) 0%,
+      color-mix(in srgb, var(--brand-primary) 6.0%, var(--brand-bg)) 46%,
+      var(--brand-bg) 78%);
+  --surface-deep:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--brand-surface) 99%, white) 0%,
+      color-mix(in srgb, var(--brand-surface) 94.0%, var(--brand-primary)) 100%);
+  --hairline: color-mix(in srgb, var(--brand-border) 54%, var(--brand-primary));
+  --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
+  --block-glow:
+    0 12px 24px -10px color-mix(in srgb, var(--glow-ink) 76%, transparent),
+    0 3px 9px -3px color-mix(in srgb, var(--brand-accent) 46%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-primary) 22%, transparent);
+}
+[data-deep="50"][data-appearance="dark"],
+[data-deep="50"][data-theme="midnight"],
+[data-deep="50"][data-theme="carbonneon"],
+[data-deep="50"][data-theme="midnightaurora"],
+[data-deep="50"][data-theme="midnightember"],
+[data-deep="50"][data-theme="midnightcitrus"],
+[data-deep="50"][data-theme="midnightorchid"],
+[data-deep="50"][data-theme="deepreef"] {
+  --block-glow:
+    0 12px 26px -10px color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 62%, #000) 70%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 30%, transparent);
+}
 
-/* ── Gradient contrast (toggle-on only) ─────────────────────────────────────
+/* ── Gradient contrast — every level above off ──────────────────────────────
    Each colour is held across a span before switching, instead of blending the
    whole way. With --brand-accent-2 absent the fallback makes stops 3 and 4 the
    same colour, so two-colour schemes get a hold-then-switch run rather than a
-   broken one. */
-[data-deep="on"] .gradient-text,
-[data-deep="on"] .stat-number {
+   broken one.
+
+   This does NOT scale with the level. The level controls depth and glow; the
+   colour-switch contrast is a separate thing Dustin asked for once, and making
+   it a fourth axis would mean the 20% setting quietly also had weaker
+   gradients, which is not what "20% deeper" says on the tin. */
+[data-deep="20"] .gradient-text,
+[data-deep="35"] .gradient-text,
+[data-deep="50"] .gradient-text,
+[data-deep="20"] .stat-number,
+[data-deep="35"] .stat-number,
+[data-deep="50"] .stat-number {
   background-image: linear-gradient(135deg,
     color-mix(in srgb, var(--brand-primary) 88%, #000) 0%,
     var(--brand-primary) 26%,
@@ -1952,7 +2010,9 @@ option:hover {
     var(--brand-accent) 64%,
     color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 88%, white) 100%);
 }
-[data-deep="on"] .progress-fill {
+[data-deep="20"] .progress-fill,
+[data-deep="35"] .progress-fill,
+[data-deep="50"] .progress-fill {
   background-image: linear-gradient(90deg,
     color-mix(in srgb, var(--brand-primary) 90%, #000) 0%,
     var(--brand-primary) 30%,
@@ -1961,20 +2021,34 @@ option:hover {
     color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 90%, white) 100%);
 }
 
-[data-deep="on"] .card,
-[data-deep="on"] .cw-surface,
-[data-deep="on"] .rounded-2xl:not(button):not(a):not([role="button"]) {
+[data-deep="20"] .card,
+[data-deep="35"] .card,
+[data-deep="50"] .card,
+[data-deep="20"] .cw-surface,
+[data-deep="35"] .cw-surface,
+[data-deep="50"] .cw-surface,
+[data-deep="20"] .rounded-2xl:not(button):not(a):not([role="button"]),
+[data-deep="35"] .rounded-2xl:not(button):not(a):not([role="button"]),
+[data-deep="50"] .rounded-2xl:not(button):not(a):not([role="button"]) {
   box-shadow: var(--block-glow), var(--shadow-1);
 }
-/* The elevated variants keep their own lift and gain the halo on top. */
-[data-deep="on"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
-[data-deep="on"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
+[data-deep="20"] .card-elevated,
+[data-deep="35"] .card-elevated,
+[data-deep="50"] .card-elevated {
+  box-shadow: var(--block-glow), var(--shadow-3);
+}
+[data-deep="20"] .card-hover:hover,
+[data-deep="35"] .card-hover:hover,
+[data-deep="50"] .card-hover:hover {
+  box-shadow: var(--block-glow), var(--shadow-2);
+}
 
-/* Motion-sensitive users get the colour, not the bloom. */
+/* Motion-sensitive users get the colour, not an animated bloom. Matches any
+   on-level: [data-deep] is only ever "off" or a number. */
 @media (prefers-reduced-motion: reduce) {
-  [data-deep="on"] .card,
-  [data-deep="on"] .cw-surface,
-  [data-deep="on"] .rounded-2xl:not(button):not(a):not([role="button"]) {
+  [data-deep]:not([data-deep="off"]) .card,
+  [data-deep]:not([data-deep="off"]) .cw-surface,
+  [data-deep]:not([data-deep="off"]) .rounded-2xl:not(button):not(a):not([role="button"]) {
     transition: none;
   }
 }

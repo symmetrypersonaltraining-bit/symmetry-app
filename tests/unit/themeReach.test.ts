@@ -287,24 +287,44 @@ test("text-clipped gradients are set with background-image, never the shorthand"
   }
 });
 
-test("depth & glow is opt-in and cannot be on by default", () => {
+test("depth & glow is opt-in, graded, and cannot be on by default", () => {
   const css = read("src/app/globals.css");
-  assert.ok(css.includes('[data-deep="on"]'), "globals.css must define the data-deep=on layer");
+  const provider = code(read("src/components/ThemeProvider.tsx"));
+
+  // Every level declared in TypeScript must have a CSS block, and vice versa —
+  // the same drift rule as themes. A level with no block silently renders as
+  // "off" while the settings row shows it selected.
+  const levels = [...provider.matchAll(/\{\s*value:\s*(\d+),/g)].map((m) => Number(m[1]));
+  assert.deepEqual(levels, [0, 20, 35, 50], "DEPTH_LEVELS should be off/20/35/50");
+
+  for (const lvl of levels.filter((l) => l > 0)) {
+    assert.ok(
+      css.includes(`[data-deep="${lvl}"] {`),
+      `globals.css has no [data-deep="${lvl}"] block, so that level renders as off`,
+    );
+  }
+  const cssLevels = new Set(
+    [...css.matchAll(/\[data-deep="(\d+)"\]/g)].map((m) => Number(m[1])),
+  );
+  for (const l of cssLevels) {
+    assert.ok(levels.includes(l), `globals.css styles level ${l}, which nothing can select`);
+  }
+
   assert.ok(
     !/:root\s*\{[^}]*--block-glow/.test(css),
     "--block-glow must not be set on :root — that would turn the effect on for " +
       "everyone, and Dustin was explicit that it is a per-person choice.",
   );
-  const provider = code(read("src/components/ThemeProvider.tsx"));
   assert.match(
     provider,
-    /useState\(false\)/,
-    "the deep state must default to false",
+    /useState<DepthLevel>\(0\)/,
+    "the depth state must default to 0 (off)",
   );
   assert.match(
     provider,
-    /typeof settings\?\.depth_glow === "boolean"/,
-    "a NULL depth_glow means 'never chosen' and must not override the device setting",
+    /isDepthLevel\(settings\?\.depth_level\)/,
+    "a NULL or unrecognised depth_level means 'never chosen' and must not " +
+      "override the device setting",
   );
 });
 

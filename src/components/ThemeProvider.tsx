@@ -42,13 +42,35 @@ export const THEMES = [
 
 export type ThemeId = (typeof THEMES)[number]["id"];
 
+/**
+ * Depth & glow strength. 0 is off; the rest are "how much deeper", and the
+ * NUMBER IS THE CONTRACT — 35 means the mix shares scale by 1.35, and the CSS
+ * block in globals.css is keyed off exactly these values via data-deep.
+ *
+ * Adding a level means adding it here AND adding its block to globals.css.
+ * Anything the app does not recognise falls back to off rather than erroring,
+ * so a stale value from an older client is harmless.
+ */
+export const DEPTH_LEVELS = [
+  { value: 0,  label: "Off",  hint: "Flat and clean" },
+  { value: 20, label: "20%",  hint: "Subtle" },
+  { value: 35, label: "35%",  hint: "Balanced" },
+  { value: 50, label: "50%",  hint: "Strongest" },
+] as const;
+
+export type DepthLevel = (typeof DEPTH_LEVELS)[number]["value"];
+
+export function isDepthLevel(n: unknown): n is DepthLevel {
+  return typeof n === "number" && DEPTH_LEVELS.some((l) => l.value === n);
+}
+
 const ThemeContext = createContext<{
   theme: ThemeId;
   setTheme: (t: ThemeId) => void;
-  /** Deeper colour + a glow behind every block. Opt-in, off by default. */
-  deep: boolean;
-  setDeep: (on: boolean) => void;
-}>({ theme: "pastel", setTheme: () => {}, deep: false, setDeep: () => {} });
+  /** Deeper colour + a glow behind every block. 0 = off. Opt-in. */
+  depth: DepthLevel;
+  setDepth: (level: DepthLevel) => void;
+}>({ theme: "pastel", setTheme: () => {}, depth: 0, setDepth: () => {} });
 
 export function useTheme() {
   return useContext(ThemeContext);
@@ -56,7 +78,7 @@ export function useTheme() {
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>("pastel");
-  const [deep, setDeepState] = useState(false);
+  const [depth, setDepthState] = useState<DepthLevel>(0);
   const [clientId, setClientId] = useState<string | null>(null);
 
   function applyTheme(t: ThemeId) {
@@ -74,10 +96,23 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
    * Off is written as an explicit "off" rather than removing the attribute, so
    * a rule can target either state later without needing :not().
    */
-  function applyDeep(on: boolean) {
-    setDeepState(on);
-    localStorage.setItem("symmetry_depth_glow", on ? "1" : "0");
-    document.documentElement.setAttribute("data-deep", on ? "on" : "off");
+  function applyDepth(level: DepthLevel) {
+    setDepthState(level);
+    localStorage.setItem("symmetry_depth_level", String(level));
+    document.documentElement.setAttribute("data-deep", level === 0 ? "off" : String(level));
+  }
+
+  /**
+   * This setting shipped as a boolean a few hours before it became a scale, so
+   * a device that opted in during that window has "1" under the old key. Map it
+   * to 35, which is what that device was actually rendering — the on-state was
+   * at 1.35x by then. Read once and rewritten under the new key, so this only
+   * matters for one visit per device.
+   */
+  function readStoredDepth(): DepthLevel {
+    const current = Number(localStorage.getItem("symmetry_depth_level"));
+    if (isDepthLevel(current)) return current;
+    return localStorage.getItem("symmetry_depth_glow") === "1" ? 35 : 0;
   }
 
   useEffect(() => {
@@ -89,8 +124,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
       setThemeState(stored);
       document.documentElement.setAttribute("data-theme", stored);
     }
-    const storedDeep = localStorage.getItem("symmetry_depth_glow");
-    applyDeep(storedDeep === "1");
+    applyDepth(readStoredDepth());
     (async () => {
       try {
         const sb: any = createClient();
@@ -105,7 +139,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
         setClientId(c.id);
         const { data: settings } = await sb
           .from("client_app_settings")
-          .select("theme, depth_glow")
+          .select("theme, depth_level")
           .eq("client_id", c.id)
           .maybeSingle();
         const dbTheme = settings?.theme as ThemeId | undefined;
@@ -113,10 +147,12 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
           applyTheme(dbTheme);
         }
         // NULL means "never chosen" and must leave the local setting alone —
-        // same rule as the theme. Only an explicit true/false from the account
-        // overrides what this device is already showing.
-        if (typeof settings?.depth_glow === "boolean") {
-          applyDeep(settings.depth_glow);
+        // same rule as the theme. Only an explicit level from the account
+        // overrides what this device is already showing. An unrecognised value
+        // (a level this build does not know) is ignored rather than treated as
+        // off, for the same reason.
+        if (isDepthLevel(settings?.depth_level)) {
+          applyDepth(settings.depth_level);
         }
       } catch {}
     })();
@@ -155,27 +191,27 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
     }
   }
 
-  function setDeep(on: boolean) {
-    applyDeep(on);
+  function setDepth(level: DepthLevel) {
+    applyDepth(level);
     // Same persistence contract as setTheme, including reading the result.
     try {
       if (clientId) {
         const sb: any = createClient();
         sb.from("client_app_settings")
-          .upsert({ client_id: clientId, depth_glow: on }, { onConflict: "client_id" })
+          .upsert({ client_id: clientId, depth_level: level }, { onConflict: "client_id" })
           .then(({ error }: { error: unknown }) => {
             if (error) {
-              console.error("[theme] depth/glow save failed — local-only on this device", error);
+              console.error("[theme] depth level save failed — local-only on this device", error);
             }
           });
       }
     } catch (err) {
-      console.error("[theme] depth/glow save threw", err);
+      console.error("[theme] depth level save threw", err);
     }
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, deep, setDeep }}>
+    <ThemeContext.Provider value={{ theme, setTheme, depth, setDepth }}>
       {children}
     </ThemeContext.Provider>
   );
