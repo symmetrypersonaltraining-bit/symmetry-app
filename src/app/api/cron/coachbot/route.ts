@@ -76,7 +76,15 @@ function validate(raw: unknown): Reply | null {
 
 interface Row { rnk: number; client_id: string; client_name: string; score: number }
 
-export async function runCoachBot(db: Db, opts: { force?: boolean } = {}): Promise<{ posted: boolean; reason: string; message?: string }> {
+/**
+ * @param force  ignore the coachbot_live flag (for a preview before turning it on)
+ * @param dry    generate and vet the message but do NOT post it
+ *
+ * `dry` exists so Dustin can read a few of these before letting it loose on
+ * thirty-five people. "Trust me, it'll be funny" is not a reasonable thing to
+ * ask of someone about their own clients.
+ */
+export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean } = {}): Promise<{ posted: boolean; reason: string; message?: string }> {
   if (!opts.force) {
     const { data: flag } = await db.from("app_flags").select("enabled").eq("key", "coachbot_live").maybeSingle();
     if ((flag as { enabled: boolean } | null)?.enabled !== true) return { posted: false, reason: "coachbot_live is off" };
@@ -150,6 +158,8 @@ export async function runCoachBot(db: Db, opts: { force?: boolean } = {}): Promi
     }
   }
 
+  if (opts.dry) return { posted: false, reason: "dry run — nothing posted", message: body };
+
   const { data: ts } = await db.from("trainer_settings").select("user_id").limit(1).maybeSingle();
   const trainerUid = (ts as { user_id: string } | null)?.user_id;
   if (!trainerUid) return { posted: false, reason: "no trainer account" };
@@ -176,9 +186,9 @@ async function handle(req: NextRequest) {
     if (!scoped.scope.isTrainer) return NextResponse.json({ error: "Trainer only" }, { status: 403 });
   }
   const db = createAdminClient() as unknown as Db;
-  const force = new URL(req.url).searchParams.get("force") === "1";
+  const sp = new URL(req.url).searchParams;
   try {
-    const out = await runCoachBot(db, { force });
+    const out = await runCoachBot(db, { force: sp.get("force") === "1", dry: sp.get("dry") === "1" });
     return NextResponse.json(out);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
