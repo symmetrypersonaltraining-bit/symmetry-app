@@ -12,6 +12,7 @@ import SetFeedback from "@/components/SetFeedback";
 import WakeLock from "@/components/WakeLock";
 import { fx } from "@/lib/fx";
 import { isDraftStale } from "@/lib/workoutDraft";
+import { useStableViewportHeight } from "@/lib/useStableViewportHeight";
 
 interface Exercise {
   id: string;
@@ -649,6 +650,10 @@ export default function WorkoutLogger({
   const [sessionCancelled, setSessionCancelled] = useState(false);
   const [timePick, setTimePick] = useState<{ peId: string; si: number } | null>(null);
   const [sessionMode, setSessionMode] = useState(false);
+  // The height this screen had before any keyboard opened. The session view is
+  // pinned to it so the soft keyboard cannot reflow the layout — it covers the
+  // bottom instead. Unconditional, like every hook must be.
+  const stableH = useStableViewportHeight();
   const [restTimer, setRestTimer] = useState<number | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [fieldCfg, setFieldCfg] = useState<Record<string, string[]>>({});
@@ -1495,7 +1500,21 @@ export default function WorkoutLogger({
     for (const f of xFields) if (!chipList.includes(f) && ["weight", "reps", "time", "speed", "hr", "each_side"].includes(f)) chipList.push(f);
 
     return (
-      <div className="fixed inset-0 flex flex-col z-[999]" style={{ background: "var(--session-bg)" }}>
+      <div
+        className="fixed top-0 left-0 right-0 flex flex-col z-[999]"
+        style={{
+          background: "var(--session-bg)",
+          // NOT inset-0. inset-0 resolves against the layout viewport, and the
+          // Android WebView shrinks that viewport when the keyboard opens — so
+          // every child reflowed into the smaller box and the exercise header
+          // vanished. Pinning to the tallest height seen in this orientation
+          // means the keyboard cannot resize this view at all: the bottom of it
+          // (notes, footer, tabs) simply ends up under the keyboard, and the
+          // sets stay exactly where they were. See useStableViewportHeight.
+          height: stableH ?? "100dvh",
+          overflow: "hidden",
+        }}
+      >
         {/* Set-pop + PR-glow overlay (pointer-events:none, cannot block logging). Revert = remove this line. */}
         <SetFeedback sets={sets} prevByPe={prevByPe} />
         {/* Keep the phone screen awake during an active session. Isolated; no-ops where unsupported. Revert = remove this line. */}
