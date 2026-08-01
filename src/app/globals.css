@@ -1597,6 +1597,148 @@ option:hover {
   }
 }
 
+
+/* ════════════════════════════════════════════════════════════════════════════
+   NINE SCHEMES ADDED 2026-08-01 — seven multicolour, two pink.
+   Revert = delete this block and the matching entries in ThemeProvider THEMES.
+
+   These are the first schemes with a THIRD colour. --brand-accent-2 is optional
+   everywhere: every derived token falls back to --brand-accent when it is
+   absent, so the original 21 two-colour schemes render byte-identically and
+   nothing had to be touched to add this.
+
+   Declared at the SAME specificity as the other themes ([data-theme="x"]) and
+   NOT under :root, for the reason written at the top of the visual-layer block:
+   a trailing :root that redefines a base token beats every theme on the tie and
+   collapses all of them into one palette.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ===== THEME: Midnight Aurora — midnight blue, cyan, violet ===== */
+[data-theme="midnightaurora"] {
+  --brand-bg: #0D1117;
+  --brand-surface: #161C26;
+  --brand-card: #1B2430;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #22D3EE;
+  --brand-accent-2: #A78BFA;
+  --brand-text: #E6EDF3;
+  --brand-text-secondary: #8B98A9;
+  --brand-border: #26303D;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Midnight Ember — midnight blue, coral, amber ===== */
+[data-theme="midnightember"] {
+  --brand-bg: #0B0E14;
+  --brand-surface: #151A22;
+  --brand-card: #1A212B;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #FB7185;
+  --brand-accent-2: #FBBF24;
+  --brand-text: #EDF1F7;
+  --brand-text-secondary: #94A0B0;
+  --brand-border: #242D3A;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Midnight Citrus — midnight blue, sky, lime ===== */
+[data-theme="midnightcitrus"] {
+  --brand-bg: #0D1117;
+  --brand-surface: #151B24;
+  --brand-card: #1A2230;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #38BDF8;
+  --brand-accent-2: #A3E635;
+  --brand-text: #E6EDF3;
+  --brand-text-secondary: #8D9AAB;
+  --brand-border: #253040;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Midnight Orchid — midnight blue, deep purple, orchid ===== */
+[data-theme="midnightorchid"] {
+  --brand-bg: #0C0F17;
+  --brand-surface: #151A24;
+  --brand-card: #1B2130;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #7C3AED;
+  --brand-accent-2: #E879F9;
+  --brand-text: #EDEFF7;
+  --brand-text-secondary: #939CB2;
+  --brand-border: #262E40;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Violet Dawn — midnight blue, deep purple, lilac — the light one ===== */
+[data-theme="violetdawn"] {
+  --brand-bg: #F4F3FC;
+  --brand-surface: #FFFFFF;
+  --brand-card: #E7E4FA;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #6D28D9;
+  --brand-accent-2: #C4B5FD;
+  --brand-text: #14102B;
+  --brand-text-secondary: #5F5B85;
+  --brand-border: #D5D0F2;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Sunset Drift — magenta, orange, gold ===== */
+[data-theme="sunsetdrift"] {
+  --brand-bg: #FFF6F2;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FFE8DC;
+  --brand-primary: #BE185D;
+  --brand-accent: #F97316;
+  --brand-accent-2: #FBBF24;
+  --brand-text: #2A0B14;
+  --brand-text-secondary: #8A5A61;
+  --brand-border: #F8CDB8;
+  --brand-sidebar: #BE185D;
+}
+
+/* ===== THEME: Deep Reef — teal, jade, purple ===== */
+[data-theme="deepreef"] {
+  --brand-bg: #0A1418;
+  --brand-surface: #121E24;
+  --brand-card: #17272E;
+  --brand-primary: #0E7490;
+  --brand-accent: #14B8A6;
+  --brand-accent-2: #A855F7;
+  --brand-text: #E4F2F5;
+  --brand-text-secondary: #86A3AC;
+  --brand-border: #1E323A;
+  --brand-sidebar: #0E7490;
+}
+
+/* ===== THEME: Blush Cloud — baby pink ===== */
+[data-theme="blushcloud"] {
+  --brand-bg: #FFF5F8;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FDE7EF;
+  --brand-primary: #E1789F;
+  --brand-accent: #F9A8D4;
+  --brand-accent-2: #FBCFE8;
+  --brand-text: #3A1225;
+  --brand-text-secondary: #9A6478;
+  --brand-border: #F7CEDD;
+  --brand-sidebar: #E1789F;
+}
+
+/* ===== THEME: Hot Pink — hot pink with a violet third ===== */
+[data-theme="hotpink"] {
+  --brand-bg: #FFF0F7;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FFD9EC;
+  --brand-primary: #FF1F8F;
+  --brand-accent: #FF6FB5;
+  --brand-accent-2: #7C3AED;
+  --brand-text: #2E0418;
+  --brand-text-secondary: #8E3563;
+  --brand-border: #FFC2DE;
+  --brand-sidebar: #FF1F8F;
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
    TRAINER CHROME FOLLOWS THE SCHEME — 2026-08-01
    Additive. Revert = delete from this banner to the end of the file, and put
@@ -1672,3 +1814,113 @@ option:hover {
    any component, but left correct so it cannot reintroduce the literal if
    something starts using it again. */
 .page-header-home { background: var(--chrome-grad); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   THE THIRD COLOUR, AND THE DEPTH + GLOW OPTION — 2026-08-01
+   Additive. Revert = delete from this banner to the end of the file.
+
+   ── PART 1 · --brand-accent-2 ───────────────────────────────────────────────
+   Nine schemes now carry a third colour. Rather than add a parallel set of
+   rules for them, the gradients that already ran primary → accent gain a third
+   stop that falls back to the accent when the theme has no third colour. So
+   the 21 two-colour schemes render EXACTLY as before — the fallback resolves
+   the new stop to the same colour as the one before it, which is a no-op
+   gradient stop — and the multicolour schemes get their full run for free.
+
+   This is deliberately a small number of high-visibility surfaces rather than
+   everything: a third colour applied everywhere stops reading as a scheme and
+   starts reading as a bug. */
+/* background-IMAGE, not the `background` shorthand. Both of these clip their
+   gradient to the glyphs (`background-clip: text` + transparent text fill), and
+   the shorthand RESETS background-clip to border-box. Overriding with the
+   shorthand here painted the gradient across the whole box and left the text
+   invisible — a solid coloured bar where the client's name should be. Caught in
+   a render against the compiled CSS, not in review. */
+.gradient-text,
+.stat-number {
+  background-image: linear-gradient(135deg,
+    var(--brand-primary),
+    var(--brand-accent) 58%,
+    var(--brand-accent-2, var(--brand-accent)));
+}
+.progress-fill {
+  background-image: linear-gradient(90deg,
+    var(--brand-primary),
+    var(--brand-accent) 62%,
+    var(--brand-accent-2, var(--brand-accent)));
+}
+
+/* ── PART 2 · Depth & glow, opt-in ──────────────────────────────────────────
+   Dustin, 2026-08-01: "lets leave a toggle for plp to add the 20% glow. I love
+   it but some may not." So it is a per-person setting, OFF by default —
+   nobody's app changes appearance until they choose it.
+
+   Driven by data-deep on <html> (ThemeProvider), for the same reason as
+   data-theme: one attribute, one CSS block, and no component in the app needs
+   to know the setting exists.
+
+   "20% deeper" is literal — the existing visual-layer-3 mix shares scale by
+   1.2 and nothing else about them changes, so every scheme deepens by the same
+   rule and keeps its character. The glow is the part people will actually
+   notice: a halo of the theme's own primary behind each block, with a second
+   tighter pass in the accent so multicolour schemes glow in two colours.
+
+   WHY THE GLOW SELECTOR IS SHAPED LIKE THAT. Only 38 places in the app use the
+   .card class; the dashboard blocks are inline-styled divs with Tailwind's
+   rounded-2xl, which is this codebase's de-facto card radius. Buttons and
+   links are excluded because a glowing button reads as a focus state, which
+   would be actively misleading. */
+[data-deep="off"] { --block-glow: 0 0 0 transparent; }
+
+[data-deep="on"] {
+  --brand-bg-deep:
+    radial-gradient(1100px 620px at 50% -12%,
+      color-mix(in srgb, var(--brand-primary) 16%, var(--brand-bg)) 0%,
+      color-mix(in srgb, var(--brand-primary) 5%, var(--brand-bg)) 46%,
+      var(--brand-bg) 78%);
+
+  --surface-deep:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--brand-surface) 99%, white) 0%,
+      color-mix(in srgb, var(--brand-surface) 95%, var(--brand-primary)) 100%);
+
+  --hairline: color-mix(in srgb, var(--brand-border) 66%, var(--brand-primary));
+
+  --block-glow:
+    0 10px 30px -12px color-mix(in srgb, var(--brand-primary) 45%, transparent),
+    0 2px 12px -4px color-mix(in srgb, var(--brand-accent) 28%, transparent);
+}
+
+/* On a dark surface a primary-tinted halo disappears into the background it is
+   meant to lift off, so the accent carries it instead — the same reasoning as
+   the specular edge being faint in dark appearance. */
+[data-deep="on"][data-appearance="dark"],
+[data-deep="on"][data-theme="midnight"],
+[data-deep="on"][data-theme="carbonneon"],
+[data-deep="on"][data-theme="midnightaurora"],
+[data-deep="on"][data-theme="midnightember"],
+[data-deep="on"][data-theme="midnightcitrus"],
+[data-deep="on"][data-theme="midnightorchid"],
+[data-deep="on"][data-theme="deepreef"] {
+  --block-glow:
+    0 10px 32px -12px color-mix(in srgb, var(--brand-accent) 34%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 12%, transparent);
+}
+
+[data-deep="on"] .card,
+[data-deep="on"] .cw-surface,
+[data-deep="on"] .rounded-2xl:not(button):not(a):not([role="button"]) {
+  box-shadow: var(--block-glow), var(--shadow-1);
+}
+/* The elevated variants keep their own lift and gain the halo on top. */
+[data-deep="on"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
+[data-deep="on"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
+
+/* Motion-sensitive users get the colour, not the bloom. */
+@media (prefers-reduced-motion: reduce) {
+  [data-deep="on"] .card,
+  [data-deep="on"] .cw-surface,
+  [data-deep="on"] .rounded-2xl:not(button):not(a):not([role="button"]) {
+    transition: none;
+  }
+}

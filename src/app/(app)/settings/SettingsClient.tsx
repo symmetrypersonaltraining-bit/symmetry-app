@@ -21,7 +21,7 @@ interface Props {
 
 export default function SettingsClient({ userEmail, userName, isTrainer,
   isInClientMode, userId, gcalSyncEnabled, gcalConnected, gcalStatus }: Props) {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, deep, setDeep } = useTheme();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
   const [gcalSync, setGcalSync] = useState(gcalSyncEnabled ?? false);
@@ -131,17 +131,56 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
       <section>
         <p className="section-header">App Color Theme</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {THEMES.map((t) => (
-            <button key={t.id} onClick={() => setTheme(t.id)} className="rounded-xl p-3 text-left transition-all" style={{ background: t.bg, border: "2px solid " + (theme === t.id ? t.primary : "transparent"), boxShadow: theme === t.id ? "0 0 0 3px " + t.primary + "30, 0 2px 8px rgba(0,0,0,0.08)" : "0 1px 3px rgba(0,0,0,0.06)", transform: theme === t.id ? "scale(1.03)" : "scale(1)" }}>
-              <div className="w-8 h-8 rounded-lg mb-2 overflow-hidden flex">
-                <div className="flex-1" style={{ background: t.bg }} />
-                <div className="flex-1" style={{ background: t.primary }} />
-                <div className="flex-1" style={{ background: ACCENT_MAP[t.id] ?? t.primary }} />
-              </div>
-              <div className="text-xs font-semibold" style={{ color: t.primary }}>{t.label}</div>
-              {theme === t.id && <div className="text-[10px] mt-0.5 font-medium" style={{ color: t.primary }}>✓ Active</div>}
-            </button>
-          ))}
+          {THEMES.map((t) => {
+            // Schemes added 2026-08-01 carry a third colour of their own. The
+            // older ones read theirs from ACCENT_MAP, which is a lookup table
+            // that has to be edited by hand every time a theme is added — so
+            // new themes carry their swatch colours inline instead and the map
+            // is only a fallback for the ones already in it.
+            const a1 = ("a" in t ? t.a : undefined) ?? ACCENT_MAP[t.id] ?? t.primary;
+            const a2 = "a2" in t ? t.a2 : undefined;
+            return (
+              <button key={t.id} onClick={() => setTheme(t.id)} className="rounded-xl p-3 text-left transition-all" style={{ background: t.bg, border: "2px solid " + (theme === t.id ? t.primary : "transparent"), boxShadow: theme === t.id ? "0 0 0 3px " + t.primary + "30, 0 2px 8px rgba(0,0,0,0.08)" : "0 1px 3px rgba(0,0,0,0.06)", transform: theme === t.id ? "scale(1.03)" : "scale(1)" }}>
+                <div className="w-8 h-8 rounded-lg mb-2 overflow-hidden flex">
+                  <div className="flex-1" style={{ background: t.bg }} />
+                  <div className="flex-1" style={{ background: t.primary }} />
+                  <div className="flex-1" style={{ background: a1 }} />
+                  {a2 && <div className="flex-1" style={{ background: a2 }} />}
+                </div>
+                <div className="text-xs font-semibold" style={{ color: t.primary }}>{t.label}</div>
+                {theme === t.id && <div className="text-[10px] mt-0.5 font-medium" style={{ color: t.primary }}>✓ Active</div>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Depth & glow. Sits directly under the swatches because it changes
+            how whichever scheme is selected above looks — putting it in its own
+            distant section would make it read as unrelated. */}
+        <div className="card p-4 mt-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>
+                Depth &amp; glow
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
+                Deepens your colour scheme and puts a soft glow behind each block.
+                Purely visual — nothing moves or changes place.
+              </p>
+            </div>
+            <div
+              role="switch"
+              aria-checked={deep}
+              aria-label="Depth and glow"
+              tabIndex={0}
+              onClick={() => setDeep(!deep)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDeep(!deep); } }}
+              className="w-11 h-6 rounded-full relative transition-colors flex-shrink-0"
+              style={{ background: deep ? "var(--brand-primary)" : "var(--brand-border)", cursor: "pointer" }}
+            >
+              <div className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all" style={{ left: deep ? "calc(100% - 20px)" : "4px" }} />
+            </div>
+          </div>
         </div>
       </section>
 

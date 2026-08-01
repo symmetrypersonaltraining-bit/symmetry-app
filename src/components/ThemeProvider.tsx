@@ -23,6 +23,21 @@ export const THEMES = [
   { id: "citrus", label: "Citrus Punch", primary: "#5bbf3a", bg: "#fbfdf3" },
   { id: "berrynoir", label: "Berry Noir", primary: "#b5379a", bg: "#f7f4fb" },
   { id: "oceandusk", label: "Ocean Dusk", primary: "#1f7a8c", bg: "#f2f6f8" },
+
+  // ── Added 2026-08-01 ────────────────────────────────────────────────────
+  // The first schemes built on THREE colours. `a2` is the third; it is optional
+  // and every scheme above renders exactly as before without it. The real
+  // tokens live in globals.css — what is here is only what the settings swatch
+  // needs to draw a preview.
+  { id: "midnightaurora", label: "Midnight Aurora", primary: "#1D4ED8", bg: "#0D1117", a: "#22D3EE", a2: "#A78BFA" },
+  { id: "midnightember",  label: "Midnight Ember",  primary: "#1D4ED8", bg: "#0B0E14", a: "#FB7185", a2: "#FBBF24" },
+  { id: "midnightcitrus", label: "Midnight Citrus", primary: "#1D4ED8", bg: "#0D1117", a: "#38BDF8", a2: "#A3E635" },
+  { id: "midnightorchid", label: "Midnight Orchid", primary: "#1D4ED8", bg: "#0C0F17", a: "#7C3AED", a2: "#E879F9" },
+  { id: "violetdawn",     label: "Violet Dawn",     primary: "#1D4ED8", bg: "#F4F3FC", a: "#6D28D9", a2: "#C4B5FD" },
+  { id: "sunsetdrift",    label: "Sunset Drift",    primary: "#BE185D", bg: "#FFF6F2", a: "#F97316", a2: "#FBBF24" },
+  { id: "deepreef",       label: "Deep Reef",       primary: "#0E7490", bg: "#0A1418", a: "#14B8A6", a2: "#A855F7" },
+  { id: "blushcloud",     label: "Blush Cloud",     primary: "#E1789F", bg: "#FFF5F8", a: "#F9A8D4", a2: "#FBCFE8" },
+  { id: "hotpink",        label: "Hot Pink",        primary: "#FF1F8F", bg: "#FFF0F7", a: "#FF6FB5", a2: "#7C3AED" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];
@@ -30,7 +45,10 @@ export type ThemeId = (typeof THEMES)[number]["id"];
 const ThemeContext = createContext<{
   theme: ThemeId;
   setTheme: (t: ThemeId) => void;
-}>({ theme: "pastel", setTheme: () => {} });
+  /** Deeper colour + a glow behind every block. Opt-in, off by default. */
+  deep: boolean;
+  setDeep: (on: boolean) => void;
+}>({ theme: "pastel", setTheme: () => {}, deep: false, setDeep: () => {} });
 
 export function useTheme() {
   return useContext(ThemeContext);
@@ -38,6 +56,7 @@ export function useTheme() {
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>("pastel");
+  const [deep, setDeepState] = useState(false);
   const [clientId, setClientId] = useState<string | null>(null);
 
   function applyTheme(t: ThemeId) {
@@ -46,13 +65,32 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
     document.documentElement.setAttribute("data-theme", t);
   }
 
+  /**
+   * Depth & glow lives on <html> next to data-theme, for the same reason: the
+   * styling is one CSS block keyed off the attribute, so nothing else in the
+   * app has to know this setting exists, and it survives client-side
+   * navigation because the attribute outlives any individual page.
+   *
+   * Off is written as an explicit "off" rather than removing the attribute, so
+   * a rule can target either state later without needing :not().
+   */
+  function applyDeep(on: boolean) {
+    setDeepState(on);
+    localStorage.setItem("symmetry_depth_glow", on ? "1" : "0");
+    document.documentElement.setAttribute("data-deep", on ? "on" : "off");
+  }
+
   useEffect(() => {
-    // Instant paint from localStorage, then account-level theme from DB wins
+    // Instant paint from localStorage, then account-level settings from the DB
+    // win. Both are read before the network call so the first frame is already
+    // correct on a repeat visit and nothing flashes.
     const stored = localStorage.getItem("symmetry_theme") as ThemeId | null;
     if (stored && THEMES.find((t) => t.id === stored)) {
       setThemeState(stored);
       document.documentElement.setAttribute("data-theme", stored);
     }
+    const storedDeep = localStorage.getItem("symmetry_depth_glow");
+    applyDeep(storedDeep === "1");
     (async () => {
       try {
         const sb: any = createClient();
@@ -65,10 +103,20 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
         }
         if (!c?.id) return;
         setClientId(c.id);
-        const { data: settings } = await sb.from("client_app_settings").select("theme").eq("client_id", c.id).maybeSingle();
+        const { data: settings } = await sb
+          .from("client_app_settings")
+          .select("theme, depth_glow")
+          .eq("client_id", c.id)
+          .maybeSingle();
         const dbTheme = settings?.theme as ThemeId | undefined;
         if (dbTheme && THEMES.find((t) => t.id === dbTheme)) {
           applyTheme(dbTheme);
+        }
+        // NULL means "never chosen" and must leave the local setting alone —
+        // same rule as the theme. Only an explicit true/false from the account
+        // overrides what this device is already showing.
+        if (typeof settings?.depth_glow === "boolean") {
+          applyDeep(settings.depth_glow);
         }
       } catch {}
     })();
@@ -107,8 +155,27 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
     }
   }
 
+  function setDeep(on: boolean) {
+    applyDeep(on);
+    // Same persistence contract as setTheme, including reading the result.
+    try {
+      if (clientId) {
+        const sb: any = createClient();
+        sb.from("client_app_settings")
+          .upsert({ client_id: clientId, depth_glow: on }, { onConflict: "client_id" })
+          .then(({ error }: { error: unknown }) => {
+            if (error) {
+              console.error("[theme] depth/glow save failed — local-only on this device", error);
+            }
+          });
+      }
+    } catch (err) {
+      console.error("[theme] depth/glow save threw", err);
+    }
+  }
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, deep, setDeep }}>
       {children}
     </ThemeContext.Provider>
   );

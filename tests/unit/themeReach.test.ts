@@ -143,6 +143,108 @@ test("no `var(--token)NN` — hex alpha appended to a var() is a dropped declara
    asserts the error handling that would have surfaced it on day one.
    ──────────────────────────────────────────────────────────────────────────── */
 
+/* ────────────────────────────────────────────────────────────────────────────
+   RULE 4 · The theme list and the theme tokens cannot drift apart.
+
+   A scheme exists in two places — an entry in THEMES (what the picker draws)
+   and a [data-theme="…"] block in globals.css (what it actually looks like).
+   Add one without the other and the failure is silent in BOTH directions: an
+   id with no tokens shows a swatch that selects nothing and falls back to the
+   default palette, and tokens with no id are simply unreachable. This is the
+   same class of drift that let client_app_settings.theme reject every save.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+test("every theme id has tokens, and every token block has an id", () => {
+  const provider = read("src/components/ThemeProvider.tsx");
+  const css = read("src/app/globals.css");
+
+  const ids = [...provider.matchAll(/\{\s*id:\s*"([a-z0-9]+)"/g)].map((m) => m[1]);
+  const blocks = new Set(
+    [...css.matchAll(/\[data-theme="([a-z0-9]+)"\]\s*\{/g)].map((m) => m[1]),
+  );
+
+  assert.ok(ids.length >= 30, `expected at least 30 themes, found ${ids.length}`);
+  assert.equal(new Set(ids).size, ids.length, "duplicate theme id in THEMES");
+
+  const missingTokens = ids.filter((id) => !blocks.has(id));
+  assert.deepEqual(
+    missingTokens,
+    [],
+    `These themes are in the picker but have no [data-theme] block in ` +
+      `globals.css, so selecting one silently falls back to the default palette: ` +
+      missingTokens.join(", "),
+  );
+
+  const orphanBlocks = [...blocks].filter((b) => !ids.includes(b));
+  assert.deepEqual(
+    orphanBlocks,
+    [],
+    `These [data-theme] blocks have no entry in THEMES, so nothing can ever ` +
+      `select them: ` + orphanBlocks.join(", "),
+  );
+});
+
+test("the third colour is optional — two-colour schemes must still resolve", () => {
+  const css = code(read("src/app/globals.css"));
+  // Note the nested var() — the fallback is itself a var(), so a naive
+  // "everything up to the first )" capture stops one paren short.
+  const uses = [...css.matchAll(/var\(--brand-accent-2\s*([^;]*?)\)\)/g)].map((m) => m[1]);
+  assert.ok(uses.length > 0, "--brand-accent-2 should be used somewhere");
+  for (const u of uses) {
+    assert.match(
+      u,
+      /^,\s*var\(--brand-accent$/,
+      "Every --brand-accent-2 read must fall back to var(--brand-accent). " +
+        "Without the fallback the 21 two-colour schemes render a gradient stop " +
+        "as 'unset', which paints black.",
+    );
+  }
+});
+
+test("text-clipped gradients are set with background-image, never the shorthand", () => {
+  const css = read("src/app/globals.css");
+  // .gradient-text and .stat-number paint their gradient INTO the glyphs via
+  // background-clip: text. The `background` shorthand resets background-clip to
+  // border-box, so any later rule using the shorthand silently un-clips them:
+  // the gradient fills the whole box and the text, whose fill colour is
+  // transparent, vanishes. It renders as a solid coloured bar where the
+  // client's name should be, and nothing errors.
+  const rules = [...css.matchAll(/(^|\})\s*([^{}]*\b(?:gradient-text|stat-number)\b[^{}]*)\{([^}]*)\}/gm)];
+  assert.ok(rules.length >= 2, "expected rules targeting .gradient-text / .stat-number");
+  for (const r of rules) {
+    const body = r[3];
+    if (!/linear-gradient/.test(body)) continue;
+    if (/background-clip/.test(body)) continue; // the defining rule sets both
+    assert.ok(
+      !/(^|;)\s*background\s*:/.test(body),
+      "A later rule re-declares the gradient with the `background` shorthand, " +
+        "which resets background-clip and makes the text invisible. Use " +
+        "`background-image:` instead.\nOffending selector: " + r[2].trim(),
+    );
+  }
+});
+
+test("depth & glow is opt-in and cannot be on by default", () => {
+  const css = read("src/app/globals.css");
+  assert.ok(css.includes('[data-deep="on"]'), "globals.css must define the data-deep=on layer");
+  assert.ok(
+    !/:root\s*\{[^}]*--block-glow/.test(css),
+    "--block-glow must not be set on :root — that would turn the effect on for " +
+      "everyone, and Dustin was explicit that it is a per-person choice.",
+  );
+  const provider = code(read("src/components/ThemeProvider.tsx"));
+  assert.match(
+    provider,
+    /useState\(false\)/,
+    "the deep state must default to false",
+  );
+  assert.match(
+    provider,
+    /typeof settings\?\.depth_glow === "boolean"/,
+    "a NULL depth_glow means 'never chosen' and must not override the device setting",
+  );
+});
+
 test("ThemeProvider surfaces a failed theme save", () => {
   const src = code(read("src/components/ThemeProvider.tsx"));
   assert.ok(
