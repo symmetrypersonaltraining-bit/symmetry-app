@@ -7,6 +7,7 @@ import HeaderAssist from "@/components/HeaderAssist";
 import RealtimeScheduleSync from "@/components/RealtimeScheduleSync";
 import PushRegister from "@/components/PushRegister";
 import MessageNotifier from "@/components/MessageNotifier";
+import { NotificationProvider } from "@/lib/useNotificationFeed";
 import PullToRefresh from "@/components/PullToRefresh";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -28,17 +29,21 @@ export default async function AppLayout({
 
   if (isTrainer) {
     return (
-      <>
+      // One provider, wrapping everything that reads unread — the bell in
+      // HeaderAssist, the banner, and the nav badge. Mounted here so there can
+      // only ever be one of it.
+      <NotificationProvider>
         <RealtimeScheduleSync />
         <PushRegister />
         <MessageNotifier />
         <PullToRefresh />
         <TrainerLayoutWrapper>{children}</TrainerLayoutWrapper>
-      </>
+      </NotificationProvider>
     );
   }
 
   return (
+    <NotificationProvider>
     <div className="min-h-screen" style={{ background: "var(--brand-bg-deep, var(--brand-bg))", backgroundAttachment: "fixed" }}>
       <RealtimeScheduleSync />
       {/* Clients register for push AND get the in-app new-message banner too. */}
@@ -54,5 +59,6 @@ export default async function AppLayout({
       <SessionDock />
       <BottomNav />
     </div>
+    </NotificationProvider>
   );
 }
