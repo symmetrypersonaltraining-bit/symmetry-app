@@ -210,7 +210,18 @@ export default function CoachChatSheet({
       const res = await fetch("/api/nutrition-ai/act", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: question, clientId, dayContext }),
+        // Send the turns so far. The sheet has always kept a Msg[] and rendered
+        // it as a conversation; it just never reached the model, so every
+        // question was answered cold. `msgs` is the state BEFORE this question
+        // was appended in React's next render, so it is exactly the prior turns.
+        body: JSON.stringify({
+          message: question,
+          clientId,
+          dayContext,
+          history: msgs
+            .filter((m) => !!m.text)
+            .map((m) => ({ role: m.role === "client" ? "user" : "assistant", content: m.text })),
+        }),
       });
       const json = (await res.json().catch(() => null)) as
         | {

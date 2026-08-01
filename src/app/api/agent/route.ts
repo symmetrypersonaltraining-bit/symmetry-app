@@ -9,6 +9,7 @@
 // history. It executes directly and narrates what it did, like chatting with
 // Claude. Model: Sonnet (tool use). Body: { messages:[{role,content}], pageContext? }.
 
+import { APP_GUIDE_TRAINER } from "@/lib/ai/app-guide";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { SONNET_MODEL } from "@/lib/ai/anthropic";
@@ -32,7 +33,10 @@ Programming rules you must always honor:
 
 Writing workouts: adjust_workout only touches THIS client's scheduled sessions (it clones a shared template into a client-owned copy first). Use scope "one" for a single session or "series" for all upcoming sessions of that workout — if it's ambiguous, ask Dustin which he wants before a big change. Reference the exact SW-id / section_id / pe_id from client_workouts.
 
-Keep replies tight. After a change, confirm exactly what you did in one or two sentences.`;
+Keep replies tight. After a change, confirm exactly what you did in one or two sentences.
+
+${APP_GUIDE_TRAINER}
+`;
 
 const TOOLS: Anthropic.Tool[] = [
   { name: "find_clients", description: "Find clients by name (partial, case-insensitive). Omit query to list all clients. Returns id, name, primary_goal.", input_schema: { type: "object", properties: { query: { type: "string", description: "name fragment; omit to list all" } } } },

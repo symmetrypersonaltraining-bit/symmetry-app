@@ -90,6 +90,24 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const message = typeof body?.message === "string" ? body.message.trim() : "";
+
+    // Conversation history. Both calls below used to send a single user turn, so
+    // every message was turn one: the sheet rendered bubbles and a typing
+    // indicator over a model with no memory. "Swap M4 for salmon" -> "actually
+    // make it 8oz" and it had no idea what "it" was. Capped at 12 turns and 700
+    // chars each so a long session cannot blow the context or the bill.
+    const history: Array<{ role: "user" | "assistant"; content: string }> =
+      Array.isArray(body?.history)
+        ? body.history
+            .filter((t: unknown): t is { role: string; content: string } =>
+              !!t && typeof (t as any).content === "string" &&
+              ((t as any).role === "user" || (t as any).role === "assistant"))
+            .slice(-12)
+            .map((t: { role: string; content: string }) => ({
+              role: t.role === "assistant" ? ("assistant" as const) : ("user" as const),
+              content: t.content.slice(0, 700),
+            }))
+        : [];
     if (!message) {
       return NextResponse.json({ error: "Say something first — tell me what you ate or what to change." }, { status: 400 });
     }
@@ -117,10 +135,13 @@ export async function POST(req: NextRequest) {
       model: HAIKU_MODEL,
       system: ACT_SYSTEM_PROMPT,
       maxTokens: 800,
-      messages: [{
-        role: "user",
-        content: `DAY CONTEXT (today's meals, trusted):\n${JSON.stringify(day)}\n\nCLIENT MESSAGE:\n${message}`,
-      }],
+      messages: [
+        ...history,
+        {
+          role: "user",
+          content: `DAY CONTEXT (today's meals, trusted):\n${JSON.stringify(day)}\n\nCLIENT MESSAGE:\n${message}`,
+        },
+      ],
       validate: validateActReply,
     });
     await logUsage(clientId, "chat", extraction.tokensIn, extraction.tokensOut, HAIKU_MODEL);
@@ -151,10 +172,13 @@ export async function POST(req: NextRequest) {
       model: HAIKU_MODEL,
       system: COACH_SYSTEM_PROMPT,
       maxTokens: 900,
-      messages: [{
-        role: "user",
-        content: `CONTEXT (server-assembled, trusted):\n${context}\n\nTODAY'S MEALS:\n${JSON.stringify(day)}\n\nCLIENT QUESTION:\n${message}`,
-      }],
+      messages: [
+        ...history,
+        {
+          role: "user",
+          content: `CONTEXT (server-assembled, trusted):\n${context}\n\nTODAY'S MEALS:\n${JSON.stringify(day)}\n\nCLIENT QUESTION:\n${message}`,
+        },
+      ],
       validate: validateCoachReply,
     });
     await logUsage(clientId, "chat", coach.tokensIn, coach.tokensOut, HAIKU_MODEL);

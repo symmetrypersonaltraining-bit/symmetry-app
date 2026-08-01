@@ -195,7 +195,20 @@ export default function NutritionV3Client(props: Props) {
   const [showNutrients, setShowNutrients] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
   const [coachDismissed, setCoachDismissed] = useState(false);
+  // Persisted. This was plain useState, so "Coach: OFF" silently survived until
+  // the next full reload and then came back on — the user could not tell
+  // whether they had turned it off or the feature was broken.
   const [coachOn, setCoachOn] = useState(true);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("sym:v3:coachOn:" + clientId);
+      if (v === "0") setCoachOn(false);
+    } catch { /* private mode */ }
+  }, [clientId]);
+  const setCoachOnPersisted = useCallback((v: boolean) => {
+    setCoachOn(v);
+    try { localStorage.setItem("sym:v3:coachOn:" + clientId, v ? "1" : "0"); } catch { /* noop */ }
+  }, [clientId]);
   const [coachApi, setCoachApi] = useState<{ message: string; kind?: string } | null>(null);
   // The WEEKLY read (clients.ai_food_focus), written every Sunday by
   // /api/cron/weekly-ai from last week vs this week. Separate from the daily
@@ -1630,10 +1643,20 @@ export default function NutritionV3Client(props: Props) {
         />
       )}
 
-      {/* floating ✦ coach chat — today only ("Apply to today" writes an extras
-          row on the visible date); hidden by the Coach toggle and by
-          client_app_settings.coach_enabled (checked inside the component). */}
-      {coachOn && selectedDate === today && (
+      {/* Floating ✦ coach chat.
+          It used to be gated on `selectedDate === today` as well as the Coach
+          toggle, and BOTH conditions removed the button from the DOM with
+          nothing on screen to say why. Tapping ‹ once to glance at yesterday
+          made the coach, the insight card and the weekly read all disappear —
+          and selectedDate is sticky in sessionStorage, so it stayed gone for
+          the rest of the browser session. That is the "my AI button does
+          nothing" report: the button was not broken, it was not there.
+          The date restriction existed because "Apply to today" writes an extras
+          row on the visible date. That is a reason to disable the WRITE on a
+          past date, not to hide the coach — asking it a question about
+          yesterday is perfectly reasonable. The sheet now renders on any date
+          and refuses only the mutating actions. */}
+      {coachOn && (
         <CoachChatSheet
           clientId={clientId}
           dayContext={coachDayContext}
@@ -2237,7 +2260,7 @@ export default function NutritionV3Client(props: Props) {
         {rowBtn("🗂", "Plan versions", "Current live + staged incoming — flips at midnight CT", () => { backSheet(); openVersions(); })}
         {activePlan && rowBtn("📅", "Week ahead", "Forward view · 1w / 4w / 8w / custom", () => replaceSheet({ kind: "forward" }))}
         {rowBtn("⭐", "My Meals", "Saved custom meals — reuse in any slot", () => replaceSheet({ kind: "mymeals", at: rows.length }))}
-        {rowBtn("✦", `Coach: ${coachOn ? "ON" : "OFF"}`, "Insight cards, celebrations & nudges — toggle anytime", () => { setCoachOn(!coachOn); setCoachDismissed(false); toast(coachOn ? "Coach off" : "Coach on"); })}
+        {rowBtn("✦", `Coach: ${coachOn ? "ON" : "OFF"}`, "Insight cards, celebrations & nudges — toggle anytime", () => { setCoachOnPersisted(!coachOn); setCoachDismissed(false); toast(coachOn ? "Coach off" : "Coach on"); })}
       </Sheet>
     );
   }
