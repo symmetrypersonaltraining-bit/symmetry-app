@@ -11,6 +11,7 @@ import CelebrationScreen from "@/components/CelebrationScreen";
 import SetFeedback from "@/components/SetFeedback";
 import WakeLock from "@/components/WakeLock";
 import { fx } from "@/lib/fx";
+import { isDraftStale } from "@/lib/workoutDraft";
 
 interface Exercise {
   id: string;
@@ -817,7 +818,8 @@ export default function WorkoutLogger({
           if (!r2) continue;
           try {
             const d2 = JSON.parse(r2);
-            if (d2 && d2.sessionMode === true) { raw = r2; window.localStorage.removeItem(k); break; }
+            // Same staleness rule as below — never adopt a dead sibling draft as "live".
+            if (d2 && d2.sessionMode === true && !isDraftStale(d2.savedAt)) { raw = r2; window.localStorage.removeItem(k); break; }
           } catch (e2) {}
         }
       }
@@ -860,7 +862,13 @@ export default function WorkoutLogger({
           }
           if (typeof d.activeSectionIdx === 'number') setActiveSectionIdx(d.activeSectionIdx);
           if (typeof d.activeExerciseIdx === 'number') setActiveExerciseIdx(d.activeExerciseIdx);
-          if (typeof d.sessionMode === 'boolean') setSessionMode(d.sessionMode);
+          // Only a FRESH draft may restore the full-screen session lock. SessionDock already
+          // treats a draft older than 8h as dead and stops offering it; hydration used to
+          // ignore age entirely, so a stale draft slammed the client straight back into the
+          // session view on every launch — closing and reopening the app could not clear it.
+          // Past the window the sets and notes still come back (nothing is lost), but the
+          // client lands on the overview and taps "Session" to go back in by choice.
+          if (d.sessionMode === true && !isDraftStale(d.savedAt)) setSessionMode(true);
           if (typeof d.sessionNote === 'string') setSessionNote(d.sessionNote);
           if (d.workoutLogId) setWorkoutLogId(d.workoutLogId);
         }
@@ -1617,6 +1625,16 @@ export default function WorkoutLogger({
           ) : null}
         </div>
 
+        {/* Scroll region (7/31 fix). Everything between the progress bar and the bottom
+            controls lives in ONE flexible, scrollable column. Before this, the header and the
+            sets block were both flex-shrink-0 inside a `fixed inset-0 flex flex-col` root with
+            no overflow anywhere, so a tall exercise (long wrapped name + video thumb + chips +
+            4+ sets + prior notes) pushed the Prev/Next/Complete bar and the tab bar below the
+            viewport with no way to reach them — a hard lock with no exit. The footer and tab
+            bar are pinned siblings BELOW this box, so they are always on screen at any content
+            height; overflow scrolls here instead of off the screen. */}
+        <div className="flex-1 min-h-0 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+
         {/* Exercise header (V6 micro-pill) — one compact row: small video thumb + name +
             inline History/Swap. Meta as micro-pills, cue collapsed behind an info toggle to
             keep the header short so all sets sit above the keyboard. NO keyboard-conditioned
@@ -1676,9 +1694,9 @@ export default function WorkoutLogger({
           )}
         </div>
 
-        {/* Sets — PINNED block (flex-shrink-0, no internal scroll) so the keyboard never
-            compresses or scrolls them. All sets stay fixed and fully visible; the keyboard
-            overlays the (secondary) controls below. Nothing here moves on keyboard state. */}
+        {/* Sets — flex-shrink-0 inside the scroll region above, so the sets themselves still
+            never compress on keyboard state; when the content is taller than the screen the
+            scroll region (not the set rows) absorbs it. */}
         <div className="flex-shrink-0 px-5">
           <div className="flex items-center gap-2 mb-1" style={{ flexWrap: "wrap" }}>
             <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>Track:</span>
@@ -1818,10 +1836,9 @@ export default function WorkoutLogger({
           </div>
         </div></div>
 
-        {/* Flexible spacer: absorbs free space so the bar + tab bar sit at the bottom when the
-            keyboard is down, and collapses to nothing when it's up (pushing them behind the
-            keyboard) — the pinned sets above never move either way. */}
-        <div className="flex-1 min-h-0" />
+        {/* /scroll region — the old flex-1 spacer that used to sit here is gone; the scroll
+            box itself is the flexible element that pushes the controls to the bottom. */}
+        </div>
 
         {/* Bottom controls (Prev/Next/Complete). */}
         <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>

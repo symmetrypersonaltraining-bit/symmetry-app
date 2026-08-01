@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { isDraftStale } from "@/lib/workoutDraft";
 
 // Global "Now training" dock. Reads the workout auto-save draft that WorkoutLogger
 // writes to localStorage (key: symmetry_wl_{clientId}_{dayId}_{t|c}). Shows only when
@@ -40,7 +41,9 @@ export default function SessionDock() {
           try { d = JSON.parse(raw); } catch { continue; }
           if (!d || d.sessionMode !== true) continue;
           const savedAt = typeof d.savedAt === "number" ? d.savedAt : 0;
-          if (savedAt && Date.now() - savedAt > 8 * 60 * 60 * 1000) continue; // stale > 8h
+          // Shared with WorkoutLogger's own hydration — see src/lib/workoutDraft.ts, which
+          // exists because the two used to disagree about what "in progress" means.
+          if (savedAt && isDraftStale(savedAt)) continue;
           if (!best || savedAt > best.savedAt) best = { clientId: parsed.clientId, dayId: parsed.dayId, savedAt };
         }
         setActive(best);
