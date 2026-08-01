@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useNotificationFeed } from "@/lib/useNotificationFeed";
 import { aggregateNotifications, totalUnread, NotifRow, RawUnread } from "@/lib/notifications";
 import { fetchGroupUnread, groupUnreadAsRows, markGroupRead } from "@/lib/groupUnread";
 
@@ -28,108 +29,38 @@ function fmtWhen(ts: string) {
 export default function NotificationCenter({ solid = false }: { solid?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState<NotifRow[]>([]);
   const ctx = useRef<{ isTrainer: boolean; myUserId: string; myClientId: string | null }>({ isTrainer: false, myUserId: "", myClientId: null });
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      const user = data?.user;
-      if (!user) return;
-      const isClientMode = typeof document !== "undefined" && document.cookie.split("; ").some((x) => x === "symmetry_client_mode=1");
-      const isTrainer = user.email === TRAINER_EMAIL && !isClientMode;
-      let myClientId: string | null = null;
-      if (!isTrainer) {
-        const { data: myClient } = await supabase.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
-        myClientId = myClient ? (myClient as { id: string }).id : null;
-      }
-      ctx.current = { isTrainer, myUserId: user.id, myClientId };
+  // The bell renders the shared feed now. It used to run its own 20s poll with
+  // its own filters — one of three components asking three different questions
+  // about the same data, which is why it could read zero while the nav badge
+  // still showed three.
+  const { items: rows, markRead, refresh: load } = useNotificationFeed();
 
-      // Same unread source as the badge: to_id=me, unread, not deleted.
-      const { data: raw } = await supabase
-        .from("messages")
-        .select("id, from_id, to_id, client_id, body, created_at, read_at, deleted_at, is_group, is_broadcast, image_url")
-        .eq("to_id", user.id)
-        .is("read_at", null)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(300);
-      let direct = (raw as RawUnread[]) || [];
-      // In client mode the trainer account is acting as a regular client — only
-      // their OWN thread's messages + broadcasts belong here. Incoming
-      // client→trainer messages (other client_ids) are trainer business and must
-      // not cross over into the client notification center. Mirrors MessagesBell.
-      if (isClientMode) {
-        direct = direct.filter((m) => m.is_broadcast || (!!m.client_id && m.client_id === myClientId));
-      }
-      // Fold in per-user GROUP unread (group_reads watermark) as synthetic rows
-      // so a new group message shows a "Group" row routing to /messages?client=group.
-      // In client mode (Dustin's own client app) include his OWN trainer-sent
-      // group/announcement messages so the bell + center light up like a real client.
-      const group = await fetchGroupUnread(supabase, user.id, isClientMode);
-      const unread = direct.concat(groupUnreadAsRows(group, user.id));
-
-      let clientNames: Record<string, string> = {};
-      if (isTrainer) {
-        const ids = Array.from(new Set(unread.map((m) => m.client_id).filter((x): x is string => !!x)));
-        if (ids.length) {
-          const { data: cs } = await supabase.from("clients").select("id, name").in("id", ids);
-          for (const c of ((cs as { id: string; name: string }[]) || [])) clientNames[c.id] = c.name;
-        }
-      }
-      setRows(aggregateNotifications(unread, { isTrainer, myUserId: user.id, clientNames, clientMode: isClientMode }));
-    } catch { /* noop */ }
-  }, []);
-
-  useEffect(() => {
-    load();
-    const iv = setInterval(load, 20000);
-    return () => clearInterval(iv);
-  }, [load]);
-
-  // Refresh when opening (fresh counts) + close on outside click / Esc.
-  useEffect(() => {
-    if (open) load();
-    function onDoc(e: MouseEvent) { if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false); }
-    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
-    if (open) { document.addEventListener("mousedown", onDoc); document.addEventListener("keydown", onKey); }
-    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
-  }, [open, load]);
-
-  async function markSourceRead(row: NotifRow) {
-    try {
-      const supabase = createClient();
-      const { myUserId } = ctx.current;
-      if (row.kind === "group") {
-        // Group unread is watermark-based → advance the caller's group_reads.
-        await markGroupRead(supabase, myUserId);
-        return;
-      }
-      let q = supabase.from("messages").update({ read_at: new Date().toISOString() }).eq("to_id", myUserId).is("read_at", null);
-      if (row.kind === "client" && row.clientId) q = q.eq("client_id", row.clientId);
-      else q = q.eq("is_group", false); // client "Trainer" row → all their direct + broadcasts
-      await q;
-    } catch { /* noop */ }
-  }
-
-  async function openRow(row: NotifRow) {
+    async function openRow(row: NotifRow) {
     setOpen(false);
-    setRows((prev) => prev.filter((r) => r.key !== row.key));
-    await markSourceRead(row);
+    await markRead(row);
     router.push(row.href);
   }
 
   async function markAll() {
     try {
       const supabase = createClient();
-      await Promise.all([
-        supabase.from("messages").update({ read_at: new Date().toISOString() }).eq("to_id", ctx.current.myUserId).is("read_at", null).is("deleted_at", null),
-        markGroupRead(supabase, ctx.current.myUserId),
-      ]);
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth?.user?.id;
+      if (uid) {
+        await Promise.all([
+          supabase.from("messages").update({ read_at: new Date().toISOString() })
+            .eq("to_id", uid).is("read_at", null).is("deleted_at", null),
+          markGroupRead(supabase),
+        ]);
+      }
     } catch { /* noop */ }
-    setRows([]);
+    // The feed owns the state — refetch rather than clearing a local copy, so
+    // the bell, the nav badge and the banner all drop together instead of the
+    // bell going quiet on its own.
+    await load();
   }
 
   const total = totalUnread(rows);
