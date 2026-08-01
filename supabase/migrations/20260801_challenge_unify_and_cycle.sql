@@ -1,0 +1,18 @@
+-- Applied to production 2026-08-01. Recorded here so the repo and the database
+-- do not drift; running it again is safe (everything is CREATE OR REPLACE /
+-- IF NOT EXISTS / ON CONFLICT DO NOTHING).
+--
+-- Three things:
+--   1. ONE challenge leaderboard, replacing two implementations that disagreed
+--      on who is ranked, how they are scored, whether demo accounts count, and
+--      what the Join button writes.
+--   2. client_announcements_seen — per-person tracking for one-time takeovers.
+--   3. The weekly cycle: score Sunday 6pm CT, announce and regenerate at 7pm.
+--
+-- Full rationale is in the commit messages and in the function bodies.
+-- pg_cron jobs installed alongside these (not creatable from a plain psql run
+-- against a fresh database without pg_cron):
+--   gcal_sync_15min        */15 * * * *   select public.trigger_gcal_sync();
+--   gcal_sync_harvest      */5  * * * *   select public.harvest_gcal_sync_runs();
+--   challenge_cycle_hourly 5    * * * *   select public.challenge_cycle_tick();
+-- (see production; full DDL applied via Supabase migrations: gcal_sync_scheduler_via_pg_cron, challenge_leaderboard_full_roster_v2, weekly_challenge_cycle, challenge_leaderboard_tie_fix)
