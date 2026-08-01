@@ -64,14 +64,37 @@ export function aggregateNotifications(
     // newest message in this source drives the snippet
     const newest = g.rows.reduce((a, b) => ((b.created_at || "") > (a.created_at || "") ? b : a), g.rows[0]);
     const snippet = snippetOf(newest.body, !!newest.image_url);
+    // Which message the tap should land ON.
+    //
+    // Opening the thread and stopping at the bottom is wrong for the group: by
+    // the time someone taps "Dustin posted an announcement", four clients have
+    // shared PRs underneath it, so the message they were told to read is off
+    // screen and they arrive at chatter. `?m=` scrolls to it and flashes it.
+    //
+    // The ANNOUNCEMENT is the target where there is one, not merely the newest
+    // unread — an announcement being buried is the exact failure this fixes, so
+    // it outranks whatever arrived after it. Otherwise the oldest unread, which
+    // is where reading should start.
+    const announcement = g.rows
+      .filter((m) => m.is_broadcast === true)
+      .sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""))
+      .slice(-1)[0];
+    const oldestUnread = g.rows.reduce(
+      (a, b) => ((b.created_at || "") < (a.created_at || "") ? b : a),
+      g.rows[0],
+    );
+    const anchor = announcement || oldestUnread;
+    const m = anchor?.id ? "&m=" + anchor.id : "";
+
     if (key === "group") {
-      out.push({ key, kind: "group", title: "Group Chat", snippet, count: g.rows.length, time: g.latest, href: "/messages?client=group" + asMarker });
+      out.push({ key, kind: "group", title: "Group Chat", snippet, count: g.rows.length, time: g.latest, href: "/messages?client=group" + asMarker + m });
     } else if (opts.isTrainer) {
       const clientId = key.slice("client:".length);
       const title = (opts.clientNames && opts.clientNames[clientId]) || "Client";
-      out.push({ key, kind: "client", clientId, title, snippet, count: g.rows.length, time: g.latest, href: "/messages?client=" + clientId });
+      out.push({ key, kind: "client", clientId, title, snippet, count: g.rows.length, time: g.latest, href: "/messages?client=" + clientId + m });
     } else {
-      out.push({ key, kind: "trainer", title: "Trainer", snippet, count: g.rows.length, time: g.latest, href: opts.clientMode ? "/messages?as=client" : "/messages" });
+      const base = opts.clientMode ? "/messages?as=client" : "/messages";
+      out.push({ key, kind: "trainer", title: "Trainer", snippet, count: g.rows.length, time: g.latest, href: base + (m ? (base.includes("?") ? m : "?" + m.slice(1)) : "") });
     }
   }
 

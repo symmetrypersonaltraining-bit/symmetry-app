@@ -421,7 +421,7 @@ function SessionDetailPopup({ ev, clients, workoutMap, onClose, onSaved }: {
           <div className="flex items-center gap-2.5">
             <i className="ti ti-clock text-base" style={{ color: "var(--brand-text-secondary)" }} />
             <span className="text-sm" style={{ color: "var(--brand-text)" }}>
-              {fmtTime(start)} \u2013 {fmtTime(end)}
+              {fmtTime(start)}{'\u2013'}{fmtTime(end)}
             </span>
           </div>
 
@@ -1420,13 +1420,22 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
                       style={{ background: "var(--brand-bg)", borderLeft: `3px solid ${color}` }}>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                          {fmtTime(start)} \u2013 {fmtTime(end)}
+                          {fmtTime(start)}{'\u2013'}{fmtTime(end)}
                         </p>
                         <p className="text-sm font-medium truncate"
                           style={{ color: isCancelled ? "var(--brand-text-secondary)" : "var(--brand-text)",
                             textDecoration: isCancelled ? "line-through" : "none" }}>
                           {ev.clientName && ev.clientName !== "Unknown" ? ev.clientName : (ev.title || ev.assessmentName || "Assessment")}
-                          {ev.clientName && ev.title && ev.title !== "Training Session" ? ` \u00b7 ${ev.title}` : ""}
+                          {/* Google Calendar events are titled with the client's
+                              name, so title === clientName for almost every row
+                              and this printed "Tim Yancey \u00b7 Tim Yancey".
+                              Only append a title that says something the name
+                              does not. */}
+                          {ev.clientName && ev.title
+                            && ev.title !== "Training Session"
+                            && ev.title.trim().toLowerCase() !== ev.clientName.trim().toLowerCase()
+                            && !ev.title.trim().toLowerCase().startsWith(ev.clientName.trim().toLowerCase())
+                              ? ` \u00b7 ${ev.title}` : ""}
                         </p>
                       </div>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize flex-shrink-0"
@@ -1434,7 +1443,14 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
                           background: isCancelled ? "#F9731620" : ev.status === "completed" ? "#43A04720" : "#1A73E820",
                           color: isCancelled ? "#F97316" : ev.status === "completed" ? "#43A047" : "#1A73E8"
                         }}>
-                        {ev.status}
+                        {/* `capitalize` on a raw database value gave
+                            "Cancelled_client". These are enum values, not copy. */}
+                        {ev.status === "cancelled_client" ? "Cancelled"
+                          : ev.status === "cancelled_trainer" ? "Cancelled by me"
+                          : ev.status === "cancelled" ? "Cancelled"
+                          : ev.status === "completed" ? "Done"
+                          : ev.status === "scheduled" ? "Scheduled"
+                          : ev.status.replace(/_/g, " ")}
                       </span>
                     </button>
                   );
@@ -1515,13 +1531,21 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
             style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
             <i className="ti ti-chevron-right text-xs" style={{ color: "var(--brand-text-secondary)" }} />
           </button>
-          <span className="text-sm font-semibold flex-1 truncate" style={{ color: "var(--brand-text)" }}>{headerLabel}</span>
+          {/* min-w-0 so THIS is what gives way when the bar is tight, rather
+              than the view toggle. A truncated date is recoverable; a truncated
+              toggle means a view you cannot reach. */}
+          <span className="text-sm font-semibold flex-1 min-w-0 truncate" style={{ color: "var(--brand-text)" }}>{headerLabel}</span>
 
-          {/* View toggle */}
-          <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "var(--brand-border)" }}>
+          {/* View toggle.
+              Four buttons in a fixed-width row next to Today, both arrows and a
+              date label do not fit a phone: "Month Weel Day Agend" was being
+              clipped and Agenda was half unreachable. flex-shrink-0 on the group
+              stops it being squeezed by its neighbours, and the buttons get
+              tighter padding so all four fit. */}
+          <div className="flex rounded-lg overflow-hidden border flex-shrink-0" style={{ borderColor: "var(--brand-border)" }}>
             {(["month","week","day","agenda"] as ViewMode[]).map(v => (
               <button key={v} onClick={() => setViewMode(v)}
-                className="px-2.5 py-1.5 text-xs font-semibold transition-colors"
+                className="flex-shrink-0 px-2 py-1.5 text-[11px] font-semibold transition-colors"
                 style={{
                   background: viewMode === v ? "var(--brand-primary)" : "var(--brand-surface)",
                   color: viewMode === v ? "white" : "var(--brand-text-secondary)",

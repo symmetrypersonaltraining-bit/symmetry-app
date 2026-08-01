@@ -105,7 +105,33 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
     if (fileRef.current) fileRef.current.value = "";
   };
 
+  // Deep link to ONE message.
+  //
+  // A notification used to open the thread and land at the bottom. In the group
+  // that is wrong: by the time someone taps "Dustin posted an announcement",
+  // four clients have shared PRs underneath it, so the thing they were told to
+  // read is off screen and they see chatter instead. ?m=<id> scrolls to that
+  // message and flashes it, so the tap lands on the message rather than near it.
+  const [flashId, setFlashId] = useState<string | null>(null);
   useEffect(() => {
+    let target: string | null = null;
+    try { target = new URLSearchParams(window.location.search).get("m"); } catch { target = null; }
+
+    if (target && thread.some((m) => m.id === target)) {
+      // Wait a frame so the thread has laid out, otherwise scrollIntoView
+      // measures against a half-rendered list and lands in the wrong place.
+      requestAnimationFrame(() => {
+        const el = document.getElementById("msg-" + target);
+        if (el) {
+          el.scrollIntoView({ behavior: "auto", block: "center" });
+          setFlashId(target);
+          setTimeout(() => setFlashId(null), 2600);
+          return;
+        }
+        bottomRef.current?.scrollIntoView({ behavior: "instant" });
+      });
+      return;
+    }
     bottomRef.current?.scrollIntoView({ behavior: "instant" });
   }, [thread]);
 
@@ -214,9 +240,21 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
               {msgs.map(m => {
                 const isMe = m.from_id === currentUserId;
                 return (
-                  <div key={m.id} className={"flex " + (isMe ? "justify-end" : "justify-start")}>
+                  <div key={m.id} id={"msg-" + m.id} className={"flex " + (isMe ? "justify-end" : "justify-start")} style={{ scrollMarginTop: 80, scrollMarginBottom: 80 }}>
                     <div className="max-w-[78%] rounded-2xl px-4 py-2.5"
-                      style={{ background: isMe ? "var(--brand-primary)" : "var(--brand-surface)", border: isMe ? "none" : "1px solid var(--brand-border)", borderBottomRightRadius: isMe ? 4 : 16, borderBottomLeftRadius: isMe ? 16 : 4 }}>
+                      style={{
+                        background: isMe ? "var(--brand-primary)" : "var(--brand-surface)",
+                        border: isMe ? "none" : "1px solid var(--brand-border)",
+                        borderBottomRightRadius: isMe ? 4 : 16,
+                        borderBottomLeftRadius: isMe ? 16 : 4,
+                        // The flash is what makes a deep link land. Without it
+                        // you arrive mid-thread with no idea which message you
+                        // were sent to read.
+                        boxShadow: flashId === m.id
+                          ? "0 0 0 3px color-mix(in srgb, var(--brand-accent) 70%, transparent), 0 6px 20px rgba(0,0,0,.18)"
+                          : undefined,
+                        transition: "box-shadow .35s ease",
+                      }}>
                       <p className="text-[11px] font-bold mb-0.5 flex items-center gap-1.5" style={{ color: isMe ? "rgba(255,255,255,0.85)" : "var(--brand-primary)" }}>
                         {nameForFrom(m)}
                         {m.is_broadcast ? <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: 0.4, padding: "1px 5px", borderRadius: 4, background: isMe ? "rgba(255,255,255,0.2)" : "color-mix(in srgb, var(--brand-primary) 16%, transparent)", color: isMe ? "#fff" : "var(--brand-primary)" }}>ANNOUNCEMENT</span> : null}
