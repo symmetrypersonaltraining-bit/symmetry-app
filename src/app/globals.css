@@ -1921,6 +1921,30 @@ option:hover {
    ════════════════════════════════════════════════════════════════════════════ */
 
 /* ── Level 20% ───────────────────────────────────────────────────────────── */
+/* ── CAPTURE THE THEME VALUE FIRST, ON html ─────────────────────────────────
+   `--brand-surface: color-mix(..., var(--brand-surface))` on `body` is a CYCLE,
+   not a re-derivation. I assumed the var() on the right would resolve against
+   the value inherited from html; it does not — a custom property that
+   references ITSELF on the SAME element is cyclic per spec, and the browser
+   makes it guaranteed-invalid. --brand-surface therefore computed to the EMPTY
+   STRING on body, and `.card { background: var(--brand-surface) }` resolved to
+   transparent. Cards had NO BACKGROUND AT ALL whenever depth was on, and it
+   read as "deeper" only because the tinted page showed straight through them.
+
+   Caught by probing getComputedStyle, not by looking at a screenshot — a
+   transparent card over a tinted page looks exactly like a tinted card, which
+   is why three rounds of eyeballing renders missed it.
+
+   The fix is one indirection: html captures the theme's value under a DIFFERENT
+   name, body derives the real token from that name. No property references
+   itself, so nothing is cyclic. */
+[data-deep="20"] {
+  --surface-base: var(--brand-surface);
+  --bg-base:      var(--brand-bg);
+  --card-base:    var(--brand-card);
+  --border-base:  var(--brand-border);
+}
+
 [data-deep="20"] body {
   /* THE BRAND COLOUR HAS TO MOVE TOO. Reported after testing 20 vs off: "I
      don't see any difference in the main color... the deep blue on this one
@@ -1948,10 +1972,10 @@ option:hover {
   /* On `body`, not `html`: the right-hand side reads the token it defines, and
      on the same element that is a cycle and CSS drops the declaration. One
      level down it resolves against the value inherited from the theme. */
-  --brand-surface: color-mix(in srgb, var(--brand-primary) 10%, var(--brand-surface));
-  --brand-bg:      color-mix(in srgb, var(--brand-primary) 8%, var(--brand-bg));
-  --brand-card:    color-mix(in srgb, var(--brand-primary) 12%, var(--brand-card));
-  --brand-border:  color-mix(in srgb, var(--brand-primary) 28%, var(--brand-border));
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 10%, var(--surface-base));
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 8%, var(--bg-base));
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 12%, var(--card-base));
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 28%, var(--border-base));
   --hairline: color-mix(in srgb, var(--brand-border) 60%, var(--brand-primary));
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
   /* A gradient you can actually see. The first version ran from the surface
@@ -1963,6 +1987,24 @@ option:hover {
      Capped at 20%. Text sits on these; measured across all 30 schemes at
      level 50, 20% leaves the worst corner at 4.8:1 and 26% drops carbon neon
      to 4.4:1, under the floor. */
+  /* The top-edge gradient strip. The Challenge and Group cards had one and
+     nothing else did — "see how there is a top border gradient? I want that on
+     all boxes app wide."
+
+     Drawn as a BACKGROUND LAYER, not a ::before. A pseudo-element would need
+     position:relative on every card, and adding that globally changes the
+     containing block for any position:absolute child — which several of these
+     cards have. A background layer cannot break layout, and border-radius
+     clips it for free.
+
+     Runs primary -> accent -> the third colour, so multicolour schemes show
+     all three in the strip. */
+  --card-topbar: linear-gradient(90deg,
+    var(--brand-primary) 0%,
+    var(--brand-accent) 58%,
+    var(--brand-accent-2, var(--brand-accent)) 100%);
+  --card-topbar-h: 2.5px;
+
   --surface-grade: linear-gradient(150deg,
     color-mix(in srgb, var(--brand-accent) 5%, var(--brand-surface)) 0%,
     var(--brand-surface) 46%,
@@ -1985,6 +2027,25 @@ option:hover {
       color-mix(in srgb, var(--brand-accent) 62%, #000) 52%, transparent),
     0 0 0 1px color-mix(in srgb, var(--brand-accent) 18%, transparent);
 }
+
+/* The strip is the raw scheme colours, which read fine against a light card
+   and disappear against a dark one — Deep Purple's primary is #4A148C, barely
+   separable from a dark surface. On dark the same gradient is lifted toward
+   white so the edge still reads. Light schemes keep the true colours, where
+   lifting them would wash the strip out instead. */
+[data-deep="20"][data-appearance="dark"] body,
+[data-deep="20"][data-theme="midnight"] body,
+[data-deep="20"][data-theme="carbonneon"] body,
+[data-deep="20"][data-theme="midnightaurora"] body,
+[data-deep="20"][data-theme="midnightember"] body,
+[data-deep="20"][data-theme="midnightcitrus"] body,
+[data-deep="20"][data-theme="midnightorchid"] body,
+[data-deep="20"][data-theme="deepreef"] body {
+  --card-topbar: linear-gradient(90deg,
+    color-mix(in srgb, var(--brand-primary) 55%, white) 0%,
+    color-mix(in srgb, var(--brand-accent) 72%, white) 58%,
+    color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 72%, white) 100%);
+}
 [data-deep="20"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
 [data-deep="20"] [style*="var(--brand-card)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
 [data-deep="20"] .card,
@@ -1992,13 +2053,23 @@ option:hover {
 [data-deep="20"] .cw-surface,
 [data-deep="20"] .focus-panel,
 [data-deep="20"] .rounded-2xl:not(button):not(a):not([role="button"]) {
-  background-image: var(--surface-grade) !important;
+  background-image: var(--card-topbar), var(--surface-grade) !important;
+  background-repeat: no-repeat, no-repeat !important;
+  background-size: 100% var(--card-topbar-h), 100% 100% !important;
+  background-position: top left, center !important;
   box-shadow: var(--block-glow), var(--shadow-1);
 }
 [data-deep="20"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
 [data-deep="20"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
 
 /* ── Level 35% ───────────────────────────────────────────────────────────── */
+[data-deep="35"] {
+  --surface-base: var(--brand-surface);
+  --bg-base:      var(--brand-bg);
+  --card-base:    var(--brand-card);
+  --border-base:  var(--brand-border);
+}
+
 [data-deep="35"] body {
   /* THE BRAND COLOUR HAS TO MOVE TOO. Reported after testing 20 vs off: "I
      don't see any difference in the main color... the deep blue on this one
@@ -2026,10 +2097,10 @@ option:hover {
   /* On `body`, not `html`: the right-hand side reads the token it defines, and
      on the same element that is a cycle and CSS drops the declaration. One
      level down it resolves against the value inherited from the theme. */
-  --brand-surface: color-mix(in srgb, var(--brand-primary) 20%, var(--brand-surface));
-  --brand-bg:      color-mix(in srgb, var(--brand-primary) 16%, var(--brand-bg));
-  --brand-card:    color-mix(in srgb, var(--brand-primary) 22%, var(--brand-card));
-  --brand-border:  color-mix(in srgb, var(--brand-primary) 48%, var(--brand-border));
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 20%, var(--surface-base));
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 16%, var(--bg-base));
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 22%, var(--card-base));
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 48%, var(--border-base));
   --hairline: color-mix(in srgb, var(--brand-border) 60%, var(--brand-primary));
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
   /* A gradient you can actually see. The first version ran from the surface
@@ -2041,6 +2112,24 @@ option:hover {
      Capped at 20%. Text sits on these; measured across all 30 schemes at
      level 50, 20% leaves the worst corner at 4.8:1 and 26% drops carbon neon
      to 4.4:1, under the floor. */
+  /* The top-edge gradient strip. The Challenge and Group cards had one and
+     nothing else did — "see how there is a top border gradient? I want that on
+     all boxes app wide."
+
+     Drawn as a BACKGROUND LAYER, not a ::before. A pseudo-element would need
+     position:relative on every card, and adding that globally changes the
+     containing block for any position:absolute child — which several of these
+     cards have. A background layer cannot break layout, and border-radius
+     clips it for free.
+
+     Runs primary -> accent -> the third colour, so multicolour schemes show
+     all three in the strip. */
+  --card-topbar: linear-gradient(90deg,
+    var(--brand-primary) 0%,
+    var(--brand-accent) 58%,
+    var(--brand-accent-2, var(--brand-accent)) 100%);
+  --card-topbar-h: 3px;
+
   --surface-grade: linear-gradient(150deg,
     color-mix(in srgb, var(--brand-accent) 8%, var(--brand-surface)) 0%,
     var(--brand-surface) 46%,
@@ -2063,6 +2152,25 @@ option:hover {
       color-mix(in srgb, var(--brand-accent) 62%, #000) 68%, transparent),
     0 0 0 1px color-mix(in srgb, var(--brand-accent) 28%, transparent);
 }
+
+/* The strip is the raw scheme colours, which read fine against a light card
+   and disappear against a dark one — Deep Purple's primary is #4A148C, barely
+   separable from a dark surface. On dark the same gradient is lifted toward
+   white so the edge still reads. Light schemes keep the true colours, where
+   lifting them would wash the strip out instead. */
+[data-deep="35"][data-appearance="dark"] body,
+[data-deep="35"][data-theme="midnight"] body,
+[data-deep="35"][data-theme="carbonneon"] body,
+[data-deep="35"][data-theme="midnightaurora"] body,
+[data-deep="35"][data-theme="midnightember"] body,
+[data-deep="35"][data-theme="midnightcitrus"] body,
+[data-deep="35"][data-theme="midnightorchid"] body,
+[data-deep="35"][data-theme="deepreef"] body {
+  --card-topbar: linear-gradient(90deg,
+    color-mix(in srgb, var(--brand-primary) 55%, white) 0%,
+    color-mix(in srgb, var(--brand-accent) 72%, white) 58%,
+    color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 72%, white) 100%);
+}
 [data-deep="35"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
 [data-deep="35"] [style*="var(--brand-card)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
 [data-deep="35"] .card,
@@ -2070,13 +2178,23 @@ option:hover {
 [data-deep="35"] .cw-surface,
 [data-deep="35"] .focus-panel,
 [data-deep="35"] .rounded-2xl:not(button):not(a):not([role="button"]) {
-  background-image: var(--surface-grade) !important;
+  background-image: var(--card-topbar), var(--surface-grade) !important;
+  background-repeat: no-repeat, no-repeat !important;
+  background-size: 100% var(--card-topbar-h), 100% 100% !important;
+  background-position: top left, center !important;
   box-shadow: var(--block-glow), var(--shadow-1);
 }
 [data-deep="35"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
 [data-deep="35"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
 
 /* ── Level 50% ───────────────────────────────────────────────────────────── */
+[data-deep="50"] {
+  --surface-base: var(--brand-surface);
+  --bg-base:      var(--brand-bg);
+  --card-base:    var(--brand-card);
+  --border-base:  var(--brand-border);
+}
+
 [data-deep="50"] body {
   /* THE BRAND COLOUR HAS TO MOVE TOO. Reported after testing 20 vs off: "I
      don't see any difference in the main color... the deep blue on this one
@@ -2104,10 +2222,10 @@ option:hover {
   /* On `body`, not `html`: the right-hand side reads the token it defines, and
      on the same element that is a cycle and CSS drops the declaration. One
      level down it resolves against the value inherited from the theme. */
-  --brand-surface: color-mix(in srgb, var(--brand-primary) 30%, var(--brand-surface));
-  --brand-bg:      color-mix(in srgb, var(--brand-primary) 24%, var(--brand-bg));
-  --brand-card:    color-mix(in srgb, var(--brand-primary) 32%, var(--brand-card));
-  --brand-border:  color-mix(in srgb, var(--brand-primary) 68%, var(--brand-border));
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 30%, var(--surface-base));
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 24%, var(--bg-base));
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 32%, var(--card-base));
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 68%, var(--border-base));
   --hairline: color-mix(in srgb, var(--brand-border) 60%, var(--brand-primary));
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
   /* A gradient you can actually see. The first version ran from the surface
@@ -2119,6 +2237,24 @@ option:hover {
      Capped at 20%. Text sits on these; measured across all 30 schemes at
      level 50, 20% leaves the worst corner at 4.8:1 and 26% drops carbon neon
      to 4.4:1, under the floor. */
+  /* The top-edge gradient strip. The Challenge and Group cards had one and
+     nothing else did — "see how there is a top border gradient? I want that on
+     all boxes app wide."
+
+     Drawn as a BACKGROUND LAYER, not a ::before. A pseudo-element would need
+     position:relative on every card, and adding that globally changes the
+     containing block for any position:absolute child — which several of these
+     cards have. A background layer cannot break layout, and border-radius
+     clips it for free.
+
+     Runs primary -> accent -> the third colour, so multicolour schemes show
+     all three in the strip. */
+  --card-topbar: linear-gradient(90deg,
+    var(--brand-primary) 0%,
+    var(--brand-accent) 58%,
+    var(--brand-accent-2, var(--brand-accent)) 100%);
+  --card-topbar-h: 3.5px;
+
   --surface-grade: linear-gradient(150deg,
     color-mix(in srgb, var(--brand-accent) 12%, var(--brand-surface)) 0%,
     var(--brand-surface) 46%,
@@ -2141,6 +2277,25 @@ option:hover {
       color-mix(in srgb, var(--brand-accent) 62%, #000) 85%, transparent),
     0 0 0 1px color-mix(in srgb, var(--brand-accent) 40%, transparent);
 }
+
+/* The strip is the raw scheme colours, which read fine against a light card
+   and disappear against a dark one — Deep Purple's primary is #4A148C, barely
+   separable from a dark surface. On dark the same gradient is lifted toward
+   white so the edge still reads. Light schemes keep the true colours, where
+   lifting them would wash the strip out instead. */
+[data-deep="50"][data-appearance="dark"] body,
+[data-deep="50"][data-theme="midnight"] body,
+[data-deep="50"][data-theme="carbonneon"] body,
+[data-deep="50"][data-theme="midnightaurora"] body,
+[data-deep="50"][data-theme="midnightember"] body,
+[data-deep="50"][data-theme="midnightcitrus"] body,
+[data-deep="50"][data-theme="midnightorchid"] body,
+[data-deep="50"][data-theme="deepreef"] body {
+  --card-topbar: linear-gradient(90deg,
+    color-mix(in srgb, var(--brand-primary) 55%, white) 0%,
+    color-mix(in srgb, var(--brand-accent) 72%, white) 58%,
+    color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 72%, white) 100%);
+}
 [data-deep="50"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
 [data-deep="50"] [style*="var(--brand-card)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
 [data-deep="50"] .card,
@@ -2148,7 +2303,10 @@ option:hover {
 [data-deep="50"] .cw-surface,
 [data-deep="50"] .focus-panel,
 [data-deep="50"] .rounded-2xl:not(button):not(a):not([role="button"]) {
-  background-image: var(--surface-grade) !important;
+  background-image: var(--card-topbar), var(--surface-grade) !important;
+  background-repeat: no-repeat, no-repeat !important;
+  background-size: 100% var(--card-topbar-h), 100% 100% !important;
+  background-position: top left, center !important;
   box-shadow: var(--block-glow), var(--shadow-1);
 }
 [data-deep="50"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
@@ -2220,4 +2378,57 @@ option:hover {
   background: color-mix(in srgb, var(--brand-primary) 9%, var(--brand-surface));
   border: 1px solid color-mix(in srgb, var(--brand-primary) 22%, var(--brand-border));
   color: var(--brand-text);
+}
+
+/* ── Boxes must not touch — 2026-08-01 ──────────────────────────────────────
+   "need to fix spacing issue here where boxes touch."
+
+   Two cards with no gap were survivable when both were flat white on grey. The
+   moment each one gained a tinted fill, a coloured ring and a gradient strip
+   along its top edge, a zero gap reads as one malformed box rather than two
+   cards — the strip of the lower card sits directly against the border of the
+   upper one.
+
+   So the depth layer, which caused it, also pays for it: a floor on the gap
+   between stacked cards. `+` rather than a blanket margin so it only applies
+   between siblings that are actually adjacent, and nothing gains trailing space
+   at the bottom of a container. */
+[data-deep]:not([data-deep="off"]) .metric-card + .metric-card,
+[data-deep]:not([data-deep="off"]) .card + .card,
+[data-deep]:not([data-deep="off"]) .metric-card + .card,
+[data-deep]:not([data-deep="off"]) .card + .metric-card {
+  margin-top: 12px;
+}
+/* Grid and flex containers set their own gap, which margin cannot fix from the
+   child. A minimum gap on the containers that hold cards covers those. */
+[data-deep]:not([data-deep="off"]) .grid:has(> .metric-card),
+[data-deep]:not([data-deep="off"]) .grid:has(> .card) {
+  gap: 12px;
+}
+
+/* ── The rows inside cards, app-wide ────────────────────────────────────────
+   "anywhere that has these long wide tabs, boarders around them app wide."
+
+   The pattern repeats everywhere: a list of rows inside a card, each row
+   painted `background: var(--brand-bg)` — 255 of them. On a flat white app
+   that was enough separation, because --brand-bg is visibly greyer than
+   --brand-surface. Once BOTH deepen toward the same primary they converge, and
+   a list of six lifts or three sessions reads as one slab of text.
+
+   One rule rather than 255 edits, matched the same way as the card surfaces —
+   on the inline style's own text. It uses an INSET box-shadow rather than a
+   border because these elements set their border inline and nothing in a
+   stylesheet outranks that; an inset ring lands just inside it and gives the
+   same edge. Controls are excluded — a ring on an input reads as focus.
+
+   Off is off: this whole block is inside the depth layer, so anyone who has
+   not opted in sees none of it. */
+[data-deep]:not([data-deep="off"]) [style*="var(--brand-bg)"]:not(input):not(select):not(textarea):not(a):not(.app-bg) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 26%, transparent);
+}
+/* A button that IS a row (the Personal Bests entries, saved-workout pickers)
+   still wants the edge; a button that is a control does not. Rows are wide, so
+   this only reinstates it where the element fills its container. */
+[data-deep]:not([data-deep="off"]) button[style*="var(--brand-bg)"][style*="width: 100%"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 26%, transparent);
 }

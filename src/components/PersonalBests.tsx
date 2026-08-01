@@ -201,9 +201,14 @@ export default function PersonalBests({ clientId }: { clientId: string }) {
               gap: 10,
               padding: "9px 11px",
               borderRadius: 12,
-              background: "var(--brand-bg)",
-              border: "1px solid var(--brand-border)",
-              borderLeft: b.isRecent ? "3px solid var(--brand-primary)" : "3px solid transparent",
+              // Was var(--brand-bg) behind a 1px neutral border. Once the page
+              // deepened, that background sat within a few percent of the card
+              // it lives on, so six lifts read as one list with no edges. A
+              // scheme-tinted fill and a scheme-tinted ring separate them, and
+              // the left bar still marks "new this month".
+              background: "color-mix(in srgb, var(--brand-primary) 6%, var(--brand-surface))",
+              border: "1px solid color-mix(in srgb, var(--brand-primary) 30%, var(--brand-border))",
+              borderLeft: b.isRecent ? "3px solid var(--brand-primary)" : "3px solid color-mix(in srgb, var(--brand-primary) 30%, var(--brand-border))",
             }}
           >
             <div style={{ flex: 1, minWidth: 0 }}>

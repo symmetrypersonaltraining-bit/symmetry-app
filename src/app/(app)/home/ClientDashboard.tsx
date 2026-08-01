@@ -690,14 +690,16 @@ export default function ClientDashboard({
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ background: "white", transform: "translate(30%, -30%)" }} />
               <p className="text-xs font-semibold text-white/70 uppercase tracking-widest relative">Today&apos;s Workouts</p>
             </div>
-            <div className="space-y-px pb-1 px-2">
+            {/* space-y-px put ONE PIXEL between sessions, so a day with three
+    of them read as a single block with three lines of text. */}
+            <div className="space-y-2 pb-2 px-2">
               {_todayWorkouts.map((tw) => {
                 const twLabel = (tw.days as any)?.label || "Workout";
                 const twIsCardio = isCardioLabel(twLabel);
                 const twDone = tw.status === "completed";
                 return (
                   <Link key={tw.id} href={`${basePath}/workout/${tw.id}`}>
-                    <div className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: "rgba(0,0,0,0.2)" }}>
+                    <div className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: "rgba(0,0,0,0.22)", border: "1px solid rgba(255,255,255,0.16)" }}>
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.2)" }}>
                         <i className={`ti ${twIsCardio ? "ti-run" : "ti-barbell"} text-sm text-white`} />
                       </div>
