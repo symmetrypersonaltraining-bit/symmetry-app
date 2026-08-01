@@ -88,7 +88,6 @@ export default async function ClientPreviewSchedulePage() {
       isTrainer={false}
       paymentReminders={[]}
       monthScheduledWorkouts={monthScheduledWorkouts}
-      defaultView="week"
     />
   );
 }

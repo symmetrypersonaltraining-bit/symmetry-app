@@ -12,9 +12,8 @@ import PrankInvoice from "@/components/PrankInvoice";
 import PaymentDueBanner from "@/components/PaymentDueBanner";
 import MilestoneBadges from "@/components/MilestoneBadges";
 import ClientWeekSummary from "@/components/ClientWeekSummary";
-import CoachFocusCard from "@/components/CoachFocusCard";
 import SundayWeighInReminder from "@/components/SundayWeighInReminder";
-import Leaderboard from "@/components/Leaderboard";
+import CommunityPair from "@/components/CommunityPair";
 import { RestDaySlip } from "@/components/FunMoments";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
 
@@ -718,71 +717,23 @@ export default function ClientDashboard({
 
         {/* Full-screen Sunday weigh-in reminder (fires only on Sundays, once) */}
         <SundayWeighInReminder />
-        {/* Daily nutrition rings */}
+
+        {/* Challenge + group, as a split pair directly under today's workout.
+            Deliberately here rather than further down: buried below the fold
+            they were invisible, and the whole point is that people see the
+            group without hunting for it. Two half-cards cost the height of one
+            full card, so the training content above them does not move. */}
+        <CommunityPair />
+
+        {/* "This week" tiles + the Focus line. Unchanged. */}
         <ClientWeekSummary />
-        {/* AI "Coach's Read" — training-side focus + a question routed to Dustin's inbox */}
-        <CoachFocusCard />
+        {/* CoachFocusCard ("Coach's Read") removed 2026-08-01. It restated the
+            Focus line that ClientWeekSummary already shows, so clients read the
+            same coaching twice in two different voices. The weekly question it
+            carried has moved onto the Focus row rather than being lost. */}
         <HomeMacrosCard />
 
         <MilestoneBadges />
-
-        {/* Community consistency board (2026-07-25). Opt-in — renders its own
-            "nobody's on the board yet" state until clients turn it on, so it is
-            safe to mount before anyone has opted in. */}
-        <Leaderboard />
-        {/* Quick Actions */}
-        <div>
-          <h2 className="text-base font-bold mb-2.5" style={{ color: "var(--brand-text)" }}>Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <Link href={`${basePath}/nutrition`}>
-              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer cw-lift" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#22c55e20" }}>
-                  <i className="ti ti-salad text-lg" style={{ color: "#22c55e" }} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Log Meal</p>
-                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Nutrition log</p>
-                </div>
-              </div>
-            </Link>
-            <Link href={`${basePath}/log-bodyfat`}>
-              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer cw-lift" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--brand-primary)20" }}>
-                  <i className="ti ti-percentage text-lg" style={{ color: "var(--brand-primary)" }} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Body Fat</p>
-                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track weight</p>
-                </div>
-              </div>
-            </Link>
-            <Link href={`${basePath}/log`}>
-              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer cw-lift" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#f59e0b20" }}>
-                  <i className="ti ti-scale text-lg" style={{ color: "#f59e0b" }} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Log Weight</p>
-                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track weight</p>
-                </div>
-              </div>
-            </Link>
-            <Link href={`${basePath}/progress`}>
-              <div className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer cw-lift" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#a855f720" }}>
-                  <i className="ti ti-chart-line text-lg" style={{ color: "#a855f7" }} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Progress</p>
-                  <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>View metrics</p>
-                </div>
-              </div>
-            </Link>
-            {/* "Message Trainer" card removed — the bottom-nav Messages tab (with
-                unread badge) is the single messaging entry point for clients. */}
-          </div>
-        </div>
-
         {/* Metrics */}
         <div>
           <div className="flex items-center justify-between mb-2.5">
@@ -798,34 +749,6 @@ export default function ClientDashboard({
             <div className="rounded-2xl py-8 text-center mt-2" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
               <i className="ti ti-chart-line text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
               <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>Your trainer will log your metrics after each assessment.</p>
-            </div>
-          )}
-        </div>
-
-        {/* Recent Workouts */}
-        <div>
-          <h2 className="text-base font-bold mb-2.5" style={{ color: "var(--brand-text)" }}>Recent Workouts</h2>
-          {recentWorkouts.length === 0 ? (
-            <div className="rounded-2xl py-8 text-center" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-              <i className="ti ti-trophy text-2xl mb-2 block" style={{ color: "var(--brand-text-secondary)" }} />
-              <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>Complete your first workout to see history here.</p>
-            </div>
-          ) : (
-            <div className="rounded-2xl overflow-hidden" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-              {recentWorkouts.map((w, i) => (
-                <Link key={w.id} href={`${basePath}/workout/${w.id}`}>
-                  <div className={`flex items-center gap-3 px-4 py-3.5 ${i < recentWorkouts.length - 1 ? "border-b" : ""}`} style={{ borderColor: "var(--brand-border)" }}>
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#22c55e20" }}>
-                      <i className="ti ti-check text-xs" style={{ color: "#22c55e" }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: "var(--brand-text)" }}>{w.days?.label || "Workout"}</p>
-                      <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{fmtDate(w.scheduled_date)}</p>
-                    </div>
-                    <i className="ti ti-chevron-right text-xs" style={{ color: "var(--brand-text-secondary)" }} />
-                  </div>
-                </Link>
-              ))}
             </div>
           )}
         </div>

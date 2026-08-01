@@ -141,6 +141,12 @@
     "source",
     "created_at"
   ],
+  "challenge_participants": [
+    "id",
+    "challenge_id",
+    "client_id",
+    "joined_at"
+  ],
   "client_app_settings": [
     "client_id",
     "can_reschedule",
@@ -463,14 +469,26 @@
     "created_at"
   ],
   "group_challenges": [
-    "id",
-    "title",
-    "metric",
-    "starts_on",
-    "ends_on",
-    "created_by",
+    "announced_at",
+    "auto_generated",
     "created_at",
-    "ended_at"
+    "created_by",
+    "emoji",
+    "ended_at",
+    "ends_on",
+    "id",
+    "metric",
+    "next_pick_client_id",
+    "rules",
+    "scored_at",
+    "scoring_note",
+    "scoring_stat",
+    "starts_on",
+    "status",
+    "tagline",
+    "title",
+    "winner_client_id",
+    "winner_score"
   ],
   "group_reads": [
     "user_id",
