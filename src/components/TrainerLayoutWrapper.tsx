@@ -8,6 +8,7 @@ import Logo from "./Logo";
 import HeaderAssist from "./HeaderAssist";
 import SessionDock from "./SessionDock";
 import AppBottomNav, { type NavItem } from "./AppBottomNav";
+import RefreshHandle from "./RefreshHandle";
 
 interface Props {
   children: React.ReactNode;
@@ -95,6 +96,8 @@ export default function TrainerLayoutWrapper({ children }: Props) {
           </button>
         </div>
 
+        <RefreshHandle />
+
         {/* Page content.
             NO overflow-y-auto. This is a COLUMN flex container with
             min-h-screen, so `flex-1` resolves to flex-basis: 0 on the HEIGHT —
@@ -144,6 +147,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
           <button onClick={handleToggleMode} aria-label="Switch to client view" className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: "var(--brand-primary)", color: "white", border: "none", cursor: "pointer" }}><i className="ti ti-user text-sm" /><span className="hidden lg:inline">Client View</span></button>
           <HeaderAssist solid />
         </div>
+        <RefreshHandle />
         {children}
       </div>
       <SessionDock />
