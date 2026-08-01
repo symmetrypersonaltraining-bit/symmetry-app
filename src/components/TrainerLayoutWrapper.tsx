@@ -75,7 +75,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
   // ── CLIENT MODE ───────────────────────────────────────────────────────────
   if (clientMode) {
     return (
-      <div className="flex flex-col min-h-screen" style={{ background: "var(--brand-bg-deep, var(--brand-bg))", backgroundAttachment: "fixed" }}>
+      <div className="flex flex-col min-h-screen app-bg">
 
         {/* Top bar — mirrors what a client would see on mobile */}
         <div className="flex items-center gap-3 px-4 pb-3 sticky top-0 z-40 shadow-sm"
@@ -95,8 +95,20 @@ export default function TrainerLayoutWrapper({ children }: Props) {
           </button>
         </div>
 
-        {/* Page content */}
-        <div className="flex-1 pb-20 overflow-y-auto">
+        {/* Page content.
+            NO overflow-y-auto. This is a COLUMN flex container with
+            min-h-screen, so `flex-1` resolves to flex-basis: 0 on the HEIGHT —
+            the div gets exactly the leftover viewport and `overflow-y: auto`
+            turned it into a real nested scroller. Nested scrollers in a WebView
+            lose the native fast path: no momentum (nothing set
+            -webkit-overflow-scrolling here, unlike every sheet in the app), and
+            no overscroll-behavior, so the gesture chains to the document
+            scroller and visibly catches at both ends. That is the "very sticky"
+            scrolling in the nutrition logger — Client View was the only place
+            with this wrapper, which is why real clients on /nutrition never saw
+            it. The document scrolls natively now, which also makes the sticky
+            top bar above actually stick. */}
+        <div className="flex-1 pb-20">
           {children}
         </div>
 
@@ -114,7 +126,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
 
   // ── TRAINER MODE ───────────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-screen" style={{ background: "var(--brand-bg-deep, var(--brand-bg))", backgroundAttachment: "fixed" }}>
+    <div className="flex min-h-screen app-bg">
       <TrainerSidebar
         clientMode={clientMode}
         onToggleClientMode={handleToggleMode}

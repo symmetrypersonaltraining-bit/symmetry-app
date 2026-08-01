@@ -1556,3 +1556,44 @@ option:hover {
     padding: 10px 12px;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   APP BACKGROUND — and why it is not `background-attachment: fixed` on touch.
+
+   All three layout shells painted the page background with
+   `background-attachment: fixed` inline. On a desktop that is free. On a phone
+   it is one of the most reliable ways to make scrolling feel sticky: a fixed
+   background cannot be scrolled by the compositor, so every frame of every
+   scroll needs a full-viewport repaint on the main thread. Android WebViews
+   drop off the fast scrolling path entirely.
+
+   Desktop keeps the fixed background because that is where it looks best and
+   costs nothing. Touch devices get a normal scrolling background — the visual
+   difference on a mostly-flat colour is almost nothing, and the scroll goes
+   back to feeling native.
+   ════════════════════════════════════════════════════════════════════════════ */
+.app-bg {
+  background: var(--brand-bg-deep, var(--brand-bg));
+  background-attachment: fixed;
+}
+@media (hover: none) and (pointer: coarse) {
+  .app-bg { background-attachment: scroll; }
+}
+
+/* Bottom nav glass: cheaper on phones.
+   A full-width `position: fixed` bar with `saturate(180%) blur(18px)` has to
+   re-sample and re-blur everything behind it on every scroll frame. That is
+   real per-frame GPU work on a mid-range Android WebView and it shows up as
+   scroll that catches. Desktop keeps the full effect; touch devices get a
+   smaller radius, which reads almost identically at this size and costs a
+   fraction as much. */
+@media (hover: none) and (pointer: coarse) {
+  .cw-glass {
+    -webkit-backdrop-filter: saturate(140%) blur(8px);
+    backdrop-filter: saturate(140%) blur(8px);
+  }
+  nav.bottom-nav-bar {
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+}
