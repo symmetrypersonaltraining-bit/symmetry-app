@@ -25,10 +25,20 @@ export default function HapticTap() {
     return () => document.removeEventListener("click", onClick);
   }, []);
 
-  useEffect(() => {
-    const onShow = (e: any) => { if (e && e.persisted) { try { location.reload(); } catch {} } };
-    window.addEventListener("pageshow", onShow);
-    return () => window.removeEventListener("pageshow", onShow);
-  }, []);
+  // REMOVED 2026-08-01 — this was half of why hardware Back stopped working.
+  //
+  //   const onShow = (e) => { if (e.persisted) location.reload(); };
+  //   window.addEventListener("pageshow", onShow);
+  //
+  // `pageshow` with persisted = true is the bfcache restore, which is exactly
+  // what a Back press produces. Reloading there means every Back press throws
+  // away the restored page and re-runs the whole app — so Back looks like it
+  // did nothing, and worse, BackButtonGuard remounts into a fresh JS context
+  // and arms another sentinel history entry. Each Back press therefore left the
+  // user one entry deeper than before. Back could never win.
+  //
+  // Whatever staleness this was guarding against, the fix is not to defeat the
+  // browser's own back navigation. VersionWatcher already handles "the deploy
+  // moved under you", and the notification feed refetches on visibilitychange.
   return null;
 }

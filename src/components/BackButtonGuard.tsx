@@ -3,77 +3,145 @@
 import { useEffect } from "react";
 
 /**
- * BackButtonGuard v2 — Android-shell only. Hardware Back must never exit the
- * app. Two layers:
- * 1. If the Capacitor App plugin bridge is available, register a backButton
- *    listener (registering one stops Capacitor's default finish-on-back) and
- *    drive history.back() ourselves.
- * 2. A history "floor": a flagged buffer entry near the bottom of the WebView
- *    history that re-arms whenever Back lands on or below it. pushState /
- *    replaceState are patched (shell only) so Next.js state rewrites cannot
- *    strip our markers — the v1 failure mode.
- * No-ops in normal browsers. Crash-safe: everything wrapped, renders nothing.
+ * BackButtonGuard v3 — Android shell only. Hardware Back must not exit the app
+ * from the first screen, and must otherwise behave completely normally.
+ *
+ * WHY v2 KILLED THE BACK BUTTON (fixed 2026-08-01)
+ *
+ * v2 kept a "floor" index and re-armed a sentinel history entry whenever Back
+ * landed at or below it:
+ *
+ *     if (!st || st.__symBack || st.__symIdx == null || st.__symIdx <= floorIdx)
+ *       setTimeout(arm, 0);
+ *
+ * Two things in that line make Back stop working, and together they make it
+ * stop working permanently.
+ *
+ * 1. `arm()` set `floorIdx = counter` AFTER pushing, so every re-arm raised the
+ *    floor. Pushing also truncates forward history, so the next Back landed on
+ *    the sentinel again, re-armed again, and raised the floor again. The floor
+ *    ratcheted upward until it was above every real page entry — at which point
+ *    `st.__symIdx <= floorIdx` matched EVERYTHING and every Back press became a
+ *    no-op. Nothing recovers from that except a fresh page load, and the next
+ *    few Back presses put it straight back.
+ *
+ * 2. `!st` and `__symIdx == null` matched any entry the patched pushState had
+ *    not stamped — including the very first entry of a cold load, before Next
+ *    attaches its own state. So Back could be dead from the first press.
+ *
+ * v3 keeps one sentinel, pushed once, and re-arms ONLY when Back actually lands
+ * on that sentinel — which is exactly the "you are at the bottom, do not exit"
+ * case it was always meant to catch. There is no counter and no floor, so there
+ * is nothing to ratchet. Every other Back press is left completely alone.
+ *
+ * replaceState is still patched, and only to carry the __symBack marker
+ * forward: Next.js rewrites the state of the CURRENT entry during navigation,
+ * which would otherwise erase the sentinel the moment it is armed. pushState is
+ * no longer touched at all.
+ *
+ * Failure mode if this is wrong: Back exits the app from the first screen, the
+ * Android default. That is a far better place to fail than Back doing nothing.
+ *
+ * No-ops in normal browsers. Renders nothing. Everything wrapped.
  */
+
+// Module scope, not component state: React can mount this twice (Strict Mode,
+// a remount on a layout change) and two sentinels would put a dead entry in the
+// middle of the stack rather than under it.
+let armed = false;
+
 export default function BackButtonGuard() {
   useEffect(() => {
     try {
-      const w = window as unknown as { Capacitor?: { isNativePlatform?: () => boolean; Plugins?: { App?: { addListener?: (ev: string, cb: () => void) => { remove?: () => void } } } } };
+      const w = window as unknown as {
+        Capacitor?: {
+          isNativePlatform?: () => boolean;
+          Plugins?: { App?: { addListener?: (ev: string, cb: () => void) => { remove?: () => void } } };
+        };
+      };
       const cap = w.Capacitor;
-      const isShell = (cap && typeof cap.isNativePlatform === "function" && cap.isNativePlatform()) || /; wv\)/.test(navigator.userAgent);
+      const isShell =
+        (cap && typeof cap.isNativePlatform === "function" && cap.isNativePlatform()) ||
+        /; wv\)/.test(navigator.userAgent);
       if (!isShell) return;
 
-      // Layer 1: native back-button listener (bulletproof when the bridge has the App plugin).
+      // Native listener. Registering one suppresses Capacitor's default
+      // finish-the-activity behaviour, so Back goes through the WebView history
+      // like it does in a browser.
       let removeNative: (() => void) | null = null;
       try {
         const AppPlugin = cap && cap.Plugins && cap.Plugins.App;
         if (AppPlugin && typeof AppPlugin.addListener === "function") {
           const h = AppPlugin.addListener("backButton", () => {
-            try { history.back(); } catch { /* noop */ }
+            try {
+              history.back();
+            } catch {
+              /* noop */
+            }
           });
-          removeNative = () => { try { if (h && typeof h.remove === "function") h.remove(); } catch { /* noop */ } };
+          removeNative = () => {
+            try {
+              if (h && typeof h.remove === "function") h.remove();
+            } catch {
+              /* noop */
+            }
+          };
         }
-      } catch { /* noop */ }
+      } catch {
+        /* noop */
+      }
 
-      // Layer 2: history floor with tamper-proof markers.
-      let counter = 0;
-      let floorIdx = 0;
-      const origPush = history.pushState.bind(history);
+      // Carry the sentinel marker through Next's own state rewrites. Nothing
+      // else about history is patched.
       const origReplace = history.replaceState.bind(history);
       type AnyState = Record<string, unknown> | null | undefined;
-      (history as History).pushState = function (st: AnyState, title: string, url?: string | URL | null) {
-        try { st = { ...(st || {}), __symIdx: ++counter }; } catch { /* noop */ }
-        return origPush(st, title, url as string | URL | null | undefined);
-      } as History["pushState"];
       (history as History).replaceState = function (st: AnyState, title: string, url?: string | URL | null) {
         try {
           const cur = (history.state || {}) as Record<string, unknown>;
-          st = { ...(st || {}), ...(cur.__symBack ? { __symBack: true } : {}), ...(cur.__symIdx != null ? { __symIdx: cur.__symIdx } : {}) };
-        } catch { /* noop */ }
+          if (cur.__symBack) st = { ...(st || {}), __symBack: true };
+        } catch {
+          /* noop */
+        }
         return origReplace(st, title, url as string | URL | null | undefined);
       } as History["replaceState"];
 
       const arm = () => {
         try {
           history.pushState({ ...(history.state || {}), __symBack: true }, "");
-          floorIdx = counter; // stamped by the patched pushState above
-        } catch { /* noop */ }
+        } catch {
+          /* noop */
+        }
       };
-      arm();
+
+      if (!armed) {
+        armed = true;
+        arm();
+      }
+
       const onPop = (e: PopStateEvent) => {
         try {
-          const st = e.state as { __symBack?: boolean; __symIdx?: number } | null;
-          // Landed on a floor entry, an unstamped (pre-guard) entry, or at/below
-          // the floor → re-arm so the next Back still stays inside the app.
-          if (!st || st.__symBack || st.__symIdx == null || st.__symIdx <= floorIdx) setTimeout(arm, 0);
-        } catch { /* noop */ }
+          const st = e.state as { __symBack?: boolean } | null;
+          // ONLY the sentinel. Anything else is a real history entry and Back
+          // is none of our business.
+          if (st && st.__symBack) setTimeout(arm, 0);
+        } catch {
+          /* noop */
+        }
       };
       window.addEventListener("popstate", onPop);
+
       return () => {
         window.removeEventListener("popstate", onPop);
         if (removeNative) removeNative();
-        try { (history as History).pushState = origPush; (history as History).replaceState = origReplace; } catch { /* noop */ }
+        try {
+          (history as History).replaceState = origReplace;
+        } catch {
+          /* noop */
+        }
       };
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }, []);
   return null;
 }
