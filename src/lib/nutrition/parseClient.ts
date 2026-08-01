@@ -34,16 +34,62 @@ function mapItem(raw: Record<string, unknown>): CustomItem | null {
   };
 }
 
+/**
+ * Why the AI said no, when it said no.
+ *
+ * This used to collapse every failure into `null`: a 429 daily cap, a 503
+ * missing API key and a 200 {paused} kill-switch all came back the same, and
+ * the UI rendered "AI parse isn't available right now" for all of them. A
+ * trainer who had simply used their fifteen parses for the day was told the
+ * feature was broken — which is exactly the report that started this
+ * ("my AI button does nothing"). The coach sheet already distinguishes all
+ * three; the parse path threw the information away.
+ *
+ * Null still means "no usable result" so no call site has to change; the reason
+ * rides alongside for the ones that want to say something true.
+ */
+export type ParseFailure = "cap" | "paused" | "unavailable" | "empty" | null;
+let lastFailure: ParseFailure = null;
+
+/** The reason the most recent parseFoodText returned null. */
+export function lastParseFailure(): ParseFailure {
+  return lastFailure;
+}
+
+export function parseFailureMessage(f: ParseFailure): string {
+  switch (f) {
+    case "cap":
+      return "You've used today's AI estimates. They reset at midnight — you can still add this by hand.";
+    case "paused":
+      return "AI is paused right now. You can still add this by hand.";
+    case "unavailable":
+      return "AI estimating isn't reachable right now. You can still add this by hand.";
+    default:
+      return "Couldn't work that one out — try naming the food more plainly, or add it by hand.";
+  }
+}
+
 export async function parseFoodText(text: string, clientId?: string): Promise<ParseResult | null> {
+  lastFailure = null;
   try {
     const res = await fetch("/api/nutrition-ai/parse", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, clientId }),
     });
-    if (!res.ok) return null;
     const json = await res.json().catch(() => null);
-    if (!json || json.error) return null;
+    if (!res.ok) {
+      lastFailure = res.status === 429 || json?.capExceeded ? "cap" : "unavailable";
+      return null;
+    }
+    if (!json || json.error) {
+      lastFailure = json?.paused ? "paused" : "unavailable";
+      return null;
+    }
+    if (json.paused) {
+      lastFailure = "paused";
+      return null;
+    }
     const rawItems: unknown[] = Array.isArray(json.items)
       ? json.items
       : Array.isArray(json.foods)
@@ -60,10 +106,12 @@ export async function parseFoodText(text: string, clientId?: string): Promise<Pa
       if (single && (single.p || single.c || single.f || single.k)) {
         return { items: [{ ...single, n: json.description || text.slice(0, 60) }], description: json.description || null };
       }
+      lastFailure = "empty";
       return null;
     }
     return { items, description: (json.description as string) || null };
   } catch {
+    lastFailure = "unavailable";
     return null;
   }
 }

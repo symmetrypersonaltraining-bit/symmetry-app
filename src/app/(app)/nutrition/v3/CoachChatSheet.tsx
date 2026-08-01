@@ -145,15 +145,39 @@ export default function CoachChatSheet({
   dayContext,
   actions,
   onApplySuggestion,
+  selectedDate,
 }: {
   clientId: string;
-  /** Today's meals as rendered — sent with every message so /act can resolve references. */
+  /** The day as rendered — sent with every message so /act can resolve references. */
   dayContext: CoachDayMeal[];
   /** Existing v3 write helpers — confirmed actions execute through these only. */
   actions: CoachActions;
-  /** Writes the delta as a quick-log extra row (positions 6/7) for today. */
+  /** Writes the delta as a quick-log extra row (positions 6/7) on the SELECTED day. */
   onApplySuggestion: (s: CoachSuggestion) => Promise<void>;
+  /**
+   * The day the logger is showing, YYYY-MM-DD.
+   *
+   * The coach used to be hidden entirely unless you were on today, which meant
+   * one tap of the back arrow made the button vanish for the rest of the
+   * session with nothing on screen explaining why. Un-gating it fixed that and
+   * introduced something worse: every write goes to the selected day, but the
+   * buttons and confirmations all said "today", so glancing at yesterday and
+   * saying "I ate a cookie" silently rewrote a closed day's macros while
+   * telling you it had logged today.
+   *
+   * Logging a day late is a real thing people do, so the fix is not to refuse
+   * it — it is to never lie about which day is being written. Every label
+   * below names the actual date whenever it is not today.
+   */
+  selectedDate: string;
 }) {
+  const todayCT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const isToday = selectedDate === todayCT;
+  // "today" when it is, an unmissable date when it is not.
+  const dayLabel = isToday
+    ? "today"
+    : new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+
   const supabase = useMemo(() => createClient(), []);
   const [enabled, setEnabled] = useState(true); // client_app_settings.coach_enabled
   const [open, setOpen] = useState(false);
@@ -191,7 +215,14 @@ export default function CoachChatSheet({
 
   function openChat() {
     // Fresh conversation each open (no persistence tonight).
-    setMsgs([{ role: "coach", text: GREETING }]);
+    setMsgs([
+      { role: "coach", text: GREETING },
+      // Said once, at the top, before anything is typed. A label on the Apply
+      // button is the last line of defence; this is the first.
+      ...(isToday
+        ? []
+        : [{ role: "coach" as const, text: "Heads up — you're looking at " + dayLabel + ", so anything I log goes on that day, not today." }]),
+    ]);
     setInput("");
     setCapped(false);
     setApplied(new Set());
@@ -218,6 +249,9 @@ export default function CoachChatSheet({
           message: question,
           clientId,
           dayContext,
+          // The model was told "only ever change TODAY's log" while the client
+          // wrote to whatever day was on screen. Now it is told the truth.
+          logDate: selectedDate,
           history: msgs
             .filter((m) => !!m.text)
             .map((m) => ({ role: m.role === "client" ? "user" : "assistant", content: m.text })),
@@ -312,7 +346,7 @@ export default function CoachChatSheet({
       await runAction(msg.action);
       setMsgs((m) => [
         ...m.map((x, i) => (i === mi ? { ...x, actionState: "done" as const } : x)),
-        { role: "coach" as const, text: "✓ Done — " + msg.action!.confirmation.replace(/\s*\?+\s*$/, "") + "." },
+        { role: "coach" as const, text: "✓ Done — " + msg.action!.confirmation.replace(/\s*\?+\s*$/, "") + (isToday ? "." : " (" + dayLabel + ").") },
       ]);
     } catch (e) {
       const why = e instanceof Error && e.message ? e.message : "something went wrong";
@@ -463,7 +497,7 @@ export default function CoachChatSheet({
                         }}
                       >
                         <span className="block text-xs font-bold" style={{ color: done ? "#22c55e" : "var(--brand-primary)" }}>
-                          {done ? "✓ Added to today" : busy ? "Adding…" : "＋ Apply to today"}
+                          {done ? "✓ Added to " + dayLabel : busy ? "Adding…" : "＋ Apply to " + dayLabel}
                         </span>
                         <span className="block text-xs mt-0.5" style={{ color: "var(--brand-text)" }}>
                           {s.label} <span style={{ color: "var(--brand-text-secondary)" }}>({fmtDelta(s.delta)})</span>

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import TrainerSidebar from "./TrainerSidebar";
-import AIAssistant from "./AIAssistant";
 import Logo from "./Logo";
 import HeaderAssist from "./HeaderAssist";
 import SessionDock from "./SessionDock";
@@ -151,7 +150,10 @@ export default function TrainerLayoutWrapper({ children }: Props) {
         {children}
       </div>
       <SessionDock />
-      <AIAssistant />
+      {/* AIAssistant is mounted ONCE, in the root layout. It used to be here
+          too: both instances passed the trainer check and both registered the
+          `symmetry:open-ai` listener, so tapping the header AI button opened
+          two stacked drawers and doubled the auth round-trips. */}
     </div>
   );
 }

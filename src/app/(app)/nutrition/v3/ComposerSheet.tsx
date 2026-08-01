@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { CustomItem, Macros, customMealMacros } from "@/lib/nutrition/dailyTotals";
-import { parseFoodText } from "@/lib/nutrition/parseClient";
+import { parseFoodText, lastParseFailure, parseFailureMessage } from "@/lib/nutrition/parseClient";
 import Sheet from "./Sheet";
 
 export default function ComposerSheet({
@@ -36,7 +36,7 @@ export default function ComposerSheet({
   const [text, setText] = useState("");
   const [items, setItems] = useState<CustomItem[]>([]);
   const [parsing, setParsing] = useState(false);
-  const [parseFailed, setParseFailed] = useState(false);
+  const [parseFailed, setParseFailed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const totals = customMealMacros({ name, items });
@@ -45,10 +45,10 @@ export default function ComposerSheet({
   async function runParse() {
     if (!text.trim()) return;
     setParsing(true);
-    setParseFailed(false);
+    setParseFailed(null);
     const result = await parseFoodText(text.trim(), clientId);
     setParsing(false);
-    if (!result || !result.items.length) { setParseFailed(true); return; }
+    if (!result || !result.items.length) { setParseFailed(parseFailureMessage(lastParseFailure())); return; }
     setItems((prev) => [...prev, ...result.items]);
     setText("");
   }
@@ -87,7 +87,7 @@ export default function ComposerSheet({
       )}
       {parseFailed && (
         <p className="text-xs mt-2 rounded-xl p-2.5" style={{ background: "rgba(245,158,11,0.12)", color: "#b45309", border: "1px solid rgba(245,158,11,0.4)" }}>
-          Couldn&apos;t parse right now — try again in a moment, or add foods one-by-one from the food database.
+          {parseFailed}
         </p>
       )}
 

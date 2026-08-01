@@ -24,9 +24,9 @@ import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
 
-const ACT_SYSTEM_PROMPT = `You are the action extractor for the nutrition coach chat inside the Symmetry Personal Training app. The client sends a free-text message plus DAY CONTEXT: today's meals as JSON [{position, label, name, logged, kcal, p, c, f}] ("label" is the on-screen name like "M2"; "position" is the stable id you must use in params).
+const ACT_SYSTEM_PROMPT = `You are the action extractor for the nutrition coach chat inside the Symmetry Personal Training app. The client sends a free-text message plus DAY CONTEXT: the viewed day's meals as JSON [{position, label, name, logged, kcal, p, c, f}] ("label" is the on-screen name like "M2"; "position" is the stable id you must use in params).
 
-Decide if the message is a REQUEST TO CHANGE TODAY'S LOG or just a question/chat. Respond with ONLY valid JSON — no markdown, no fences — exactly:
+Decide if the message is a REQUEST TO CHANGE THE VIEWED DAY'S LOG or just a question/chat. Respond with ONLY valid JSON — no markdown, no fences — exactly:
 {"intent":"swap_meal"|"move_meal"|"copy_meal"|"delete_meal"|"add_snack"|"log_meal"|"unlog_meal"|"none","params":{...},"confirmation":string|null,"reply":string}
 
 Intents and their params:
@@ -45,7 +45,8 @@ Rules:
 - If the message is a question or general chat, respond intent "none" with params {"clarify":false} and a brief placeholder in "reply" (a fuller coach answer is generated separately).
 - "confirmation" (action intents only): ONE human sentence describing exactly what will happen, including estimated kcal and P/C/F where relevant, e.g. "Swap M4 → Salmon + rice (est 520 kcal · 42P/45C/16F)?". For intent "none" use null.
 - "reply": a short, friendly coach response (1-2 sentences) to show above the confirmation card.
-- Only ever change TODAY's log. Requests about other days, the plan itself, or targets → intent "none" (answer as chat).`;
+- You act on THE DAY BEING VIEWED, which is stated in the user turn as LOG DATE. It is usually today; it is sometimes an earlier day the client is catching up on. Either way DAY CONTEXT is that day's meals, and any action you extract applies to it. Requests about a DIFFERENT day, the plan itself, or targets → intent "none" (answer as chat).
+- If LOG DATE is not today, say which day you are logging to in "confirmation" — e.g. "Add Greek yogurt to Fri Jul 31 (est 150 kcal · 15P/12C/4F)?". Confirming a write onto the wrong day is the one mistake here that quietly corrupts a closed day's numbers.`;
 
 const MAX_DAY_MEALS = 30;
 
@@ -115,6 +116,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "That message is too long — keep it under 1500 characters." }, { status: 400 });
     }
     const day = sanitizeDayContext(body?.dayContext);
+    // The day the logger is actually showing. The client writes every action to
+    // this date, so the model has to be told it — it used to be instructed to
+    // "only ever change TODAY's log" while the writes went wherever the user
+    // had navigated. Falls back to today when absent (older clients).
+    const todayCT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+    const logDate = /^\d{4}-\d{2}-\d{2}$/.test(String(body?.logDate || "")) ? String(body.logDate) : todayCT;
+    const dayName = new Date(logDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 
     const scoped = await resolveAiScope(typeof body?.clientId === "string" ? body.clientId : null);
     if (!scoped.ok) return scoped.response;
@@ -139,7 +147,9 @@ export async function POST(req: NextRequest) {
         ...history,
         {
           role: "user",
-          content: `DAY CONTEXT (today's meals, trusted):\n${JSON.stringify(day)}\n\nCLIENT MESSAGE:\n${message}`,
+          content:
+            `LOG DATE: ${logDate} (${dayName})${logDate === todayCT ? " — this IS today" : " — NOT today; the client is catching up on an earlier day"}\n\n` +
+            `DAY CONTEXT (that day's meals, trusted):\n${JSON.stringify(day)}\n\nCLIENT MESSAGE:\n${message}`,
         },
       ],
       validate: validateActReply,
@@ -176,7 +186,7 @@ export async function POST(req: NextRequest) {
         ...history,
         {
           role: "user",
-          content: `CONTEXT (server-assembled, trusted):\n${context}\n\nTODAY'S MEALS:\n${JSON.stringify(day)}\n\nCLIENT QUESTION:\n${message}`,
+          content: `CONTEXT (server-assembled, trusted):\n${context}\n\nMEALS ON ${logDate} (${dayName}):\n${JSON.stringify(day)}\n\nCLIENT QUESTION:\n${message}`,
         },
       ],
       validate: validateCoachReply,

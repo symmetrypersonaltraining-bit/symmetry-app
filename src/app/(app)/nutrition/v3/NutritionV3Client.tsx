@@ -20,7 +20,7 @@ import {
   kcalOf, EXTRA_POSITIONS, INSERT_POSITION_MIN, INSERT_POSITION_MAX,
 } from "@/lib/nutrition/dailyTotals";
 import { planItemsToCustom } from "@/lib/nutrition/mealToCustom";
-import { parseFoodText } from "@/lib/nutrition/parseClient";
+import { parseFoodText, lastParseFailure, parseFailureMessage } from "@/lib/nutrition/parseClient";
 import { pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 import Sheet from "./Sheet";
 import FoodSearchSheet from "./FoodSearchSheet";
@@ -1001,8 +1001,13 @@ export default function NutritionV3Client(props: Props) {
   }, [clientId, selectedDate, today, coachOn, supabase]);
 
   // ---- coach card ---------------------------------------------------------
+  // The insight is about TODAY, so it is only generated on today — but it also
+  // has to be CLEARED when you navigate away, which it never was. The effect
+  // returned early on a past date and left the previous payload in state, so
+  // today's "protein is trailing" sat on top of a day three weeks ago as though
+  // it described it.
   useEffect(() => {
-    if (!coachOn || selectedDate !== today) return;
+    if (!coachOn || selectedDate !== today) { setCoachApi(null); return; }
     let on = true;
     // Cache key version (2026-07-25): v2 fixed a backwards macro direction;
     // v3 fixes the adaptive-maintenance calc (thin/noisy weigh-ins were producing
@@ -1654,13 +1659,25 @@ export default function NutritionV3Client(props: Props) {
           The date restriction existed because "Apply to today" writes an extras
           row on the visible date. That is a reason to disable the WRITE on a
           past date, not to hide the coach — asking it a question about
-          yesterday is perfectly reasonable. The sheet now renders on any date
-          and refuses only the mutating actions. */}
+          yesterday is perfectly reasonable.
+
+          The comment here used to claim the sheet "refuses only the mutating
+          actions" on a past date. It did not; no such guard was ever written.
+          Every action wrote to selectedDate while the buttons, the
+          confirmations and the model's own instructions all said "today", so
+          glancing at yesterday and saying "I ate a cookie" silently rewrote a
+          closed day's macros and told you it had logged today.
+
+          Logging a day late is a real thing people do, so it is not refused —
+          it is just never lied about. selectedDate goes to the sheet, which
+          names the day on every button and warns on open, and to the model,
+          which now states the date in its confirmation. */}
       {coachOn && (
         <CoachChatSheet
           clientId={clientId}
           dayContext={coachDayContext}
           actions={coachActions}
+          selectedDate={selectedDate}
           onApplySuggestion={async (s) => {
             await addExtra(
               [{ n: s.label, p: s.delta.p, c: s.delta.c, f: s.delta.f, k: s.delta.kcal || kcalOf(s.delta.p, s.delta.c, s.delta.f), est: true }],
@@ -2848,7 +2865,9 @@ function OffPlanFlow({
     const result = await parseFoodText(text.trim(), clientId);
     setBusy(false);
     if (!result || !result.items.length) {
-      setErrMsg("AI parse isn't available right now — you can still save it as pending (macros filled in tonight).");
+      // Say WHICH no it is. "Isn't available right now" for a daily cap reads
+      // as a broken feature, and that is what got reported as one.
+      setErrMsg(parseFailureMessage(lastParseFailure()) + " You can also save it as pending — macros get filled in tonight.");
       return;
     }
     const tot = customMealMacros({ name: "", items: result.items });
