@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import TrainerWeekDigest from "@/components/TrainerWeekDigest";
-import AttentionFeed from "@/components/AttentionFeed";
+import CommunityPair from "@/components/CommunityPair";
 import LiveSessions from "@/components/LiveSessions";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
@@ -177,17 +177,10 @@ export default function TrainerHome({
           </p>
         </div>
 
-        {/* Anyone training this minute outranks anyone who went quiet last
-            week, so this sits first. Renders nothing when the gym is empty. */}
-        <LiveSessions />
-
-        {/* Short "act on these first" strip. Renders nothing when nobody is
-            flagged, so a clean week costs zero screen space. */}
-        <AttentionFeed />
-
-        <TrainerWeekDigest />
-
-        {/* Today's Client Sessions — scrollable list */}
+        {/* Today's Sessions, first. It is the shape of the whole morning and
+            the only block with a Start button on it — everything else on this
+            screen is context for it. "Who needs you today" used to sit here and
+            has been removed entirely. */}
         <div
           className="rounded-2xl overflow-hidden"
           style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}
@@ -315,6 +308,20 @@ export default function TrainerHome({
           )}
         </div>
 
+        {/* Anyone training this minute. Sits under today's list rather than
+            above it: the list is the shape of the whole morning, this is the
+            one row happening right now. */}
+        <LiveSessions />
+
+        {/* Challenge board + group chat preview. Replaces the old Messages
+            card, which was a link with nothing on it — this shows the last two
+            group messages and the live board, so the group is visible from home
+            instead of being somewhere to navigate to. */}
+        <CommunityPair />
+
+        {/* Week ahead — roster + focus editing. */}
+        <TrainerWeekDigest />
+
         {/* Stat Cards Row */}
         <div className="grid grid-cols-2 gap-3">
 
@@ -410,62 +417,6 @@ export default function TrainerHome({
             )}
           </div>
         </div>
-
-        {/* Notifications Card */}
-        <Link href="/payments">
-          <div
-            className="rounded-2xl p-4 flex items-center gap-4"
-            style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}
-          >
-            <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 relative"
-              style={{ background: notificationCount > 0 ? "#f59e0b20" : "var(--brand-card)" }}
-            >
-              <i
-                className="ti ti-bell text-xl"
-                style={{
-                  color: notificationCount > 0 ? "#f59e0b" : "var(--brand-text-secondary)",
-                }}
-              />
-              {notificationCount > 0 && (
-                <span
-                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-white font-bold"
-                  style={{ background: "#f59e0b", fontSize: "10px" }}
-                >
-                  {notificationCount > 9 ? "9+" : notificationCount}
-                </span>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>
-                Notifications
-              </p>
-              <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                {notificationCount > 0
-                  ? notificationCount +
-                    " pending reminder" +
-                    (notificationCount !== 1 ? "s" : "")
-                  : "No pending reminders"}
-              </p>
-            </div>
-            <i
-              className="ti ti-chevron-right text-sm"
-              style={{ color: "var(--brand-text-secondary)" }}
-            />
-          </div>
-        </Link>
-
-        {/* Messages Card */}
-        <Link href="/messages" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "var(--brand-surface)", border: "1px solid var(--brand-border)", borderRadius: 16, padding: 14 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: "var(--brand-primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <i className="ti ti-message-circle" style={{ color: "#fff", fontSize: 20 }} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontWeight: 800, color: "var(--brand-text)", fontSize: 14 }}>Messages</p>
-            <p style={{ color: "var(--brand-text-secondary)", fontSize: 12 }}>Client & group chat</p>
-          </div>
-          <i className="ti ti-chevron-right" style={{ color: "var(--brand-text-secondary)", fontSize: 18 }} />
-        </Link>
 
       </div>
     </>
