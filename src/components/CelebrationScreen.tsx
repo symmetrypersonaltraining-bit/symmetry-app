@@ -5,6 +5,7 @@ import Confetti from "./Confetti";
 import Link from "next/link";
 import CountUp from "@/components/CountUp";
 import ShareToGroup from "@/components/ShareToGroup";
+import { sendGroupMessage } from "@/app/(app)/home/messageActions";
 import { fx } from "@/lib/fx";
 
 /**
@@ -215,6 +216,38 @@ export default function CelebrationScreen({
       (topPr.previous ? ` (previous best ${topPr.previous} lb)` : "")
     : `💪 ${firstName} just finished ${dayLabel || "a session"} — ${setCount} sets, ${vStr} lb moved` +
       (dustins ? ` — that's ${dustins} coach Dustin${dustins === 1 ? "" : "s"}.` : ".");
+  // ── PR auto-share ────────────────────────────────────────────────────────
+  // Dustin: PRs go to the group on their own, with no notification.
+  //
+  // The Share button stays — sharing an ordinary session is still a choice —
+  // but a PR is the thing most worth the group seeing and the thing a client is
+  // least likely to broadcast about themselves. Waiting for them to tap means
+  // the best moments never make it into the thread.
+  //
+  // Silent on purpose: the message lands in the group and shows as unread, but
+  // does not push. Buzzing thirty-five phones every time someone hits a PR is
+  // how a group chat gets muted, and a muted group chat ends the whole feature.
+  //
+  // Guarded by a per-PR key in sessionStorage so a re-render, a back-navigation
+  // or a second look at the celebration cannot post it twice.
+  useEffect(() => {
+    if (!topPr) return;
+    const key =
+      "sym:prshare:" + (clientId || "me") + ":" + topPr.movement + ":" + topPr.weight + ":" + topPr.reps;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch {
+      return; // no storage = no idempotency guarantee = don't post
+    }
+    void sendGroupMessage(shareText, null, true).catch(() => {
+      try { sessionStorage.removeItem(key); } catch { /* noop */ }
+    });
+    // shareText is derived from topPr; keying on topPr alone keeps this to one
+    // run per PR rather than one per re-render of the rotating copy.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topPr?.movement, topPr?.weight, topPr?.reps, clientId]);
+
   const headline = HEADLINES[(seed + tapIdx) % HEADLINES.length];
   const fortune = FORTUNES[(seed + tapIdx) % FORTUNES.length];
   const lucky = LUCKY[seed % LUCKY.length];
@@ -930,7 +963,14 @@ export default function CelebrationScreen({
       {content}
 
       {/* Community: push the win into the group chat. */}
-      <ShareToGroup text={shareText} label={topPr ? "Share this PR" : "Share to group"} />
+      {/* A PR has already posted itself (silently) — see the auto-share effect.
+          Offering "Share this PR" again would double-post it. */}
+      {!topPr && <ShareToGroup text={shareText} label="Share to group" />}
+      {topPr && (
+        <p style={{ fontSize: 12, fontWeight: 700, textAlign: "center", color: "rgba(255,255,255,0.6)", margin: "4px 0 8px" }}>
+          👊 Posted to the group
+        </p>
+      )}
 
       <Link href={doneHref} style={doneBtn}>
         Done ✓

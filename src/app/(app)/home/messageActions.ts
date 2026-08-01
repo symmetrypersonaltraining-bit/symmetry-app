@@ -127,12 +127,25 @@ export async function sendBroadcastMessage(body: string, imageUrl?: string | nul
   return rows.length;
 }
 
-export async function sendGroupMessage(body: string, imageUrl?: string | null): Promise<void> {
+/**
+ * Post to the group.
+ *
+ * `silent` skips the push fan-out. It exists for messages the app posts on a
+ * client's behalf — an auto-shared PR, for instance. Those belong in the thread
+ * so the group sees the win, but buzzing thirty-five phones every time somebody
+ * finishes a set is how a group chat gets muted, and a muted group chat is the
+ * end of the community feature. The message still appears, still shows as
+ * unread in the app, and still turns up in the notification centre; it just
+ * does not ring.
+ */
+export async function sendGroupMessage(body: string, imageUrl?: string | null, silent = false): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
   await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, image_url: imageUrl || null, is_group: true });
   revalidatePath("/messages");
+
+  if (silent) return;
 
   // Push all OTHER group members (every client + the trainer) except the sender.
   // Uses the admin client so the recipient list isn't limited by the sender's RLS.
