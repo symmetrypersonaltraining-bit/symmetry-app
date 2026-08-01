@@ -4,6 +4,13 @@
 // Read, the weekly Focus callout, etc. Renders his profile photo (clients
 // .avatar_url for the trainer account) with the "DG" gradient monogram as a
 // fallback. Resolved once per mount; the trainer row rarely changes.
+//
+// THIS IS THE REAL PHOTO, AND IT STAYS THAT WAY. Dustin's rule, 2026-08-01:
+// the cartoon is for AI-generated surfaces only — Coach Bot and anything else
+// the app writes on its own. Anywhere a client is reading something FROM HIM
+// shows his actual face. Putting the cartoon here would quietly relabel his
+// own coaching as machine output, which is the opposite of what it is.
+// The cartoon lives at /public/coachbot.png; do not wire it in here.
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
