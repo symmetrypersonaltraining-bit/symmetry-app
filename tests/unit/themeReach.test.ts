@@ -287,6 +287,25 @@ test("text-clipped gradients are set with background-image, never the shorthand"
   }
 });
 
+test("the depth layer reaches the app's real, class-less surfaces", () => {
+  const css = read("src/app/globals.css");
+  // The cards on the dashboard are inline `background: var(--brand-surface)`
+  // with a numeric borderRadius and NO class. A depth layer that only targets
+  // .card / .rounded-2xl misses all 274 of them, which is exactly what shipped
+  // first and why 35 and 50 looked identical on a real phone.
+  assert.match(
+    css,
+    /\[style\*="var\(--brand-surface\)"\]/,
+    "the depth layer must reach inline-styled surfaces, not just classed ones",
+  );
+  assert.match(
+    css,
+    /body\s*\{[^}]*--brand-surface:\s*color-mix\(in srgb, var\(--brand-primary\)/,
+    "--brand-surface itself must deepen, so every inline var(--brand-surface) " +
+      "follows without needing a class",
+  );
+});
+
 test("depth & glow is opt-in, graded, and cannot be on by default", () => {
   const css = read("src/app/globals.css");
   const provider = code(read("src/components/ThemeProvider.tsx"));
@@ -299,8 +318,10 @@ test("depth & glow is opt-in, graded, and cannot be on by default", () => {
 
   for (const lvl of levels.filter((l) => l > 0)) {
     assert.ok(
-      css.includes(`[data-deep="${lvl}"] {`),
-      `globals.css has no [data-deep="${lvl}"] block, so that level renders as off`,
+      // `body` on purpose — the tokens are redefined one element down so the
+      // right-hand var() resolves against the theme instead of cycling.
+      css.includes(`[data-deep="${lvl}"] body {`),
+      `globals.css has no [data-deep="${lvl}"] body block, so that level renders as off`,
     );
   }
   const cssLevels = new Set(

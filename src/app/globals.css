@@ -1893,99 +1893,194 @@ option:hover {
    would be actively misleading. */
 [data-deep="off"] { --block-glow: 0 0 0 transparent; }
 
-/* ── Level 20% (x1.2) ─────────────────────────────────────────────────────── */
-[data-deep="20"] {
-  --brand-bg-deep:
-    radial-gradient(1100px 620px at 50% -12%,
-      color-mix(in srgb, var(--brand-primary) 15.6%, var(--brand-bg)) 0%,
-      color-mix(in srgb, var(--brand-primary) 4.8%, var(--brand-bg)) 46%,
-      var(--brand-bg) 78%);
-  --surface-deep:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--brand-surface) 99%, white) 0%,
-      color-mix(in srgb, var(--brand-surface) 95.2%, var(--brand-primary)) 100%);
-  --hairline: color-mix(in srgb, var(--brand-border) 70%, var(--brand-primary));
+/* ════════════════════════════════════════════════════════════════════════════
+   WHY THE TOKENS ARE REDEFINED ON `body` AND NOT ON `html`.
+
+   First version of this feature only deepened --brand-bg-deep and
+   --surface-deep, and only put the glow on .card / .cw-surface / .rounded-2xl.
+   Dustin tested 35 vs 50 on his phone: "no difference in color depth at all
+   from 30-50. and I dont think glow changes either."
+
+   He was right, and my verification was at fault: I rendered a harness page
+   built out of .card and .rounded-2xl, which is not what the app is made of.
+   The real surfaces — MetricCards, the progress tiles, most of the dashboard —
+   are inline-styled `background: var(--brand-surface)` with a numeric
+   borderRadius and no class at all. 274 of them. Every selector I had written
+   missed every one.
+
+   So the deepening now happens to --brand-surface / --brand-bg / --brand-card /
+   --brand-border THEMSELVES, which every one of those 274 inline styles already
+   reads. Nothing has to be tagged and nothing can be missed.
+
+   It has to be on `body` rather than `html` because the right-hand side reads
+   the same token it defines:
+
+       --brand-surface: color-mix(in srgb, var(--brand-primary) 9%, var(--brand-surface))
+
+   On the same element that is a cycle and the whole declaration is invalid. On
+   a descendant, the var() on the right resolves against the INHERITED value
+   from html — the theme's own surface — and the result cascades down to
+   everything. Same trick, one level down.
+
+   This is also why the visual-layer-3 warning ("never redefine --brand-bg in a
+   trailing :root") is not violated: that rule is about a `:root` block beating
+   every [data-theme] on a specificity tie and collapsing all schemes into one.
+   These derive FROM the active theme instead of replacing it, and they sit on a
+   different element.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Level 20% ───────────────────────────────────────────────────────────── */
+[data-deep="20"] body {
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 5%, var(--brand-surface));
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 4%, var(--brand-bg));
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 6%, var(--brand-card));
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 14%, var(--brand-border));
+
+  --hairline: color-mix(in srgb, var(--brand-border) 86%, var(--brand-primary));
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
+
+  /* The gradient every surface gets, so a card is a graded field rather than a
+     flat fill. Strength tracks the level. */
+  --surface-grade: linear-gradient(170deg,
+    color-mix(in srgb, var(--brand-surface) 100%, transparent) 0%,
+    color-mix(in srgb, var(--brand-primary) 4%, var(--brand-surface)) 100%);
+
   --block-glow:
     0 12px 24px -10px color-mix(in srgb, var(--glow-ink) 48%, transparent),
     0 3px 9px -3px color-mix(in srgb, var(--brand-accent) 26%, transparent),
     0 0 0 1px color-mix(in srgb, var(--brand-primary) 10%, transparent);
 }
-[data-deep="20"][data-appearance="dark"],
-[data-deep="20"][data-theme="midnight"],
-[data-deep="20"][data-theme="carbonneon"],
-[data-deep="20"][data-theme="midnightaurora"],
-[data-deep="20"][data-theme="midnightember"],
-[data-deep="20"][data-theme="midnightcitrus"],
-[data-deep="20"][data-theme="midnightorchid"],
-[data-deep="20"][data-theme="deepreef"] {
+[data-deep="20"][data-appearance="dark"] body,
+[data-deep="20"][data-theme="midnight"] body,
+[data-deep="20"][data-theme="carbonneon"] body,
+[data-deep="20"][data-theme="midnightaurora"] body,
+[data-deep="20"][data-theme="midnightember"] body,
+[data-deep="20"][data-theme="midnightcitrus"] body,
+[data-deep="20"][data-theme="midnightorchid"] body,
+[data-deep="20"][data-theme="deepreef"] body {
   --block-glow:
     0 12px 26px -10px color-mix(in srgb,
       color-mix(in srgb, var(--brand-accent) 62%, #000) 46%, transparent),
     0 0 0 1px color-mix(in srgb, var(--brand-accent) 15%, transparent);
 }
-/* ── Level 35% (x1.35) ─────────────────────────────────────────────────────── */
-[data-deep="35"] {
-  --brand-bg-deep:
-    radial-gradient(1100px 620px at 50% -12%,
-      color-mix(in srgb, var(--brand-primary) 17.5%, var(--brand-bg)) 0%,
-      color-mix(in srgb, var(--brand-primary) 5.5%, var(--brand-bg)) 46%,
-      var(--brand-bg) 78%);
-  --surface-deep:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--brand-surface) 99%, white) 0%,
-      color-mix(in srgb, var(--brand-surface) 94.6%, var(--brand-primary)) 100%);
-  --hairline: color-mix(in srgb, var(--brand-border) 62%, var(--brand-primary));
+/* ── Level 35% ───────────────────────────────────────────────────────────── */
+[data-deep="35"] body {
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 9%, var(--brand-surface));
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 7%, var(--brand-bg));
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 11%, var(--brand-card));
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 24%, var(--brand-border));
+
+  --hairline: color-mix(in srgb, var(--brand-border) 76%, var(--brand-primary));
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
+
+  /* The gradient every surface gets, so a card is a graded field rather than a
+     flat fill. Strength tracks the level. */
+  --surface-grade: linear-gradient(170deg,
+    color-mix(in srgb, var(--brand-surface) 100%, transparent) 0%,
+    color-mix(in srgb, var(--brand-primary) 7%, var(--brand-surface)) 100%);
+
   --block-glow:
     0 12px 24px -10px color-mix(in srgb, var(--glow-ink) 62%, transparent),
     0 3px 9px -3px color-mix(in srgb, var(--brand-accent) 36%, transparent),
     0 0 0 1px color-mix(in srgb, var(--brand-primary) 15%, transparent);
 }
-[data-deep="35"][data-appearance="dark"],
-[data-deep="35"][data-theme="midnight"],
-[data-deep="35"][data-theme="carbonneon"],
-[data-deep="35"][data-theme="midnightaurora"],
-[data-deep="35"][data-theme="midnightember"],
-[data-deep="35"][data-theme="midnightcitrus"],
-[data-deep="35"][data-theme="midnightorchid"],
-[data-deep="35"][data-theme="deepreef"] {
+[data-deep="35"][data-appearance="dark"] body,
+[data-deep="35"][data-theme="midnight"] body,
+[data-deep="35"][data-theme="carbonneon"] body,
+[data-deep="35"][data-theme="midnightaurora"] body,
+[data-deep="35"][data-theme="midnightember"] body,
+[data-deep="35"][data-theme="midnightcitrus"] body,
+[data-deep="35"][data-theme="midnightorchid"] body,
+[data-deep="35"][data-theme="deepreef"] body {
   --block-glow:
     0 12px 26px -10px color-mix(in srgb,
       color-mix(in srgb, var(--brand-accent) 62%, #000) 58%, transparent),
     0 0 0 1px color-mix(in srgb, var(--brand-accent) 22%, transparent);
 }
-/* ── Level 50% (x1.5) ─────────────────────────────────────────────────────── */
-[data-deep="50"] {
-  --brand-bg-deep:
-    radial-gradient(1100px 620px at 50% -12%,
-      color-mix(in srgb, var(--brand-primary) 19.5%, var(--brand-bg)) 0%,
-      color-mix(in srgb, var(--brand-primary) 6.0%, var(--brand-bg)) 46%,
-      var(--brand-bg) 78%);
-  --surface-deep:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--brand-surface) 99%, white) 0%,
-      color-mix(in srgb, var(--brand-surface) 94.0%, var(--brand-primary)) 100%);
-  --hairline: color-mix(in srgb, var(--brand-border) 54%, var(--brand-primary));
+/* ── Level 50% ───────────────────────────────────────────────────────────── */
+[data-deep="50"] body {
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 14%, var(--brand-surface));
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 11%, var(--brand-bg));
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 17%, var(--brand-card));
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 36%, var(--brand-border));
+
+  --hairline: color-mix(in srgb, var(--brand-border) 64%, var(--brand-primary));
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
+
+  /* The gradient every surface gets, so a card is a graded field rather than a
+     flat fill. Strength tracks the level. */
+  --surface-grade: linear-gradient(170deg,
+    color-mix(in srgb, var(--brand-surface) 100%, transparent) 0%,
+    color-mix(in srgb, var(--brand-primary) 11%, var(--brand-surface)) 100%);
+
   --block-glow:
     0 12px 24px -10px color-mix(in srgb, var(--glow-ink) 76%, transparent),
     0 3px 9px -3px color-mix(in srgb, var(--brand-accent) 46%, transparent),
     0 0 0 1px color-mix(in srgb, var(--brand-primary) 22%, transparent);
 }
-[data-deep="50"][data-appearance="dark"],
-[data-deep="50"][data-theme="midnight"],
-[data-deep="50"][data-theme="carbonneon"],
-[data-deep="50"][data-theme="midnightaurora"],
-[data-deep="50"][data-theme="midnightember"],
-[data-deep="50"][data-theme="midnightcitrus"],
-[data-deep="50"][data-theme="midnightorchid"],
-[data-deep="50"][data-theme="deepreef"] {
+[data-deep="50"][data-appearance="dark"] body,
+[data-deep="50"][data-theme="midnight"] body,
+[data-deep="50"][data-theme="carbonneon"] body,
+[data-deep="50"][data-theme="midnightaurora"] body,
+[data-deep="50"][data-theme="midnightember"] body,
+[data-deep="50"][data-theme="midnightcitrus"] body,
+[data-deep="50"][data-theme="midnightorchid"] body,
+[data-deep="50"][data-theme="deepreef"] body {
   --block-glow:
     0 12px 26px -10px color-mix(in srgb,
       color-mix(in srgb, var(--brand-accent) 62%, #000) 70%, transparent),
     0 0 0 1px color-mix(in srgb, var(--brand-accent) 30%, transparent);
 }
+
+/* ── Reaching the surfaces that have no class ───────────────────────────────
+   The app's cards are inline `background: var(--brand-surface)`. CSS cannot
+   select on a computed background, but it CAN select on the inline style's
+   text, and that string is exactly the marker we need — it appears on card
+   surfaces and essentially nowhere else.
+
+   Form controls and anything clickable are excluded: a glowing input reads as
+   focus and a glowing button reads as pressed, both of which would be lying
+   about state.
+
+   `background-image` carries !important because these elements set the
+   `background` SHORTHAND inline, which sets background-image: none at inline
+   specificity. This is the one case where !important is the correct tool
+   rather than a shortcut — there is no selector that outranks an inline
+   declaration. The colour still comes from the element's own inline
+   background-color underneath, so nothing is being overridden except "no
+   gradient". */
+[data-deep="20"],
+[data-deep="35"],
+[data-deep="50"] {
+  --deep-surface-sel: 1;
+}
+[data-deep="20"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="20"] .card,
+[data-deep="20"] .cw-surface,
+[data-deep="20"] .rounded-2xl:not(button):not(a):not([role="button"]) {
+  background-image: var(--surface-grade) !important;
+  box-shadow: var(--block-glow), var(--shadow-1);
+}
+[data-deep="20"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
+[data-deep="20"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
+[data-deep="35"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="35"] .card,
+[data-deep="35"] .cw-surface,
+[data-deep="35"] .rounded-2xl:not(button):not(a):not([role="button"]) {
+  background-image: var(--surface-grade) !important;
+  box-shadow: var(--block-glow), var(--shadow-1);
+}
+[data-deep="35"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
+[data-deep="35"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
+[data-deep="50"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="50"] .card,
+[data-deep="50"] .cw-surface,
+[data-deep="50"] .rounded-2xl:not(button):not(a):not([role="button"]) {
+  background-image: var(--surface-grade) !important;
+  box-shadow: var(--block-glow), var(--shadow-1);
+}
+[data-deep="50"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
+[data-deep="50"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
 
 /* ── Gradient contrast — every level above off ──────────────────────────────
    Each colour is held across a span before switching, instead of blending the
@@ -2021,27 +2116,6 @@ option:hover {
     color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 90%, white) 100%);
 }
 
-[data-deep="20"] .card,
-[data-deep="35"] .card,
-[data-deep="50"] .card,
-[data-deep="20"] .cw-surface,
-[data-deep="35"] .cw-surface,
-[data-deep="50"] .cw-surface,
-[data-deep="20"] .rounded-2xl:not(button):not(a):not([role="button"]),
-[data-deep="35"] .rounded-2xl:not(button):not(a):not([role="button"]),
-[data-deep="50"] .rounded-2xl:not(button):not(a):not([role="button"]) {
-  box-shadow: var(--block-glow), var(--shadow-1);
-}
-[data-deep="20"] .card-elevated,
-[data-deep="35"] .card-elevated,
-[data-deep="50"] .card-elevated {
-  box-shadow: var(--block-glow), var(--shadow-3);
-}
-[data-deep="20"] .card-hover:hover,
-[data-deep="35"] .card-hover:hover,
-[data-deep="50"] .card-hover:hover {
-  box-shadow: var(--block-glow), var(--shadow-2);
-}
 
 /* Motion-sensitive users get the colour, not an animated bloom. Matches any
    on-level: [data-deep] is only ever "off" or a number. */
