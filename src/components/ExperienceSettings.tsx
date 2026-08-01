@@ -81,6 +81,7 @@ export default function ExperienceSettings({ isTrainer }: { isTrainer: boolean }
   const [board, setBoard] = useState(false);
   const [nudges, setNudges] = useState(true);
   const [nudgesLive, setNudgesLive] = useState(false);
+  const [coachbotLive, setCoachbotLive] = useState(false);
   const [clientId, setClientId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -109,6 +110,8 @@ export default function ExperienceSettings({ isTrainer }: { isTrainer: boolean }
         }
         if (isTrainer) {
           const { data: f } = await supabase.from("app_flags").select("enabled").eq("key", "nudges_live").maybeSingle();
+          const { data: cb } = await supabase.from("app_flags").select("enabled").eq("key", "coachbot_live").maybeSingle();
+          setCoachbotLive((cb as { enabled: boolean } | null)?.enabled === true);
           setNudgesLive((f as { enabled: boolean } | null)?.enabled === true);
         }
       } catch {
@@ -225,6 +228,34 @@ export default function ExperienceSettings({ isTrainer }: { isTrainer: boolean }
                   if (error) setNudgesLive(!next);
                 } catch {
                   setNudgesLive(!next);
+                }
+              })();
+            }}
+          />
+
+          <Row
+            icon="ti-message-chatbot"
+            title="Coach Bot in the group chat"
+            sub={
+              coachbotLive
+                ? "LIVE — posts light-hearted smack talk about the challenge three times a week. Never pushes a notification, never names anyone in the bottom half of the board."
+                : "Off. Nothing posts. Turn it on when you want the group chat to have a mouth on it."
+            }
+            on={coachbotLive}
+            disabled={!ready}
+            onToggle={() => {
+              const next = !coachbotLive;
+              setCoachbotLive(next);
+              fx(next ? "pr" : "tap");
+              (async () => {
+                try {
+                  const { error } = await supabase
+                    .from("app_flags")
+                    .update({ enabled: next, updated_at: new Date().toISOString() })
+                    .eq("key", "coachbot_live");
+                  if (error) setCoachbotLive(!next);
+                } catch {
+                  setCoachbotLive(!next);
                 }
               })();
             }}

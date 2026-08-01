@@ -605,7 +605,8 @@
     "is_broadcast",
     "is_group",
     "deleted_at",
-    "image_url"
+    "image_url",
+    "sender_kind"
   ],
   "metrics": [
     "id",

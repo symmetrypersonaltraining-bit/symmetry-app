@@ -18,6 +18,7 @@ interface Message {
   read_at: string | null;
   created_at: string | null;
   is_broadcast?: boolean | null;
+  sender_kind?: string | null;
   __recipients?: number;
 }
 
@@ -238,13 +239,19 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
             </div>
             <div className="space-y-2">
               {msgs.map(m => {
-                const isMe = m.from_id === currentUserId;
+                // Coach Bot posts from the trainer's auth user, so without this
+                // every bot line would render as one of Dustin's own messages —
+                // right-aligned, in his colour, under his name. It is not him,
+                // and pretending otherwise makes his real messages harder to
+                // pick out, which is the opposite of what the bot is for.
+                const isBot = m.sender_kind === "coachbot";
+                const isMe = !isBot && m.from_id === currentUserId;
                 return (
                   <div key={m.id} id={"msg-" + m.id} className={"flex " + (isMe ? "justify-end" : "justify-start")} style={{ scrollMarginTop: 80, scrollMarginBottom: 80 }}>
                     <div className="max-w-[78%] rounded-2xl px-4 py-2.5"
                       style={{
-                        background: isMe ? "var(--brand-primary)" : "var(--brand-surface)",
-                        border: isMe ? "none" : "1px solid var(--brand-border)",
+                        background: isMe ? "var(--brand-primary)" : isBot ? "color-mix(in srgb, #8b5cf6 10%, var(--brand-surface))" : "var(--brand-surface)",
+                        border: isMe ? "none" : isBot ? "1px solid rgba(139,92,246,0.45)" : "1px solid var(--brand-border)",
                         borderBottomRightRadius: isMe ? 4 : 16,
                         borderBottomLeftRadius: isMe ? 16 : 4,
                         // The flash is what makes a deep link land. Without it
@@ -255,8 +262,14 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                           : undefined,
                         transition: "box-shadow .35s ease",
                       }}>
-                      <p className="text-[11px] font-bold mb-0.5 flex items-center gap-1.5" style={{ color: isMe ? "rgba(255,255,255,0.85)" : "var(--brand-primary)" }}>
-                        {nameForFrom(m)}
+                      <p className="text-[11px] font-bold mb-0.5 flex items-center gap-1.5" style={{ color: isMe ? "rgba(255,255,255,0.85)" : isBot ? "#a78bfa" : "var(--brand-primary)" }}>
+                        {isBot ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/coachbot.png" alt="" width={18} height={18} style={{ borderRadius: "50%", objectFit: "cover" }} />
+                            Coach Bot
+                          </>
+                        ) : nameForFrom(m)}
                         {m.is_broadcast ? <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: 0.4, padding: "1px 5px", borderRadius: 4, background: isMe ? "rgba(255,255,255,0.2)" : "color-mix(in srgb, var(--brand-primary) 16%, transparent)", color: isMe ? "#fff" : "var(--brand-primary)" }}>ANNOUNCEMENT</span> : null}
                         {m.__recipients ? <span style={{ fontSize: 9, fontWeight: 600, opacity: 0.8 }}>· {m.__recipients} recipient{m.__recipients === 1 ? "" : "s"}</span> : null}
                       </p>
