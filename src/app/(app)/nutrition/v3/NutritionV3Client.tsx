@@ -21,6 +21,7 @@ import {
 } from "@/lib/nutrition/dailyTotals";
 import { planItemsToCustom } from "@/lib/nutrition/mealToCustom";
 import { parseFoodText, lastParseFailure, parseFailureMessage } from "@/lib/nutrition/parseClient";
+import AiBadge from "@/components/AiBadge";
 import { pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 import Sheet from "./Sheet";
 import FoodSearchSheet from "./FoodSearchSheet";
@@ -1424,7 +1425,7 @@ export default function NutritionV3Client(props: Props) {
       {weekFood && !weekFoodDismissed && coachOn && !coachDismissed && (
         <div className="mx-4 mt-2.5 p-3" style={{ ...CARD, borderLeft: "3px solid var(--brand-primary)", animation: "v3fadeup 0.35s ease" }}>
           <div className="flex items-start gap-2.5">
-            <span className="flex-shrink-0 flex items-center justify-center" style={{ width: 24, height: 24, borderRadius: 8, background: "var(--brand-bg)", color: "var(--brand-primary)", fontSize: 13 }}>✦</span>
+            <AiBadge size={26} />
             <div className="flex-1">
               <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.1, color: "var(--brand-primary)", marginBottom: 4 }}>YOUR WEEK</p>
               <p className="text-xs leading-relaxed" style={{ color: "var(--brand-text-secondary)" }}>{weekFood}</p>
@@ -1449,7 +1450,7 @@ export default function NutritionV3Client(props: Props) {
       {/* coach card */}
       {coach && (
         <div className="mx-4 mt-2.5 flex items-start gap-2.5 p-3" style={{ ...CARD, borderLeft: `3px solid ${coach.kind === "push" ? ORANGE : GREEN}`, animation: "v3fadeup 0.35s ease" }}>
-          <span className="flex-shrink-0 flex items-center justify-center" style={{ width: 24, height: 24, borderRadius: 8, background: "var(--brand-bg)", color: "var(--brand-primary)", fontSize: 13 }}>✦</span>
+          <AiBadge size={26} />
           <p className="flex-1 text-xs leading-relaxed" style={{ color: "var(--brand-text-secondary)" }}>{coach.html}</p>
           <button onClick={() => setCoachDismissed(true)} aria-label="dismiss" style={{ color: "var(--brand-text-secondary)", fontSize: 12, padding: "2px 6px" }}>✕</button>
         </div>

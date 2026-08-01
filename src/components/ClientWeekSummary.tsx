@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useNutritionAverages } from "@/components/nutrition/useNutritionAverages";
 import CoachBadge from "@/components/CoachBadge";
+import AiBadge from "@/components/AiBadge";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -49,7 +50,7 @@ interface Summary {
   // LAST week (the once-weekly full-screen review only)
   doneLast: number; totalLast: number;
   weightDelta: number | null; streak: number;
-  focus: string | null; firstName: string;
+  focus: string | null; focusSource: string | null; firstName: string;
   lastWkStart: string; lastWkEnd: string; thisWk: string; thisWkEnd: string;
 }
 
@@ -86,22 +87,23 @@ export default function ClientWeekSummary() {
         let cid: string | null = null;
         let clientName = "";
         let focus: string | null = null;
+        let focusSource: string | null = null;
         try { cid = new URLSearchParams(window.location.search).get("forClient"); } catch { cid = null; }
         if (!cid) {
           const { data: userData } = await supabase.auth.getUser();
           const user = userData ? userData.user : null;
           if (!user) return;
-          const col = "id, name, weekly_focus, weekly_focus_week";
+          const col = "id, name, weekly_focus, weekly_focus_week, weekly_focus_source";
           if ((user.email || "") === TRAINER_EMAIL) {
             const { data: c } = await supabase.from("clients").select(col).ilike("name", "%Dustin%").limit(1);
-            if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = currentWeekFocus(c[0]); }
+            if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = currentWeekFocus(c[0]); focusSource = c[0].weekly_focus_source ?? null; }
           } else {
             const { data: c } = await supabase.from("clients").select(col).eq("auth_user_id", user.id).limit(1);
-            if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = currentWeekFocus(c[0]); }
+            if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = currentWeekFocus(c[0]); focusSource = c[0].weekly_focus_source ?? null; }
           }
         } else {
-          const { data: c } = await supabase.from("clients").select("id, name, weekly_focus, weekly_focus_week").eq("id", cid).limit(1);
-          if (c && c[0]) { clientName = c[0].name; focus = currentWeekFocus(c[0]); }
+          const { data: c } = await supabase.from("clients").select("id, name, weekly_focus, weekly_focus_week, weekly_focus_source").eq("id", cid).limit(1);
+          if (c && c[0]) { clientName = c[0].name; focus = currentWeekFocus(c[0]); focusSource = c[0].weekly_focus_source ?? null; }
         }
         if (!cid || !on) return;
         if (on) setClientId(cid);
@@ -134,7 +136,7 @@ export default function ClientWeekSummary() {
 
         const firstName = (clientName || "").split(" ")[0] || "there";
         if (!on) return;
-        setS({ doneThis, totalThis, doneLast, totalLast, weightDelta, streak, focus: focus || null, firstName, lastWkStart, lastWkEnd, thisWk, thisWkEnd });
+        setS({ doneThis, totalThis, doneLast, totalLast, weightDelta, streak, focus: focus || null, focusSource, firstName, lastWkStart, lastWkEnd, thisWk, thisWkEnd });
       } catch { /* fail silent -> render nothing */ }
     })();
     return () => { on = false; };
@@ -164,6 +166,11 @@ export default function ClientWeekSummary() {
   }
 
   const focusText = s.focus && s.focus.trim() ? s.focus.trim() : null;
+  // Who actually wrote this line. The weekly sweep drafts it and Dustin approves
+  // or rewrites it on Saturday — 'trainer' means his words, 'ai' means the app's.
+  // Badging both the same way would make his own coaching indistinguishable from
+  // generated copy, which costs him the thing that makes it worth reading.
+  const focusIsAi = !!focusText && s.focusSource !== "trainer";
   const stat = (n: React.ReactNode, l: string, d?: React.ReactNode) => (
     <div style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", borderRadius: 16, padding: 12 }}>
       <div style={{ fontSize: 22, fontWeight: 800, color: "var(--brand-text)" }}>{n}</div>
@@ -197,7 +204,7 @@ export default function ClientWeekSummary() {
         </div>
         {(focusText || s.totalThis > 0) && (
           <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "#eef2ff", border: "1px solid #dbe4ff", borderRadius: 14, padding: 9 }}>
-            <CoachBadge size={30} />
+            {focusIsAi ? <AiBadge size={30} /> : <CoachBadge size={30} />}
             <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
               <b>Focus:</b> {focusText || (s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " on the calendar this week — let's go.")}
             </div>
@@ -222,9 +229,9 @@ export default function ClientWeekSummary() {
             </div>
             <div style={{ fontWeight: 800, fontSize: 14, color: "var(--brand-text)", marginTop: 2 }}>This week's focus</div>
             <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "#eef2ff", border: "1px solid #dbe4ff", borderRadius: 14, padding: 11 }}>
-              <CoachBadge size={30} />
+              {focusIsAi ? <AiBadge size={30} /> : <CoachBadge size={30} />}
               <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
-                <b>Dustin:</b> {focusText || ("You've got " + s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " scheduled this week. Show up and stack another good one.")}
+                <b>{focusIsAi ? "Your focus:" : "Dustin:"}</b> {focusText || ("You've got " + s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " scheduled this week. Show up and stack another good one.")}
               </div>
             </div>
             <button onClick={dismissBrief} style={{ display: "block", textAlign: "center", background: "var(--brand-primary)", color: "#fff", fontWeight: 800, padding: 14, borderRadius: 15, fontSize: 15, border: "none", width: "100%", cursor: "pointer", marginTop: "auto" }}>

@@ -21,6 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import AiBadge from "@/components/AiBadge";
 import { kcalOf } from "@/lib/nutrition/dailyTotals";
 import Sheet from "./Sheet";
 
@@ -416,6 +417,16 @@ export default function CoachChatSheet({
             <div ref={listRef} style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: 8 }}>
               {msgs.map((msg, mi) => (
                 <div key={mi} className="flex flex-col mb-2" style={{ alignItems: msg.role === "client" ? "flex-end" : "flex-start" }}>
+                  {/* The coach's face on its first line of a run. Same artwork as
+                      Coach Bot in the group chat and the insight cards above —
+                      one AI face across the app, so a client learns it once and
+                      always knows whether they are reading Dustin or the app. */}
+                  {msg.role !== "client" && (mi === 0 || msgs[mi - 1].role === "client") && (
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <AiBadge size={20} />
+                      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, color: "var(--brand-text-secondary)" }}>COACH</span>
+                    </div>
+                  )}
                   <div
                     className="text-[13px] leading-relaxed"
                     style={{
