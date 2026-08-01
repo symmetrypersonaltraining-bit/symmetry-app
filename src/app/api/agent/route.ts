@@ -16,8 +16,7 @@ import { SONNET_MODEL } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { resolveAiScope, enforceMeter, missingKeyResponse, Db } from "@/lib/ai/scope";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { applyProposal, loadDayTree, CT_TODAY, Proposal } from "@/lib/ai/workoutAdjust";
-import { assembleCoachContext, assembleTrainingContext } from "@/lib/ai/coach-context";
+import { TRAINER_TOOLS, execTrainerTool } from "@/lib/ai/agent-tools";
 
 export const runtime = "nodejs";
 
@@ -33,113 +32,18 @@ Programming rules you must always honor:
 
 Writing workouts: adjust_workout only touches THIS client's scheduled sessions (it clones a shared template into a client-owned copy first). Use scope "one" for a single session or "series" for all upcoming sessions of that workout — if it's ambiguous, ask Dustin which he wants before a big change. Reference the exact SW-id / section_id / pe_id from client_workouts.
 
+THE CALENDAR. book_session, move_session and cancel_session write to GOOGLE, not to the app. Google is the source of truth and the app syncs from it, so this is the only safe direction — and it means a change shows in the app on the next sync rather than instantly. Say so. Never delete a session to cancel it: cancel_session colours it orange, which is how the app and the billing recognise a cancellation. A booked event's title must contain the client's name or the sync cannot match it to them, and an unmatched event is an unbilled session — book_session handles that, don't override the title with something that drops the name.
+
+MESSAGES GO TO REAL PEOPLE. Before send_message, show Dustin the exact text and wait, unless he has already told you what to say. An announcement (group + announcement:true) puts a full-screen takeover in front of all 35 clients — only when he asks for something that loud.
+
+ANYTHING YOU CHANGE CAN BE TAKEN BACK. Every write is logged; recent_actions lists them and undo_action reverses one. If you get something wrong, undo it and say so rather than layering another change on top. Workout edits are the exception — they have no faithful inverse, so be sure before applying one to a series.
+
+query_table is the fallback for anything the specific tools don't cover — it reads any allow-listed table with simple filters. Prefer the purpose-built tools when they fit; they return better-shaped context.
+
 Keep replies tight. After a change, confirm exactly what you did in one or two sentences.
 
 ${APP_GUIDE_TRAINER}
 `;
-
-const TOOLS: Anthropic.Tool[] = [
-  { name: "find_clients", description: "Find clients by name (partial, case-insensitive). Omit query to list all clients. Returns id, name, primary_goal.", input_schema: { type: "object", properties: { query: { type: "string", description: "name fragment; omit to list all" } } } },
-  { name: "client_overview", description: "Full snapshot of one client: profile, goals, injuries, latest weight/body-fat + trend, active program + current phase, macro targets, workout adherence/streak.", input_schema: { type: "object", properties: { client_id: { type: "string" } }, required: ["client_id"] } },
-  { name: "client_workouts", description: "The client's upcoming scheduled workouts with full exercise detail — includes the SW-id, section_id and pe_id required to adjust them.", input_schema: { type: "object", properties: { client_id: { type: "string" } }, required: ["client_id"] } },
-  { name: "client_nutrition", description: "The client's live meal plan (meals + foods + macros), current macro targets, recent daily totals, and averages vs targets.", input_schema: { type: "object", properties: { client_id: { type: "string" } }, required: ["client_id"] } },
-  { name: "adjust_workout", description: "Change a client's scheduled workout (swap/modify/remove/add exercises). Clones a library day into a client-owned copy — never edits the master library.", input_schema: { type: "object", properties: {
-    client_id: { type: "string" },
-    scheduled_workout_id: { type: "string", description: "the SW-id from client_workouts" },
-    scope: { type: "string", enum: ["one", "series"], description: "'one' = just that session; 'series' = all upcoming sessions of that workout" },
-    summary: { type: "string", description: "one plain-English sentence describing the change" },
-    changes: { type: "array", items: { type: "object", properties: {
-      op: { type: "string", enum: ["swap", "modify", "remove", "add"] },
-      pe_id: { type: "string", description: "for swap/modify/remove" },
-      section_id: { type: "string", description: "for add" },
-      to_exercise: { type: "string", description: "for swap: new exercise name" },
-      exercise: { type: "string", description: "for add: exercise name" },
-      type: { type: "string", enum: ["weight", "reps", "time"], description: "for add" },
-      sets: { type: "number" }, reps: { type: "string" }, load: { type: "string" }, duration: { type: "string" }, note: { type: "string" },
-    }, required: ["op"] } },
-  }, required: ["client_id", "scheduled_workout_id", "scope", "changes", "summary"] } },
-  { name: "set_macro_targets", description: "Set a client's daily macro targets. Creates a new dated target version effective today (history is kept).", input_schema: { type: "object", properties: {
-    client_id: { type: "string" }, calories: { type: "number" }, protein: { type: "number" }, carbs: { type: "number" }, fats: { type: "number" }, rationale: { type: "string" },
-  }, required: ["client_id", "calories", "protein", "carbs", "fats"] } },
-];
-
-async function execTool(db: Db, name: string, input: Record<string, unknown>): Promise<string> {
-  try {
-    if (name === "find_clients") {
-      const q = typeof input.query === "string" ? input.query.trim() : "";
-      let query = db.from("clients").select("id, name, primary_goal").is("archived_at", null).order("name").limit(60);
-      if (q) query = db.from("clients").select("id, name, primary_goal").ilike("name", `%${q}%`).is("archived_at", null).order("name").limit(60);
-      const { data } = await query;
-      return JSON.stringify(data || []);
-    }
-    const clientId = typeof input.client_id === "string" ? input.client_id : "";
-    if (!clientId) return "Error: client_id required.";
-
-    if (name === "client_overview") {
-      const [profRes, mRes, apRes, mtRes] = await Promise.all([
-        db.from("clients").select("name, email, date_of_birth, experience_level, primary_goal, secondary_goals, training_frequency, days_per_week, injuries_limitations, injuries, current_weight, current_body_fat_pct, notes, start_date").eq("id", clientId).maybeSingle(),
-        db.from("metrics").select("metric_date, weight, body_fat_pct").eq("client_id", clientId).order("metric_date", { ascending: false }).limit(6),
-        db.from("program_assignments").select("program_id, programs(name, phases(label, position))").eq("client_id", clientId).eq("active", true).limit(1).maybeSingle(),
-        db.from("macro_targets").select("calories, protein, carbs, fats, effective_date").eq("client_id", clientId).order("effective_date", { ascending: false }).limit(1).maybeSingle(),
-      ]);
-      const training = await assembleTrainingContext(db, clientId);
-      return JSON.stringify({ profile: profRes.data, recent_metrics: mRes.data, active_program: apRes.data, macro_targets: mtRes.data, training_context: training });
-    }
-
-    if (name === "client_workouts") {
-      const today = CT_TODAY();
-      const { data: sws } = await db.from("scheduled_workouts").select("id, scheduled_date, status, day_id").eq("client_id", clientId).is("deleted_at", null).eq("status", "scheduled").gte("scheduled_date", today).order("scheduled_date").limit(10);
-      const out: string[] = [];
-      for (const sw of ((sws as { id: string; scheduled_date: string; day_id: string }[]) || [])) {
-        const day = await loadDayTree(db, sw.day_id);
-        out.push(`[SW-id ${sw.id}] ${sw.scheduled_date} — ${day?.label || "workout"}`);
-        for (const s of (day?.sections || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0))) {
-          out.push(`  Section "${s.client_facing_name || s.internal_name}" (section_id ${s.id}):`);
-          for (const pe of (s.prescribed_exercises || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0))) {
-            out.push(`    - [pe_id ${pe.id}] ${pe.exercises?.name || "exercise"} ${pe.sets ?? ""}x${pe.volume_value ?? ""}${pe.load_descriptor ? ` (${pe.load_descriptor})` : ""}${pe.cue ? ` — ${pe.cue}` : ""}`);
-          }
-        }
-      }
-      return out.length ? out.join("\n") : "No upcoming scheduled workouts.";
-    }
-
-    if (name === "client_nutrition") {
-      const ctx = await assembleCoachContext(db, clientId);
-      return ctx;
-    }
-
-    if (name === "adjust_workout") {
-      const proposal: Proposal = {
-        scheduled_workout_id: String(input.scheduled_workout_id || ""),
-        reason: "", summary: typeof input.summary === "string" ? input.summary : "",
-        changes: Array.isArray(input.changes) ? (input.changes as Proposal["changes"]) : [],
-      };
-      const scope = input.scope === "series" ? "series" : "one";
-      const res = await applyProposal(db, clientId, proposal, scope);
-      return res.message;
-    }
-
-    if (name === "set_macro_targets") {
-      const today = CT_TODAY();
-      const row = {
-        client_id: clientId,
-        calories: Math.round(Number(input.calories) || 0),
-        protein: Math.round(Number(input.protein) || 0),
-        carbs: Math.round(Number(input.carbs) || 0),
-        fats: Math.round(Number(input.fats) || 0),
-        effective_date: today,
-        rationale: typeof input.rationale === "string" ? input.rationale : null,
-      };
-      const { error } = await db.from("macro_targets").insert(row);
-      if (error) return `Error setting macro targets: ${error.message}`;
-      return `Set macro targets effective ${today}: ${row.calories} kcal, ${row.protein}P / ${row.carbs}C / ${row.fats}F.`;
-    }
-
-    return `Unknown tool: ${name}`;
-  } catch (e) {
-    return `Tool error: ${(e as Error).message}`;
-  }
-}
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -172,8 +76,8 @@ export async function POST(req: NextRequest) {
   const client = new Anthropic({ apiKey });
   let tokensIn = 0, tokensOut = 0;
   try {
-    for (let i = 0; i < 8; i++) {
-      const resp = await client.messages.create({ model: SONNET_MODEL, max_tokens: 1600, system, tools: TOOLS, messages });
+    for (let i = 0; i < 14; i++) {
+      const resp = await client.messages.create({ model: SONNET_MODEL, max_tokens: 1600, system, tools: TRAINER_TOOLS, messages });
       tokensIn += resp.usage?.input_tokens ?? 0;
       tokensOut += resp.usage?.output_tokens ?? 0;
 
@@ -182,7 +86,7 @@ export async function POST(req: NextRequest) {
         const results: Anthropic.ToolResultBlockParam[] = [];
         for (const block of resp.content) {
           if (block.type === "tool_use") {
-            const out = await execTool(admin, block.name, (block.input as Record<string, unknown>) || {});
+            const out = await execTrainerTool(admin, block.name, (block.input as Record<string, unknown>) || {});
             results.push({ type: "tool_result", tool_use_id: block.id, content: out });
           }
         }

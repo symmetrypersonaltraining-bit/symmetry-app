@@ -896,5 +896,16 @@
     "approved_at",
     "published_at",
     "created_at"
+  ],
+  "ai_action_log": [
+    "id",
+    "created_at",
+    "actor",
+    "action",
+    "client_id",
+    "summary",
+    "undo",
+    "undone_at",
+    "undo_error"
   ]
 }
