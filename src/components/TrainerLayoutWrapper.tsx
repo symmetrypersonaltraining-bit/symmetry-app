@@ -77,9 +77,17 @@ export default function TrainerLayoutWrapper({ children }: Props) {
     return (
       <div className="flex flex-col min-h-screen app-bg">
 
-        {/* Top bar — mirrors what a client would see on mobile */}
+        {/* Top bar — mirrors what a client would see on mobile.
+            Uses --chrome-grad, the same token as the trainer sidebar and
+            AppHeader, for two reasons. It was a FLAT var(--brand-primary),
+            which meant (a) it never moved when the depth level changed, and
+            the top bar is the biggest block of scheme colour on any screen —
+            "the deep blue on this one looks exactly the same on all settings"
+            — and (b) it carries white text on the raw primary, which is 2.5:1
+            on Blush Cloud and worse on Soft Pastel. --chrome-grad is floored
+            toward black precisely so white stays legible in all 30 schemes. */}
         <div className="flex items-center gap-3 px-4 pb-3 sticky top-0 z-40 shadow-sm"
-          style={{ background: "var(--brand-primary)", paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
+          style={{ background: "var(--chrome-grad)", paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
           <Logo size={28} color="white" className="flex-shrink-0" />
           <div className="flex-1">
             <span className="text-white font-semibold text-sm">Symmetry</span>

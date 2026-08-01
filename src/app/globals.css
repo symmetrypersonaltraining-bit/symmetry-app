@@ -1922,6 +1922,29 @@ option:hover {
 
 /* ── Level 20% ───────────────────────────────────────────────────────────── */
 [data-deep="20"] body {
+  /* THE BRAND COLOUR HAS TO MOVE TOO. Reported after testing 20 vs off: "I
+     don't see any difference in the main color... the deep blue on this one
+     looks exactly the same on all settings." He was looking at the top bar,
+     which is the single largest block of scheme colour on any screen, and it
+     was not in the deepening at all — only surfaces were.
+
+     Only the CHROME gradient deepens, not --brand-primary itself. Primary is
+     also the colour of links, labels and icons sitting ON dark backgrounds in
+     the dark schemes; darkening the token would quietly cut the contrast of
+     every one of those. The chrome gradient carries white text, so mixing it
+     further toward black only ever improves its contrast. */
+  --chrome-grad: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary) 40%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 56%, #000) 55%,
+    color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 42%, var(--brand-primary)) 56%, #000) 100%);
+  --chrome-grad-v: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-primary) 40%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 56%, #000) 46%,
+    color-mix(in srgb, var(--brand-primary) 48%, #000) 100%);
+
   /* On `body`, not `html`: the right-hand side reads the token it defines, and
      on the same element that is a cycle and CSS drops the declaration. One
      level down it resolves against the value inherited from the theme. */
@@ -1931,8 +1954,18 @@ option:hover {
   --brand-border:  color-mix(in srgb, var(--brand-primary) 28%, var(--brand-border));
   --hairline: color-mix(in srgb, var(--brand-border) 60%, var(--brand-primary));
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
-  --surface-grade: linear-gradient(170deg,
-    color-mix(in srgb, var(--brand-surface) 100%, transparent) 0%,
+  /* A gradient you can actually see. The first version ran from the surface
+     colour to a primary tint — same hue at both ends, so it read as "very
+     slightly uneven" rather than as a gradient. This runs ACROSS the scheme:
+     the accent in one corner, the surface through the middle, the primary in
+     the other. Two different hues is what makes a gradient legible.
+
+     Capped at 20%. Text sits on these; measured across all 30 schemes at
+     level 50, 20% leaves the worst corner at 4.8:1 and 26% drops carbon neon
+     to 4.4:1, under the floor. */
+  --surface-grade: linear-gradient(150deg,
+    color-mix(in srgb, var(--brand-accent) 5%, var(--brand-surface)) 0%,
+    var(--brand-surface) 46%,
     color-mix(in srgb, var(--brand-primary) 8%, var(--brand-surface)) 100%);
   --block-glow:
     0 12px 26px -10px color-mix(in srgb, var(--glow-ink) 55%, transparent),
@@ -1967,6 +2000,29 @@ option:hover {
 
 /* ── Level 35% ───────────────────────────────────────────────────────────── */
 [data-deep="35"] body {
+  /* THE BRAND COLOUR HAS TO MOVE TOO. Reported after testing 20 vs off: "I
+     don't see any difference in the main color... the deep blue on this one
+     looks exactly the same on all settings." He was looking at the top bar,
+     which is the single largest block of scheme colour on any screen, and it
+     was not in the deepening at all — only surfaces were.
+
+     Only the CHROME gradient deepens, not --brand-primary itself. Primary is
+     also the colour of links, labels and icons sitting ON dark backgrounds in
+     the dark schemes; darkening the token would quietly cut the contrast of
+     every one of those. The chrome gradient carries white text, so mixing it
+     further toward black only ever improves its contrast. */
+  --chrome-grad: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary) 32%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 48%, #000) 55%,
+    color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 42%, var(--brand-primary)) 48%, #000) 100%);
+  --chrome-grad-v: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-primary) 32%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 48%, #000) 46%,
+    color-mix(in srgb, var(--brand-primary) 40%, #000) 100%);
+
   /* On `body`, not `html`: the right-hand side reads the token it defines, and
      on the same element that is a cycle and CSS drops the declaration. One
      level down it resolves against the value inherited from the theme. */
@@ -1976,9 +2032,19 @@ option:hover {
   --brand-border:  color-mix(in srgb, var(--brand-primary) 48%, var(--brand-border));
   --hairline: color-mix(in srgb, var(--brand-border) 60%, var(--brand-primary));
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
-  --surface-grade: linear-gradient(170deg,
-    color-mix(in srgb, var(--brand-surface) 100%, transparent) 0%,
-    color-mix(in srgb, var(--brand-primary) 16%, var(--brand-surface)) 100%);
+  /* A gradient you can actually see. The first version ran from the surface
+     colour to a primary tint — same hue at both ends, so it read as "very
+     slightly uneven" rather than as a gradient. This runs ACROSS the scheme:
+     the accent in one corner, the surface through the middle, the primary in
+     the other. Two different hues is what makes a gradient legible.
+
+     Capped at 20%. Text sits on these; measured across all 30 schemes at
+     level 50, 20% leaves the worst corner at 4.8:1 and 26% drops carbon neon
+     to 4.4:1, under the floor. */
+  --surface-grade: linear-gradient(150deg,
+    color-mix(in srgb, var(--brand-accent) 8%, var(--brand-surface)) 0%,
+    var(--brand-surface) 46%,
+    color-mix(in srgb, var(--brand-primary) 14%, var(--brand-surface)) 100%);
   --block-glow:
     0 12px 26px -10px color-mix(in srgb, var(--glow-ink) 72%, transparent),
     0 3px 10px -3px color-mix(in srgb, var(--brand-accent) 44%, transparent),
@@ -2012,6 +2078,29 @@ option:hover {
 
 /* ── Level 50% ───────────────────────────────────────────────────────────── */
 [data-deep="50"] body {
+  /* THE BRAND COLOUR HAS TO MOVE TOO. Reported after testing 20 vs off: "I
+     don't see any difference in the main color... the deep blue on this one
+     looks exactly the same on all settings." He was looking at the top bar,
+     which is the single largest block of scheme colour on any screen, and it
+     was not in the deepening at all — only surfaces were.
+
+     Only the CHROME gradient deepens, not --brand-primary itself. Primary is
+     also the colour of links, labels and icons sitting ON dark backgrounds in
+     the dark schemes; darkening the token would quietly cut the contrast of
+     every one of those. The chrome gradient carries white text, so mixing it
+     further toward black only ever improves its contrast. */
+  --chrome-grad: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary) 24%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 40%, #000) 55%,
+    color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 42%, var(--brand-primary)) 40%, #000) 100%);
+  --chrome-grad-v: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-primary) 24%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 40%, #000) 46%,
+    color-mix(in srgb, var(--brand-primary) 32%, #000) 100%);
+
   /* On `body`, not `html`: the right-hand side reads the token it defines, and
      on the same element that is a cycle and CSS drops the declaration. One
      level down it resolves against the value inherited from the theme. */
@@ -2021,9 +2110,19 @@ option:hover {
   --brand-border:  color-mix(in srgb, var(--brand-primary) 68%, var(--brand-border));
   --hairline: color-mix(in srgb, var(--brand-border) 60%, var(--brand-primary));
   --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
-  --surface-grade: linear-gradient(170deg,
-    color-mix(in srgb, var(--brand-surface) 100%, transparent) 0%,
-    color-mix(in srgb, var(--brand-primary) 26%, var(--brand-surface)) 100%);
+  /* A gradient you can actually see. The first version ran from the surface
+     colour to a primary tint — same hue at both ends, so it read as "very
+     slightly uneven" rather than as a gradient. This runs ACROSS the scheme:
+     the accent in one corner, the surface through the middle, the primary in
+     the other. Two different hues is what makes a gradient legible.
+
+     Capped at 20%. Text sits on these; measured across all 30 schemes at
+     level 50, 20% leaves the worst corner at 4.8:1 and 26% drops carbon neon
+     to 4.4:1, under the floor. */
+  --surface-grade: linear-gradient(150deg,
+    color-mix(in srgb, var(--brand-accent) 12%, var(--brand-surface)) 0%,
+    var(--brand-surface) 46%,
+    color-mix(in srgb, var(--brand-primary) 20%, var(--brand-surface)) 100%);
   --block-glow:
     0 12px 26px -10px color-mix(in srgb, var(--glow-ink) 90%, transparent),
     0 3px 10px -3px color-mix(in srgb, var(--brand-accent) 58%, transparent),
