@@ -178,12 +178,13 @@
     "ai_daily_chat_limit",
     "ai_daily_photo_limit",
     "ai_daily_parse_limit",
-    "ai_daily_planbuild_limit",
     "workout_ai",
     "workout_build_daily_limit",
     "seen_ai_workout_notice",
     "leaderboard_opt_in",
-    "nudges_enabled"
+    "nudges_enabled",
+    "ai_daily_plan_build_limit",
+    "ai_daily_verify_limit"
   ],
   "client_assessments": [
     "id",

@@ -191,10 +191,15 @@ export async function POST(req: NextRequest) {
       }
 
       const text = resp.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
-      if (scope.clientId) await logUsage(scope.clientId, "chat", tokensIn, tokensOut, SONNET_MODEL);
+      // Unconditional. This used to be gated on `scope.clientId`, so if the
+      // trainer had no clients row the entire agent's SONNET spend went
+      // unlogged — invisible to the $95 monthly kill switch, which is the one
+      // thing meant to stop a runaway bill. logUsage takes a null client_id and
+      // the spend rollups group by month, not by client.
+      await logUsage(scope.clientId ?? null, "chat", tokensIn, tokensOut, SONNET_MODEL);
       return NextResponse.json({ message: text || "(done)" });
     }
-    if (scope.clientId) await logUsage(scope.clientId, "chat", tokensIn, tokensOut, SONNET_MODEL);
+    await logUsage(scope.clientId ?? null, "chat", tokensIn, tokensOut, SONNET_MODEL);
     return NextResponse.json({ message: "That took several steps — tell me the next thing and I'll keep going." });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
