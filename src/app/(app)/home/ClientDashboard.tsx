@@ -12,6 +12,7 @@ import PrankInvoice from "@/components/PrankInvoice";
 import PaymentDueBanner from "@/components/PaymentDueBanner";
 import MilestoneBadges from "@/components/MilestoneBadges";
 import ClientWeekSummary from "@/components/ClientWeekSummary";
+import ProgrammingQuestion from "@/components/ProgrammingQuestion";
 import SundayWeighInReminder from "@/components/SundayWeighInReminder";
 import CommunityPair from "@/components/CommunityPair";
 import ChallengeTakeover from "@/components/ChallengeTakeover";
@@ -732,6 +733,13 @@ export default function ClientDashboard({
 
         {/* "This week" tiles + the Focus line. Unchanged. */}
         <ClientWeekSummary />
+
+        {/* Fortnightly programming check-in. Renders nothing at all on the
+            weeks nothing is being asked, and disappears the moment it is
+            answered — so it never becomes furniture people scroll past. Sits
+            directly under the week card because that is the block it is asking
+            about. */}
+        <ProgrammingQuestion />
         {/* CoachFocusCard ("Coach's Read") removed 2026-08-01. It restated the
             Focus line that ClientWeekSummary already shows, so clients read the
             same coaching twice in two different voices. The weekly question it

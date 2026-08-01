@@ -46,17 +46,31 @@ You write THREE things:
 3. "foodFocus" — the nutrition read for their food logger. Start from how they actually ate last week (the given averages, adherence and the signed vs-target deltas), then say what to work on this week. Name real numbers from the context. Never set a new macro target — that is Dustin's call.
 
 Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
-{"focus":string,"coachRead":string,"foodFocus":string}
+{"focus":string,"coachRead":string,"foodFocus":string,"programmingQuestion":string}
 
 Rules:
 - "focus": ONE sentence, under 120 characters, no leading "Focus:".
 - "coachRead": 2-4 sentences, plain text, no question at the end.
-- "foodFocus": 2-4 sentences, plain text, grounded in the stated numbers.`;
+- "foodFocus": 2-4 sentences, plain text, grounded in the stated numbers.
+- "programmingQuestion": ONE question, under 140 characters, asking this client whether anything about their PROGRAMMING should change — exercises, volume, session length, days, an area they want more or less of, something that has been bothering them physically. Ground it in what actually happened in their last two weeks so it does not read as a form letter: if they skipped legs twice, ask about that; if every session ran long, ask about session length. Never ask about weight, diet or body composition. Never ask a yes/no question they can dismiss with one word.`;
 
 interface WeeklyReply {
   focus: string;
   coachRead: string;
   foodFocus: string;
+  programmingQuestion: string;
+}
+
+// Fortnightly, anchored to a fixed Sunday so the cadence is stable whatever
+// happens to run history. Asking every week turns into noise people stop
+// reading; asking on a "every other run" counter drifts the moment a run is
+// missed or replayed.
+const FORTNIGHT_ANCHOR = Date.parse("2026-08-02T00:00:00Z"); // a Sunday
+function isQuestionWeek(weekStart: string): boolean {
+  const wk = Date.parse(weekStart + "T00:00:00Z");
+  if (Number.isNaN(wk)) return false;
+  const weeks = Math.round((wk - FORTNIGHT_ANCHOR) / (7 * 86400000));
+  return ((weeks % 2) + 2) % 2 === 0;
 }
 
 function validateWeekly(raw: unknown): WeeklyReply | null {
@@ -71,6 +85,9 @@ function validateWeekly(raw: unknown): WeeklyReply | null {
     focus: focus.slice(0, 200),
     coachRead: coachRead.slice(0, 900),
     foodFocus: foodFocus.slice(0, 900),
+    // Optional on purpose. A missing question costs one skipped fortnightly
+    // prompt; failing validation over it would cost the whole client's week.
+    programmingQuestion: s("programmingQuestion").slice(0, 200),
   };
 }
 
@@ -173,6 +190,24 @@ async function runSweep(opts: { onlyClientId?: string | null; today?: string }):
 
       const { error: upErr } = await db.from("clients").update(update).eq("id", c.id);
       if (upErr) throw new Error(upErr.message);
+
+      // Fortnightly programming question. Its own try/catch: a failure here
+      // must not cost this client their focus, which is already written.
+      // upsert on (client_id, week_start) makes a replayed sweep a no-op
+      // rather than a second question, and ignoreDuplicates means an answer
+      // already given is never overwritten by a re-run.
+      if (result.value.programmingQuestion && isQuestionWeek(week)) {
+        try {
+          await db
+            .from("client_program_feedback")
+            .upsert(
+              { client_id: c.id, week_start: week, question: result.value.programmingQuestion },
+              { onConflict: "client_id,week_start", ignoreDuplicates: true },
+            );
+        } catch (qe) {
+          console.error("weekly-ai: programming question failed for", c.id, qe);
+        }
+      }
 
       results.push({ clientId: c.id, name, status: trainerOwnsFocus ? "focus-kept" : "written" });
     } catch (e: unknown) {
