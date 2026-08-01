@@ -1,2 +1,27 @@
-! [remote rejected] refusing to allow a Personal Access Token to update
-  .github/workflows/gcal-sync.yml without `workflow` scope
+# RETIRED — kept as a tombstone so nobody re-creates it by accident.
+#
+# This used to run every 15 minutes and curl GET /api/gcal-sync with no
+# credentials at all. Once the cron guard was hardened to fail closed, every
+# run got a 401, the step exited 1, and GitHub emailed a failure ~96 times a
+# day. The file was then overwritten with a git error message, which made it
+# invalid YAML, so it stopped running entirely and the calendar sync went dead.
+#
+# The schedule now lives in pg_cron (job `gcal_sync_15min`), which authenticates
+# with a key held in public.app_scheduler_key. See src/lib/scheduler-key.ts and
+# public.trigger_gcal_sync() / public.gcal_sync_runs.
+#
+# Nothing here runs on its own: the only trigger is a manual dispatch.
+name: GCal Sync (retired - schedule moved to pg_cron)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  retired:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain
+        run: |
+          echo "This workflow is retired."
+          echo "The GCal sync runs from pg_cron: public.trigger_gcal_sync()"
+          echo "Run history: select * from public.gcal_sync_runs order by id desc;"
