@@ -1539,23 +1539,22 @@ option:hover {
   position: sticky;
   top: 0;
   z-index: 45;
-  display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 8px;
   padding: 8px 14px 6px;
   background: var(--brand-bg);
 }
-@media (max-width: 1023px) {
-  .trainer-top-strip {
-    position: fixed;
-    top: env(safe-area-inset-top, 0px);
-    right: 0;
-    left: auto;
-    background: transparent;
-    padding: 10px 12px;
-  }
-}
+/* No mobile rule any more, on purpose.
+   This used to go `position: fixed` under 1024px so it could sit inside the
+   blue top bar. That made TWO independently positioned fixed elements aim at
+   the same corner, which depends on z-index, on safe-area insets resolving
+   identically in both, and on neither inheriting a stacking context from an
+   ancestor. It came back as "the bell is partially hidden" twice.
+   On mobile the bell now renders INSIDE the bar as a normal flex child
+   (TrainerSidebar's mobileActions), where overlap is not expressible. The
+   element above is desktop-only — the JSX carries `hidden lg:flex`, which is
+   also why `display` is no longer set here. */
 
 /* ════════════════════════════════════════════════════════════════════════════
    APP BACKGROUND — and why it is not `background-attachment: fixed` on touch.

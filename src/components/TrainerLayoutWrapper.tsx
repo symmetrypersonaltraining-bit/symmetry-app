@@ -134,15 +134,28 @@ export default function TrainerLayoutWrapper({ children }: Props) {
         onToggleClientMode={handleToggleMode}
         userName="Dustin Gautreaux"
         userInitials="DG"
+        // On mobile these live INSIDE the blue bar, in normal flow. They used
+        // to be a second position:fixed element aimed at the same corner,
+        // which is why the bell kept coming back half-covered.
+        mobileActions={
+          <>
+            <button onClick={handleToggleMode} aria-label="Switch to client view"
+              className="flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0"
+              style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer" }}>
+              <i className="ti ti-user text-base text-white" />
+            </button>
+            <HeaderAssist />
+          </>
+        }
       />
       <div className="flex-1 min-w-0 overflow-y-auto">
-        {/* Spacer for the fixed mobile top bar. h-16, not h-14: the bar is
-            12 + 36 + 12 tall, and the strip below it no longer occupies a row
-            on mobile to absorb the difference. */}
-        <div className="lg:hidden h-16" />
-        {/* Desktop: an in-flow sticky row, so these buttons never cover content.
-            Mobile: fixed into the blue header bar — see .trainer-top-strip. */}
-        <div className="trainer-top-strip">
+        {/* Spacer for the fixed mobile top bar (12 + 36 + 12, plus the safe
+            area). Nothing else occupies a row on mobile now. */}
+        <div className="lg:hidden" style={{ height: "calc(60px + env(safe-area-inset-top))" }} />
+        {/* DESKTOP ONLY. On mobile these controls are rendered inside the blue
+            top bar above (TrainerSidebar mobileActions) — there is no second
+            fixed element on this screen any more. */}
+        <div className="trainer-top-strip hidden lg:flex">
           <button onClick={handleToggleMode} aria-label="Switch to client view" className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: "var(--brand-primary)", color: "white", border: "none", cursor: "pointer" }}><i className="ti ti-user text-sm" /><span className="hidden lg:inline">Client View</span></button>
           <HeaderAssist solid />
         </div>

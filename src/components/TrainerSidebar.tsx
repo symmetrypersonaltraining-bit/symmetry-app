@@ -52,6 +52,22 @@ interface Props {
   onToggleClientMode?: () => void;
   userName?: string;
   userInitials?: string;
+  /**
+   * Rendered INSIDE the mobile top bar, on the right.
+   *
+   * The notification bell and the Client View button used to live in a
+   * SEPARATE position:fixed strip that had to sit in the same corner as this
+   * bar. Two independently positioned fixed elements competing for one corner
+   * is a bug that keeps coming back — it depends on z-index, on safe-area
+   * insets resolving the same way in both, and on neither picking up a
+   * stacking context from an ancestor. It has now been reported twice as "the
+   * bell is partially hidden".
+   *
+   * Putting them in this flex row makes overlap structurally impossible: they
+   * are laid out in normal flow, in the same box, by the same rules as the
+   * logo next to them.
+   */
+  mobileActions?: React.ReactNode;
 }
 
 export default function TrainerSidebar({
@@ -59,6 +75,7 @@ export default function TrainerSidebar({
   onToggleClientMode,
   userName = "Dustin",
   userInitials = "DG",
+  mobileActions,
 }: Props) {
   const { avatarUrl: myAvatarUrl } = useMyClientRow();
   const pathname = usePathname();
@@ -224,9 +241,12 @@ export default function TrainerSidebar({
           <i className="ti ti-menu-2 text-xl text-white" />
         </button>
         <Logo size={32} color="white" className="flex-shrink-0" />
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="text-white font-semibold text-sm">Symmetry</div>
         </div>
+        {mobileActions ? (
+          <div className="flex items-center gap-2 flex-shrink-0">{mobileActions}</div>
+        ) : null}
       </div>
 
       {/* Mobile drawer */}
