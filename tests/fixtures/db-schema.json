@@ -147,6 +147,11 @@
     "client_id",
     "joined_at"
   ],
+  "client_announcements_seen": [
+    "client_id",
+    "key",
+    "seen_at"
+  ],
   "client_app_settings": [
     "client_id",
     "can_reschedule",

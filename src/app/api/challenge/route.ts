@@ -180,8 +180,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Bad request" }, { status: 400 });
   }
 
-  // "join" is client-accessible: opt the caller into the named board so they
-  // show up in the challenge standings. (Everything else is trainer-only.)
+  // "join" is client-accessible. (Everything else is trainer-only.)
+  //
+  // This used to set client_app_settings.leaderboard_opt_in — a DIFFERENT flag
+  // from the one the dashboard's Join writes, which is why twenty-three people
+  // had joined and six were showing on the group-chat board. Joining now means
+  // one thing in one place: a row in challenge_participants for the live
+  // challenge.
   if (body.action === "join") {
     let cid: string | null = null;
     const { data: c } = await supabase.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
@@ -191,8 +196,22 @@ export async function POST(req: NextRequest) {
       cid = (c2 as { id: string } | null)?.id ?? null;
     }
     if (!cid) return NextResponse.json({ error: "No client profile" }, { status: 400 });
-    await db.from("client_app_settings").upsert({ client_id: cid, leaderboard_opt_in: true }, { onConflict: "client_id" });
-    return NextResponse.json({ ok: true, optedIn: true });
+
+    const { data: live } = await db
+      .from("group_challenges")
+      .select("id")
+      .eq("status", "live")
+      .lte("starts_on", CT_TODAY())
+      .gte("ends_on", CT_TODAY())
+      .order("starts_on", { ascending: false })
+      .limit(1);
+    const liveId = ((live as { id: string }[]) || [])[0]?.id;
+    if (!liveId) return NextResponse.json({ error: "No challenge running" }, { status: 400 });
+
+    // Ignore a duplicate: the unique constraint is the source of truth and
+    // "join twice" should read as success, not as an error.
+    await db.from("challenge_participants").insert({ challenge_id: liveId, client_id: cid });
+    return NextResponse.json({ ok: true, joined: true });
   }
 
   // Create / end are trainer-only.
@@ -203,9 +222,15 @@ export async function POST(req: NextRequest) {
   const today = CT_TODAY();
 
   try {
+    // `status` matters as much as `ended_at`: v_active_challenge — which both
+    // dashboards read — filters on status = 'live'. Writing only ended_at left
+    // an "ended" challenge still showing as live everywhere else.
     if (body.action === "end") {
       if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-      await db.from("group_challenges").update({ ended_at: new Date().toISOString() }).eq("id", body.id);
+      await db
+        .from("group_challenges")
+        .update({ ended_at: new Date().toISOString(), status: "complete" })
+        .eq("id", body.id);
       return NextResponse.json({ ok: true });
     }
 
@@ -223,13 +248,13 @@ export async function POST(req: NextRequest) {
     // Two overlapping boards would make "who's winning" ambiguous.
     await db
       .from("group_challenges")
-      .update({ ended_at: new Date().toISOString() })
+      .update({ ended_at: new Date().toISOString(), status: "complete" })
       .is("ended_at", null)
       .gte("ends_on", today);
 
     const { data, error } = await db
       .from("group_challenges")
-      .insert({ title, metric, starts_on: today, ends_on, created_by: user.id })
+      .insert({ title, metric, starts_on: today, ends_on, created_by: user.id, status: "live" })
       .select("id, title, metric, starts_on, ends_on")
       .single();
 

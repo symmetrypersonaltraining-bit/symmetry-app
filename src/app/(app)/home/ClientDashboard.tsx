@@ -14,6 +14,7 @@ import MilestoneBadges from "@/components/MilestoneBadges";
 import ClientWeekSummary from "@/components/ClientWeekSummary";
 import SundayWeighInReminder from "@/components/SundayWeighInReminder";
 import CommunityPair from "@/components/CommunityPair";
+import ChallengeTakeover from "@/components/ChallengeTakeover";
 import { RestDaySlip } from "@/components/FunMoments";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
 
@@ -590,6 +591,10 @@ export default function ClientDashboard({
 
   return (
     <>
+      {/* One-time full-screen challenge announcement. Renders nothing once the
+          client has seen it, and nothing at all when no challenge is live. */}
+      <ChallengeTakeover basePath={basePath} />
+
       {activeMetric && activeMetricConfig && (
         <MetricModal
           metricKey={activeMetric}

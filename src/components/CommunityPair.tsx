@@ -327,8 +327,12 @@ export default function CommunityPair({ basePath = "" }: { basePath?: string }) 
             </div>
           )}
 
-          <div style={{ marginBottom: 10 }}>
-            {(board ?? []).slice(0, 12).map((r) => (
+          {/* The WHOLE roster, scrollable. It used to cut at 12, which hid
+              two thirds of the board and meant most people could not find
+              themselves on it — the fastest way to make a leaderboard
+              irrelevant to the people it is supposed to motivate. */}
+          <div style={{ marginBottom: 10, maxHeight: 340, overflowY: "auto" }}>
+            {(board ?? []).map((r) => (
               <div
                 key={r.client_id}
                 style={{
