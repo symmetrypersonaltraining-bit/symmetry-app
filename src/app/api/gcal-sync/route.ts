@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getValidAccessToken, gcalFetch } from '@/lib/gcal';
 import { isCronRequest } from '@/lib/cron-auth';
+import { isDbSchedulerRequest } from '@/lib/scheduler-key';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { TRAINER_EMAIL } from '@/lib/ai/scope';
 
@@ -53,7 +54,11 @@ export async function POST(req: NextRequest) {
   // reminder amounts was callable by anyone who knew the URL, and `?reset=true`
   // would clear the appointment table first. Same rule as GET now — a genuine
   // scheduler, or a signed-in trainer (which is how GcalSyncButton calls it).
-  if (!isCronRequest(req)) {
+  // Three ways in, all server-side: Vercel's own scheduler (unforgeable
+  // x-vercel-cron), the pg_cron scheduler (database-held key — see
+  // scheduler-key.ts for why the 15-minute sync moved there), or a signed-in
+  // trainer tapping Sync Now.
+  if (!isCronRequest(req) && !(await isDbSchedulerRequest(req))) {
     const authClient = await createServerClient();
     const { data: { user } } = await authClient.auth.getUser();
     if (!user || user.email !== TRAINER_EMAIL) {
@@ -273,7 +278,7 @@ export async function GET(req: NextRequest) {
   // GcalSyncButton hits this with a plain browser GET and no secret, so a
   // signed-in trainer is accepted too. That is not a loosening: the button
   // already reaches the same code through POST, which has no auth of its own.
-  if (!isCronRequest(req)) {
+  if (!isCronRequest(req) && !(await isDbSchedulerRequest(req))) {
     const supabase = await createServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || user.email !== TRAINER_EMAIL) {
