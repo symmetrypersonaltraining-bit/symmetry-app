@@ -1014,7 +1014,7 @@ export default function NutritionV3Client(props: Props) {
     // v3 fixes the adaptive-maintenance calc (thin/noisy weigh-ins were producing
     // absurd calorie targets like "eat 177 kcal to lose 1 lb"). Bumping the version
     // invalidates stale insights so they regenerate with the corrected math.
-    const cacheKey = "sym:v3:coach:v3:" + clientId + ":" + today;
+    const cacheKey = "sym:v3:coach:v4:" + clientId + ":" + today;
     try {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) { setCoachApi(JSON.parse(cached)); return; }

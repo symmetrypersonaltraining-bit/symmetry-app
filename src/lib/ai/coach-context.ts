@@ -24,6 +24,63 @@ export function ctShiftDays(iso: string, delta: number): string {
 
 import { APP_GUIDE } from "@/lib/ai/app-guide";
 
+
+/**
+ * WHERE WE ARE IN TIME, stated rather than left to be inferred.
+ *
+ * Reported 2026-08-02, mid-afternoon on a SUNDAY: the coach card opened with
+ * "you're 2 days into the week and the logging's gone quiet — only 914 kcal
+ * recorded so far", and treated a day that had barely started as evidence of
+ * under-eating. Sunday is day 1 of the week in this app; the model had no way
+ * to know that because the context only ever said `Today's date: 2026-08-02`.
+ * A bare ISO date does not tell you the weekday, it does not tell you where the
+ * week starts, and it does not tell you what time it is — so the model filled
+ * all three in by guessing, and guessed wrong on every one.
+ *
+ * The system prompt already forbade judging today. That was not enough: the
+ * rule was abstract ("the current day may be in progress") while the numbers
+ * were concrete. Stating the hour, the weekday, the position in the week and
+ * how many meals are still ahead makes the partial day a fact in the data
+ * rather than a caveat in the instructions.
+ *
+ * Dustin: "This information needs to be accurate. This is literally the most
+ * important part of this app right now."
+ */
+export function nowBlock(mealsPlanned?: number | null, mealsLogged?: number | null): string {
+  const now = new Date();
+  const ct = (opts: Intl.DateTimeFormatOptions) =>
+    now.toLocaleString("en-US", { timeZone: "America/Chicago", ...opts });
+
+  const iso = CT_TODAY();
+  const weekday = ct({ weekday: "long" });
+  const clock = ct({ hour: "numeric", minute: "2-digit", hour12: true });
+  const hour24 = Number(ct({ hour: "2-digit", hour12: false }));
+
+  // Sunday-start, matching weekStartOf() and every "This week" range in the UI.
+  const [y, m, d] = iso.split("-").map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0 = Sunday
+  const weekStart = new Date(Date.UTC(y, m - 1, d));
+  weekStart.setUTCDate(weekStart.getUTCDate() - dow);
+
+  const partOfDay =
+    hour24 < 11 ? "It is still MORNING — most of today's food is ahead of them."
+    : hour24 < 16 ? "It is the AFTERNOON — the evening meals are still ahead of them."
+    : hour24 < 21 ? "It is the EVENING — most of today's meals should be logged by now."
+    : "It is LATE EVENING — today is essentially finished.";
+
+  const mealsLine =
+    mealsPlanned && mealsPlanned > 0
+      ? ` Today's plan has ${mealsPlanned} meals and ${mealsLogged ?? 0} are logged so far, which leaves ${Math.max(0, mealsPlanned - (mealsLogged ?? 0))} still to come.`
+      : "";
+
+  return [
+    `RIGHT NOW (America/Chicago): ${weekday} ${iso}, ${clock}.`,
+    `THE WEEK: weeks run Sunday to Saturday. This week started ${weekStart.toISOString().slice(0, 10)} (Sunday), so today is DAY ${dow + 1} OF 7.`,
+    `TODAY IS NOT OVER. ${partOfDay}${mealsLine}`,
+    `Do NOT say how many days "into the week" they are other than day ${dow + 1} of 7, and do NOT treat today's running totals as a finished day, a shortfall, or evidence of under-eating. Unlogged meals that have not happened yet are not missed meals.`,
+  ].join("\n");
+}
+
 export const COACH_SYSTEM_PROMPT = `You are the personal nutrition coach inside the Symmetry Personal Training app (physique coaching, trainer: Dustin). You are not a generic chatbot — you know THIS client: their name, their goal, their body-composition trend, their actual meal plan, and exactly how they've been eating. Speak to them by first name, like a coach who has watched their numbers all week. Be encouraging, honest, specific, and brief — no fluff, no lecture, no hedging platitudes. Ground every statement in the context data provided; never invent numbers. If the data is sparse (few logged days), say so plainly and keep advice modest. You may suggest small macro adjustments, but frame them as suggestions for the client to run by Dustin — plan changes are his call.
 
 What makes your coaching stand out — the best AI coach in any fitness app (do this every time there's data for it):
@@ -41,7 +98,8 @@ Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
 
 Rules:
 - "message": up to ~6 sentences, plain text. Personal and specific to the data — never generic, never a wall of text.
-- The current day may be IN PROGRESS. NEVER describe today (todaySoFar) as "under" or "over" budget or as a full/complete day — it isn't finished. Base ALL averages, trends, and consistency judgments ONLY on completedDays. You may reference todaySoFar only as progress (e.g. "you're on pace" / "X left today"), never as a deficit/surplus verdict.
+- TIME AND DATE ARE GIVEN TO YOU IN THE "RIGHT NOW" BLOCK. Use them exactly. Never state or imply the weekday, the date, the time of day, or how far into the week it is from anything other than that block — you cannot infer them, and getting them wrong makes every judgement built on top of them wrong too.
+- The current day is IN PROGRESS unless the block says otherwise. NEVER describe today (todaySoFar) as "under" or "over" budget, as "quiet", as a shortfall, or as a full/complete day — it is not finished, and meals that have not happened yet are not missed meals. Base ALL averages, trends, and consistency judgments ONLY on completedDays. You may reference todaySoFar only as progress (e.g. "you're on pace" / "X left today"), never as a deficit/surplus verdict and never as evidence of under-eating.
 - Trends & targets: use the signed AVERAGES deltas, the weight/body-fat trajectory lines, and the ENERGY BALANCE calorie numbers exactly as given — they are the source of truth. Do NOT recompute above/below, up/down, or any calorie target yourself.
 - "suggestions": 0-3 concrete, actionable tweaks (e.g. {"label":"Add a scoop of whey at breakfast","delta":{"p":25,"c":2,"f":1,"kcal":117}}). deltas are the daily macro change in grams / kcal (negative = reduce). Prefer tweaks that map to a real meal on their plan. Omit the array or leave it empty when nothing concrete applies.
 
@@ -381,7 +439,7 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
   const adh = (adherenceRes.data as { log_date: string }[]) || [];
   const loggedDays14 = new Set(adh.map((a) => a.log_date)).size;
 
-  const lines: string[] = [`Today's date: ${today}`];
+  const lines: string[] = [nowBlock(), `Today's date: ${today}`];
   if (profile?.line) lines.push(profile.line);
   lines.push(
     `WORKOUT ADHERENCE: last 30 days ${done30}/${total30} scheduled sessions completed; last 7 days ${done7}/${total7} completed. Current completed-session streak: ${streak} day${streak === 1 ? "" : "s"}.`
@@ -397,9 +455,44 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
   return lines.join("\n");
 }
 
+
+/** Planned meals for today vs how many are logged so far. */
+async function fetchTodayMealProgress(
+  db: Db,
+  clientId: string,
+  today: string,
+): Promise<{ planned: number | null; logged: number }> {
+  try {
+    const { data: plan } = await db
+      .from("meal_plans")
+      .select("id")
+      .eq("client_id", clientId)
+      .lte("effective_date", today)
+      .order("effective_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const planId = (plan as { id: string } | null)?.id ?? null;
+    let planned: number | null = null;
+    if (planId) {
+      const { data: meals } = await db.from("meals").select("id").eq("meal_plan_id", planId);
+      planned = ((meals as unknown[]) || []).length || null;
+    }
+    const { data: logs } = await db
+      .from("meal_adherence_logs")
+      .select("meal_position")
+      .eq("client_id", clientId)
+      .eq("log_date", today);
+    const logged = new Set(((logs as { meal_position: number | null }[]) || []).map((l) => l.meal_position)).size;
+    return { planned, logged };
+  } catch {
+    // An appearance detail must never take the coach card down with it.
+    return { planned: null, logged: 0 };
+  }
+}
+
 export async function assembleCoachContext(db: Db, clientId: string): Promise<string> {
   const today = CT_TODAY();
-  const [dailyTotals, targetRes, metricsRes, planSummary, profile, weekBlock] = await Promise.all([
+  const [dailyTotals, targetRes, metricsRes, planSummary, profile, weekBlock, mealProgress] = await Promise.all([
     fetchDailyTotals(db, clientId, 14),
     db
       .from("macro_targets")
@@ -418,6 +511,11 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
     fetchMealPlanSummary(db, clientId),
     fetchClientProfile(db, clientId),
     weeklyNumbersBlockSafe(db, clientId),
+    // How much of today is still ahead of them. Without this the model sees two
+    // logged meals and no idea whether that is the whole plan or the first
+    // third of it — which is how "only 914 kcal across 2 meals" became a verdict
+    // instead of a progress note.
+    fetchTodayMealProgress(db, clientId, today),
   ]);
 
   const target = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
@@ -425,7 +523,7 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
   const latestWeight = metrics.find((m) => m.weight != null);
   const latestBf = metrics.find((m) => m.body_fat_pct != null);
 
-  const lines: string[] = [`Today's date: ${today}`];
+  const lines: string[] = [nowBlock(mealProgress.planned, mealProgress.logged), `Today's date: ${today}`];
   if (profile?.line) lines.push(profile.line);
   lines.push(
     target
