@@ -72,14 +72,17 @@ export default async function ProgressPage({
 
       <div className="px-4 py-4">
         {clientId ? (
-          <>
+          // space-y-3: these six components were stacked with no gap and each
+          // was left to bring its own margin. Several bring none, so the Streak
+          // tile sat directly against the Consistency card.
+          <div className="space-y-3">
             <MetricCards clientId={clientId} />
             <ConsistencyCalendar clientId={clientId} />
             <AchievementCard clientId={clientId} name={clientName} />
             <ProgressPhotos clientId={clientId} clientName={clientName} />
             <ThenVsNow clientId={clientId} />
             <PersonalBests clientId={clientId} />
-          </>
+          </div>
         ) : (
           <p className="text-center py-12" style={{ color: "var(--brand-text-secondary)" }}>
             Select a client above to view their progress.

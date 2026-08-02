@@ -726,7 +726,13 @@ nav.bottom-nav-bar {
 
 /* ── Metric card ── */
 .metric-card {
-  background: linear-gradient(135deg, var(--brand-surface) 0%, var(--brand-card) 100%);
+  /* background-COLOR plus background-IMAGE, not the shorthand. The shorthand
+     sets background-color to transparent, so the card's entire fill lived in
+     the gradient — and the depth layer replaces background-image with its own
+     overlay, which left the card see-through. Keeping the colour separate
+     means anything that swaps the image can never remove the fill. */
+  background-color: var(--brand-surface);
+  background-image: linear-gradient(135deg, var(--brand-surface) 0%, var(--brand-card) 100%);
   border: 1px solid var(--brand-border);
   border-radius: 14px;
   padding: 14px 16px;
@@ -2029,10 +2035,20 @@ option:hover {
     var(--brand-accent-2, var(--brand-accent)) 100%);
   --card-topbar-h: 2.5px;
 
+  /* TRANSPARENT STOPS, NOT SURFACE-COLOURED ONES. This gradient is painted
+     over every card, and the first version mixed toward --brand-surface — an
+     opaque colour. On a card whose background is NOT the surface it simply
+     covered it: "Today's Workouts" is `background: var(--brand-primary)`, a
+     solid navy block, and the grade painted a grey sheet across it. Reported
+     as "why r these grey on all color schemes".
+
+     Mixing toward `transparent` instead makes it a TINT. It reads identically
+     on a normal surface card and leaves a coloured card its colour, which is
+     what an overlay should have been from the start. */
   --surface-grade: linear-gradient(150deg,
-    color-mix(in srgb, var(--brand-accent) 5%, var(--brand-surface)) 0%,
-    var(--brand-surface) 46%,
-    color-mix(in srgb, var(--brand-primary) 8%, var(--brand-surface)) 100%);
+    color-mix(in srgb, var(--brand-accent) 5%, transparent) 0%,
+    transparent 46%,
+    color-mix(in srgb, var(--brand-primary) 8%, transparent) 100%);
   --block-glow:
     0 12px 26px -10px color-mix(in srgb, var(--glow-ink) 55%, transparent),
     0 3px 10px -3px color-mix(in srgb, var(--brand-accent) 30%, transparent),
@@ -2162,10 +2178,20 @@ option:hover {
     var(--brand-accent-2, var(--brand-accent)) 100%);
   --card-topbar-h: 3px;
 
+  /* TRANSPARENT STOPS, NOT SURFACE-COLOURED ONES. This gradient is painted
+     over every card, and the first version mixed toward --brand-surface — an
+     opaque colour. On a card whose background is NOT the surface it simply
+     covered it: "Today's Workouts" is `background: var(--brand-primary)`, a
+     solid navy block, and the grade painted a grey sheet across it. Reported
+     as "why r these grey on all color schemes".
+
+     Mixing toward `transparent` instead makes it a TINT. It reads identically
+     on a normal surface card and leaves a coloured card its colour, which is
+     what an overlay should have been from the start. */
   --surface-grade: linear-gradient(150deg,
-    color-mix(in srgb, var(--brand-accent) 8%, var(--brand-surface)) 0%,
-    var(--brand-surface) 46%,
-    color-mix(in srgb, var(--brand-primary) 14%, var(--brand-surface)) 100%);
+    color-mix(in srgb, var(--brand-accent) 8%, transparent) 0%,
+    transparent 46%,
+    color-mix(in srgb, var(--brand-primary) 14%, transparent) 100%);
   --block-glow:
     0 12px 26px -10px color-mix(in srgb, var(--glow-ink) 72%, transparent),
     0 3px 10px -3px color-mix(in srgb, var(--brand-accent) 44%, transparent),
@@ -2295,10 +2321,20 @@ option:hover {
     var(--brand-accent-2, var(--brand-accent)) 100%);
   --card-topbar-h: 3.5px;
 
+  /* TRANSPARENT STOPS, NOT SURFACE-COLOURED ONES. This gradient is painted
+     over every card, and the first version mixed toward --brand-surface — an
+     opaque colour. On a card whose background is NOT the surface it simply
+     covered it: "Today's Workouts" is `background: var(--brand-primary)`, a
+     solid navy block, and the grade painted a grey sheet across it. Reported
+     as "why r these grey on all color schemes".
+
+     Mixing toward `transparent` instead makes it a TINT. It reads identically
+     on a normal surface card and leaves a coloured card its colour, which is
+     what an overlay should have been from the start. */
   --surface-grade: linear-gradient(150deg,
-    color-mix(in srgb, var(--brand-accent) 12%, var(--brand-surface)) 0%,
-    var(--brand-surface) 46%,
-    color-mix(in srgb, var(--brand-primary) 20%, var(--brand-surface)) 100%);
+    color-mix(in srgb, var(--brand-accent) 12%, transparent) 0%,
+    transparent 46%,
+    color-mix(in srgb, var(--brand-primary) 20%, transparent) 100%);
   --block-glow:
     0 12px 26px -10px color-mix(in srgb, var(--glow-ink) 90%, transparent),
     0 3px 10px -3px color-mix(in srgb, var(--brand-accent) 58%, transparent),
@@ -2433,11 +2469,17 @@ option:hover {
    between stacked cards. `+` rather than a blanket margin so it only applies
    between siblings that are actually adjacent, and nothing gains trailing space
    at the bottom of a container. */
-[data-deep]:not([data-deep="off"]) .metric-card + .metric-card,
-[data-deep]:not([data-deep="off"]) .card + .card,
-[data-deep]:not([data-deep="off"]) .metric-card + .card,
-[data-deep]:not([data-deep="off"]) .card + .metric-card {
-  margin-top: 12px;
+/* The `+` version of this only caught cards that share a parent, and on the
+   Progress screen they mostly do not — MetricCards renders its own grid, the
+   Consistency card is a separate component, and nothing sat between them. A
+   bottom margin on the card itself does not care who its parent is.
+
+   Cards inside a grid pick up 12px of extra space below each row as well.
+   That is a slightly roomier grid, not a broken one, and it is the right trade
+   against two boxes with a gradient strip each sharing an edge. */
+[data-deep]:not([data-deep="off"]) .card,
+[data-deep]:not([data-deep="off"]) .metric-card {
+  margin-bottom: 12px;
 }
 /* Grid and flex containers set their own gap, which margin cannot fix from the
    child. A minimum gap on the containers that hold cards covers those. */
@@ -2518,4 +2560,18 @@ option:hover {
 [data-theme="deepreef"] [style*="color: var(--brand-primary)"],
 [data-theme="deepreef"] [style*="color:var(--brand-primary)"] {
   color: color-mix(in srgb, var(--brand-primary) 42%, white) !important;
+}
+
+/* Cards inside a grid or flex row already have `gap` doing the spacing, so the
+   bottom margin above is both redundant and harmful there: it eats into a
+   stretched grid item's height, and an item whose height is reduced no longer
+   matches its neighbour — which is why the top-left Progress tile came out
+   taller than the one beside it. Inside a grid the gap owns the spacing and the
+   item takes the full row height. */
+[data-deep]:not([data-deep="off"]) .grid > .card,
+[data-deep]:not([data-deep="off"]) .grid > .metric-card,
+[data-deep]:not([data-deep="off"]) .flex > .card,
+[data-deep]:not([data-deep="off"]) .flex > .metric-card {
+  margin-bottom: 0;
+  height: 100%;
 }

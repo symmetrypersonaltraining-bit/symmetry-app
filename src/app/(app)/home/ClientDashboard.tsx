@@ -685,34 +685,68 @@ export default function ClientDashboard({
           </Link>
         ) : (
           // Multiple workouts today — branded header + individual clickable rows
-          <div className="rounded-2xl overflow-hidden" style={{ background: "var(--brand-primary)" }}>
-            <div className="px-5 pt-5 pb-2 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ background: "white", transform: "translate(30%, -30%)" }} />
-              <p className="text-xs font-semibold text-white/70 uppercase tracking-widest relative">Today&apos;s Workouts</p>
+          // A SURFACE CARD LIKE EVERY OTHER CARD ON THIS SCREEN.
+          //
+          // This was a solid `background: var(--brand-primary)` block with
+          // white text and rows on rgba(0,0,0,0.22). It was the only card on
+          // the dashboard that was not a surface, which made it the one thing
+          // that could not follow the scheme properly — reported as "today's
+          // workouts should be consistent w the rest of the color scheme", and
+          // before that as looking grey, because a translucent black row over
+          // a coloured block goes grey no matter what colour the block is.
+          //
+          // Emphasis now comes from the header tint and the left bar on each
+          // row — the same language the schedule board uses — rather than from
+          // inverting the whole card.
+          <div className="card overflow-hidden" style={{ padding: 0 }}>
+            <div
+              className="px-4 py-2.5"
+              style={{
+                background: "color-mix(in srgb, var(--brand-primary) 15%, var(--brand-surface))",
+                borderBottom: "1.5px solid color-mix(in srgb, var(--brand-primary) 38%, var(--brand-border))",
+              }}
+            >
+              <p className="text-xs font-extrabold uppercase tracking-widest" style={{ color: "var(--brand-text)" }}>
+                Today&apos;s Workouts
+              </p>
             </div>
-            {/* space-y-px put ONE PIXEL between sessions, so a day with three
-    of them read as a single block with three lines of text. */}
-            <div className="space-y-2 pb-2 px-2">
+            <div className="space-y-2 p-2">
               {_todayWorkouts.map((tw) => {
                 const twLabel = (tw.days as any)?.label || "Workout";
                 const twIsCardio = isCardioLabel(twLabel);
                 const twDone = tw.status === "completed";
+                // Same two colours the schedule board uses for the same two
+                // kinds of session, so a cardio row looks like a cardio row
+                // wherever you meet it.
+                const twColor = twIsCardio ? "#5ec9a3" : "var(--brand-primary)";
                 return (
-                  <Link key={tw.id} href={`${basePath}/workout/${tw.id}`}>
-                    <div className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: "rgba(0,0,0,0.22)", border: "1px solid rgba(255,255,255,0.16)" }}>
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.2)" }}>
-                        <i className={`ti ${twIsCardio ? "ti-run" : "ti-barbell"} text-sm text-white`} />
+                  <Link key={tw.id} href={`${basePath}/workout/${tw.id}`} className="block">
+                    <div
+                      className="flex items-center gap-3 px-3 py-3 rounded-xl"
+                      style={{
+                        background: `color-mix(in srgb, ${twColor} 9%, var(--brand-surface))`,
+                        border: `1.5px solid color-mix(in srgb, ${twColor} 55%, transparent)`,
+                        borderLeft: `5px solid ${twColor}`,
+                      }}
+                    >
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: `color-mix(in srgb, ${twColor} 18%, transparent)` }}
+                      >
+                        <i className={`ti ${twIsCardio ? "ti-run" : "ti-barbell"} text-sm`} style={{ color: twColor }} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{twLabel}</p>
+                        <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{twLabel}</p>
                       </div>
                       {twDone ? (
-                        <div className="inline-flex items-center gap-1 bg-white/20 rounded-full px-2 py-1 flex-shrink-0">
-                          <i className="ti ti-check text-xs text-white" />
-                          <span className="text-xs text-white/80">Done</span>
+                        <div className="inline-flex items-center gap-1 rounded-full px-2 py-1 flex-shrink-0"
+                          style={{ background: "color-mix(in srgb, #22c55e 16%, transparent)", color: "#16a34a" }}>
+                          <i className="ti ti-check text-xs" />
+                          <span className="text-xs font-semibold">Done</span>
                         </div>
                       ) : (
-                        <div className="inline-flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 flex-shrink-0" style={{ color: "var(--brand-primary)" }}>
+                        <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 flex-shrink-0"
+                          style={{ background: "var(--brand-primary)", color: "#fff" }}>
                           <i className="ti ti-player-play text-xs" />
                           <span className="text-xs font-semibold">Start</span>
                         </div>
