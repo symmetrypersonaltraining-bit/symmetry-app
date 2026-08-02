@@ -25,7 +25,12 @@
 //   none         no reminder is ever generated or shown (couples who pay
 //                together: Troy/Krysta, Celeste/Greg)
 
-export type Cadence = "monthly" | "biweekly" | "weekly" | "quarterly";
+// "semimonthly" = two fixed dates each month (Sharon Rambo: the 7th and the
+// 23rd), NOT every 14 days. Biweekly drifts away from a fixed pair immediately
+// — 07-07, 07-21, 08-04 instead of 07-07, 07-23, 08-07 — which is exactly how
+// her reminders ended up on the wrong dates while Google Calendar, which is the
+// source of truth for payments, had the right ones all along.
+export type Cadence = "monthly" | "semimonthly" | "biweekly" | "weekly" | "quarterly";
 export type BillingType = "per_session" | "flat" | "none";
 
 export interface ReminderCalcInput {
@@ -72,6 +77,17 @@ export interface ReminderCalcResult {
 export function previousDueDate(dueDate: string, cadence: Cadence | null): string {
   const parts = dueDate.split("-").map(Number);
   const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+  // Semi-monthly steps between the month's TWO anchor days, derived from the
+  // due date itself rather than stored: a due date on the 23rd came from the
+  // 7th of the same month, one on the 7th came from the 23rd of the month
+  // before. Deriving it keeps the pair wherever the calendar put it instead of
+  // hardcoding one client's dates into a shared helper.
+  if (cadence === "semimonthly") {
+    const day = dt.getUTCDate();
+    if (day > 16) dt.setUTCDate(day - 16);
+    else { dt.setUTCMonth(dt.getUTCMonth() - 1); dt.setUTCDate(day + 16); }
+    return dt.toISOString().slice(0, 10);
+  }
   if (cadence === "weekly") dt.setUTCDate(dt.getUTCDate() - 7);
   else if (cadence === "biweekly") dt.setUTCDate(dt.getUTCDate() - 14);
   else if (cadence === "quarterly") dt.setUTCMonth(dt.getUTCMonth() - 3);
@@ -82,6 +98,12 @@ export function previousDueDate(dueDate: string, cadence: Cadence | null): strin
 export function nextDueDate(dueDate: string, cadence: Cadence | null): string {
   const parts = dueDate.split("-").map(Number);
   const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    if (cadence === "semimonthly") {
+    const day = dt.getUTCDate();
+    if (day <= 16) dt.setUTCDate(day + 16);
+    else { dt.setUTCMonth(dt.getUTCMonth() + 1); dt.setUTCDate(day - 16); }
+    return dt.toISOString().slice(0, 10);
+  }
   if (cadence === "weekly") dt.setUTCDate(dt.getUTCDate() + 7);
   else if (cadence === "biweekly") dt.setUTCDate(dt.getUTCDate() + 14);
   else if (cadence === "quarterly") dt.setUTCMonth(dt.getUTCMonth() + 3);

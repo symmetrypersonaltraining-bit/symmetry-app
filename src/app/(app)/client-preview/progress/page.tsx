@@ -38,7 +38,12 @@ export default async function ClientPreviewProgressPage() {
         <h1 className="text-white font-medium text-lg">Progress</h1>
         <p className="text-white/60 text-sm">{clientName}</p>
       </div>
-      <div className="px-4 py-4">
+      {/* space-y-5 — the SAME fix as /progress. This is the Client View copy of
+          the same screen and it was missed the first time, which is why the
+          Streak tile was still sitting against the Consistency card here after
+          the other page was fixed. Any change to one of these two belongs in
+          both. */}
+      <div className="px-4 py-4 space-y-5">
         <MetricCards clientId={clientId} />
         <ConsistencyCalendar clientId={clientId} />
         <AchievementCard clientId={clientId} name={clientName} />
