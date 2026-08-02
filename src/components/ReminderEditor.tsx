@@ -103,10 +103,37 @@ export default function ReminderEditor() {
       // rule the scheduled rows ARE the bill, so dropping them dropped the
       // arithmetic. Look-back widened 110 -> 200 days so a past-due QUARTERLY
       // cycle (Jennifer Day) is not truncated and silently under-counted.
-      const { data: appts } = await sup
-        .from("appointments")
-        .select("client_id, scheduled_at, status")
-        .gte("scheduled_at", new Date(Date.now() - 200 * 86400000).toISOString());
+      // SCOPED TO THE CLIENTS ON SCREEN, ORDERED, AND WITH AN EXPLICIT LIMIT.
+      //
+      // This fetched EVERY appointment in a 200-day window with no .in(), no
+      // .order() and no .limit(). PostgREST caps an unbounded select at 1000
+      // rows; there are 4,859 in that window. So ~80% of appointments never
+      // reached the arithmetic, and with no ORDER BY the 1000 that did arrive
+      // were whatever physical order the heap happened to return — meaning
+      // which clients got billed correctly was luck, and it could change
+      // between page loads.
+      //
+      // Found from Sharon Rambo's reminder reading "0 sessions trained in this
+      // cycle" while her calendar showed three inside the window. Silent
+      // under-billing: the screen looked fine and the number was simply too
+      // small.
+      //
+      // Scoping to the client_ids that actually have a live reminder takes it
+      // from ~4,859 rows to a couple of hundred, which is both correct and
+      // faster. The explicit limit is a backstop that would now have to be
+      // genuinely exceeded rather than silently hit.
+      const reminderClientIds = Array.from(
+        new Set((rems || []).map((r: any) => r.client_id).filter(Boolean)),
+      );
+      const { data: appts } = reminderClientIds.length
+        ? await sup
+            .from("appointments")
+            .select("client_id, scheduled_at, status")
+            .in("client_id", reminderClientIds)
+            .gte("scheduled_at", new Date(Date.now() - 200 * 86400000).toISOString())
+            .order("scheduled_at")
+            .limit(5000)
+        : { data: [] as any[] };
       const byClient: Record<string, any> = {};
       (clients || []).forEach((c: any) => { byClient[c.id] = c; });
       const calendarCadenceOf = (cid: string): Cadence | null => {

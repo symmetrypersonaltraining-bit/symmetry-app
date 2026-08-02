@@ -72,10 +72,12 @@ export default async function ProgressPage({
 
       <div className="px-4 py-4">
         {clientId ? (
-          // space-y-3: these six components were stacked with no gap and each
-          // was left to bring its own margin. Several bring none, so the Streak
-          // tile sat directly against the Consistency card.
-          <div className="space-y-3">
+          // space-y-5, not space-y-3. Twelve pixels was enough when cards were
+          // flat; it is not enough now that each one carries a glow that
+          // extends past its own border and a gradient strip along its top
+          // edge. The Streak tile's halo and the Consistency card's strip were
+          // meeting in the middle of the gap.
+          <div className="space-y-5">
             <MetricCards clientId={clientId} />
             <ConsistencyCalendar clientId={clientId} />
             <AchievementCard clientId={clientId} name={clientName} />
