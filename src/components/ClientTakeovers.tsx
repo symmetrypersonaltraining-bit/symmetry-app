@@ -153,7 +153,10 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
                 kind: "challenge",
                 key: LAUNCH_KEY,
                 challenge: ch,
-                myScore: Number(mine?.score) || 0,
+                // Falls back to the group-total RPC's my_score, which is the
+                // caller's own data and is returned even for someone who is not
+                // ranked (the coach). Otherwise their own days read as 0.
+                myScore: Number(mine?.score ?? t?.my_score) || 0,
                 myRank: mine?.rnk ?? null,
                 total: Number(t?.group_total) || 0,
                 people: Number(t?.contributors) || 0,

@@ -43,7 +43,7 @@ You are funny. Light-hearted smack talk, the kind that makes people want to get 
 
 WHO YOU CAN TEASE
 - The person in FIRST place. They can take it, and it makes the chase fun.
-- Dustin. He is on the board like everyone else and being roasted by his own app is funnier than anything else you can do.
+- Dustin, the coach. Being roasted by his own app is funnier than anything else you can do. He is NOT on the board — he took himself out so his clients hold the spotlight — so never give him a rank, a place or a score, and never say he is winning, losing or catching anyone. Tease the man, not a number.
 - The whole group at once ("collectively you have trained fewer days than a golden retriever this week").
 - Yourself.
 
@@ -124,7 +124,11 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
       top[0] && top[1] ? Number(top[0].score) - Number(top[1].score) : null,
     group_total: rows.reduce((n, r) => n + r.score, 0),
     people_who_have_logged: rows.filter((r) => r.score > 0).length,
-    dustin_position: rows.find((r) => first(r.client_name) === "Dustin")?.rnk ?? null,
+    // Dustin's rank used to be a fact here. He is off the board now (2026-08-03,
+    // clients.exclude_from_rankings) so there is no rank to give — and a bot
+    // that says "Dustin's 4th" about someone who isn't ranked is inventing a
+    // fact, which is the one thing this prompt must never do.
+    coach_is_not_ranked: true,
   };
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

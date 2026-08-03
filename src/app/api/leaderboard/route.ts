@@ -16,7 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { resolveAiScope, Db } from "@/lib/ai/scope";
-import { excludedClientIds } from "@/lib/demoClient";
+import { unrankedClientIds } from "@/lib/rankings";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     if (!ids.length) return NextResponse.json({ rows: [], me: null, optedIn, window: win });
 
     const [namesRes, logRes] = await Promise.all([
-      admin.from("clients").select("id, name, email").in("id", ids).is("archived_at", null),
+      admin.from("clients").select("id, name, email, exclude_from_rankings").in("id", ids).is("archived_at", null),
       admin
         .from("workout_logs")
         .select("client_id, log_date")
@@ -63,11 +63,13 @@ export async function GET(req: NextRequest) {
         .gte("log_date", since),
     ]);
 
-    // Demo/test accounts never rank against real people.
-    const nameRows = (namesRes.data as { id: string; name: string | null; email: string | null }[]) || [];
-    const excluded = excludedClientIds(nameRows);
+    // Demo/test accounts never rank against real people, and neither does the
+    // trainer — this board is the clients'.
+    const nameRows =
+      (namesRes.data as { id: string; name: string | null; email: string | null; exclude_from_rankings: boolean | null }[]) || [];
+    const unranked = unrankedClientIds(nameRows);
     const names = new Map(
-      nameRows.filter((c) => !excluded.has(c.id)).map((c) => [c.id, (c.name || "").split(" ")[0] || "Member"]),
+      nameRows.filter((c) => !unranked.has(c.id)).map((c) => [c.id, (c.name || "").split(" ")[0] || "Member"]),
     );
 
     // Distinct DAYS trained, not raw log rows — two sessions in one day is one
@@ -78,8 +80,10 @@ export async function GET(req: NextRequest) {
       days.get(r.client_id)!.add(r.log_date);
     }
 
+    // names.has() rather than !unranked.has(): an id that opted in and was
+    // later archived has no row here at all, and used to rank as "Member".
     const ranked = ids
-      .filter((id) => !excluded.has(id))
+      .filter((id) => names.has(id))
       .map((id) => ({ id, first: names.get(id) || "Member", sessions: days.get(id)?.size ?? 0 }))
       .sort((a, b) => b.sessions - a.sessions || a.first.localeCompare(b.first))
       .map((r, i) => ({ ...r, rank: i + 1 }));

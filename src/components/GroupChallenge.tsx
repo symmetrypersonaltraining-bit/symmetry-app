@@ -249,7 +249,8 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
                 You&apos;re #{me.rnk}
               </span>
             ) : null}
-            {!joined && (
+            {/* No Join for the coach — he is deliberately not ranked. */}
+            {!joined && !isTrainer && (
               <span
                 style={{
                   fontSize: 11,
@@ -497,8 +498,27 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
                     </div>
                   </div>
 
-                  {/* Join / your status */}
-                  {!joined ? (
+                  {/* Join / your status.
+                      The coach sees neither: he is off the board on purpose, and
+                      an empty "You're #—" or a Join button he cannot act on reads
+                      as a bug rather than as a decision. Say the decision. */}
+                  {isTrainer ? (
+                    <div
+                      style={{
+                        background: "var(--brand-surface)",
+                        border: "1px solid var(--brand-border)",
+                        borderRadius: 14,
+                        padding: "11px 14px",
+                        fontSize: 12.5,
+                        lineHeight: 1.5,
+                        color: "var(--brand-text-secondary)",
+                      }}
+                    >
+                      <b style={{ color: "var(--brand-text)" }}>You&apos;re not on the board.</b> Your sessions still
+                      count toward the group total — you just don&apos;t take a place, so the top of the board is your
+                      clients.
+                    </div>
+                  ) : !joined ? (
                     <div
                       style={{
                         background: "color-mix(in srgb, var(--brand-primary) 8%, transparent)",

@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TRAINER_EMAIL, resolveAiScope, Db } from "@/lib/ai/scope";
 import { excludedClientIds } from "@/lib/demoClient";
+import { unrankedClientIds } from "@/lib/rankings";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
@@ -84,9 +85,21 @@ export async function GET() {
     // Demo/test accounts are dropped from BOTH the named standings and the
     // anonymous group total — an inflated total is just as misleading to the
     // people reading it as a fake name on the board would be.
-    const { data: allClients } = await db.from("clients").select("id, name, email").is("archived_at", null);
-    const excluded = excludedClientIds(allClients as { id: string; name: string | null; email: string | null }[] | null);
-    const rankIds = ids.filter((id) => !excluded.has(id));
+    //
+    // Two sets, and the difference matters. `excluded` (demo/test) never counts
+    // anywhere. `unranked` also holds the TRAINER: his days are real so they
+    // still feed the anonymous group total, but he is never named or placed —
+    // the board is the clients'. Same rule the SQL board enforces via
+    // clients.exclude_from_rankings; see src/lib/rankings.ts.
+    const { data: allClients } = await db
+      .from("clients")
+      .select("id, name, email, exclude_from_rankings")
+      .is("archived_at", null);
+    const roster =
+      (allClients as { id: string; name: string | null; email: string | null; exclude_from_rankings: boolean | null }[] | null) || [];
+    const excluded = excludedClientIds(roster);
+    const unranked = unrankedClientIds(roster);
+    const rankIds = ids.filter((id) => !unranked.has(id));
 
     const [namesRes, woRes, mlRes] = await Promise.all([
       db.from("clients").select("id, name").in("id", rankIds.length ? rankIds : ["00000000-0000-0000-0000-000000000000"]),
