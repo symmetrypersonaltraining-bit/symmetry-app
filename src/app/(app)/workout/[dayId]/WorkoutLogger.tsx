@@ -3,6 +3,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { startDictation } from "@/lib/dictation";
 import { createClient } from "@/lib/supabase/client";
+// Aliased: this file already has a local submitFeedback() handler, and the
+// import silently shadowed it — the call below was recursing into itself.
+import { submitFeedback as fileFeedback } from "@/lib/feedback";
 import { sendClientMessage } from "@/app/(app)/home/messageActions";
 import Link from "next/link";
 import OffPlanBanner from "@/components/OffPlanBanner";
@@ -1358,12 +1361,7 @@ export default function WorkoutLogger({
     let src = "app";
     try { const m = localStorage.getItem("symmetry_view_mode"); if (m) src = m + "-app"; } catch { /* noop */ }
     try {
-      await supabase.from("app_feedback").insert({
-        source: src,
-        client_context: typeof window !== "undefined" ? window.location.pathname : null,
-        transcript: fbText.trim(),
-        status: "new",
-      });
+      await fileFeedback(supabase, { source: src, transcript: fbText.trim() });
     } catch (e) { console.error(e); }
     setFbSent(true); setFbText(""); setFbSending(false);
     setTimeout(() => { setFbSent(false); setShowFeedback(false); }, 2200);

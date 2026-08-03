@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { startDictation, type DictationHandle } from "@/lib/dictation";
 import { createClient } from "@/lib/supabase/client";
+import { submitFeedback } from "@/lib/feedback";
 import NotificationCenter from "@/components/NotificationCenter";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -67,7 +68,10 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
           if (!up.error) { const { data: pub } = sb.storage.from("feedback").getPublicUrl(path); photo_url = pub?.publicUrl || null; }
         } catch {}
       }
-      await sb.from("app_feedback").insert({ source, client_context: typeof window !== "undefined" ? window.location.pathname : null, transcript: tag + msg.trim(), status: "new", photo_url });
+      // submitFeedback stamps WHO filed it and kicks off reading the
+      // screenshot — see src/lib/feedback.ts. This path is the one that takes
+      // photos, and every one of Jennifer's ten reports came through it.
+      await submitFeedback(sb, { source, transcript: tag + msg.trim(), imageUrl: photo_url });
       setDone(true); setMsg(""); setSentiment(null); setFile(null);
       setTimeout(() => { setDone(false); setOpen(false); }, 1700);
     } catch {} finally { setSending(false); }

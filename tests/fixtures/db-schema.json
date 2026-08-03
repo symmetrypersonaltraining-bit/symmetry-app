@@ -84,7 +84,9 @@
   "change_summary",
   "commit_sha",
   "resolved_at",
-  "photo_url"
+  "photo_url",
+  "client_id",
+  "image_summary"
  ],
  "app_flags": [
   "key",

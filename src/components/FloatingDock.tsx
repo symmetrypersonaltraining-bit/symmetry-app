@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { submitFeedback } from "@/lib/feedback";
 import { startDictation } from "@/lib/dictation";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -85,7 +86,7 @@ export default function FloatingDock() {
       let source = "app";
       try { const m = localStorage.getItem("symmetry_view_mode"); if (m) source = m + "-app"; } catch {}
       const tag = sentiment === "like" ? "[LIKE] " : sentiment === "change" ? "[CHANGE] " : "";
-      await sb.from("app_feedback").insert({ source, client_context: typeof window !== "undefined" ? window.location.pathname : null, transcript: tag + msg.trim(), status: "new" });
+      await submitFeedback(sb, { source, transcript: tag + msg.trim() });
       setDone(true); setMsg(""); setSentiment(null);
       setTimeout(() => { setDone(false); setOpen(false); }, 1700);
     } catch {} finally { setSending(false); }

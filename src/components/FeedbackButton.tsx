@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { submitFeedback } from "@/lib/feedback";
 import { startDictation, type DictationHandle } from "@/lib/dictation";
 
 export default function FeedbackButton() {
@@ -26,12 +27,7 @@ export default function FeedbackButton() {
     setSending(true);
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("app_feedback").insert({
-      source: user?.email ?? "client",
-      client_context: typeof window !== "undefined" ? window.location.pathname : null,
-      transcript: msg.trim(),
-      status: "new",
-    });
+    await submitFeedback(supabase, { source: user?.email ?? "client", transcript: msg.trim() });
     setSent(true);
     setSending(false);
     setMsg("");
