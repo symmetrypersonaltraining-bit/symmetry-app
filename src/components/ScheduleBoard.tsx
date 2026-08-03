@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { isPeakWeekLocked } from "@/lib/peak-week";
 
 export interface BoardWorkout {
   id: string;
@@ -27,7 +28,6 @@ const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct
 // sessions; whoever needs a genuine freeze can get one that is stored per
 // client rather than compiled in. The `lockedFor` prop makes the scope explicit
 // at every call site instead of leaving it implicit in a constant nobody reads.
-const PEAK_WEEK = { clientId: "69021074-1708-4d73-9245-918862048709", start: "2026-08-03", end: "2026-08-09" };
 const HOLD_MS = 250;
 
 function todayCT(): string {
@@ -99,10 +99,7 @@ export default function ScheduleBoard({
   // Only the person whose peak week it is sees the lock. Everyone else's
   // schedule behaves normally — which is what it should always have done.
   const isLockedDate = useCallback(
-    (d: string) =>
-      (forClient || ownerClientId) === PEAK_WEEK.clientId &&
-      d >= PEAK_WEEK.start &&
-      d <= PEAK_WEEK.end,
+    (d: string) => isPeakWeekLocked(d, forClient || ownerClientId),
     [forClient, ownerClientId],
   );
   const [showPast, setShowPast] = useState(false);

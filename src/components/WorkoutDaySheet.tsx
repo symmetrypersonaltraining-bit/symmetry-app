@@ -4,12 +4,13 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { isPeakWeekLocked } from "@/lib/peak-week";
 
 export type DaySheetWorkout = { id: string; dayId: string; date: string; label: string; status: string };
 
-const LOCKED_START = "2026-08-03";
-const LOCKED_END = "2026-08-09";
-const isLocked = (d: string) => d >= LOCKED_START && d <= LOCKED_END;
+// Was its own copy of the dates, unscoped — see src/lib/peak-week.ts. This is
+// the surface Todd hit: a missed workout could not be pulled forward to today
+// because the day sheet froze the whole week for everybody.
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const isCardio = (l: string) => /cardio|treadmill|stair|walk|run/i.test(l);
@@ -48,6 +49,7 @@ export default function WorkoutDaySheet({
   workouts,
   basePath = "",
   forClient = "",
+  ownerClientId = "",
   today,
   onClose,
   onMoved,
@@ -55,12 +57,15 @@ export default function WorkoutDaySheet({
   date: string | null;
   workouts: DaySheetWorkout[];
   forClient?: string;
+  /** Whose schedule this sheet belongs to. Peak Week is scoped on it. */
+  ownerClientId?: string;
   basePath?: string;
   today: string;
   onClose: () => void;
   onMoved?: (id: string, newDate: string) => void;
 }) {
   const router = useRouter();
+  const isLockedHere = (d: string) => isPeakWeekLocked(d, forClient || ownerClientId);
   const [moving, setMoving] = useState<DaySheetWorkout | null>(null);
   const [sel, setSel] = useState<string>(today);
   const [saving, setSaving] = useState(false);
@@ -96,7 +101,7 @@ export default function WorkoutDaySheet({
     const target = sel;
     if (target === moving.date) { setMoving(null); return; }
     if (target < today) { setNotice("Can't move a workout into the past."); return; }
-    if (isLocked(target) || isLocked(moving.date)) { setNotice("Peak Week workouts are locked."); return; }
+    if (isLockedHere(target) || isLockedHere(moving.date)) { setNotice("Peak Week workouts are locked."); return; }
     setSaving(true);
     setNotice(null);
     try {
@@ -199,7 +204,7 @@ export default function WorkoutDaySheet({
                       >
                         {isToday ? "▶ Start workout" : done ? "View / edit log" : "✓ Log this workout"}
                       </Link>
-                      {!isLocked(w.date) && !done ? (
+                      {!isLockedHere(w.date) && !done ? (
                         <button
                           onClick={() => setMoving(w)}
                           style={{
@@ -236,7 +241,7 @@ export default function WorkoutDaySheet({
                 style={{ height: 176, overflowY: "auto", scrollSnapType: "y mandatory", paddingTop: 66, paddingBottom: 66 }}
               >
                 {dates.map((d) => {
-                  const locked = isLocked(d);
+                  const locked = isLockedHere(d);
                   const active = d === sel;
                   return (
                     <div
@@ -268,8 +273,8 @@ export default function WorkoutDaySheet({
               </button>
               <button
                 onClick={doMove}
-                disabled={saving || isLocked(sel)}
-                style={{ flex: 1, background: "var(--brand-primary)", color: "#fff", border: "none", borderRadius: 12, padding: 12, fontWeight: 800, fontSize: 14, cursor: "pointer", opacity: saving || isLocked(sel) ? 0.6 : 1 }}
+                disabled={saving || isLockedHere(sel)}
+                style={{ flex: 1, background: "var(--brand-primary)", color: "#fff", border: "none", borderRadius: 12, padding: 12, fontWeight: 800, fontSize: 14, cursor: "pointer", opacity: saving || isLockedHere(sel) ? 0.6 : 1 }}
               >
                 {saving ? "Moving…" : "Move to " + pretty(sel)}
               </button>
