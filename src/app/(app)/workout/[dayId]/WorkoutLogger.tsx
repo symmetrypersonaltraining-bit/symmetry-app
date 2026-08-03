@@ -24,6 +24,8 @@ interface Exercise {
   muscle_group: string | null;
   equipment_required?: string[] | null;
   video_url?: string | null;
+  /** ok | dead | error | null — see /api/cron/check-videos. */
+  video_status?: string | null;
 }
 
 interface PrescribedExercise {
@@ -414,7 +416,7 @@ function SwapModal({ pe, onClose, onSwap }: { pe: PrescribedExercise; onClose: (
       setLoading(true);
       const { data } = await supabase
         .from("exercises")
-        .select("id, name, modality, muscle_group, equipment_required, video_url")
+        .select("id, name, modality, muscle_group, equipment_required, video_url, video_status")
         .ilike("name", `%${query}%`)
         .is("client_owner_id", null)
         .limit(30);
@@ -1713,7 +1715,13 @@ export default function WorkoutLogger({
             {currentSection.client_facing_name || currentSection.internal_name}
           </p>
           <div className="flex items-center gap-2.5">
-            {currentExercise?.exercises?.video_url && (() => {
+            {/* A video known to be dead does not get a play button. Jennifer
+                tapped one mid-set and got "the YouTube account associated with
+                this video has been terminated" — a dead end dressed up as a
+                feature. Better to show nothing than to offer something that
+                fails: only 'dead' hides it, so an unchecked or errored video
+                still shows, because absence of proof is not proof. */}
+            {currentExercise?.exercises?.video_url && currentExercise.exercises.video_status !== "dead" && (() => {
               const __vid = __ytId(currentExercise.exercises.video_url);
               return (
                 <button type="button" data-no-swipe aria-label="Play exercise demo"

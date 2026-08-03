@@ -452,7 +452,9 @@
   "availability_status",
   "created_at",
   "client_owner_id",
-  "created_by"
+  "created_by",
+  "video_status",
+  "video_checked_at"
  ],
  "food_catalog": [
   "id",
