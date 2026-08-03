@@ -95,6 +95,96 @@ async function resolveExerciseId(db: Db, clientId: string, rawName: string): Pro
   return (made as { id: string }).id;
 }
 
+
+/**
+ * The phase a hand-built workout hangs off, creating one if there isn't one.
+ *
+ * days.phase_id is NOT NULL, so a workout needs a phase, a phase needs a
+ * program, and a client with no active program has none of it. Three clients
+ * are in that state right now, and every one of them would have hit a dead end
+ * reading "ask Dustin to assign one" — for a feature that has nothing to do
+ * with their programming.
+ *
+ * The answer already exists in the data: 25 clients carry a "Personal Workouts"
+ * program (programs.personal_for_client_id), one phase, holding the workouts
+ * they scheduled themselves. This makes that pattern on demand instead of
+ * assuming someone set it up earlier. Values match the existing rows exactly —
+ * status 'live', category 'training layer', structure_type 'single-session',
+ * phase 'Personal' — so these are indistinguishable from the ones already
+ * there, and nothing downstream has to learn a new shape.
+ *
+ * The client's REAL programming is preferred whenever they have some, so a
+ * manual workout sits alongside their actual block rather than in a sidecar.
+ * The personal program is only the fallback.
+ */
+async function ensurePhaseId(db: Db, clientId: string): Promise<string | null> {
+  // 1 · their active program, if they have one
+  const { data: ap } = await db
+    .from("program_assignments")
+    .select("programs(phases(id, position))")
+    .eq("client_id", clientId)
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+  const phases = (((ap as { programs?: { phases?: { id: string; position: number }[] } } | null)?.programs?.phases) || [])
+    .slice()
+    .sort((a, b) => a.position - b.position);
+  if (phases[0]) return phases[0].id;
+
+  // 2 · an existing personal program
+  const { data: personal } = await db
+    .from("programs")
+    .select("id, phases(id, position)")
+    .eq("personal_for_client_id", clientId)
+    .limit(1)
+    .maybeSingle();
+  const pRow = personal as { id: string; phases?: { id: string; position: number }[] } | null;
+  if (pRow) {
+    const ph = (pRow.phases || []).slice().sort((a, b) => a.position - b.position);
+    if (ph[0]) return ph[0].id;
+    const { data: madePhase } = await db
+      .from("phases")
+      .insert({ program_id: pRow.id, label: "Personal", position: 1, intent: "Client-scheduled library workouts" })
+      .select("id")
+      .single();
+    return (madePhase as { id: string } | null)?.id ?? null;
+  }
+
+  // 3 · make one
+  const { data: prog, error: progErr } = await db
+    .from("programs")
+    .insert({
+      name: "Personal Workouts",
+      status: "live",
+      category: "training layer",
+      structure_type: "single-session",
+      personal_for_client_id: clientId,
+    })
+    .select("id")
+    .single();
+  if (progErr || !prog) return null;
+  const programId = (prog as { id: string }).id;
+
+  const { data: phase, error: phaseErr } = await db
+    .from("phases")
+    .insert({ program_id: programId, label: "Personal", position: 1, intent: "Client-scheduled library workouts" })
+    .select("id")
+    .single();
+  if (phaseErr || !phase) return null;
+
+  // Matches the 25 that already exist: the assignment is active, which is what
+  // makes the program visible to the client at all. It does not displace real
+  // programming — this branch only runs when there is none to displace.
+  await db.from("program_assignments").insert({
+    client_id: clientId,
+    program_id: programId,
+    current_phase_id: (phase as { id: string }).id,
+    active: true,
+  });
+
+  return (phase as { id: string }).id;
+}
+
 export async function POST(req: Request) {
   let body: {
     clientId?: string;
@@ -129,29 +219,15 @@ export async function POST(req: Request) {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(body.date || "") ? (body.date as string) : CT_TODAY();
   const db = createAdminClient();
 
-  // Which phase to hang the day off. days.phase_id is NOT NULL, so a client
-  // with no active program has nowhere to put one — same constraint the AI
-  // route works under, resolved the same way.
-  const { data: ap } = await db
-    .from("program_assignments")
-    .select("program_id, programs(phases(id, position))")
-    .eq("client_id", clientId)
-    .eq("active", true)
-    .limit(1)
-    .maybeSingle();
-  const phases = (((ap as { programs?: { phases?: { id: string; position: number }[] } } | null)?.programs?.phases) || [])
-    .slice()
-    .sort((a, b) => a.position - b.position);
-  let phaseId: string | null = phases[0]?.id ?? null;
+  let phaseId = await ensurePhaseId(db, clientId);
   if (body.replaceDayId) {
+    // Replacing a specific day? Put the new one in the same phase so it sits
+    // beside what it replaced rather than in a different part of the program.
     const { data: rep } = await db.from("days").select("phase_id").eq("id", body.replaceDayId).maybeSingle();
     phaseId = (rep as { phase_id?: string } | null)?.phase_id ?? phaseId;
   }
   if (!phaseId) {
-    return NextResponse.json(
-      { error: "You need an active program before you can save your own workouts. Ask Dustin to assign one." },
-      { status: 409 },
-    );
+    return NextResponse.json({ error: "Could not set up a place to save this. Send Dustin a message." }, { status: 500 });
   }
 
   const created: { days?: string } = {};
