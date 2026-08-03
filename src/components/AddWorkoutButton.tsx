@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { FunLoader } from "@/components/FunMoments";
+import ManualWorkoutBuilder from "@/components/ManualWorkoutBuilder";
 
 type LibDay = { id: string; label: string };
 
@@ -21,6 +22,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
   const [custom, setCustom] = useState(false);
+  const [build, setBuild] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [pickedDate, setPickedDate] = useState<string>(dateStr || ctToday());
@@ -122,7 +124,13 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
               <input type="date" value={pickedDate} min={minDate} max={ctToday()} onChange={(e) => setPickedDate(e.target.value)} style={{ flex: 1, minWidth: 150, padding: "9px 10px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", fontSize: 14, fontFamily: "inherit" }} />
               {pickedDate !== ctToday() && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--brand-primary, #7c9cf5)" }}>backdated</span>}
             </div>
-            {!custom ? (
+            {build ? (
+              <ManualWorkoutBuilder
+                clientId={clientId}
+                date={pickedDate}
+                onCancel={() => setBuild(false)}
+              />
+            ) : !custom ? (
               <>
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your workouts" style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", marginBottom: 10 }} />
                 <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", userSelect: "none" }}>
@@ -139,7 +147,13 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
                     {filtered.length === 0 && <div style={{ padding: 12, opacity: 0.6, fontSize: 13 }}>No matching workouts.</div>}
                   </div>
                 )}
-                <button onClick={() => setCustom(true)} style={{ marginTop: 12, width: "100%", padding: "12px", borderRadius: 12, border: "1px dashed rgba(140,150,180,.5)", background: "transparent", cursor: "pointer", fontSize: 14, fontWeight: 700, color: "inherit" }}>+ Custom workout (type what you did)</button>
+                {/* Two different jobs, kept as two buttons. "Build" is for a
+                    workout you are about to DO and want to log set by set;
+                    "type what you did" is for one that already happened and
+                    only needs recording. Collapsing them into one flow makes
+                    both worse. */}
+                <button onClick={() => setBuild(true)} style={{ marginTop: 12, width: "100%", padding: "12px", borderRadius: 12, border: "none", background: "var(--brand-primary)", cursor: "pointer", fontSize: 14, fontWeight: 800, color: "#fff" }}>+ Build my own workout</button>
+                <button onClick={() => setCustom(true)} style={{ marginTop: 8, width: "100%", padding: "12px", borderRadius: 12, border: "1px dashed rgba(140,150,180,.5)", background: "transparent", cursor: "pointer", fontSize: 14, fontWeight: 700, color: "inherit" }}>Just type what I did</button>
               </>
             ) : (
               <>

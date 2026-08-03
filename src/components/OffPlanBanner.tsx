@@ -178,10 +178,14 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
         <div key={r.id} className="flex items-center justify-between p-3 mb-2" style={box}>
           <div className="min-w-0">
             <p className="text-xs font-bold truncate" style={{ color: "var(--brand-text)" }}>Off-plan: {r.description}</p>
-            <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>becomes a library workout tonight 🌙</p>
+            {/* Second copy of the same dead promise — this one on the row
+                itself, where it sat next to a PENDING chip that never cleared.
+                A status badge that never changes is a bug report waiting to
+                happen. */}
+            <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>Recorded — Dustin can see it</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="font-extrabold px-2 py-0.5 rounded-full" style={{ background: "#fef3c7", color: "#b45309", fontSize: 9 }}>PENDING</span>
+            <span className="font-extrabold px-2 py-0.5 rounded-full" style={{ background: "color-mix(in srgb, #22c55e 16%, transparent)", color: "#16a34a", fontSize: 9 }}>LOGGED</span>
             <button onClick={() => deleteRow(r.id)} aria-label="Delete" style={{ color: "var(--brand-text-secondary)" }}><i className="ti ti-trash text-sm" /></button>
           </div>
         </div>
@@ -289,7 +293,13 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
           <button onClick={() => setMode("type")} className="w-full flex items-center gap-3 p-2.5 text-left rounded-2xl">
             <span className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0" style={{ background: "#fef3c7" }}>✍️</span>
             <span><span className="block text-sm font-bold" style={{ color: "var(--brand-text)" }}>I did something else</span>
-            <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>Type it - it becomes a library workout tonight</span></span>
+            {/* Was "it becomes a library workout tonight". Nothing had rolled one
+                up since 2026-07-29 — the converter is gone, there is no function
+                in the database and no route that reads offplan_workout_logs. The
+                copy promised a thing that no longer happened, which is worse
+                than promising nothing. It is recorded immediately now, and the
+                sentence says only what is actually true. */}
+            <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>Type it — recorded straight away, Dustin sees it</span></span>
           </button>
         </div>
       )}
