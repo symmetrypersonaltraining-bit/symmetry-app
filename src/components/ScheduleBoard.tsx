@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -13,8 +13,21 @@ export interface BoardWorkout {
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const LOCKED_START = "2026-08-03";
-const LOCKED_END = "2026-08-09";
+// PEAK WEEK IS ONE PERSON'S, NOT EVERYONE'S.
+//
+// These two constants froze 2026-08-03 → 08-09 for EVERY client in the app.
+// They are Dustin's own peak week — his shoot is Aug 9 — and they were written
+// as a module-level constant, so every client on the roster opened their
+// schedule to a padlock and "Peak Week" on every day of that range.
+//
+// Reported 2026-08-03, 5:17 AM, by Tyler Dorsett: "My workouts are locked and
+// it won't let me access them." He was trying to train.
+//
+// Scoped to the trainer's own client row. A client can always move their own
+// sessions; whoever needs a genuine freeze can get one that is stored per
+// client rather than compiled in. The `lockedFor` prop makes the scope explicit
+// at every call site instead of leaving it implicit in a constant nobody reads.
+const PEAK_WEEK = { clientId: "69021074-1708-4d73-9245-918862048709", start: "2026-08-03", end: "2026-08-09" };
 const HOLD_MS = 250;
 
 function todayCT(): string {
@@ -40,7 +53,7 @@ function typeOf(label: string): "wk" | "mob" | "car" {
   return "wk";
 }
 const TYPE_COLOR: Record<string, string> = { wk: "var(--brand-primary)", mob: "#a78bfa", car: "#5ec9a3" };
-const isLockedDate = (d: string) => d >= LOCKED_START && d <= LOCKED_END;
+
 
 /**
  * ScheduleBoard — compact scrollable schedule board. ~5-7 days visible on mobile.
@@ -57,12 +70,20 @@ export default function ScheduleBoard({
   workouts: initial,
   basePath = "",
   forClient = "",
+  ownerClientId = "",
   daysBack = 7,
   daysAhead = 20,
 }: {
   workouts: BoardWorkout[];
   basePath?: string;
   forClient?: string;
+  /**
+   * Whose schedule this board is showing. Needed because `forClient` is only
+   * set when a TRAINER is viewing someone else — on a client's own /workout
+   * page it is empty, so it cannot answer "is this Dustin's board?". The Peak
+   * Week freeze is scoped on this.
+   */
+  ownerClientId?: string;
   daysBack?: number;
   daysAhead?: number;
 }) {
@@ -75,6 +96,15 @@ export default function ScheduleBoard({
   const [notice, setNotice] = useState<string | null>(null);
   const [movePick, setMovePick] = useState<{ id: string; label: string } | null>(null);
   const [pickDate, setPickDate] = useState<string>(today);
+  // Only the person whose peak week it is sees the lock. Everyone else's
+  // schedule behaves normally — which is what it should always have done.
+  const isLockedDate = useCallback(
+    (d: string) =>
+      (forClient || ownerClientId) === PEAK_WEEK.clientId &&
+      d >= PEAK_WEEK.start &&
+      d <= PEAK_WEEK.end,
+    [forClient, ownerClientId],
+  );
   const [showPast, setShowPast] = useState(false);
   // Feedback 6e90c584: "ability to move past workouts forwards". A workout that
   // sits on a past date used to be frozen — no drag handle, no Move button — so
@@ -84,7 +114,7 @@ export default function ScheduleBoard({
   // it, and missing it is exactly when you need to move it.
   const missed = useMemo(
     () => workouts.filter((w) => w.date < today && w.status !== "completed" && !isLockedDate(w.date)),
-    [workouts, today],
+    [workouts, today, isLockedDate],
   );
   // The past section used to auto-open whenever anything was missed, which meant
   // the board almost always opened onto last week rather than today — you had to

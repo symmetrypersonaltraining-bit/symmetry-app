@@ -179,7 +179,7 @@ export default async function WorkoutPage(props: {
             <div style={{ marginTop: "0.85rem" }}>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
               <ScheduleWeekBar workouts={calWorkouts} />
-              <ScheduleBoard workouts={calWorkouts} />
+              <ScheduleBoard workouts={calWorkouts} ownerClientId={clientId || ""} />
             </div>
           </>
         ) : allPhases.length > 0 ? (
@@ -192,7 +192,7 @@ export default async function WorkoutPage(props: {
             <div style={{ marginTop: "1rem" }}>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
               <ScheduleWeekBar workouts={calWorkouts} />
-              <ScheduleBoard workouts={calWorkouts} />
+              <ScheduleBoard workouts={calWorkouts} ownerClientId={clientId || ""} />
             </div>
           </>
         ) : (
