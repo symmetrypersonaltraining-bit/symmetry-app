@@ -213,21 +213,21 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
                 <div>
                   <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Distance (mi)</label>
                   <input type="number" value={distance} onChange={e => setDistance(e.target.value)}
-                    placeholder="\u2014" inputMode="decimal"
+                    placeholder="—" inputMode="decimal"
                     className="w-full px-3 py-3 rounded-xl text-base font-semibold text-center outline-none"
                     style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
                 </div>
                 <div>
                   <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Calories</label>
                   <input type="number" value={cardioKcal} onChange={e => setCardioKcal(e.target.value)}
-                    placeholder="\u2014" inputMode="numeric"
+                    placeholder="—" inputMode="numeric"
                     className="w-full px-3 py-3 rounded-xl text-base font-semibold text-center outline-none"
                     style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
                 </div>
                 <div>
                   <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>Avg HR (bpm)</label>
                   <input type="number" value={avgHr} onChange={e => setAvgHr(e.target.value)}
-                    placeholder="\u2014" inputMode="numeric"
+                    placeholder="—" inputMode="numeric"
                     className="w-full px-3 py-3 rounded-xl text-base font-semibold text-center outline-none"
                     style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
                 </div>

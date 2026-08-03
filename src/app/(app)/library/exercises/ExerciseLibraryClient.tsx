@@ -257,7 +257,7 @@ export default function ExerciseLibraryClient({ exercises }: Props) {
                       )}
                       {ex.modality && (
                         <>
-                          <span style={{ color: "var(--brand-border)" }}>\u00b7</span>
+                          <span style={{ color: "var(--brand-border)" }}>·</span>
                           <span className="text-[10px] capitalize" style={{ color: "var(--brand-text-secondary)" }}>{ex.modality}</span>
                         </>
                       )}

@@ -62,7 +62,7 @@ interface Props {
 
 // ---- Mini sparkline ----
 function MiniSparkline({ values, color }: { values: number[]; color: string }) {
-  if (values.length < 2) return <span style={{ color: "var(--brand-text-secondary)", fontSize: 12 }}>\u2014</span>;
+  if (values.length < 2) return <span style={{ color: "var(--brand-text-secondary)", fontSize: 12 }}>—</span>;
   const w = 80, h = 28, pad = 3;
   const min = Math.min(...values), max = Math.max(...values);
   const range = max - min || 1;
@@ -765,7 +765,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
           <select value={val} onChange={e => set(field, e.target.value)}
             className="flex-1 text-sm rounded-lg px-2.5 py-1.5 outline-none"
             style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-primary)", color: "var(--brand-text)" }}>
-            <option value="">\u2014</option>
+            <option value="">—</option>
             {options.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         ) : (

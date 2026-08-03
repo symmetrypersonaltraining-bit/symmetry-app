@@ -309,7 +309,7 @@ function ExerciseHistory({ exerciseId, exId, clientId, exerciseName, onClose, on
           <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs uppercase tracking-widest mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>History{history.length > 0 ? ` \u00b7 ${history.length} sessions` : ""}</p>
+              <p className="text-xs uppercase tracking-widest mb-0.5" style={{ color: "var(--brand-text-secondary)" }}>History{history.length > 0 ? ` · ${history.length} sessions` : ""}</p>
               <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>{exerciseName}</h3>
             </div>
             <div className="flex items-center gap-2">

@@ -119,7 +119,7 @@ function AddExerciseDrawer({
           <div className="relative">
             <i className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sm"
               style={{ color: "var(--brand-text-secondary)" }} />
-            <input type="text" placeholder="Search exercises\u2026" value={search}
+            <input type="text" placeholder="Search exercises…" value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm border"
               style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)", color: "var(--brand-text)" }} />
@@ -204,7 +204,7 @@ function AddExerciseDrawer({
                 <label className="text-[10px] font-semibold uppercase tracking-wide block mb-1"
                   style={{ color: "var(--brand-text-secondary)" }}>Coaching Cue (optional)</label>
                 <input type="text" value={cue} onChange={e => setCue(e.target.value)}
-                  placeholder="Keep core tight, neutral spine\u2026"
+                  placeholder="Keep core tight, neutral spine…"
                   className="w-full px-3 py-2 rounded-lg text-sm border"
                   style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)", color: "var(--brand-text)" }} />
               </div>

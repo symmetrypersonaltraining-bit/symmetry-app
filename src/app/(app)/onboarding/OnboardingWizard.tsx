@@ -197,7 +197,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
         {step === 2 && (
           <div className="pt-4">
             <h2 className="text-xl font-bold mb-1" style={{ color: "var(--brand-text)" }}>Training experience</h2>
-            <p className="text-sm mb-6" style={{ color: "var(--brand-text-secondary)" }}>Be honest \u2014 this shapes your program design.</p>
+            <p className="text-sm mb-6" style={{ color: "var(--brand-text-secondary)" }}>Be honest — this shapes your program design.</p>
             <div className="space-y-2.5 mb-6">
               {EXPERIENCE_LEVELS.map(lvl => (
                 <button key={lvl.val} onClick={() => set("experience_level", lvl.val)}

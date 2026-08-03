@@ -858,7 +858,7 @@ export default function AssessmentPage() {
             )}
 
             {/* Assessment Summary (editable) */}
-            <Field label="Assessment Summary (Client-Facing \u2014 Editable)">
+            <Field label="Assessment Summary (Client-Facing — Editable)">
               <textarea
                 value={aiResult.assessment_summary || ''}
                 onChange={e => setAiResult((prev: any) => ({ ...prev, assessment_summary: e.target.value }))}
