@@ -27,6 +27,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAiScope } from "@/lib/ai/scope";
+import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import Anthropic from "@anthropic-ai/sdk";
 import { HAIKU_MODEL } from "@/lib/ai/anthropic";
 
@@ -51,8 +52,15 @@ Rules:
 - No preamble. Start with the description.`;
 
 export async function POST(req: Request) {
-  const scoped = await resolveAiScope(null);
-  if (!scoped.ok) return scoped.response;
+  // The scheduler may call this too. Six reports carry a screenshot taken
+  // before this route existed — including "app automatically doubling the value
+  // of the meal I logged", where the picture is the only evidence — and there
+  // was no way to describe them after the fact without a client session. A
+  // backfill needs a door.
+  if (!(await isDbSchedulerRequest(req))) {
+    const scoped = await resolveAiScope(null);
+    if (!scoped.ok) return scoped.response;
+  }
 
   let body: { feedbackId?: string; imageUrl?: string };
   try {
