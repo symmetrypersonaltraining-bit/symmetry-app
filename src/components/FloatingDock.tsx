@@ -93,6 +93,10 @@ export default function FloatingDock() {
   }
 
   // RETIRED 2026-07-03: dock replaced by HeaderAssist (header corner). To restore, delete the next two lines.
+// Asked for again on 6/26 ("keep ai assistant/feedback full movable block in
+// workout app") and reviewed 2026-08-04 — staying retired. Dustin: "dont put ai
+// assistant in logger there no reason fir clients to need it there". Restoring
+// this also puts feedback in two places at once, which is the reason it went.
   const RETIRED = true;
   if (RETIRED) return null;
 

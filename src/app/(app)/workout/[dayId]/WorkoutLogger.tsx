@@ -695,6 +695,20 @@ export default function WorkoutLogger({
   const [swapTargetPe, setSwapTargetPe] = useState<PrescribedExercise | null>(null);
   // V6 consolidated logger: feedback sheet (both roles) → app_feedback; AI note sheet
   // (trainer only) → trainer_notes; cue collapsed behind an ⓘ toggle to shorten the header.
+  //
+  // NO AI ASSISTANT IN HERE, ON PURPOSE. Session mode covers the screen at
+  // z-999, so HeaderAssist — and with it the assistant — is unreachable
+  // mid-workout. That reads like an oversight and it is not one.
+  //
+  //   Dustin, 2026-08-04: "dont put ai assistant in logger there no reason fir
+  //   clients to need it there"
+  //
+  // A client mid-set needs the weight box, the check button and a way to flag a
+  // problem. That is what is here. An audit will keep surfacing this as a gap
+  // (it did on 8/4, off the back of Todd's "keep ai assistant/feedback full
+  // movable block" from 6/26) — it is a decision, not a bug. The flag button
+  // below is the deliberate exception: reporting something broken has to work
+  // from the screen it broke on.
   const [showFeedback, setShowFeedback] = useState(false);
   const [fbText, setFbText] = useState("");
   const [fbSent, setFbSent] = useState(false);
