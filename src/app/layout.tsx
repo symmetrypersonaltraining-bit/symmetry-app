@@ -15,7 +15,17 @@ import ThemeProvider from "@/components/ThemeProvider";
 export const metadata: Metadata = {
   title: "Symmetry Corrective",
   description: "Train smarter. Move better. Live stronger.",
-  manifest: "/manifest.json",
+  // app/manifest.ts serves this; it used to point at a public/manifest.json
+  // that did not exist, so no phone could install the app properly.
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    // Without this iOS uses a screenshot of the page as the home-screen icon.
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

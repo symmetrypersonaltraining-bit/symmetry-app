@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import QRCode from "qrcode";
 
 export default function InviteClientButton({
   clientId,
@@ -13,6 +14,9 @@ export default function InviteClientButton({
   const router = useRouter();
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [errMsg, setErrMsg] = useState("");
+  // The in-studio path. Dustin is standing next to them — a QR they scan off his
+  // phone beats an email that lands in spam and a password they have to type.
+  const [qr, setQr] = useState<string | null>(null);
 
   async function handleInvite() {
     if (state !== "idle") return;
@@ -25,6 +29,11 @@ export default function InviteClientButton({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
+      if (data.oneTapUrl) {
+        try {
+          setQr(await QRCode.toDataURL(data.oneTapUrl, { width: 320, margin: 1 }));
+        } catch { /* the email still went; the QR is a shortcut, not the flow */ }
+      }
       setState("sent");
       setTimeout(() => router.refresh(), 1500);
     } catch (e: any) {
@@ -32,6 +41,24 @@ export default function InviteClientButton({
       setState("error");
       setTimeout(() => setState("idle"), 3000);
     }
+  }
+
+  if (qr) {
+    return (
+      <div onClick={() => setQr(null)}
+        style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(8,10,18,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <p style={{ color: "#fff", fontWeight: 800, fontSize: 16, margin: "0 0 4px" }}>{clientName}</p>
+        <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 12.5, margin: "0 0 16px", textAlign: "center", maxWidth: 280, lineHeight: 1.45 }}>
+          Have them scan this with their phone camera. It signs them in, sets a
+          password and puts the app on their home screen.
+        </p>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={qr} alt="Invite QR code" style={{ width: 280, height: 280, borderRadius: 16, background: "#fff", padding: 10 }} />
+        <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 11.5, marginTop: 14 }}>
+          The same link is in their email. Tap anywhere to close.
+        </p>
+      </div>
+    );
   }
 
   if (state === "sent") {

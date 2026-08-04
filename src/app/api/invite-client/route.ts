@@ -77,6 +77,30 @@ export async function POST(req: NextRequest) {
     first_login_completed: false,
   }, { onConflict: "client_id" });
 
+  // ── The one-tap link ──────────────────────────────────────────────────────
+  //
+  // Dustin, 8/4: "id like an easier start up for clients... the flow is
+  // currently very sloppy for new clients."
+  //
+  // It was: read a 10-character password out of an email, switch apps, type it
+  // into a phone keyboard without a typo, then set a real one. Every step is a
+  // place to give up, and the temp password is the worst of them.
+  //
+  // Supabase can mint a recovery link that signs them in and lands them on
+  // /welcome, where they choose a password with a session already in hand. The
+  // temp password stays in the email as a fallback — links expire and mail
+  // clients mangle them, and "the button didn't work" must not mean "you cannot
+  // get in".
+  let oneTapUrl: string | null = null;
+  try {
+    const { data: link } = await admin.auth.admin.generateLink({
+      type: "recovery",
+      email: client.email,
+      options: { redirectTo: `${APP_URL}/auth/callback?next=/welcome` },
+    });
+    oneTapUrl = link?.properties?.action_link ?? null;
+  } catch { /* the password path below still works */ }
+
   // Send invite email via Resend
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
@@ -85,7 +109,7 @@ export async function POST(req: NextRequest) {
       from: "Symmetry Corrective <noreply@symmetrypersonaltraining.com>",
       to: client.email,
       subject: "You're invited to the Symmetry Training App",
-      html: buildInviteEmailHtml({ firstName, email: client.email, tempPassword, apkUrl: APK_URL }),
+      html: buildInviteEmailHtml({ firstName, email: client.email, tempPassword, apkUrl: APK_URL, oneTapUrl }),
     });
   }
 
@@ -96,5 +120,8 @@ export async function POST(req: NextRequest) {
     // Include temp password in response for trainer to copy if Resend not configured
     tempPassword: resendKey ? undefined : tempPassword,
     emailSent: !!resendKey,
+    // Returned so the trainer can show it as a QR in the studio — the fastest
+    // onboarding there is, since he is standing next to them.
+    oneTapUrl,
   });
 }

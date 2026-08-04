@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import TrainerLayoutWrapper from "@/components/TrainerLayoutWrapper";
 import BottomNav from "@/components/BottomNav";
+import InstallPrompt from "@/components/InstallPrompt";
 import SessionDock from "@/components/SessionDock";
 import HeaderAssist from "@/components/HeaderAssist";
 import RealtimeScheduleSync from "@/components/RealtimeScheduleSync";
@@ -58,6 +59,9 @@ export default async function AppLayout({
       <RefreshHandle />
       <div className="pb-20">{children}</div>
       <SessionDock />
+      {/* Registers the service worker and offers the install where the
+          platform allows it. Renders nothing once installed or dismissed. */}
+      <InstallPrompt />
       <BottomNav />
     </div>
     </NotificationProvider>

@@ -8,8 +8,10 @@ export function buildInviteEmailHtml(opts: {
   email: string;
   tempPassword: string;
   apkUrl: string;
+  /** One-tap sign-in link. Null if Supabase could not mint one. */
+  oneTapUrl?: string | null;
 }): string {
-  const { firstName, email, tempPassword, apkUrl } = opts;
+  const { firstName, email, tempPassword, apkUrl, oneTapUrl } = opts;
   return `
 <!DOCTYPE html>
 <html>
@@ -28,16 +30,29 @@ export function buildInviteEmailHtml(opts: {
         Dustin has set up your Symmetry Training App account. Your training, nutrition, and progress — all in one place.
       </p>
 
-      <!-- Download app -->
+      ${oneTapUrl ? `
+      <!-- One tap in. This is the whole flow now; everything below it is a
+           fallback for when the link expires or the mail client breaks it. -->
+      <div style="text-align: center; margin: 0 0 10px;">
+        <a href="${oneTapUrl}" style="display: inline-block; background: #E53935; color: white; text-decoration: none; padding: 16px 34px; border-radius: 10px; font-weight: 700; font-size: 16px;">
+          Open my app →
+        </a>
+      </div>
+      <p style="text-align: center; color: #888; font-size: 12px; margin: 0 0 24px;">
+        Opens straight in — no password to type. We'll help you pick one and put
+        the app on your home screen. If the link has expired, use the details below.
+      </p>` : ``}
+
+      <!-- Android APK, for anyone who wants the installed app -->
       <div style="text-align: center; margin: 0 0 24px;">
-        <a href="${apkUrl}" style="display: inline-block; background: #E53935; color: white; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 700; font-size: 15px;">
-          📲 Download the App (Android)
+        <a href="${apkUrl}" style="display: inline-block; background: #fff; color: #E53935; text-decoration: none; padding: 12px 26px; border-radius: 10px; font-weight: 700; font-size: 14px; border: 1px solid #E53935;">
+          📲 Android app (optional)
         </a>
       </div>
 
       <!-- Credentials box -->
       <div style="background: #f8f8f8; border-radius: 10px; padding: 20px; margin: 0 0 24px; border: 1px solid #eee;">
-        <p style="margin: 0 0 12px; font-size: 13px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">Login Credentials</p>
+        <p style="margin: 0 0 12px; font-size: 13px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">If you need to sign in by hand</p>
         <p style="margin: 0 0 8px; font-size: 15px; color: #333;">
           <strong>Email:</strong> ${email}
         </p>
