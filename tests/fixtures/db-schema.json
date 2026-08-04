@@ -129,6 +129,12 @@
     "applied",
     "created_at"
   ],
+  "birthday_posts": [
+    "client_id",
+    "year",
+    "kind",
+    "posted_at"
+  ],
   "calendar_payments": [
     "id",
     "client_id",
