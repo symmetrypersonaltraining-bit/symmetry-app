@@ -93,3 +93,37 @@ test("first-run never traps anyone", () => {
   // that makes a first impression feel broken.
   assert.match(src, /fontSize: 16,/);
 });
+
+/**
+ * PUBLIC MEANS PUBLIC.
+ *
+ * The manifest and icons shipped, and the install prompt still would not have
+ * worked. Checking what the live site actually served found everything behind
+ * the login wall: a phone fetches /manifest.webmanifest with NO session, got
+ * redirected to /login, and received HTML. HTML is not a manifest, so Chrome
+ * would have gone on refusing to offer "Install app" — the same symptom, a new
+ * cause, and invisible without asking the deployed site.
+ *
+ * Same for /privacy, which is the URL Apple and Google fetch while logged out.
+ * A privacy policy a reviewer cannot read is not a published privacy policy.
+ */
+test("the install and policy URLs are reachable without a session", () => {
+  const mw = read("src/middleware.ts");
+  for (const p of ['pathname === "/privacy"', 'pathname === "/manifest.webmanifest"', 'pathname === "/sw.js"', 'pathname.startsWith("/icons/")']) {
+    assert.ok(mw.includes(p), `middleware must let ${p} through unauthenticated`);
+  }
+  // And they have to sit ABOVE the redirect, or the allowance never runs.
+  assert.ok(
+    mw.indexOf('pathname === "/privacy"') < mw.indexOf('NextResponse.redirect(new URL("/login"'),
+    "the public allowance must come before the login redirect",
+  );
+});
+
+test("first-run comes before the intake questionnaire, not after", () => {
+  // /welcome sets the app up; /onboarding asks about goals and injuries. Without
+  // /welcome in the skip list the onboarding redirect fired first and a new
+  // client was asked about their health history before they had a password.
+  const mw = read("src/middleware.ts");
+  assert.match(mw, /pathname === "\/onboarding" \|\| pathname === "\/set-password" \|\| pathname === "\/welcome"/);
+  assert.match(read("src/app/(app)/welcome/WelcomeClient.tsx"), /needsIntake \? "\/onboarding" : "\/home"/);
+});

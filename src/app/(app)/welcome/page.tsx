@@ -28,10 +28,20 @@ export default async function WelcomePage() {
 
   const { data: c } = await supabase
     .from("clients")
-    .select("id, name")
+    .select("id, name, onboarding_complete")
     .eq("auth_user_id", user.id)
     .maybeSingle();
-  const client = c as { id: string; name: string | null } | null;
+  const client = c as { id: string; name: string | null; onboarding_complete: boolean | null } | null;
 
-  return <WelcomeClient firstName={(client?.name || "").split(" ")[0] || "there"} clientId={client?.id ?? null} />;
+  return (
+    <WelcomeClient
+      firstName={(client?.name || "").split(" ")[0] || "there"}
+      clientId={client?.id ?? null}
+      // A brand-new client still owes Dustin the goals/history questionnaire.
+      // This screen sets the APP up; that one collects the answers. Order
+      // matters — nobody should be asked about injuries before they have a
+      // password.
+      needsIntake={client?.onboarding_complete === false}
+    />
+  );
 }

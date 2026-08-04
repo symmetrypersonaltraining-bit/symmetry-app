@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import InstallPrompt, { isIos, isStandalone } from "@/components/InstallPrompt";
 
-export default function WelcomeClient({ firstName, clientId }: { firstName: string; clientId: string | null }) {
+export default function WelcomeClient({ firstName, clientId, needsIntake }: { firstName: string; clientId: string | null; needsIntake?: boolean }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [pw, setPw] = useState("");
@@ -158,8 +158,9 @@ export default function WelcomeClient({ firstName, clientId }: { firstName: stri
           ) : (
             <button onClick={askNotifications} style={{ ...primary, marginBottom: 8 }}>Turn on notifications</button>
           )}
-          <button onClick={() => router.push("/home")} style={notifState === "granted" ? primary : ghost}>
-            Take me to my programme
+          <button onClick={() => router.push(needsIntake ? "/onboarding" : "/home")}
+            style={notifState === "granted" ? primary : ghost}>
+            {needsIntake ? "Next — a few questions from Dustin" : "Take me to my programme"}
           </button>
         </div>
       )}
