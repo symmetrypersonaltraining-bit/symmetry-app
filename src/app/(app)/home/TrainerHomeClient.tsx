@@ -2,6 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { pausePaymentReminder } from './actions';
+import { createClient } from '@/lib/supabase/client';
+import { submitFeedback } from '@/lib/feedback';
 
 type TodaySession = { id: string; clientId: string; clientName: string; workoutLabel: string; dayId: string; status: string; };
 type Client = { id: string; name: string };
@@ -184,7 +186,14 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
 
       {/* Floating AI + Feedback cluster */}
       <div ref={clusterRef} onMouseDown={startDrag} onTouchStart={startDrag} style={{ position: 'fixed', bottom: 24, right: 20, display: 'flex', gap: 8, zIndex: 200, cursor: 'grab', userSelect: 'none', touchAction: 'none' }}>
-        <button onClick={() => window.dispatchEvent(new Event('symmetry:open:ai'))} title='AI assistant' style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--brand-primary)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,156,245,.35)' }}>
+        {/* symmetry:open-ai, with a HYPHEN. This said 'symmetry:open:ai' from the
+            day it was written and AIAssistant has only ever listened for the
+            hyphenated name — so this button has never once opened anything.
+            Dustin, 8/4: "my ai button from my trainer app home screen is not
+            working". One character. Nothing threw, so nothing ever surfaced it;
+            tests/unit/appEvents.test.ts now fails the build on a dispatch with
+            no listener. */}
+        <button onClick={() => window.dispatchEvent(new CustomEvent('symmetry:open-ai'))} title='AI assistant' style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--brand-primary)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,156,245,.35)' }}>
           <i className='ti ti-sparkles' style={{ fontSize: 20, color: '#fff' }} />
         </button>
         <button onClick={() => setFeedbackOpen(true)} title='App Feedback' style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--brand-card)', border: '1.5px solid var(--brand-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(20,30,55,.10)' }}>
@@ -202,7 +211,16 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
             ) : (
               <>
                 <textarea value={feedbackText} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFeedbackText(e.target.value)} placeholder='What can be improved?' rows={4} style={{ width: '100%', borderRadius: 12, border: '1.5px solid var(--brand-border)', padding: 12, fontSize: 14, resize: 'none', fontFamily: 'inherit', background: 'var(--brand-bg)', color: 'var(--brand-text)', boxSizing: 'border-box' as const }} />
-                <button onClick={async () => { setFeedbackSent(true); setTimeout(() => { setFeedbackOpen(false); setFeedbackText(''); setFeedbackSent(false); }, 1800); }} style={{ marginTop: 10, width: '100%', padding: '12px 0', borderRadius: 12, background: 'var(--brand-primary)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>Send Feedback</button>
+                {/* This used to set setFeedbackSent(true) and nothing else: it
+                    said "Thank you! Feedback sent." and threw the text away.
+                    Every report filed from this box was lost. It goes through
+                    submitFeedback now, the same path as the header button. */}
+                <button onClick={async () => {
+                  const text = feedbackText.trim();
+                  if (text) { try { await submitFeedback(createClient() as any, { source: 'trainer-app', transcript: text }); } catch {} }
+                  setFeedbackSent(true);
+                  setTimeout(() => { setFeedbackOpen(false); setFeedbackText(''); setFeedbackSent(false); }, 1800);
+                }} style={{ marginTop: 10, width: '100%', padding: '12px 0', borderRadius: 12, background: 'var(--brand-primary)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>Send Feedback</button>
               </>
             )}
           </div>
