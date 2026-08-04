@@ -146,8 +146,9 @@ export default function WelcomeClient({ firstName, clientId, needsIntake }: { fi
             Want a nudge when Dustin messages you?
           </h2>
           <p style={{ fontSize: 13, color: "var(--brand-text-secondary)", lineHeight: 1.5, marginTop: 0 }}>
-            Messages and schedule changes only. Never marketing, and you can turn it
-            off in Settings whenever you like.
+            Messages and schedule changes only — never marketing, and you can turn
+            it off in Settings whenever you like. Saying yes now means your phone
+            is ready the moment Dustin turns them on.
           </p>
           {notifState === "granted" ? (
             <p style={{ fontSize: 13.5, fontWeight: 700, color: "var(--brand-primary)" }}>Notifications are on ✓</p>

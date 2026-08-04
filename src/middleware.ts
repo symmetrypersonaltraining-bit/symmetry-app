@@ -83,16 +83,35 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // For clients: if onboarding not complete, redirect to onboarding wizard
+  // For clients: first run, then the intake wizard, then the app.
+  //
+  // One query, not two — middleware runs on every navigation and this already
+  // cost a round trip.
   if (pathname.startsWith("/")) {
     const { data: clientRow } = await supabase
       .from("clients")
-      .select("onboarding_complete")
+      .select("onboarding_complete, client_app_settings(first_login_completed)")
       .eq("email", user.email!)
       .maybeSingle();
 
-    if (clientRow && clientRow.onboarding_complete === false) {
-      return NextResponse.redirect(new URL("/onboarding", request.url));
+    if (clientRow) {
+      // /welcome is where the one-tap invite link lands. But links expire, and
+      // the invite email carries a temporary password as a fallback — someone
+      // signing in that way used to skip first-run entirely and never be asked
+      // to choose a password or offered the home-screen install. However they
+      // got in, a first-time client sees the same screen.
+      const settings = clientRow.client_app_settings as unknown as
+        | { first_login_completed: boolean | null }
+        | { first_login_completed: boolean | null }[]
+        | null;
+      const row = Array.isArray(settings) ? settings[0] : settings;
+      if (row && row.first_login_completed === false) {
+        return NextResponse.redirect(new URL("/welcome", request.url));
+      }
+
+      if (clientRow.onboarding_complete === false) {
+        return NextResponse.redirect(new URL("/onboarding", request.url));
+      }
     }
   }
 

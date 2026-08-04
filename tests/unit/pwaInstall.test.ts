@@ -127,3 +127,20 @@ test("first-run comes before the intake questionnaire, not after", () => {
   assert.match(mw, /pathname === "\/onboarding" \|\| pathname === "\/set-password" \|\| pathname === "\/welcome"/);
   assert.match(read("src/app/(app)/welcome/WelcomeClient.tsx"), /needsIntake \? "\/onboarding" : "\/home"/);
 });
+
+test("a first-time client reaches first-run however they signed in", () => {
+  // The one-tap link lands on /welcome. But links expire, and the invite email
+  // carries a temporary password as a fallback — someone signing in that way
+  // skipped first-run entirely: never asked to choose a password, never offered
+  // the home-screen install. The flag decides, not the route they arrived by.
+  const mw = read("src/middleware.ts");
+  assert.match(mw, /first_login_completed === false/);
+  assert.match(mw, /NextResponse\.redirect\(new URL\("\/welcome", request\.url\)\)/);
+  // First run comes BEFORE the intake questionnaire.
+  assert.ok(
+    mw.indexOf('new URL("/welcome"') < mw.indexOf('new URL("/onboarding"'),
+    "password and install come before goals and injury history",
+  );
+  // And it stays one round trip — middleware runs on every navigation.
+  assert.match(mw, /client_app_settings\(first_login_completed\)/);
+});
