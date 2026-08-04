@@ -35,6 +35,7 @@ const TRAINER_NAV: SidebarItem[] = [
       { href: "/library/exercises", label: "Exercise Library", icon: "ti-barbell" },
       { href: "/library/workouts", label: "Workouts", icon: "ti-list-check" },
       { href: "/library/programs", label: "Programs", icon: "ti-trophy" },
+      { href: "/recipes", label: "Recipes", icon: "ti-chef-hat" },
     ],
   },
   { href: "/nutrition", label: "Nutrition", icon: "ti-salad" },

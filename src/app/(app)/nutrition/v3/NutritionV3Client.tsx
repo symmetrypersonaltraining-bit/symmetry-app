@@ -1253,6 +1253,18 @@ export default function NutritionV3Client(props: Props) {
         @keyframes v3fadeup { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
       `}</style>
 
+      {/* Recipes live next to nutrition, not in the tab bar — a seventh tab
+          would shrink the six people use every day. */}
+      <div className="px-4 pt-3">
+        <a href="/recipes" className="flex items-center gap-2 px-3 py-2 rounded-xl"
+          style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", textDecoration: "none" }}>
+          <span style={{ fontSize: 15 }}>🍳</span>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--brand-text)" }}>Recipes</span>
+          <span style={{ fontSize: 11, color: "var(--brand-text-secondary)" }}>build one, or cook from the shared library</span>
+          <span style={{ marginLeft: "auto", color: "var(--brand-text-secondary)" }}>›</span>
+        </a>
+      </div>
+
       {/* date nav */}
       <div className="relative flex items-center justify-center gap-1 px-4 pt-3">
         <button onClick={() => setSelectedDate(shiftDateStr(selectedDate, -1))} aria-label="previous day" className="w-11 h-10 flex items-center justify-center rounded-xl" style={{ color: "var(--brand-text-secondary)", fontSize: 20 }}>‹</button>
