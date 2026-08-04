@@ -148,3 +148,35 @@ test("prefill matches the rep target before falling back to the last session", (
   // Never overwrite what someone already typed or logged.
   assert.match(block, /if \(row\.done \|\| !\(row\.weight === '' \|\| row\.weight == null\)\) return row;/);
 });
+
+/**
+ * THE NAME OF THE MOVEMENT CANNOT BE THE THING THAT DISAPPEARS.
+ *
+ * Gerard, 2026-08-04, mid-session screenshot: sets, Track chips, 11,325 lb
+ * moved, a notes box — and nowhere on the screen what exercise it was.
+ *
+ * Nothing was missing from the data. The header sat inside a `flex-shrink: 1`
+ * `min-h-0` scroll box, which is allowed to collapse to zero height when the
+ * pinned sets and footer take the space. On his phone it did, and the name went
+ * with it: scrolled inside a region with no height, so there was nothing left
+ * to scroll to.
+ *
+ * The layout of this screen has been rebalanced twice already (7/31 Gerard, 8/1
+ * Dustin), so the rule is pinned in a test: the name is pinned like the sets,
+ * and only the meta pills and cue are allowed to scroll.
+ */
+
+test("the exercise name is pinned above the shrinkable region, not inside it", () => {
+  const scroll = SRC.indexOf('className="min-h-0 overflow-y-auto"');
+  const name = SRC.indexOf("{currentExercise.exercises?.name || \"Exercise\"}");
+  assert.ok(scroll > -1 && name > -1);
+  assert.ok(name < scroll, "the name must render BEFORE the shrinkable scroll box, not within it");
+  const pinned = SRC.slice(SRC.indexOf('<div className="px-5 flex-shrink-0"'), name);
+  assert.match(pinned, /flexShrink: 0/, "its container must refuse to compress");
+});
+
+test("a very long movement name is clamped, not unbounded", () => {
+  // Unbounded height is why it was put in the scroll box in the first place —
+  // clamping is what lets it be pinned safely.
+  assert.match(SRC, /WebkitLineClamp: 2/);
+});

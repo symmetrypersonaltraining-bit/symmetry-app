@@ -1802,13 +1802,22 @@ export default function WorkoutLogger({
 
             Nothing here is conditioned on the keyboard. Keyboard-conditioned
             layout has caused roughly twenty bugs in this file and is banned. */}
-        <div className="min-h-0 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch", flexGrow: 0, flexShrink: 1, flexBasis: "auto" }}>
+        {/* PINNED, not scrollable. Gerard, 8/4: a screenshot mid-session with
+            NO EXERCISE NAME anywhere — sets, Track chips, notes, but nothing
+            saying what he was lifting.
 
-        {/* Exercise header (V6 micro-pill) — one compact row: small video thumb + name +
-            inline History/Swap. Meta as micro-pills, cue collapsed behind an info toggle to
-            keep the header short so all sets sit above the keyboard. NO keyboard-conditioned
-            layout — nothing here moves when the keyboard opens. */}
-        <div className="px-5 mb-3 flex-shrink-0">
+            Nothing was missing from the data. This header used to live inside
+            the shrinkable scroll box below, and flex-shrink:1 + min-h-0 lets a
+            box collapse to ZERO when the pinned sets and footer want the space.
+            On a shorter phone it did, and the name went with it — scrolled into
+            a region with no height, so there was nothing to scroll.
+
+            The name is the single thing this screen exists to tell you, so it
+            gets the same treatment as the sets: pinned, never compressed. Only
+            the meta pills and cue stay scrollable, which is what the 7/31 fix
+            actually needed. A very long name clamps to two lines rather than
+            growing without bound — the reason it was put in the scroll box. */}
+        <div className="px-5 flex-shrink-0" style={{ flexShrink: 0 }}>
           <p className="text-[11px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: "var(--brand-primary)" }}>
             {currentSection.client_facing_name || currentSection.internal_name}
           </p>
@@ -1831,7 +1840,10 @@ export default function WorkoutLogger({
                 </button>
               );
             })()}
-            <h2 className="text-xl font-bold text-white leading-tight flex-1 min-w-0">{currentExercise.exercises?.name}</h2>
+            <h2 className="text-xl font-bold text-white leading-tight flex-1 min-w-0"
+              style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+              {currentExercise.exercises?.name || "Exercise"}
+            </h2>
             <button onClick={() => setHistoryExercise({ id: currentExercise.id, exId: currentExercise.exercises?.id, name: currentExercise.exercises?.name })}
               className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }} title="View history">
@@ -1843,6 +1855,15 @@ export default function WorkoutLogger({
               <i className="ti ti-switch-horizontal text-base" style={{ color: "#e0a83e" }} />
             </button>
           </div>
+        </div>
+
+        <div className="min-h-0 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch", flexGrow: 0, flexShrink: 1, flexBasis: "auto" }}>
+
+        {/* Exercise header (V6 micro-pill) — one compact row: small video thumb + name +
+            inline History/Swap. Meta as micro-pills, cue collapsed behind an info toggle to
+            keep the header short so all sets sit above the keyboard. NO keyboard-conditioned
+            layout — nothing here moves when the keyboard opens. */}
+        <div className="px-5 mb-3 flex-shrink-0">
           <div className="flex gap-1.5 mt-2 flex-wrap items-center">
             {currentExercise.volume_value && (
               <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>{currentExercise.volume_value}</span>
@@ -2095,6 +2116,12 @@ export default function WorkoutLogger({
   // \u2500\u2500\u2500 STANDARD VIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   return (
     <div style={{ background: "var(--brand-bg)", minHeight: "100vh", paddingBottom: 96 }}>
+      {/* "Can we make phone stay open during session?" (7/8) — the wake lock was
+          wired to session mode only, so the day-card view, which is how most
+          people actually log, still went dark between sets. The logger being
+          open at all is the signal. Auto-released by the browser the moment the
+          tab is hidden; no-ops where unsupported. */}
+      <WakeLock active />
       {historyExercise && (
         <ExerciseHistory exerciseId={historyExercise.id} exId={historyExercise.exId} clientId={clientId} exerciseName={historyExercise.name}
           onClose={() => setHistoryExercise(null)}

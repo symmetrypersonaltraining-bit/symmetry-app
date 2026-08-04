@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isPeakWeekLocked } from "@/lib/peak-week";
+import { moveScheduledWorkout, MOVE_BACK_DAYS } from "@/lib/moveWorkout";
 
 export type DaySheetWorkout = { id: string; dayId: string; date: string; label: string; status: string };
 
@@ -72,12 +73,15 @@ export default function WorkoutDaySheet({
   const [notice, setNotice] = useState<string | null>(null);
   const wheelRef = useRef<HTMLDivElement | null>(null);
 
+  // Seven days back, same window the schedule board uses. A session logged on
+  // the wrong day is always in the past — a forward-only wheel could not fix
+  // the one case people actually hit.
   const dates: string[] = [];
-  for (let i = 0; i <= 56; i++) dates.push(addDays(today, i));
+  for (let i = -MOVE_BACK_DAYS; i <= 56; i++) dates.push(addDays(today, i));
 
   useEffect(() => {
     if (!moving || !wheelRef.current) return;
-    const start = moving.date >= today ? moving.date : today;
+    const start = dates.includes(moving.date) ? moving.date : today;
     setSel(start);
     const idx = Math.max(0, dates.indexOf(start));
     const el = wheelRef.current;
@@ -100,14 +104,14 @@ export default function WorkoutDaySheet({
     if (!moving || saving) return;
     const target = sel;
     if (target === moving.date) { setMoving(null); return; }
-    if (target < today) { setNotice("Can't move a workout into the past."); return; }
+    if (target < addDays(today, -MOVE_BACK_DAYS)) { setNotice("Can't move a workout more than a week back."); return; }
     if (isLockedHere(target) || isLockedHere(moving.date)) { setNotice("Peak Week workouts are locked."); return; }
     setSaving(true);
     setNotice(null);
     try {
       const supabase: any = createClient();
-      const { error } = await supabase.from("scheduled_workouts").update({ scheduled_date: target }).eq("id", moving.id);
-      if (error) throw error;
+      const failure = await moveScheduledWorkout(supabase, { id: moving.id }, target);
+      if (failure) throw new Error(failure);
       if (onMoved) onMoved(moving.id, target);
       setMoving(null);
       onClose();
@@ -204,7 +208,12 @@ export default function WorkoutDaySheet({
                       >
                         {isToday ? "▶ Start workout" : done ? "View / edit log" : "✓ Log this workout"}
                       </Link>
-                      {!isLockedHere(w.date) && !done ? (
+                      {/* Completed sessions move too. A workout you add yourself is
+                          written completed, so hiding Move for `done` hid it for
+                          exactly the workouts people most want to move — and a
+                          session logged on the wrong day is the whole use case.
+                          The schedule board dropped this rule on 1 Aug. */}
+                      {!isLockedHere(w.date) ? (
                         <button
                           onClick={() => setMoving(w)}
                           style={{

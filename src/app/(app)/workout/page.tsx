@@ -54,12 +54,20 @@ export default async function WorkoutPage(props: {
   // Get active program phases/days
   let allPhases: { id: string; label: string; days: { id: string; label: string }[] }[] = [];
   if (clientId) {
-    const { data: assignment } = await supabase
+    // maybeSingle() ERRORS when more than one row matches, and 25 of 35 clients
+    // have more than one active assignment (Sharon and Sara have four). For all
+    // of them this select returned nothing, allPhases stayed empty, and the page
+    // fell through to the "no program" card — which is also the branch that does
+    // not render the schedule board, so those clients had no way to move a
+    // workout at all on any day they had none scheduled. Newest assignment wins.
+    const { data: assignments } = await supabase
       .from("program_assignments")
-      .select("program_id, programs(name, phases(id, label, position, days(id, label, position)))")
+      .select("program_id, created_at, programs(name, phases(id, label, position, days(id, label, position)))")
       .eq("client_id", clientId)
       .eq("active", true)
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const assignment = (assignments || [])[0] ?? null;
     if (assignment) {
       const prog = (assignment as any).programs;
       allPhases = (prog?.phases || [])

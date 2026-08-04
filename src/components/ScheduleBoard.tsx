@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isPeakWeekLocked } from "@/lib/peak-week";
+import { moveScheduledWorkout } from "@/lib/moveWorkout";
 
 export interface BoardWorkout {
   id: string;
@@ -172,8 +173,13 @@ export default function ScheduleBoard({
     setWorkouts((prev) => prev.map((x) => (x.id === id ? { ...x, date: toDate } : x)));
     try {
       const supabase: any = createClient();
-      const { error } = await supabase.from("scheduled_workouts").update({ scheduled_date: toDate }).eq("id", id);
-      if (error) throw error;
+      // Shared with the day sheet (src/lib/moveWorkout.ts). It also carries
+      // workout_logs.log_date, which this surface has been leaving behind since
+      // completed workouts became movable — the streak and the consistency
+      // calendar read log_date, so without it the app disagreed with itself
+      // about which day the session happened on.
+      const failure = await moveScheduledWorkout(supabase, { id }, toDate);
+      if (failure) throw new Error(failure);
       flash("Moved ✓");
       router.refresh();
     } catch {
