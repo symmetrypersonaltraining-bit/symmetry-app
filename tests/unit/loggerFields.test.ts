@@ -180,3 +180,53 @@ test("a very long movement name is clamped, not unbounded", () => {
   // clamping is what lets it be pinned safely.
   assert.match(SRC, /WebkitLineClamp: 2/);
 });
+
+/**
+ * TWO DEFECTS THAT SURVIVED BEING "RESOLVED".
+ *
+ * Both were closed without a fix, and both are Troy's, from 29 June:
+ *
+ *   "Need to be able to click the log/check button on exercise to unlog it.
+ *    Tracking variables need to stay editable even once clicked done"
+ *
+ * The un-log button existed and every press was a lie — it flipped local state
+ * only, so set_logs kept completed=true with the old weight and reps. It looked
+ * like it worked because the localStorage draft overrode `done` on rehydrate,
+ * on that phone, until the draft expired.
+ *
+ * And "stay editable when done" was the exact opposite of the code: eleven
+ * `disabled={setEntry.done}` props locked every field the moment a set was
+ * logged, so the only way to correct 135 to 155 was to un-log first — which is
+ * what he was already doing and asked not to have to do.
+ */
+
+test("un-logging a set reaches the database", () => {
+  assert.match(SRC, /async function unlogSet\(peId: string, si: number\)/);
+  assert.match(SRC, /\.update\(\{ completed: false \}\)/);
+  assert.match(SRC, /\.eq\("set_number", si \+ 1\)/);
+  // Every un-log path goes through it — three call sites, two surfaces.
+  assert.doesNotMatch(SRC, /updateSet\((?:pe|currentExercise)\.id, si, "done", false\)/,
+    "a local-state-only un-log is the bug");
+  const calls = SRC.match(/unlogSet\((?:pe|currentExercise)\.id, si\)/g) || [];
+  assert.ok(calls.length >= 3, `expected 3 un-log call sites, found ${calls.length}`);
+});
+
+test("a logged set stays editable, and the correction is saved", () => {
+  assert.doesNotMatch(SRC, /disabled=\{setEntry\.done\}/, "this is what locked the fields");
+  // Editing a done set re-fires logSet, which is an idempotent upsert.
+  const blurs = SRC.match(/if \(setEntry\.done\) logSet\(/g) || [];
+  assert.ok(blurs.length >= 8, `every field must re-save on blur, found ${blurs.length}`);
+  // The green "done" styling is a separate ternary and must survive.
+  assert.match(SRC, /setEntry\.done \? "#22c55e"/);
+});
+
+test("the day-card view has a demo to tap, like the session view", () => {
+  // "remove the watch demo button we can just click on the actual video" was
+  // done in the session view only; this card had no video at all.
+  const dayCard = SRC.slice(SRC.indexOf("SESSION MODE") + 100);
+  assert.match(dayCard, /setVideoUrl\(pe\.exercises!\.video_url!\)/);
+  assert.match(dayCard, /pe\.exercises\.video_status !== "dead"/, "a dead demo still gets no play button");
+  // And the lightbox is actually mounted here, or the button opens nothing.
+  const mounts = SRC.match(/\{videoUrl && <VideoModal/g) || [];
+  assert.equal(mounts.length, 2, "one lightbox per surface");
+});

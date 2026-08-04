@@ -1228,6 +1228,27 @@ export default function WorkoutLogger({
     await persistFields(peId, exerciseId, nf);
   };
 
+  /**
+   * Take a set back off the board — in the database, not just on screen.
+   *
+   * Troy, 6/29: "Need to be able to click the log/check button on exercise to
+   * unlog it." The button existed and worked, and every un-log was a lie: it
+   * flipped local state only, so set_logs kept completed = true with the old
+   * weight and reps. It survived on that phone because the localStorage draft
+   * overrode `done` on rehydrate — and nowhere else. Open the same workout on
+   * another device, or after the draft expired, and the set was logged again.
+   */
+  async function unlogSet(peId: string, si: number) {
+    updateSet(peId, si, "done", false);
+    if (!workoutLogId) return;   // never written, so nothing to undo
+    try {
+      await supabase.from("set_logs").update({ completed: false })
+        .eq("workout_log_id", workoutLogId)
+        .eq("prescribed_exercise_id", peId)
+        .eq("set_number", si + 1);
+    } catch { /* the box is already clear; the next log rewrites the row */ }
+  }
+
   async function logSet(peId: string, si: number) {
     setSaving(true);
     try {
@@ -1925,18 +1946,18 @@ export default function WorkoutLogger({
             <div key={si} className="flex items-center gap-1.5 mb-1">
               <div className="w-8 text-center text-sm font-bold"
                 style={{ color: setEntry.done ? "#22c55e" : "rgba(255,255,255,0.25)" }}>S{si + 1}</div>
-              {xFields.includes("weight") && (<input type="text" value={setEntry.weight} onFocus={focusScroll} onBlur={focusBlur}
+              {xFields.includes("weight") && (<input type="text" value={setEntry.weight} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); }}
                 onChange={e => updateSet(currentExercise.id, si, "weight", e.target.value)}
-                disabled={setEntry.done} placeholder=""
+                /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="decimal" />)}
-              {xFields.includes("reps") && (<input type="text" value={setEntry.reps} onFocus={focusScroll} onBlur={focusBlur}
+              {xFields.includes("reps") && (<input type="text" value={setEntry.reps} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); }}
                 onChange={e => updateSet(currentExercise.id, si, "reps", e.target.value)}
-                disabled={setEntry.done} placeholder=""
+                /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
@@ -1944,33 +1965,33 @@ export default function WorkoutLogger({
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="numeric" />)}
               {xFields.includes("time") && (<input type="text" value={setEntry.time} readOnly
-                onClick={() => { if (!setEntry.done) setTimePick({ peId: currentExercise.id, si }); }}
-                disabled={setEntry.done} placeholder="0:00"
+                onClick={() => setTimePick({ peId: currentExercise.id, si })}
+                /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder="0:00"
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="decimal" />)}
-              {xFields.includes("speed") && (<input type="text" value={setEntry.speed} onFocus={focusScroll} onBlur={focusBlur}
+              {xFields.includes("speed") && (<input type="text" value={setEntry.speed} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); }}
                 onChange={e => updateSet(currentExercise.id, si, "speed", e.target.value)}
-                disabled={setEntry.done} placeholder=""
+                /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="decimal" />)}
-              {xFields.includes("hr") && (<input type="text" value={setEntry.hr} onFocus={focusScroll} onBlur={focusBlur}
+              {xFields.includes("hr") && (<input type="text" value={setEntry.hr} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); }}
                 onChange={e => updateSet(currentExercise.id, si, "hr", e.target.value)}
-                disabled={setEntry.done} placeholder=""
+                /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
                 style={{
                   background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="numeric" />)}
-              <button onClick={() => { if (setEntry.done) { updateSet(currentExercise.id, si, "done", false); } else { fx("log"); logSet(currentExercise.id, si); } }}
+              <button onClick={() => { if (setEntry.done) { unlogSet(currentExercise.id, si); } else { fx("log"); logSet(currentExercise.id, si); } }}
                 disabled={saving}
                 data-fx-own
                 className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -2122,6 +2143,7 @@ export default function WorkoutLogger({
           open at all is the signal. Auto-released by the browser the moment the
           tab is hidden; no-ops where unsupported. */}
       <WakeLock active />
+      {videoUrl && <VideoModal url={videoUrl} onClose={() => setVideoUrl(null)} />}
       {historyExercise && (
         <ExerciseHistory exerciseId={historyExercise.id} exId={historyExercise.exId} clientId={clientId} exerciseName={historyExercise.name}
           onClose={() => setHistoryExercise(null)}
@@ -2229,6 +2251,22 @@ export default function WorkoutLogger({
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                      {/* The "watch demo" button was removed in favour of tapping
+                          the video itself — but only the session view ever got a
+                          video to tap. This card had neither. Same rule as there:
+                          a demo known to be dead gets no play button. */}
+                      {pe.exercises?.video_url && pe.exercises.video_status !== "dead" && (() => {
+                        const __v = __ytId(pe.exercises.video_url);
+                        return (
+                          <button onClick={e => { e.stopPropagation(); setVideoUrl(pe.exercises!.video_url!); }}
+                            aria-label="Play exercise demo"
+                            style={{ position: "relative", width: 46, height: 30, flexShrink: 0, borderRadius: 7, overflow: "hidden", padding: 0, border: "none", cursor: "pointer", backgroundColor: "#111", backgroundImage: __v ? ("url(https://img.youtube.com/vi/" + __v + "/hqdefault.jpg)") : "none", backgroundSize: "cover", backgroundPosition: "center" }}>
+                            <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 18, height: 18, borderRadius: "50%", background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <span style={{ width: 0, height: 0, borderTop: "4px solid transparent", borderBottom: "4px solid transparent", borderLeft: "7px solid #fff", marginLeft: 1 }} />
+                            </span>
+                          </button>
+                        );
+                      })()}
                       <button onClick={e => { e.stopPropagation(); setHistoryExercise({ id: pe.id, exId: pe.exercises?.id, name: pe.exercises?.name }); }}
                         className="w-8 h-8 rounded-lg flex items-center justify-center"
                         style={{ background: "var(--brand-card)" }} title="View history">
@@ -2258,7 +2296,7 @@ export default function WorkoutLogger({
                       &ldquo;{pe.cue}&rdquo;
                     </p>
                   )}
-                  {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} disabled={setEntry.done} placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} disabled={setEntry.done} placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} disabled={setEntry.done} placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { updateSet(pe.id, si, "done", false); } else { logSet(pe.id, si); } }} disabled={saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="flex items-center gap-1.5 mb-1 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["weight","Weight"],["reps","Reps"],["time","Time"],["each_side","Each side"]] as [string,string][]).map(([f, lab]) => { const on = sFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? sFields.filter((x: string) => x !== f) : [...sFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div><div className="grid mb-2" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
+                  {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { unlogSet(pe.id, si); } else { logSet(pe.id, si); } }} disabled={saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="flex items-center gap-1.5 mb-1 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["weight","Weight"],["reps","Reps"],["time","Time"],["each_side","Each side"]] as [string,string][]).map(([f, lab]) => { const on = sFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? sFields.filter((x: string) => x !== f) : [...sFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div><div className="grid mb-2" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
                     <div />
                     {sFields.includes("weight") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>{isPerHandLoad(pe) ? "LBS/HAND" : "LBS"}</div>}
                     {sFields.includes("reps") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>REPS</div>}
@@ -2272,8 +2310,8 @@ export default function WorkoutLogger({
                         {si + 1}
                       </div>
                       {sFields.includes("weight") && (<input type="text" value={setEntry.weight}
-                        onChange={e => updateSet(pe.id, si, "weight", e.target.value)}
-                        disabled={setEntry.done} placeholder={'\u2014'}
+                        onChange={e => updateSet(pe.id, si, "weight", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }}
+                        /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={'\u2014'}
                         className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
@@ -2281,8 +2319,8 @@ export default function WorkoutLogger({
                           border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
                         }} inputMode="decimal" />)}
                       {sFields.includes("reps") && (<input type="text" value={setEntry.reps}
-                        onChange={e => updateSet(pe.id, si, "reps", e.target.value)}
-                        disabled={setEntry.done} placeholder={'\u2014'}
+                        onChange={e => updateSet(pe.id, si, "reps", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }}
+                        /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={'\u2014'}
                         className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
@@ -2290,15 +2328,15 @@ export default function WorkoutLogger({
                           border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
                         }} inputMode="numeric" />)}
                       {sFields.includes("time") && (<input type="text" value={setEntry.time} readOnly
-                        onClick={e => { e.stopPropagation(); if (!setEntry.done) setTimePick({ peId: pe.id, si }); }}
-                        disabled={setEntry.done} placeholder={'0:00'}
+                        onClick={e => { e.stopPropagation(); setTimePick({ peId: pe.id, si }); }}
+                        /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={'0:00'}
                         className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
                           background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
                           color: setEntry.done ? "#22c55e" : "var(--brand-text)",
                           border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
                         }} inputMode="decimal" />)}
-                      <button onClick={e => { e.stopPropagation(); if (setEntry.done) { updateSet(pe.id, si, "done", false); } else { logSet(pe.id, si); } }}
+                      <button onClick={e => { e.stopPropagation(); if (setEntry.done) { unlogSet(pe.id, si); } else { logSet(pe.id, si); } }}
                         disabled={saving}
                         className="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
                         style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}>
