@@ -77,19 +77,26 @@ depends on it.
 
 - `codemagic.yaml` → workflow `android-debug`, manual trigger, unsigned debug APK,
   emailed to Dustin. There is **no Play Store listing**.
-- `ios-release-workflow.yaml` is written and staged but **inert** — Codemagic only
-  reads `codemagic.yaml`. It needs an active Apple Developer account, an App Store
-  Connect API key, and the app registered under `com.symmetry.app`.
+- iOS: the workflow existed but sat in `ios-release-workflow.yaml`, which
+  **Codemagic never reads** — it only reads `codemagic.yaml`. A staged file is an
+  inert file. **Merged in 2026-08-04**; the workflow is now selectable.
 
-**This is the real blocker.** Apple Health data cannot be read without an iOS
-build, and an iOS build cannot exist without a paid Apple Developer account
-(~$99/yr) and a TestFlight or App Store release. Health Connect on Android is
-reachable from a sideloaded APK for testing, but **Google Play requires the Health
-apps declaration form** before a Health-Connect app can be listed publicly, which
-matters the moment we stop sideloading.
+**CORRECTED 2026-08-04.** This section previously called the Apple Developer
+account the blocker. It is not — Dustin: *"it is active just didn't complete the
+mobile app n distribute yet."* The account exists; the app was simply never built
+and distributed. What remains is three pieces of App Store Connect setup and a
+build run, written up in `docs/IOS-RELEASE-CHECKLIST.md`.
 
-Sequence implied by this: **Android/Health Connect first, Apple second**, and
-Apple only after the developer account exists.
+Apple Health still cannot be read until there is an iOS build on a phone, so
+TestFlight is a genuine prerequisite — but it is now a day's work, not a
+purchasing decision.
+
+Android: Health Connect is reachable from a sideloaded debug APK for testing, but
+**Google Play requires the Health apps declaration form** before a Health-Connect
+app can be listed publicly, which matters the moment we stop sideloading.
+
+Sequence: **Android/Health Connect first** (no store review needed to test),
+**Apple second**, and Apple is no longer waiting on anything but a build.
 
 ### 2.4 What we already know about our own client base
 
@@ -436,7 +443,7 @@ be in place first, and neither is something I can do.
 | 2 | Health Connect via Capacitor plugin, Android APK, real data end to end | Phase 1 |
 | 3 | Dedupe rules (§8) + steps on Progress + "trained elsewhere" on the client profile | Phase 2, real data |
 | 4 | Garmin webhooks | Garmin approval |
-| 5 | Apple Health | Apple Developer account, App Store or TestFlight |
+| 5 | Apple Health | An iOS build on a phone — see `docs/IOS-RELEASE-CHECKLIST.md`. Account is active. |
 | 6 | Food: CSV import first; aggregator only if D4 says live sync | D4 |
 
 Phase 0 costs nothing and unblocks two long queues. It should start whether or
@@ -452,9 +459,10 @@ not the rest does.
   alive on 2026-08-04; check commit dates before committing to one.
 - Aggregator pricing. All of them quote per connected user and none publish
   numbers publicly. Somebody has to ask.
-- Whether the studio's Apple Developer account exists or has lapsed —
-  `ios-release-workflow.yaml` says *"When the Apple Developer account is ACTIVE"*,
-  which implies it is not.
+- ~~Whether the studio's Apple Developer account exists or has lapsed.~~
+  **ANSWERED 8/4: it is active.** The app was never completed and distributed,
+  which is a different and much smaller problem — see
+  `docs/IOS-RELEASE-CHECKLIST.md`.
 
 ---
 
