@@ -47,6 +47,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/draco/") ||
     pathname.startsWith("/anatomy-preview") ||
     pathname === "/privacy" ||
+    // /install is the QR target. A client scans it while signed OUT — that is
+    // the entire scenario — so a login redirect here defeats the purpose.
+    pathname === "/install" ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js" ||
     pathname.startsWith("/icons/") ||

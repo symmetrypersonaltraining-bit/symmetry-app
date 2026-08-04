@@ -109,3 +109,34 @@ test("sign-in fields are 16px, so iOS does not zoom the page on focus", () => {
     );
   }
 });
+
+/**
+ * THE QR CODE FOR EVERYBODY.
+ *
+ * The invite QR is per-client and only rendered when `!client.auth_user_id` —
+ * a client who has never had a login. Every client already using the app shows
+ * a Reset-credentials button instead, which changes their password. So "show
+ * them how to install it" had no answer for the ~35 people who most needed to
+ * hear it. /install is public, permanent, identical for everyone, and safe to
+ * print.
+ */
+test("/install is reachable without signing in", () => {
+  const mw = read("src/middleware.ts");
+  assert.ok(mw.includes('pathname === "/install"'), "the QR target must not redirect to /login");
+  assert.ok(
+    mw.indexOf('pathname === "/install"') < mw.indexOf('NextResponse.redirect(new URL("/login"'),
+    "the allowance has to sit above the redirect or it never runs",
+  );
+});
+
+test("the install page carries both halves: instructions and the QR itself", () => {
+  const src = read("src/app/install/page.tsx");
+  assert.match(src, /Add to Home Screen/, "iOS has no install API; instructions are the only route");
+  assert.match(src, /InstallPrompt/, "Android gets the real one-tap install");
+  assert.match(src, /QRCode\.toDataURL/, "the page has to be able to show its own QR");
+  assert.match(src, /\/install"/, "the QR must encode the install URL, not the bare origin");
+});
+
+test("settings points at it, or nobody will ever find it", () => {
+  assert.match(read("src/app/(app)/settings/SettingsClient.tsx"), /href="\/install"/);
+});

@@ -302,6 +302,26 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
         </section>
         )}
 
+      {/* Where the install QR lives. Dustin asked "where do I find the qr code
+          to have clients download this" — the per-client one only appears on a
+          client who has never had a login, so this is the one that works for
+          everybody, including the clients already using the app. */}
+      <section>
+        <p className="section-header">Getting clients set up</p>
+        <a href="/install" className="card p-4 flex items-center gap-3" style={{ textDecoration: "none" }}>
+          <i className="ti ti-qrcode text-2xl" style={{ color: "var(--brand-primary)" }} />
+          <span className="flex-1 min-w-0">
+            <span className="block text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Install QR code</span>
+            <span className="block text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
+              {isTrainer && !isInClientMode
+                ? "Show this to a client and they scan it — works for new and existing clients alike."
+                : "Put Symmetry on another phone, or add it to your home screen."}
+            </span>
+          </span>
+          <i className="ti ti-chevron-right" style={{ color: "var(--brand-text-secondary)" }} />
+        </a>
+      </section>
+
       <section>
         <p className="section-header">About</p>
         <div className="card p-4 space-y-3">
