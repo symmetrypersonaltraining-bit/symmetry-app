@@ -2084,6 +2084,24 @@ export default function NutritionV3Client(props: Props) {
         onOpenFoodSearch={() => openSheet({ kind: "foodsearch", target: "adjust", rowKey })}
         onClose={closeAllSheets}
         onBack={backSheet}
+        onSaveToPlan={async (clean) => {
+          if (!row.chosen?.id) return;
+          try {
+            const res = await fetch("/api/nutrition/plan-edit", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ mealId: row.chosen.id, overrides: clean }),
+            });
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json?.ok) { toast.error((json && json.error) || "Couldn't save that to your plan"); return; }
+            closeAllSheets();
+            toast.success(json.cloned
+              ? "Saved to your plan 📌 — this is your version now, Dustin's is in your history"
+              : "Saved to your plan 📌", { duration: 4000 });
+            setTimeout(() => { try { window.location.reload(); } catch { /* noop */ } }, 1400);
+          } catch {
+            toast.error("Network error — check your connection and try again");
+          }
+        }}
         onSave={async (clean) => {
           const keepFlags: Partial<ItemOverrides> = {};
           if (existingOv.__ord != null) keepFlags.__ord = existingOv.__ord;
@@ -2430,13 +2448,15 @@ export default function NutritionV3Client(props: Props) {
 // ---------------------------------------------------------------------------
 
 function PlanAdjustSheet({
-  meal, existingOv, loggedNow, onOpenFoodSearch, onSave, onClose, onBack,
+  meal, existingOv, loggedNow, onOpenFoodSearch, onSave, onSaveToPlan, onClose, onBack,
 }: {
   meal: PlanMeal;
   existingOv: ItemOverrides;
   loggedNow: boolean;
   onOpenFoodSearch: () => void;
   onSave: (clean: ItemOverrides) => Promise<void>;
+  /** Same edit, kept for good — rewrites the meal in the plan itself. */
+  onSaveToPlan: (clean: ItemOverrides) => Promise<void>;
   onClose: () => void;
   onBack: () => void;
 }) {
@@ -2515,8 +2535,33 @@ function PlanAdjustSheet({
         className="w-full py-3 rounded-2xl text-sm font-bold text-white"
         style={{ background: "var(--brand-primary)" }}
       >
-        {saving ? "Saving…" : "Save — totals update ✓"}
+        {saving ? "Saving…" : "Save for today — totals update ✓"}
       </button>
+      {/* The edit that STICKS. Until now every adjustment was a one-day patch:
+          eat 3/4 cup of rice instead of 1/2 and you typed it again tomorrow,
+          and the day after. Jerry re-entered egg whites every morning for a
+          fortnight before asking for them to be put in the plan.
+          Editing the trainer's plan clones it first — his version is archived,
+          never overwritten, and stays restorable in the timeline. */}
+      <button
+        onClick={async () => {
+          setSaving(true);
+          try {
+            const clean: ItemOverrides = {};
+            for (const k of Object.keys(draft)) if (k !== "__added") clean[k] = draft[k];
+            if (adds.length) clean.__added = adds;
+            await onSaveToPlan(clean);
+          } finally { setSaving(false); }
+        }}
+        disabled={saving}
+        className="w-full mt-2 py-3 rounded-2xl text-sm font-bold"
+        style={{ border: "1px solid var(--brand-primary)", color: "var(--brand-primary)", background: "transparent" }}
+      >
+        📌 Save to my plan — every day
+      </button>
+      <p className="text-center mt-2" style={{ fontSize: 11, color: "var(--brand-text-secondary)", lineHeight: 1.4 }}>
+        Keeps this meal the way you just set it. Dustin&rsquo;s original plan is saved to your history, not overwritten.
+      </p>
     </Sheet>
   );
 }
