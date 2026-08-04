@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
+import KeyboardSafeArea from "@/components/KeyboardSafeArea";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -99,8 +100,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      className="min-h-screen flex flex-col"
+    // The keyboard covering the password field and the Sign in button is the
+    // difference between a client getting into the app and giving up on it.
+    <KeyboardSafeArea
+      className="flex flex-col"
       style={{ background: "#0F4C81" }}
     >
       {/* Top branding */}
@@ -119,8 +122,11 @@ export default function LoginPage() {
 
       {/* Card */}
       <div
-        className="flex-1 rounded-t-3xl px-6 pt-8 pb-10"
-        style={{ background: "#EDF2F7" }}
+        className="rounded-t-3xl px-6 pt-8 pb-10"
+        // flexShrink 0 so the card keeps its full natural height inside the
+        // shortened box and the whole thing scrolls, instead of the card being
+        // squeezed and the button clipped away with nowhere to scroll to.
+        style={{ background: "#EDF2F7", flex: "1 0 auto" }}
       >
         {magicSent ? (
           <div className="text-center py-8">
@@ -203,11 +209,14 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
-                  className="w-full rounded-lg px-4 py-3 text-sm border"
+                  className="w-full rounded-lg px-4 py-3 border"
                   style={{
                     background: "white",
                     borderColor: "#C8D8EC",
                     color: "#0D1B2E",
+                    // 16px minimum, or iOS zooms the page the moment the field is
+                    // focused — the keyboard problem in a different costume.
+                    fontSize: 16,
                   }}
                 />
               </div>
@@ -226,11 +235,14 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter password"
                     required
-                    className="w-full rounded-lg px-4 py-3 text-sm border"
+                    className="w-full rounded-lg px-4 py-3 border"
                     style={{
                       background: "white",
                       borderColor: "#C8D8EC",
                       color: "#0D1B2E",
+                      // 16px minimum, or iOS zooms the page the moment the field is
+                      // focused — the keyboard problem in a different costume.
+                      fontSize: 16,
                     }}
                   />
                 </div>
@@ -276,6 +288,6 @@ export default function LoginPage() {
           </>
         )}
       </div>
-    </div>
+    </KeyboardSafeArea>
   );
 }

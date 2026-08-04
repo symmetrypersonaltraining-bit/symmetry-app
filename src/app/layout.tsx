@@ -39,9 +39,24 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   themeColor: "#0F4C81",
-  // Keyboard OVERLAYS content instead of resizing/scrolling it, so the workout logger's
-  // pinned sets never move when the keyboard opens. Chrome/Android; harmless elsewhere.
-  interactiveWidget: "overlays-content",
+  // The keyboard shrinks the VISUAL viewport only — which is the browser default,
+  // and the behaviour every ordinary form in this app needs: Chrome pans the page
+  // so the field you just tapped stays visible.
+  //
+  // This said "overlays-content" from 7d7cc8f (11 Jul) until 04 Aug. That was one
+  // part of an approach to the workout logger which was ABANDONED — the
+  // visualViewport listener it shipped with was ripped out in 4cb50a1 (scroll
+  // loop) and the scrollIntoView in 48d246f. The logger now holds its layout with
+  // useStableViewportHeight, which works whether or not the viewport resizes and
+  // does not depend on this line at all (it can't — inside the native WebView the
+  // activity's windowSoftInputMode overrides the meta tag anyway).
+  //
+  // So the setting bought the logger nothing and cost every other screen the
+  // browser's own scroll-the-focused-field-into-view. On the sign-in screen that
+  // meant the password field and the Sign in button sat under the keyboard with
+  // no way to reach them. Screens that need more than the browser's panning wrap
+  // themselves in <KeyboardSafeArea>.
+  interactiveWidget: "resizes-visual",
 };
 
 export default function RootLayout({

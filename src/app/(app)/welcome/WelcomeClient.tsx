@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import InstallPrompt, { isIos, isStandalone } from "@/components/InstallPrompt";
+import KeyboardSafeArea from "@/components/KeyboardSafeArea";
 
 export default function WelcomeClient({ firstName, clientId, needsIntake }: { firstName: string; clientId: string | null; needsIntake?: boolean }) {
   const router = useRouter();
@@ -78,7 +79,10 @@ export default function WelcomeClient({ firstName, clientId, needsIntake }: { fi
   };
 
   return (
-    <div style={{ padding: "26px 16px 100px", background: "var(--brand-bg)", minHeight: "100vh" }}>
+    // Step 1 is two password fields. On a short phone the keyboard reaches the
+    // "Save and continue" button, and a client who cannot finish this screen is
+    // a client who never gets into the app. See KeyboardSafeArea.
+    <KeyboardSafeArea style={{ padding: "26px 16px 100px", background: "var(--brand-bg)" }}>
       <div style={{ textAlign: "center", marginBottom: 20 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icons/icon-192.png" alt="" style={{ width: 64, height: 64, borderRadius: 16, marginBottom: 10 }} />
@@ -169,6 +173,6 @@ export default function WelcomeClient({ firstName, clientId, needsIntake }: { fi
       <p style={{ textAlign: "center", fontSize: 11.5, color: "var(--brand-text-secondary)", marginTop: 18 }}>
         Stuck? Message Dustin from inside the app — he gets it straight away.
       </p>
-    </div>
+    </KeyboardSafeArea>
   );
 }

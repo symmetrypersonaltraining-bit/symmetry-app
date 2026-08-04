@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
+import KeyboardSafeArea from "@/components/KeyboardSafeArea";
 
 export default function SetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -96,7 +97,9 @@ export default function SetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "#0F4C81" }}>
+    // Same keyboard problem as sign-in: two password fields and the button that
+    // submits them, on a screen with no room to scroll. See KeyboardSafeArea.
+    <KeyboardSafeArea className="flex flex-col" style={{ background: "#0F4C81" }}>
       {/* Branding */}
       <div className="flex flex-col items-center pt-16 pb-10 px-6">
         <Logo size={72} color="white" />
@@ -105,7 +108,7 @@ export default function SetPasswordPage() {
       </div>
 
       {/* Card */}
-      <div className="flex-1 rounded-t-3xl px-6 pt-8 pb-10" style={{ background: "#EDF2F7" }}>
+      <div className="rounded-t-3xl px-6 pt-8 pb-10" style={{ background: "#EDF2F7", flex: "1 0 auto" }}>
         {done ? (
           <div className="flex flex-col items-center pt-8 gap-3">
             <div
@@ -142,8 +145,9 @@ export default function SetPasswordPage() {
                   placeholder="At least 8 characters"
                   required
                   minLength={8}
-                  className="w-full rounded-lg px-4 py-3 text-sm border"
-                  style={{ background: "white", borderColor: "#C8D8EC", color: "#0D1B2E" }}
+                  className="w-full rounded-lg px-4 py-3 border"
+                  // 16px minimum, or iOS zooms the page on focus.
+                  style={{ background: "white", borderColor: "#C8D8EC", color: "#0D1B2E", fontSize: 16 }}
                 />
               </div>
 
@@ -157,8 +161,9 @@ export default function SetPasswordPage() {
                   onChange={(e) => setConfirm(e.target.value)}
                   placeholder="Repeat your password"
                   required
-                  className="w-full rounded-lg px-4 py-3 text-sm border"
-                  style={{ background: "white", borderColor: "#C8D8EC", color: "#0D1B2E" }}
+                  className="w-full rounded-lg px-4 py-3 border"
+                  // 16px minimum, or iOS zooms the page on focus.
+                  style={{ background: "white", borderColor: "#C8D8EC", color: "#0D1B2E", fontSize: 16 }}
                 />
               </div>
 
@@ -178,6 +183,6 @@ export default function SetPasswordPage() {
           </>
         )}
       </div>
-    </div>
+    </KeyboardSafeArea>
   );
 }
