@@ -79,6 +79,27 @@ at 1.0.0. Bump the marketing version in the workflow when it means something.
 
 ---
 
+## Part 2b — What the pre-flight already fixed
+
+Checked 2026-08-04 before you run it, so these don't cost you a failed build:
+
+- **Building the workspace, not the project.** The step said
+  `build-ipa --project ios/App/App.xcodeproj`. Capacitor's iOS dependencies come
+  in through CocoaPods, and `npx cap sync ios` generates `App.xcworkspace` —
+  building the bare project fails to link them. Changed to `--workspace`.
+- **A blank icon can no longer ship silently.** Both icon steps ended in
+  `|| true`, so if generation failed the build carried on and uploaded
+  Capacitor's placeholder icon, which Apple rejects. It now fails at the icon
+  step, where it is obvious and costs nothing.
+- **Verified:** `capacitor-web/index.html` exists, so `npx cap add ios` has a
+  webDir to point at; bundle ID in `capacitor.config.ts` is `com.symmetry.app`
+  and matches what you register; the Info.plist patch path
+  (`ios/App/App/Info.plist`) is right for Capacitor 6; the icon generator pulls
+  the badge from the live site, which CI can reach.
+- **Known and harmless:** `APP_STORE_APPLE_ID` is empty. Publishing resolves the
+  app by bundle ID, so the build will still upload. Fill it in anyway (Part 1,
+  step 4) so it is unambiguous.
+
 ## Part 3 — Things that will bite
 
 **"No matching profiles found."** The bundle ID in App Store Connect doesn't match

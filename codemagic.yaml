@@ -167,9 +167,13 @@ workflows:
       - name: Generate app icon (mirror Android icon step)
         script: |
           python3 -m pip install --quiet --user pillow numpy || pip3 install --quiet pillow numpy
-          python3 resources/generate_icons.py || true
-          # Fallback: if generate_icons.py doesn't emit the iOS AppIcon set, generate from source logo.
-          npx --yes @capacitor/assets generate --ios --iconBackgroundColor '#0F4C81' --iconBackgroundColorDark '#0B0F17' || true
+          python3 resources/generate_icons.py
+          npx --yes @capacitor/assets generate --ios --iconBackgroundColor '#0F4C81' --iconBackgroundColorDark '#0B0F17'
+          # Both steps used to end in `|| true`. A failed icon generation then
+          # shipped Capacitor's blank placeholder to TestFlight silently, and
+          # Apple rejects placeholder icons. Fail here instead, where it is
+          # obvious and free to fix.
+          test -s assets/icon-only.png || { echo "icon generation produced nothing"; exit 1; }
 
       - name: Set marketing + build version
         script: |
@@ -182,8 +186,11 @@ workflows:
 
       - name: Build & archive IPA
         script: |
+          # WORKSPACE, not the .xcodeproj. `npx cap sync ios` runs pod install and
+          # Capacitor's own dependencies come in as Pods — building the bare
+          # project fails to link them. Pre-flighted 2026-08-04.
           xcode-project build-ipa \
-            --project "ios/App/App.xcodeproj" \
+            --workspace "ios/App/App.xcworkspace" \
             --scheme "App"
     artifacts:
       - build/ios/ipa/*.ipa
