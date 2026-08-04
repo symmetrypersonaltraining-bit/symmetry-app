@@ -3,17 +3,20 @@
 // The full-screen things the app says to a client, and the rules for when it is
 // allowed to say them.
 //
-// There are three of these now — join the challenge, celebrate the winner, read
-// the trainer's announcement — and they were heading for three components each
-// deciding independently whether to cover the screen. That ends with two
+// There are five of these now — it's your birthday, join the challenge,
+// celebrate the winner, read the trainer's announcement, and (last, quietly)
+// tell us when your birthday is — and they were heading for five components
+// each deciding independently whether to cover the screen. That ends with two
 // takeovers stacked on top of each other on a Sunday evening, which is worse
 // than either alone.
 //
 // So: ONE component, ONE query pass, and at most ONE takeover ever on screen.
-// Priority is by shelf life, not importance. The winner announcement is stale
-// by Tuesday; a challenge invitation is good until the challenge ends; an
-// announcement Dustin wrote will still make sense tomorrow. Whatever loses
-// today is still unseen tomorrow, so nothing is dropped — it just waits.
+// Priority is by shelf life, not importance. A birthday is good for ONE day and
+// is therefore first; the winner announcement is stale by Tuesday; a challenge
+// invitation is good until the challenge ends; an announcement Dustin wrote
+// will still make sense tomorrow; "when is your birthday" is good forever and
+// so goes last, behind everything with an expiry date. Whatever loses today is
+// still unseen tomorrow, so nothing is dropped — it just waits.
 //
 // "Seen" is per PERSON (client_announcements_seen), not per device. localStorage
 // would re-show a takeover on their phone after they dismissed it on the iPad,
@@ -27,6 +30,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { fx } from "@/lib/fx";
+import Confetti from "@/components/Confetti";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function pretty(iso: string): string {
@@ -63,6 +67,8 @@ interface Announcement {
 }
 
 type Pick =
+  | { kind: "birthday"; key: string; firstName: string }
+  | { kind: "askdob"; key: string }
   | { kind: "winner"; key: string; winner: Winner }
   | { kind: "challenge"; key: string; challenge: Challenge; myScore: number; myRank: number | null; total: number; people: number; joined: boolean }
   | { kind: "announcement"; key: string; announcement: Announcement }
@@ -77,6 +83,8 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
   const [pick, setPick] = useState<Pick>(null);
   const [meId, setMeId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [dob, setDob] = useState("");
+  const [dobErr, setDobErr] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -91,6 +99,30 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
           .select("key")
           .eq("client_id", cid);
         const seen = new Set(((seenRows as { key: string }[]) ?? []).map((r) => r.key));
+
+        // ── 0. Their own birthday ────────────────────────────────────────
+        // First, because it is only true for one day. Everything else below
+        // still makes sense tomorrow; this doesn't.
+        const { data: meRow } = await supabase
+          .from("clients")
+          .select("name, date_of_birth")
+          .eq("id", cid)
+          .maybeSingle();
+        const meC = meRow as { name: string | null; date_of_birth: string | null } | null;
+        const todayCT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+        const dobMd = (meC?.date_of_birth || "").slice(5, 10);
+        // 29 Feb falls back to the 28th in a non-leap year — see lib/birthdays.
+        const yr = Number(todayCT.slice(0, 4));
+        const leap = (yr % 4 === 0 && yr % 100 !== 0) || yr % 400 === 0;
+        const effMd = dobMd === "02-29" && !leap ? "02-28" : dobMd;
+        const bdayKey = "birthday-" + todayCT.slice(0, 4);
+        if (effMd && effMd === todayCT.slice(5, 10) && !seen.has(bdayKey)) {
+          if (alive) {
+            setMeId(cid);
+            setPick({ kind: "birthday", key: bdayKey, firstName: (meC?.name || "").split(" ")[0] || "you" });
+          }
+          return;
+        }
 
         // ── 1. A winner to celebrate ─────────────────────────────────────
         // Only for three days. "Cheyenne won!" a week later is not a
@@ -184,6 +216,26 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
         if (ann && alive) {
           setMeId(cid);
           setPick({ kind: "announcement", key: "announcement-" + ann.id, announcement: ann });
+          return;
+        }
+
+        // ── 4. "When's your birthday?" ───────────────────────────────────
+        // 18 of Dustin's 34 clients have no date on file, and a birthday bot
+        // that skips half the room reads as favouritism. This asks.
+        //
+        // The key carries the MONTH, deliberately. Everything else here is seen
+        // once and gone forever, which is right for an announcement and wrong
+        // for a question: somebody who taps "not now" while walking into a
+        // session would never be asked again, and the gap would be permanent.
+        // A month-stamped key means skipping costs them nothing today and asks
+        // again in thirty days. Answering writes the date, and the date itself
+        // is what stops it — not the seen-marker.
+        if (!meC?.date_of_birth && alive) {
+          const askKey = "birthday-ask-" + todayCT.slice(0, 7);
+          if (!seen.has(askKey)) {
+            setMeId(cid);
+            setPick({ kind: "askdob", key: askKey });
+          }
         }
       } catch {
         /* a takeover must never take the dashboard down */
@@ -207,6 +259,27 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
     },
     [supabase, meId, pick],
   );
+
+  async function saveDob() {
+    if (busy) return;
+    // A date they have to fix later is worse than no date. Reject the two
+    // things a date picker actually produces by accident: the future, and a
+    // year somebody typed with a digit missing.
+    const y = Number((dob || "").slice(0, 4));
+    if (!dob || !y) { setDobErr("Pick a date first."); return; }
+    if (dob > new Date().toISOString().slice(0, 10)) { setDobErr("That's in the future."); return; }
+    if (y < 1900) { setDobErr("Check the year on that one."); return; }
+    setBusy(true); setDobErr(null);
+    try {
+      // RLS: client_update_own_clients allows a client to update their own row.
+      const { error } = await supabase.from("clients").update({ date_of_birth: dob }).eq("id", meId);
+      if (error) { setDobErr("Couldn't save that — try again in a moment."); return; }
+      fx("tap");
+      await dismiss();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (!pick) return null;
 
@@ -239,6 +312,89 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
     fontWeight: 700,
     cursor: "pointer",
   };
+
+  // ── THEIR BIRTHDAY ────────────────────────────────────────────────────────
+  // Dustin asked for this alongside the group post. The group chat is everyone
+  // else noticing; this is the app noticing. No age anywhere on it — the date
+  // is stored so we know WHEN, never so anyone can publish HOW OLD.
+  if (pick.kind === "birthday") {
+    return shell(
+      <>
+        <Confetti />
+        <div style={{ background: "var(--grad-hero, var(--brand-primary))", color: "#fff", padding: "calc(40px + env(safe-area-inset-top)) 20px 34px", textAlign: "center" }}>
+          <div style={{ fontSize: 58, lineHeight: 1 }}>🎂</div>
+          <div style={{ fontSize: 26, fontWeight: 900, marginTop: 12, lineHeight: 1.15 }}>
+            Happy birthday, {pick.firstName}.
+          </div>
+          <div style={{ fontSize: 13.5, opacity: 0.9, marginTop: 8, lineHeight: 1.5 }}>
+            From Dustin and everyone who trains here.
+          </div>
+        </div>
+
+        <div style={{ maxWidth: 520, margin: "0 auto", padding: "22px 18px 32px" }}>
+          <p style={{ fontSize: 14.5, lineHeight: 1.65, color: "var(--brand-text)", textAlign: "center", marginBottom: 20 }}>
+            Take the day if you want it. The gym will still be here tomorrow,
+            and so will we.
+          </p>
+          <button onClick={() => void dismiss(() => router.push(`${basePath}/messages?client=group`))} style={primaryBtn}>
+            💬 See the group chat
+          </button>
+          <button onClick={() => void dismiss()} style={quietBtn}>
+            Thanks — to my dashboard
+          </button>
+        </div>
+      </>,
+    );
+  }
+
+  // ── WHEN IS YOUR BIRTHDAY ─────────────────────────────────────────────────
+  // Deliberately the gentlest screen in the app: it asks for something, which
+  // none of the others do. Skippable in one tap, no guilt copy, and it says
+  // plainly what the date is for — people hand over a date of birth much more
+  // easily when they are told it is not an age check.
+  if (pick.kind === "askdob") {
+    return shell(
+      <>
+        <div style={{ background: "var(--grad-hero, var(--brand-primary))", color: "#fff", padding: "calc(34px + env(safe-area-inset-top)) 20px 26px", textAlign: "center" }}>
+          <div style={{ fontSize: 46, lineHeight: 1 }}>🎂</div>
+          <div style={{ fontSize: 22, fontWeight: 900, marginTop: 10, lineHeight: 1.2 }}>
+            When&rsquo;s your birthday?
+          </div>
+        </div>
+
+        <div style={{ maxWidth: 520, margin: "0 auto", padding: "22px 18px 32px" }}>
+          <p style={{ fontSize: 14, lineHeight: 1.65, color: "var(--brand-text)", marginBottom: 6 }}>
+            So the group chat can say something on the day. That&rsquo;s the whole
+            reason we&rsquo;re asking.
+          </p>
+          <p style={{ fontSize: 12.5, lineHeight: 1.6, color: "var(--brand-text-secondary)", marginBottom: 18 }}>
+            Your age is never shown to anyone — not in the group, not on the
+            board, not anywhere in the app.
+          </p>
+
+          <input
+            type="date"
+            value={dob}
+            onChange={(e) => setDob(e.target.value)}
+            max={new Date().toISOString().slice(0, 10)}
+            style={{
+              width: "100%", boxSizing: "border-box", padding: "13px 12px", borderRadius: 12,
+              border: "1px solid var(--brand-border)", background: "var(--brand-card, var(--brand-surface))",
+              color: "var(--brand-text)", fontSize: 16, marginBottom: 14, // 16px or iOS zooms on focus
+            }}
+          />
+          {dobErr && <p style={{ color: "#ef4444", fontSize: 12.5, fontWeight: 600, margin: "0 0 10px" }}>{dobErr}</p>}
+
+          <button onClick={() => void saveDob()} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>
+            {busy ? "Saving…" : "Save it"}
+          </button>
+          <button onClick={() => void dismiss()} style={quietBtn}>
+            Not now
+          </button>
+        </div>
+      </>,
+    );
+  }
 
   // ── WINNER ────────────────────────────────────────────────────────────────
   if (pick.kind === "winner") {
