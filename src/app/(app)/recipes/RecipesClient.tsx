@@ -222,6 +222,26 @@ export default function RecipesClient({
 function RecipeView({ rec, onClose }: { rec: RecipeRow; onClose: () => void }) {
   const [ings, setIngs] = useState<{ food: string; amount: number | null; unit: string | null; protein: number; carbs: number; fats: number; source: string; note: string | null }[] | null>(null);
   const supabase = useMemo(() => createClient(), []);
+  // Logging it is the point of having cooked it.
+  const [howMany, setHowMany] = useState("1");
+  const [logging, setLogging] = useState(false);
+  const [logged, setLogged] = useState<string | null>(null);
+
+  async function logIt() {
+    if (logging) return;
+    setLogging(true);
+    try {
+      const res = await fetch("/api/recipes/log", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipeId: rec.id, servings: Number(howMany) || 1 }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) { setLogged((json && json.error) || "Couldn't log that."); return; }
+      setLogged(`Logged — ${json.macros.kcal} cal added to today ✓`);
+    } catch {
+      setLogged("Network error — check your connection.");
+    } finally { setLogging(false); }
+  }
 
   useMemo(() => {
     (async () => {
@@ -283,7 +303,23 @@ function RecipeView({ rec, onClose }: { rec: RecipeRow; onClose: () => void }) {
           </>
         )}
 
-        <button onClick={onClose} style={{ width: "100%", marginTop: 16, padding: 12, borderRadius: 12, border: "none", background: "var(--brand-primary)", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>
+        {/* Eat what you cooked. Lands in today as an extra, exactly like the
+            in-app "add something" flow — same row shape, so the ring, the day
+            total and the adherence percentage all treat it identically. */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 16 }}>
+          <label style={{ flex: "0 0 auto", fontSize: 11.5, color: "var(--brand-text-secondary)", fontWeight: 700 }}>
+            SERVINGS
+            <input value={howMany} onChange={(e) => setHowMany(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal"
+              style={{ width: 62, marginLeft: 8, padding: "9px 8px", borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-card)", color: "var(--brand-text)", fontSize: 13, textAlign: "center" }} />
+          </label>
+          <button onClick={logIt} disabled={logging}
+            style={{ flex: 1, padding: 12, borderRadius: 12, border: "none", background: "var(--brand-primary)", color: "#fff", fontWeight: 800, fontSize: 14, cursor: logging ? "default" : "pointer", opacity: logging ? 0.6 : 1 }}>
+            {logging ? "Logging…" : "🍽️ Log this to today"}
+          </button>
+        </div>
+        {logged && <p style={{ fontSize: 12.5, fontWeight: 700, color: "var(--brand-primary)", textAlign: "center", marginTop: 8 }}>{logged}</p>}
+
+        <button onClick={onClose} style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, border: "1px solid var(--brand-border)", background: "transparent", color: "var(--brand-text-secondary)", fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}>
           Close
         </button>
       </div>

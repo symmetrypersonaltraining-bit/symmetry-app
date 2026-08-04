@@ -104,3 +104,39 @@ test("the AI never gets to state the calories", () => {
 test("free foods are not given invented macros", () => {
   assert.match(AI, /Water, salt, pepper, herbs, spices[^\n]*are 0\/0\/0/);
 });
+
+/**
+ * LOGGING WHAT YOU COOKED.
+ *
+ * Dustin: "yes add that" — the log button. A recipe nobody can eat is a
+ * document.
+ */
+const LOG = readFileSync(join(process.cwd(), "src/app/api/recipes/log/route.ts"), "utf8");
+
+test("a logged recipe lands in the same shape as any other extra", () => {
+  // A second write path producing a slightly different row is how the day
+  // total, the ring and the adherence percentage start disagreeing.
+  assert.match(LOG, /adherence: "Off-plan"/);
+  assert.match(LOG, /__custom: \{/);
+  assert.match(LOG, /kind: "extra"/);
+  assert.match(LOG, /macros_pending: false/);
+});
+
+test("it can never overwrite a planned meal", () => {
+  // Plan meals live at 1..N; the quick-log band starts at 101 and steps past
+  // anything already logged that day.
+  assert.match(LOG, /let position = 101;/);
+  assert.match(LOG, /while \(taken\.has\(position\)\) position\+\+;/);
+});
+
+test("a blank servings box logs one serving, not zero", () => {
+  assert.match(LOG, /Number\.isFinite\(eaten\) && eaten > 0 \? Math\.min\(eaten, 20\) : 1/);
+});
+
+test("you can only log your own recipe or one from the shared library", () => {
+  assert.match(LOG, /rec\.visibility !== "public" && rec\.client_id !== clientId/);
+});
+
+test("an estimate stays an estimate after a trip through a recipe", () => {
+  assert.match(LOG, /const est = ings\.some\(\(i\) => i\.source === "ai"\)/);
+});
