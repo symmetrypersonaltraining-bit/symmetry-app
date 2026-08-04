@@ -914,6 +914,17 @@ export default function CelebrationScreen({
     <div style={overlay}>
       <Confetti />
       <style>{CSS}</style>
+      {/* Everything scrolls; Done is pinned below it. Before 8/4 this was one
+          flex column with overflowY:auto, and the big card carried `flex: 1` —
+          which means basis 0, so it did not take its own height, it took
+          whatever was left over. On a phone where the PR plate, the AI line,
+          the stats and the coach-units line had already used the screen up,
+          "left over" was less than the card's content, and `overflow: hidden`
+          plus `justifyContent: center` sheared it at BOTH ends: the top of
+          Dustin's head gone, the headline cut through the middle of a word,
+          the paragraph under it missing entirely. Nothing scrolled, because a
+          child that shrinks to fit never creates overflow to scroll. */}
+      <div style={scrollArea}>
       <div style={{ fontSize: 12, fontWeight: 800, color: "var(--brand-primary)", letterSpacing: 1.5 }}>
         ✓ WORKOUT COMPLETE
       </div>
@@ -972,9 +983,14 @@ export default function CelebrationScreen({
         </p>
       )}
 
-      <Link href={doneHref} style={doneBtn}>
-        Done ✓
-      </Link>
+      </div>
+      {/* Pinned, so a card tall enough to scroll can never put the only way out
+          of this screen below the fold. */}
+      <div style={doneBar}>
+        <Link href={doneHref} style={doneBtn}>
+          Done ✓
+        </Link>
+      </div>
     </div>
   );
 }
@@ -986,16 +1002,34 @@ const overlay: React.CSSProperties = {
   background: "var(--brand-bg)",
   display: "flex",
   flexDirection: "column",
-  gap: 10,
-  padding: "22px 16px",
   maxWidth: 440,
   margin: "0 auto",
+  // The frame itself does not scroll — scrollArea does. Keeping the scroll on
+  // an inner box is what lets Done stay pinned outside it.
+  overflow: "hidden",
+};
+const scrollArea: React.CSSProperties = {
+  flex: "1 1 auto",
   overflowY: "auto",
+  WebkitOverflowScrolling: "touch",
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+  padding: "22px 16px 6px",
+};
+const doneBar: React.CSSProperties = {
+  flex: "0 0 auto",
+  padding: "10px 16px calc(12px + env(safe-area-inset-bottom))",
+  background: "var(--brand-bg)",
 };
 const statBox: React.CSSProperties = { flex: 1, background: "var(--brand-surface)", borderRadius: 16, padding: 10, textAlign: "center", boxShadow: "0 8px 26px rgba(20,30,55,.08)" };
 const statNum: React.CSSProperties = { fontSize: 18, color: "var(--brand-text)", display: "block", fontVariantNumeric: "tabular-nums" };
 const statLbl: React.CSSProperties = { fontSize: 9.5, color: "var(--brand-text-secondary)", fontWeight: 700, letterSpacing: 0.5 };
-const bigCard: React.CSSProperties = { background: "var(--brand-surface)", borderRadius: 24, boxShadow: "0 8px 26px rgba(20,30,55,.08)", padding: 18, flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", position: "relative", overflow: "hidden" };
+// flexGrow 1 / flexShrink 0 / basis auto — NOT `flex: 1`. Fill spare room when
+// there is some; keep every pixel of your own height when there isn't, and let
+// the page scroll instead. `flex: 1` is basis 0, which is what sheared the
+// Apparition card in half on 8/4.
+const bigCard: React.CSSProperties = { background: "var(--brand-surface)", borderRadius: 24, boxShadow: "0 8px 26px rgba(20,30,55,.08)", padding: 18, flexGrow: 1, flexShrink: 0, flexBasis: "auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", position: "relative", overflow: "hidden" };
 const bnBand: React.CSSProperties = { background: "#c0111f", color: "#fff", fontWeight: 900, fontSize: 11, letterSpacing: 2, padding: "6px 12px", borderRadius: 8, display: "inline-block" };
 const bnHead: React.CSSProperties = { fontSize: 24, fontWeight: 900, color: "var(--brand-text)", lineHeight: 1.15, margin: "14px 0", fontFamily: "Georgia, serif" };
 const bnSub: React.CSSProperties = { fontSize: 12, color: "var(--brand-text-secondary)", fontStyle: "italic" };
