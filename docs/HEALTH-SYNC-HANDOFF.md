@@ -171,6 +171,12 @@ Realistic routes for food, best first:
 1. **Aggregator.** Terra (and others) list MyFitnessPal as a supported
    integration, having done the partner deal themselves. If food logger import is
    a real requirement, this is the only clean path to MFP.
+   *Dustin, 8/4: "csv, for now, cliemt can pay for agg if they want?"* — worth
+   knowing that the aggregator contract is with US, not the client: they bill per
+   connected user to the developer, so a client cannot buy it directly. Making it
+   a paid add-on is possible (we pay the aggregator, the client pays us a monthly
+   uplift) but it needs a price and a billing route, and neither exists today.
+   Park it until somebody actually asks.
 2. **Cronometer** has a documented partner API and is the friendliest of the
    dedicated trackers.
 3. **File import.** MFP, Cronometer and Lose It all let a *user* export their own
@@ -385,6 +391,11 @@ Rules to agree before writing the importer:
 Recommendation: direct for Health Connect + Apple Health + Garmin. Revisit an
 aggregator only if food-logger sync is a hard requirement.
 
+**FOOD SCOPE — DECIDED 2026-08-04: CSV import first.** User-initiated export from
+MyFitnessPal / Cronometer / Lose It, uploaded in the app. No partner deal, no
+monthly fee, no terms breached. Live sync via an aggregator stays on the shelf
+until a client asks and a price is agreed (see §4).
+
 **D2 — Where do steps live?** `everfit_daily_steps` renamed to `daily_steps`, or a
 new `health_daily` and leave the Everfit table alone?
 Recommendation: new `health_daily`, leave the old table untouched; it is historical.
@@ -393,11 +404,14 @@ Recommendation: new `health_daily`, leave the old table untouched; it is histori
 service-role-only schema?
 Recommendation: service-role-only, no client-readable policy at all.
 
-**D4 — What does imported food DO to adherence?** Options: (a) imported meals are
-informational only and adherence still measures our plan; (b) imported calories
-count as off-plan entries; (c) a client on an external food logger opts out of
-plan adherence entirely.
-Recommendation: (a) for v1 — it changes nothing we already trust.
+**D4 — What does imported food DO to adherence? — DECIDED 2026-08-04: (b), counts
+as off-plan.** Imported meals land as off-plan entries, so they hit day totals and
+adherence exactly like a photo-logged meal does today. Implementation note: that
+means the importer writes through the SAME path as the existing off-plan flow
+(`meal_adherence_logs`, adherence `Off-plan`, `est_*` macros, a `__custom` block)
+rather than inventing a second shape — the same rule the recipe logger follows.
+A meal imported at 8pm for a breakfast slot must not overwrite a planned meal:
+use the 101+ quick-log band, as `/api/recipes/log` does.
 
 **D5 — On disconnect, keep or delete the imported history?**
 Recommendation: keep, flagged as from a now-disconnected source. Deleting a
@@ -406,7 +420,7 @@ client's training history because they changed watches is worse.
 **D6 — Which screens ship in v1?** Recommendation: Settings → Connected apps, plus
 steps on Progress. Everything else after real data exists.
 
-**D7 — Who is doing this?** It is a native + backend project with store review in
+**D7 — Who is doing this?** (still open) It is a native + backend project with store review in
 it, and the Apple half cannot start until there is a developer account. If it is
 me in a future session, the Apple account and the Garmin application both need to
 be in place first, and neither is something I can do.
@@ -417,7 +431,7 @@ be in place first, and neither is something I can do.
 
 | Phase | Work | Blocked on |
 |---|---|---|
-| 0 | Publish a privacy policy. Submit the Garmin developer application. | Dustin |
+| 0 | ~~Publish a privacy policy~~ **DONE 8/4** — live at `/privacy`. ~~Draft the Garmin application~~ **DONE 8/4** — `docs/GARMIN-APPLICATION-DRAFT.md`, needs Dustin to fill in the studio's city/state and submit. | Dustin to submit Garmin |
 | 1 | Schema (§7) + Settings → Connected apps screen, no providers wired | D1–D3, D6 |
 | 2 | Health Connect via Capacitor plugin, Android APK, real data end to end | Phase 1 |
 | 3 | Dedupe rules (§8) + steps on Progress + "trained elsewhere" on the client profile | Phase 2, real data |
