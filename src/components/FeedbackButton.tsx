@@ -18,7 +18,17 @@ export default function FeedbackButton() {
       onResult: (t) => setMsg(m => (m ? m.trim() + " " : "") + t),
       onStart: () => setListening(true),
       onEnd: () => setListening(false),
-      onUnavailable: () => { setListening(false); alert("Voice input isn't available on this device — you can type your feedback."); },
+      // Say WHICH failure. This button reported the same sentence for a denied
+      // microphone, a missing engine and a dead recognizer, which is how "the
+      // mic doesn't work" got reported three times with nothing to act on.
+      onUnavailable: (reason) => {
+        setListening(false);
+        alert(
+          reason && reason.startsWith("browser-error: not-allowed")
+            ? "Microphone permission is off for Symmetry. Turn it on in your phone's app settings, then tap the mic again."
+            : "Voice input couldn't start — " + (reason || "unknown") + "\n\nYou can type your feedback instead. If it keeps happening, send Dustin this message.",
+        );
+      },
     });
   }
 
@@ -68,7 +78,7 @@ export default function FeedbackButton() {
               <textarea
                 value={msg}
                 onChange={e => setMsg(e.target.value)}
-                placeholder="Tell us what\'s working or what needs fixing…"
+                placeholder="Tell us what's working or what needs fixing…"
                 rows={4}
                 style={{
                   width: "100%", border: "1px solid var(--brand-border,#e3e9f3)", borderRadius: 10,

@@ -1503,9 +1503,9 @@ export default function NutritionV3Client(props: Props) {
           // with 0C. An override of 0 = the item was removed for this day.
           const rowOv = row.log?.item_overrides || null;
           const rowHasOv = !!(rowOv && Object.keys(rowOv).some((k) => !k.startsWith("__")));
-          const itemList: { label: string; free?: boolean; removed?: boolean }[] =
+          const itemList: { label: string; free?: boolean; removed?: boolean; added?: boolean }[] =
             row.kind === "plan" && row.chosen
-              ? [...(row.chosen.meal_items || [])].sort((a, b) => a.position - b.position).map((it) => {
+              ? [...[...(row.chosen.meal_items || [])].sort((a, b) => a.position - b.position).map((it) => {
                   const oAmt = rowHasOv ? (rowOv![it.id] as { amount?: number } | undefined)?.amount : undefined;
                   const amt = oAmt != null ? oAmt : it.amount;
                   return {
@@ -1517,7 +1517,17 @@ export default function NutritionV3Client(props: Props) {
                     free: it.is_unlimited,
                     removed: oAmt === 0,
                   };
-                })
+                }),
+                // Foods ADDED to a plan meal count toward the meal's calories
+                // (planMealMacros adds __added) but were never listed here, so
+                // the card read higher than the food shown on it with nothing
+                // to explain the gap — Madeleine's 30 Jul breakfast listed 393
+                // cal of food and printed 593. That gap is what "the app is
+                // doubling my breakfast" looks like from the outside.
+                ...((rowOv?.__added || []) as { name: string; servings?: number }[]).map((ad) => ({
+                  label: ad.name + (ad.servings && ad.servings !== 1 ? ` — ${ad.servings}×` : ""),
+                  added: true,
+                }))]
               : row.meta?.items?.length
               ? row.meta.items.map((it) => ({ label: it.n + (it.free ? "" : it.a ? ` — ${it.a}` : ""), free: it.free }))
               : [];
@@ -1554,6 +1564,7 @@ export default function NutritionV3Client(props: Props) {
                           {it.label}
                           {it.removed && <span style={{ marginLeft: 5, fontSize: 8.5, fontWeight: 800, background: "rgba(148,163,184,0.2)", color: "var(--brand-text-secondary)", padding: "1px 5px", borderRadius: 4, verticalAlign: "middle", textDecoration: "none" }}>removed</span>}
                           {it.free && <span style={{ marginLeft: 5, fontSize: 8.5, fontWeight: 800, background: "rgba(34,197,94,0.15)", color: GREEN, padding: "1px 5px", borderRadius: 4, verticalAlign: "middle" }}>FREE</span>}
+                          {it.added && <span style={{ marginLeft: 5, fontSize: 8.5, fontWeight: 800, background: "rgba(66,165,245,0.16)", color: BLUE, padding: "1px 5px", borderRadius: 4, verticalAlign: "middle" }}>ADDED</span>}
                         </p>
                       ))}
                     </div>

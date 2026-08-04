@@ -87,3 +87,35 @@ test("no \\uXXXX escapes in JSX text or attributes — they render literally", (
       offenders.join("\n  "),
   );
 });
+
+/**
+ * SAME BUG, DIFFERENT ESCAPE.
+ *
+ * Found on the feedback popover every client sees:
+ *
+ *     placeholder="Tell us what\'s working or what needs fixing…"
+ *
+ * `\'` is a valid escape in a JS string and a literal backslash in a JSX
+ * attribute, so thirty-five people were being asked what\'s working. Exactly the
+ * \uXXXX bug above with a different escape character, so it is caught here.
+ */
+const BACKSLASH_IN_ATTR = /=\s*"[^"]*\\['"nrt][^"]*"/g;
+
+test("no backslash escapes inside JSX attribute values — they render literally", () => {
+  const offenders: string[] = [];
+  for (const file of walk("src")) {
+    const src = readFileSync(join(ROOT, file), "utf8");
+    src.split("\n").forEach((line, i) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("*") || trimmed.startsWith("//") || trimmed.startsWith("/*")) return;
+      for (const m of line.matchAll(BACKSLASH_IN_ATTR)) {
+        offenders.push(`${file}:${i + 1}  ${m[0].slice(0, 70)}`);
+      }
+    });
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    "A JSX attribute is not a JS string — the backslash renders. Drop it:\n  " + offenders.join("\n  "),
+  );
+});

@@ -257,11 +257,26 @@ export default function FoodSearchSheet({
     setCreating(true);
   }
 
+  // Save a food you typed yourself, then hand it to the SAME amount picker every
+  // searched food goes through.
+  //
+  // Jerry, 2026-07-31: "When u add a custom food and change the serving size the
+  // macros dont change." He is exactly right, and the catalog caught him proving
+  // it — two "Ultra Beer" rows 61 seconds apart, serving_desc "1 serving" then
+  // "10 servings", macros byte-identical both times. This screen treated the
+  // serving box as a LABEL: it was written to the row, printed on the item, and
+  // never multiplied by anything. Meanwhile the search path has had working
+  // amount/unit scaling since 7/17.
+  //
+  // So the typed serving now becomes the food's BASE serving and the picker
+  // opens on top of it — type the macros for one slice, then say you had three.
+  // No new arithmetic: servingsFor()/pickItem() already do all of it.
   async function saveCustomFood() {
     const p = parseFloat(cf.p) || 0, c = parseFloat(cf.c) || 0, f = parseFloat(cf.f) || 0;
     if (!cf.name.trim() || p + c + f === 0) return;
     setBusy(true);
     let id: string | null = null;
+    let saved: Record<string, unknown> | null = null;
     try {
       const { data } = await supabase
         .from("food_catalog")
@@ -277,10 +292,20 @@ export default function FoodSearchSheet({
         })
         .select()
         .single();
+      saved = (data as Record<string, unknown> | null) ?? null;
       id = (data as { id?: string } | null)?.id ?? null;
     } catch { /* catalog not ready — still log the item locally */ }
     setBusy(false);
     setPendingBarcode(null);
+    if (saved && id) {
+      setCreating(false);
+      setCf({ name: "", serving: "1 serving", p: "", c: "", f: "" });
+      openPicked(mapRow(saved, true));
+      return;
+    }
+    // Catalog write failed — log it at face value rather than losing what they
+    // typed. One serving of exactly what they entered, which is what the old
+    // path always did.
     onPick({ n: cf.name.trim(), a: cf.serving || "1 serving", p, c, f, k: kcalOf(p, c, f), food_id: id, fac: 1 });
   }
 
@@ -437,7 +462,9 @@ export default function FoodSearchSheet({
             ))}
           </div>
           <p className="text-center text-xs mt-2" style={{ color: "var(--brand-text-secondary)" }}>
-            = {kcalOf(parseFloat(cf.p) || 0, parseFloat(cf.c) || 0, parseFloat(cf.f) || 0)} cal
+            = {kcalOf(parseFloat(cf.p) || 0, parseFloat(cf.c) || 0, parseFloat(cf.f) || 0)} cal per {cf.serving.trim() || "1 serving"}
+            <br />
+            <span style={{ opacity: 0.8 }}>You&apos;ll pick how much you had next.</span>
           </p>
           <button onClick={saveCustomFood} disabled={busy} className="w-full mt-2 py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)", opacity: cf.name.trim() ? 1 : 0.5 }}>
             {busy ? "Saving…" : "Save + add it"}
