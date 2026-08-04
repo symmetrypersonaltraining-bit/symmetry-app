@@ -1373,57 +1373,98 @@ export default function WorkoutLogger({
     if (navigator.vibrate) navigator.vibrate(20);
   }
 
+  // Dustin, 8/4: "workout logger keeps not logging in my app. after I hit finish
+  // it goes back n is not logged. happened multiple times today."
+  //
+  // This function had NO error handling. Not a swallowed catch — no catch at
+  // all, just try/finally. So if the insert or either update failed, the promise
+  // rejected into nowhere: no message, no retry, the button simply went from
+  // "Saving…" back to "Complete ✓" and the session stayed open. From the other
+  // side of the screen that is indistinguishable from "I hit finish and nothing
+  // happened", which is exactly the report. A failure the user cannot see is a
+  // failure that gets reported as flakiness and can never be diagnosed.
+  //
+  // Every write is now checked and anything that goes wrong is said out loud.
+  const [completeError, setCompleteError] = useState<string | null>(null);
+
   async function completeWorkout() {
     setSaving(true);
+    setCompleteError(null);
     try {
       const logId = await ensureWorkoutLog();
-      await supabase.from("workout_logs").update({
+      const { error: logErr } = await supabase.from("workout_logs").update({
         completed: true, completed_at: new Date().toISOString(), status: "Done as planned",
         note: sessionNote || null,
       }).eq("id", logId);
-      try {
+      // THE workout row. If this failed the session did not happen as far as the
+      // app is concerned, and carrying on to the schedule update would leave the
+      // calendar claiming a workout that has no log behind it.
+      if (logErr) throw logErr;
+      {
         const __today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
         // Mark the scheduled workout complete. Prefer today's instance; if the
         // workout was scheduled for a prior day and never moved, fall back to the
         // most recent still-scheduled instance on/before today so make-up logs
         // still show as completed on the schedule.
-        const { data: __todayRow } = await (supabase as any)
+        // EVERY row for this day today, not the first one.
+        //
+        // This was `.order("id").limit(1)`, which marked exactly one scheduled
+        // row complete and left any twin sitting there saying "not done". The
+        // home screen decides whether a workout is logged purely from
+        // scheduled_workouts.status — so with two rows for the same session you
+        // finish the workout, go back, and the app tells you it isn't logged.
+        // It is, and there is a second card claiming otherwise. Ordering by
+        // UUID also meant WHICH one got marked was effectively random.
+        //
+        // Soft-deleted rows are excluded: a removed session must not be
+        // resurrected as "completed".
+        const { data: __todayRows } = await (supabase as any)
           .from("scheduled_workouts")
           .select("id")
           .eq("client_id", clientId)
           .eq("day_id", day.id)
           .eq("scheduled_date", __today)
-          .order("id")
-          .limit(1);
-        let __swId: string | null =
-          __todayRow && __todayRow.length ? __todayRow[0].id : null;
-        if (!__swId) {
+          .is("deleted_at", null);
+        let __swIds: string[] = ((__todayRows as { id: string }[] | null) ?? []).map((r) => r.id);
+        if (!__swIds.length) {
           const { data: __pastRows } = await (supabase as any)
             .from("scheduled_workouts")
             .select("id")
             .eq("client_id", clientId)
             .eq("day_id", day.id)
             .eq("status", "scheduled")
+            .is("deleted_at", null)
             .lte("scheduled_date", __today)
             .order("scheduled_date", { ascending: false })
             .limit(1);
-          if (__pastRows && __pastRows.length) __swId = __pastRows[0].id;
+          if (__pastRows && __pastRows.length) __swIds = [__pastRows[0].id];
         }
-        if (__swId) {
-          await (supabase as any)
+        if (__swIds.length) {
+          const { error: __swErr } = await (supabase as any)
             .from("scheduled_workouts")
             .update({ status: "completed", workout_log_id: logId })
-            .eq("id", __swId);
+            .in("id", __swIds);
+          if (__swErr) throw __swErr;
         } else {
           // No scheduled row matched (unscheduled / make-up session) - create a completed
           // one so the workout still counts in every tracking tile and counter.
-          await (supabase as any)
+          const { error: __insErr } = await (supabase as any)
             .from("scheduled_workouts")
             .insert({ client_id: clientId, day_id: day.id, scheduled_date: __today, status: "completed", workout_log_id: logId, source: "client_self_assign" });
+          if (__insErr) throw __insErr;
         }
-      } catch {}
+      }
       setWorkoutComplete(true);
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    } catch (e) {
+      // Say it. The sets are all still in the database and the session stays
+      // open, so tapping again is safe and is the right thing to do.
+      console.error("completeWorkout", e);
+      setCompleteError(
+        (e as { message?: string })?.message
+          ? `Couldn't finish the workout: ${(e as { message?: string }).message}. Your sets are saved — tap Complete again.`
+          : "Couldn't finish the workout — check your connection and tap Complete again. Your sets are saved.",
+      );
     } finally { setSaving(false); }
   }
 
@@ -2098,6 +2139,12 @@ export default function WorkoutLogger({
               style={{ background: "rgba(255,255,255,0.06)", color: globalIdx === 0 ? "rgba(255,255,255,0.2)" : "white" }}>
               <i className="ti ti-arrow-left mr-1" /> Prev
             </button>
+            {/* Never let a failed finish look like a successful one. */}
+            {completeError && (
+              <div style={{ position: "absolute", left: 12, right: 12, bottom: 62, background: "#7f1d1d", color: "#fff", borderRadius: 12, padding: "9px 12px", fontSize: 12, lineHeight: 1.4, zIndex: 5 }}>
+                {completeError}
+              </div>
+            )}
             {globalIdx < totalExercises - 1 ? (
               <button onClick={() => navigateToGlobal(globalIdx + 1)}
                 className="flex-1 py-3 rounded-2xl text-sm font-semibold text-white"
@@ -2108,10 +2155,10 @@ export default function WorkoutLogger({
               <button onClick={completeWorkout} disabled={saving}
                 className="flex-1 py-3 rounded-2xl text-sm font-semibold transition-all"
                 style={{
-                  background: progressPct === 100 ? "#22c55e" : "rgba(255,255,255,0.06)",
-                  color: progressPct === 100 ? "white" : "rgba(255,255,255,0.3)",
+                  background: completeError ? "#ef4444" : progressPct === 100 ? "#22c55e" : "rgba(255,255,255,0.06)",
+                  color: completeError || progressPct === 100 ? "white" : "rgba(255,255,255,0.3)",
                 }}>
-                {saving ? "Saving\u2026" : "Complete \u2713"}
+                {saving ? "Saving\u2026" : completeError ? "Try again \u21bb" : "Complete \u2713"}
               </button>
             )}
           </div>
@@ -2392,12 +2439,19 @@ export default function WorkoutLogger({
           </div>
         )}
 
+        {completeError && (
+          <p style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #ef4444", color: "#ef4444", borderRadius: 12, padding: "9px 12px", fontSize: 12.5, lineHeight: 1.45, marginTop: 10 }}>
+            {completeError}
+          </p>
+        )}
         <button onClick={completeWorkout} disabled={saving}
           className="w-full rounded-2xl py-4 text-sm font-bold transition-all mt-2"
-          style={progressPct === 100
+          style={completeError
+            ? { background: "#ef4444", color: "white" }
+            : progressPct === 100
             ? { background: "#22c55e", color: "white" }
             : { background: "var(--brand-surface)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}>
-          {saving ? "Saving\u2026" : progressPct === 100 ? "\ud83c\udfc6 Complete Workout" : `${progressPct}% \u2014 keep going!`}
+          {saving ? "Saving\u2026" : completeError ? "Try again \u21bb" : progressPct === 100 ? "\ud83c\udfc6 Complete Workout" : `${progressPct}% \u2014 keep going!`}
         </button>
       </div>
       {!sessionMode && (

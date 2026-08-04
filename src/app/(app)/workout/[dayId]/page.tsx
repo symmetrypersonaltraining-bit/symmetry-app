@@ -74,11 +74,18 @@ export default async function WorkoutDayPage({
     clientId = data?.id || null;
     clientName = data?.name || null;
   } else if (isTrainer) {
-    // Trainer viewing their own workout (Dustin as client)
+    // Trainer logging their OWN workout.
+    //
+    // This used to be .ilike("name", "%Dustin%").maybeSingle(). Two problems:
+    // maybeSingle ERRORS when more than one row matches, and the error was
+    // discarded — so the day a client called Dustin signs up, the trainer's own
+    // logger silently gets clientId = null, every write fails, and Finish does
+    // nothing. Matching a person by a substring of their name was always a
+    // guess; his account id is a fact.
     const { data } = await supabase
       .from("clients")
       .select("id, name")
-      .ilike("name", "%Dustin%")
+      .eq("auth_user_id", user.id)
       .maybeSingle();
     clientId = data?.id || null;
     clientName = data?.name || null;
@@ -93,13 +100,28 @@ export default async function WorkoutDayPage({
   }
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-  const { data: existingLog } = await supabase
+  // TODAY'S log for this day — and it must survive there being more than one.
+  //
+  // This was .maybeSingle(), which in PostgREST is not "give me one of them" but
+  // "ERROR if there is more than one". The error was discarded, so two logs for
+  // the same day meant existingLog === null: the logger opened blank, showed
+  // none of the sets already recorded, and created a THIRD log. Every reopen
+  // added another. The screen said nothing was logged while the database held
+  // two sessions' worth.
+  //
+  // A completed log wins over an open one, then the newest — reopening a
+  // finished workout should show it finished, not offer an empty one.
+  const { data: existingLogs, error: existingLogErr } = await supabase
     .from("workout_logs")
-    .select("id, completed, set_logs(*)")
+    .select("id, completed, log_date, created_at, set_logs(*)")
     .eq("client_id", clientId || "")
     .eq("day_id", resolvedDayId)
     .gte("log_date", today)
-    .maybeSingle();
+    .order("completed", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (existingLogErr) console.error("workout page: existing log lookup", existingLogErr);
+  const existingLog = (existingLogs as { id: string; completed: boolean; set_logs: unknown[] }[] | null)?.[0] ?? null;
 
   const { data: swInst } = await supabase
     .from("scheduled_workouts")
@@ -110,9 +132,13 @@ export default async function WorkoutDayPage({
     .is("deleted_at", null)
     .eq("day_id", resolvedDayId)
     .eq("client_id", clientId || "")
-    .eq("scheduled_date", new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }))
-    .maybeSingle();
-  const scheduledWorkoutId = swInst?.id || null;
+    .eq("scheduled_date", today)
+    // Same maybeSingle trap: two scheduled rows for one day is a real state in
+    // this data (Dustin had two identical "Peak — Arms A" cards on 4 Aug) and it
+    // must not blank the id out.
+    .order("id")
+    .limit(1);
+  const scheduledWorkoutId = (swInst as { id: string }[] | null)?.[0]?.id ?? null;
 
   const phase = (day as any).phases;
   const program = phase?.programs;
