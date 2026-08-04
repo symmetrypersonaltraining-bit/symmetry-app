@@ -101,3 +101,50 @@ test("persistFields can actually see the exercise it is propagating", () => {
   // tapping a chip must not rewrite thirty-four other people's prescriptions.
   assert.match(SRC, /if \(!exerciseId \|\| !isTrainerSession\) return;/);
 });
+
+/**
+ * PRESET DEFAULTS, AND WEIGHTS THAT REMEMBER THE REP TARGET.
+ *
+ * Dustin, 2026-08-04: "the app needs to have preset defaults for movements but
+ * still able to toggle change them. when we log something the next time that
+ * movement comes up it falls back to previously logged w preloaded weights if
+ * recorded. the most recent weights for that number of reps for that movement
+ * should be preloaded."
+ *
+ * Two separate things, both asserted here because both were previously a guess:
+ *   - a MOVEMENT-level default (exercises.default_tracked_fields) between the
+ *     prescription and the heuristic, so a fix set once is inherited by every
+ *     program written afterwards;
+ *   - prefill matched on REP COUNT, not on set number within the last session.
+ *     Last week 3×12 at 40 lb, today 3×8: the old rule offered 40. The number
+ *     worth beating is whatever was last done for 8.
+ */
+
+test("tracked fields fall back prescription → movement → heuristic", () => {
+  const fn = SRC.slice(SRC.indexOf("function defaultTrackedFields"), SRC.indexOf("// Reps that should ALWAYS prefill"));
+  const presc = fn.indexOf("pe?.tracked_fields");
+  const lib = fn.indexOf("pe?.exercises?.default_tracked_fields");
+  const heuristic = fn.indexOf("BW_NAME_RE");
+  assert.ok(presc > -1 && lib > -1 && heuristic > -1, "all three levels must be present");
+  assert.ok(presc < lib && lib < heuristic, "order decides which wins — most specific first");
+});
+
+test("the movement default is only ever written by the trainer", () => {
+  const fn = SRC.slice(SRC.indexOf("const persistFields ="), SRC.indexOf("const saveCardioFields"));
+  assert.match(fn, /if \(!exerciseId \|\| !isTrainerSession\) return;/);
+  assert.ok(
+    fn.indexOf("isTrainerSession") < fn.indexOf('from("exercises")'),
+    "the library write must sit behind the trainer guard",
+  );
+});
+
+test("prefill matches the rep target before falling back to the last session", () => {
+  const block = SRC.slice(SRC.indexOf("if (row.done || !(row.weight"), SRC.indexOf("// --- end previous weights ---"));
+  assert.match(block, /h\.reps === target && h\.weight != null && h\.weight > 0/, "rep-matched, and a 0 is not an answer");
+  assert.ok(
+    block.indexOf("atReps") < block.indexOf("if (p) {"),
+    "the rep-matched hit must be preferred over the last-session fallback",
+  );
+  // Never overwrite what someone already typed or logged.
+  assert.match(block, /if \(row\.done \|\| !\(row\.weight === '' \|\| row\.weight == null\)\) return row;/);
+});

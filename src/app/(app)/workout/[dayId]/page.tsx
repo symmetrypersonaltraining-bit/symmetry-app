@@ -42,7 +42,7 @@ export default async function WorkoutDayPage({
           unilateral, tempo, load_descriptor, cue, rest,
           superset_group, intensity_type, use_drop_sets,
           use_rest_pause, use_partials,
-          exercises(id, name, modality, muscle_group, equipment_required, video_url)
+          exercises(id, name, modality, muscle_group, equipment_required, video_url, video_status, default_tracked_fields)
         )
       )
     `)

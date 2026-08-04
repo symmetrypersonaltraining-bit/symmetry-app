@@ -545,10 +545,24 @@ const BW_NAME_RE = /push[\s-]?up|pull[\s-]?up|chin[\s-]?up|\bdips?\b|bird ?dog|d
 // "Barbell Hip Bridge", "Dumbbell Hip Hinge") must keep its weight box.
 const LOADED_NAME_RE = /barbell|dumbbell|\bdb\b|\bbb\b|kettlebell|\bkb\b|cable|machine|smith|plate|weighted|loaded|trap bar|landmine/i;
 
+// THREE LEVELS, most specific first (2026-08-04). Dustin: "the app needs to
+// have preset defaults for movements but still able to toggle change them."
+//
+//   1. tracked_fields on THIS prescription — somebody chose it here
+//   2. default_tracked_fields on the MOVEMENT — the trainer's library default
+//   3. the name/modality heuristic below — last resort
+//
+// Level 2 is the new one, and it is why a fix stops coming back: set Kettlebell
+// Swing to weight+reps once and every future program inherits it, instead of
+// re-running a guess that got Walking Lunge wrong for a month.
 function defaultTrackedFields(pe: any): string[] {
   const raw = pe?.tracked_fields;
   if (Array.isArray(raw) && raw.length > 0) {
     return raw.map((f: string) => (f === "duration" ? "time" : f));
+  }
+  const lib = pe?.exercises?.default_tracked_fields;
+  if (Array.isArray(lib) && lib.length > 0) {
+    return lib.map((f: string) => (f === "duration" ? "time" : f));
   }
   const nm = String(pe?.exercises?.name || "");
   const eachSide = pe?.unilateral === true || SIDE_NAME_RE.test(nm);
@@ -997,7 +1011,19 @@ export default function WorkoutLogger({
   }, [sessionMode, activeSectionIdx, activeExerciseIdx, localSections]);
   // --- end manual swipe ---
   // --- Auto-load previous weights per movement (editable) ---
+  //
+  // Dustin, 2026-08-04: "the most recent weights for that number of reps for
+  // that movement should be preloaded."
+  //
+  // The old rule was "most recent SESSION, matched by set number", which is
+  // wrong the moment the rep target changes. Last week 3×12 at 40 lb, today
+  // 3×8 — it offered 40, when the number worth beating is whatever you last did
+  // for 8. Now every set looks for the newest log of the SAME movement at the
+  // SAME rep count, and only falls back to the newest at any rep count (which
+  // is the old behaviour, and still better than a blank box).
   const [prevByPe, setPrevByPe] = useState<Record<string, Record<number, { weight: string; reps: string }>>>({});
+  /** Newest-first prior logs per prescription, for rep-matched prefill. */
+  const [histByPe, setHistByPe] = useState<Record<string, { weight: number | null; reps: number | null; set_number: number }[]>>({});
   useEffect(() => {
     if (!clientId) return;
     const peList = (localSections || []).flatMap((sec: any) => (sec.prescribed_exercises || []) as any[]);
@@ -1051,6 +1077,23 @@ export default function WorkoutLogger({
             };
           }
         }
+        // Every prior log for the movement, newest first — the rep-matched
+        // prefill needs the whole history, not just the last session.
+        const hist: Record<string, { weight: number | null; reps: number | null; set_number: number }[]> = {};
+        for (const pe of peIds) {
+          const list: { weight: number | null; reps: number | null; set_number: number }[] = [];
+          for (const row of rows) {
+            if (workoutLogId && row.workout_log_id === workoutLogId) continue;
+            if (!matches(row, pe)) continue;
+            list.push({
+              weight: row.weight_lbs == null ? null : Number(row.weight_lbs),
+              reps: row.reps == null ? null : Number(row.reps),
+              set_number: row.set_number,
+            });
+          }
+          if (list.length) hist[pe] = list;
+        }
+        setHistByPe(hist);
         setPrevByPe(map);
       } catch (e) {}
     })();
@@ -1068,7 +1111,20 @@ export default function WorkoutLogger({
         if (!pv || !Array.isArray(next[pe])) continue;
         next[pe] = next[pe].map((row: any, i: number) => {
           const p = pv[i + 1] || pv[i];
-          if (p && !row.done && (row.weight === '' || row.weight == null)) {
+          if (row.done || !(row.weight === '' || row.weight == null)) return row;
+          // Rep-matched first: the newest real weight this movement was logged
+          // at for THIS rep target. A blank/0 weight is not an answer — half of
+          // set_logs carry 0 from an empty box.
+          const target = Number(row.reps);
+          const list = histByPe[pe] || [];
+          const atReps = Number.isFinite(target) && target > 0
+            ? list.find((h) => h.reps === target && h.weight != null && h.weight > 0)
+            : undefined;
+          if (atReps) {
+            changed = true;
+            return { ...row, weight: String(atReps.weight) };
+          }
+          if (p) {
             changed = true;
             return { ...row, weight: p.weight, reps: (row.reps === '' || row.reps == null) ? p.reps : row.reps };
           }
@@ -1078,7 +1134,7 @@ export default function WorkoutLogger({
       return changed ? next : prev;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prevByPe]);
+  }, [prevByPe, histByPe]);
   // --- end previous weights ---
   // --- Inline exercise video (thumbnail + tap to play) ---
   const __ytId = (u: any): string | null => {
@@ -1159,6 +1215,12 @@ export default function WorkoutLogger({
         .eq("exercise_id", exerciseId)
         .is("tracked_fields", null);
     } catch { /* best-effort: the single-row update above already succeeded */ }
+    // And make it the movement's DEFAULT, so programs written later inherit it
+    // instead of falling back to the heuristic. RLS on exercises is
+    // trainer-only, so this is a no-op for anyone else even if it is reached.
+    try {
+      await supabase.from("exercises").update({ default_tracked_fields: nf }).eq("id", exerciseId);
+    } catch { /* the prescription-level fix already landed */ }
   };
 
   const saveCardioFields = async (peId: string, nf: string[], exerciseId?: string) => {
