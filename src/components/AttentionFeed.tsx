@@ -53,6 +53,7 @@ const TAG_ICON: Record<string, string> = {
   quiet: "ti-clock-pause",
   slipping: "ti-trending-down",
   nutrition: "ti-salad",
+  recipe: "ti-chef-hat",
 };
 
 interface DraftState {
@@ -241,7 +242,10 @@ export default function AttentionFeed() {
                   {r.detail}
                 </div>
                 <div style={{ display: "flex", gap: 12, marginTop: 7, alignItems: "center", flexWrap: "wrap" }}>
-                  <button
+                  {/* Drafting a message to a recipe is nonsense — and r.id is
+                      "recipe:<uuid>" here, not a client id, so the draft call
+                      would fail anyway. */}
+                  {r.tag !== "recipe" && <button
                     onClick={() => toggleDrafts(r)}
                     data-fx-own
                     style={{
@@ -255,12 +259,12 @@ export default function AttentionFeed() {
                     }}
                   >
                     {open === r.id ? "Hide drafts ▴" : "Draft a message ▾"}
-                  </button>
+                  </button>}
                   <Link
-                    href={"/clients/" + r.id}
+                    href={r.tag === "recipe" ? "/recipes" : "/clients/" + r.id}
                     style={{ fontSize: 11.5, fontWeight: 800, color: "var(--brand-text-secondary)", textDecoration: "none" }}
                   >
-                    Open profile
+                    {r.tag === "recipe" ? "Review it" : "Open profile"}
                   </Link>
                   <button
                     onClick={() => markHandled(r.id)}

@@ -45,8 +45,25 @@ export default async function RecipesPage() {
       : Promise.resolve({ data: [] }),
   ]);
 
+  // The client's live plan slots, so a recipe can become a meal without
+  // leaving the page. Trainer-authored plans get cloned on write (see
+  // /api/nutrition/plan-edit) — nothing here mutates Dustin's original.
+  let planMeals: { id: string; name: string; position: number }[] = [];
+  if (clientId) {
+    const { data: live } = await supabase
+      .from("meal_plans").select("id").eq("client_id", clientId).eq("status", "live")
+      .order("effective_date", { ascending: false }).limit(1);
+    const planId = ((live as { id: string }[]) || [])[0]?.id;
+    if (planId) {
+      const { data: ms } = await supabase
+        .from("meals").select("id, name, position").eq("meal_plan_id", planId).order("position");
+      planMeals = (ms as { id: string; name: string; position: number }[]) || [];
+    }
+  }
+
   return (
     <RecipesClient
+      planMeals={planMeals}
       clientId={clientId}
       isTrainer={isTrainer}
       mine={(mineRes.data as never[]) || []}

@@ -212,6 +212,32 @@ export async function GET() {
       }
     }
 
+    // 7. Recipes waiting on approval. Not a client-behaviour signal like the
+    //    rest, but it belongs in the same place for the same reason: it is a
+    //    thing only Dustin can clear, and it is invisible until someone opens
+    //    a tab they have no reason to open. A client who sends a recipe and
+    //    hears nothing for a week does not send a second one.
+    try {
+      const { data: pend } = await admin
+        .from("recipes")
+        .select("id, title, submitted_at, clients(name)")
+        .eq("visibility", "submitted")
+        .order("submitted_at");
+      const subs = (pend as unknown as { id: string; title: string; submitted_at: string | null; clients: { name: string | null } | null }[]) || [];
+      for (const s of subs) {
+        const who = (s.clients?.name || "").split(" ")[0] || "Someone";
+        const waited = s.submitted_at ? daysBetween(String(s.submitted_at).slice(0, 10), today) : 0;
+        rows.push({
+          id: "recipe:" + s.id,
+          name: who,
+          reason: "Recipe waiting for you",
+          detail: `“${s.title}” — sent ${waited <= 0 ? "today" : waited === 1 ? "yesterday" : waited + " days ago"}. Approve it and everyone gets it.`,
+          severity: waited >= 3 ? 3 : waited >= 1 ? 2 : 1,
+          tag: "recipe",
+        });
+      }
+    } catch { /* the roster feed stands on its own */ }
+
     rows.sort((a, b) => b.severity - a.severity || a.name.localeCompare(b.name));
     return NextResponse.json({ rows, checked: clients.length, generatedAt: today });
   } catch {

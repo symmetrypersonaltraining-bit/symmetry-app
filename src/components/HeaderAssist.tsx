@@ -13,6 +13,36 @@ const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
  * Self-contained: detects trainer + client-mode itself, writes feedback to
  * app_feedback, opens the AI panel via the existing "symmetry:open-ai" event.
  */
+
+/**
+ * Does this read like somebody logging a meal into the wrong box?
+ *
+ * Gerard, 1 Aug: logged M1 at 4:10pm, then at 4:14 and 4:20 typed "Had 1 cup
+ * cream of wheat, fruit, and 2 eggs for breakfast" and "Had 4 protein pancakes
+ * with pecans, blueberries, butter, milk and 1 egg with coconut water for
+ * lunch" into the FEEDBACK box. Both landed in Dustin's bug list; neither
+ * landed in his day. He had already done the hard part — writing the food out
+ * — and the app filed it where nothing would ever count it.
+ *
+ * Deliberately narrow: past-tense eating language plus a meal name. It is
+ * better to miss a few than to nag somebody writing a genuine bug report about
+ * breakfast.
+ */
+export function looksLikeAMealLog(text: string): boolean {
+  const t = (text || "").toLowerCase().trim();
+  if (t.length < 12) return false;
+  // A real bug report about food says something is wrong with the app.
+  if (/\b(bug|broken|wrong|won'?t|can'?t|doesn'?t|error|crash|fix|issue|should be|not working)\b/.test(t)) return false;
+  // Talking ABOUT the app is a bug report, however much food it mentions.
+  // "App automatically doubling the value of the meal I logged for breakfast"
+  // is a real report that this rule used to flag.
+  if (/\b(app|screen|button|tab|page|log|logs|logged|logging|shows?|says?|macros|database|serving size|swap|doubl\w*)\b/.test(t)) return false;
+  const ate = /\b(had|ate|eating|drank|just finished|for breakfast|for lunch|for dinner|as a snack)\b/.test(t);
+  const meal = /\b(breakfast|lunch|dinner|snack|meal|shake|smoothie)\b/.test(t);
+  const food = /\b(eggs?|oats?|rice|chicken|beef|steak|pancakes?|yogurt|protein|fruit|toast|coffee|salad|potato|cereal|wheat|milk|banana|apple|sandwich)\b/.test(t);
+  return ate && (meal || food);
+}
+
 export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
   const [isTrainer, setIsTrainer] = useState(false);
   const [clientMode, setClientMode] = useState(false);
@@ -103,6 +133,15 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
                 <button onClick={() => { buzz(12); setSentiment("change"); }} style={{ flex: 1, padding: "9px 0", borderRadius: 11, cursor: "pointer", border: "1px solid var(--brand-border, rgba(255,255,255,.15))", background: sentiment === "change" ? "var(--brand-primary)" : "transparent", color: sentiment === "change" ? "#fff" : "inherit", fontWeight: 600 }}>Change</button>
               </div>
               <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={3} placeholder="What do you like, or what should change?" style={{ width: "100%", resize: "vertical", borderRadius: 11, padding: "9px 10px", fontSize: 14, background: "var(--brand-surface, rgba(0,0,0,.25))", color: "inherit", border: "1px solid var(--brand-border, rgba(255,255,255,.15))", boxSizing: "border-box" }} />
+              {looksLikeAMealLog(msg) && (
+                <div style={{ marginTop: 8, padding: "9px 11px", borderRadius: 11, border: "1px solid #e0a83e", background: "rgba(224,168,62,0.12)", fontSize: 12.5, lineHeight: 1.45 }}>
+                  That reads like a meal. This box goes to Dustin as feedback — it will <b>not</b> count toward your day.
+                  <a href="/nutrition" style={{ display: "block", marginTop: 6, fontWeight: 800, color: "var(--brand-primary)", textDecoration: "none" }}>
+                    Log it in Nutrition instead →
+                  </a>
+                  <span style={{ opacity: 0.75 }}>Or send it anyway if you meant to.</span>
+                </div>
+              )}
               <button type="button" onClick={startVoice} style={{ marginTop: 8, width: "100%", padding: "9px 0", borderRadius: 11, border: "1px solid var(--brand-border, rgba(255,255,255,.15))", background: listening ? "var(--brand-primary)" : "transparent", color: listening ? "#fff" : "inherit", fontWeight: 600, cursor: "pointer" }}>{listening ? "Listening, tap to stop" : "Dictate with voice"}</button>
               <label style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "9px 10px", borderRadius: 11, border: "1px solid var(--brand-border, rgba(255,255,255,.15))", cursor: "pointer", fontSize: 13, boxSizing: "border-box" }}>
                 <span style={{ fontWeight: 600 }}>{file ? "🖼️ " + file.name.slice(0, 22) : "📎 Attach image"}</span>

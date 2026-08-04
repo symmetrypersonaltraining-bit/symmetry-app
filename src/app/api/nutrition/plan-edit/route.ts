@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    let body: { mealId?: string; overrides?: Record<string, unknown> | null };
+    let body: { mealId?: string; overrides?: Record<string, unknown> | null; items?: { food: string; amount?: number | null; unit?: string | null; protein?: number; carbs?: number; fats?: number }[] };
     try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
     const mealId = body.mealId;
     if (!mealId) return NextResponse.json({ error: "Missing mealId" }, { status: 400 });
@@ -83,7 +83,21 @@ export async function POST(req: NextRequest) {
       .select("id, food, amount, unit, basis, protein, carbs, fats, is_unlimited, position")
       .eq("meal_id", meal.id)
       .order("position");
-    const edited = resolveEditedItems((itemRows as PlanItemLike[]) || [], body.overrides || null);
+    // A recipe replaces the meal outright: its own ingredients ARE the new
+    // items, so there is nothing to fold overrides into. Everything else
+    // (the day's adjustments) goes through resolveEditedItems.
+    const edited = Array.isArray(body.items) && body.items.length
+      ? body.items.slice(0, 40).map((i) => ({
+          food: String(i.food || "").slice(0, 120),
+          amount: i.amount == null || !Number.isFinite(Number(i.amount)) ? null : Number(i.amount),
+          unit: i.unit ? String(i.unit).slice(0, 24) : null,
+          basis: null,
+          protein: Math.round(Number(i.protein) || 0),
+          carbs: Math.round(Number(i.carbs) || 0),
+          fats: Math.round(Number(i.fats) || 0),
+          is_unlimited: false,
+        })).filter((i) => i.food)
+      : resolveEditedItems((itemRows as PlanItemLike[]) || [], body.overrides || null);
     if (!edited.length) return NextResponse.json({ error: "That would leave the meal empty" }, { status: 400 });
 
     let targetPlanId = meal.meal_plan_id;

@@ -43,10 +43,11 @@ type Tab = "mine" | "shared" | "pending";
 const r0 = (n: number) => Math.round(Number(n) || 0);
 
 export default function RecipesClient({
-  clientId, isTrainer, mine, shared, pending,
+  clientId, isTrainer, mine, shared, pending, planMeals,
 }: {
   clientId: string | null;
   isTrainer: boolean;
+  planMeals: { id: string; name: string; position: number }[];
   mine: RecipeRow[];
   shared: RecipeRow[];
   pending: RecipeRow[];
@@ -143,7 +144,7 @@ export default function RecipesClient({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={rec.image_url} alt="" style={{ width: 58, height: 58, borderRadius: 12, objectFit: "cover", flex: "0 0 auto" }} />
                 ) : (
-                  <div style={{ width: 58, height: 58, borderRadius: 12, background: "var(--brand-card)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flex: "0 0 auto" }}>🍽️</div>
+                  <RecipeCover title={rec.title} size={58} />
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>{rec.title}</div>
@@ -212,20 +213,83 @@ export default function RecipesClient({
         })
       )}
 
-      {viewing && <RecipeView rec={viewing} onClose={() => setViewing(null)} />}
+      {viewing && <RecipeView rec={viewing} planMeals={planMeals} onClose={() => setViewing(null)} />}
+    </div>
+  );
+}
+
+
+/**
+ * A cover for a recipe with no photo.
+ *
+ * Deterministic from the title, so the same dish always looks the same, and two
+ * dishes next to each other never look identical. Beats a grey box, costs
+ * nothing to store, and a real photo replaces it the moment somebody uploads
+ * one from the builder.
+ */
+function RecipeCover({ title, size }: { title: string; size: number }) {
+  let h = 0;
+  for (let i = 0; i < title.length; i++) h = (h * 31 + title.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  const initials = title.replace(/[^A-Za-z ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: size > 100 ? 14 : 12, flex: "0 0 auto",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      background: `linear-gradient(140deg, hsl(${hue} 62% 42%), hsl(${(hue + 42) % 360} 58% 28%))`,
+      color: "rgba(255,255,255,0.92)", fontWeight: 900, letterSpacing: ".02em",
+      fontSize: Math.max(13, Math.round(size * 0.34)),
+    }}>
+      {initials || "🍽"}
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function RecipeView({ rec, onClose }: { rec: RecipeRow; onClose: () => void }) {
+function RecipeView({ rec, planMeals, onClose }: { rec: RecipeRow; planMeals: { id: string; name: string; position: number }[]; onClose: () => void }) {
   const [ings, setIngs] = useState<{ food: string; amount: number | null; unit: string | null; protein: number; carbs: number; fats: number; source: string; note: string | null }[] | null>(null);
   const supabase = useMemo(() => createClient(), []);
   // Logging it is the point of having cooked it.
   const [howMany, setHowMany] = useState("1");
   const [logging, setLogging] = useState(false);
   const [logged, setLogged] = useState<string | null>(null);
+
+  // Make it a meal, not just today's entry. Which slot is the client's call —
+  // this is their plan, and a recipe that lands in the wrong one is worse than
+  // no button. The server clones a trainer-authored plan before writing, so
+  // Dustin's original is archived and restorable, never overwritten.
+  const [slot, setSlot] = useState("");
+  const [planning, setPlanning] = useState(false);
+
+  async function addToPlan() {
+    if (!slot || planning || !ings) return;
+    setPlanning(true);
+    try {
+      const s = Number(rec.servings) || 1;
+      // Scaled to ONE serving: a plan meal is what you eat, not what the pot
+      // holds. A six-serving chili dropped in whole would triple somebody's day.
+      const items = ings.map((i) => ({
+        food: i.food,
+        amount: i.amount == null ? null : Math.round((i.amount / s) * 100) / 100,
+        unit: i.unit,
+        protein: Math.round(Number(i.protein) / s),
+        carbs: Math.round(Number(i.carbs) / s),
+        fats: Math.round(Number(i.fats) / s),
+      }));
+      const res = await fetch("/api/nutrition/plan-edit", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mealId: slot, items }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) { setLogged((json && json.error) || "Couldn't add that to your plan."); return; }
+      setLogged(json.cloned
+        ? "Added to your plan 📌 — this is your version now, Dustin's is in your history"
+        : "Added to your plan 📌");
+    } catch {
+      setLogged("Network error — check your connection.");
+    } finally { setPlanning(false); }
+  }
 
   async function logIt() {
     if (logging) return;
@@ -256,9 +320,11 @@ function RecipeView({ rec, onClose }: { rec: RecipeRow; onClose: () => void }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 95, background: "rgba(8,10,18,0.75)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto", background: "var(--brand-bg)", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16 }}>
-        {rec.image_url && (
+        {rec.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={rec.image_url} alt="" style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 14, marginBottom: 12 }} />
+        ) : (
+          <div style={{ marginBottom: 12 }}><RecipeCover title={rec.title} size={180} /></div>
         )}
         <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--brand-text)", margin: "0 0 4px" }}>{rec.title}</h2>
         <div style={{ fontSize: 12, color: "var(--brand-text-secondary)", marginBottom: 10 }}>
@@ -317,6 +383,19 @@ function RecipeView({ rec, onClose }: { rec: RecipeRow; onClose: () => void }) {
             {logging ? "Logging…" : "🍽️ Log this to today"}
           </button>
         </div>
+        {planMeals.length > 0 && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+            <select value={slot} onChange={(e) => setSlot(e.target.value)}
+              style={{ flex: 1, minWidth: 0, padding: "10px 8px", borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-card)", color: "var(--brand-text)", fontSize: 12.5 }}>
+              <option value="">Put it in my plan as…</option>
+              {planMeals.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+            <button onClick={addToPlan} disabled={!slot || planning}
+              style={{ flex: "0 0 auto", padding: "11px 14px", borderRadius: 12, border: "1px solid var(--brand-primary)", background: "transparent", color: "var(--brand-primary)", fontWeight: 800, fontSize: 12.5, cursor: !slot || planning ? "default" : "pointer", opacity: !slot || planning ? 0.5 : 1 }}>
+              {planning ? "Adding…" : "📌 Add"}
+            </button>
+          </div>
+        )}
         {logged && <p style={{ fontSize: 12.5, fontWeight: 700, color: "var(--brand-primary)", textAlign: "center", marginTop: 8 }}>{logged}</p>}
 
         <button onClick={onClose} style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, border: "1px solid var(--brand-border)", background: "transparent", color: "var(--brand-text-secondary)", fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}>
