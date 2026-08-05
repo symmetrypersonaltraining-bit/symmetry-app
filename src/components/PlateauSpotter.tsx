@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 
 interface Row {
   exercise: string;
+  assistance?: boolean;
   best: number;
   reps: number;
   lastIncrease: string | null;
@@ -109,7 +110,10 @@ export default function PlateauSpotter({ clientId }: { clientId: string }) {
               </div>
               <div style={{ textAlign: "right", flex: "0 0 auto" }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: "var(--brand-text)" }}>
-                  {Math.round(r.best)} lb{r.reps ? " × " + r.reps : ""}
+                  {/* "120 lb" on an assisted dip reads like a load. It is the
+                      assistance being taken off, and without the word the whole
+                      row means the opposite of what it looks like. */}
+                  {Math.round(r.best)} lb{r.assistance ? " assist" : ""}{r.reps ? " × " + r.reps : ""}
                 </div>
                 <div style={{ fontSize: 10.5, fontWeight: 700, color: hot ? "#ef4444" : "#f59e0b" }}>
                   {weeks} wk{weeks === 1 ? "" : "s"}

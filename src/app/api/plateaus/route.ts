@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TRAINER_EMAIL, Db } from "@/lib/ai/scope";
 import { createClient } from "@/lib/supabase/server";
+import { isBetterLoad, looksLikeAssistance } from "@/lib/loadDirection";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,8 @@ function daysBetween(a: string, b: string): number {
 
 export interface PlateauRow {
   exercise: string;
+  /** Lower load = stronger (assisted dip/pull-up). Changes what "best" means AND how it reads. */
+  assistance: boolean;
   best: number;
   reps: number;
   lastIncrease: string | null;
@@ -85,12 +88,12 @@ export async function GET(req: NextRequest) {
 
     // Chunked so a long-tenured client can't blow the URL length on .in().
     const ids = logs.map((l) => l.id);
-    const setRows: { workout_log_id: string; weight_lbs: number | null; reps: number | null; exercises: { name?: string } | null }[] = [];
+    const setRows: { workout_log_id: string; weight_lbs: number | null; reps: number | null; exercises: { name?: string; load_is_assistance?: boolean } | null }[] = [];
     for (let i = 0; i < ids.length; i += 100) {
       const slice = ids.slice(i, i + 100);
       const r = await admin
         .from("set_logs")
-        .select("workout_log_id, weight_lbs, reps, exercise_id, completed, exercises(name)")
+        .select("workout_log_id, weight_lbs, reps, exercise_id, completed, exercises(name, load_is_assistance)")
         .in("workout_log_id", slice)
         .eq("completed", true);
       for (const s of ((r.data as Record<string, unknown>[]) || [])) {
@@ -98,24 +101,34 @@ export async function GET(req: NextRequest) {
           workout_log_id: s.workout_log_id as string,
           weight_lbs: s.weight_lbs as number | null,
           reps: s.reps as number | null,
-          exercises: (s.exercises as { name?: string } | null) || null,
+          exercises: (s.exercises as { name?: string; load_is_assistance?: boolean } | null) || null,
         });
       }
     }
 
     // exercise name -> date -> best { weight, reps }
+    //
+    // "Best" is not always "most". On an assisted dip or pull-up machine the
+    // stack counterweights the lifter, so taking weight OFF is the improvement.
+    // This card was telling Dustin that Tim's assisted dip hadn't moved in four
+    // weeks while Tim went 140 -> 110 and doubled the reps. See lib/loadDirection.
+    const assistByName = new Map<string, boolean>();
     const byEx = new Map<string, Map<string, { w: number; r: number }>>();
     for (const s of setRows) {
       const name = (s.exercises?.name || "").trim();
       const w = Number(s.weight_lbs) || 0;
       const r = Number(s.reps) || 0;
       if (!name || w <= 0) continue; // bodyweight / cardio can't plateau on load
+      if (!assistByName.has(name)) {
+        assistByName.set(name, s.exercises?.load_is_assistance ?? looksLikeAssistance(name));
+      }
+      const assist = assistByName.get(name)!;
       const d = dateOf.get(s.workout_log_id);
       if (!d) continue;
       if (!byEx.has(name)) byEx.set(name, new Map());
       const perDay = byEx.get(name)!;
       const cur = perDay.get(d);
-      if (!cur || w > cur.w) perDay.set(d, { w, r });
+      if (!cur || isBetterLoad(w, cur.w, assist)) perDay.set(d, { w, r });
     }
 
     const rows: PlateauRow[] = [];
@@ -127,12 +140,16 @@ export async function GET(req: NextRequest) {
       const lastSeen = dates[dates.length - 1];
       if (daysBetween(lastSeen, today) > RECENT_DAYS) continue; // dropped from the program
 
-      let runningBest = 0;
+      const assist = assistByName.get(name) ?? false;
+      // Seeded from the first session rather than 0, because on an assisted
+      // movement every real load is BELOW zero-is-best and nothing would ever
+      // count as an improvement.
+      let runningBest: number | null = null;
       let lastIncrease: string | null = null;
       let bestReps = 0;
       for (const d of dates) {
         const e = perDay.get(d)!;
-        if (e.w > runningBest) {
+        if (runningBest === null || isBetterLoad(e.w, runningBest, assist)) {
           runningBest = e.w;
           bestReps = e.r;
           lastIncrease = d;
@@ -148,7 +165,8 @@ export async function GET(req: NextRequest) {
 
       rows.push({
         exercise: name,
-        best: runningBest,
+        assistance: assist,
+        best: runningBest as number,
         reps: bestReps,
         lastIncrease,
         daysStuck,

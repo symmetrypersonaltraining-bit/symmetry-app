@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Confetti from "./Confetti";
+import { loadLabel } from "@/lib/loadDirection";
 import Link from "next/link";
 import CountUp from "@/components/CountUp";
 import ShareToGroup from "@/components/ShareToGroup";
@@ -144,7 +145,7 @@ export default function CelebrationScreen({
   // concepts gain personalisation without any of them being rewritten. Every
   // failure path leaves aiLine null and the screen behaves exactly as before.
   const [aiLine, setAiLine] = useState<string | null>(null);
-  const [aiPrs, setAiPrs] = useState<{ movement: string; weight: number; reps: number; previous: number | null }[]>([]);
+  const [aiPrs, setAiPrs] = useState<{ movement: string; weight: number; reps: number; previous: number | null; assistance?: boolean }[]>([]);
   // 80f43c91: "Add how many coach Dustin's you lifted for workout celebrations."
   // His real weigh-in, served by /api/celebration, so the joke tracks his cut
   // instead of quietly drifting out of date. null until it lands (or forever,
@@ -188,11 +189,18 @@ export default function CelebrationScreen({
   // one, and neither is nudging 100 lb to 102.5. Ten pounds up, or five
   // percent up, is the bar. That keeps the head rare on its own — no extra
   // dice roll needed, because big PRs are already occasional.
+  // On an assisted machine the gain is the amount taken OFF the stack, so the
+  // subtraction runs the other way. Written as one `gain` rather than two
+  // branches, because a threshold that is right in one place and inverted in
+  // another is how the whole assisted-lift problem started. See lib/loadDirection.
+  const prGain = topPr && topPr.previous
+    ? (topPr.assistance ? topPr.previous - topPr.weight : topPr.weight - topPr.previous)
+    : 0;
   const bigPr = !!(
     topPr &&
     topPr.previous &&
     topPr.previous > 0 &&
-    (topPr.weight - topPr.previous >= 10 || topPr.weight >= topPr.previous * 1.05)
+    (prGain >= 10 || prGain >= topPr.previous * 0.05)
   );
 
   const vStr = volume.toLocaleString();
@@ -212,8 +220,8 @@ export default function CelebrationScreen({
   const unitCount = Math.max(1, Math.round(volume / unit[1]));
 
   const shareText = topPr
-    ? `🏆 ${firstName} just hit a PR — ${topPr.movement} ${topPr.weight} lb × ${topPr.reps}` +
-      (topPr.previous ? ` (previous best ${topPr.previous} lb)` : "")
+    ? `🏆 ${firstName} just hit a PR — ${topPr.movement} ${loadLabel(topPr.weight, !!topPr.assistance)} × ${topPr.reps}` +
+      (topPr.previous ? ` (was ${loadLabel(topPr.previous, !!topPr.assistance)})` : "")
     : `💪 ${firstName} just finished ${dayLabel || "a session"} — ${setCount} sets, ${vStr} lb moved` +
       (dustins ? ` — that's ${dustins} coach Dustin${dustins === 1 ? "" : "s"}.` : ".");
   // ── PR auto-share ────────────────────────────────────────────────────────
@@ -886,7 +894,7 @@ export default function CelebrationScreen({
   // card you get bored of. The PR plate above already carries the numbers, so
   // this card is the reaction, not a second scoreboard.
   if (bigPr && topPr) {
-    const jump = Math.round(topPr.weight - (topPr.previous || 0));
+    const jump = Math.round(Math.abs(prGain));
     content = (
       <div style={{ ...bigCard, background: "radial-gradient(100% 80% at 50% 34%, #3a2c10 0%, #150f04 62%, #080602 100%)", padding: "22px 16px" }}>
         <div aria-hidden style={rays} />
@@ -900,7 +908,9 @@ export default function CelebrationScreen({
           style={{ width: 132, height: "auto", display: "block", margin: "14px 0 4px", position: "relative", zIndex: 1, filter: "drop-shadow(0 0 26px rgba(224,168,62,.55))", animation: "cs-bob 3.4s ease-in-out .3s infinite" }}
         />
         <div style={{ position: "relative", zIndex: 1, fontSize: 18.5, fontWeight: 900, color: "#ffe9b0", lineHeight: 1.25, marginTop: 8 }}>
-          {firstName} put {jump} more pound{jump === 1 ? "" : "s"} on {topPr.movement}.
+          {topPr.assistance
+            ? `${firstName} took ${jump} pound${jump === 1 ? "" : "s"} off the ${topPr.movement}.`
+            : `${firstName} put ${jump} more pound${jump === 1 ? "" : "s"} on ${topPr.movement}.`}
         </div>
         <div style={{ position: "relative", zIndex: 1, fontSize: 12.5, color: "#d9c18a", marginTop: 8, maxWidth: 270, lineHeight: 1.55 }}>
           Coach Dustin has materialised. He only does this for the big ones. He
@@ -936,13 +946,17 @@ export default function CelebrationScreen({
         <div style={prPlate}>
           <div style={{ fontSize: 9.5, letterSpacing: 3, color: "#e0a83e", fontWeight: 900 }}>NEW PERSONAL RECORD</div>
           <div style={{ fontSize: 27, fontWeight: 900, color: "#ffe9b0", margin: "6px 0", letterSpacing: -0.5 }}>
-            {topPr.weight} lb
+            {topPr.weight} lb{topPr.assistance ? <span style={{ fontSize: 14, fontWeight: 800 }}> assist</span> : null}
           </div>
           <div style={{ fontSize: 12.5, color: "#d9c18a" }}>
             {topPr.movement} × {topPr.reps}
           </div>
           {topPr.previous ? (
-            <div style={{ marginTop: 8, fontSize: 10.5, color: "#b9a071" }}>previous best · {topPr.previous} lb</div>
+            <div style={{ marginTop: 8, fontSize: 10.5, color: "#b9a071" }}>
+              {/* "previous best 140 lb" next to "120 lb" reads like a step
+                  backwards on an assisted machine. It is 20 lb less help. */}
+              {topPr.assistance ? `was ${topPr.previous} lb assist — ${Math.round(prGain)} lb less help` : `previous best · ${topPr.previous} lb`}
+            </div>
           ) : null}
           {aiPrs.length > 1 ? (
             <div style={{ marginTop: 8, fontSize: 10.5, color: "#b9a071" }}>+{aiPrs.length - 1} more today</div>

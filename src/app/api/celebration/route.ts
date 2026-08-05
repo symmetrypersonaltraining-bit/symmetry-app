@@ -25,6 +25,7 @@ import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { compareLoads, isBetterLoad, looksLikeAssistance } from "@/lib/loadDirection";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,8 @@ interface Pr {
   weight: number;
   reps: number;
   previous: number | null;
+  /** Assisted machine: the weight came DOWN, and the screen has to say so. */
+  assistance?: boolean;
 }
 
 function validate(raw: unknown): { line: string } | null {
@@ -155,11 +158,16 @@ export async function POST(req: NextRequest) {
     // Today's sets for this session
     let sets = 0;
     let volume = 0;
-    const todayBest = new Map<string, { w: number; r: number; name: string }>();
+    // "Best" is not always "most". On an assisted dip or pull-up the stack
+    // counterweights the lifter, so the improvement is taking weight OFF — and
+    // a PR check written as `w > previous` can never fire on one. Tim Yancey
+    // went 140 -> 110 on assisted dips over a month and was never once
+    // congratulated for it. See lib/loadDirection.
+    const todayBest = new Map<string, { w: number; r: number; name: string; assist: boolean }>();
     if (logRow?.id) {
       const { data: sl } = await admin
         .from("set_logs")
-        .select("weight_lbs, reps, exercise_id, completed, exercises(name)")
+        .select("weight_lbs, reps, exercise_id, completed, exercises(name, load_is_assistance)")
         .eq("workout_log_id", logRow.id)
         .eq("completed", true);
       for (const s of ((sl as Record<string, unknown>[]) || [])) {
@@ -169,9 +177,11 @@ export async function POST(req: NextRequest) {
         volume += w * r;
         const exId = s.exercise_id as string | null;
         const nm = ((s.exercises as { name?: string } | null)?.name) || "";
+        const assist = ((s.exercises as { load_is_assistance?: boolean } | null)?.load_is_assistance)
+          ?? looksLikeAssistance(nm);
         if (exId && w > 0) {
           const cur = todayBest.get(exId);
-          if (!cur || w > cur.w) todayBest.set(exId, { w, r, name: nm });
+          if (!cur || isBetterLoad(w, cur.w, assist)) todayBest.set(exId, { w, r, name: nm, assist });
         }
       }
     }
@@ -191,14 +201,17 @@ export async function POST(req: NextRequest) {
       for (const p of ((prior as Record<string, unknown>[]) || [])) {
         const id = p.exercise_id as string;
         const w = Number(p.weight_lbs) || 0;
-        if (!best.has(id) || w > (best.get(id) as number)) best.set(id, w);
+        const assist = todayBest.get(id)?.assist ?? false;
+        if (!best.has(id) || isBetterLoad(w, best.get(id) as number, assist)) best.set(id, w);
       }
       for (const [id, t] of todayBest) {
         const prev = best.get(id);
         // A first-ever logged weight is not a "record" — needs something to beat.
-        if (prev != null && t.w > prev) prs.push({ movement: t.name, weight: t.w, reps: t.r, previous: prev });
+        if (prev != null && isBetterLoad(t.w, prev, t.assist)) {
+          prs.push({ movement: t.name, weight: t.w, reps: t.r, previous: prev, assistance: t.assist });
+        }
       }
-      prs.sort((a, b) => b.weight - a.weight);
+      prs.sort(compareLoads);
     }
 
     // Streak: consecutive days back from today with a completed workout

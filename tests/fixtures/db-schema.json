@@ -462,7 +462,8 @@
     "created_by",
     "video_status",
     "video_checked_at",
-    "default_tracked_fields"
+    "default_tracked_fields",
+    "load_is_assistance"
   ],
   "food_catalog": [
     "id",
