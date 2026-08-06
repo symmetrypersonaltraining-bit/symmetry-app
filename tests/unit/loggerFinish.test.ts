@@ -109,3 +109,59 @@ test("the trainer's own client row is found by id, not by their name", () => {
   assert.ok(!/ilike\("name", "%Dustin%"\)/.test(PAGE_CODE), "never identify a person by a substring of their name");
   assert.match(PAGE_CODE, /\.eq\("auth_user_id", user\.id\)/);
 });
+
+/**
+ * "IT KEEPS COMPLETING MY CARDIO FOR TODAY INSTEAD."
+ *
+ * Madeleine Coker, 2026-08-06 06:35: "Trying to log my cardio for yesterday and
+ * it keeps completing my cardio for today instead."
+ *
+ * Exactly what the data showed. She tapped the 5 Aug cardio card at 06:30 on
+ * the 6th and the app:
+ *
+ *   - wrote the workout_log with log_date = 6 Aug
+ *   - marked the 6th's cardio card completed
+ *   - left the 5th's card still "scheduled"
+ *
+ * So her make-up vanished and a day she had not trained got credited. Doing it
+ * again would keep re-closing today, which is why "it KEEPS completing".
+ *
+ * The logger had no idea which day it was logging. It asked the clock, in three
+ * separate places — the log insert, the scheduled-row match, and the
+ * existing-log lookup. The scheduled_workouts row it was opened from knows the
+ * answer, and page.tsx was already reading that row and throwing the date away.
+ *
+ * One value, threaded through. A card from the past records against the day it
+ * was FOR; a card from the future records against today, because that is when
+ * the work actually happened.
+ */
+test("the logger knows which day it is logging, and does not ask the clock", () => {
+  const page = PAGE_CODE;
+  assert.match(page, /\.select\("day_id, scheduled_date"\)/, "the scheduled date must be read, not discarded");
+  assert.match(
+    page,
+    /const sessionDate = scheduledDate && scheduledDate < today \? scheduledDate : today;/,
+    "past card → its own date; future card → today",
+  );
+  assert.match(page, /sessionDate=\{sessionDate\}/, "and it has to reach the logger");
+});
+
+test("nothing in the finish path reads the clock any more", () => {
+  // Three call sites each asked "what is today?" independently. That is the
+  // same shape as every other bug in this file: one fact, computed in more than
+  // one place, drifting apart.
+  assert.match(CODE, /log_date: sessionDate,/, "the log row belongs to the session date");
+  assert.match(CODE, /const __today = sessionDate;/, "so does the scheduled row it closes");
+  assert.ok(
+    !/toLocaleDateString\("en-CA"/.test(CODE),
+    "the logger must not compute today for itself; sessionDate is the single answer",
+  );
+});
+
+test("the page finds the log for THAT day, not 'today or later'", () => {
+  // .gte("log_date", today) could never match yesterday's log, so a make-up
+  // opened a blank screen and made a second row.
+  assert.match(PAGE_CODE, /\.eq\("log_date", sessionDate\)/);
+  assert.ok(!/\.gte\("log_date", today\)/.test(PAGE_CODE), "the old today-or-later window is back");
+  assert.match(PAGE_CODE, /\.eq\("scheduled_date", sessionDate\)/);
+});

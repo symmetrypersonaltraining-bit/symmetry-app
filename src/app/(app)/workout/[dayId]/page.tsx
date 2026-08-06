@@ -19,13 +19,26 @@ export default async function WorkoutDayPage({
   const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
 
   let resolvedDayId = dayId;
+  // The DATE this session belongs to, which is not always today.
+  //
+  // Madeleine Coker, 2026-08-06 06:35: "Trying to log my cardio for yesterday
+  // and it keeps completing my cardio for today instead." She tapped the 5 Aug
+  // cardio card at 06:30 on the 6th; the app wrote log_date = 6 Aug, marked the
+  // 6th's card complete, and left the 5th still outstanding. Her make-up
+  // vanished and a day she had not trained got credited.
+  //
+  // The logger had no concept of which day it was logging — it asked the clock,
+  // in three separate places. The scheduled_workouts row it was opened from
+  // knows, and the answer was being read and thrown away right here.
+  let scheduledDate: string | null = null;
   {
     const { data: schedRow } = await supabase
       .from("scheduled_workouts")
-      .select("day_id")
+      .select("day_id, scheduled_date")
       .eq("id", dayId)
       .maybeSingle();
     if (schedRow?.day_id) resolvedDayId = schedRow.day_id;
+    if (schedRow?.scheduled_date) scheduledDate = schedRow.scheduled_date as string;
   }
 
   const { data: day } = await supabase
@@ -100,6 +113,12 @@ export default async function WorkoutDayPage({
   }
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  // A card from the past is a make-up and records against the day it was FOR —
+  // that is what "log my cardio for yesterday" means, and it is what Dustin's
+  // adherence per scheduled day counts. A card from the future records against
+  // today, because that is the day the work actually happened; completing it
+  // still closes the future card.
+  const sessionDate = scheduledDate && scheduledDate < today ? scheduledDate : today;
   // TODAY'S log for this day — and it must survive there being more than one.
   //
   // This was .maybeSingle(), which in PostgREST is not "give me one of them" but
@@ -116,7 +135,7 @@ export default async function WorkoutDayPage({
     .select("id, completed, log_date, created_at, set_logs(*)")
     .eq("client_id", clientId || "")
     .eq("day_id", resolvedDayId)
-    .gte("log_date", today)
+    .eq("log_date", sessionDate)
     .order("completed", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(1);
@@ -132,7 +151,7 @@ export default async function WorkoutDayPage({
     .is("deleted_at", null)
     .eq("day_id", resolvedDayId)
     .eq("client_id", clientId || "")
-    .eq("scheduled_date", today)
+    .eq("scheduled_date", sessionDate)
     // Same maybeSingle trap: two scheduled rows for one day is a real state in
     // this data (Dustin had two identical "Peak — Arms A" cards on 4 Aug) and it
     // must not blank the id out.
@@ -155,6 +174,7 @@ export default async function WorkoutDayPage({
       existingLogId={existingLog?.id || null}
       existingSetLogs={existingLog?.set_logs || []}
       scheduledWorkoutId={scheduledWorkoutId}
+      sessionDate={sessionDate}
     />
   );
 }

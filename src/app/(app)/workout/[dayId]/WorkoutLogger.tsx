@@ -67,6 +67,13 @@ interface Props {
   existingSetLogs: any[];
   /** The scheduled_workouts row this session came from, when it was on the calendar. */
   scheduledWorkoutId?: string | null;
+  /**
+   * The DATE this session belongs to — the scheduled date for a make-up, today
+   * otherwise. Everything that used to ask the clock asks this instead.
+   * Madeleine Coker, 8/6: "Trying to log my cardio for yesterday and it keeps
+   * completing my cardio for today instead."
+   */
+  sessionDate: string;
 }
 
 type SetData = { weight: string; reps: string; time: string; speed: string; hr: string; done: boolean };
@@ -645,7 +652,7 @@ function VideoModal({ url, onClose }: { url: string; onClose: () => void }) {
 
 export default function WorkoutLogger({
   day, phase, program, sections, clientId, clientName, isTrainerSession,
-  existingLogId, existingSetLogs, scheduledWorkoutId,
+  existingLogId, existingSetLogs, scheduledWorkoutId, sessionDate,
 }: Props) {
   const supabase = createClient();
 
@@ -1179,9 +1186,11 @@ export default function WorkoutLogger({
 
   async function ensureWorkoutLog(): Promise<string> {
     if (workoutLogId) return workoutLogId;
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+    // sessionDate, NOT the clock. Logging yesterday's cardio this morning wrote
+    // log_date = today, so the make-up disappeared and today got credited for
+    // work that was not done.
     const { data, error } = await supabase.from("workout_logs").insert({
-      client_id: clientId, day_id: day.id, log_date: today,
+      client_id: clientId, day_id: day.id, log_date: sessionDate,
       started_at: new Date().toISOString(), completed: false,
     }).select("id").single();
     if (error) throw error;
@@ -1401,7 +1410,9 @@ export default function WorkoutLogger({
       // calendar claiming a workout that has no log behind it.
       if (logErr) throw logErr;
       {
-        const __today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+        // The day this session is FOR. Matching on the clock is what closed the
+        // wrong card: the 6th's cardio was ticked off while the 5th's stayed open.
+        const __today = sessionDate;
         // Mark the scheduled workout complete. Prefer today's instance; if the
         // workout was scheduled for a prior day and never moved, fall back to the
         // most recent still-scheduled instance on/before today so make-up logs
