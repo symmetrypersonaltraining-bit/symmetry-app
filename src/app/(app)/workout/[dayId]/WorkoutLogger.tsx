@@ -1185,7 +1185,36 @@ export default function WorkoutLogger({
   }
 
   async function ensureWorkoutLog(): Promise<string> {
-    if (workoutLogId) return workoutLogId;
+    // Dustin, 2026-08-06, mid-session on Knee Stability P2 Day 2:
+    //   "Couldn't finish the workout: insert or update on table
+    //    scheduled_workouts violates foreign key constraint
+    //    scheduled_workouts_workout_log_id_fkey."
+    //
+    // The id came out of the resumed draft in localStorage, and the row it
+    // named was gone. This function trusted it on sight. What followed:
+    //
+    //   1. the workout_logs UPDATE ran with .eq("id", <dead id>) and matched
+    //      NOTHING — PostgREST does not call that an error, so it passed
+    //   2. the scheduled_workouts write then pointed at the same dead id and
+    //      the foreign key finally caught it
+    //
+    // So the failure surfaced two steps downstream of its cause, wearing the
+    // name of a table that had nothing to do with it. And it was permanent:
+    // the draft is re-read on every mount, so "tap Complete again" handed the
+    // very same dead id back, forever. The sets could not save either —
+    // set_logs carries the same foreign key.
+    //
+    // A resumed id is a claim about the database, not a fact. Check it.
+    if (workoutLogId) {
+      const { data: alive } = await supabase
+        .from("workout_logs").select("id").eq("id", workoutLogId).maybeSingle();
+      if (alive) return workoutLogId;
+      // Dead. Drop it and fall through to a fresh row rather than stranding
+      // the session — the sets are all still in component state and get
+      // written against the new log the moment it exists.
+      setWorkoutLogId(null);
+      __clearDraft();
+    }
     // sessionDate, NOT the clock. Logging yesterday's cardio this morning wrote
     // log_date = today, so the make-up disappeared and today got credited for
     // work that was not done.
@@ -1401,14 +1430,19 @@ export default function WorkoutLogger({
     setCompleteError(null);
     try {
       const logId = await ensureWorkoutLog();
-      const { error: logErr } = await supabase.from("workout_logs").update({
+      const { data: logRows, error: logErr } = await supabase.from("workout_logs").update({
         completed: true, completed_at: new Date().toISOString(), status: "Done as planned",
         note: sessionNote || null,
-      }).eq("id", logId);
+      }).eq("id", logId).select("id");
       // THE workout row. If this failed the session did not happen as far as the
       // app is concerned, and carrying on to the schedule update would leave the
       // calendar claiming a workout that has no log behind it.
       if (logErr) throw logErr;
+      // An UPDATE that matches no rows is not an error in PostgREST, so this
+      // used to sail through and let the failure resurface further down as a
+      // foreign-key violation naming scheduled_workouts. Nought rows here means
+      // the log is not there; say so, here, where it happened.
+      if (!logRows || !logRows.length) throw new Error("the workout log went missing mid-session");
       {
         // The day this session is FOR. Matching on the clock is what closed the
         // wrong card: the 6th's cardio was ticked off while the 5th's stayed open.

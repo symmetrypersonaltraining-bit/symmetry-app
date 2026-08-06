@@ -165,3 +165,51 @@ test("the page finds the log for THAT day, not 'today or later'", () => {
   assert.ok(!/\.gte\("log_date", today\)/.test(PAGE_CODE), "the old today-or-later window is back");
   assert.match(PAGE_CODE, /\.eq\("scheduled_date", sessionDate\)/);
 });
+
+/**
+ * "VIOLATES FOREIGN KEY CONSTRAINT SCHEDULED_WORKOUTS_WORKOUT_LOG_ID_FKEY."
+ *
+ * Dustin, 2026-08-06, 11 exercises into Knee Stability P2 Day 2:
+ * "Couldn't finish the workout: insert or update on table scheduled_workouts
+ * violates foreign key constraint scheduled_workouts_workout_log_id_fkey.
+ * Your sets are saved — tap Complete again."
+ *
+ * The sets were not saved, and tapping again could never work.
+ *
+ * ensureWorkoutLog short-circuited on any id it already held — including one
+ * rehydrated from the localStorage draft, which is a claim about the database
+ * and not a fact. The row was gone. What followed:
+ *
+ *   - the workout_logs UPDATE ran .eq("id", <dead id>), matched no rows, and
+ *     PostgREST called that success
+ *   - the scheduled_workouts write pointed at the same dead id and the foreign
+ *     key caught it there
+ *
+ * So the error named a table that had nothing to do with the cause, two steps
+ * downstream. And because the draft is re-read on every mount, "tap Complete
+ * again" handed back the identical dead id — permanently stuck. set_logs
+ * carries the same foreign key, so nothing was being written either.
+ */
+test("a resumed workout log id is verified before it is trusted", () => {
+  assert.match(
+    CODE,
+    /const \{ data: alive \} = await supabase\s*\n?\s*\.from\("workout_logs"\)\.select\("id"\)\.eq\("id", workoutLogId\)\.maybeSingle\(\);/,
+    "a draft-restored id must be checked against the database, not assumed live",
+  );
+  assert.ok(
+    !/if \(workoutLogId\) return workoutLogId;/.test(CODE),
+    "the bare short-circuit is back — that is the bug",
+  );
+});
+
+test("a dead id is discarded and the session continues on a fresh log", () => {
+  // Stranding the user mid-workout is not an acceptable answer either. The sets
+  // are in component state and get written against the new row.
+  assert.match(CODE, /setWorkoutLogId\(null\);\s*\n\s*__clearDraft\(\);/);
+});
+
+test("an update that matches no rows is treated as the failure it is", () => {
+  // This is what let the real cause travel two steps before surfacing.
+  assert.match(CODE, /\.eq\("id", logId\)\.select\("id"\)/);
+  assert.match(CODE, /if \(!logRows \|\| !logRows\.length\) throw new Error\(/);
+});
