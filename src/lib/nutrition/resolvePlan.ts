@@ -37,11 +37,29 @@ export interface DayGroupPlan {
 
 // Pure selection over already-fetched live candidates (ordered effective_date
 // desc, created_at desc). Unit-tested. `everyday` = null OR empty day_group.
-export function pickPlanForDate<T extends { day_group?: number[] | null }>(
+//
+// Dustin, 2026-08-05: "If we set up a meal plan that changes, it needs to be
+// scheduled ahead of time. And I need to be able to see it days ahead of time,
+// instead of having you flip it on live day-by-day, like we did with my peak.
+// That did not work."
+//
+// The candidate list may now contain plans that have not STARTED yet — the
+// fetch reaches into the future so a scheduled plan can be viewed before its
+// first day. So the effective_date filter moved in here, where the viewed date
+// is known. It used to live entirely in the query (.lte effective_date, today),
+// which was only correct while nothing ahead of today was ever fetched.
+//
+// Getting this wrong shows next week's menu today, so it is checked against the
+// DATE BEING VIEWED and nothing else.
+export function pickPlanForDate<T extends { day_group?: number[] | null; effective_date?: string | null }>(
   candidates: T[],
   dateStr: string,
 ): T | null {
-  const list = candidates || [];
+  // Not started yet, as of the date being viewed. A null effective_date is a
+  // plan with no start — always in force.
+  const list = (candidates || []).filter(
+    (p) => p.effective_date == null || p.effective_date <= dateStr,
+  );
   const wd = isoWeekdayFromDateStr(dateStr);
   const tagged = list.find((p) => Array.isArray(p.day_group) && p.day_group.includes(wd));
   if (tagged) return tagged;
@@ -51,15 +69,40 @@ export function pickPlanForDate<T extends { day_group?: number[] | null }>(
   return everyday ?? null;
 }
 
-// Fetch ALL of a client's live plans effective on/before dateStr (day-group
-// tagged + the everyday one), newest-effective first. This is the set the v3
-// logger holds so client-side date navigation can pick the right menu per day
-// with zero refetch.
+/**
+ * How far past `dateStr` the plan set reaches.
+ *
+ * The screen can page a day at a time; 8 weeks is far enough to see a whole
+ * prep block laid out and short enough that the payload stays small. A plan
+ * scheduled beyond this is still there — it just is not preloaded.
+ */
+export const PLAN_LOOKAHEAD_DAYS = 56;
+
+/** dateStr shifted by n days, calendar-safe, no Date parsing of the string. */
+export function shiftDate(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + days));
+  return t.toISOString().slice(0, 10);
+}
+
+// Fetch a client's live plans (day-group tagged + the everyday one),
+// newest-effective first. This is the set the v3 logger holds so client-side
+// date navigation can pick the right menu per day with zero refetch.
+//
+// It now reaches FORWARD as well. Scheduling a plan to start next Monday used
+// to be invisible until Monday: the query stopped at today, so paging ahead
+// showed the current menu for a day it would not actually govern, and the only
+// way to make the new plan appear was to flip it live on the morning. Which is
+// exactly what Dustin asked to stop doing.
+//
+// pickPlanForDate does the effective_date comparison against the viewed date,
+// so a plan that has not started cannot leak into an earlier day.
 export async function fetchLivePlans(
   supabase: SupabaseClient,
   clientId: string,
   dateStr: string,
   selectExtra?: string,
+  lookaheadDays: number = PLAN_LOOKAHEAD_DAYS,
 ): Promise<DayGroupPlan[]> {
   const sel = selectExtra ? PLAN_SELECT + ", " + selectExtra : PLAN_SELECT;
   const { data } = await supabase
@@ -67,7 +110,7 @@ export async function fetchLivePlans(
     .select(sel)
     .eq("client_id", clientId)
     .eq("status", "live")
-    .lte("effective_date", dateStr)
+    .lte("effective_date", shiftDate(dateStr, Math.max(0, lookaheadDays)))
     .order("effective_date", { ascending: false })
     .order("created_at", { ascending: false });
   return (data as unknown as DayGroupPlan[]) || [];

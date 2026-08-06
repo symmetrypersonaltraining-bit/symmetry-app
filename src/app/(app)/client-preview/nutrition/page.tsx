@@ -51,7 +51,9 @@ export default async function ClientPreviewNutritionPage() {
   const [livePlans, tlRes, mtRes, wlRes] = await Promise.all([
     // Full live-plan SET (day-group tagged + everyday). pickPlanForDate resolves
     // the governing menu; one null-day_group plan → today's behavior unchanged.
-    fetchLivePlans(supabase, clientId, today),
+    // lookahead 0 — the preview renders a single day, so there is no reason to
+        // ship it eight weeks of plans it will filter straight back out.
+        fetchLivePlans(supabase, clientId, today, undefined, 0),
     supabase
       .from("meal_adherence_logs")
       .select("*")

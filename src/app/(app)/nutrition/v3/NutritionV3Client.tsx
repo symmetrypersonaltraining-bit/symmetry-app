@@ -186,6 +186,21 @@ export default function NutritionV3Client(props: Props) {
     if (!set.length) return mealPlan ?? null;
     return pickPlanForDate(set, selectedDate) ?? mealPlan ?? null;
   }, [livePlans, mealPlan, selectedDate]);
+
+  // Dustin, 2026-08-05: "If we set up a meal plan that changes, it needs to be
+  // scheduled ahead of time. And I need to be able to see it days ahead of
+  // time, instead of having you flip it on live day-by-day, like we did with my
+  // peak. That did not work."
+  //
+  // The plan set now reaches forward, so paging into next week shows the menu
+  // that WILL govern that day. This says so — a menu that has not started yet
+  // looks identical to the current one otherwise, and mistaking one for the
+  // other is worse than not being able to look ahead at all.
+  const planStartsLater = !!(
+    activePlan &&
+    (activePlan as { effective_date?: string | null }).effective_date &&
+    ((activePlan as { effective_date?: string | null }).effective_date as string) > today
+  );
   const openMode = !activePlan || !(activePlan.meals || []).length;
   const [logs, setLogs] = useState<DbLog[]>(todayLogs);
   const [sheetStack, setSheetStack] = useState<NonNullable<SheetState>[]>([]);
@@ -1270,7 +1285,15 @@ export default function NutritionV3Client(props: Props) {
         <button onClick={() => setSelectedDate(shiftDateStr(selectedDate, -1))} aria-label="previous day" className="w-11 h-10 flex items-center justify-center rounded-xl" style={{ color: "var(--brand-text-secondary)", fontSize: 20 }}>‹</button>
         <div className="text-center" style={{ minWidth: 170 }}>
           <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>{selectedDate === today ? "Today" : fmtDateLong(selectedDate)}</p>
-          <p style={{ color: "var(--brand-text-secondary)", fontSize: 11 }}>{selectedDate === today ? fmtDateLong(selectedDate) : selectedDate > today ? "upcoming day" : "past day"}</p>
+          <p style={{ color: planStartsLater ? GOLD : "var(--brand-text-secondary)", fontSize: 11, fontWeight: planStartsLater ? 700 : 400 }}>
+            {selectedDate === today
+              ? fmtDateLong(selectedDate)
+              : planStartsLater
+              ? `scheduled — ${planLabel(activePlan as never)}`
+              : selectedDate > today
+              ? "upcoming day"
+              : "past day"}
+          </p>
         </div>
         <button onClick={() => setSelectedDate(shiftDateStr(selectedDate, 1))} aria-label="next day" className="w-11 h-10 flex items-center justify-center rounded-xl" style={{ color: "var(--brand-text-secondary)", fontSize: 20 }}>›</button>
         <button onClick={() => openSheet({ kind: "menu" })} aria-label="plan menu" className="w-11 h-10 flex items-center justify-center rounded-xl absolute right-3 top-3" style={{ color: "var(--brand-text)", fontSize: 20 }}>⋯</button>

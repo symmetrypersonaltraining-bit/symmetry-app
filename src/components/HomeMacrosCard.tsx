@@ -48,7 +48,9 @@ export default function HomeMacrosCard() {
         supabase.from("macro_targets").select("*").eq("client_id", clientId).lte("effective_date", today).order("effective_date", { ascending: false }).limit(1),
         // DAY-GROUP: resolve today's governing menu. One null-day_group plan →
         // same plan as before (behavior unchanged for existing clients).
-        fetchLivePlans(supabase, clientId, today),
+        // lookahead 0 — the home card only ever shows today, so there is no reason to
+        // ship it eight weeks of plans it will filter straight back out.
+        fetchLivePlans(supabase, clientId, today, undefined, 0),
         // Tolerates the column not existing yet (flag stays off → legacy calc).
         supabase.from("client_app_settings").select("nutrition_v3").eq("client_id", clientId).maybeSingle(),
       ]);
