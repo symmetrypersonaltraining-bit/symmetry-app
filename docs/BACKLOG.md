@@ -8,6 +8,26 @@ Sources folded in: `app_feedback` (open rows), `FEEDBACK-LIST-8-6.md`,
 `docs/MULTI-TRAINER-BACKLOG.md`, the Notion Master Build Tracker, and everything
 parked in the previous version of this file.
 
+**Re-verified 2026-08-07 evening:** `app_feedback` has exactly 4 rows with
+status `new` (`73fcd284`, `8aa820a9`, `2c2df05f`, `95f11695`). All four are
+already tracked below as items 1, 3, 4 and 5. Nothing new.
+
+---
+
+## How code ships from a cloud session
+
+A Cowork **cloud** session cannot push to GitHub. Verified 2026-08-07 across
+three routes — sandbox `git push`, the sandbox GitHub REST API, and
+`device_bash` on the laptop — all refused by the proxy with 403. **This is not
+a token problem;** the PAT authenticates fine and the proxy discards it before
+GitHub ever sees the request. Do not rotate the token in response to a 403.
+
+The cloud does all the work and all the gates; the laptop performs the push via
+the **ship bridge**: Dustin runs `SHIP-WATCHER.bat` from the Trainer App folder,
+the session drops a git bundle plus a `SHIP-NOW` trigger in `outbox\`, and the
+watcher fast-forwards `origin/main`. It refuses any non-fast-forward, so it
+cannot clobber `main`. Full detail in `START-HERE-SESSION-SETUP.md`.
+
 ---
 
 ## Shipped 2026-08-07 — do not redo
