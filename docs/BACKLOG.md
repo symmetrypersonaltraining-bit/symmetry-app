@@ -87,13 +87,58 @@ Fixing the duplicate *programmes* without fixing whatever writes duplicate
 `app_feedback` `8aa820a9`, 2026-08-05. Needs name, modality, video URL, default
 tracked fields.
 
-## 4. Full nutrients in the food logger
+## 4. Full nutrients in the food logger  ← IN PROGRESS
 
-`app_feedback` `2c2df05f`, 2026-08-04. Currently protein/carbs/fats only —
-`meal_items` has no kcal column and everything downstream computes 4P + 4C + 9F.
-"Full nutrients" means fibre, sugar, sodium, micros: a schema change plus every
-surface that reads macros. **Scope with Dustin before touching** — how far past
-fibre/sugar/sodium does he actually want to go?
+`app_feedback` `2c2df05f`. **Scoped 2026-08-07: Dustin said FULL micros, and
+"for AI get them all working properly."** Not fibre/sugar/sodium only.
+
+### Done and shipped 2026-08-07
+
+| SHA | What |
+|---|---|
+| `a0320dc` | One calorie formula. 4/4/9 existed NINE times and they were not identical (some rounded, some did not), so it had to be consolidated before adding fields or they would diverge further. Plus the first-ever test suite for `src/lib/ai/nutrition-json.ts`, which gates every AI nutrition reply and had ZERO coverage. |
+| `716c58c` | Storage. `micros` jsonb on `meal_items`, `foods`, `food_catalog`, `recipe_ingredients`; `est_micros` on `meal_adherence_logs`; `total_micros` on `recipes`; nullable `kcal` on `meal_items`/`foods`. Canonical registry at `src/lib/nutrition/nutrients.ts` (33 nutrients). Migration `add_micronutrient_storage`, additive only. |
+| `da30c87` | The AI half. `parse`, `plan-build`, `verify-food` and `analyze-meal-photo` all request and store micros. Prompt field list is GENERATED from the registry so it cannot drift from what the validator accepts. |
+
+**Design rules — read before continuing this item:**
+
+- Nutrients live in ONE `micros` jsonb per row, keyed by the registry. Not 33
+  columns × 6 tables (~180 columns and a migration per nutrient).
+- `fiber`, `sugar`, `sodium`, `sat_fat` keep their existing flat columns on
+  `food_catalog` and as `est_*` on `meal_adherence_logs`, and stay
+  authoritative there. **There is no dual write.** `readNutrients()` merges
+  flat + jsonb and is the ONLY thing that should know this.
+- NULL/absent = UNKNOWN, never zero. A 0 is a claim the food contains none of
+  that nutrient and silently drags the day's total down.
+- Adding a partially-known meal contributes what it knows rather than poisoning
+  the day's total to unknown.
+- `meal_items.kcal` is nullable: stored when known from a label, derived 4/4/9
+  otherwise. Every existing row is NULL so nothing changed. This matches what
+  `validateParseResult` already did — it trusts a positive model kcal over the
+  formula, which is correct for alcohol, fibre and sugar alcohols.
+
+### Still to do on this item
+
+1. **Plan path threading.** `plan-edit/route.ts` and `adopt-plan/route.ts`
+   build `meal_items` payloads by hand and do not yet carry `micros`/`kcal`.
+   Note `plan-edit`'s clone path selects an explicit column list
+   (`select("food, amount, unit, basis, protein, carbs, fats, ...")`) — it will
+   silently DROP micros until that list is updated. AI-authored plans already
+   produce micros; nothing persists them yet.
+2. **`dailyTotals.planMealMacros`/`computeDayTotals`** have no nutrient path for
+   plan meals (the comment says plan meals have "NO nutrient source" — that is
+   now out of date). Needs a `planMealNutrients` mirroring the existing
+   `customMealNutrients`, then the day panel reflects planned micros too.
+3. **UI.** `NutritionV3Client.tsx` has an "ALL NUTRIENTS" panel showing the four
+   legacy nutrients. `groupedNutrients()` / `formatNutrient()` / `pctOfDaily()`
+   exist to render the full 33 grouped by carb/fat/mineral/vitamin — the panel
+   just needs pointing at them.
+4. **Backfill `food_catalog.micros`** from the USDA/OFF import (197,826 rows
+   already carry the legacy four; the rest of the panel is available upstream
+   for many of them).
+5. **Two surfaces bypass the canonical calculators entirely** and will not pick
+   any of this up: `MealPlanClient.tsx` and `NutritionAverages.tsx` run their
+   own DB queries and their own maths. Worth fixing independently of micros.
 
 ## 5. Pull from Garmin / Google / Apple
 
