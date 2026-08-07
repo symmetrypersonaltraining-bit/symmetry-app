@@ -193,14 +193,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Bad request" }, { status: 400 });
   }
 
-  // "join" is client-accessible. (Everything else is trainer-only.)
+  // "join" and "leave" are client-accessible. (Everything else is trainer-only.)
   //
-  // This used to set client_app_settings.leaderboard_opt_in — a DIFFERENT flag
+  // Join used to set client_app_settings.leaderboard_opt_in — a DIFFERENT flag
   // from the one the dashboard's Join writes, which is why twenty-three people
-  // had joined and six were showing on the group-chat board. Joining now means
-  // one thing in one place: a row in challenge_participants for the live
-  // challenge.
-  if (body.action === "join") {
+  // had joined and six were showing on the group-chat board. Membership now
+  // means one thing in one place: a row in challenge_participants for the live
+  // challenge. Leave MUST delete from that same table for the same reason.
+  //
+  // Both are deliberately available to the trainer too: "everyone" means
+  // everyone. Note that joining does NOT make the coach ranked — that is
+  // clients.exclude_from_rankings, a separate flag on a separate decision.
+  if (body.action === "join" || body.action === "leave") {
     let cid: string | null = null;
     const { data: c } = await supabase.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
     cid = (c as { id: string } | null)?.id ?? null;
@@ -220,6 +224,18 @@ export async function POST(req: NextRequest) {
       .limit(1);
     const liveId = ((live as { id: string }[]) || [])[0]?.id;
     if (!liveId) return NextResponse.json({ error: "No challenge running" }, { status: 400 });
+
+    if (body.action === "leave") {
+      // Idempotent: leaving twice reads as success. Deleting a row that is
+      // not there is not an error, and surfacing one would make the button
+      // look broken to someone double-tapping it.
+      await db
+        .from("challenge_participants")
+        .delete()
+        .eq("challenge_id", liveId)
+        .eq("client_id", cid);
+      return NextResponse.json({ ok: true, joined: false });
+    }
 
     // Ignore a duplicate: the unique constraint is the source of truth and
     // "join twice" should read as success, not as an error.
