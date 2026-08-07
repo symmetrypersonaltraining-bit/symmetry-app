@@ -485,7 +485,8 @@
     "verified",
     "ai_verified_at",
     "created_by_client_id",
-    "created_at"
+    "created_at",
+    "micros"
   ],
   "food_import_state": [
     "source",
@@ -507,7 +508,9 @@
     "source",
     "created_by_client_id",
     "verified",
-    "created_at"
+    "created_at",
+    "kcal",
+    "micros"
   ],
   "group_challenges": [
     "announced_at",
@@ -574,7 +577,8 @@
     "est_fiber",
     "est_sugar",
     "est_sodium",
-    "est_sat_fat"
+    "est_sat_fat",
+    "est_micros"
   ],
   "meal_items": [
     "id",
@@ -588,7 +592,9 @@
     "carbs",
     "fats",
     "position",
-    "created_at"
+    "created_at",
+    "kcal",
+    "micros"
   ],
   "meal_plans": [
     "id",
@@ -808,7 +814,8 @@
     "food_id",
     "source",
     "note",
-    "created_at"
+    "created_at",
+    "micros"
   ],
   "recipes": [
     "id",
@@ -830,7 +837,8 @@
     "total_carbs",
     "total_fats",
     "created_at",
-    "updated_at"
+    "updated_at",
+    "total_micros"
   ],
   "reminders": [
     "id",
