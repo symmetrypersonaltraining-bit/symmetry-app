@@ -9,7 +9,7 @@
 // this week so far) — which is what the weekly copy is written from.
 
 import { Db } from "@/lib/ai/scope";
-import { computeDayTotals, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
+import { computeDayTotals, kcalOf, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
 import { weeklyNumbersBlockSafe } from "@/lib/ai/weekly-context";
 
 // Every date the AI sees must be America/Chicago. log_date is written in Central time, so a
@@ -225,7 +225,7 @@ export async function fetchMealPlanSummary(db: Db, clientId: string): Promise<st
     });
     let p = 0, c = 0, f = 0;
     for (const it of its) { p += Number(it.protein) || 0; c += Number(it.carbs) || 0; f += Number(it.fats) || 0; }
-    const macro = (p || c || f) ? ` [~${Math.round(4 * p + 4 * c + 9 * f)} kcal · ${Math.round(p)}P/${Math.round(c)}C/${Math.round(f)}F]` : "";
+    const macro = (p || c || f) ? ` [~${Math.round(kcalOf(p, c, f))} kcal · ${Math.round(p)}P/${Math.round(c)}C/${Math.round(f)}F]` : "";
     return `- ${m.name}${m.timing ? " (" + m.timing + ")" : ""}: ${foods.join(", ") || "—"}${macro}`;
   }).join("\n");
 }

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import GroceryListSheet from "./GroceryListSheet";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 import { useKeyboardInset, scrollFocusedIntoView } from "@/lib/useKeyboardInset";
-import { adherencePct } from "@/lib/nutrition/dailyTotals";
+import { adherencePct, kcalOf } from "@/lib/nutrition/dailyTotals";
 
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
@@ -73,7 +73,8 @@ function addedFromFood(fd: Food): AddedFood {
 function reServings(x: AddedFood): AddedFood { return { ...x, servings: servingsFor(x.amount ?? 1, x.unit ?? "serving", x.serving) }; }
 interface RecentEntry { label: string; food_id: string | null; p: number; c: number; f: number; }
 
-function quickKcal(p: number, c: number, f: number) { return Math.round(4 * p + 4 * c + 9 * f); }
+// Was a local 4/4/9 copy. Rounds because it feeds est_kcal writes and display.
+function quickKcal(p: number, c: number, f: number) { return Math.round(kcalOf(p, c, f)); }
 
 // Phone camera photos are 3–12 MB — far over Vercel's ~4.5 MB request limit, which made
 // AI photo analysis die with an opaque error. Downscale to ≤1280px JPEG (~200–400 KB)
@@ -581,7 +582,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         } else if (opt.pct !== null && itemsByMeal[log.meal_id]) {
           const m = itemsByMeal[log.meal_id];
           protein += m.protein * opt.pct; carbs += m.carbs * opt.pct; fats += m.fats * opt.pct;
-          kcal += (m.protein * 4 + m.carbs * 4 + m.fats * 9) * opt.pct;
+          kcal += kcalOf(m.protein, m.carbs, m.fats) * opt.pct;
         }
       }
       const denom = dayset.size || 1;
@@ -720,7 +721,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       carbs   += item.carbs   || 0;
       fats    += item.fats    || 0;
     }
-    const kcal = protein * 4 + carbs * 4 + fats * 9;
+    const kcal = kcalOf(protein, carbs, fats);
     return { kcal, protein, carbs, fats };
   }
 
@@ -757,7 +758,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
               c += (ad.c || 0) * sv;
               f += (ad.f || 0) * sv;
             }
-            kcal    += (p * 4 + c * 4 + f * 9) * opt.pct;
+            kcal    += kcalOf(p, c, f) * opt.pct;
             protein += p * opt.pct;
             carbs   += c * opt.pct;
             fats    += f * opt.pct;
@@ -989,7 +990,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       p += (it.protein || 0) * scale; c += (it.carbs || 0) * scale; f += (it.fats || 0) * scale;
     }
     for (const ad of sheetAdds) { const sv = ad.servings || 1; p += ad.p * sv; c += ad.c * sv; f += ad.f * sv; }
-    return { protein: p, carbs: c, fats: f, kcal: p * 4 + c * 4 + f * 9 };
+    return { protein: p, carbs: c, fats: f, kcal: kcalOf(p, c, f) };
   }
   function buildOverridePayload(chosen: Meal): Record<string, any> | null {
     const overrides: Record<string, { amount: number }> = {};
@@ -1081,7 +1082,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
     for (const ad of (ov.__added as { servings?: number; p?: number; c?: number; f?: number }[]) || []) {
       const sv = ad.servings || 1; p += (ad.p || 0) * sv; c += (ad.c || 0) * sv; f += (ad.f || 0) * sv;
     }
-    return { kcal: p * 4 + c * 4 + f * 9, protein: p, carbs: c, fats: f };
+    return { kcal: kcalOf(p, c, f), protein: p, carbs: c, fats: f };
   }
   // Compact row for a multi-option slot.
   function renderMultiSlot(slot: { position: number; options: Meal[] }) {

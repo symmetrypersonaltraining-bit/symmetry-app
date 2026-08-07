@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { kcalOf } from "@/lib/nutrition/dailyTotals";
 import { FunLoader } from "@/components/FunMoments";
 
 type RangeKey = "day" | "1w" | "2w" | "4w" | "8w" | "custom";
@@ -93,7 +94,7 @@ export default function NutritionAverages({ clientId, today }: { clientId: strin
     const logged = dayset.size;
     const denom = logged || 1;
     const t = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
-    setResult({ loggedDays: logged, totalDays: diffDays(start, end) + 1, p: sp / denom, c: sc / denom, f: sf / denom, kcal: (4 * sp + 4 * sc + 9 * sf) / denom, target: t ? { p: Number(t.protein) || 0, c: Number(t.carbs) || 0, f: Number(t.fats) || 0, kcal: Number(t.calories) || 0 } : null, start: start, end: end });
+    setResult({ loggedDays: logged, totalDays: diffDays(start, end) + 1, p: sp / denom, c: sc / denom, f: sf / denom, kcal: kcalOf(sp, sc, sf) / denom, target: t ? { p: Number(t.protein) || 0, c: Number(t.carbs) || 0, f: Number(t.fats) || 0, kcal: Number(t.calories) || 0 } : null, start: start, end: end });
     setLoading(false);
   }, [clientId, today, range, customStart, customEnd]);
 

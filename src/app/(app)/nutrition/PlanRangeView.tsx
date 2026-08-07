@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { kcalOf } from "@/lib/nutrition/dailyTotals";
 
 type RVItem = { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number };
 type RVMeal = { id: string; name: string; position: number; meal_items: RVItem[] };
@@ -27,7 +28,7 @@ function planTotals(p: RVPlan | null) {
     meals++;
     for (const it of m.meal_items || []) { protein += it.protein || 0; carbs += it.carbs || 0; fats += it.fats || 0; }
   }
-  return { kcal: protein * 4 + carbs * 4 + fats * 9, protein, carbs, fats, meals };
+  return { kcal: kcalOf(protein, carbs, fats), protein, carbs, fats, meals };
 }
 
 export default function PlanRangeView({ clientId, startDate, days, basePlan, baseTarget }: {

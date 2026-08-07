@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { computeDayTotals, adherencePct, PlanMeal, PlanItem, LogRow } from "@/lib/nutrition/dailyTotals";
+import { computeDayTotals, adherencePct, kcalOf, PlanMeal, PlanItem, LogRow } from "@/lib/nutrition/dailyTotals";
 import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
@@ -10,7 +10,8 @@ const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 interface MacroState { kcal: number; protein: number; carbs: number; fats: number; }
 interface TargetState { calories: number; protein: number; carbs: number; fats: number; }
 
-function hmKcal(p: number, c: number, f: number) { return 4 * p + 4 * c + 9 * f; }
+// Was a local 4/4/9 copy. Now the shared one — same value, one definition.
+const hmKcal = kcalOf;
 
 export default function HomeMacrosCard() {
   const [consumed, setConsumed] = useState<MacroState | null>(null);

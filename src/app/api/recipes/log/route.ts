@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { perServing } from "@/lib/recipes";
+import { kcalOf } from "@/lib/nutrition/dailyTotals";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
   const p = Math.round(per.protein * howMany * 10) / 10;
   const c = Math.round(per.carbs * howMany * 10) / 10;
   const f = Math.round(per.fats * howMany * 10) / 10;
-  const kcal = r0(p * 4 + c * 4 + f * 9);
+  const kcal = r0(kcalOf(p, c, f));
   // If any ingredient was a model's estimate, so is this entry. The marker
   // rides along rather than being laundered out by the trip through a recipe.
   const est = ings.some((i) => i.source === "ai");

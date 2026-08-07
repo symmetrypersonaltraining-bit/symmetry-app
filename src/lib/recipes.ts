@@ -8,6 +8,8 @@
 // computed twice and drifting; a recipe has three places that want its macros
 // (the card, the builder footer, the saved row) and they must never disagree.
 
+import { kcalOf as canonicalKcalOf } from "@/lib/nutrition/dailyTotals";
+
 export type RecipeVisibility = "private" | "submitted" | "public" | "rejected";
 export type IngredientSource = "manual" | "database" | "ai";
 
@@ -48,8 +50,15 @@ const num = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-/** 4/4/9. Calories are a function of the macros, never a separately typed number. */
-export const kcalOf = (p: number, c: number, f: number) => Math.round(p * 4 + c * 4 + f * 9);
+/**
+ * 4/4/9. Calories are a function of the macros, never a separately typed number.
+ *
+ * Delegates to the canonical implementation in `nutrition/dailyTotals` so there
+ * is one formula in the codebase, not seven. The rounding belongs to THIS
+ * module (recipe totals are stored as whole calories) and stays here — the
+ * shared helper is deliberately exact so callers choose their own precision.
+ */
+export const kcalOf = (p: number, c: number, f: number) => Math.round(canonicalKcalOf(p, c, f));
 
 /** What the whole pot contains. */
 export function recipeTotals(ingredients: RecipeIngredient[]): Macros {
