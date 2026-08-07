@@ -181,6 +181,28 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
     }
   }
 
+  async function leave() {
+    if (joining || !ch) return;
+    setJoining(true);
+    try {
+      // Goes through /api/challenge so the delete runs with the service role.
+      // It deletes from challenge_participants — the SAME table join writes.
+      // If these two ever point at different places we are back to the bug
+      // where twenty-three people had joined and six were showing.
+      await fetch("/api/challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "leave" }),
+      });
+      setJoined(false);
+      await load();
+    } catch {
+      /* leave the state alone and let the next load settle it */
+    } finally {
+      setJoining(false);
+    }
+  }
+
   if (!loaded) return null;
   if (!ch && !isTrainer) return null;
 
@@ -249,8 +271,9 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
                 You&apos;re #{me.rnk}
               </span>
             ) : null}
-            {/* No Join for the coach — he is deliberately not ranked. */}
-            {!joined && !isTrainer && (
+            {/* Join shows for everyone, the coach included. Leave lives in the
+                drawer, where there is room to say what it does. */}
+            {!joined && (
               <span
                 style={{
                   fontSize: 11,
@@ -498,27 +521,16 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
                     </div>
                   </div>
 
-                  {/* Join / your status.
-                      The coach sees neither: he is off the board on purpose, and
-                      an empty "You're #—" or a Join button he cannot act on reads
-                      as a bug rather than as a decision. Say the decision. */}
-                  {isTrainer ? (
-                    <div
-                      style={{
-                        background: "var(--brand-surface)",
-                        border: "1px solid var(--brand-border)",
-                        borderRadius: 14,
-                        padding: "11px 14px",
-                        fontSize: 12.5,
-                        lineHeight: 1.5,
-                        color: "var(--brand-text-secondary)",
-                      }}
-                    >
-                      <b style={{ color: "var(--brand-text)" }}>You&apos;re not on the board.</b> Your sessions still
-                      count toward the group total — you just don&apos;t take a place, so the top of the board is your
-                      clients.
-                    </div>
-                  ) : !joined ? (
+                  {/* Join / Leave / your status.
+                      Everyone gets a control, the coach included — a button only
+                      some people can see reads as a bug rather than as a
+                      decision. Membership is one row in challenge_participants;
+                      Leave deletes exactly that row.
+
+                      Being "in" and being RANKED are different things. The coach
+                      can be in and still not take a place on the board — that is
+                      clients.exclude_from_rankings, not this. */}
+                  {!joined ? (
                     <div
                       style={{
                         background: "color-mix(in srgb, var(--brand-primary) 8%, transparent)",
@@ -528,9 +540,18 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
                       }}
                     >
                       <div style={{ fontSize: 12.5, color: "var(--brand-text)", lineHeight: 1.5, marginBottom: 10 }}>
-                        You&apos;re already on the board at{" "}
-                        <b style={{ color: "var(--brand-primary)" }}>{me?.score ?? 0}</b> — every day you&apos;ve trained
-                        since {pretty(ch.starts_on)} is counted. Tap in so everyone knows you&apos;re playing.
+                        {me ? (
+                          <>
+                            You&apos;re already on the board at{" "}
+                            <b style={{ color: "var(--brand-primary)" }}>{me.score}</b> — every day you&apos;ve trained
+                            since {pretty(ch.starts_on)} is counted. Tap in so everyone knows you&apos;re playing.
+                          </>
+                        ) : (
+                          <>
+                            Every day you train from {pretty(ch.starts_on)} counts. Tap in so everyone knows
+                            you&apos;re playing.
+                          </>
+                        )}
                       </div>
                       <button
                         onClick={join}
@@ -548,24 +569,46 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
                           opacity: joining ? 0.6 : 1,
                         }}
                       >
-                        {joining ? "Joining…" : "🙌 I'm in"}
+                        {joining ? "Joining\u2026" : "\ud83d\ude4c I'm in"}
                       </button>
                     </div>
-                  ) : me ? (
+                  ) : (
                     <div
                       style={{
                         background: "var(--brand-surface)",
                         border: "1px solid var(--brand-border)",
                         borderRadius: 14,
                         padding: "11px 14px",
-                        fontSize: 13,
-                        fontWeight: 800,
-                        color: "var(--brand-primary)",
                       }}
                     >
-                      You&apos;re in — #{me.rnk} with {me.score} {unit}. 🔥
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "var(--brand-primary)", lineHeight: 1.5 }}>
+                        {me ? `You're in — #${me.rnk} with ${me.score} ${unit}. \ud83d\udd25` : "You're in."}
+                      </div>
+                      {!me && (
+                        <div style={{ fontSize: 12, color: "var(--brand-text-secondary)", lineHeight: 1.5, marginTop: 4 }}>
+                          Your sessions count toward the group total, but you don&apos;t take a place on the board.
+                        </div>
+                      )}
+                      <button
+                        onClick={leave}
+                        disabled={joining}
+                        style={{
+                          marginTop: 10,
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          padding: "7px 12px",
+                          borderRadius: 999,
+                          border: "1px solid var(--brand-border)",
+                          background: "none",
+                          color: "var(--brand-text-secondary)",
+                          cursor: "pointer",
+                          opacity: joining ? 0.6 : 1,
+                        }}
+                      >
+                        {joining ? "Leaving\u2026" : "Leave challenge"}
+                      </button>
                     </div>
-                  ) : null}
+                  )}
 
                   {/* Scoreboard — the whole roster */}
                   <div>
