@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
 import { extractJson } from '@/lib/ai/nutrition-json';
 import { logUsage, pausedBody, assertNotPaused, checkAndLog, AiPaused, CapExceeded, capBody } from '@/lib/ai/meter';
+import { nutrientPromptSpec, sanitizeNutrients, roundNutrients, LEGACY_NUTRIENT_KEYS } from "@/lib/nutrition/nutrients";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = 'claude-sonnet-4-6';
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: media as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data: imageBase64 } },
-          { type: 'text', text: 'Analyze this food photo and estimate the macros as accurately as possible. Use official nutrition data, not just visual estimation, whenever possible. If the photo or the accompanying text contains a receipt, packaging, a menu, or food from an identifiable restaurant or chain (for example Wing Snob, Buffalo Wild Wings, Chipotle, or anything ordered via UberEats or DoorDash), IDENTIFY THE RESTAURANT and the specific items, then base the macros on that chain\'s OFFICIAL published nutrition for those exact items and quantities rather than guessing visually. Count discrete items precisely (for example the number of wings, tenders, or slices) and multiply by the known per-item macros. Wings from wing chains are commonly OVER-estimated on calories and fat, so anchor to official per-wing values (a typical bone-in wing is about 80 to 100 kcal plain) rather than inflating. Only fall back to pure visual estimation when no brand or chain is identifiable. Respond with JSON only: { "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number, "description": "what you see, including the restaurant or item and whether macros came from official data or a visual estimate", "restaurant": string or null (the identified chain/restaurant name), "source": "restaurant_official" when the macros come from a chain\'s official published nutrition, otherwise "visual_estimate", "fiber_g": number or null, "sugar_g": number or null, "sodium_mg": number or null, "sat_fat_g": number or null }. For the four nutrient fields: give a real number when the item is identifiable enough to look up (a named chain item, a packaged product, or a plain whole food), and null when it genuinely is not — a null is far more useful than a guess, because these totals are used to watch blood pressure and fiber intake. Sodium especially: restaurant and packaged food sodium is not visually estimable, so return it only from official or reference data.' + extraText }
+          { type: 'text', text: 'Analyze this food photo and estimate the macros as accurately as possible. Use official nutrition data, not just visual estimation, whenever possible. If the photo or the accompanying text contains a receipt, packaging, a menu, or food from an identifiable restaurant or chain (for example Wing Snob, Buffalo Wild Wings, Chipotle, or anything ordered via UberEats or DoorDash), IDENTIFY THE RESTAURANT and the specific items, then base the macros on that chain\'s OFFICIAL published nutrition for those exact items and quantities rather than guessing visually. Count discrete items precisely (for example the number of wings, tenders, or slices) and multiply by the known per-item macros. Wings from wing chains are commonly OVER-estimated on calories and fat, so anchor to official per-wing values (a typical bone-in wing is about 80 to 100 kcal plain) rather than inflating. Only fall back to pure visual estimation when no brand or chain is identifiable. Respond with JSON only: { "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number, "description": "what you see, including the restaurant or item and whether macros came from official data or a visual estimate", "restaurant": string or null (the identified chain/restaurant name), "source": "restaurant_official" when the macros come from a chain\'s official published nutrition, otherwise "visual_estimate", "fiber_g": number or null, "sugar_g": number or null, "sodium_mg": number or null, "sat_fat_g": number or null }. For the four nutrient fields: give a real number when the item is identifiable enough to look up (a named chain item, a packaged product, or a plain whole food), and null when it genuinely is not — a null is far more useful than a guess, because these totals are used to watch blood pressure and fiber intake. Sodium especially: restaurant and packaged food sodium is not visually estimable, so return it only from official or reference data. Additionally return a "micros" object with any OTHER micronutrients you genuinely know for this food.\n\n' + nutrientPromptSpec() + extraText }
         ]
       }]
     });
@@ -110,6 +111,13 @@ export async function POST(req: NextRequest) {
     const sodium = nutOrNull(result.sodium_mg, 0);
     const satFat = nutOrNull(result.sat_fat_g, 1);
 
+    // Everything BEYOND the legacy four. fiber/sugar/sodium/sat_fat keep their
+    // own est_* columns and stay authoritative there, so they are stripped out
+    // of the jsonb rather than written twice and left to drift.
+    const fullMicros = sanitizeNutrients(result.micros ?? result.nutrients);
+    for (const k of LEGACY_NUTRIENT_KEYS) delete fullMicros[k];
+    const estMicros = Object.keys(fullMicros).length ? roundNutrients(fullMicros) : null;
+
     // Structured JSONB for the nightly rollup / charts / AI — the est_* fields
     // and this object are ALWAYS written together so they can never disagree.
     const offPlanMacros: Record<string, unknown> = {
@@ -121,6 +129,7 @@ export async function POST(req: NextRequest) {
       sugar,
       sodium,
       sat_fat: satFat,
+      micros: estMicros,
       description,
       estimated: true,
       source,
@@ -148,6 +157,7 @@ export async function POST(req: NextRequest) {
             est_sugar: sugar,
             est_sodium: sodium,
             est_sat_fat: satFat,
+            est_micros: estMicros,
             analysis_status: 'complete',
             macros_pending: false,
           })

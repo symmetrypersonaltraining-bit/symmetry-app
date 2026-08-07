@@ -14,11 +14,12 @@ import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { validatePlanDraft } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
+import { nutrientPromptSpec } from "@/lib/nutrition/nutrients";
 
 const SYSTEM_PROMPT = `You build meal plans for Symmetry Personal Training (physique coach Dustin). Plans use simple, repeatable whole foods in the style of his real plans: chicken breast, 93/7 ground beef, white fish, eggs / egg whites, Oikos Triple Zero yogurt, whey protein, cream of rice, jasmine rice, potatoes, oats, rice cakes, fruit, olive oil, almonds/nut butter, vegetables (free). Amounts are precise (grams or common measures, cooked basis unless noted).
 
 Respond with ONLY valid JSON — no markdown, no fences, no prose — exactly this shape:
-{"targets":{"kcal":number,"p":number,"c":number,"f":number},"reasoning":string|null,"meals":[{"name":string,"timing":string|null,"items":[{"food":string,"amount":number|null,"unit":string|null,"p":number,"c":number,"f":number,"kcal":number}]}],"totals":{"kcal":number,"p":number,"c":number,"f":number}}
+{"targets":{"kcal":number,"p":number,"c":number,"f":number},"reasoning":string|null,"meals":[{"name":string,"timing":string|null,"items":[{"food":string,"amount":number|null,"unit":string|null,"p":number,"c":number,"f":number,"kcal":number,"micros":object}]}],"totals":{"kcal":number,"p":number,"c":number,"f":number}}
 
 Rules:
 - Exactly 5 meals (Meal 1 through Meal 5), each with 2-4 items and a sensible timing (e.g. "7:00 AM", "post-workout").
@@ -26,7 +27,9 @@ Rules:
 - The summed totals MUST land within 3% of the targets on kcal and within 5g on each macro. Check your math before answering.
 - When TARGETS are given: use them exactly as the "targets" and set "reasoning" to null.
 - When a CONSULT is given (client answers + metrics/goal): first decide appropriate daily targets (protein ~0.8-1.2g per lb bodyweight, sensible deficit/surplus for the goal), put a concise 2-4 sentence explanation in "reasoning", then build the meals to hit them.
-- This is a DRAFT for the coach/client to review — do not mention databases or saving.`;
+- This is a DRAFT for the coach/client to review — do not mention databases or saving.
+
+${nutrientPromptSpec()}`;
 
 interface Targets {
   kcal: number;

@@ -21,6 +21,7 @@ import {
   countKnownNutrients,
   roundNutrient,
   groupedNutrients,
+  nutrientPromptSpec,
   pctOfDaily,
   formatNutrient,
 } from "../../src/lib/nutrition/nutrients.ts";
@@ -186,4 +187,34 @@ test("formatNutrient renders the unit and shows unknown as a dash", () => {
   assert.equal(formatNutrient("vitamin_d", 20), "20 mcg");
   assert.equal(formatNutrient("fiber", null), "—");
   assert.equal(formatNutrient("unobtainium", 5), "—");
+});
+
+// ─── the prompt contract ────────────────────────────────────────────────────
+
+test("the generated prompt names EVERY key the validator accepts", () => {
+  // The failure this prevents: a nutrient is added to the registry, the model
+  // is never told about it, and the field silently stays empty forever. Or the
+  // reverse - the prompt asks for a key sanitizeNutrients() drops on the floor,
+  // so the model's answer is discarded and nobody notices.
+  const spec = nutrientPromptSpec();
+  const missing = NUTRIENT_KEYS.filter((k) => !spec.includes(k));
+  assert.deepEqual(missing, [], `keys absent from the prompt: ${missing.join(", ")}`);
+
+  const everything = Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, 1]));
+  assert.equal(Object.keys(sanitizeNutrients(everything)).length, NUTRIENT_KEYS.length);
+});
+
+test("the prompt states the null-not-zero rule", () => {
+  // This is the rule that keeps daily totals honest; losing it from the prompt
+  // would quietly turn every unknown into a 0.
+  const spec = nutrientPromptSpec();
+  assert.match(spec, /NEVER write 0/);
+  assert.match(spec, /OMIT any nutrient you do not actually know/);
+});
+
+test("the prompt carries the unit for every nutrient", () => {
+  const spec = nutrientPromptSpec();
+  for (const n of NUTRIENTS) {
+    assert.ok(spec.includes(`${n.key} (${n.unit})`), `${n.key} missing its unit in the prompt`);
+  }
 });

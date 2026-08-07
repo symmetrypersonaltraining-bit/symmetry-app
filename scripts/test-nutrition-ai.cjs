@@ -15,19 +15,46 @@ const assert = require("assert");
 const repo = path.resolve(__dirname, "..");
 const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "nutrition-ai-tests-"));
 
-execSync(
-  [
-    "npx tsc",
-    "src/lib/ai/meter-core.ts",
-    "src/lib/ai/nutrition-json.ts",
-    `--outDir ${outDir}`,
-    "--module commonjs --target es2020 --skipLibCheck --types node",
-  ].join(" "),
-  { cwd: repo, stdio: "inherit" }
+// nutrition-json.ts now imports two PURE leaf modules (nutrition/dailyTotals,
+// nutrition/nutrients) so there is one calorie formula and one nutrient
+// registry in the codebase rather than several. Those imports are RELATIVE on
+// purpose - tsc's `paths` mapping is compile-time only and would leave an
+// unresolvable require("@/...") in this standalone CommonJS output.
+//
+// rootDir is pinned to src/ so the output tree stays predictable: as soon as an
+// entry file imports across into a sibling folder, tsc infers a different
+// common root and every require() below would move.
+const tsconfigPath = path.join(outDir, "tsconfig.tests.json");
+fs.writeFileSync(
+  tsconfigPath,
+  JSON.stringify(
+    {
+      compilerOptions: {
+        outDir,
+        rootDir: path.join(repo, "src"),
+        module: "commonjs",
+        target: "es2020",
+        skipLibCheck: true,
+        types: ["node"],
+        // The generated tsconfig lives in a temp dir, so @types resolution has
+        // to be pointed back at the repo explicitly.
+        typeRoots: [path.join(repo, "node_modules/@types")],
+        esModuleInterop: true,
+      },
+      files: [
+        path.join(repo, "src/lib/ai/meter-core.ts"),
+        path.join(repo, "src/lib/ai/nutrition-json.ts"),
+      ],
+    },
+    null,
+    2
+  )
 );
 
-const core = require(path.join(outDir, "meter-core.js"));
-const nj = require(path.join(outDir, "nutrition-json.js"));
+execSync(`npx tsc -p ${tsconfigPath}`, { cwd: repo, stdio: "inherit" });
+
+const core = require(path.join(outDir, "lib/ai/meter-core.js"));
+const nj = require(path.join(outDir, "lib/ai/nutrition-json.js"));
 
 let passed = 0;
 let failed = 0;

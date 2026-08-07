@@ -255,6 +255,37 @@ export function pctOfDaily(key: string, value: number | null): number | null {
   return (value / def.dailyReference) * 100;
 }
 
+/**
+ * The micronutrient contract handed to the model, GENERATED FROM THE REGISTRY.
+ *
+ * Hand-writing this list in each prompt is how the AI ends up returning keys
+ * the database drops on the floor. Generating it means adding a nutrient above
+ * teaches every AI endpoint about it at once, and the keys the model is asked
+ * for are by construction the keys sanitizeNutrients() accepts.
+ */
+export function nutrientPromptSpec(): string {
+  const byGroup = NUTRIENT_GROUP_ORDER.map((g) => {
+    const rows = NUTRIENTS.filter((n) => n.group === g);
+    if (!rows.length) return null;
+    return `  ${NUTRIENT_GROUP_LABEL[g]}: ${rows.map((n) => `${n.key} (${n.unit})`).join(", ")}`;
+  }).filter(Boolean);
+
+  return [
+    'Also return a "micros" object on EVERY item, using EXACTLY these keys and units:',
+    ...byGroup,
+    "",
+    "RULES for micros — these matter more than completeness:",
+    '- OMIT any nutrient you do not actually know. A missing key means "unknown".',
+    "- NEVER write 0 for something you are unsure about. A null or omitted value is",
+    "  far more useful than a guess: 0 is a claim the food contains none of it, and",
+    "  it silently drags the client's daily total down.",
+    "- Use the units above exactly. Sodium is mg, fibre is g, vitamin D is mcg.",
+    "- Values are for the stated amount of that item, not per 100 g and not per serving",
+    "  unless the stated amount IS one serving.",
+    "- Do not invent keys. Anything not in the list above is discarded.",
+  ].join("\n");
+}
+
 /** Compact "12.5 g" / "480 mg" for display. */
 export function formatNutrient(key: string, value: number | null): string {
   const def = NUTRIENT_BY_KEY[key];

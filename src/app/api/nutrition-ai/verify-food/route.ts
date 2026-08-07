@@ -11,17 +11,20 @@ import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { validateVerifyResult } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
+import { nutrientPromptSpec } from "@/lib/nutrition/nutrients";
 
 const SYSTEM_PROMPT = `You are a nutrition data auditor. You are given one food-catalog entry (name, serving info, macros) from a coaching app. Compare it against your knowledge of official nutrition labels and USDA data for that food/brand at that serving size.
 
 Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
-{"plausible":boolean,"confidence":"high"|"medium"|"low","corrected":{"kcal":number,"protein":number,"carbs":number,"fats":number},"notes":string}
+{"plausible":boolean,"confidence":"high"|"medium"|"low","corrected":{"kcal":number,"protein":number,"carbs":number,"fats":number,"micros":object},"notes":string}
 
 Rules:
 - "plausible": whether the stored macros are reasonable for this food at this serving.
 - "corrected": your best macros for the stated serving. If the stored values are already right, return them unchanged.
 - "confidence": "high" ONLY when you clearly recognize the food/brand and serving and are sure of the label/USDA values; "medium" for well-known generic foods with some serving ambiguity; "low" otherwise.
-- "notes": one short sentence on what (if anything) was off.`;
+- "notes": one short sentence on what (if anything) was off.
+
+${nutrientPromptSpec()}`;
 
 export async function POST(req: NextRequest) {
   try {

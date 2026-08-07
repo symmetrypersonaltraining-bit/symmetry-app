@@ -1,7 +1,7 @@
 // POST /api/nutrition-ai/parse
 // Body: { text: string, clientId?: string }
 // "8 oz chicken, 1 cup jasmine rice, 1 tbsp olive oil"
-//   → { items: [{ name, amount, unit, kcal, p, c, f }], totals: { kcal, p, c, f } }
+//   → { items: [{ name, amount, unit, kcal, p, c, f, micros }], totals: { kcal, p, c, f, micros } }
 // Auth-checked, client-scoped, metered (feature 'parse', default 15/day),
 // Haiku, strict JSON with one retry on a malformed reply.
 
@@ -10,17 +10,20 @@ import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { validateParseResult } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
+import { nutrientPromptSpec } from "@/lib/nutrition/nutrients";
 
 const SYSTEM_PROMPT = `You are a nutrition parsing engine for a physique coach's app. The user gives a free-text description of foods with amounts (e.g. "8 oz chicken, 1 cup jasmine rice, 1 tbsp olive oil"). Split it into individual items and estimate macros for the stated amount of each item using USDA / nutrition-label knowledge (assume cooked weights unless stated raw; assume plain preparation unless stated otherwise).
 
 Respond with ONLY valid JSON — no markdown, no fences, no prose — exactly this shape:
-{"items":[{"name":string,"amount":number|null,"unit":string|null,"kcal":number,"p":number,"c":number,"f":number}],"totals":{"kcal":number,"p":number,"c":number,"f":number}}
+{"items":[{"name":string,"amount":number|null,"unit":string|null,"kcal":number,"p":number,"c":number,"f":number,"micros":object}],"totals":{"kcal":number,"p":number,"c":number,"f":number}}
 
 Rules:
 - p/c/f are grams of protein/carbs/fat for that item at that amount; kcal is calories for that amount.
 - amount is the numeric quantity the user stated (null if none given); unit is its unit ("oz","cup","tbsp","g","slice",...) or null.
 - Include EVERY food mentioned as its own item. Never invent foods that were not mentioned.
-- Be realistic, not inflated. totals must be the sum of the items.`;
+- Be realistic, not inflated. totals must be the sum of the items.
+
+${nutrientPromptSpec()}`;
 
 export async function POST(req: NextRequest) {
   try {

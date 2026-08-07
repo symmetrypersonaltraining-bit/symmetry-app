@@ -1,7 +1,22 @@
 // Strict-JSON extraction + validation for the nutrition AI endpoints.
-// PURE module (no imports) so it can be unit-tested in plain node.
+//
+// Imports ONLY pure leaf modules (nutrients, dailyTotals). This file is
+// compiled STANDALONE by scripts/test-nutrition-ai.cjs and required as plain
+// CommonJS, so it must not reach for Supabase, `next/*`, or anything that
+// pulls a runtime in behind it. That is what the older "PURE module (no
+// imports)" note was protecting — the constraint is real, it is just about the
+// standalone compile rather than about imports as such.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+// RELATIVE imports, deliberately, not the "@/" alias used elsewhere:
+// scripts/test-nutrition-ai.cjs compiles this file standalone and requires the
+// output as plain CommonJS. tsc's `paths` mapping is compile-time only - it
+// does NOT rewrite the emitted require() - so an "@/" import here compiles
+// clean and then dies at runtime with "Cannot find module". Relative paths
+// survive both the Next build and that standalone compile.
+import { kcalOf } from "../nutrition/dailyTotals";
+import { sanitizeNutrients, addNutrients, roundNutrients, type NutrientMap } from "../nutrition/nutrients";
 
 /** Pull the first JSON object out of a model reply (tolerates ``` fences / stray prose). */
 export function extractJson(text: string): any | null {
@@ -30,8 +45,13 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
+/**
+ * 4/4/9, rounded. Delegates to the canonical helper so the AI path and the
+ * logger can never quote different calories for the same food. The rounding is
+ * this module's own: model-facing numbers are whole calories.
+ */
 export function kcalFromMacros(p: number, c: number, f: number): number {
-  return Math.round(p * 4 + c * 4 + f * 9);
+  return Math.round(kcalOf(p, c, f));
 }
 
 // ---------------------------------------------------------------------------
@@ -46,11 +66,13 @@ export interface ParsedItem {
   p: number;
   c: number;
   f: number;
+  /** Micronutrients keyed by the registry. Absent key = unknown, never zero. */
+  micros?: NutrientMap;
 }
 
 export interface ParseResult {
   items: ParsedItem[];
-  totals: { kcal: number; p: number; c: number; f: number };
+  totals: { kcal: number; p: number; c: number; f: number; micros: NutrientMap };
 }
 
 /**
@@ -76,16 +98,26 @@ export function validateParseResult(raw: unknown): ParseResult | null {
     const amountRaw = it.amount;
     const amount = amountRaw == null ? null : Number.isFinite(Number(amountRaw)) ? Number(amountRaw) : null;
     const unit = typeof it.unit === "string" && it.unit.trim() ? it.unit.trim() : null;
-    out.push({ name, amount, unit, kcal, p, c, f });
+    // Unknown keys and negatives are dropped here rather than stored; a model
+    // that invents "vitamin_q" must not put it in the database.
+    const micros = sanitizeNutrients(it.micros ?? it.nutrients);
+    out.push({ name, amount, unit, kcal, p, c, f, ...(Object.keys(micros).length ? { micros } : {}) });
   }
 
   const totals = out.reduce(
     (t, it) => ({ kcal: t.kcal + it.kcal, p: t.p + it.p, c: t.c + it.c, f: t.f + it.f }),
     { kcal: 0, p: 0, c: 0, f: 0 }
   );
+  const microTotals = out.reduce<NutrientMap>((acc, it) => (it.micros ? addNutrients(acc, it.micros) : acc), {});
   return {
     items: out,
-    totals: { kcal: Math.round(totals.kcal), p: round1(totals.p), c: round1(totals.c), f: round1(totals.f) },
+    totals: {
+      kcal: Math.round(totals.kcal),
+      p: round1(totals.p),
+      c: round1(totals.c),
+      f: round1(totals.f),
+      micros: roundNutrients(microTotals),
+    },
   };
 }
 
@@ -136,6 +168,8 @@ export interface PlanMealItem {
   c: number;
   f: number;
   kcal: number;
+  /** Micronutrients keyed by the registry; written to meal_items.micros. */
+  micros?: NutrientMap;
 }
 
 export interface PlanMeal {
@@ -185,6 +219,7 @@ export function validatePlanDraft(raw: unknown): PlanDraft | null {
       const f = round1(num(it.f ?? it.fats ?? it.fat));
       const kcalRaw = num(it.kcal ?? it.calories);
       const amountRaw = it.amount;
+      const itMicros = sanitizeNutrients(it.micros ?? it.nutrients);
       items.push({
         food,
         amount: amountRaw == null ? null : Number.isFinite(Number(amountRaw)) ? Number(amountRaw) : null,
@@ -193,6 +228,7 @@ export function validatePlanDraft(raw: unknown): PlanDraft | null {
         c,
         f,
         kcal: kcalRaw > 0 ? Math.round(kcalRaw) : kcalFromMacros(p, c, f),
+        ...(Object.keys(itMicros).length ? { micros: itMicros } : {}),
       });
     }
     const subtotal = items.reduce(
@@ -487,7 +523,7 @@ export function finalizeAct(act: ActReply, day: ActDayMeal[]): ActReply {
 export interface VerifyResult {
   plausible: boolean;
   confidence: "high" | "medium" | "low";
-  corrected: { kcal: number; protein: number; carbs: number; fats: number };
+  corrected: { kcal: number; protein: number; carbs: number; fats: number; micros?: NutrientMap };
   notes: string | null;
 }
 
@@ -501,10 +537,20 @@ export function validateVerifyResult(raw: unknown): VerifyResult | null {
   const fats = round1(num(c.fats ?? c.f ?? c.fat ?? c.fat_g));
   const kcalRaw = num(c.kcal ?? c.calories);
   const confidence = r.confidence === "high" || r.confidence === "medium" || r.confidence === "low" ? r.confidence : "low";
+  // verify-food audits food_catalog rows, which carry micronutrients too. It
+  // used to correct only P/C/F/kcal, so a food could be marked verified while
+  // its micros stayed wrong.
+  const micros = roundNutrients(sanitizeNutrients(c.micros ?? c.nutrients ?? r.micros ?? r.nutrients));
   return {
     plausible: Boolean(r.plausible),
     confidence,
-    corrected: { kcal: kcalRaw > 0 ? Math.round(kcalRaw) : kcalFromMacros(protein, carbs, fats), protein, carbs, fats },
+    corrected: {
+      kcal: kcalRaw > 0 ? Math.round(kcalRaw) : kcalFromMacros(protein, carbs, fats),
+      protein,
+      carbs,
+      fats,
+      ...(Object.keys(micros).length ? { micros } : {}),
+    },
     notes: typeof r.notes === "string" && r.notes.trim() ? r.notes.trim() : null,
   };
 }

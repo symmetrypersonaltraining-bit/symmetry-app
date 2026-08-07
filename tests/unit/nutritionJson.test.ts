@@ -6,12 +6,11 @@
 //  1. It is the module that decides whether a model reply is usable at all. A
 //     silent regression here degrades to "the AI didn't understand you" rather
 //     than to a crash, so nothing surfaces it.
-//  2. Its header says "PURE module (no imports) so it can be unit-tested in
-//     plain node" — a deliberate design constraint that means it carries its
-//     OWN copy of the 4/4/9 calorie formula. Every other copy in the codebase
-//     was consolidated onto nutrition/dailyTotals.kcalOf; this one cannot be,
-//     without breaking the purity that makes it testable. So the copy stays and
-//     THIS FILE is the guard that stops the two from drifting apart.
+//  2. It is compiled STANDALONE by scripts/test-nutrition-ai.cjs and required
+//     as plain CommonJS, so it may only import pure leaf modules. It now
+//     imports the canonical kcalOf rather than carrying its own copy — the
+//     drift guard below stays anyway, because it is cheap and it is the test
+//     that would catch the formula being re-inlined here in a hurry.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -203,4 +202,61 @@ test("validateVerifyResult derives kcal only when none was supplied", () => {
 test("validateVerifyResult rejects unusable input", () => {
   assert.equal(validateVerifyResult(null), null);
   assert.equal(validateVerifyResult("nope"), null);
+});
+
+// ─── micronutrients through the AI layer ────────────────────────────────────
+
+test("validateParseResult keeps known micros and drops invented ones", () => {
+  const out = validateParseResult({
+    items: [{
+      name: "Salmon", amount: 6, unit: "oz", p: 40, c: 0, f: 14,
+      micros: { sodium: 90, vitamin_d: 14, unobtainium: 999, iron: -3 },
+    }],
+  });
+  assert.ok(out);
+  assert.deepEqual(out!.items[0].micros, { sodium: 90, vitamin_d: 14 });
+});
+
+test("validateParseResult sums micros across items, carrying partial knowledge", () => {
+  const out = validateParseResult({
+    items: [
+      { name: "Salmon", p: 40, c: 0, f: 14, micros: { sodium: 90, vitamin_d: 14 } },
+      { name: "Broccoli", p: 3, c: 6, f: 0, micros: { sodium: 30, vitamin_c: 81 } },
+      { name: "Olive oil", p: 0, c: 0, f: 14 }, // no micros at all
+    ],
+  });
+  assert.ok(out);
+  // sodium known on two items sums; each single-item nutrient carries through;
+  // the item with no micros does not blank the totals.
+  assert.equal(out!.totals.micros.sodium, 120);
+  assert.equal(out!.totals.micros.vitamin_d, 14);
+  assert.equal(out!.totals.micros.vitamin_c, 81);
+});
+
+test("an item with no micros omits the key entirely rather than storing {}", () => {
+  const out = validateParseResult({ items: [{ name: "Water", p: 0, c: 0, f: 0 }] });
+  assert.ok(out);
+  assert.equal("micros" in out!.items[0], false);
+});
+
+test("validatePlanDraft carries micros onto plan items", () => {
+  const out = validatePlanDraft({
+    targets: { kcal: 2000, p: 180, c: 200, f: 55 },
+    meals: [{
+      name: "M1", timing: "7am",
+      items: [{ food: "Eggs", amount: 3, unit: "whole", p: 18, c: 1, f: 15, micros: { choline: 440, vitamin_d: 2 } }],
+    }],
+  });
+  assert.ok(out);
+  assert.deepEqual(out!.meals[0].items[0].micros, { choline: 440, vitamin_d: 2 });
+});
+
+test("validateVerifyResult can now correct micros, not just macros", () => {
+  // A food used to be markable 'verified' while its micronutrients stayed wrong.
+  const out = validateVerifyResult({
+    plausible: false, confidence: "high",
+    corrected: { protein: 30, carbs: 10, fats: 5, micros: { sodium: 610, potassium: 300 } },
+  });
+  assert.ok(out);
+  assert.deepEqual(out!.corrected.micros, { sodium: 610, potassium: 300 });
 });
