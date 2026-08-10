@@ -57,8 +57,13 @@ test("session view is pinned to a stable height, not inset-0", () => {
   // inset-0 resolves against the LAYOUT viewport, which the Android WebView
   // shrinks when the keyboard opens — the whole view reflows and the exercise
   // header disappears. The height comes from useStableViewportHeight, which
-  // never adopts a shorter viewport, so the keyboard covers the bottom of the
-  // screen instead of resizing it.
+  // never adopts a shorter viewport WHILE A KEYBOARD IS UP, so the keyboard
+  // covers the bottom of the screen instead of resizing it.
+  //
+  // 8/10: that hook used to be grow-only, which fixed the keyboard and caused
+  // the tab row below to vanish (see the next test). It can now come back down
+  // for genuine viewport changes only — three guards, pinned in
+  // tests/unit/stableViewportHeight.test.ts. The keyboard rule is unchanged.
   assert.ok(
     SRC.includes("useStableViewportHeight"),
     "logger must pin its height with useStableViewportHeight so the keyboard cannot resize it",
@@ -133,5 +138,30 @@ test("session mode does not leak its history entry", () => {
   assert.ok(
     SRC.includes("poppedByBack"),
     "session-mode back handling must clean up its own history entry when it was not consumed by Back",
+  );
+});
+
+test("the app tab row is present, and is the last thing in the session view", () => {
+  // Removed on 8/1 to buy back height and put straight back at Dustin's
+  // request — he uses them mid-session. Then on 8/10 they vanished again
+  // WITHOUT anyone editing this file: useStableViewportHeight was grow-only, so
+  // any moment the viewport was briefly taller became a permanent pin, the
+  // container ended up taller than the screen, and the bottom row hung below
+  // the fold. The tab row is the bottom row, so it is what disappeared.
+  //
+  // Two things are asserted. That the tabs still EXIST, because deleting them
+  // is the tempting way to reclaim height and it has been done once. And that
+  // they come after the Prev/Next controls, because being last is exactly why
+  // they are the canary — anything that overshoots the viewport eats them
+  // first, and a reordering would hide that signal.
+  const controls = at("{/* Bottom controls (Prev/Next/Complete). */}", "the Prev/Next footer");
+  const tabs = at("{/* App tabs.", "the app tab row");
+  assert.ok(
+    tabs > controls,
+    "the app tab row must stay last in the session view — it is the first thing an over-tall container pushes off screen",
+  );
+  assert.ok(
+    /ti-home/.test(SRC) && /ti-salad/.test(SRC),
+    "the tab row must still render its links; removing them to reclaim height was tried on 8/1 and reverted",
   );
 });
