@@ -25,6 +25,13 @@ Rules:
 
 ${nutrientPromptSpec()}`;
 
+// Macros-only. Used ONLY if the full request (which asks for 33 micronutrients
+// per food) fails twice. Logging your dinner must not depend on the model
+// getting vitamin K right — see the fallbackSystem note in lib/ai/anthropic.ts.
+const FALLBACK_SYSTEM_PROMPT = SYSTEM_PROMPT.replace(nutrientPromptSpec(), "")
+  .replace(',"micros":object', "")
+  .trim();
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -46,9 +53,14 @@ export async function POST(req: NextRequest) {
       apiKey,
       model: HAIKU_MODEL,
       system: SYSTEM_PROMPT,
-      maxTokens: 900,
+      // 4000, not 900: a multi-item meal with micronutrients does not fit in
+      // 900 and the reply truncates mid-JSON. That exact mistake took this
+      // endpoint down - both attempts hit the ceiling and clients were told
+      // "AI estimating isn't reachable right now".
+      maxTokens: 4000,
       messages: [{ role: "user", content: text }],
       validate: validateParseResult,
+      fallbackSystem: FALLBACK_SYSTEM_PROMPT,
     });
 
     await logUsage(clientId, "parse", result.tokensIn, result.tokensOut, HAIKU_MODEL);

@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     const message = await client.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 3000,
       system: 'You are a precise nutrition-estimation assistant for a physique coach. Prefer official restaurant or brand nutrition data over visual guesses, count items exactly, and avoid over-estimating calories and fat. Always respond with valid JSON only, no markdown and no prose outside the JSON.',
       messages: [{
         role: 'user',

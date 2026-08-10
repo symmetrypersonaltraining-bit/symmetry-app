@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       apiKey,
       model: SONNET_MODEL,
       system: SYSTEM_PROMPT,
-      maxTokens: 3000,
+      maxTokens: 8000,
       messages: [{ role: "user", content: userText }],
       validate: validatePlanDraft,
     });

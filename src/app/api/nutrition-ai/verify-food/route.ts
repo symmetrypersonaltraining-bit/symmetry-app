@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       apiKey,
       model: HAIKU_MODEL,
       system: SYSTEM_PROMPT,
-      maxTokens: 400,
+      maxTokens: 1500,
       messages: [{ role: "user", content: `Food catalog entry to audit:\n${JSON.stringify(presentable)}` }],
       validate: validateVerifyResult,
     });
