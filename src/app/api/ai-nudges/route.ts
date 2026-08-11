@@ -144,7 +144,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const [clientsRes, wlRes, mealRes, settingsRes, recentRes] = await Promise.all([
-      admin.from("clients").select("id, name, primary_goal, auth_user_id").not("auth_user_id", "is", null).is("archived_at", null),
+      // Test accounts are excluded outright. A dry run of the segmentation on
+      // 11 Aug had "Test Client" queued for a real message in Dustin's name.
+      admin.from("clients").select("id, name, primary_goal, auth_user_id").not("auth_user_id", "is", null).is("archived_at", null).not("name", "ilike", "%test%"),
       admin.from("workout_logs").select("client_id, log_date").eq("completed", true).gte("log_date", since30),
       admin.from("meal_adherence_logs").select("client_id, log_date").gte("log_date", since30),
       admin.from("client_app_settings").select("client_id, nudges_enabled"),

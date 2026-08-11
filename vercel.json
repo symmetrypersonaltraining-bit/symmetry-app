@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/birthdays",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/ai-nudges",
+      "schedule": "0 15 * * 1"
     }
   ]
 }
