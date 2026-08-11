@@ -59,6 +59,34 @@ Also done directly in the database:
 
 ---
 
+## 0. Logger reported a SAVED workout as a failure — FIXED 2026-08-11
+
+**Shipped `39fc4a8`.** Lauren Standefer, 11 Aug 10:04am, mid-session:
+"Couldn't finish the workout: duplicate key value violates unique constraint
+`uq_workout_log_one_completed`."
+
+Her workout had completed at 10:03:28. At 10:04:02 the logger inserted a SECOND
+`workout_logs` row for the same client/day/date, copied all 24 of her sets into
+it, and tried to complete that one. The partial unique index refused —
+correctly — and the refusal was shown to her as her workout failing to save.
+
+Root cause: `ensureWorkoutLog` treated "I hold no log id" as "no log exists".
+The draft is cleared on completion, so every remount after finishing looks
+identical to a fresh start. It now looks up client + day + sessionDate before
+inserting, and a COMPLETED log always wins over a newer incomplete one — the
+ordering matters, because Lauren's orphan was created 38 seconds AFTER the
+completed row. Helper: `src/lib/workoutLogLookup.ts`, 7 tests.
+
+An already-complete session now shows as finished rather than erroring, and
+re-runs the schedule-marking block only when no `scheduled_workouts` row points
+at the log yet — re-running it unconditionally would find "nothing scheduled
+today" and pull a future session forward, which is the Sara Prince bug.
+
+Data: her completed log and its 24 sets are intact and the 11 Aug schedule row
+is `completed`. The orphan log and its 24 duplicate sets were removed, backed
+up first to `bak_lauren_orphan_log_20260811` and
+`bak_lauren_orphan_setlogs_20260811`.
+
 ## 1. Custom workout from the schedule page  ← NEXT
 
 `app_feedback` `73fcd284`, 2026-08-06, client-app, from Dustin.
@@ -70,7 +98,28 @@ exists elsewhere — this is about reaching it from the schedule page. Check
 whether the AI "Create / Replace Workout" builder (shipped `900af2b`) can be
 mounted here rather than building a second one.
 
-## 2. Duplicate-programme bug — INVESTIGATE, DELETE NOTHING
+## 2. Duplicate-programme bug — ROOT CAUSE FOUND AND FIXED 2026-08-11
+
+**Shipped `1ca7876`.** Six duplicate (client, day, date) groups existed across
+a 60-day window and FOUR of them shared a `created_at` to the microsecond —
+one insert batch writing the same session twice. That is the copy-week path:
+`loadWorkouts` on the trainer's programme calendar did not filter `deleted_at`,
+so soft-deleted sessions were displayed; `copyCurrentWeek` read what was
+displayed; `pasteWeekBulk` inserted it blind. A week holding one duplicate
+pasted two copies forward and doubled again on every paste. Bobbie Page carried
+four of the six groups, which is exactly what that looks like.
+
+All three leaks are closed and the logic is a tested pure helper
+(`src/lib/scheduleDedupe.ts`, 8 tests).
+
+**STILL OPEN — needs Dustin.** A partial unique index on
+`(client_id, day_id, scheduled_date) WHERE deleted_at IS NULL` would make
+duplicates impossible at the database level, but would also forbid
+legitimately doing the same session twice in one day. His call, not mine.
+
+**The three surviving duplicate pairs were NOT deleted.** Ask first.
+
+### Original note (kept for context)
 
 Three copies of **"Knee Stability & Strength"** exist (one 17 Jun, two 25 Jul;
 one has zero scheduled rows). This is almost certainly the same root cause that
@@ -126,14 +175,21 @@ tracked fields.
    `select()` list. Confirmed against real data: plan-build ran successfully
    for the first time ever on 11 Aug and `meal_items` still had zero rows with
    micros. Five tests in `tests/unit/adoptPlan.test.ts`.
-2. **`dailyTotals.planMealMacros`/`computeDayTotals`** have no nutrient path for
-   plan meals (the comment says plan meals have "NO nutrient source" — that is
-   now out of date). Needs a `planMealNutrients` mirroring the existing
-   `customMealNutrients`, then the day panel reflects planned micros too.
-3. **UI.** `NutritionV3Client.tsx` has an "ALL NUTRIENTS" panel showing the four
-   legacy nutrients. `groupedNutrients()` / `formatNutrient()` / `pctOfDaily()`
-   exist to render the full 33 grouped by carb/fat/mineral/vitamin — the panel
-   just needs pointing at them.
+2. ~~**Plan-meal nutrient path.**~~ **DONE 2026-08-11 (`173f60b`).**
+   `planMealNutrientMap` reads the panel off `meal_items.micros`, honouring
+   amount overrides and prorated by adherence. Three things had to change
+   together: the calculator, the SELECT lists (`PLAN_SELECT` and
+   `PlanRangeView` both omitted `micros`, and an omitted column reads exactly
+   like an empty one), and the types (`LogRow.est_micros`, `CustomItem.mi`).
+   `DayTotals.nutrientMap` now carries the whole registry and the legacy four
+   are a PROJECTION of it, not a second calculation — they used to be computed
+   twice down parallel branches, which is how a panel and a chart end up
+   disagreeing about the same day.
+3. ~~**UI.**~~ **DONE 2026-08-11 (`173f60b`).** The ALL NUTRIENTS panel renders
+   the full registry grouped by carbohydrate / fat / mineral / vitamin, with
+   % of daily reference where one exists. Nutrients nothing knew are hidden
+   rather than shown as a column of dashes — the coverage footnote already
+   states the gap.
 4. **Backfill `food_catalog.micros`** from the USDA/OFF import (197,826 rows
    already carry the legacy four; the rest of the panel is available upstream
    for many of them).
