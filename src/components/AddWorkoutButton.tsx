@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { FunLoader } from "@/components/FunMoments";
 import ManualWorkoutBuilder from "@/components/ManualWorkoutBuilder";
+import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
 
 type LibDay = { id: string; label: string };
 
@@ -84,8 +85,28 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
         const completedAt = new Date(pickedDate + "T12:00:00Z").toISOString();
         const wl = await (supabase as any).from("workout_logs").insert({ client_id: cid, day_id: d.id, log_date: pickedDate, completed: true, completed_at: completedAt, started_at: completedAt, status: "Done as planned", source: "trainer_backfill" }).select("id").single();
         if (wl.error || !wl.data) { window.alert("Could not add: " + (wl.error ? wl.error.message : "no log created")); return; }
+        // Same rule for a finished session: if it was already on the calendar
+        // this week, mark THAT one done rather than leaving a duplicate behind.
+        const slotDone = await pullForwardSlot(cid, d.id, pickedDate);
+        if (slotDone) {
+          const mvC = await (supabase as any).from("scheduled_workouts")
+            .update({ scheduled_date: pickedDate, moved_from_date: slotDone.scheduled_date, position: pos, status: "completed", workout_log_id: wl.data.id, updated_at: new Date().toISOString() })
+            .eq("id", slotDone.id);
+          if (mvC.error) { window.alert("Could not add: " + mvC.error.message); return; }
+          window.location.reload();
+          return;
+        }
         const insC = await (supabase as any).from("scheduled_workouts").insert({ client_id: cid, day_id: d.id, scheduled_date: pickedDate, position: pos, status: "completed", workout_log_id: wl.data.id, source: "trainer" });
         if (insC.error) { window.alert("Could not add: " + insC.error.message); return; }
+        window.location.reload();
+        return;
+      }
+      const slot = await pullForwardSlot(cid, d.id, pickedDate);
+      if (slot) {
+        const mv = await (supabase as any).from("scheduled_workouts")
+          .update({ scheduled_date: pickedDate, moved_from_date: slot.scheduled_date, position: pos, updated_at: new Date().toISOString() })
+          .eq("id", slot.id);
+        if (mv.error) { window.alert("Could not add: " + mv.error.message); return; }
         window.location.reload();
         return;
       }
@@ -93,6 +114,24 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
       if (ins.error) { window.alert("Could not add: " + ins.error.message); return; }
       window.location.reload();
     } finally { setBusy(false); }
+  }
+
+
+  // Doing a planned session early consumes its slot instead of adding another.
+  // Sara Prince, 11 Aug: mobility done Sunday to get ahead left the same two
+  // sessions still sitting later in her week and her adherence reading 30%.
+  async function pullForwardSlot(cid: string, dayId: string, date: string) {
+    const { data } = await (supabase as any)
+      .from("scheduled_workouts")
+      .select("id, day_id, scheduled_date, status, deleted_at")
+      .eq("client_id", cid)
+      .eq("day_id", dayId)
+      .eq("status", "scheduled")
+      .is("deleted_at", null)
+      .gt("scheduled_date", date)
+      .order("scheduled_date", { ascending: true })
+      .limit(10);
+    return findSlotToPullForward((data as SlotCandidate[]) || [], dayId, date);
   }
 
   async function addCustom() {
