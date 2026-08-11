@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { scheduleWriteError } from "@/lib/scheduleConflict";
 import { createClient } from "@/lib/supabase/client";
 import { FunLoader } from "@/components/FunMoments";
 import ManualWorkoutBuilder from "@/components/ManualWorkoutBuilder";
@@ -92,12 +93,12 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
           const mvC = await (supabase as any).from("scheduled_workouts")
             .update({ scheduled_date: pickedDate, moved_from_date: slotDone.scheduled_date, position: pos, status: "completed", workout_log_id: wl.data.id, updated_at: new Date().toISOString() })
             .eq("id", slotDone.id);
-          if (mvC.error) { window.alert("Could not add: " + mvC.error.message); return; }
+          if (mvC.error) { window.alert(scheduleWriteError(mvC.error, "add")); return; }
           window.location.reload();
           return;
         }
         const insC = await (supabase as any).from("scheduled_workouts").insert({ client_id: cid, day_id: d.id, scheduled_date: pickedDate, position: pos, status: "completed", workout_log_id: wl.data.id, source: "trainer" });
-        if (insC.error) { window.alert("Could not add: " + insC.error.message); return; }
+        if (insC.error) { window.alert(scheduleWriteError(insC.error, "add")); return; }
         window.location.reload();
         return;
       }
@@ -106,12 +107,12 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
         const mv = await (supabase as any).from("scheduled_workouts")
           .update({ scheduled_date: pickedDate, moved_from_date: slot.scheduled_date, position: pos, updated_at: new Date().toISOString() })
           .eq("id", slot.id);
-        if (mv.error) { window.alert("Could not add: " + mv.error.message); return; }
+        if (mv.error) { window.alert(scheduleWriteError(mv.error, "add")); return; }
         window.location.reload();
         return;
       }
       const ins = await (supabase as any).from("scheduled_workouts").insert({ client_id: cid, day_id: d.id, scheduled_date: pickedDate, position: pos, status: "scheduled", source: clientId ? "trainer" : "client_self_assign" });
-      if (ins.error) { window.alert("Could not add: " + ins.error.message); return; }
+      if (ins.error) { window.alert(scheduleWriteError(ins.error, "add")); return; }
       window.location.reload();
     } finally { setBusy(false); }
   }
@@ -141,7 +142,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
       const cid = await effectiveClientId();
       if (!cid) { window.alert("Could not find your client profile."); return; }
       const ins = await (supabase as any).from("offplan_workout_logs").insert({ client_id: cid, log_date: pickedDate, description: text.trim().slice(0, 80), details: text.trim(), status: "pending" });
-      if (ins.error) { window.alert("Could not add: " + ins.error.message); return; }
+      if (ins.error) { window.alert(scheduleWriteError(ins.error, "add")); return; }
       window.location.reload();
     } finally { setBusy(false); }
   }

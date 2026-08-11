@@ -112,12 +112,26 @@ four of the six groups, which is exactly what that looks like.
 All three leaks are closed and the logic is a tested pure helper
 (`src/lib/scheduleDedupe.ts`, 8 tests).
 
-**STILL OPEN — needs Dustin.** A partial unique index on
-`(client_id, day_id, scheduled_date) WHERE deleted_at IS NULL` would make
-duplicates impossible at the database level, but would also forbid
-legitimately doing the same session twice in one day. His call, not mine.
+**CLOSED 2026-08-11.** Dustin: "yes add the unique index, shouldn't be doing
+same session twice." Migration `uq_scheduled_workout_one_per_day` is live:
+unique on `(client_id, day_id, scheduled_date) WHERE deleted_at IS NULL`, so a
+soft-deleted session never blocks re-adding the same one.
 
-**The three surviving duplicate pairs were NOT deleted.** Ask first.
+The 6 pre-existing duplicate pairs were resolved first, keeping the row that
+carried a `workout_log_id` (never orphan a logged session), then completed over
+scheduled, then oldest — deterministic, never UUID-random. In every completed
+pair BOTH rows already pointed at the same `workout_log_id`, so no session was
+lost. The losers are soft-deleted, not removed, and the whole set is backed up
+to `bak_dupe_sched_20260811`.
+
+A constraint only helps if what the user SEES improves too — the lesson from
+Lauren's toast the same morning. Every path that writes a scheduled session now
+runs its error through `src/lib/scheduleConflict.ts`, which recognises this
+index specifically (not any 23505, and not an FK failure wearing the same table
+name) and says "that session is already on the calendar for that day" instead
+of raw Postgres. Three of those paths — `assignDay`, `saveAndSchedule` and the
+programme page's `moveWorkout` — were discarding their error entirely, so a
+rejection would have looked like the button doing nothing at all.
 
 ### Original note (kept for context)
 

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { startDictation } from "@/lib/dictation";
 import { dedupeInsertRows, type ExistingSlot } from "@/lib/scheduleDedupe";
+import { scheduleWriteError } from "@/lib/scheduleConflict";
 import Link from "next/link";
 
 // ---- Types ----
@@ -253,13 +254,17 @@ function WorkoutEditor({
   async function assignDay(dayId: string) {
     if (!selectedDate) return;
     setSaving(true);
-    await supabase.from("scheduled_workouts").insert({
+    // uq_scheduled_workout_one_per_day can reject this. The write used to
+    // discard its error entirely, so a rejection would look like the button
+    // doing nothing at all — the single worst way for a constraint to surface.
+    const { error: assignErr } = await supabase.from("scheduled_workouts").insert({
       client_id: clientId,
       day_id: dayId,
       scheduled_date: selectedDate,
       status: "scheduled",
     });
     setSaving(false);
+    if (assignErr) { window.alert(scheduleWriteError(assignErr, "schedule")); return; }
     onRefresh();
     onClose();
   }
@@ -371,12 +376,13 @@ function WorkoutEditor({
         }
       }
 
-      await supabase.from("scheduled_workouts").insert({
+      const { error: schedErr } = await supabase.from("scheduled_workouts").insert({
         client_id: clientId,
         day_id: (newDay as any).id,
         scheduled_date: selectedDate,
         status: "scheduled",
       });
+      if (schedErr) { window.alert(scheduleWriteError(schedErr, "schedule")); return; }
 
       onRefresh();
       onClose();
@@ -1055,21 +1061,26 @@ export default function ProgramPage() {
       [{ client_id: clientId, day_id: copiedWorkout.day_id, scheduled_date: date, status: "scheduled" }],
       (ex || []) as unknown as ExistingSlot[]
     );
-    if (rows.length > 0) await supabase.from("scheduled_workouts").insert(rows);
+    if (rows.length > 0) {
+      const { error } = await supabase.from("scheduled_workouts").insert(rows);
+      if (error) { window.alert(scheduleWriteError(error, "paste")); return; }
+    }
     setCopiedWorkout(null);
     loadWorkouts();
   }
 
   async function moveWorkout(workout: ScheduledWorkout, newDate: string) {
-    await supabase.from("scheduled_workouts").update({ scheduled_date: newDate }).eq("id", workout.id);
+    const { error } = await supabase.from("scheduled_workouts").update({ scheduled_date: newDate }).eq("id", workout.id);
+    if (error) { window.alert(scheduleWriteError(error, "move")); return; }
     loadWorkouts();
   }
 
   async function scheduleLibraryDay(dayId: string, targetDate: string) {
-    await supabase.from("scheduled_workouts").insert({
+    const { error } = await supabase.from("scheduled_workouts").insert({
       client_id: clientId, day_id: dayId,
       scheduled_date: targetDate, status: "scheduled", source: "trainer", position: 1,
     });
+    if (error) { window.alert(scheduleWriteError(error, "schedule")); return; }
     loadWorkouts();
   }
 
@@ -1116,7 +1127,10 @@ export default function ProgramPage() {
       existing = (ex || []) as unknown as ExistingSlot[];
     }
     const toInsert = dedupeInsertRows(insertRows, existing);
-    if (toInsert.length > 0) await supabase.from("scheduled_workouts").insert(toInsert);
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from("scheduled_workouts").insert(toInsert);
+      if (error) { setBulkPasting(false); window.alert(scheduleWriteError(error, "paste")); return; }
+    }
     setBulkPasting(false);
     setCopiedWeek(null);
     loadWorkouts();

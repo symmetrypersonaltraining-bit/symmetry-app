@@ -20,6 +20,7 @@
 // streak. So the log moves with the workout, here, once, for everyone.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { scheduleWriteError } from "./scheduleConflict";
 
 export interface MovableWorkout {
   id: string;
@@ -48,7 +49,10 @@ export async function moveScheduledWorkout(
     .from("scheduled_workouts")
     .update({ scheduled_date: toDate })
     .eq("id", w.id);
-  if (error) return "Couldn't move that workout. Try again.";
+  // A move can now collide with uq_scheduled_workout_one_per_day: the target
+  // day may already hold this exact session. "Try again" would be bad advice —
+  // retrying cannot work — so say what actually happened.
+  if (error) return scheduleWriteError(error, "move");
 
   // Best effort, and never fatal: the workout has already moved, and a stale
   // log_date is a smaller problem than telling someone the move failed when it

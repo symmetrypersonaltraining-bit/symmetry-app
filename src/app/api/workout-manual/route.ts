@@ -28,6 +28,7 @@
 // failure, because it looks like a workout until you open it.
 
 import { NextResponse } from "next/server";
+import { isDuplicateScheduleError, duplicateScheduleMessage } from "@/lib/scheduleConflict";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAiScope } from "@/lib/ai/scope";
 import { findExerciseIdByName } from "@/lib/exerciseLookup";
@@ -347,6 +348,11 @@ export async function POST(req: Request) {
         await db.from("sections").delete().eq("day_id", created.days);
         await db.from("days").delete().eq("id", created.days);
       } catch { /* the original error is the one worth reporting */ }
+    }
+    // uq_scheduled_workout_one_per_day is not a server fault and must not read
+    // like one — that session is simply already on the calendar that day.
+    if (isDuplicateScheduleError(err)) {
+      return NextResponse.json({ error: duplicateScheduleMessage("add") }, { status: 409 });
     }
     const msg = err instanceof Error ? err.message : "Could not save that workout.";
     return NextResponse.json({ error: msg }, { status: 500 });
