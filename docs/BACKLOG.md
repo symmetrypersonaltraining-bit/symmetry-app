@@ -318,6 +318,39 @@ badly.
 programming, a meal plan with macros, and a few logged sessions and weigh-ins so
 the charts have shape. Test account only, nowhere near a real client.
 
+## 7c. Help & Tutorials — LANDED 2026-08-11 (was never in this repo)
+
+Dustin, 11 Aug: "we set up the tutorials in his app to guide him through
+setting up to run app as is. what do we do now?"
+
+The answer was worse than "they're stale". **The Help & Tutorials centre had
+never landed in this repo at all.** It existed as two patch files in the
+project docs (`help-center-READY-8-07.patch`, commit `fe1e23e`) and applied
+only inside Dylan's fork. Retiring that fork — the entire point of this week's
+work — would have deleted the tutorials with it.
+
+Now in the shared repo, so both instances get it and it stays current with the
+code: `src/components/HelpCenter.tsx`, `src/lib/help/articles.ts`, wired into
+Settings, 20 tests.
+
+Three things changed versus the patch:
+
+- **Instance-neutral.** No article names a person; the product name comes from
+  `BUSINESS_NAME`. A tutorial telling another trainer's client to contact
+  Dustin is worse than no tutorial — it is confidently, specifically wrong. A
+  test enforces it.
+- **A new "Running Your Own Instance" category**, trainer-only, replacing the
+  fork's setup guidance. It describes the app as it is NOW — configured, not
+  edited — including the AI-key warning (a shared key spends the other
+  instance's cap) and the APK warning (another instance's build opens their
+  login screen).
+- **Existing articles updated** for what shipped this week: early sessions
+  consuming their slot rather than adding one, copy/paste-week not duplicating,
+  a finished workout reading as finished, and the full nutrient panel.
+
+**Standing rule, in the file header:** when a feature lands, its article changes
+in the same commit.
+
 ## 8. Smaller / hygiene
 
 - **Tim Yancey dip data.** His 4 Jul Assisted Dip records `20.00` assist and

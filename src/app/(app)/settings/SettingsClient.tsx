@@ -7,6 +7,7 @@ import { useTheme, THEMES, DEPTH_LEVELS } from "@/components/ThemeProvider";
 import { AvatarSelf } from "@/components/Avatar";
 import PaymentsSettingsCard from "@/components/PaymentsSettingsCard";
 import ExperienceSettings from "@/components/ExperienceSettings";
+import HelpCenter from "@/components/HelpCenter";
 
 interface Props {
   userEmail: string;
@@ -321,6 +322,8 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
           <i className="ti ti-chevron-right" style={{ color: "var(--brand-text-secondary)" }} />
         </a>
       </section>
+
+      <HelpCenter isTrainer={isTrainer && !isInClientMode} />
 
       <section>
         <p className="section-header">About</p>
