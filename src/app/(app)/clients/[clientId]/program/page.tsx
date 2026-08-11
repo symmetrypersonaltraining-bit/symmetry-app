@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { startDictation } from "@/lib/dictation";
+import { dedupeInsertRows, type ExistingSlot } from "@/lib/scheduleDedupe";
 import Link from "next/link";
 
 // ---- Types ----
@@ -1018,6 +1019,9 @@ export default function ProgramPage() {
       .from("scheduled_workouts")
       .select("id, scheduled_date, status, day_id, client_id, days(id, label)")
       .eq("client_id", clientId)
+      // Soft-deleted sessions must not appear here. They were showing, which
+      // meant copy-week picked them up and pasted deleted work into the future.
+      .is("deleted_at", null)
       .gte("scheduled_date", allDatesArr[0])
       .lte("scheduled_date", allDatesArr[allDatesArr.length - 1])
       .order("scheduled_date");
@@ -1043,10 +1047,15 @@ export default function ProgramPage() {
 
   async function pasteWorkout(date: string) {
     if (!copiedWorkout) return;
-    await supabase.from("scheduled_workouts").insert({
-      client_id: clientId, day_id: copiedWorkout.day_id,
-      scheduled_date: date, status: "scheduled",
-    });
+    const { data: ex } = await supabase
+      .from("scheduled_workouts")
+      .select("day_id, scheduled_date, deleted_at")
+      .eq("client_id", clientId).eq("scheduled_date", date);
+    const rows = dedupeInsertRows(
+      [{ client_id: clientId, day_id: copiedWorkout.day_id, scheduled_date: date, status: "scheduled" }],
+      (ex || []) as unknown as ExistingSlot[]
+    );
+    if (rows.length > 0) await supabase.from("scheduled_workouts").insert(rows);
     setCopiedWorkout(null);
     loadWorkouts();
   }
@@ -1092,7 +1101,22 @@ export default function ProgramPage() {
         });
       }
     }
-    if (insertRows.length > 0) await supabase.from("scheduled_workouts").insert(insertRows);
+    // Read what is already on those dates before writing, so a paste over an
+    // existing week tops it up instead of doubling it — and so a duplicate in
+    // the SOURCE week cannot propagate forward. See src/lib/scheduleDedupe.ts.
+    const dates = insertRows.map(r => r.scheduled_date).sort();
+    let existing: ExistingSlot[] = [];
+    if (dates.length > 0) {
+      const { data: ex } = await supabase
+        .from("scheduled_workouts")
+        .select("day_id, scheduled_date, deleted_at")
+        .eq("client_id", clientId)
+        .gte("scheduled_date", dates[0])
+        .lte("scheduled_date", dates[dates.length - 1]);
+      existing = (ex || []) as unknown as ExistingSlot[];
+    }
+    const toInsert = dedupeInsertRows(insertRows, existing);
+    if (toInsert.length > 0) await supabase.from("scheduled_workouts").insert(toInsert);
     setBulkPasting(false);
     setCopiedWeek(null);
     loadWorkouts();
