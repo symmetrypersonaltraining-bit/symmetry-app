@@ -4,6 +4,7 @@ import MealPlanClient from "../../nutrition/MealPlanClient";
 import NutritionV3Client from "../../nutrition/v3/NutritionV3Client";
 import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 import { isTrainerEmail } from "@/lib/trainer";
+import { fetchOwnClientRow } from "@/lib/ownClient";
 
 export default async function ClientPreviewNutritionPage() {
   const supabase = await createClient();
@@ -11,11 +12,8 @@ export default async function ClientPreviewNutritionPage() {
   if (!user) redirect("/login");
   if (!isTrainerEmail(user.email)) redirect("/nutrition");
 
-  const { data: clientRecord } = await supabase
-    .from("clients")
-    .select("id, name")
-    .ilike("name", "%Dustin%")
-    .maybeSingle();
+  // The trainer's own client row, by login not by name. src/lib/ownClient.ts.
+  const clientRecord = await fetchOwnClientRow<{ id: string; name: string }>(supabase, user, "id, name");
 
   if (!clientRecord) {
     return (

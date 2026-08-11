@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { isTrainerEmail } from "@/lib/trainer";
+import { fetchOwnClientRow } from "@/lib/ownClient";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const supabase = createClient() as any;
@@ -79,10 +79,11 @@ export function useMyClientRow(): { id: string | null; avatarUrl: string | null;
         let rows = (
           await supabase.from("clients").select("id, avatar_url").eq("auth_user_id", user.id).limit(1)
         ).data;
-        if ((!rows || !rows.length) && isTrainerEmail(user.email)) {
-          rows = (
-            await supabase.from("clients").select("id, avatar_url").ilike("name", "%Dustin%").limit(1)
-          ).data;
+        if (!rows || !rows.length) {
+          // Was .ilike("name", "%Dustin%") — see src/lib/ownClient.ts.
+          const own = await fetchOwnClientRow<{ id: string; avatar_url: string | null }>(
+            supabase, user, "id, avatar_url");
+          rows = own ? [own] : null;
         }
         if (!cancelled && rows && rows[0]) {
           setId(rows[0].id as string);

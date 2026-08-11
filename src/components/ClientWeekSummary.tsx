@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useNutritionAverages } from "@/components/nutrition/useNutritionAverages";
 import CoachBadge from "@/components/CoachBadge";
 import AiBadge from "@/components/AiBadge";
-import { isTrainerEmail } from "@/lib/trainer";
+import { fetchOwnClientRow } from "@/lib/ownClient";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -94,13 +94,15 @@ export default function ClientWeekSummary() {
           const user = userData ? userData.user : null;
           if (!user) return;
           const col = "id, name, weekly_focus, weekly_focus_week, weekly_focus_source";
-          if (isTrainerEmail((user.email || ""))) {
-            const { data: c } = await supabase.from("clients").select(col).ilike("name", "%Dustin%").limit(1);
-            if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = currentWeekFocus(c[0]); focusSource = c[0].weekly_focus_source ?? null; }
-          } else {
-            const { data: c } = await supabase.from("clients").select(col).eq("auth_user_id", user.id).limit(1);
-            if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = currentWeekFocus(c[0]); focusSource = c[0].weekly_focus_source ?? null; }
-          }
+          // One path for everyone. The trainer branch used to look for a client
+          // literally named Dustin, which finds nothing on any other instance —
+          // see src/lib/ownClient.ts.
+          const own = await fetchOwnClientRow<{
+            id: string; name: string;
+            weekly_focus?: string | null; weekly_focus_week?: string | null;
+            weekly_focus_source: string | null;
+          }>(supabase, user, col);
+          if (own) { cid = own.id; clientName = own.name; focus = currentWeekFocus(own); focusSource = own.weekly_focus_source ?? null; }
         } else {
           const { data: c } = await supabase.from("clients").select("id, name, weekly_focus, weekly_focus_week, weekly_focus_source").eq("id", cid).limit(1);
           if (c && c[0]) { clientName = c[0].name; focus = currentWeekFocus(c[0]); focusSource = c[0].weekly_focus_source ?? null; }

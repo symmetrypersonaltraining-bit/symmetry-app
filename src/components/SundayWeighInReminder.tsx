@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { isTrainerEmail } from "@/lib/trainer";
+import { fetchOwnClientRow } from "@/lib/ownClient";
 
 function todayCT(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
@@ -35,11 +35,10 @@ export default function SundayWeighInReminder() {
           const { data: userData } = await supabase.auth.getUser();
           const user = userData ? userData.user : null;
           if (!user) return;
-          if (isTrainerEmail((user.email || ""))) {
-            const { data: c } = await supabase.from("clients").select("id").ilike("name", "%Dustin%").limit(1);
-            cid = c && c[0] ? c[0].id : null;
-          } else {
-            const { data: c } = await supabase.from("clients").select("id").eq("auth_user_id", user.id).limit(1);
+          {
+            // Was a name search on the trainer branch — src/lib/ownClient.ts.
+            const own = await fetchOwnClientRow<{ id: string }>(supabase, user, "id");
+            const c = own ? [own] : null;
             cid = c && c[0] ? c[0].id : null;
           }
         }

@@ -118,3 +118,35 @@ test("identity checks do not compare emails by hand", () => {
     .map((p) => p.split("\\").join("/"));
   assert.deepEqual(bad, [], `Compare with isTrainerEmail() instead of === TRAINER_EMAIL:\n  ${bad.join("\n  ")}`);
 });
+
+// ── The coach is not found by name ───────────────────────────────────────────
+//
+// Five components looked up the trainer's own clients row with
+// .ilike("name", "%Dustin%") — but only on the trainer branch; for a client
+// they correctly used auth_user_id. On any other instance there is no client
+// called Dustin, so the query returns nothing and the component renders as if
+// the person has no data: no coach avatar, no week summary, no milestone
+// badges, no macros card, no weigh-in reminder. Nothing throws, nothing logs.
+//
+// Same class of bug as the hardcoded email, one layer down, and silent.
+
+test("no component finds the coach by searching for a human's name", () => {
+  const offenders = walk("src")
+    .filter((p) => !p.endsWith("lib/ownClient.ts"))
+    .filter((p) => /ilike\(\s*["']name["']\s*,\s*["']%Dustin%["']\s*\)/.test(readFileSync(p, "utf8")))
+    .map((p) => p.split("\\").join("/"))
+    // A comment recording the old code is fine; a live query is not.
+    .filter((p) => {
+      const src = readFileSync(p, "utf8");
+      return src.split("\n").some(
+        (l) => /ilike\(\s*["']name["']\s*,\s*["']%Dustin%["']\s*\)/.test(l) && !l.trim().startsWith("//"),
+      );
+    });
+
+  assert.deepEqual(
+    offenders,
+    [],
+    `Looking up a person by name only works on one database:\n  ${offenders.join("\n  ")}\n\n` +
+      "Use fetchOwnClientRow(sb, user, columns) from @/lib/ownClient.",
+  );
+});

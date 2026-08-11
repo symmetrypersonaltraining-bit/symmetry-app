@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isTrainerEmail } from "@/lib/trainer";
+import { fetchOwnClientRow } from "@/lib/ownClient";
 
 export default async function ClientPreviewWorkoutPage() {
   const supabase = await createClient();
@@ -8,12 +9,9 @@ export default async function ClientPreviewWorkoutPage() {
   if (!user) redirect("/login");
   if (!isTrainerEmail(user.email)) redirect("/workout");
 
-  // Find the most recent scheduled workout for the client (Dustin)
-  const { data: clientRecord } = await supabase
-    .from("clients")
-    .select("id")
-    .ilike("name", "%Dustin%")
-    .maybeSingle();
+  // Preview means "show me my own client view", so this is the trainer's own
+  // client row — found by their login, not by their name. src/lib/ownClient.ts.
+  const clientRecord = await fetchOwnClientRow<{ id: string }>(supabase, user, "id");
 
   if (!clientRecord) {
     return (

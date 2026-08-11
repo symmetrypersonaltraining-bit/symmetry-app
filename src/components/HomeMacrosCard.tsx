@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { computeDayTotals, adherencePct, kcalOf, PlanMeal, PlanItem, LogRow } from "@/lib/nutrition/dailyTotals";
 import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
-import { isTrainerEmail } from "@/lib/trainer";
+import { fetchOwnClientRow } from "@/lib/ownClient";
 
 interface MacroState { kcal: number; protein: number; carbs: number; fats: number; }
 interface TargetState { calories: number; protein: number; carbs: number; fats: number; }
@@ -29,11 +29,10 @@ export default function HomeMacrosCard() {
         const { data: userData } = await supabase.auth.getUser();
         const user = userData ? userData.user : null;
         if (!user) return;
-        if (isTrainerEmail((user.email || ""))) {
-          const { data: c } = await supabase.from("clients").select("id").ilike("name", "%Dustin%").limit(1);
-          clientId = c && c[0] ? c[0].id : null;
-        } else {
-          const { data: c } = await supabase.from("clients").select("id").eq("auth_user_id", user.id).limit(1);
+        {
+          // Was a name search on the trainer branch — src/lib/ownClient.ts.
+          const own = await fetchOwnClientRow<{ id: string }>(supabase, user, "id");
+          const c = own ? [own] : null;
           clientId = c && c[0] ? c[0].id : null;
         }
       }

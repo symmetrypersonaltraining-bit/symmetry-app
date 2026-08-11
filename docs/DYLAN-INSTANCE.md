@@ -55,6 +55,51 @@ only one worth defending later.
 
 ---
 
+## What was ALREADY fine (checked, not assumed)
+
+**His own Claude works today, with no code change.** `ANTHROPIC_API_KEY` is read
+from the environment in 29 places — it is per-DEPLOYMENT, not per-trainer. His
+own Vercel project with his own key means his AI spend is entirely his.
+
+**And his AI budget is automatically his own.** The $95 kill switch
+(`MONTHLY_COST_CAP_USD`) and every per-client cap read `ai_usage_log`, which
+lives in each instance's own database. Separate Supabase → separate meter, for
+free. The only way to get this wrong is to SHARE one Anthropic key between
+instances, at which point his usage counts toward Dustin's cap and can pause AI
+for Symmetry's clients.
+
+## What was actually broken — the coach was found by NAME
+
+Nine places looked up the trainer's own `clients` row with:
+
+```ts
+.ilike("name", "%Dustin%")
+```
+
+...and only on the trainer branch. For a client they did the right thing and
+used `auth_user_id`.
+
+On any other database there is no client called Dustin. The query returns
+nothing, and the component renders as though the person has no data: **no coach
+avatar, no week summary, no milestone badges, no macros card, no Sunday
+weigh-in reminder, an empty client-preview, an empty log page.** Nothing
+throws. Nothing logs. It is simply not there.
+
+That is the same mistake as the hardcoded email — identity by literal string —
+one layer down, in the data, where it fails silently instead of loudly. Fixed:
+`fetchOwnClientRow()` in `src/lib/ownClient.ts` looks up by `auth_user_id`,
+then email, never by name. Verified first that Dustin's row already carries
+`auth_user_id` and a matching email, so the name match was never load-bearing.
+
+A test now fails the build on a new one.
+
+## The env contract
+
+`.env.local.example` listed **four** variables. The code reads **fifteen**.
+Standing up a second instance meant discovering the other eleven by watching
+things fail one at a time — which is most of why this ended up a fork. That
+file is now the complete list, marked REQUIRED vs optional.
+
 ## Standing it up
 
 ### Step 1 — get the schema into the repo *(needs a credential from Dustin)*

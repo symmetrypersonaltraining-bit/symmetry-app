@@ -7,6 +7,7 @@ import { type CalWorkout } from "@/components/RescheduleCalendar";
 import ScheduleWeekBar from "@/components/ScheduleWeekBar";
 import ScheduleBoard from "@/components/ScheduleBoard";
 import { isTrainerEmail } from "@/lib/trainer";
+import { fetchOwnClientRow } from "@/lib/ownClient";
 
 async function isClientMode(asMarker?: string): Promise<boolean> {
   // Explicit ?as=client marker OR the cookie (marker wins on first render even
@@ -35,9 +36,11 @@ export default async function WorkoutPage(props: {
   let clientId: string | null = null;
   let clientName = "You";
   if (isTrainer && !inClientMode) {
-    const { data } = await supabase.from("clients").select("id, name").ilike("name", "%Dustin%").maybeSingle();
+    // By login, not by name — src/lib/ownClient.ts. The fallback label comes
+    // from the row now, so a different trainer is not greeted as Dustin.
+    const data = await fetchOwnClientRow<{ id: string; name: string }>(supabase, user, "id, name");
     clientId = data?.id || null;
-    clientName = data?.name || "Dustin";
+    clientName = data?.name || "You";
   } else {
     const { data } = await supabase.from("clients").select("id, name").eq("auth_user_id", user.id).maybeSingle();
     if (!data && isTrainer) {

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import LogClient from "./LogClient";
 import { isClientMode } from "@/lib/client-mode";
 import { isTrainerEmail } from "@/lib/trainer";
+import { fetchOwnClientRow } from "@/lib/ownClient";
 
 export default async function LogPage() {
   const supabase = await createClient();
@@ -14,12 +15,9 @@ export default async function LogPage() {
 
   const clientMode = await isClientMode();
   if (isTrainer && !clientMode) {
-    const { data } = await supabase
-      .from("clients")
-      .select("id, name")
-      .ilike("name", "%Dustin%")
-      .maybeSingle();
-    clientRecord = data;
+    // The trainer's OWN client row — by their login, not by their name.
+    // See src/lib/ownClient.ts.
+    clientRecord = await fetchOwnClientRow<{ id: string; name: string }>(supabase, user, "id, name");
   } else {
     const { data } = await supabase
       .from("clients")
