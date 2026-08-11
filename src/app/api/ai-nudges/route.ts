@@ -29,6 +29,15 @@ import { Db, TRAINER_EMAIL } from "@/lib/ai/scope";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { isCronRequest } from "@/lib/cron-auth";
+import {
+  segment,
+  isRehab,
+  NUTRITION_HABIT_DAYS,
+  NUTRITION_MAX_PER_LAPSE,
+  type Row,
+  type Tone,
+  type Seg,
+} from "./segment";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -57,45 +66,31 @@ HARD RULES:
 - Never guilt-trip. Never shame. You are on their side.
 - No emoji unless it clearly earns its place. At most one.
 - Ask for the SMALLEST possible next step, not a big commitment.
-- Sound like a person texting, not a marketing email.`;
+- Sound like a person texting, not a marketing email.
 
-type Tone = "warm" | "push" | "direct" | "gentle";
-type Seg = "thriving" | "overtraining" | "nutrition_gap" | "slipping" | "quiet" | "escalate" | "never_started";
+BE USEFUL, NOT JUST ENCOURAGING (Dustin, 10 Aug: "be more helpful with tips
+based on their real data and what they are actually using"):
+- Where the data supports it, give ONE concrete, specific tip they could act on
+  today — tied to what they are actually doing, not generic advice. A tip they
+  could have got from any fitness article is wasted space.
+- CONGRATULATE real wins by name and number: a streak, a return after a gap, a
+  session count that beat last week. Say what they did, not "great job".
+- Someone who has fallen off gets a way BACK IN, not a scolding. Name the
+  smallest re-entry point — one meal logged, one session on the calendar.
+- Use what they actually use. If they train hard and never touch the food
+  logger, coach the training. Do not sell them a feature they have opted out of
+  by behaviour.
+- If the numbers do not support a specific tip, say less. A short honest
+  message beats a padded one with invented advice.
 
-interface Row {
-  id: string;
-  name: string | null;
-  goal: string | null;
-  w7: number;
-  w30: number;
-  daysSinceWorkout: number | null;
-  mealDays7: number;
-  daysSinceMeal: number | null;
-  everTrained: boolean;
-  everLoggedMeal: boolean;
-}
-
-function isRehab(goal: string | null): boolean {
-  const g = (goal || "").toLowerCase();
-  return g.includes("rehab") || g.includes("pain") || g.includes("injur");
-}
-
-function segment(r: Row): { seg: Seg; tone: Tone } {
-  if (isRehab(r.goal)) {
-    // Rehab clients never get the hard track, whatever the numbers say.
-    if (r.daysSinceWorkout != null && r.daysSinceWorkout >= 10) return { seg: "escalate", tone: "gentle" };
-    if (r.daysSinceWorkout != null && r.daysSinceWorkout >= 3) return { seg: "quiet", tone: "gentle" };
-    return { seg: "thriving", tone: "gentle" };
-  }
-  if (!r.everTrained) return { seg: "never_started", tone: "warm" };
-  if (r.daysSinceWorkout != null && r.daysSinceWorkout >= 10) return { seg: "escalate", tone: "direct" };
-  if (r.w7 >= 10) return { seg: "overtraining", tone: "warm" };
-  if (r.daysSinceWorkout != null && r.daysSinceWorkout >= 5) return { seg: "quiet", tone: "warm" };
-  if (r.w7 <= 3 && r.w30 <= 10) return { seg: "slipping", tone: "push" };
-  // Training well but nutrition dark — the biggest coachable gap.
-  if (r.w7 >= 4 && (r.daysSinceMeal == null || r.daysSinceMeal >= 5)) return { seg: "nutrition_gap", tone: "push" };
-  return { seg: "thriving", tone: "warm" };
-}
+ASK, DO NOT ONLY TELL:
+- Where it fits naturally, end with ONE short question that invites a reply —
+  whether the last change helped, what is actually getting in the way, where
+  they want help next, what would keep them on track. One question, never a
+  survey, and only when it does not make the message longer than it should be.
+- The point of the question is to LEARN this specific client: what they
+  respond to, what they ignore, what they are really trying to do. Their answer
+  goes to Dustin, so ask something whose answer he could act on.`;
 
 function validate(raw: unknown): { body: string } | null {
   if (!raw || typeof raw !== "object") return null;
@@ -153,7 +148,10 @@ export async function POST(req: NextRequest) {
       admin.from("workout_logs").select("client_id, log_date").eq("completed", true).gte("log_date", since30),
       admin.from("meal_adherence_logs").select("client_id, log_date").gte("log_date", since30),
       admin.from("client_app_settings").select("client_id, nudges_enabled"),
-      admin.from("ai_nudge_log").select("client_id, created_at, sent").gte("created_at", shiftDays(today, -7)),
+      // 60 days, with the segment: the weekly cap needs 7 days, but the
+      // nutrition per-lapse cap counts back to the client's last meal log,
+      // which can be well outside a week.
+      admin.from("ai_nudge_log").select("client_id, created_at, sent, segment").gte("created_at", shiftDays(today, -59)),
     ]);
 
     const clients = (clientsRes.data as { id: string; name: string | null; primary_goal: string | null; auth_user_id: string }[]) || [];
@@ -164,11 +162,14 @@ export async function POST(req: NextRequest) {
     );
 
     // Frequency caps come from what we actually SENT, not previews.
-    const recent = ((recentRes.data as { client_id: string; created_at: string; sent: boolean }[]) || []).filter((r) => r.sent);
+    const allSent = ((recentRes.data as { client_id: string; created_at: string; sent: boolean; segment: string | null }[]) || []).filter((r) => r.sent);
+    const weekAgoIso = shiftDays(today, -6);
     const lastSent = new Map<string, string>();
     const weekCount = new Map<string, number>();
-    for (const r of recent) {
-      weekCount.set(r.client_id, (weekCount.get(r.client_id) ?? 0) + 1);
+    for (const r of allSent) {
+      if (r.created_at.slice(0, 10) >= weekAgoIso) {
+        weekCount.set(r.client_id, (weekCount.get(r.client_id) ?? 0) + 1);
+      }
       const prev = lastSent.get(r.client_id);
       if (!prev || r.created_at > prev) lastSent.set(r.client_id, r.created_at);
     }
@@ -182,6 +183,20 @@ export async function POST(req: NextRequest) {
     for (const r of ((mealRes.data as { client_id: string; log_date: string }[]) || [])) {
       if (!mealDates.has(r.client_id)) mealDates.set(r.client_id, []);
       mealDates.get(r.client_id)!.push(r.log_date);
+    }
+    const lastMealDate = new Map<string, string>();
+    for (const [cid, ds] of mealDates) {
+      const last = ds.slice().sort().at(-1);
+      if (last) lastMealDate.set(cid, last);
+    }
+    // Nutrition nudges already sent during the CURRENT lapse, i.e. since the
+    // client last logged a meal. Logging again empties this by definition.
+    const nutritionSentThisLapse = new Map<string, number>();
+    for (const r of allSent) {
+      if (r.segment !== "nutrition_gap") continue;
+      const lastMeal = lastMealDate.get(r.client_id);
+      if (lastMeal && r.created_at.slice(0, 10) < lastMeal) continue;
+      nutritionSentThisLapse.set(r.client_id, (nutritionSentThisLapse.get(r.client_id) ?? 0) + 1);
     }
 
     const rows: Row[] = clients.map((c) => {
@@ -197,6 +212,7 @@ export async function POST(req: NextRequest) {
         w30: new Set(w).size,
         daysSinceWorkout: lastW ? daysBetween(lastW, today) : null,
         mealDays7: new Set(m.filter((d) => d >= since7)).size,
+        mealDays30: new Set(m).size,
         daysSinceMeal: lastM ? daysBetween(lastM, today) : null,
         everTrained: w.length > 0,
         everLoggedMeal: m.length > 0,
@@ -239,6 +255,8 @@ export async function POST(req: NextRequest) {
       // Guardrails
       let suppressed: string | null = null;
       if (nudgesOff.has(r.id)) suppressed = "client_opted_out";
+      else if (seg === "nutrition_gap" && (nutritionSentThisLapse.get(r.id) ?? 0) >= NUTRITION_MAX_PER_LAPSE)
+        suppressed = "nutrition_lapse_cap";
       else if ((weekCount.get(r.id) ?? 0) >= 3) suppressed = "weekly_cap";
       else {
         const last = lastSent.get(r.id);
@@ -259,9 +277,16 @@ export async function POST(req: NextRequest) {
         sessionsLast30Days: r.w30,
         daysSinceLastWorkout: r.daysSinceWorkout,
         daysWithMealsLoggedLast7: r.mealDays7,
+        daysWithMealsLoggedLast30: r.mealDays30,
         daysSinceLastMealLog: r.daysSinceMeal,
         hasNeverLoggedNutrition: !r.everLoggedMeal,
         hasNeverTrained: !r.everTrained,
+        // What they actually engage with, so the message coaches THAT and
+        // stops pushing a part of the app they have never chosen to use.
+        usesNutritionLogging: r.mealDays30 >= NUTRITION_HABIT_DAYS,
+        trainingIsTheirStrength: r.w30 >= 8,
+        sessionsThisWeekVsAverage:
+          r.w30 > 0 ? Number((r.w7 - r.w30 / 4.3).toFixed(1)) : null,
         situation: seg,
         requestedTone: tone,
         isRehabClient: isRehab(r.goal),
