@@ -49,7 +49,7 @@ export default function PlanRangeView({ clientId, startDate, days, basePlan, bas
       try {
         const [fpRes, ftRes] = await Promise.all([
           supabase.from("meal_plans")
-            .select("id, version_number, effective_date, meals(id, name, position, meal_items(id, food, amount, unit, is_unlimited, protein, carbs, fats, position))")
+            .select("id, version_number, effective_date, meals(id, name, position, meal_items(id, food, amount, unit, is_unlimited, protein, carbs, fats, micros, position))")
             .eq("client_id", clientId).eq("status", "live")
             .gt("effective_date", startDate).lte("effective_date", endDate)
             .order("effective_date", { ascending: true }),

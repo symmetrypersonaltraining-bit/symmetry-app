@@ -26,6 +26,15 @@
 //   • Inserted day meals:      meal_position 21–40 band, __custom set.
 // ============================================================================
 
+// RELATIVE, not "@/lib/...", and deliberately so: scripts/test-nutrition-ai.cjs
+// compiles this module standalone to CommonJS, and tsc's `paths` mapping is
+// compile-time only — an "@/" specifier survives into the emitted require()
+// and cannot resolve. Same reason nutrition-json.ts imports this file
+// relatively. This cost a live outage once; do not "tidy" it.
+import {
+  readNutrients, addNutrients, scaleNutrients, type NutrientMap,
+} from "./nutrients";
+
 export interface PlanItem {
   id: string;
   food: string;
@@ -37,6 +46,10 @@ export interface PlanItem {
   carbs: number | null;
   fats: number | null;
   position: number;
+  // Added 2026-08-11. Plan meals used to carry macros and nothing else, which
+  // is why a day built from the plan could not state its own sodium. The AI
+  // plan builder now writes a full nutrient panel here.
+  micros?: unknown;
 }
 
 // meals.rotation jsonb — structured rotation/alternation metadata (additive,
@@ -90,6 +103,11 @@ export interface CustomItem {
   su?: number | null;   // sugar, g
   so?: number | null;   // sodium, mg
   sf?: number | null;   // saturated fat, g
+  // The other 29. Full registry keys, not short ones — this bag is written by
+  // the AI and read by the registry, and inventing a second naming scheme for
+  // it would just be a mapping table nobody maintains. The legacy four above
+  // stay where they are so existing rows keep working.
+  mi?: Record<string, number | null> | null;
 }
 
 export interface CustomMeta {
@@ -135,6 +153,11 @@ export interface LogRow {
   est_sugar?: number | null;
   est_sodium?: number | null;
   est_sat_fat?: number | null;
+  // The full panel, added by migration `add_micronutrient_storage`. The four
+  // est_* columns above remain authoritative for their own nutrients; this
+  // carries the other 29. readNutrients() merges the two and is the only thing
+  // that should know the split.
+  est_micros?: unknown;
   macros_pending?: boolean | null;
   item_overrides?: ItemOverrides | null;
   photo_url?: string | null;
@@ -221,12 +244,17 @@ export function planMealMacros(meal: PlanMeal, overrides?: ItemOverrides | null)
 // Open Food Facts / USDA import, but nothing ever displayed them and
 // meal_adherence_logs did not persist them, so they were discarded at log time.
 //
-// The hard part is not the arithmetic, it is honesty about coverage. A plan meal
-// has NO nutrient source at all — meal_items stores protein/carbs/fats and
-// nothing else — so a day assembled from plan meals genuinely does not know its
-// sodium. Reporting that as 0 mg would be a lie the UI could not detect, so
-// every accessor here returns null for unknown and the day total carries a
-// count of how many logged meals actually contributed.
+// The hard part is not the arithmetic, it is honesty about coverage. Reporting
+// an unknown as 0 mg would be a lie the UI could not detect, so every accessor
+// here returns null for unknown and the day total carries a count of how many
+// logged meals actually contributed.
+//
+// UPDATED 2026-08-11. The line that used to stand here — "a plan meal has NO
+// nutrient source at all" — is no longer true. `meal_items.micros` carries the
+// full 33-nutrient panel from the AI plan builder, so a day assembled from plan
+// meals can now report its own sodium where the builder knew it. See
+// planMealNutrients below. Items predating the panel still have no micros, and
+// those stay null rather than becoming zero.
 
 export interface Nutrients {
   fiber: number | null;   // g
@@ -295,31 +323,117 @@ export function customMealNutrients(meta: CustomMeta): Nutrients {
   return out;
 }
 
-// What a single log row contributed in nutrients. Mirrors logConsumedMacros'
-// precedence so the two can never disagree about which row counted.
-export function logConsumedNutrients(log: LogRow): Nutrients {
-  const ov = log.item_overrides || null;
-  if (ov?.__removed || ov?.__unlogged || ov?.__custom?.unlogged) return NUTRIENTS_UNKNOWN;
-  if (log.macros_pending) return NUTRIENTS_UNKNOWN;
+// The full nutrient panel for a plan meal, honouring per-day item overrides and
+// added foods exactly as planMealMacros does. Returns a sparse NutrientMap:
+// a key is present only when at least one item knew that nutrient.
+export function planMealNutrientMap(meal: PlanMeal, overrides?: ItemOverrides | null): NutrientMap {
+  const ov = overrides || null;
+  const hasOv = !!(ov && Object.keys(ov).some((k) => !k.startsWith("__")));
+  let out: NutrientMap = {};
+  for (const item of meal.meal_items || []) {
+    let scale = 1;
+    if (hasOv) {
+      const o = ov![item.id] as { amount?: number } | undefined;
+      const oAmt = o?.amount;
+      if (oAmt != null && item.amount) scale = oAmt / item.amount;
+      else if (oAmt === 0) scale = 0;
+    }
+    const n = readNutrients(item.micros);
+    if (Object.keys(n).length === 0) continue;
+    out = addNutrients(out, scaleNutrients(n, scale));
+  }
+  // __added foods carry macros only (the quick-add sheet never collected
+  // micros), so they contribute nothing here rather than a false zero.
+  return out;
+}
 
-  const fromCols = estNutrients(log);
-  if (hasAnyNutrient(fromCols)) {
-    // Off-plan/est rows are absolute, not prorated — same rule as est_*.
+// The four legacy nutrients for a plan meal, for the existing day panel.
+// Derived from the same map so the panel and the full 33-nutrient view can
+// never disagree.
+export function planMealNutrients(meal: PlanMeal, overrides?: ItemOverrides | null): Nutrients {
+  const m = planMealNutrientMap(meal, overrides);
+  const pick = (k: string) => (m[k] == null ? null : Number(m[k]));
+  return { fiber: pick("fiber"), sugar: pick("sugar"), sodium: pick("sodium"), satFat: pick("sat_fat") };
+}
+
+// ─── The full 33-nutrient panel ──────────────────────────────────────────────
+//
+// Everything above deals in the legacy four because the day panel and the
+// charts were built around them. These functions are the same logic over the
+// whole registry, and the four are a projection of this, never a second
+// calculation. If the two ever disagree it is a bug in the projection.
+
+function customMealNutrientMap(meta: CustomMeta): NutrientMap {
+  let out: NutrientMap = {};
+  for (const it of meta.items || []) {
+    const fac = it.fac ?? 1;
+    // The legacy short keys and the full bag merge here; short keys win,
+    // because that is where the food database writes and it is the more
+    // trustworthy of the two.
+    const n = readNutrients(it.mi, {
+      fiber: it.fi, sugar: it.su, sodium: it.so, sat_fat: it.sf,
+    });
+    if (Object.keys(n).length === 0) continue;
+    out = addNutrients(out, scaleNutrients(n, fac));
+  }
+  return out;
+}
+
+/** The full panel a single log row contributed. Mirrors logConsumedNutrients'
+ *  precedence exactly, so the two can never credit different rows. */
+export function logConsumedNutrientMap(
+  log: LogRow,
+  mealById?: Map<string, PlanMeal>,
+  mealByPos?: Map<number, PlanMeal>
+): NutrientMap {
+  const ov = log.item_overrides || null;
+  if (ov?.__removed || ov?.__unlogged || ov?.__custom?.unlogged) return {};
+  if (log.macros_pending) return {};
+
+  const fromCols = readNutrients(log.est_micros, {
+    fiber: log.est_fiber, sugar: log.est_sugar,
+    sodium: log.est_sodium, sat_fat: log.est_sat_fat,
+  });
+  if (Object.keys(fromCols).length > 0) {
     if (log.adherence === "Off-plan" || !log.adherence) return fromCols;
     const pct = adherencePct(log.adherence);
-    return pct == null ? fromCols : scaleN(fromCols, pct);
+    return pct == null ? fromCols : scaleNutrients(fromCols, pct);
   }
 
   if (ov?.__custom) {
-    const n = customMealNutrients(ov.__custom);
-    if (!hasAnyNutrient(n)) return NUTRIENTS_UNKNOWN;
+    const n = customMealNutrientMap(ov.__custom);
+    if (Object.keys(n).length === 0) return {};
     if (log.adherence === "Off-plan" || !log.adherence) return n;
     const pct = adherencePct(log.adherence);
-    return pct == null ? n : scaleN(n, pct);
+    return pct == null ? n : scaleNutrients(n, pct);
   }
 
-  // Plan meal with no itemised source: genuinely unknown.
-  return NUTRIENTS_UNKNOWN;
+  const meal =
+    (log.meal_id && mealById?.get(log.meal_id)) ||
+    (log.meal_position <= 100 ? mealByPos?.get(log.meal_position) : undefined);
+  if (!meal) return {};
+  const n = planMealNutrientMap(meal, ov);
+  if (Object.keys(n).length === 0) return {};
+  const pct = adherencePct(log.adherence);
+  return pct == null ? n : scaleNutrients(n, pct);
+}
+
+// What a single log row contributed in nutrients. Mirrors logConsumedMacros'
+// precedence so the two can never disagree about which row counted.
+//
+// The plan-meal maps are optional so existing callers that only have a log row
+// keep working; without them a plan meal resolves to unknown, as it always did.
+export function logConsumedNutrients(
+  log: LogRow,
+  mealById?: Map<string, PlanMeal>,
+  mealByPos?: Map<number, PlanMeal>
+): Nutrients {
+  // A PROJECTION of the full map, not a second calculation. The two used to be
+  // written out separately, which is exactly how a panel and a chart end up
+  // disagreeing about the same day.
+  const m = logConsumedNutrientMap(log, mealById, mealByPos);
+  const pick = (k: string) => (m[k] == null ? null : Number(m[k]));
+  return { fiber: pick("fiber"), sugar: pick("sugar"), sodium: pick("sodium"), satFat: pick("sat_fat") };
 }
 
 // Macros for a day-custom (itemized) meal.
@@ -405,6 +519,10 @@ export interface DayTotals extends Macros {
   // very different statement from 820 mg for the day, and without the
   // denominator a partial total reads as a complete one.
   nutrientKnownCount: number;
+  // The whole registry. `nutrients` above is a projection of four of these,
+  // kept because the macro card and the charts were built on it. A key is
+  // present only when at least one meal knew it — absent still means UNKNOWN.
+  nutrientMap: NutrientMap;
 }
 
 // THE canonical function. logs = all meal_adherence_logs rows for one client+date;
@@ -419,7 +537,7 @@ export function computeDayTotals(logs: LogRow[], planMeals: PlanMeal[]): DayTota
   }
   let kcal = 0, protein = 0, carbs = 0, fats = 0;
   let loggedCount = 0, pendingCount = 0, nutrientKnownCount = 0;
-  let nutrients: Nutrients = { ...NUTRIENTS_UNKNOWN };
+  let nutrientMap: NutrientMap = {};
   for (const log of logs || []) {
     const ov = log.item_overrides || null;
     if (ov?.__removed) continue;
@@ -428,10 +546,17 @@ export function computeDayTotals(logs: LogRow[], planMeals: PlanMeal[]): DayTota
     if (log.macros_pending && !placeholder) pendingCount++;
     const m = logConsumedMacros(log, mealById, mealByPos);
     kcal += m.kcal; protein += m.protein; carbs += m.carbs; fats += m.fats;
-    const n = logConsumedNutrients(log);
-    if (hasAnyNutrient(n)) { nutrients = addN(nutrients, n); nutrientKnownCount++; }
+    // Accumulate the WHOLE registry once; the legacy four fall out of it below.
+    // Counting a meal as "known" now means it knew ANY nutrient, not just one
+    // of the original four — a meal that only knows its iron still counted.
+    const nm = logConsumedNutrientMap(log, mealById, mealByPos);
+    if (Object.keys(nm).length > 0) { nutrientMap = addNutrients(nutrientMap, nm); nutrientKnownCount++; }
   }
-  return { kcal, protein, carbs, fats, loggedCount, pendingCount, nutrients, nutrientKnownCount };
+  const pick = (k: string) => (nutrientMap[k] == null ? null : Number(nutrientMap[k]));
+  const nutrients: Nutrients = {
+    fiber: pick("fiber"), sugar: pick("sugar"), sodium: pick("sodium"), satFat: pick("sat_fat"),
+  };
+  return { kcal, protein, carbs, fats, loggedCount, pendingCount, nutrients, nutrientKnownCount, nutrientMap };
 }
 
 // Adherence score for a day: average proration across PLAN meal slots

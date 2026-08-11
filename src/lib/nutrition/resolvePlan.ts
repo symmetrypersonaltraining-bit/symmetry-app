@@ -23,7 +23,11 @@ import { isoWeekdayFromDateStr } from "./weekday";
 // effective_date so the resolver (and client-side date-nav) can pick correctly.
 export const PLAN_SELECT =
   "id, version_number, title, day_group, effective_date, " +
-  "meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, position))";
+  // `micros` matters: without it in the select list, meal_items arrive with no
+  // nutrient panel and computeDayTotals reports every planned meal's sodium as
+  // unknown even though the row has it. An omitted column reads exactly like an
+  // empty one, which is how this stayed invisible.
+  "meals(id, name, timing, position, swaps, meal_items(id, food, amount, unit, is_unlimited, basis, protein, carbs, fats, micros, position))";
 
 export interface DayGroupPlan {
   id: string;

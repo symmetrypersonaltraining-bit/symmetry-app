@@ -23,6 +23,7 @@ import { planItemsToCustom } from "@/lib/nutrition/mealToCustom";
 import { parseFoodText, lastParseFailure, parseFailureMessage } from "@/lib/nutrition/parseClient";
 import AiBadge from "@/components/AiBadge";
 import { pickPlanForDate } from "@/lib/nutrition/resolvePlan";
+import { groupedNutrients, pctOfDaily } from "@/lib/nutrition/nutrients";
 import Sheet from "./Sheet";
 import FoodSearchSheet from "./FoodSearchSheet";
 import ComposerSheet from "./ComposerSheet";
@@ -1179,13 +1180,20 @@ export default function NutritionV3Client(props: Props) {
   // One nutrient cell. An em dash for null is deliberate: the plan-meal path has
   // no nutrient source, and printing "0 mg" for a day of unlogged sodium would
   // be indistinguishable from a genuinely sodium-free day.
-  function nutrientRow(lab: string, val: number | null, unit: string) {
+  function nutrientRow(lab: string, val: number | null, unit: string, pct?: number | null) {
     const known = val != null;
     return (
-      <div className="flex items-baseline justify-between rounded-lg px-2 py-1" style={{ background: "var(--brand-bg)" }}>
+      <div key={lab} className="flex items-baseline justify-between rounded-lg px-2 py-1" style={{ background: "var(--brand-bg)" }}>
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.4, color: "var(--brand-text-secondary)" }}>{lab}</span>
-        <span style={{ fontSize: 12, fontWeight: 800, color: known ? "var(--brand-text)" : "var(--brand-text-secondary)" }}>
-          {known ? `${unit === "mg" ? Math.round(val) : Math.round(val * 10) / 10} ${unit}` : "—"}
+        <span className="flex items-baseline gap-1">
+          <span style={{ fontSize: 12, fontWeight: 800, color: known ? "var(--brand-text)" : "var(--brand-text-secondary)" }}>
+            {known ? `${unit === "mg" || unit === "mcg" ? Math.round(val) : Math.round(val * 10) / 10} ${unit}` : "—"}
+          </span>
+          {/* % of the daily reference, where one exists. It is the number that
+              makes 440 mg of choline mean something to a client. */}
+          {pct != null && (
+            <span style={{ fontSize: 9, fontWeight: 700, color: "var(--brand-text-secondary)" }}>{Math.round(pct)}%</span>
+          )}
         </span>
       </div>
     );
@@ -1403,15 +1411,27 @@ export default function NutritionV3Client(props: Props) {
                     </button>
                     {showNutrients && (
                       <div className="mt-1 pt-2" style={{ borderTop: "1px dashed var(--brand-border)" }}>
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                          {nutrientRow("Fiber", totals.nutrients.fiber, "g")}
-                          {nutrientRow("Sugar", totals.nutrients.sugar, "g")}
-                          {nutrientRow("Sodium", totals.nutrients.sodium, "mg")}
-                          {nutrientRow("Sat. fat", totals.nutrients.satFat, "g")}
-                        </div>
+                        {/* The full registry, grouped. Nutrients nothing knew
+                            are hidden rather than shown as a column of dashes —
+                            30 em-dashes is noise, and the footnote below already
+                            states the coverage. */}
+                        {groupedNutrients(totals.nutrientMap).map((g) => {
+                          const rows = g.rows.filter((r) => r.value != null);
+                          if (rows.length === 0) return null;
+                          return (
+                            <div key={g.group} className="mb-2">
+                              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.8, color: "var(--brand-text-secondary)", marginBottom: 4 }}>
+                                {g.label.toUpperCase()}
+                              </p>
+                              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                                {rows.map((r) => nutrientRow(r.def.label, r.value, r.def.unit, pctOfDaily(r.def.key, r.value)))}
+                              </div>
+                            </div>
+                          );
+                        })}
                         <p className="mt-2" style={{ fontSize: 10, color: "var(--brand-text-secondary)", lineHeight: 1.35 }}>
                           {totals.nutrientKnownCount === 0
-                            ? "No nutrient data for today's meals yet — foods logged from the database or a photo carry it; plan meals don't."
+                            ? "No nutrient data for today's meals yet — foods logged from the database, a photo, or an AI-built plan carry it."
                             : `From ${totals.nutrientKnownCount} of ${totals.loggedCount} logged meal${totals.loggedCount === 1 ? "" : "s"}${totals.nutrientKnownCount < totals.loggedCount ? " — the rest have no nutrient source, so this is a floor, not the day's total." : "."}`}
                         </p>
                       </div>

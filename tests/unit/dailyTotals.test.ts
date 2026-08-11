@@ -14,6 +14,8 @@ import {
   computeDayTotals,
   logConsumedMacros,
   planMealMacros,
+  planMealNutrients,
+  planMealNutrientMap,
   customMealMacros,
   adherencePct,
   dayAdherencePct,
@@ -396,5 +398,82 @@ describe("computeDayTotals — full mixed day (integration of everything)", () =
     assert.equal(t.protein, 56 + 40 + 15 + 5);
     assert.equal(t.loggedCount, 5);
     assert.equal(t.pendingCount, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan-meal nutrients. Until 11 Aug a plan meal had no nutrient source at all,
+// so a client eating entirely on plan saw "sodium: unknown" for the whole day.
+// meal_items.micros now carries the AI plan builder's full panel.
+// ---------------------------------------------------------------------------
+describe("planMealNutrients / planMealNutrientMap", () => {
+  function micoPlan(): PlanMeal[] {
+    return [{
+      id: "m1", name: "Breakfast", timing: null, position: 1,
+      meal_items: [
+        { id: "i1", food: "Eggs", amount: 3, unit: "whole", is_unlimited: false, protein: 18, carbs: 1, fats: 15, position: 1,
+          micros: { sodium: 210, choline: 440, sat_fat: 5 } },
+        { id: "i2", food: "Oats", amount: 1, unit: "cup", is_unlimited: false, protein: 10, carbs: 54, fats: 6, position: 2,
+          micros: { sodium: 5, fiber: 8 } },
+      ],
+    }];
+  }
+
+  it("sums the panel across a meal's items", () => {
+    const m = planMealNutrientMap(micoPlan()[0]);
+    assert.equal(m.sodium, 215);
+    assert.equal(m.fiber, 8);
+    assert.equal(m.choline, 440);
+  });
+
+  it("a nutrient only one item knows is still a real number", () => {
+    // Not null just because the other item was silent about it.
+    const m = planMealNutrientMap(micoPlan()[0]);
+    assert.equal(m.choline, 440);
+  });
+
+  it("a nutrient nobody knows stays absent, never zero", () => {
+    const m = planMealNutrientMap(micoPlan()[0]);
+    assert.equal(m.iron == null, true);
+  });
+
+  it("legacy four are projected for the existing day panel", () => {
+    const n = planMealNutrients(micoPlan()[0]);
+    assert.equal(n.sodium, 215);
+    assert.equal(n.fiber, 8);
+    assert.equal(n.satFat, 5);
+    assert.equal(n.sugar, null); // unknown, not 0
+  });
+
+  it("an item amount override scales its nutrients too", () => {
+    // Half the eggs is half their sodium; the oats are untouched.
+    const ov: ItemOverrides = { i1: { amount: 1.5 } };
+    const m = planMealNutrientMap(micoPlan()[0], ov);
+    assert.equal(m.sodium, 110); // 105 + 5
+  });
+
+  it("items with no micros contribute nothing rather than zeroing the meal", () => {
+    const plan = makePlan(); // the original fixture — no micros anywhere
+    const m = planMealNutrientMap(plan[0]);
+    assert.deepEqual(m, {});
+    assert.deepEqual(planMealNutrients(plan[0]), { fiber: null, sugar: null, sodium: null, satFat: null });
+  });
+
+  it("computeDayTotals reports planned nutrients, prorated by adherence", () => {
+    const plan = micoPlan();
+    const t = computeDayTotals([log({ meal_position: 1, meal_id: "m1", adherence: "1/2" })], plan);
+    assert.equal(t.nutrients.sodium, 107.5);
+    assert.equal(t.nutrientKnownCount, 1);
+  });
+
+  it("a plan day with no micros still reports unknown, and counts zero", () => {
+    const t = computeDayTotals([log({ meal_position: 1, meal_id: "m1", adherence: "Full" })], makePlan());
+    assert.equal(t.nutrients.sodium, null);
+    assert.equal(t.nutrientKnownCount, 0);
+  });
+
+  it("a skipped meal contributes no nutrients", () => {
+    const t = computeDayTotals([log({ meal_position: 1, meal_id: "m1", adherence: "Skipped" })], micoPlan());
+    assert.equal(t.nutrients.sodium, 0);
   });
 });
