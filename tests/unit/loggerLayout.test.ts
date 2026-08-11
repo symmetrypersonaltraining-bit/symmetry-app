@@ -165,3 +165,25 @@ test("the app tab row is present, and is the last thing in the session view", ()
     "the tab row must still render its links; removing them to reclaim height was tried on 8/1 and reverted",
   );
 });
+
+test("finishing a session done EARLY moves its scheduled slot instead of adding one", () => {
+  // Sara Prince, 11 Aug: mobility done Sunday to get ahead created a SECOND
+  // session on Sunday and left the original sitting later in the week, so her
+  // week read 30% adherence for being ahead of schedule.
+  //
+  // The completion lookup checked today, then checked BACKWARDS for a missed
+  // session, then inserted. There was no case for doing something early. This
+  // asserts the forward case exists and still runs through the shared rule
+  // rather than a second hand-rolled copy of it.
+  assert.ok(
+    SRC.includes("findSlotToPullForward"),
+    "completing a session must reuse the shared pull-forward rule, not re-implement it",
+  );
+  const forward = at('.gt("scheduled_date", __today)', "the forward lookup for an early session");
+  const insert = SRC.indexOf('source: "client_self_assign"');
+  assert.ok(insert > -1, "the create-a-new-row fallback should still exist for genuinely unplanned work");
+  assert.ok(
+    forward < insert,
+    "the forward lookup must run BEFORE the insert, or an early session still creates a duplicate",
+  );
+});

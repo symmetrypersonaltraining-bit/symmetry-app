@@ -16,6 +16,7 @@ import WakeLock from "@/components/WakeLock";
 import { fx } from "@/lib/fx";
 import { isDraftStale } from "@/lib/workoutDraft";
 import { useStableViewportHeight } from "@/lib/useStableViewportHeight";
+import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
 
 interface Exercise {
   id: string;
@@ -1499,7 +1500,53 @@ export default function WorkoutLogger({
             .limit(1);
           if (__pastRows && __pastRows.length) __swIds = [__pastRows[0].id];
         }
-        if (__swIds.length) {
+        // ...and if there is nothing today and nothing missed, look FORWARD.
+        //
+        // Sara Prince, 11 Aug: "Did hip and ankle mobility Sunday to get a head
+        // start. The app added additional sessions to Sunday instead of giving
+        // me credit for two week mobility sessions."
+        //
+        // She was right, and this is where it happened. The lookup checked
+        // today, then checked BACKWARDS for a missed session, then gave up and
+        // inserted a brand new row — there was no case for doing a session
+        // EARLY. So her Wednesday mobility, done on Sunday, created a second
+        // session on Sunday and left Wednesday's still sitting there unfinished.
+        // Her week went from 7 planned to 9 and read 30% adherence for being
+        // ahead of schedule.
+        //
+        // Getting ahead of your programme must never look like falling behind.
+        if (!__swIds.length) {
+          const { data: __futureRows } = await (supabase as any)
+            .from("scheduled_workouts")
+            .select("id, day_id, scheduled_date, status, deleted_at")
+            .eq("client_id", clientId)
+            .eq("day_id", day.id)
+            .eq("status", "scheduled")
+            .is("deleted_at", null)
+            .gt("scheduled_date", __today)
+            .order("scheduled_date", { ascending: true })
+            .limit(10);
+          const __slot = findSlotToPullForward((__futureRows as SlotCandidate[]) || [], day.id, __today);
+          if (__slot) {
+            // Move it to today rather than completing it in place: the calendar
+            // should show the session on the day it was actually done.
+            const { error: __mvErr } = await (supabase as any)
+              .from("scheduled_workouts")
+              .update({
+                scheduled_date: __today,
+                moved_from_date: __slot.scheduled_date,
+                status: "completed",
+                workout_log_id: logId,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", __slot.id);
+            if (__mvErr) throw __mvErr;
+            __swIds = ["__moved__"]; // sentinel: handled, skip both branches below
+          }
+        }
+        if (__swIds.length === 1 && __swIds[0] === "__moved__") {
+          // Already handled by the pull-forward above.
+        } else if (__swIds.length) {
           const { error: __swErr } = await (supabase as any)
             .from("scheduled_workouts")
             .update({ status: "completed", workout_log_id: logId })
