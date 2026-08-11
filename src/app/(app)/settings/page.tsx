@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import SettingsClient from "./SettingsClient";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ gcal?: string; as?: string }> }) {
   const supabase = await createClient();
@@ -9,7 +10,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   if (!user) redirect("/login");
 
   const { data: profile } = await supabase.from("clients").select("name").eq("auth_user_id", user.id).maybeSingle();
-  const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
+  const isTrainer = isTrainerEmail(user.email);
   const cookieStore = await cookies();
   const sp = await searchParams;
   // Explicit ?as=client marker OR the cookie (marker wins on first render even

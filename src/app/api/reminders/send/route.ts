@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isCronRequest } from "@/lib/cron-auth";
+import { isTrainerEmail } from "@/lib/trainer";
 
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 const RESEND_API_URL = "https://api.resend.com/emails";
 
 async function sendEmail(to: string, subject: string, html: string) {
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user || user.email !== TRAINER_EMAIL) {
+  if (!user || !isTrainerEmail(user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

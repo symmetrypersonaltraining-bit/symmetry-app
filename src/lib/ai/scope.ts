@@ -1,5 +1,5 @@
 // Shared auth + client-scoping + metering guard for the nutrition AI routes.
-// Pattern matches the rest of the app: trainer is identified by email, clients
+// Trainer identity comes from @/lib/trainer (a setting, not a literal); clients
 // map to a `clients` row via auth_user_id (email fallback).
 
 import { NextResponse } from "next/server";
@@ -7,9 +7,10 @@ import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AiFeature, AiPaused, CapExceeded } from "@/lib/ai/meter-core";
 import { assertNotPaused, capBody, checkAndLog, pausedBody } from "@/lib/ai/meter";
-
-export const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
+// Re-exported so the many routes that already import TRAINER_EMAIL from here
+// keep working. The single source of truth is @/lib/trainer.
+export { TRAINER_EMAIL, TRAINER_EMAILS, isTrainerEmail, isTrainerUser } from "@/lib/trainer";
+import { isTrainerEmail } from "@/lib/trainer";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Db = SupabaseClient<any, any, any>;
 
@@ -39,7 +40,7 @@ export async function resolveAiScope(requestedClientId?: string | null): Promise
   if (!user) {
     return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
-  const isTrainer = user.email === TRAINER_EMAIL;
+  const isTrainer = isTrainerEmail(user.email);
 
   let ownClientId: string | null = null;
   const { data: byAuth } = await supabase

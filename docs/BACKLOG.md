@@ -261,12 +261,33 @@ Dustin actually sent is the highest-signal, lowest-effort version of it.
 shipped 2026-08-04. Parked behind the iPhone build, not blocked technically.
 This feedback row can be closed against that work.
 
-## 6. Make "trainer" a setting instead of an email address
+## 6. ~~Make "trainer" a setting instead of an email address~~ DONE 2026-08-11
 
-`docs/MULTI-TRAINER-BACKLOG.md`. 63 call sites across 62 files plus the
-`is_trainer()` SQL function. ~a day. Do it before scaling, not after — it is
-what stands between Dustin and a second trainer, and why Dylan's instance is a
-fork rather than a configuration.
+All 63 call sites across 62 files now go through `src/lib/trainer.ts`, and
+`is_trainer()` reads a `public.trainers` table instead of a string literal.
+Same function signature, so all **64 RLS policies** that call it were untouched.
+
+Verified before and after: across all 33 auth users the rewritten function
+disagrees with the old literal on **zero** of them. The table was seeded and
+matched against a real `auth.users` row BEFORE the function was swapped — doing
+it the other way round would have denied all 64 policies at once and locked
+Dustin out of every client's data.
+
+Comparisons became `isTrainerEmail()` rather than `=== TRAINER_EMAIL`, which is
+the part that actually enables a second trainer; the equality form compiles,
+reads fine, and silently supports exactly one.
+
+`tests/unit/trainerIdentity.test.ts` fails the build on a 64th hardcoded copy
+of the address, with a capped allowlist for the three genuine business-contact
+uses (privacy policy, payment links, the Open Food Facts User-Agent). Without
+that scan the literal comes back within a month.
+
+How to add a trainer: `docs/ADDING-A-TRAINER.md`.
+
+**Still NOT done, and worth being clear about:** `is_trainer()` remains binary.
+A trainer sees ALL clients. Per-trainer client scoping means changing the 64
+policies themselves and is a separate, larger piece of work. This makes a
+second trainer possible; it is not yet multi-tenancy.
 
 ## 7. iOS TestFlight
 

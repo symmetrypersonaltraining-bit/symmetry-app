@@ -6,8 +6,7 @@ import NutritionV3Client from "./v3/NutritionV3Client";
 import NutritionAverages from "@/components/NutritionAverages";
 import ClientSelector from "@/components/ClientSelector";
 import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 async function isClientMode(asMarker?: string): Promise<boolean> {
   // Explicit ?as=client marker OR the cookie (marker wins on first render even
@@ -27,7 +26,7 @@ export default async function NutritionPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = user.email === TRAINER_EMAIL;
+  const isTrainer = isTrainerEmail(user.email);
   const sp = await searchParams;
   const inClientMode = await isClientMode(sp?.as);
 

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -13,7 +12,7 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user && user.email !== TRAINER_EMAIL) {
+      if (user && !isTrainerEmail(user.email)) {
         const { data: clientRec } = await supabase
           .from("clients")
           .select("id")

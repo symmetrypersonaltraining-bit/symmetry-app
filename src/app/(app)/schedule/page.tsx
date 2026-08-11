@@ -2,8 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import ScheduleClient from "./ScheduleClient";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
 
 function getCentralNow() {
   const now = new Date();
@@ -26,7 +25,7 @@ export default async function SchedulePage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = user.email === TRAINER_EMAIL;
+  const isTrainer = isTrainerEmail(user.email);
 
   // Trainer in trainer-mode: the Schedule tab must show the trainer schedule
   // (the appointments calendar on /home), NOT the personal client program.

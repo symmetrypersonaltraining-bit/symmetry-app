@@ -26,11 +26,12 @@ import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { compareLoads, isBetterLoad, looksLikeAssistance } from "@/lib/loadDirection";
+import { TRAINER_EMAIL } from "@/lib/trainer";
 
 export const dynamic = "force-dynamic";
 
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-const COACH_EMAIL = "symmetrypersonaltraining@gmail.com";
+const COACH_EMAIL = TRAINER_EMAIL;
 function shiftDays(iso: string, delta: number): string {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));

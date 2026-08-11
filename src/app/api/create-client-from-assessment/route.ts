@@ -3,14 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 import { buildInviteEmailHtml } from "@/lib/inviteEmail";
+import { isTrainerEmail } from "@/lib/trainer";
 
 // Full onboarding from the assessment flow: save the assessment, create the
 // client profile with ALL assessment info, create their login with a temporary
 // password (client is routed to set-password on first login via
 // client_app_settings.password_is_temporary), link the assessment to the client,
 // and email the APK invite. Trainer-only.
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 const APK_URL = process.env.NEXT_PUBLIC_ANDROID_APK_URL || "https://mkfiginpiesospsnktea.supabase.co/storage/v1/object/public/app-downloads/symmetry.apk";
 
 function generateTempPassword(): string {
@@ -32,7 +31,7 @@ const nn = (v: any) => (v === "" || v === undefined ? null : v);
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.email !== TRAINER_EMAIL) {
+  if (!user || !isTrainerEmail(user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

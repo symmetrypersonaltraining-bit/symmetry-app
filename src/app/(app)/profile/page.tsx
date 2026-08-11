@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "./SignOutButton";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -9,7 +10,7 @@ export default async function ProfilePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
+  const isTrainer = isTrainerEmail(user.email);
 
   const { data: client } = await supabase
     .from("clients")

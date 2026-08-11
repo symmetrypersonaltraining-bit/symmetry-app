@@ -23,11 +23,10 @@ import {
   killSwitchTripped,
   resolveDailyLimit,
 } from "@/lib/ai/meter-core";
+import { TRAINER_EMAIL } from "@/lib/trainer";
 
 export { AiPaused, CapExceeded } from "@/lib/ai/meter-core";
 export type { AiFeature } from "@/lib/ai/meter-core";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 const RESEND_API_URL = "https://api.resend.com/emails";
 // Marker "feature" for the once-per-day pause notification (cost 0, no client).
 const PAUSE_NOTICE_FEATURE = "kill_switch_notice";

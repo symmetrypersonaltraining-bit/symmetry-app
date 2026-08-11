@@ -7,13 +7,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-
-const TRAINER_EMAIL = 'symmetrypersonaltraining@gmail.com';
+import { isTrainerEmail } from "@/lib/trainer";
 
 async function requireTrainer() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.email !== TRAINER_EMAIL) return { supabase, ok: false as const };
+  if (!user || !isTrainerEmail(user.email)) return { supabase, ok: false as const };
   return { supabase, ok: true as const };
 }
 

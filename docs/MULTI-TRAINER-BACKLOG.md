@@ -82,3 +82,17 @@ from the cross-app columns migration. As of 2026-08-04 there are **99 rows, all
 `'live'`** — nothing from Dylan's instance has ever landed here. If his feedback
 is meant to reach Dustin's board, that wiring is still missing; if it isn't,
 the column can go when this work happens.
+
+---
+
+# DONE 2026-08-11
+
+Shipped. `src/lib/trainer.ts` is the single answer on the app side;
+`public.trainers` is the single answer on the database side. All 64 RLS policies
+were left untouched because `is_trainer()` kept its signature. Zero behaviour
+change for Dustin — verified across all 33 auth users, the rewritten function
+disagrees with the old literal on none of them.
+
+Operational guide: `docs/ADDING-A-TRAINER.md`.
+
+The related open question below (`app_feedback.app_instance`) is still open.

@@ -4,8 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { computeDayTotals, adherencePct, kcalOf, PlanMeal, PlanItem, LogRow } from "@/lib/nutrition/dailyTotals";
 import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 interface MacroState { kcal: number; protein: number; carbs: number; fats: number; }
 interface TargetState { calories: number; protein: number; carbs: number; fats: number; }
@@ -30,7 +29,7 @@ export default function HomeMacrosCard() {
         const { data: userData } = await supabase.auth.getUser();
         const user = userData ? userData.user : null;
         if (!user) return;
-        if ((user.email || "") === TRAINER_EMAIL) {
+        if (isTrainerEmail((user.email || ""))) {
           const { data: c } = await supabase.from("clients").select("id").ilike("name", "%Dustin%").limit(1);
           clientId = c && c[0] ? c[0].id : null;
         } else {

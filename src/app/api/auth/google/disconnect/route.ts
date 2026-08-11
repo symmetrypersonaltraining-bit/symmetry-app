@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import { TRAINER_EMAIL } from '@/lib/ai/scope';
+import { isTrainerEmail } from "@/lib/trainer";
 
 // Revoke the Google grant and wipe the stored credentials.
 //
@@ -38,7 +39,7 @@ export async function POST() {
   try {
     const supabase = await createServerClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user || user.email !== TRAINER_EMAIL) {
+    if (!user || !isTrainerEmail(user.email)) {
       return NextResponse.json({ ok: false, error: 'Trainer only' }, { status: 403 });
     }
 

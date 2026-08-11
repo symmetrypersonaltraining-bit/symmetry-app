@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Confetti from "./Confetti";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 type Badge = { id: string; label: string; icon: string; kind: "sessions" | "streak"; threshold: number };
 const BADGES: Badge[] = [
@@ -45,7 +44,7 @@ export default function MilestoneBadges() {
         const email = auth?.user?.email || "";
         if (forClient) {
           clientId = forClient;
-        } else if (email === TRAINER_EMAIL) {
+        } else if (isTrainerEmail(email)) {
           const { data: d } = await supabase.from("clients").select("id").ilike("name", "%Dustin%").maybeSingle();
           clientId = d?.id || null;
         } else if (auth?.user) {

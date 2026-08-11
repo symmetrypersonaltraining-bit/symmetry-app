@@ -1,7 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -71,7 +70,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Trainer skips all client checks
-  if (user.email === TRAINER_EMAIL) {
+  if (isTrainerEmail(user.email)) {
     return supabaseResponse;
   }
 

@@ -2,14 +2,13 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import PaymentsClient from "./PaymentsClient";
 import ReminderEditor from "@/components/ReminderEditor";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function PaymentsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  if (user.email !== TRAINER_EMAIL) redirect("/home");
+  if (!isTrainerEmail(user.email)) redirect("/home");
 
   // All clients with fee/frequency info
   const { data: clientRows } = await supabase

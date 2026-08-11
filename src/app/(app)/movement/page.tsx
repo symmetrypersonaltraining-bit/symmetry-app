@@ -2,8 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import CaptureClient from './CaptureClient';
-
-const TRAINER_EMAIL = 'symmetrypersonaltraining@gmail.com';
+import { isTrainerEmail } from "@/lib/trainer";
 
 async function isClientMode(): Promise<boolean> {
   const store = await cookies();
@@ -17,7 +16,7 @@ export default async function MovementPage({ searchParams }: { searchParams: Pro
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const isTrainer = (user.email ?? '') === TRAINER_EMAIL;
+  const isTrainer = isTrainerEmail((user.email ?? ''));
   const inClientMode = isTrainer ? await isClientMode() : false;
   const sp = await searchParams;
 

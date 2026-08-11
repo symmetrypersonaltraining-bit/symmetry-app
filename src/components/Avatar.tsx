@@ -6,12 +6,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { isTrainerEmail } from "@/lib/trainer";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const supabase = createClient() as any;
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
 export function initialsOf(name: string): string {
   return (
     (name || "")
@@ -81,7 +79,7 @@ export function useMyClientRow(): { id: string | null; avatarUrl: string | null;
         let rows = (
           await supabase.from("clients").select("id, avatar_url").eq("auth_user_id", user.id).limit(1)
         ).data;
-        if ((!rows || !rows.length) && user.email === TRAINER_EMAIL) {
+        if ((!rows || !rows.length) && isTrainerEmail(user.email)) {
           rows = (
             await supabase.from("clients").select("id, avatar_url").ilike("name", "%Dustin%").limit(1)
           ).data;

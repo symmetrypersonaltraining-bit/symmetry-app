@@ -16,12 +16,10 @@ import { PlanMeal } from "@/lib/nutrition/dailyTotals";
 import { PdfCtx } from "@/lib/nutrition/pdf";
 import { buildAndUploadPdf, StorageLike } from "@/lib/nutrition/pdfExport";
 import { resolveLivePlanForDate } from "@/lib/nutrition/resolvePlan";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
 export async function POST(req: NextRequest) {
   try {
     const sb = await createClient();
@@ -37,7 +35,7 @@ export async function POST(req: NextRequest) {
     const startISO = /^\d{4}-\d{2}-\d{2}$/.test(String(body?.startDate || "")) ? String(body.startDate) : today;
 
     // Authorize: trainer, or the signed-in client viewing their own plan.
-    const isTrainer = user.email === TRAINER_EMAIL;
+    const isTrainer = isTrainerEmail(user.email);
     if (!isTrainer) {
       const { data: c } = await sb.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
       if (!c || (c as { id: string }).id !== clientId) {

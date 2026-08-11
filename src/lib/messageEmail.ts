@@ -1,9 +1,10 @@
+import { TRAINER_EMAIL } from "./trainer";
 // Trainer alert email for client→trainer messages. Pure builder (no server/DOM
 // imports) so it's unit-testable and reused by the server action. The actual
 // send uses the same Resend REST setup + verified sender the reminders/invites
 // use.
 
-export const TRAINER_ALERT_EMAIL = 'symmetrypersonaltraining@gmail.com';
+export const TRAINER_ALERT_EMAIL = TRAINER_EMAIL;
 export const RESEND_FROM = 'Symmetry Corrective <noreply@symmetrypersonaltraining.com>';
 
 export function escapeHtml(s: string): string {

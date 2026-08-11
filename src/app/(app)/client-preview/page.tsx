@@ -1,14 +1,13 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import ClientDashboard from "../home/ClientDashboard";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
 
 export default async function ClientPreviewPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  if (user.email !== TRAINER_EMAIL) redirect("/home");
+  if (!isTrainerEmail(user.email)) redirect("/home");
 
   const { data: clientRecord } = await supabase
     .from("clients")

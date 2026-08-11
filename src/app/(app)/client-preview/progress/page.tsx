@@ -6,14 +6,13 @@ import AchievementCard from "@/components/AchievementCard";
 import PersonalBests from "@/components/PersonalBests";
 import ThenVsNow from "@/components/ThenVsNow";
 import ProgressPhotos from "@/components/ProgressPhotos";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
 
 export default async function ClientPreviewProgressPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  if (user.email !== TRAINER_EMAIL) redirect("/progress");
+  if (!isTrainerEmail(user.email)) redirect("/progress");
 
   const { data: clientRecord } = await supabase
     .from("clients")

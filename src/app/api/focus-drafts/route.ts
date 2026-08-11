@@ -10,11 +10,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export const dynamic = "force-dynamic";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
 /** The Sunday that starts the week containing `iso`. */
@@ -48,7 +46,7 @@ async function requireTrainer() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return user?.email === TRAINER_EMAIL;
+  return isTrainerEmail(user?.email);
 }
 
 export async function GET() {

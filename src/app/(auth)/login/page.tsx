@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import KeyboardSafeArea from "@/components/KeyboardSafeArea";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -47,7 +48,7 @@ export default function LoginPage() {
       // Check if this is a client with a temporary password
       try {
         const { data: { user: loggedInUser } } = await supabase.auth.getUser();
-        if (loggedInUser && loggedInUser.email !== "symmetrypersonaltraining@gmail.com") {
+        if (loggedInUser && !isTrainerEmail(loggedInUser.email)) {
           const { data: clientRec } = await supabase
             .from("clients")
             .select("id")

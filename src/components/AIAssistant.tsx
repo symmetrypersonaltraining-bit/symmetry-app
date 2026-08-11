@@ -4,6 +4,7 @@ import { startDictation } from "@/lib/dictation";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
+import { isTrainerEmail } from "@/lib/trainer";
 
 interface Change { op: string }
 interface Proposal { scheduled_workout_id: string; reason: string; summary: string; changes: Change[] }
@@ -63,12 +64,12 @@ export default function AIAssistant() {
   const [_ok, _setOk] = useState(false);
   useEffect(() => {
     createClient().auth.getUser().then(({ data }) => {
-      _setOk(data.user?.email === 'symmetrypersonaltraining@gmail.com');
+      _setOk(isTrainerEmail(data.user?.email));
     });
   }, []);
   const [isTrainer, setIsTrainer] = useState(false);
   useEffect(() => {
-    (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (data?.user?.email === "symmetrypersonaltraining@gmail.com") setIsTrainer(true); } catch {} })();
+    (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (isTrainerEmail(data?.user?.email)) setIsTrainer(true); } catch {} })();
   }, []);
   const [open, setOpen] = useState(false);
   useEffect(() => {

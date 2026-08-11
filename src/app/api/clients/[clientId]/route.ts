@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export async function PATCH(
   req: NextRequest,
@@ -9,7 +10,7 @@ export async function PATCH(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user || user.email !== "symmetrypersonaltraining@gmail.com") {
+  if (!user || !isTrainerEmail(user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

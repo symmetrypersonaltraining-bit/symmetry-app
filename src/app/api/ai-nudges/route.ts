@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, TRAINER_EMAIL } from "@/lib/ai/scope";
+import { isTrainerEmail } from "@/lib/trainer";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { isCronRequest } from "@/lib/cron-auth";
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user || user.email !== TRAINER_EMAIL) {
+    if (!user || !isTrainerEmail(user.email)) {
       return NextResponse.json({ error: "Trainer only" }, { status: 403 });
     }
   }

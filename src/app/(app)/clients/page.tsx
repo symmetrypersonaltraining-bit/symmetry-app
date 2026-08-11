@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import ClientsListClient from "./ClientsListClient";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function ClientsPage() {
   const supabase = await createClient();
@@ -11,7 +10,7 @@ export default async function ClientsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  if (user.email !== TRAINER_EMAIL) redirect("/home");
+  if (!isTrainerEmail(user.email)) redirect("/home");
 
   // Fetch all clients with their active program
   const { data: clients } = await supabase

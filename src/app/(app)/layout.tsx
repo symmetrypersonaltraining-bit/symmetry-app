@@ -10,8 +10,7 @@ import PushRegister from "@/components/PushRegister";
 import MessageNotifier from "@/components/MessageNotifier";
 import { NotificationProvider } from "@/lib/useNotificationFeed";
 import RefreshHandle from "@/components/RefreshHandle";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function AppLayout({
   children,
@@ -26,7 +25,7 @@ export default async function AppLayout({
   if (!user) redirect("/login");
 
   const email = user?.email ?? "";
-  const isTrainer = email === TRAINER_EMAIL;
+  const isTrainer = isTrainerEmail(email);
 
   if (isTrainer) {
     return (

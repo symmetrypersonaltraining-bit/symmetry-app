@@ -7,6 +7,7 @@ import ClientWorkoutAI from "@/components/ClientWorkoutAI";
 import InviteClientButton from "./InviteClientButton";
 import ResetCredentialsButton from "./ResetCredentialsButton";
 import ArchiveClientButton from "./ArchiveClientButton";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function ClientProfilePage({
   params,
@@ -17,7 +18,7 @@ export default async function ClientProfilePage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  if (user.email !== "symmetrypersonaltraining@gmail.com") redirect("/home");
+  if (!isTrainerEmail(user.email)) redirect("/home");
 
   const { data: client } = await supabase
     .from("clients")

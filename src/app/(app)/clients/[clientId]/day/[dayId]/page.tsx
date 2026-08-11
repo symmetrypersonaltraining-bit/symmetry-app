@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import WorkoutDayEditor from "./WorkoutDayEditor";
 import ClientProfileNav from "@/components/ClientProfileNav";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function WorkoutDayEditPage({
   params,
@@ -13,7 +14,7 @@ export default async function WorkoutDayEditPage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  if (user.email !== "symmetrypersonaltraining@gmail.com") redirect("/home");
+  if (!isTrainerEmail(user.email)) redirect("/home");
 
   const { data: client } = await supabase
     .from("clients")

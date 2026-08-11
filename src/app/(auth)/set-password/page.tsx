@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import KeyboardSafeArea from "@/components/KeyboardSafeArea";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default function SetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -22,7 +23,7 @@ export default function SetPasswordPage() {
     async function check() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.replace("/login"); return; }
-      if (user.email === "symmetrypersonaltraining@gmail.com") { router.replace("/home"); return; }
+      if (isTrainerEmail(user.email)) { router.replace("/home"); return; }
 
       const { data: clientRec } = await supabase
         .from("clients")

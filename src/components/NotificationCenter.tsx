@@ -13,8 +13,6 @@ import { useNotificationFeed } from "@/lib/useNotificationFeed";
 import { aggregateNotifications, totalUnread, NotifRow, RawUnread } from "@/lib/notifications";
 import { fetchGroupUnread, groupUnreadAsRows, markGroupRead } from "@/lib/groupUnread";
 
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
 function fmtWhen(ts: string) {
   if (!ts) return "";
   const d = new Date(ts);

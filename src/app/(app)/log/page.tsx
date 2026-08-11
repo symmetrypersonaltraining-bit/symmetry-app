@@ -2,13 +2,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import LogClient from "./LogClient";
 import { isClientMode } from "@/lib/client-mode";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function LogPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
+  const isTrainer = isTrainerEmail(user.email);
   let clientRecord: { id: string; name: string } | null = null;
 
   const clientMode = await isClientMode();

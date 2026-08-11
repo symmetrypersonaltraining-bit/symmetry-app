@@ -1,13 +1,12 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function ClientPreviewWorkoutPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  if (user.email !== TRAINER_EMAIL) redirect("/workout");
+  if (!isTrainerEmail(user.email)) redirect("/workout");
 
   // Find the most recent scheduled workout for the client (Dustin)
   const { data: clientRecord } = await supabase

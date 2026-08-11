@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import WorkoutLogger from "./WorkoutLogger";
+import { isTrainerEmail } from "@/lib/trainer";
 
 
 export default async function WorkoutDayPage({
@@ -16,7 +17,7 @@ export default async function WorkoutDayPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = user.email === "symmetrypersonaltraining@gmail.com";
+  const isTrainer = isTrainerEmail(user.email);
 
   let resolvedDayId = dayId;
   // The DATE this session belongs to, which is not always today.

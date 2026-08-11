@@ -6,8 +6,7 @@ import Link from "next/link";
 import { type CalWorkout } from "@/components/RescheduleCalendar";
 import ScheduleWeekBar from "@/components/ScheduleWeekBar";
 import ScheduleBoard from "@/components/ScheduleBoard";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 async function isClientMode(asMarker?: string): Promise<boolean> {
   // Explicit ?as=client marker OR the cookie (marker wins on first render even
@@ -26,7 +25,7 @@ export default async function WorkoutPage(props: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = user.email === TRAINER_EMAIL;
+  const isTrainer = isTrainerEmail(user.email);
   const inClientMode = isTrainer ? await isClientMode(searchParams.as) : false;
 
   // Central time today

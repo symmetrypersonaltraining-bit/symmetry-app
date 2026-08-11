@@ -19,9 +19,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
 /**
  * Is this answer worth putting in front of Dustin?
  *

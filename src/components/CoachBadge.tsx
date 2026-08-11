@@ -14,9 +14,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
+import { TRAINER_EMAIL } from "@/lib/trainer";
 // Module-level cache so multiple badges on one screen don't each hit the DB.
 let cachedUrl: string | null | undefined; // undefined = not fetched, null = none
 

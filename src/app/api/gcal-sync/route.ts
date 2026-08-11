@@ -6,6 +6,7 @@ import { isCronRequest } from '@/lib/cron-auth';
 import { isDbSchedulerRequest } from '@/lib/scheduler-key';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { TRAINER_EMAIL } from '@/lib/ai/scope';
+import { isTrainerEmail } from "@/lib/trainer";
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
   if (!isCronRequest(req) && !(await isDbSchedulerRequest(req))) {
     const authClient = await createServerClient();
     const { data: { user } } = await authClient.auth.getUser();
-    if (!user || user.email !== TRAINER_EMAIL) {
+    if (!user || !isTrainerEmail(user.email)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }
@@ -281,7 +282,7 @@ export async function GET(req: NextRequest) {
   if (!isCronRequest(req) && !(await isDbSchedulerRequest(req))) {
     const supabase = await createServerClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user || user.email !== TRAINER_EMAIL) {
+    if (!user || !isTrainerEmail(user.email)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }

@@ -2,9 +2,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import MessagesClient from "./MessagesClient";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
+import { isTrainerEmail } from "@/lib/trainer";
 // Never serve a cached/prefetched variant of this route — the trainer-vs-client
 // branch must be decided per request from the cookie + ?as marker.
 export const dynamic = "force-dynamic";
@@ -25,7 +23,7 @@ export default async function MessagesPage(props: {
   // renders on the FIRST server render even if the cookie hasn't propagated yet
   // (it's set in a client effect) — fixing the intermittent trainer-inbox leak.
   const __isInClientMode = __cookieStore.get("symmetry_client_mode")?.value === "1" || searchParams.as === "client";
-  const isTrainer = user.email === TRAINER_EMAIL && !__isInClientMode;
+  const isTrainer = isTrainerEmail(user.email) && !__isInClientMode;
 
   if (searchParams.client === "group") {
     const { data: gmsgs } = await supabase.from("messages").select("*").eq("is_group", true).is("deleted_at", null).order("created_at", { ascending: true });

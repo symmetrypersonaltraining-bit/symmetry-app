@@ -3,8 +3,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { submitFeedback } from "@/lib/feedback";
 import { startDictation } from "@/lib/dictation";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default function FloatingDock() {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -24,7 +23,7 @@ export default function FloatingDock() {
 
   useEffect(() => {
     try { const p = localStorage.getItem("symmetry_dock_pos"); if (p) setPos(JSON.parse(p)); } catch {}
-    (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (data?.user?.email === TRAINER_EMAIL) setIsTrainer(true); } catch {} })();
+    (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (isTrainerEmail(data?.user?.email)) setIsTrainer(true); } catch {} })();
     const checkClientMode = () => {
       try {
         const cookieOn = document.cookie.includes("symmetry_client_mode=1");

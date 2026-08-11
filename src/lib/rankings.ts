@@ -20,6 +20,7 @@
 
 import { TRAINER_EMAIL } from "@/lib/ai/scope";
 import { isExcludedFromRoster } from "@/lib/demoClient";
+import { isTrainerEmail } from "@/lib/trainer";
 
 /** True when this person must never appear in a ranked, named standing. */
 export function isExcludedFromRankings(
@@ -30,7 +31,7 @@ export function isExcludedFromRankings(
 ): boolean {
   if (!client) return false;
   if (client.exclude_from_rankings === true) return true;
-  if ((client.email || "").trim().toLowerCase() === TRAINER_EMAIL) return true;
+  if (isTrainerEmail(client.email)) return true;
   return isExcludedFromRoster(client);
 }
 

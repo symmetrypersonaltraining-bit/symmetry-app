@@ -16,12 +16,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { adoptPlan, AdoptDb, AdoptMealInput } from "@/lib/nutrition/adoptPlan";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
 // Supabase admin client → AdoptDb adapter.
 function makeDb(admin: ReturnType<typeof createAdminClient>): AdoptDb {
   return {
@@ -75,7 +73,7 @@ export async function POST(req: NextRequest) {
     const source = body?.source === "manual" ? "manual" : "ai";
 
     // Authorize: trainer, or the signed-in client acting on their own record.
-    const isTrainer = user.email === TRAINER_EMAIL;
+    const isTrainer = isTrainerEmail(user.email);
     if (!isTrainer) {
       const { data: c } = await sb.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
       if (!c || (c as { id: string }).id !== clientId) {

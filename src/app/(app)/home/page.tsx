@@ -7,8 +7,7 @@ import TrainerHome from "./TrainerHome";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
 import PendingRemindersPanel from "@/components/PendingRemindersPanel";
 import SlackerGate from "@/components/SlackerScreen";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
 
 async function isClientMode(asMarker?: string): Promise<boolean> {
   // Explicit ?as=client marker OR the cookie. The marker guarantees the client
@@ -28,7 +27,7 @@ export default async function HomePage(props: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = (user?.email ?? "") === TRAINER_EMAIL;
+  const isTrainer = isTrainerEmail((user?.email ?? ""));
   const isInClientMode = isTrainer ? await isClientMode(searchParams.as) : false;
 
   // ── TRAINER VIEW ──────────────────────────────────────────────────────────

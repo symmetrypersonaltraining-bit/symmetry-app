@@ -19,8 +19,8 @@ import { analyze, type AnalyzeInput } from '@/lib/movement/analyze';
 import { buildProgram } from '@/lib/movement/program';
 import { doseForPain } from '@/lib/movement/dose';
 import { CHECKPOINT_LABELS, SURFACE_COPY, violatesSurfaceLanguage } from '@/lib/movement/ces-data';
+import { isTrainerEmail } from "@/lib/trainer";
 
-const TRAINER_EMAIL = 'symmetrypersonaltraining@gmail.com';
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // This route runs SONNET on every call and had no metering and no kill switch:
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
         .insert({
           client_id: body.clientId,
           created_by: user.id,
-          captured_by: body.capturedBy ?? (user.email === TRAINER_EMAIL ? 'trainer' : 'client'),
+          captured_by: body.capturedBy ?? (isTrainerEmail(user.email) ? 'trainer' : 'client'),
           assessment_type: engine.assessment,
           captured_at: engine.capturedAt,
           views: body.input.views.map((v) => ({ view: v.view, wedge: v.wedge, reps: v.frames.length, quality: v.quality })),

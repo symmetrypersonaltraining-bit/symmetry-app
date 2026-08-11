@@ -5,8 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { useNutritionAverages } from "@/components/nutrition/useNutritionAverages";
 import CoachBadge from "@/components/CoachBadge";
 import AiBadge from "@/components/AiBadge";
+import { isTrainerEmail } from "@/lib/trainer";
 
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function todayCT(): string {
@@ -94,7 +94,7 @@ export default function ClientWeekSummary() {
           const user = userData ? userData.user : null;
           if (!user) return;
           const col = "id, name, weekly_focus, weekly_focus_week, weekly_focus_source";
-          if ((user.email || "") === TRAINER_EMAIL) {
+          if (isTrainerEmail((user.email || ""))) {
             const { data: c } = await supabase.from("clients").select(col).ilike("name", "%Dustin%").limit(1);
             if (c && c[0]) { cid = c[0].id; clientName = c[0].name; focus = currentWeekFocus(c[0]); focusSource = c[0].weekly_focus_source ?? null; }
           } else {

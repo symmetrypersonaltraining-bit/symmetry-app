@@ -4,10 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 
 import { resolveAiScope, enforceMeter } from "@/lib/ai/scope";
 import { logUsage } from "@/lib/ai/meter";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
 import { SYMMETRY_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
+import { isTrainerEmail } from "@/lib/trainer";
 
 const SYSTEM_PROMPT = SYMMETRY_SYSTEM_PROMPT;
 
@@ -47,7 +45,7 @@ export async function POST(req: NextRequest) {
     }
 
     const anthropic = new Anthropic({ apiKey });
-    const isTrainer = user.email === TRAINER_EMAIL;
+    const isTrainer = isTrainerEmail(user.email);
 
     let systemPrompt = SYSTEM_PROMPT;
     systemPrompt += `\n\nCurrent user: ${isTrainer ? "Trainer (Dustin)" : "Client"} — ${user.email}`;

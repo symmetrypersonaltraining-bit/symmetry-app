@@ -7,8 +7,7 @@ import AchievementCard from "@/components/AchievementCard";
 import PersonalBests from "@/components/PersonalBests";
 import ThenVsNow from "@/components/ThenVsNow";
 import ProgressPhotos from "@/components/ProgressPhotos";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function ProgressPage({
   searchParams,
@@ -19,7 +18,7 @@ export default async function ProgressPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = user.email === TRAINER_EMAIL;
+  const isTrainer = isTrainerEmail(user.email);
   const params = await searchParams;
 
   let clientId: string | null = null;

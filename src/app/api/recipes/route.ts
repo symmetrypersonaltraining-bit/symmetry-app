@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TRAINER_EMAIL } from "@/lib/ai/scope";
 import { cleanRecipe, recipeTotals, validateRecipe, RecipeInput } from "@/lib/recipes";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ async function whoami() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;
-  const isTrainer = user.email === TRAINER_EMAIL;
+  const isTrainer = isTrainerEmail(user.email);
   let clientId: string | null = null;
   const { data: c } = await sb.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
   clientId = (c as { id: string } | null)?.id ?? null;

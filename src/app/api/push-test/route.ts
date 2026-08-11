@@ -6,17 +6,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendPushDiagnostics } from "@/lib/push";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
 export async function POST() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
-  if (user.email !== TRAINER_EMAIL) return NextResponse.json({ error: "Trainer only." }, { status: 403 });
+  if (!isTrainerEmail(user.email)) return NextResponse.json({ error: "Trainer only." }, { status: 403 });
 
   const result = await sendPushDiagnostics(user.id, "Symmetry test", "Push test ✓", { url: "/messages" });
   return NextResponse.json(result);

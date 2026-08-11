@@ -12,17 +12,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import RecipesClient from "./RecipesClient";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export const dynamic = "force-dynamic";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
 export default async function RecipesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = user.email === TRAINER_EMAIL;
+  const isTrainer = isTrainerEmail(user.email);
   let clientId: string | null = null;
   {
     const { data: c } = await supabase.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();

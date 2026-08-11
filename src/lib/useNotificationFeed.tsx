@@ -26,6 +26,7 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { aggregateNotifications, type NotifRow, type RawUnread } from "@/lib/notifications";
 import { fetchGroupUnread, markGroupRead } from "@/lib/groupUnread";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export interface NotificationFeed {
   items: NotifRow[];
@@ -48,8 +49,6 @@ const Ctx = createContext<NotificationFeed>(EMPTY);
 // Inlined rather than imported from @/lib/ai/scope: that module pulls in
 // next/headers, which is server-only, and importing it here broke the build
 // outright. NotificationCenter keeps its own copy for the same reason.
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
 const POLL_MS = 25000;
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
@@ -92,7 +91,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       const { data: me } = await supabase
         .from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
       const myClientId = (me as { id: string } | null)?.id ?? null;
-      const isTrainer = user.email === TRAINER_EMAIL && !clientMode;
+      const isTrainer = isTrainerEmail(user.email) && !clientMode;
 
       // ROWS, not a count. The banner needs to know WHICH messages are unread —
       // a HEAD count is why it could never route to the sender's thread.

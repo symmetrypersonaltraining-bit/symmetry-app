@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import ProposalsClient from "./ProposalsClient";
+import { isTrainerEmail } from "@/lib/trainer";
 
 // Trainer approval surface for schedule_change_proposals.
 //
@@ -11,14 +12,11 @@ import ProposalsClient from "./ProposalsClient";
 // Deliberately its own route rather than a panel on client_notifications:
 // that table is client-facing and payment-shaped, and reusing it would put
 // trainer-only rows in front of clients.
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
-
 export default async function ScheduleProposalsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  if (user.email !== TRAINER_EMAIL) redirect("/home");
+  if (!isTrainerEmail(user.email)) redirect("/home");
 
   const { data: rows } = await supabase
     .from("schedule_change_proposals")

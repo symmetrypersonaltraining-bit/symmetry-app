@@ -7,8 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-
-const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+import { isTrainerEmail } from "@/lib/trainer";
 
 function todayCT(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
@@ -36,7 +35,7 @@ export default function SundayWeighInReminder() {
           const { data: userData } = await supabase.auth.getUser();
           const user = userData ? userData.user : null;
           if (!user) return;
-          if ((user.email || "") === TRAINER_EMAIL) {
+          if (isTrainerEmail((user.email || ""))) {
             const { data: c } = await supabase.from("clients").select("id").ilike("name", "%Dustin%").limit(1);
             cid = c && c[0] ? c[0].id : null;
           } else {

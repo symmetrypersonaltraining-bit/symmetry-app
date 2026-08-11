@@ -37,6 +37,7 @@ import { logUsage } from "@/lib/ai/meter";
 import { TRAINER_EMAIL, Db, enforceMeter } from "@/lib/ai/scope";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { isTrainerEmail } from "@/lib/trainer";
 
 export const dynamic = "force-dynamic";
 
@@ -219,7 +220,7 @@ function validate(raw: unknown): { drafts: string[] } | null {
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.email !== TRAINER_EMAIL) {
+  if (!user || !isTrainerEmail(user.email)) {
     return NextResponse.json({ error: "Trainer only" }, { status: 403 });
   }
 
