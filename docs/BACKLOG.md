@@ -294,6 +294,30 @@ second trainer possible; it is not yet multi-tenancy.
 ~45 minutes of App Store Connect clicks **only Dustin can do**. Steps in
 `docs/IOS-RELEASE-CHECKLIST.md`. Build side is pre-flighted.
 
+## 7b. The demo account shows an empty app  ← NOT STARTED, Dustin said "not yet"
+
+Checked 2026-08-11 while confirming the download and login Dylan was given.
+Both work: `symmetry.apk` (7.2 MB, 20 Jul) serves from Supabase storage, the
+login page renders, and the four auth files touched this session are
+behaviour-identical (verified across all 33 accounts).
+
+The account itself is the problem. `test-client@symmetry-test.com`
+("Test Client"):
+
+- 8 scheduled workouts, **0 upcoming** — every one is in the past
+- **0 meal plans**, 0 workout logs
+- `password_is_temporary` still true, so sign-in forces the set-password screen
+- last sign-in 3 July
+
+So someone can download it, get in, and land in a blank app. Not caused by any
+recent change — it has been this way since early July — but it demos nothing,
+and for someone evaluating from a trainer's perspective it undersells the app
+badly.
+
+**The fix, when Dustin wants it:** seed that ONE account with a week of real
+programming, a meal plan with macros, and a few logged sessions and weigh-ins so
+the charts have shape. Test account only, nowhere near a real client.
+
 ## 8. Smaller / hygiene
 
 - **Tim Yancey dip data.** His 4 Jul Assisted Dip records `20.00` assist and
