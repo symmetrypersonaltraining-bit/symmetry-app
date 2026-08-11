@@ -119,12 +119,13 @@ tracked fields.
 
 ### Still to do on this item
 
-1. **Plan path threading.** `plan-edit/route.ts` and `adopt-plan/route.ts`
-   build `meal_items` payloads by hand and do not yet carry `micros`/`kcal`.
-   Note `plan-edit`'s clone path selects an explicit column list
-   (`select("food, amount, unit, basis, protein, carbs, fats, ...")`) — it will
-   silently DROP micros until that list is updated. AI-authored plans already
-   produce micros; nothing persists them yet.
+1. ~~**Plan path threading.**~~ **DONE 2026-08-11.** Micros and a label `kcal`
+   now survive from the AI draft all the way to `meal_items`. FIVE separate
+   layers were dropping them — the client's `PlanDraft` type, the draft→adopt
+   mapping, the adopt request body, `AdoptItemInput`, and `plan-edit`'s clone
+   `select()` list. Confirmed against real data: plan-build ran successfully
+   for the first time ever on 11 Aug and `meal_items` still had zero rows with
+   micros. Five tests in `tests/unit/adoptPlan.test.ts`.
 2. **`dailyTotals.planMealMacros`/`computeDayTotals`** have no nutrient path for
    plan meals (the comment says plan meals have "NO nutrient source" — that is
    now out of date). Needs a `planMealNutrients` mirroring the existing

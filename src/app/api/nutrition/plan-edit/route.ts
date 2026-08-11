@@ -142,7 +142,10 @@ export async function POST(req: NextRequest) {
           await admin.from("meal_items").insert(edited.map((it, i) => ({ meal_id: copyId, ...it, position: i + 1 })));
         } else {
           const { data: its } = await admin
-            .from("meal_items").select("food, amount, unit, basis, protein, carbs, fats, is_unlimited, position")
+            // kcal + micros MUST be in this list. It is an explicit column list, so a
+            // column missing from it is silently dropped when the plan is cloned -
+            // the trap flagged in docs/BACKLOG.md item 4.
+            .from("meal_items").select("food, amount, unit, basis, protein, carbs, fats, is_unlimited, position, kcal, micros")
             .eq("meal_id", m.id).order("position");
           const rows = (its as Record<string, unknown>[]) || [];
           if (rows.length) await admin.from("meal_items").insert(rows.map((r) => ({ ...r, meal_id: copyId })));

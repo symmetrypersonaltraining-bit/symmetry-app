@@ -1097,7 +1097,7 @@ export default function NutritionV3Client(props: Props) {
     planName: string,
     effective: string,
     targets: Macros,
-    draftMeals: { name: string; timing: string | null; items: { food: string; amount: number | null; unit: string | null; p: number; c: number; f: number; free?: boolean; basis?: string | null }[] }[],
+    draftMeals: { name: string; timing: string | null; items: { food: string; amount: number | null; unit: string | null; p: number; c: number; f: number; free?: boolean; basis?: string | null; kcal?: number | null; micros?: Record<string, number | null> | null }[] }[],
     source: "ai" | "manual"
   ): Promise<boolean> {
     try {
@@ -1112,6 +1112,8 @@ export default function NutritionV3Client(props: Props) {
               food: it.food, amount: it.amount ?? null, unit: it.unit || null,
               basis: it.basis === "cooked" || it.basis === "raw" ? it.basis : null,
               protein: it.p || 0, carbs: it.c || 0, fats: it.f || 0, is_unlimited: !!it.free,
+              ...(it.kcal != null ? { kcal: it.kcal } : {}),
+              ...(it.micros ? { micros: it.micros } : {}),
             })),
           })),
         }),
@@ -1815,7 +1817,10 @@ export default function NutritionV3Client(props: Props) {
                   { kcal: draft.targets.kcal, protein: draft.targets.p, carbs: draft.targets.c, fats: draft.targets.f },
                   draft.meals.map((dm) => ({
                     name: dm.name, timing: dm.timing,
-                    items: dm.items.map((it) => ({ food: it.food, amount: it.amount, unit: it.unit, p: it.p, c: it.c, f: it.f })),
+                    // kcal + micros carried through: the AI has produced them
+                    // since da30c87 and every one was being dropped on the
+                    // floor at adoption time.
+                    items: dm.items.map((it) => ({ food: it.food, amount: it.amount, unit: it.unit, p: it.p, c: it.c, f: it.f, kcal: it.kcal ?? null, micros: it.micros ?? null })),
                   })),
                   "ai"
                 );
@@ -2685,7 +2690,9 @@ function ForwardSheet({
 interface PlanDraft {
   targets: { kcal: number; p: number; c: number; f: number };
   reasoning: string | null;
-  meals: { name: string; timing: string | null; items: { food: string; amount: number | null; unit: string | null; p: number; c: number; f: number; kcal: number }[] }[];
+  // micros: the AI returns them (da30c87) and they must survive all the way to
+  // meal_items, or "full micronutrients" stops at the draft screen.
+  meals: { name: string; timing: string | null; items: { food: string; amount: number | null; unit: string | null; p: number; c: number; f: number; kcal: number; micros?: Record<string, number | null> | null }[] }[];
   totals: { kcal: number; p: number; c: number; f: number };
 }
 

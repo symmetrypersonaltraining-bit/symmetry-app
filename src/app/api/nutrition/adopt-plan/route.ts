@@ -8,7 +8,7 @@
 // trainer-authored rows under RLS.
 //
 // Body: { clientId, title, effectiveDate?, targets:{calories,protein,carbs,fats},
-//         meals:[{name,timing,items:[{food,amount,unit,basis,protein,carbs,fats,is_unlimited}]}],
+//         meals:[{name,timing,items:[{food,amount,unit,basis,protein,carbs,fats,is_unlimited,kcal?,micros?}]}],
 //         source:'ai'|'manual' }
 // Returns: { planId } | { error }
 

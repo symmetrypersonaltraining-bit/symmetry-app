@@ -1,3 +1,5 @@
+import { sanitizeNutrients, roundNutrients } from "@/lib/nutrition/nutrients";
+
 // Nutrition v3 — adopt-plan core. Archives the client's current live plan(s)
 // and installs a new one (meals + items + macro_targets), non-destructively:
 // the old plan is only set status='archived' so it stays in the timeline and is
@@ -14,6 +16,10 @@ export interface AdoptItemInput {
   carbs: number;
   fats: number;
   is_unlimited?: boolean;
+  /** Calories when the source knew them from a label; else derived 4/4/9. */
+  kcal?: number | null;
+  /** Micronutrients keyed by lib/nutrition/nutrients.ts. */
+  micros?: Record<string, number | null> | null;
 }
 export interface AdoptMealInput {
   name: string;
@@ -42,6 +48,7 @@ export interface AdoptDb {
   insertMealItems(rows: Array<{
     meal_id: string; food: string; amount: number; unit: string; is_unlimited: boolean;
     basis: string | null; protein: number; carbs: number; fats: number; position: number;
+    kcal?: number | null; micros?: Record<string, number | null> | null;
   }>): Promise<void>;
   insertMacroTarget(row: { client_id: string; effective_date: string; calories: number; protein: number; carbs: number; fats: number; rationale: string }): Promise<void>;
 }
@@ -94,6 +101,16 @@ export async function adoptPlan(db: AdoptDb, params: AdoptParams): Promise<strin
       carbs: rnd(it.carbs),
       fats: rnd(it.fats),
       position: j + 1,
+      // Carry micronutrients and a label kcal through to storage. The AI plan
+      // builder has produced these since da30c87 and NOTHING persisted them —
+      // adopting a plan silently dropped every one. Sanitised so a stray key
+      // from a model reply cannot reach the column; omitted entirely when
+      // empty, because absent means unknown and {} would claim otherwise.
+      ...(it.kcal != null && Number.isFinite(Number(it.kcal)) ? { kcal: rnd(it.kcal) } : {}),
+      ...(() => {
+        const m = sanitizeNutrients(it.micros);
+        return Object.keys(m).length ? { micros: roundNutrients(m) } : {};
+      })(),
     }));
     if (items.length) await db.insertMealItems(items);
   }
