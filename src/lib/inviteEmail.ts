@@ -1,3 +1,4 @@
+import { COACH_FIRST_NAME } from "./trainer";
 // Shared invite-email builder — used by BOTH /api/create-client (new client with
 // invite) and /api/invite-client (invite/re-invite existing client) so the two
 // can never drift again. Sends the Android APK download + login steps, plus an
@@ -27,7 +28,7 @@ export function buildInviteEmailHtml(opts: {
     <div style="padding: 32px;">
       <p style="color: #333; font-size: 16px; margin: 0 0 8px;">Hi ${firstName},</p>
       <p style="color: #555; font-size: 15px; margin: 0 0 24px; line-height: 1.5;">
-        Dustin has set up your Symmetry Training App account. Your training, nutrition, and progress — all in one place.
+        ${COACH_FIRST_NAME} has set up your Symmetry Training App account. Your training, nutrition, and progress — all in one place.
       </p>
 
       ${oneTapUrl ? `
@@ -81,7 +82,7 @@ export function buildInviteEmailHtml(opts: {
       </div>
 
       <p style="color: #999; font-size: 13px; margin: 0; text-align: center;">
-        Questions? Reply to this email or contact Dustin directly.
+        Questions? Reply to this email or contact ${COACH_FIRST_NAME} directly.
       </p>
     </div>
     <!-- Footer -->

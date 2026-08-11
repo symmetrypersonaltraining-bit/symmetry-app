@@ -8,6 +8,7 @@ import HeaderAssist from "./HeaderAssist";
 import SessionDock from "./SessionDock";
 import AppBottomNav, { type NavItem } from "./AppBottomNav";
 import RefreshHandle from "./RefreshHandle";
+import { COACH_NAME } from "@/lib/trainer";
 
 interface Props {
   children: React.ReactNode;
@@ -140,7 +141,7 @@ export default function TrainerLayoutWrapper({ children }: Props) {
       <TrainerSidebar
         clientMode={clientMode}
         onToggleClientMode={handleToggleMode}
-        userName="Dustin Gautreaux"
+        userName={COACH_NAME}
         userInitials="DG"
         // On mobile these live INSIDE the blue bar, in normal flow. They used
         // to be a second position:fixed element aimed at the same corner,

@@ -28,6 +28,7 @@ import { Db } from "@/lib/ai/scope";
 import { applyProposal, loadDayTree, CT_TODAY, Proposal } from "@/lib/ai/workoutAdjust";
 import { assembleCoachContext, assembleTrainingContext } from "@/lib/ai/coach-context";
 import { getValidAccessToken, gcalFetch } from "@/lib/gcal";
+import { COACH_FIRST_NAME } from "../trainer";
 
 // ── Read-only surface for the general query tool ────────────────────────────
 //
@@ -80,7 +81,7 @@ export const TRAINER_TOOLS: Anthropic.Tool[] = [
   { name: "set_macro_targets", description: "Set a client's daily macro targets. Creates a new dated version effective today; history is kept.", input_schema: { type: "object", properties: {
     client_id: { type: "string" }, calories: { type: "number" }, protein: { type: "number" }, carbs: { type: "number" }, fats: { type: "number" }, rationale: { type: "string" },
   }, required: ["client_id", "calories", "protein", "carbs", "fats"] } },
-  { name: "send_message", description: "Send a message as Dustin — to one client, or to the whole group. Say what you are about to send and get his go-ahead first unless he has clearly already asked for it.", input_schema: { type: "object", properties: {
+  { name: "send_message", description: `Send a message as ${COACH_FIRST_NAME} — to one client, or to the whole group. Say what you are about to send and get his go-ahead first unless he has clearly already asked for it.`, input_schema: { type: "object", properties: {
     client_id: { type: "string", description: "omit for the group" },
     body: { type: "string" },
     group: { type: "boolean", description: "true = group chat" },

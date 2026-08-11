@@ -20,6 +20,7 @@ import { enforceMeter, missingKeyResponse, resolveAiScope, TRAINER_EMAIL, Db } f
 import { createAdminClient } from "@/lib/supabase/admin";
 import type Anthropic from "@anthropic-ai/sdk";
 import { findExerciseIdByName } from "@/lib/exerciseLookup";
+import { COACH_FIRST_NAME, COACH_NAME } from "@/lib/trainer";
 
 export const runtime = "nodejs";
 
@@ -113,7 +114,7 @@ async function buildContext(db: Db, clientId: string, dayId: string | null): Pro
 }
 
 function systemPrompt(mode: string): string {
-  const base = `You are the workout designer for Symmetry Personal Training (corrective + physique coach Dustin Gautreaux). You create ONE workout for a specific client that COMPLEMENTS Dustin's current programming for them and does NOT clash with what's scheduled next (e.g. don't hammer legs the day before a programmed leg day; keep corrective clients within safe patterns). Prefer common, well-known exercises so they map to the app's library and have demo videos.
+  const base = `You are the workout designer for Symmetry Personal Training (corrective + physique coach ${COACH_NAME}). You create ONE workout for a specific client that COMPLEMENTS ${COACH_FIRST_NAME}'s current programming for them and does NOT clash with what's scheduled next (e.g. don't hammer legs the day before a programmed leg day; keep corrective clients within safe patterns). Prefer common, well-known exercises so they map to the app's library and have demo videos.
 
 Respond with ONLY valid JSON — no markdown, no fences, no prose — exactly this shape:
 {"title":string,"focus":string,"rationale":string,"duration_min":number|null,"sections":[{"name":"Warm-Up"|"Strength"|"Accessory"|"Cardio","exercises":[{"name":string,"type":"weight"|"reps"|"time","sets":number,"reps":string|null,"duration":string|null,"note":string|null}]}]}
@@ -310,7 +311,7 @@ export async function POST(req: NextRequest) {
 
   // ─── notify the trainer (self-serve + notified) ───
   try {
-    const { data: tr } = await admin.from("clients").select("auth_user_id").or(`email.eq.${TRAINER_EMAIL},name.ilike.%Dustin%`).not("auth_user_id", "is", null).limit(1).maybeSingle();
+    const { data: tr } = await admin.from("clients").select("auth_user_id").or(`email.eq.${TRAINER_EMAIL},name.ilike.%${COACH_FIRST_NAME}%`).not("auth_user_id", "is", null).limit(1).maybeSingle();
     const trainerAuth = (tr as { auth_user_id: string } | null)?.auth_user_id;
     if (trainerAuth && scope.userId && trainerAuth !== scope.userId) {
       const verb = mode === "activity" ? "logged an extra activity" : mode === "equipment" ? "AI-built a workout from available equipment" : "AI-replaced today's workout";

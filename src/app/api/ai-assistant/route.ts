@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveAiScope, enforceMeter } from "@/lib/ai/scope";
 import { logUsage } from "@/lib/ai/meter";
 import { SYMMETRY_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
-import { isTrainerEmail } from "@/lib/trainer";
+import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 
 const SYSTEM_PROMPT = SYMMETRY_SYSTEM_PROMPT;
 
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "AI assistant not configured yet. Ask Dustin to add ANTHROPIC_API_KEY to Vercel." },
+        { error: `AI assistant not configured yet. Ask ${COACH_FIRST_NAME} to add ANTHROPIC_API_KEY to Vercel.` },
         { status: 503 }
       );
     }
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     const isTrainer = isTrainerEmail(user.email);
 
     let systemPrompt = SYSTEM_PROMPT;
-    systemPrompt += `\n\nCurrent user: ${isTrainer ? "Trainer (Dustin)" : "Client"} — ${user.email}`;
+    systemPrompt += `\n\nCurrent user: ${isTrainer ? `Trainer (${COACH_FIRST_NAME})` : "Client"} — ${user.email}`;
     if (context) systemPrompt += `\n\nPage context:\n${context}`;
 
     const response = await anthropic.messages.create({

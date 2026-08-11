@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 type Who = "dad" | "wife";
 
@@ -109,7 +110,7 @@ export default function PrankInvoice() {
         <div style={{ background: "#fff", borderRadius: 24, maxWidth: 420, width: "100%", padding: 28, textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", color: "#111" }}>
           <div style={{ fontSize: 48 }}>{HEARTS}</div>
           <div style={{ fontWeight: 900, fontSize: 28, color: "#22c55e", transform: "rotate(-6deg)", display: "inline-block", padding: "4px 14px", borderRadius: 8, margin: "8px 0", border: "4px solid #22c55e" }}>PAID IN FULL</div>
-          <div style={{ fontSize: 15, marginTop: 8 }}>{PAID_MSG[who]}<br />{"— Dustin "}{HEART}</div>
+          <div style={{ fontSize: 15, marginTop: 8 }}>{PAID_MSG[who]}<br />{`— ${COACH_FIRST_NAME} `}{HEART}</div>
           <button onClick={dismiss} style={{ width: "100%", marginTop: 16, background: "#22c55e", color: "#fff", fontWeight: 800, fontSize: 15, padding: "12px 0", borderRadius: 14, border: "none" }}>Close (you{"’"}re welcome)</button>
         </div>
       )}

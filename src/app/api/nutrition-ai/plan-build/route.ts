@@ -15,8 +15,9 @@ import { validatePlanDraft } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { nutrientPromptSpec } from "@/lib/nutrition/nutrients";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
-const SYSTEM_PROMPT = `You build meal plans for Symmetry Personal Training (physique coach Dustin). Plans use simple, repeatable whole foods in the style of his real plans: chicken breast, 93/7 ground beef, white fish, eggs / egg whites, Oikos Triple Zero yogurt, whey protein, cream of rice, jasmine rice, potatoes, oats, rice cakes, fruit, olive oil, almonds/nut butter, vegetables (free). Amounts are precise (grams or common measures, cooked basis unless noted).
+const SYSTEM_PROMPT = `You build meal plans for Symmetry Personal Training (physique coach ${COACH_FIRST_NAME}). Plans use simple, repeatable whole foods in the style of his real plans: chicken breast, 93/7 ground beef, white fish, eggs / egg whites, Oikos Triple Zero yogurt, whey protein, cream of rice, jasmine rice, potatoes, oats, rice cakes, fruit, olive oil, almonds/nut butter, vegetables (free). Amounts are precise (grams or common measures, cooked basis unless noted).
 
 Respond with ONLY valid JSON — no markdown, no fences, no prose — exactly this shape:
 {"targets":{"kcal":number,"p":number,"c":number,"f":number},"reasoning":string|null,"meals":[{"name":string,"timing":string|null,"items":[{"food":string,"amount":number|null,"unit":string|null,"p":number,"c":number,"f":number,"kcal":number,"micros":object}]}],"totals":{"kcal":number,"p":number,"c":number,"f":number}}
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
 
     if (!result.value) {
       return NextResponse.json(
-        { error: "Couldn't produce a clean plan draft — please try again, or ask Dustin to build it manually." },
+        { error: `Couldn't produce a clean plan draft \u2014 please try again, or ask ${COACH_FIRST_NAME} to build it manually.` },
         { status: 502 }
       );
     }

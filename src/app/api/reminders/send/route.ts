@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isCronRequest } from "@/lib/cron-auth";
-import { isTrainerEmail } from "@/lib/trainer";
+import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
@@ -47,7 +47,7 @@ function reminderEmailHtml(clientName: string, amountDue: number, dueDate: strin
     </div>
     ${notes ? `<p style="color:#4E6080;font-size:14px;font-style:italic;margin:0 0 20px">${notes}</p>` : ""}
     <p style="color:#4E6080;font-size:14px;margin:0">
-      Questions? Reply to this email or contact Dustin directly.
+      Questions? Reply to this email or contact ${COACH_FIRST_NAME} directly.
     </p>
   </div>
   <p style="color:#4E6080;font-size:12px;text-align:center;margin:16px 0 0">

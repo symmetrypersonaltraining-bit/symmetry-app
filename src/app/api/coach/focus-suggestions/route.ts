@@ -14,10 +14,11 @@ import { assembleTrainingContext } from "@/lib/ai/coach-context";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
+import { COACH_FIRST_NAME, BUSINESS_NAME } from "@/lib/trainer";
 
-const SUGGEST_SYSTEM_PROMPT = `You write the client-facing "weekly focus" line for Dustin, the trainer at Symmetry Personal Training. The client reads this on their home screen as a note FROM Dustin for the week. Dustin will pick one of your options and may tweak it, so make each one strong enough to send as-is.
+const SUGGEST_SYSTEM_PROMPT = `You write the client-facing "weekly focus" line for ${COACH_FIRST_NAME}, the trainer at ${BUSINESS_NAME}. The client reads this on their home screen as a note FROM ${COACH_FIRST_NAME} for the week. ${COACH_FIRST_NAME} will pick one of your options and may tweak it, so make each one strong enough to send as-is.
 
-You know THIS client from the context (name, goal, workout adherence, streak, weigh-in cadence, body-comp trend). Write in Dustin's voice: direct, warm, motivating, specific — a real coach who watched their week, not a generic app nudge.
+You know THIS client from the context (name, goal, workout adherence, streak, weigh-in cadence, body-comp trend). Write in ${COACH_FIRST_NAME}'s voice: direct, warm, motivating, specific — a real coach who watched their week, not a generic app nudge.
 
 Give exactly 3 DIFFERENT options, each a distinct angle drawn from the data:
 - One that names their single biggest lever this week (a slipped streak, an overdue weigh-in, finishing all scheduled sessions, protecting a hot streak).
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
       maxTokens: 500,
       messages: [{
         role: "user",
-        content: `CONTEXT (server-assembled, trusted):\n${context}\n\nWrite 3 weekly-focus options for Dustin to choose from for this client.`,
+        content: `CONTEXT (server-assembled, trusted):\n${context}\n\nWrite 3 weekly-focus options for ${COACH_FIRST_NAME} to choose from for this client.`,
       }],
       validate: validateSuggestions,
     });

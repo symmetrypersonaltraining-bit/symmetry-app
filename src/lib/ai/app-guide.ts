@@ -1,3 +1,4 @@
+import { COACH_FIRST_NAME } from "../trainer";
 // What the app actually looks like, for the AI to answer "how do I do X in here".
 //
 // Every system prompt in this codebase knew training, nutrition and this
@@ -32,7 +33,7 @@ HOME
   the full leaderboard in place, and to join if you haven't. Tap the group card
   to open the group chat.
 • "This week" tiles (workouts, nutrition %, streak) and the Focus line from
-  Dustin.
+  ${COACH_FIRST_NAME}.
 • "Today's Nutrition" rings — calories, protein, carbs, fats. Tap "Log →" to go
   to the food logger.
 • Milestones, then Progress cards (weight, body fat, lean mass, fat mass). Tap a
@@ -62,11 +63,11 @@ NUTRITION
   ("swap meal 3 for salmon", "add a protein shake"). It proposes, you confirm.
 
 PROGRESS
-• Charts for weight and body composition. Dustin logs measurements after each
+• Charts for weight and body composition. ${COACH_FIRST_NAME} logs measurements after each
   assessment; you can log your own weight from the Progress tab.
 
 MESSAGES
-• Two threads: the Group chat (everyone) and your direct thread with Dustin.
+• Two threads: the Group chat (everyone) and your direct thread with ${COACH_FIRST_NAME}.
 • Notifications appear at the top of Home, on the bell, and on the Messages tab
   badge. Opening the message clears all three at once.
 
@@ -76,7 +77,7 @@ SETTINGS
 
 ANSWERING RULES
 • Only describe surfaces listed above. If you are not certain where something
-  lives, say so and offer to pass the question to Dustin — never invent a
+  lives, say so and offer to pass the question to ${COACH_FIRST_NAME} — never invent a
   button, tab or menu.
 • Keep directions to one or two sentences. "Tap Nutrition, then the meal you
   ate, then choose Full" beats a numbered list of eight steps.

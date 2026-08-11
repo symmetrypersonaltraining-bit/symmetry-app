@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { startDictation } from "@/lib/dictation";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 interface SwapDay { id: string; label: string; }
 interface OffPlanRow { id: string; description: string; details: string | null; status: string; }
@@ -168,7 +169,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
           ▶ Start this workout
         </button>
       )}
-      <p className="text-center mt-2" style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>Saved to your library for next time. Dustin was notified.</p>
+      <p className="text-center mt-2" style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>Saved to your library for next time. {COACH_FIRST_NAME} was notified.</p>
     </div>
   );
 
@@ -182,7 +183,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
                 itself, where it sat next to a PENDING chip that never cleared.
                 A status badge that never changes is a bug report waiting to
                 happen. */}
-            <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>Recorded — Dustin can see it</p>
+            <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>Recorded — {COACH_FIRST_NAME} can see it</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className="font-extrabold px-2 py-0.5 rounded-full" style={{ background: "color-mix(in srgb, #22c55e 16%, transparent)", color: "#16a34a", fontSize: 9 }}>LOGGED</span>
@@ -299,7 +300,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
                 copy promised a thing that no longer happened, which is worse
                 than promising nothing. It is recorded immediately now, and the
                 sentence says only what is actually true. */}
-            <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>Type it — recorded straight away, Dustin sees it</span></span>
+            <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>Type it — recorded straight away, {COACH_FIRST_NAME} sees it</span></span>
           </button>
         </div>
       )}

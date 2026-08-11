@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import MealPlanClient from "../../nutrition/MealPlanClient";
 import NutritionV3Client from "../../nutrition/v3/NutritionV3Client";
 import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
-import { isTrainerEmail } from "@/lib/trainer";
+import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 import { fetchOwnClientRow } from "@/lib/ownClient";
 
 export default async function ClientPreviewNutritionPage() {
@@ -24,7 +24,7 @@ export default async function ClientPreviewNutritionPage() {
   }
 
   const clientId = clientRecord.id;
-  const clientName = clientRecord.name || "Dustin";
+  const clientName = clientRecord.name || `${COACH_FIRST_NAME}`;
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   // Central, not UTC: derive the 7-day floor from the Central date, not Date.now() in UTC.
   const weekFloor = (() => {

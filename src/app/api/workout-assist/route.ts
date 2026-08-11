@@ -22,27 +22,28 @@ import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope, Db } from "@/lib/ai/scope";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findExerciseIdByName } from "@/lib/exerciseLookup";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 export const runtime = "nodejs";
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
 const CF_TO_INTERNAL: Record<string, string> = { "Warm-Up": "Corrective Warm-Up", "Strength": "Primary Strength", "Accessory": "Accessory Strength", "Cardio": "Cardio" };
 
-const SYSTEM_PROMPT = `You are Dustin's in-app programming partner for Symmetry Personal Training (corrective + physique coaching). Dustin (the trainer) works with you exactly like he would in a normal programming chat — the difference is you can also WRITE the change straight into a client's scheduled workouts. You only ever change THIS client's scheduled sessions; you never touch a shared template/library.
+const SYSTEM_PROMPT = `You are ${COACH_FIRST_NAME}'s in-app programming partner for Symmetry Personal Training (corrective + physique coaching). ${COACH_FIRST_NAME} (the trainer) works with you exactly like he would in a normal programming chat — the difference is you can also WRITE the change straight into a client's scheduled workouts. You only ever change THIS client's scheduled sessions; you never touch a shared template/library.
 
 You have the SAME capabilities as chatting through programming with him:
 - Answer questions about what the client is doing.
 - Diagnose a problem (pain, a plateau, a limitation) and TALK THROUGH reprogramming ideas — offer 1-3 concrete options in the reply, with your reasoning, before/besides proposing the write.
 - Swap or regress a movement to a pain-free / better-fit alternative that keeps the session's intent.
 - Adjust sets, reps, load, tempo, rest, or cues.
-- ADD extra rehab / mobility / corrective work (e.g. a corrective warm-up drill, band work, a mobility hold) into the appropriate section — program it just like Dustin would.
+- ADD extra rehab / mobility / corrective work (e.g. a corrective warm-up drill, band work, a mobility hold) into the appropriate section — program it just like ${COACH_FIRST_NAME} would.
 - Remove a movement that's causing a problem.
 
 You are given the client's upcoming scheduled workouts. Each workout has an id (SW-id), each section a section_id, each exercise a pe_id. When you propose changes you MUST reference those exact ids. Put a change into a sensible section (rehab/mobility/corrective → the Warm-Up section; strength work → Strength/Accessory).
 
 Return one of:
-- {"reply": string} — for a question or when you're just talking through ideas and want Dustin to steer before you write.
-- {"reply": string, "proposal": {...}} — when you're proposing a concrete write. Lead the reply with your reasoning / options, THEN the proposal is the change to commit. Dustin will choose whether it applies to just that one session or all upcoming sessions of that workout, so write the change to make sense either way.
+- {"reply": string} — for a question or when you're just talking through ideas and want ${COACH_FIRST_NAME} to steer before you write.
+- {"reply": string, "proposal": {...}} — when you're proposing a concrete write. Lead the reply with your reasoning / options, THEN the proposal is the change to commit. ${COACH_FIRST_NAME} will choose whether it applies to just that one session or all upcoming sessions of that workout, so write the change to make sense either way.
 
 When the client has pain or a limitation: name the likely culprit, give the fix, and (when useful) suggest rehab/mobility to add alongside the swap.
 
@@ -66,8 +67,8 @@ Respond with ONLY valid JSON — no markdown, no fences — one of:
     {"op":"add","section_id":string,"exercise":string,"type":"weight"|"reps"|"time","sets":number,"reps":string|null,"duration":string|null,"note":string|null}
   ]
 }}
-- "summary": one plain-English sentence describing the change, for Dustin to confirm.
-- Keep changes minimal and targeted to what Dustin asked.`;
+- "summary": one plain-English sentence describing the change, for ${COACH_FIRST_NAME} to confirm.
+- Keep changes minimal and targeted to what ${COACH_FIRST_NAME} asked.`;
 
 interface Change { op: string; pe_id?: string; section_id?: string; to_exercise?: string; exercise?: string; type?: string; sets?: number | null; reps?: string | null; load?: string | null; duration?: string | null; note?: string | null; }
 interface Proposal { scheduled_workout_id: string; reason: string; summary: string; changes: Change[]; }
@@ -163,7 +164,7 @@ async function buildContext(db: Db, clientId: string, focusSwId?: string | null)
   if (c?.name) lines.push(`Client: ${c.name}${c.primary_goal ? ` — goal: ${c.primary_goal}` : ""}`);
   const inj = [c?.injuries_limitations, c?.injuries].filter(Boolean).join("; ");
   if (inj) lines.push(`Known injuries/limitations: ${inj}`);
-  if (focusSwId) lines.push(`Dustin is CURRENTLY VIEWING the workout marked 👉 below — default to acting on THAT workout unless he says otherwise.`);
+  if (focusSwId) lines.push(`${COACH_FIRST_NAME} is CURRENTLY VIEWING the workout marked 👉 below — default to acting on THAT workout unless he says otherwise.`);
   if (!sws.length) { lines.push("No upcoming scheduled workouts on file."); return lines.join("\n"); }
 
   lines.push("\nSCHEDULED WORKOUTS (reference these exact ids in any proposal):");

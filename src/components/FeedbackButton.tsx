@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { submitFeedback } from "@/lib/feedback";
 import { startDictation, type DictationHandle } from "@/lib/dictation";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 export default function FeedbackButton() {
   const [open, setOpen] = useState(false);
@@ -26,7 +27,7 @@ export default function FeedbackButton() {
         alert(
           reason && reason.startsWith("browser-error: not-allowed")
             ? "Microphone permission is off for Symmetry. Turn it on in your phone's app settings, then tap the mic again."
-            : "Voice input couldn't start — " + (reason || "unknown") + "\n\nYou can type your feedback instead. If it keeps happening, send Dustin this message.",
+            : "Voice input couldn't start — " + (reason || "unknown") + `\n\nYou can type your feedback instead. If it keeps happening, send ${COACH_FIRST_NAME} this message.`,
         );
       },
     });
@@ -70,11 +71,11 @@ export default function FeedbackButton() {
         }}>
           {sent ? (
             <div style={{ textAlign: "center", padding: "12px 0", fontWeight: 700, color: "#5ec9a3", fontSize: 15 }}>
-              &#10003; Thanks! Dustin will follow up.
+              &#10003; Thanks! {COACH_FIRST_NAME} will follow up.
             </div>
           ) : (
             <>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: "var(--brand-text,#2a3147)" }}>Send feedback to Dustin</div>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: "var(--brand-text,#2a3147)" }}>Send feedback to {COACH_FIRST_NAME}</div>
               <textarea
                 value={msg}
                 onChange={e => setMsg(e.target.value)}

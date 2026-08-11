@@ -8,6 +8,7 @@ import CountUp from "@/components/CountUp";
 import ShareToGroup from "@/components/ShareToGroup";
 import { sendGroupMessage } from "@/app/(app)/home/messageActions";
 import { fx } from "@/lib/fx";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 /**
  * CelebrationScreen — workout-complete celebration (28 rotating concepts,
@@ -214,7 +215,7 @@ export default function CelebrationScreen({
   // constant so the list stays a plain module constant and the coach entry only
   // exists on the sessions where we actually know his weight.
   const units: [string, number, string][] = coachWeight
-    ? [...UNITS, ["coach Dustins (" + coachWeight + " lb, and cutting)", coachWeight, "🧍‍♂️"]]
+    ? [...UNITS, [`coach ${COACH_FIRST_NAME}s (` + coachWeight + " lb, and cutting)", coachWeight, "🧍‍♂️"]]
     : UNITS;
   const unit = units[(seed + reroll) % units.length];
   const unitCount = Math.max(1, Math.round(volume / unit[1]));
@@ -223,9 +224,9 @@ export default function CelebrationScreen({
     ? `🏆 ${firstName} just hit a PR — ${topPr.movement} ${loadLabel(topPr.weight, !!topPr.assistance)} × ${topPr.reps}` +
       (topPr.previous ? ` (was ${loadLabel(topPr.previous, !!topPr.assistance)})` : "")
     : `💪 ${firstName} just finished ${dayLabel || "a session"} — ${setCount} sets, ${vStr} lb moved` +
-      (dustins ? ` — that's ${dustins} coach Dustin${dustins === 1 ? "" : "s"}.` : ".");
+      (dustins ? ` — that's ${dustins} coach ${COACH_FIRST_NAME}${dustins === 1 ? "" : "s"}.` : ".");
   // ── PR auto-share ────────────────────────────────────────────────────────
-  // Dustin: PRs go to the group on their own, with no notification.
+  // {COACH_FIRST_NAME}: PRs go to the group on their own, with no notification.
   //
   // The Share button stays — sharing an ordinary session is still a choice —
   // but a PR is the thing most worth the group seeing and the thing a client is
@@ -825,7 +826,7 @@ export default function CelebrationScreen({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/coach-flex.webp"
-            alt="Coach Dustin, flexing"
+            alt={`Coach ${COACH_FIRST_NAME}, flexing`}
             style={{ width: 168, height: "auto", display: "block", marginTop: 10, filter: "drop-shadow(0 14px 22px rgba(0,0,0,.5))", animation: "cs-flex 2.6s ease-in-out .4s 3", transformOrigin: "50% 100%" }}
           />
         </button>
@@ -904,7 +905,7 @@ export default function CelebrationScreen({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/coach-head.webp"
-          alt="Coach Dustin has appeared"
+          alt={`Coach ${COACH_FIRST_NAME} has appeared`}
           style={{ width: 132, height: "auto", display: "block", margin: "14px 0 4px", position: "relative", zIndex: 1, filter: "drop-shadow(0 0 26px rgba(224,168,62,.55))", animation: "cs-bob 3.4s ease-in-out .3s infinite" }}
         />
         <div style={{ position: "relative", zIndex: 1, fontSize: 18.5, fontWeight: 900, color: "#ffe9b0", lineHeight: 1.25, marginTop: 8 }}>
@@ -913,7 +914,7 @@ export default function CelebrationScreen({
             : `${firstName} put ${jump} more pound${jump === 1 ? "" : "s"} on ${topPr.movement}.`}
         </div>
         <div style={{ position: "relative", zIndex: 1, fontSize: 12.5, color: "#d9c18a", marginTop: 8, maxWidth: 270, lineHeight: 1.55 }}>
-          Coach Dustin has materialised. He only does this for the big ones. He
+          Coach {COACH_FIRST_NAME} has materialised. He only does this for the big ones. He
           will not be answering questions.
         </div>
       </div>
@@ -931,7 +932,7 @@ export default function CelebrationScreen({
           the stats and the coach-units line had already used the screen up,
           "left over" was less than the card's content, and `overflow: hidden`
           plus `justifyContent: center` sheared it at BOTH ends: the top of
-          Dustin's head gone, the headline cut through the middle of a word,
+          {COACH_FIRST_NAME}&rsquo;s head gone, the headline cut through the middle of a word,
           the paragraph under it missing entirely. Nothing scrolled, because a
           child that shrinks to fit never creates overflow to scroll. */}
       <div style={scrollArea}>
@@ -976,7 +977,7 @@ export default function CelebrationScreen({
         <div style={dustinBox}>
           <span style={{ fontSize: 20, lineHeight: 1 }}>🧍‍♂️</span>
           <span style={{ flex: 1, lineHeight: 1.45 }}>
-            That&rsquo;s <b style={{ color: "var(--brand-primary)", fontSize: 15 }}>{dustins}</b> coach Dustin
+            That&rsquo;s <b style={{ color: "var(--brand-primary)", fontSize: 15 }}>{dustins}</b> coach {COACH_FIRST_NAME}
             {dustins === 1 ? "" : "s"} lifted today.
             <span style={{ display: "block", fontSize: 10.5, color: "var(--brand-text-secondary)", marginTop: 2 }}>
               He weighs {coachWeight} lb. He did not consent to this.

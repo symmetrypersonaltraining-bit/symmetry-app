@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 const GOALS = [
   "Fat Loss", "Muscle Gain", "Body Recomposition", "Strength",
@@ -111,7 +112,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
               Welcome, {firstName}! \ud83d\udc4b
             </h1>
             <p className="text-sm mb-8 leading-relaxed" style={{ color: "var(--brand-text-secondary)" }}>
-              Let&apos;s take 2 minutes to set up your profile. This helps Dustin customize your training and track your progress accurately.
+              Let&apos;s take 2 minutes to set up your profile. This helps {COACH_FIRST_NAME} customize your training and track your progress accurately.
             </p>
 
             <div className="space-y-3 mb-8">
@@ -291,7 +292,7 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
           <div className="pt-4">
             <h2 className="text-xl font-bold mb-1" style={{ color: "var(--brand-text)" }}>Injuries & limitations</h2>
             <p className="text-sm mb-6" style={{ color: "var(--brand-text-secondary)" }}>
-              Any pain, past surgeries, movements to avoid? Dustin needs to know this to train you safely.
+              Any pain, past surgeries, movements to avoid? {COACH_FIRST_NAME} needs to know this to train you safely.
             </p>
             <textarea value={form.injuries_limitations} onChange={e => set("injuries_limitations", e.target.value)}
               rows={5} placeholder="e.g. Lower back tightness, left shoulder impingement from old rotator cuff tear, avoid overhead pressing for now..."

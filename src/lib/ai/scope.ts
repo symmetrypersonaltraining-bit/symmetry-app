@@ -10,7 +10,7 @@ import { assertNotPaused, capBody, checkAndLog, pausedBody } from "@/lib/ai/mete
 // Re-exported so the many routes that already import TRAINER_EMAIL from here
 // keep working. The single source of truth is @/lib/trainer.
 export { TRAINER_EMAIL, TRAINER_EMAILS, isTrainerEmail, isTrainerUser } from "@/lib/trainer";
-import { isTrainerEmail } from "@/lib/trainer";
+import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Db = SupabaseClient<any, any, any>;
 
@@ -100,7 +100,7 @@ export async function enforceMeter(clientId: string | null, feature: AiFeature):
 /** 503 body used by every route when the Anthropic key is missing. */
 export function missingKeyResponse(): NextResponse {
   return NextResponse.json(
-    { error: "AI is not configured yet. Ask Dustin to add ANTHROPIC_API_KEY to Vercel." },
+    { error: `AI is not configured yet. Ask ${COACH_FIRST_NAME} to add ANTHROPIC_API_KEY to Vercel.` },
     { status: 503 }
   );
 }

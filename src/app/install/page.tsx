@@ -24,6 +24,7 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import Logo from "@/components/Logo";
 import InstallPrompt, { isIos, isStandalone } from "@/components/InstallPrompt";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 const INSTALL_URL = "https://symmetry-app-omega.vercel.app/install";
 
@@ -92,7 +93,7 @@ export default function InstallPage() {
             </Link>
             <p style={{ fontSize: 12, color: "#4E6080", textAlign: "center", margin: "10px 0 0", lineHeight: 1.5 }}>
               Use the email and password you already have. Forgotten it? Tap
-              &ldquo;Forgot password&rdquo; on the sign-in screen, or message Dustin.
+              &ldquo;Forgot password&rdquo; on the sign-in screen, or message {COACH_FIRST_NAME}.
             </p>
           </div>
         )}

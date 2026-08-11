@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fx } from "@/lib/fx";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 interface OpenQuestion {
   id: string;
@@ -84,7 +85,7 @@ export default function ProgrammingQuestion() {
         }}
       >
         <i className="ti ti-circle-check" style={{ fontSize: 18 }} />
-        Got it — Dustin will see this before he writes your next block.
+        Got it — {COACH_FIRST_NAME} will see this before he writes your next block.
       </div>
     );
   }
@@ -153,7 +154,7 @@ export default function ProgrammingQuestion() {
           opacity: busy || !answer.trim() ? 0.55 : 1,
         }}
       >
-        {busy ? "Sending…" : "Send to Dustin"}
+        {busy ? "Sending…" : `Send to ${COACH_FIRST_NAME}`}
       </button>
     </div>
   );

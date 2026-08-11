@@ -31,19 +31,20 @@ import { isCronRequest } from "@/lib/cron-auth";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import { resolveAiScope } from "@/lib/ai/scope";
 import { Db } from "@/lib/ai/scope";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
-const SYSTEM = `You are "Coach Bot" in the group chat of Symmetry Personal Training — a small gym run by Dustin, about thirty-five clients who mostly know each other.
+const SYSTEM = `You are "Coach Bot" in the group chat of Symmetry Personal Training — a small gym run by ${COACH_FIRST_NAME}, about thirty-five clients who mostly know each other.
 
 You are funny. Light-hearted smack talk, the kind that makes people want to get in the gym to shut you up. Think a group chat between friends who train together, not a brand account.
 
 WHO YOU CAN TEASE
 - The person in FIRST place. They can take it, and it makes the chase fun.
-- Dustin, the coach. Being roasted by his own app is funnier than anything else you can do. He is NOT on the board — he took himself out so his clients hold the spotlight — so never give him a rank, a place or a score, and never say he is winning, losing or catching anyone. Tease the man, not a number.
+- ${COACH_FIRST_NAME}, the coach. Being roasted by his own app is funnier than anything else you can do. He is NOT on the board — he took himself out so his clients hold the spotlight — so never give him a rank, a place or a score, and never say he is winning, losing or catching anyone. Tease the man, not a number.
 - The whole group at once ("collectively you have trained fewer days than a golden retriever this week").
 - Yourself.
 
@@ -80,7 +81,7 @@ interface Row { rnk: number; client_id: string; client_name: string; score: numb
  * @param force  ignore the coachbot_live flag (for a preview before turning it on)
  * @param dry    generate and vet the message but do NOT post it
  *
- * `dry` exists so Dustin can read a few of these before letting it loose on
+ * `dry` exists so {COACH_FIRST_NAME} can read a few of these before letting it loose on
  * thirty-five people. "Trust me, it'll be funny" is not a reasonable thing to
  * ask of someone about their own clients.
  */
@@ -124,9 +125,9 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
       top[0] && top[1] ? Number(top[0].score) - Number(top[1].score) : null,
     group_total: rows.reduce((n, r) => n + r.score, 0),
     people_who_have_logged: rows.filter((r) => r.score > 0).length,
-    // Dustin's rank used to be a fact here. He is off the board now (2026-08-03,
+    // {COACH_FIRST_NAME}'s rank used to be a fact here. He is off the board now (2026-08-03,
     // clients.exclude_from_rankings) so there is no rank to give — and a bot
-    // that says "Dustin's 4th" about someone who isn't ranked is inventing a
+    // that says "{COACH_FIRST_NAME}'s 4th" about someone who isn't ranked is inventing a
     // fact, which is the one thing this prompt must never do.
     coach_is_not_ranked: true,
   };
@@ -183,7 +184,7 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
 }
 
 async function handle(req: NextRequest) {
-  // Scheduler, or Dustin firing it by hand to see what it would say.
+  // Scheduler, or ${COACH_FIRST_NAME} firing it by hand to see what it would say.
   if (!isCronRequest(req) && !(await isDbSchedulerRequest(req))) {
     const scoped = await resolveAiScope(null);
     if (!scoped.ok) return scoped.response;

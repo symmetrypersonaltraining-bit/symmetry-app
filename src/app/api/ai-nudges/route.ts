@@ -26,7 +26,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, TRAINER_EMAIL } from "@/lib/ai/scope";
-import { isTrainerEmail } from "@/lib/trainer";
+import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { isCronRequest } from "@/lib/cron-auth";
@@ -54,7 +54,7 @@ function daysBetween(a: string, b: string): number {
   return Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 }
 
-const SYSTEM = `You write short re-engagement messages from Dustin, a personal trainer, to his client inside the Symmetry app. They arrive in the client's message inbox and look like Dustin wrote them.
+const SYSTEM = `You write short re-engagement messages from ${COACH_FIRST_NAME}, a personal trainer, to his client inside the Symmetry app. They arrive in the client's message inbox and look like ${COACH_FIRST_NAME} wrote them.
 
 Respond with ONLY valid JSON, no markdown, no fences:
 {"body": string}
@@ -69,7 +69,7 @@ HARD RULES:
 - Ask for the SMALLEST possible next step, not a big commitment.
 - Sound like a person texting, not a marketing email.
 
-BE USEFUL, NOT JUST ENCOURAGING (Dustin, 10 Aug: "be more helpful with tips
+BE USEFUL, NOT JUST ENCOURAGING (${COACH_FIRST_NAME}, 10 Aug: "be more helpful with tips
 based on their real data and what they are actually using"):
 - Where the data supports it, give ONE concrete, specific tip they could act on
   today — tied to what they are actually doing, not generic advice. A tip they
@@ -91,7 +91,7 @@ ASK, DO NOT ONLY TELL:
   survey, and only when it does not make the message longer than it should be.
 - The point of the question is to LEARN this specific client: what they
   respond to, what they ignore, what they are really trying to do. Their answer
-  goes to Dustin, so ask something whose answer he could act on.`;
+  goes to ${COACH_FIRST_NAME}, so ask something whose answer he could act on.`;
 
 function validate(raw: unknown): { body: string } | null {
   if (!raw || typeof raw !== "object") return null;
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
   try {
     const [clientsRes, wlRes, mealRes, settingsRes, recentRes] = await Promise.all([
       // Test accounts are excluded outright. A dry run of the segmentation on
-      // 11 Aug had "Test Client" queued for a real message in Dustin's name.
+      // 11 Aug had "Test Client" queued for a real message in ${COACH_FIRST_NAME}'s name.
       admin.from("clients").select("id, name, primary_goal, auth_user_id").not("auth_user_id", "is", null).is("archived_at", null).not("name", "ilike", "%test%"),
       admin.from("workout_logs").select("client_id, log_date").eq("completed", true).gte("log_date", since30),
       admin.from("meal_adherence_logs").select("client_id, log_date").gte("log_date", since30),
@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
 
       if (seg === "thriving") continue;
 
-      // Escalation: stop messaging, tell Dustin a human should step in.
+      // Escalation: stop messaging, tell ${COACH_FIRST_NAME} a human should step in.
       if (seg === "escalate") {
         escalations.push(
           `${r.name} — ${r.daysSinceWorkout ?? "?"} days since training, ${r.w30} sessions in 30d${
@@ -337,7 +337,7 @@ export async function POST(req: NextRequest) {
       previews.push({ name: r.name || "?", segment: seg, tone, body: text, sent: didSend });
     }
 
-    // ── digest to Dustin ──
+    // ── digest to ${COACH_FIRST_NAME} ──
     if (trainerAuth) {
       const lines: string[] = [
         wantSend ? "🤖 Nudges sent tonight:" : "🤖 Nudge PREVIEW (nothing was sent to clients):",

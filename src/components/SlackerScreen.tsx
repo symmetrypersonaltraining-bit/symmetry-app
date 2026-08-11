@@ -19,6 +19,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { COACH_FIRST_NAME, COACH_NAME, BUSINESS_NAME } from "@/lib/trainer";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const supabase = createClient() as any;
@@ -206,7 +207,7 @@ function GhostTown({ daysOut, onDismiss }: ScreenProps) {
           <div className="ss-row" style={{ color: "#7a6a40" }}><span className="ss-ri">🦗</span><span>Workout log: just crickets and vibes</span></div>
           <div className="ss-row" style={{ color: "#7a6a40" }}><span className="ss-ri">🕸️</span><span>Meal tracking: fully cobwebbed over</span></div>
           <div className="ss-row" style={{ color: "#7a6a40" }}><span className="ss-ri">🌵</span><span>Your scale has turned into a cactus</span></div>
-          <div className="ss-row" style={{ color: "#7a6a40" }}><span className="ss-ri">👻</span><span>Dustin is haunted by your absence</span></div>
+          <div className="ss-row" style={{ color: "#7a6a40" }}><span className="ss-ri">👻</span><span>{COACH_FIRST_NAME} is haunted by your absence</span></div>
         </div>
         <div style={{ marginBottom: 16 }}>
           <div className="ss-bar-label" style={{ color: "#5a4a20" }}>
@@ -223,7 +224,7 @@ function GhostTown({ daysOut, onDismiss }: ScreenProps) {
         <button className="ss-btn2" style={{ borderColor: "#3d3210", color: "#5a4a20" }} onClick={() => setExcuse("The ghost town does not accept excuses.")}>
           {excuse}
         </button>
-        <div className="ss-foot" style={{ color: "#3d3210" }}>Symmetry PT · Princeton TX · Dustin is watching 👀</div>
+        <div className="ss-foot" style={{ color: "#3d3210" }}>{BUSINESS_NAME} · {COACH_FIRST_NAME} is watching 👀</div>
       </div>
     </>
   );
@@ -315,7 +316,7 @@ function HrMemo({ daysOut, onDismiss }: ScreenProps) {
         </div>
         <div style={{ fontSize: 10, color: "#555", marginBottom: 14, lineHeight: 2 }}>
           <strong style={{ color: "#222", display: "inline-block", width: 50 }}>TO:</strong> You, specifically<br />
-          <strong style={{ color: "#222", display: "inline-block", width: 50 }}>FROM:</strong> Dustin (HR, CEO, Coach)<br />
+          <strong style={{ color: "#222", display: "inline-block", width: 50 }}>FROM:</strong> {COACH_FIRST_NAME} (HR, CEO, Coach)<br />
           <strong style={{ color: "#222", display: "inline-block", width: 50 }}>RE:</strong> Your recent logging situation<br />
           <strong style={{ color: "#222", display: "inline-block", width: 50 }}>DATE:</strong> Right now
         </div>
@@ -339,7 +340,7 @@ function HrMemo({ daysOut, onDismiss }: ScreenProps) {
         </button>
         <div style={{ borderTop: "1px solid #d4c8a8", paddingTop: 14, marginTop: 12, fontSize: 11, color: "#555", lineHeight: 1.6 }}>
           Warm regards (barely),<br />
-          <strong style={{ color: "#222", display: "block", fontSize: 13, marginTop: 4 }}>Dustin Gautreaux</strong>
+          <strong style={{ color: "#222", display: "block", fontSize: 13, marginTop: 4 }}>{COACH_NAME}</strong>
           Head of Accountability · Symmetry PT
         </div>
       </div>
@@ -368,7 +369,7 @@ function Reboot({ daysOut, onDismiss }: ScreenProps) {
         {line(`✗ Last log entry ......... ${daysOut} DAYS AGO`, "#ff3b30")}
         {line("✗ Momentum ............... CRITICALLY LOW", "#ff3b30")}
         {line("✗ Accountability chip .... OFFLINE", "#ff3b30")}
-        {line("⚠ Dustin sadness detected ....... TRUE", "#ff9500")}
+        {line(`⚠ ${COACH_FIRST_NAME} sadness detected ....... TRUE`, "#ff9500")}
         <div style={{ borderTop: "1px solid #003d10", margin: "12px 0" }} />
         {line("INITIATING CLIENT REBOOT...", "#ff9500")}
         {line("Purging excuses ............... DONE", "#007a20")}
@@ -464,7 +465,7 @@ function Clinical({ daysOut, onDismiss }: ScreenProps) {
           {vital("💪 Momentum", "Critical", "#fee", "#c00")}
           {vital("🥗 Meal Tracking", "Absent", "#fee", "#c00")}
           {vital("🏋️ Workout Log", "Missing", "#fee", "#c00")}
-          {vital("😤 Dustin Concern", "Elevated", "#fff8e1", "#856404")}
+          {vital(`😤 ${COACH_FIRST_NAME} Concern`, "Elevated", "#fff8e1", "#856404")}
           {vital("💚 Comeback Potential", "Excellent", "#e8f8ec", "#1a7a3a")}
         </div>
         <div style={{ background: "#f8f9ff", border: "1px solid #dee2ff", borderRadius: 10, padding: "12px 14px", marginBottom: 16, fontSize: 12, color: "#3d5af1", lineHeight: 1.6 }}>
@@ -488,7 +489,7 @@ function Clinical({ daysOut, onDismiss }: ScreenProps) {
 
 function BreakingNews({ daysOut, onDismiss }: ScreenProps) {
   const [claim, setClaim] = useState("I was working out offline");
-  const tickerText = `🔴 BREAKING: Local gym-goer not seen logging in ${daysOut} days · Dustin concerned · Momentum at historic lows · Coach issues formal statement · More at 11 `;
+  const tickerText = `🔴 BREAKING: Local gym-goer not seen logging in ${daysOut} days · ${COACH_FIRST_NAME} concerned · Momentum at historic lows · Coach issues formal statement · More at 11 `;
   return (
     <>
       <div style={{ position: "fixed", inset: 0, background: "#111", zIndex: -1 }} />
@@ -505,7 +506,7 @@ function BreakingNews({ daysOut, onDismiss }: ScreenProps) {
           <div style={{ fontSize: 22, fontWeight: 900, color: "#fff", lineHeight: 1.2, marginBottom: 12 }}>Client Goes<br />Off-Grid</div>
           <div style={{ background: "#e53935", color: "#fff", padding: "10px 16px", margin: "0 -18px 16px", textAlign: "left" }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", opacity: 0.8 }}>Developing story</div>
-            <div style={{ fontSize: 14, fontWeight: 900 }}>Logs: absent · Dustin: concerned</div>
+            <div style={{ fontSize: 14, fontWeight: 900 }}>Logs: absent · {COACH_FIRST_NAME}: concerned</div>
           </div>
           <div style={{ fontSize: 12, color: "#888", lineHeight: 1.6, marginBottom: 16 }}>
             Sources confirm the client has not been seen logging in {daysOut} days. Investigators are baffled. The program is sitting there, untouched.
@@ -524,7 +525,7 @@ function BreakingNews({ daysOut, onDismiss }: ScreenProps) {
           </div>
           <div style={{ background: "#1a1a1a", borderLeft: "3px solid #e53935", borderRadius: "0 8px 8px 0", padding: "12px 14px", marginBottom: 16, fontSize: 12, color: "#aaa", lineHeight: 1.6, textAlign: "left", fontStyle: "italic" }}>
             &quot;They were doing so well. We just want them to come back. The program misses them.&quot;
-            <div style={{ fontSize: 10, color: "#e53935", fontWeight: 700, fontStyle: "normal", marginTop: 4 }}>— Dustin Gautreaux, Head Coach</div>
+            <div style={{ fontSize: 10, color: "#e53935", fontWeight: 700, fontStyle: "normal", marginTop: 4 }}>— {COACH_NAME}, Head Coach</div>
           </div>
           <button className="ss-btn" style={{ background: "#e53935", color: "#fff", borderRadius: 10 }} onClick={onDismiss}>
             📡 I&apos;m here. I&apos;m back. Stand down.
@@ -558,7 +559,7 @@ function DisappointedDad({ daysOut, onDismiss }: ScreenProps) {
       <div style={{ position: "fixed", inset: 0, background: "#1c1c1e", zIndex: -1 }} />
       <div className="ss-card" style={{ background: "#2c2c2e", borderRadius: 20, boxShadow: "0 20px 50px rgba(0,0,0,.6)" }}>
         <div style={{ width: 80, height: 80, borderRadius: "50%", background: "#3a3a3c", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, margin: "0 auto 14px", border: "3px solid #48484a" }}>👨‍💼</div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 2 }}>Dustin Gautreaux</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 2 }}>{COACH_NAME}</div>
         <div style={{ fontSize: 11, color: "#636366", marginBottom: 20 }}>Head Coach · Symmetry PT · Princeton, TX</div>
         <div style={{ background: "#1c1c1e", borderRadius: "16px 16px 16px 4px", padding: "14px 16px", marginBottom: 8, textAlign: "left" }}>
           <div style={{ fontSize: 13, color: "#e5e5ea", lineHeight: 1.65 }}>Hey. It&apos;s been {daysOut} days. I&apos;m not mad. I&apos;m just... disappointed. 😔</div>
@@ -571,7 +572,7 @@ function DisappointedDad({ daysOut, onDismiss }: ScreenProps) {
         <div style={{ fontSize: 10, color: "#48484a", marginBottom: 18 }}>Read · Just now · delivered to your guilt</div>
         <div style={{ background: "#1c1c1e", borderRadius: 12, padding: "14px 16px", marginBottom: 18 }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: "#48484a", textTransform: "uppercase", marginBottom: 12, textAlign: "left" }}>Current status</div>
-          {bar("Dustin worry level", "70%", "#ffd60a")}
+          {bar(`${COACH_FIRST_NAME} worry level`, "70%", "#ffd60a")}
           {bar("Your momentum", "15%", "#ff453a")}
           {bar("Comeback potential", "95%", "#30d158")}
         </div>
@@ -617,10 +618,10 @@ function Intervention({ daysOut, onDismiss }: ScreenProps) {
             <div key={e} style={{ background: "#1e1e1e", border: "2px solid #2a2a2a", borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, margin: "0 -4px" }}>{e}</div>
           ))}
         </div>
-        <div style={{ fontSize: 10.5, color: "#555", marginBottom: 18 }}>Your program, your macros, your data, and Dustin</div>
+        <div style={{ fontSize: 10.5, color: "#555", marginBottom: 18 }}>Your program, your macros, your data, and {COACH_FIRST_NAME}</div>
         {letter("From: Your Program", "\u201CI've been sitting here. Ready. Waiting. Just... logging in every day. Hoping.\u201D", "#ff9500")}
         {letter("From: Your Macro Targets", "\u201CWe're not angry. We're just numbers. But we miss being hit. Even approximately.\u201D", "#30d158")}
-        {letter("From: Dustin", "\u201CI built this for you. Log one thing. That's all. Let's go — I'm not giving up on you.\u201D", "#bf5af2")}
+        {letter(`From: ${COACH_FIRST_NAME}`, "\u201CI built this for you. Log one thing. That's all. Let's go — I'm not giving up on you.\u201D", "#bf5af2")}
         <button className="ss-btn" style={{ background: "linear-gradient(135deg,#ff9500,#ff6b00)", color: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(255,149,0,.3)", marginTop: 10 }} onClick={onDismiss}>
           🫶 I hear you all. I&apos;m back.
         </button>
@@ -708,7 +709,7 @@ function MissedCalls({ daysOut, onDismiss }: ScreenProps) {
         <div style={{ width: "100%", margin: "6px 0 14px" }}>
           {callRow("🏋️", "Leg Day", "missed call · every day this week", <span style={{ color: "#ff453a" }}>(7)</span>, "12px 12px 4px 4px")}
           {callRow("🥗", "Your Macros", "missed call · “u up?”", null, "4px")}
-          {callRow("👨‍💼", "Dustin", "voicemail · 0:04", null, "4px 4px 12px 12px")}
+          {callRow("👨‍💼", COACH_FIRST_NAME, "voicemail · 0:04", null, "4px 4px 12px 12px")}
         </div>
         <div style={{ background: "rgba(255,149,0,.1)", border: "1px solid #ff950044", borderRadius: 10, padding: "10px 12px", fontSize: 11.5, color: "#ffb761", textAlign: "left", lineHeight: 1.5, marginBottom: 14 }}>
           🎙️ <strong>Voicemail:</strong> &ldquo;Hey it&apos;s your dumbbells. We&apos;re all just sittin&apos; here. Rackin&apos; up. Call us back, yeah?&rdquo;

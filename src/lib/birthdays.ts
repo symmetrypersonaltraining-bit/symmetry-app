@@ -1,3 +1,4 @@
+import { COACH_FIRST_NAME } from "./trainer";
 // Who has a birthday, and what the group chat says about it.
 //
 // Dustin, 2026-08-04: "lets activate an automatic fun bday msg for everyone in
@@ -103,7 +104,7 @@ export function isPrintable(message: string, people: BirthdayPerson[]): boolean 
   return people.some((p) => m.toLowerCase().includes(p.firstName.toLowerCase()));
 }
 
-export const BIRTHDAY_SYSTEM = `You are "Coach Bot" in the group chat of Symmetry Personal Training — a small gym run by Dustin, about thirty-five clients who mostly know each other and train together.
+export const BIRTHDAY_SYSTEM = `You are "Coach Bot" in the group chat of Symmetry Personal Training — a small gym run by {COACH_FIRST_NAME}, about thirty-five clients who mostly know each other and train together.
 
 Today is someone's birthday. Write the group chat message.
 

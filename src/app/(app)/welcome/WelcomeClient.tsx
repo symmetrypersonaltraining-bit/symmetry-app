@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import InstallPrompt, { isIos, isStandalone } from "@/components/InstallPrompt";
 import KeyboardSafeArea from "@/components/KeyboardSafeArea";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 export default function WelcomeClient({ firstName, clientId, needsIntake }: { firstName: string; clientId: string | null; needsIntake?: boolean }) {
   const router = useRouter();
@@ -147,12 +148,12 @@ export default function WelcomeClient({ firstName, clientId, needsIntake }: { fi
       {step === 3 && (
         <div style={card}>
           <h2 style={{ fontSize: 16, fontWeight: 800, color: "var(--brand-text)", margin: "0 0 6px" }}>
-            Want a nudge when Dustin messages you?
+            Want a nudge when {COACH_FIRST_NAME} messages you?
           </h2>
           <p style={{ fontSize: 13, color: "var(--brand-text-secondary)", lineHeight: 1.5, marginTop: 0 }}>
             Messages and schedule changes only — never marketing, and you can turn
             it off in Settings whenever you like. Saying yes now means your phone
-            is ready the moment Dustin turns them on.
+            is ready the moment {COACH_FIRST_NAME} turns them on.
           </p>
           {notifState === "granted" ? (
             <p style={{ fontSize: 13.5, fontWeight: 700, color: "var(--brand-primary)" }}>Notifications are on ✓</p>
@@ -165,13 +166,13 @@ export default function WelcomeClient({ firstName, clientId, needsIntake }: { fi
           )}
           <button onClick={() => router.push(needsIntake ? "/onboarding" : "/home")}
             style={notifState === "granted" ? primary : ghost}>
-            {needsIntake ? "Next — a few questions from Dustin" : "Take me to my programme"}
+            {needsIntake ? `Next — a few questions from ${COACH_FIRST_NAME}` : "Take me to my programme"}
           </button>
         </div>
       )}
 
       <p style={{ textAlign: "center", fontSize: 11.5, color: "var(--brand-text-secondary)", marginTop: 18 }}>
-        Stuck? Message Dustin from inside the app — he gets it straight away.
+        Stuck? Message {COACH_FIRST_NAME} from inside the app — he gets it straight away.
       </p>
     </KeyboardSafeArea>
   );

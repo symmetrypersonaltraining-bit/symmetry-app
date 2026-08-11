@@ -17,7 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TRAINER_EMAIL } from "@/lib/ai/scope";
 import { cleanRecipe, recipeTotals, validateRecipe, RecipeInput } from "@/lib/recipes";
-import { isTrainerEmail } from "@/lib/trainer";
+import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       // because its author tidied up. It comes down first, and only Dustin
       // can do that.
       if (r.visibility === "public" && !me.isTrainer) {
-        return NextResponse.json({ error: "That one is in the shared library — ask Dustin to take it down first." }, { status: 400 });
+        return NextResponse.json({ error: `That one is in the shared library \u2014 ask ${COACH_FIRST_NAME} to take it down first.` }, { status: 400 });
       }
       const { error } = await admin.from("recipes").delete().eq("id", r.id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });

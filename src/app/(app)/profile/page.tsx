@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "./SignOutButton";
-import { isTrainerEmail } from "@/lib/trainer";
+import { isTrainerEmail, COACH_NAME } from "@/lib/trainer";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -18,7 +18,7 @@ export default async function ProfilePage() {
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
-  const displayName = isTrainer ? "Dustin Gautreaux" : client?.name || user.email || "Client";
+  const displayName = isTrainer ? `${COACH_NAME}` : client?.name || user.email || "Client";
   const initials = displayName
     .split(" ")
     .map((n: string) => n[0])

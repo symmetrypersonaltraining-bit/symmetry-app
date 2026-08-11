@@ -18,6 +18,7 @@ import { isDraftStale } from "@/lib/workoutDraft";
 import { useStableViewportHeight } from "@/lib/useStableViewportHeight";
 import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
 import { pickExistingLog, type ExistingLog } from "@/lib/workoutLogLookup";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 interface Exercise {
   id: string;
@@ -1674,7 +1675,7 @@ export default function WorkoutLogger({
       };
       const { data } = await supabase.from("exercise_notes").insert(row).select("id, note, author, created_at");
       if (data && data[0]) setExNotePrior(prev => [data[0] as unknown as { id: string; note: string; author: string; created_at: string }, ...prev]);
-      // Client-authored notes also land in the trainer's messaging inbox, tagged with the movement, so Dustin can answer.
+      // Client-authored notes also land in the trainer's messaging inbox, tagged with the movement, so {COACH_FIRST_NAME} can answer.
       if (!isTrainerSession) {
         const exName = currentExercise.exercises?.name ?? "Exercise";
         try { await sendClientMessage(`[Question · ${exName}]\n${row.note}`); } catch (e) { console.error(e); }
@@ -1704,7 +1705,7 @@ export default function WorkoutLogger({
     });
   }
 
-  // One place that turns a dictation failure reason into something Dustin can
+  // One place that turns a dictation failure reason into something {COACH_FIRST_NAME} can
   // act on. "not-allowed" is a permission he can grant; "no-engine" is a device
   // limit he cannot. Telling him the difference is the whole point.
   function voiceMessage(why: string): string {
@@ -2019,7 +2020,7 @@ export default function WorkoutLogger({
             advance, finish or leave. The fix put the header AND the sets in one
             flex-1 scroll box with the footer pinned below.
 
-            Dustin, 8/1: that made the keyboard case worse. With the sets inside
+            {COACH_FIRST_NAME}, 8/1: that made the keyboard case worse. With the sets inside
             the flexible box, opening the keyboard squeezed that box to a sliver
             — set 1 visible, set 2 sheared in half — because the footer and the
             tab bar kept their full height in what was left.
@@ -2240,7 +2241,7 @@ export default function WorkoutLogger({
             (pain, couldn't do it, form). Saved to exercise_notes keyed by exercise so
             programming (app + chat) reads the history.
 
-            DELIBERATELY THE LAST THING ABOVE THE FOOTER. Dustin's rule for this
+            DELIBERATELY THE LAST THING ABOVE THE FOOTER. {COACH_FIRST_NAME}'s rule for this
             screen: when the keyboard comes up it may cover this card and
             nothing else — every set row stays visible and nothing on screen
             moves. That only works if the notes are BELOW the sets, so the
@@ -2318,7 +2319,7 @@ export default function WorkoutLogger({
           </div>
         </div>
         {/* App tabs. Removed briefly on 8/1 to buy back height for the sets;
-            put straight back at Dustin's request — he uses them mid-session.
+            put straight back at ${COACH_FIRST_NAME}'s request — he uses them mid-session.
             They are affordable again because of the restructure above: the sets
             are flex-shrink-0 OUTSIDE the scroll box now, so when the keyboard
             opens it is the header box and the spacer that give up height, never

@@ -31,6 +31,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { fx } from "@/lib/fx";
 import Confetti from "@/components/Confetti";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function pretty(iso: string): string {
@@ -327,7 +328,7 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
             Happy birthday, {pick.firstName}.
           </div>
           <div style={{ fontSize: 13.5, opacity: 0.9, marginTop: 8, lineHeight: 1.5 }}>
-            From Dustin and everyone who trains here.
+            From {COACH_FIRST_NAME} and everyone who trains here.
           </div>
         </div>
 

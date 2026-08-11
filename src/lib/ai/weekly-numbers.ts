@@ -1,3 +1,4 @@
+import { COACH_FIRST_NAME } from "../trainer";
 // Last week vs this week — the numbers, derived once, server-side.
 //
 // Dustin: "food logger one base numbers on how they did last week and what to
@@ -318,4 +319,4 @@ export function weeklyNumbersBlock(
 export const WEEKLY_WRITER_RULES = `Ground every claim in the numbers given. Never invent a figure, never restate a direction differently from how it is stated, and never describe the partial current week as a finished one. If the numbers are thin, say so plainly and keep the ask small.
 Write to the client, by first name, the way a coach who watched their week would talk. Warm, direct, specific, no lecture, no filler.
 Never use clinical or certification language (no "corrective phase", no "activation", no "inhibit/lengthen/activate/integrate", no NASM terminology) — plain gym English only.
-Plan changes are Dustin's call: you may suggest, never prescribe a new macro target or program as settled.`;
+Plan changes are ${COACH_FIRST_NAME}'s call: you may suggest, never prescribe a new macro target or program as settled.`;

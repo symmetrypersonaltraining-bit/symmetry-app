@@ -30,6 +30,7 @@ import { fetchWeeklyComparison } from "@/lib/ai/weekly-context";
 import { resolveAiScope } from "@/lib/ai/scope";
 import { isCronRequest } from "@/lib/cron-auth";
 import { WEEKLY_WRITER_RULES, weekStartOf } from "@/lib/ai/weekly-numbers";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -44,14 +45,14 @@ function nextDay(iso: string): string {
   return dt.toISOString().slice(0, 10);
 }
 
-const WEEKLY_SYSTEM_PROMPT = `You are the coach inside the Symmetry Personal Training app (trainer: Dustin), writing this client's week. You are handed their real numbers for last week and this week so far, already computed.
+const WEEKLY_SYSTEM_PROMPT = `You are the coach inside the Symmetry Personal Training app (trainer: ${COACH_FIRST_NAME}), writing this client's week. You are handed their real numbers for last week and this week so far, already computed.
 
 ${WEEKLY_WRITER_RULES}
 
 You write THREE things:
 1. "focus" — the one thing this client should aim at this week. It appears as "Focus: ..." on their week card. It must come out of what actually happened last week: if adherence slipped, the focus addresses that; if they logged only two days, the focus is logging; if they crushed it, the focus protects the win and adds one notch. Concrete and doable in a week, not a slogan.
 2. "coachRead" — the training-side read for the home screen: consistency, sessions completed, weigh-in cadence, body-composition movement. Warm, specific, honest about slips without scolding, light humor when it fits.
-3. "foodFocus" — the nutrition read for their food logger. Start from how they actually ate last week (the given averages, adherence and the signed vs-target deltas), then say what to work on this week. Name real numbers from the context. Never set a new macro target — that is Dustin's call.
+3. "foodFocus" — the nutrition read for their food logger. Start from how they actually ate last week (the given averages, adherence and the signed vs-target deltas), then say what to work on this week. Name real numbers from the context. Never set a new macro target — that is ${COACH_FIRST_NAME}'s call.
 
 Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
 {"focus":string,"coachRead":string,"foodFocus":string,"programmingQuestion":string}

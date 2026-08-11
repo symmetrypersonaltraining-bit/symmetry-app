@@ -9,6 +9,7 @@
 // (the card, the builder footer, the saved row) and they must never disagree.
 
 import { kcalOf as canonicalKcalOf } from "@/lib/nutrition/dailyTotals";
+import { COACH_FIRST_NAME } from "./trainer";
 
 export type RecipeVisibility = "private" | "submitted" | "public" | "rejected";
 export type IngredientSource = "manual" | "database" | "ai";
@@ -131,7 +132,7 @@ export function cleanRecipe(r: RecipeInput): RecipeInput {
 /** Wording for each state, written for the person who owns the recipe. */
 export function visibilityLabel(v: RecipeVisibility): { text: string; tone: "muted" | "wait" | "good" | "warn" } {
   switch (v) {
-    case "submitted": return { text: "Waiting on Dustin", tone: "wait" };
+    case "submitted": return { text: `Waiting on ${COACH_FIRST_NAME}`, tone: "wait" };
     case "public":    return { text: "In the shared library", tone: "good" };
     case "rejected":  return { text: "Not published — still yours", tone: "warn" };
     default:          return { text: "Only you", tone: "muted" };

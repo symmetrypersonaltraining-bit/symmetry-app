@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "./Logo";
 import { useMyClientRow } from "@/components/Avatar";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 interface SidebarItem {
   href?: string;
@@ -74,7 +75,7 @@ interface Props {
 export default function TrainerSidebar({
   clientMode = false,
   onToggleClientMode,
-  userName = "Dustin",
+  userName = COACH_FIRST_NAME,
   userInitials = "DG",
   mobileActions,
 }: Props) {

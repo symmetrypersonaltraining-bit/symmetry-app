@@ -65,3 +65,37 @@ export function isTrainerEmail(email: string | null | undefined): boolean {
 export function isTrainerUser(user: { email?: string | null } | null | undefined): boolean {
   return isTrainerEmail(user?.email);
 }
+
+// ── The coach's NAME, as clients read it ─────────────────────────────────────
+//
+// Separate from identity above, and needed for a different reason. The app
+// spoke Dustin's name out loud in about forty places of client-facing copy:
+// "Send to Dustin", "Your answer for Dustin…", "Dustin was notified", the
+// trainer sidebar, the celebration screen, the slacker screen, and inside the
+// AI prompts that write the weekly focus line.
+//
+// None of that BREAKS on another instance — it is worse than broken. It works
+// perfectly and addresses the wrong human, so every client Dylan coaches is
+// told to go and talk to Dustin. There is no error to notice; it just reads as
+// somebody else's app.
+//
+// Configure with NEXT_PUBLIC_COACH_NAME. Unset, it is Dustin, so nothing
+// changes on the live instance.
+
+const DEFAULT_COACH_NAME = "Dustin Gautreaux";
+const DEFAULT_BUSINESS_NAME = "Symmetry Personal Training";
+
+/** Full name, for signatures and the trainer sidebar. */
+export const COACH_NAME: string =
+  (process.env.NEXT_PUBLIC_COACH_NAME || "").trim() || DEFAULT_COACH_NAME;
+
+/**
+ * First name, which is how clients are actually addressed in copy.
+ * Derived rather than configured separately — two settings that must agree is
+ * one setting too many, and someone would eventually set only one of them.
+ */
+export const COACH_FIRST_NAME: string = COACH_NAME.split(/\s+/)[0] || COACH_NAME;
+
+/** The business, for AI prompts and anywhere the studio is named in copy. */
+export const BUSINESS_NAME: string =
+  (process.env.NEXT_PUBLIC_BUSINESS_NAME || "").trim() || DEFAULT_BUSINESS_NAME;

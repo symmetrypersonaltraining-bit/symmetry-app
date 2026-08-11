@@ -13,6 +13,7 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 import {
   perServing, recipeTotals, validateRecipe, visibilityLabel,
   type RecipeIngredient, type RecipeVisibility,
@@ -130,7 +131,7 @@ export default function RecipesClient({
           {tab === "mine"
             ? "Nothing here yet. Build one — type the ingredients in and let the app work out the numbers, or pull them from the food database."
             : tab === "shared"
-            ? "No shared recipes yet. Build one you're proud of and send it to Dustin."
+            ? `No shared recipes yet. Build one you're proud of and send it to ${COACH_FIRST_NAME}.`
             : "Nothing waiting on you."}
         </div>
       ) : (
@@ -165,7 +166,7 @@ export default function RecipesClient({
 
               {rec.review_note && rec.visibility === "rejected" && (
                 <div style={{ fontSize: 11.5, color: "var(--brand-text-secondary)", marginTop: 8, paddingLeft: 10, borderLeft: "2px solid var(--brand-border)" }}>
-                  Dustin: {rec.review_note}
+                  {COACH_FIRST_NAME}: {rec.review_note}
                 </div>
               )}
 
@@ -198,7 +199,7 @@ export default function RecipesClient({
                     ) : rec.visibility !== "public" ? (
                       <button disabled={busy} onClick={() => act({ action: "submit", id: rec.id })}
                         style={{ flex: 1, fontSize: 12.5, fontWeight: 800, padding: "9px 10px", borderRadius: 10, border: "1px solid var(--brand-primary)", background: "transparent", color: "var(--brand-primary)", cursor: "pointer" }}>
-                        Send to Dustin
+                        Send to {COACH_FIRST_NAME}
                       </button>
                     ) : null}
                     <button disabled={busy} onClick={() => { if (confirm("Delete this recipe?")) act({ action: "delete", id: rec.id }); }}
@@ -258,7 +259,7 @@ function RecipeView({ rec, planMeals, onClose }: { rec: RecipeRow; planMeals: { 
   // Make it a meal, not just today's entry. Which slot is the client's call —
   // this is their plan, and a recipe that lands in the wrong one is worse than
   // no button. The server clones a trainer-authored plan before writing, so
-  // Dustin's original is archived and restorable, never overwritten.
+  // {COACH_FIRST_NAME}'s original is archived and restorable, never overwritten.
   const [slot, setSlot] = useState("");
   const [planning, setPlanning] = useState(false);
 
@@ -284,7 +285,7 @@ function RecipeView({ rec, planMeals, onClose }: { rec: RecipeRow; planMeals: { 
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) { setLogged((json && json.error) || "Couldn't add that to your plan."); return; }
       setLogged(json.cloned
-        ? "Added to your plan 📌 — this is your version now, Dustin's is in your history"
+        ? `Added to your plan 📌 — this is your version now, ${COACH_FIRST_NAME}'s is in your history`
         : "Added to your plan 📌");
     } catch {
       setLogged("Network error — check your connection.");
@@ -679,7 +680,7 @@ function RecipeBuilder({
           </button>
           <button onClick={() => save(true)} disabled={busy}
             style={{ flex: "0 0 auto", padding: "12px 14px", borderRadius: 12, border: "1px solid var(--brand-primary)", background: "transparent", color: "var(--brand-primary)", fontWeight: 800, fontSize: 13, cursor: busy ? "default" : "pointer" }}>
-            Save + send to Dustin
+            Save + send to {COACH_FIRST_NAME}
           </button>
         </div>
       </div>

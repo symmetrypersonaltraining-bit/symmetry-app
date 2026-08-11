@@ -8,6 +8,7 @@ import SaturdayReview from "@/components/SaturdayReview";
 import LiveSessions from "@/components/LiveSessions";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 interface TodaySession {
   id: string;
@@ -177,7 +178,7 @@ export default function TrainerHome({
           <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
             {"Good " + getGreeting() + ","}
           </p>
-          <h1 className="text-2xl font-bold gradient-text">Dustin 👋</h1>
+          <h1 className="text-2xl font-bold gradient-text">{COACH_FIRST_NAME} 👋</h1>
           <p className="text-sm mt-1" style={{ color: "var(--brand-text-secondary)" }}>
             {dateLabel}
           </p>

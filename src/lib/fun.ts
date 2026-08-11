@@ -1,3 +1,4 @@
+import { COACH_FIRST_NAME } from "./trainer";
 /**
  * fun — personality copy. 2026-07-25.
  *
@@ -88,5 +89,5 @@ export function anniversary(since: string | null | undefined, today: string): { 
 export const REST_DAY = {
   title: "Official Rest Day",
   body: "This is not skipping. Muscle is built between sessions, not during them. Eat, sleep, come back stronger.",
-  signed: "— Dustin, Symmetry Personal Training",
+  signed: `— ${COACH_FIRST_NAME}, Symmetry Personal Training`,
 };

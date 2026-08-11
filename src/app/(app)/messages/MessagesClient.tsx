@@ -7,6 +7,7 @@ import { sendMessage, sendClientMessage, sendGroupMessage, sendBroadcastMessage,
 import { createClient } from "@/lib/supabase/client";
 import MessageReactions from "@/components/MessageReactions";
 import GroupChallenge from "@/components/GroupChallenge";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 interface Message {
   id: string;
@@ -506,7 +507,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
   }
 
   // Client single-thread layout (with Trainer / Group toggle + composer)
-  const clientTitle = isGroup ? "Group Chat" : "Dustin — Trainer";
+  const clientTitle = isGroup ? "Group Chat" : `${COACH_FIRST_NAME} — Trainer`;
   const pill = (active: boolean) => ({ flex: 1, textAlign: "center" as const, padding: "10px 0", borderRadius: 999, textDecoration: "none", fontSize: 13.5, fontWeight: active ? 800 : 600, background: active ? "var(--brand-primary)" : "var(--brand-surface)", color: active ? "#fff" : "var(--brand-text)", border: "1px solid var(--brand-border)" });
   return (
     // Definite height (viewport minus the app header + bottom nav) so the

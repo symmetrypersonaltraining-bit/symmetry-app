@@ -40,6 +40,7 @@ import { logUsage } from "@/lib/ai/meter";
 import { isCronRequest } from "@/lib/cron-auth";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import { resolveAiScope, type Db } from "@/lib/ai/scope";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 import {
   BIRTHDAY_SYSTEM, centralToday, effectiveMonthDay, fallbackLine, isPrintable,
   joinNames, monthDay, nextDay, type BirthdayPerson,
@@ -208,7 +209,7 @@ export async function runBirthdays(
 }
 
 async function handle(req: NextRequest) {
-  // The scheduler, or Dustin looking at what it would say.
+  // The scheduler, or {COACH_FIRST_NAME} looking at what it would say.
   if (!isCronRequest(req) && !(await isDbSchedulerRequest(req))) {
     const scoped = await resolveAiScope(null);
     if (!scoped.ok) return scoped.response;

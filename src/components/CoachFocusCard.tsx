@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { sendClientMessage } from "@/app/(app)/home/messageActions";
 import CoachBadge from "@/components/CoachBadge";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 interface FocusData { message: string; question: string | null; }
 
@@ -54,7 +55,7 @@ export default function CoachFocusCard() {
     if (!data || !data.question || !answer.trim() || sending) return;
     setSending(true);
     try {
-      await sendClientMessage(`[Coach's Read — Dustin to review]\nQ: ${data.question}\nA: ${answer.trim()}`);
+      await sendClientMessage(`[Coach's Read \u2014 ${COACH_FIRST_NAME} to review]\nQ: ${data.question}\nA: ${answer.trim()}`);
       // Clear this week's question so it won't reappear until the next cycle.
       try {
         await fetch("/api/coach/focus", {
@@ -67,7 +68,7 @@ export default function CoachFocusCard() {
     } catch {
       // Surface a soft failure without blocking the card.
       setSent(false);
-      alert("Couldn't send that to Dustin just now — try again in a moment.");
+      alert(`Couldn't send that to ${COACH_FIRST_NAME} just now \u2014 try again in a moment.`);
     } finally {
       setSending(false);
     }
@@ -105,7 +106,7 @@ export default function CoachFocusCard() {
         <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--brand-text)", marginBottom: 7 }}>{data.question}</div>
         {sent ? (
           <div style={{ display: "flex", alignItems: "center", gap: 7, background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 12, padding: "9px 11px", fontSize: 12.5, color: "#047857", fontWeight: 600 }}>
-            <i className="ti ti-circle-check" /> Sent to Dustin — he&rsquo;ll see it in your messages.
+            <i className="ti ti-circle-check" /> Sent to {COACH_FIRST_NAME} — he&rsquo;ll see it in your messages.
           </div>
         ) : (
           <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
@@ -113,7 +114,7 @@ export default function CoachFocusCard() {
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") submitAnswer(); }}
-              placeholder="Your answer for Dustin…"
+              placeholder={`Your answer for ${COACH_FIRST_NAME}…`}
               style={{ flex: 1, fontSize: 13, padding: "10px 12px", borderRadius: 12, border: "1px solid var(--brand-border)", background: "var(--brand-card)", color: "var(--brand-text)", outline: "none" }}
             />
             <button

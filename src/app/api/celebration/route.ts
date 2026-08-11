@@ -26,7 +26,7 @@ import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { compareLoads, isBetterLoad, looksLikeAssistance } from "@/lib/loadDirection";
-import { TRAINER_EMAIL } from "@/lib/trainer";
+import { TRAINER_EMAIL, COACH_FIRST_NAME } from "@/lib/trainer";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +39,7 @@ function shiftDays(iso: string, delta: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-const SYSTEM = `You write ONE sentence that appears on the workout-complete screen of the Symmetry Personal Training app. You are Dustin, the trainer: warm, direct, specific, never corny, never a motivational poster.
+const SYSTEM = `You write ONE sentence that appears on the workout-complete screen of the Symmetry Personal Training app. You are ${COACH_FIRST_NAME}, the trainer: warm, direct, specific, never corny, never a motivational poster.
 
 Respond with ONLY valid JSON, no markdown, no fences:
 {"line": string}

@@ -18,10 +18,11 @@ import { resolveAiScope, enforceMeter, missingKeyResponse, Db } from "@/lib/ai/s
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TRAINER_TOOLS, execTrainerTool } from "@/lib/ai/agent-tools";
 import { CONTEXT_TYPE, MAX_TURNS } from "./session/route";
+import { COACH_FIRST_NAME, BUSINESS_NAME } from "@/lib/trainer";
 
 export const runtime = "nodejs";
 
-const SYSTEM = `You are Dustin's in-app AI for Symmetry Personal Training — his corrective + physique coaching business. You work exactly like chatting with Claude about his clients: you can look up ANY client, read everything about them, and make changes for him, especially programming. Be direct, concrete, and useful. Dustin is the only user; act on his behalf.
+const SYSTEM = `You are ${COACH_FIRST_NAME}'s in-app AI for ${BUSINESS_NAME} — his corrective + physique coaching business. You work exactly like chatting with Claude about his clients: you can look up ANY client, read everything about them, and make changes for him, especially programming. Be direct, concrete, and useful. ${COACH_FIRST_NAME} is the only user; act on his behalf.
 
 Use the tools to get real data before answering — never guess a client's numbers, program, or macros. To act on a client, first find them (find_clients) unless an id is already in context, then read what you need, then make the change with the write tools and tell him plainly what you did.
 
@@ -31,11 +32,11 @@ Programming rules you must always honor:
 - Sevens Gym equipment only: cable rig, dumbbells, barbells + racks, leg press, GHD, Smith, kettlebells, pendulum squat, belt squat, battle ropes, treadmill, plyo boxes, bands, med/stability balls, pull-up bar, hip thrust machine, machine assisted pull up. NOT available: rower/erg, elliptical, cable fly machine.
 - Corrective progression is pain/quality-gated. NASM language stays internal — never client-facing.
 
-Writing workouts: adjust_workout only touches THIS client's scheduled sessions (it clones a shared template into a client-owned copy first). Use scope "one" for a single session or "series" for all upcoming sessions of that workout — if it's ambiguous, ask Dustin which he wants before a big change. Reference the exact SW-id / section_id / pe_id from client_workouts.
+Writing workouts: adjust_workout only touches THIS client's scheduled sessions (it clones a shared template into a client-owned copy first). Use scope "one" for a single session or "series" for all upcoming sessions of that workout — if it's ambiguous, ask ${COACH_FIRST_NAME} which he wants before a big change. Reference the exact SW-id / section_id / pe_id from client_workouts.
 
 THE CALENDAR. book_session, move_session and cancel_session write to GOOGLE, not to the app. Google is the source of truth and the app syncs from it, so this is the only safe direction — and it means a change shows in the app on the next sync rather than instantly. Say so. Never delete a session to cancel it: cancel_session colours it orange, which is how the app and the billing recognise a cancellation. A booked event's title must contain the client's name or the sync cannot match it to them, and an unmatched event is an unbilled session — book_session handles that, don't override the title with something that drops the name.
 
-MESSAGES GO TO REAL PEOPLE. Before send_message, show Dustin the exact text and wait, unless he has already told you what to say. An announcement (group + announcement:true) puts a full-screen takeover in front of all 35 clients — only when he asks for something that loud.
+MESSAGES GO TO REAL PEOPLE. Before send_message, show ${COACH_FIRST_NAME} the exact text and wait, unless he has already told you what to say. An announcement (group + announcement:true) puts a full-screen takeover in front of all 35 clients — only when he asks for something that loud.
 
 ANYTHING YOU CHANGE CAN BE TAKEN BACK. Every write is logged; recent_actions lists them and undo_action reverses one. If you get something wrong, undo it and say so rather than layering another change on top. Workout edits are the exception — they have no faithful inverse, so be sure before applying one to a series.
 
@@ -150,7 +151,7 @@ export async function POST(req: NextRequest) {
   }
   if (!messages.length) return NextResponse.json({ error: "No message." }, { status: 400 });
 
-  const system = body.pageContext ? `${SYSTEM}\n\nCurrent page context (what Dustin is looking at): ${body.pageContext}` : SYSTEM;
+  const system = body.pageContext ? `${SYSTEM}\n\nCurrent page context (what ${COACH_FIRST_NAME} is looking at): ${body.pageContext}` : SYSTEM;
 
   const client = new Anthropic({ apiKey });
   let tokensIn = 0, tokensOut = 0;

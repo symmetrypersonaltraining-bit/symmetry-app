@@ -37,6 +37,7 @@ import {
   type WeekSession,
 } from "@/lib/weeklyBrief";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ const HISTORY_DAYS = 120; // enough to judge "ever done this" and to spot a stal
 const NOTE_DAYS = 14;
 const STALL_LOOKBACK = 8; // sessions of a movement to walk when counting a stall
 
-const SYSTEM = `You write ONE sentence for the top of a weekly programming brief in the Symmetry Personal Training trainer app. The reader is Dustin, the coach, standing in the gym about to start a session with this client. You are talking to the coach, never to the client.
+const SYSTEM = `You write ONE sentence for the top of a weekly programming brief in the Symmetry Personal Training trainer app. The reader is ${COACH_FIRST_NAME}, the coach, standing in the gym about to start a session with this client. You are talking to the coach, never to the client.
 
 Respond with ONLY valid JSON, no markdown, no fences:
 {"line": string}
@@ -213,7 +214,7 @@ export async function POST(req: NextRequest) {
             sessionsThisWeek: brief.days.map((d) => `${d.day}: ${d.labels.join(", ")}`),
             whatChanged: brief.changes.map((c) => c.text),
             // Written to the client, not the coach — the model is told so in
-            // SYSTEM so it doesn't parrot it back at Dustin as his own note.
+            // SYSTEM so it doesn't parrot it back at ${COACH_FIRST_NAME} as his own note.
             focusTheClientHasBeenShown: input.weeklyFocus,
             newMovements: movements.filter((m) => !m.everLogged).map((m) => m.name),
             lastWeek: { scheduled: lastWeekScheduled, completed: lastWeekCompleted },

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { type CalWorkout } from "@/components/RescheduleCalendar";
 import ScheduleWeekBar from "@/components/ScheduleWeekBar";
 import ScheduleBoard from "@/components/ScheduleBoard";
-import { isTrainerEmail } from "@/lib/trainer";
+import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 import { fetchOwnClientRow } from "@/lib/ownClient";
 
 async function isClientMode(asMarker?: string): Promise<boolean> {
@@ -46,7 +46,7 @@ export default async function WorkoutPage(props: {
     if (!data && isTrainer) {
       const { data: d2 } = await supabase.from("clients").select("id, name").eq("email", user.email!).maybeSingle();
       clientId = d2?.id || null;
-      clientName = d2?.name || "Dustin";
+      clientName = d2?.name || `${COACH_FIRST_NAME}`;
     } else {
       clientId = data?.id || null;
       clientName = data?.name || "You";

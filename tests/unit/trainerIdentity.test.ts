@@ -15,7 +15,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { TRAINER_EMAIL, TRAINER_EMAILS, isTrainerEmail, isTrainerUser } from "../../src/lib/trainer.ts";
+import {
+  TRAINER_EMAIL, TRAINER_EMAILS, isTrainerEmail, isTrainerUser,
+  COACH_NAME, COACH_FIRST_NAME, BUSINESS_NAME,
+} from "../../src/lib/trainer.ts";
 
 // ── The module ───────────────────────────────────────────────────────────────
 
@@ -149,4 +152,61 @@ test("no component finds the coach by searching for a human's name", () => {
     `Looking up a person by name only works on one database:\n  ${offenders.join("\n  ")}\n\n` +
       "Use fetchOwnClientRow(sb, user, columns) from @/lib/ownClient.",
   );
+});
+
+// ── The coach's NAME in client-facing copy ───────────────────────────────────
+//
+// About a hundred places spoke Dustin's name out loud: "Send to Dustin", "Your
+// answer for Dustin…", "Dustin was notified", the trainer sidebar, the PWA
+// manifest, and inside the AI system prompts that write in his voice.
+//
+// None of it BREAKS on another instance, which is why it is worse than broken.
+// It works perfectly and names the wrong human, so every client another trainer
+// coaches is told to go and talk to Dustin. There is no error to notice.
+
+const COACH_ALLOWED = new Map<string, string>([
+  ["src/lib/trainer.ts", "where the default belongs"],
+  ["src/app/privacy/page.tsx", "a legal document naming the real business and person"],
+  ["src/lib/pay-links.ts", "the business's actual payment recipient"],
+  ["src/lib/peak-week.ts", "a client id, with the name as a comment"],
+]);
+
+/** Strip line comments, block comments and JSX comments before scanning. */
+function stripComments(src: string): string {
+  return src
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")   // {/* jsx */}
+    .replace(/\/\*[\s\S]*?\*\//g, "")             // /* block */
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");        // // line  (":" guards https://)
+}
+
+test("no client-facing copy names the coach directly", () => {
+  const NAME = ["Dus", "tin"].join(""); // not a literal here either
+  const offenders = walk("src")
+    .map((p) => p.split("\\").join("/"))
+    .filter((p) => !COACH_ALLOWED.has(p))
+    .filter((p) => stripComments(readFileSync(p, "utf8")).includes(NAME));
+
+  assert.deepEqual(
+    offenders,
+    [],
+    `The coach's name is hardcoded in:\n  ${offenders.join("\n  ")}\n\n` +
+      "Use COACH_FIRST_NAME / COACH_NAME from @/lib/trainer. In JSX that is " +
+      "{COACH_FIRST_NAME}; inside a template literal ${COACH_FIRST_NAME}; a " +
+      "plain \"…\" string needs converting to a backtick template first.",
+  );
+});
+
+test("the coach-name allowlist has not quietly grown", () => {
+  assert.ok(COACH_ALLOWED.size <= 4, `COACH_ALLOWED is ${COACH_ALLOWED.size} entries`);
+});
+
+test("the coach's first name is derived, never configured twice", () => {
+  // Two settings that have to agree is one setting too many — someone would
+  // eventually set NEXT_PUBLIC_COACH_NAME and not its first-name twin.
+  assert.equal(COACH_FIRST_NAME, COACH_NAME.split(/\s+/)[0]);
+});
+
+test("an unconfigured instance still reads as Dustin's", () => {
+  assert.equal(COACH_NAME, ["Dustin", "Gautreaux"].join(" "));
+  assert.equal(BUSINESS_NAME, "Symmetry Personal Training");
 });
