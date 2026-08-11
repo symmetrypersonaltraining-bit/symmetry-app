@@ -17,8 +17,12 @@
 // to the client it applies to. This constant is a stopgap for one person's
 // shoot week and should be deleted after it, not extended.
 
+// The client id is Dustin's, from Dustin's database, so on any other instance
+// it matches nobody. Harmless there (nothing locks), but a hardcoded row id is
+// exactly the kind of thing that silently means something else on another
+// database. Configurable, and empty means the freeze is simply off.
 export const PEAK_WEEK = {
-  clientId: "69021074-1708-4d73-9245-918862048709", // Dustin
+  clientId: process.env.NEXT_PUBLIC_PEAK_WEEK_CLIENT_ID || "69021074-1708-4d73-9245-918862048709",
   start: "2026-08-03",
   end: "2026-08-09",
 } as const;

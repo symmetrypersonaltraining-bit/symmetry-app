@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const REDIRECT_URI = 'https://symmetry-app-omega.vercel.app/api/auth/google/callback';
-const APP_URL = 'https://symmetry-app-omega.vercel.app';
+// Per instance: an OAuth callback pinned to one deployment sends another
+// instance's trainer to that deployment when they connect their calendar.
+const APP_ORIGIN = process.env.NEXT_PUBLIC_APP_URL || 'https://symmetry-app-omega.vercel.app';
+const REDIRECT_URI = `${APP_ORIGIN}/api/auth/google/callback`;
+const APP_URL = APP_ORIGIN;
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code');

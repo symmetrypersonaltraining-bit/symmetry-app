@@ -6,7 +6,12 @@ import { buildInviteEmailHtml } from "@/lib/inviteEmail";
 import { isTrainerEmail } from "@/lib/trainer";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://symmetry-app-omega.vercel.app";
-const APK_URL = process.env.NEXT_PUBLIC_ANDROID_APK_URL || "https://mkfiginpiesospsnktea.supabase.co/storage/v1/object/public/app-downloads/symmetry.apk";
+// Falls back to THIS instance's own storage bucket, never a hardcoded project.
+// The APK is a thin shell that loads a fixed server URL, so shipping another
+// instance's build sends the client to somebody else's login screen — an
+// invite that works perfectly and lands on the wrong app.
+const APK_URL = process.env.NEXT_PUBLIC_ANDROID_APK_URL
+  || `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/app-downloads/symmetry.apk`;
 
 function generateTempPassword(): string {
   // 10-char: 2 uppercase + 2 digits + 6 lowercase — readable, no ambiguous chars

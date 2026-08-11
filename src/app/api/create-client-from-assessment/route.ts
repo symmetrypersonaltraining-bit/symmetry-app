@@ -10,7 +10,12 @@ import { isTrainerEmail } from "@/lib/trainer";
 // password (client is routed to set-password on first login via
 // client_app_settings.password_is_temporary), link the assessment to the client,
 // and email the APK invite. Trainer-only.
-const APK_URL = process.env.NEXT_PUBLIC_ANDROID_APK_URL || "https://mkfiginpiesospsnktea.supabase.co/storage/v1/object/public/app-downloads/symmetry.apk";
+// Falls back to THIS instance's own storage bucket, never a hardcoded project.
+// The APK is a thin shell that loads a fixed server URL, so shipping another
+// instance's build sends the client to somebody else's login screen — an
+// invite that works perfectly and lands on the wrong app.
+const APK_URL = process.env.NEXT_PUBLIC_ANDROID_APK_URL
+  || `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/app-downloads/symmetry.apk`;
 
 function generateTempPassword(): string {
   const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";

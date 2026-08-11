@@ -93,6 +93,24 @@ then email, never by name. Verified first that Dustin's row already carries
 
 A test now fails the build on a new one.
 
+## Three more things that would have broken his instance
+
+Found on a sweep for single-tenant assumptions after the name fixes:
+
+- **The invite email shipped Dustin's APK.** `APK_URL` fell back to a hardcoded
+  `mkfiginpiesospsnktea` storage URL. The APK is a thin shell that loads a fixed
+  server URL, so Dylan's clients would have installed an app that opens
+  **Dustin's login screen**. An invite that works perfectly and lands on the
+  wrong app. Now falls back to the instance's own Supabase storage.
+- **Google Calendar OAuth was pinned to `symmetry-app-omega.vercel.app`** in
+  both halves of the flow, so connecting a calendar on another instance would
+  bounce the trainer to Dustin's deployment. Now derived from
+  `NEXT_PUBLIC_APP_URL`.
+- **Peak week hardcoded a client UUID** from Dustin's database. Harmless
+  elsewhere (it matches nobody, so nothing locks) but a raw row id is exactly
+  the sort of value that silently means something different on another
+  database. Now `NEXT_PUBLIC_PEAK_WEEK_CLIENT_ID`.
+
 ## The env contract
 
 `.env.local.example` listed **four** variables. The code reads **fifteen**.
@@ -102,23 +120,32 @@ file is now the complete list, marked REQUIRED vs optional.
 
 ## Standing it up
 
-### Step 1 — get the schema into the repo *(needs a credential from Dustin)*
+### Step 1 — get the schema into the repo *(runs on Dustin's laptop)*
 
-`scripts/dump-schema.sh` does the whole job, but needs the live database's
-connection string:
+**This one cannot run in a cloud session.** Verified 2026-08-11: the direct
+database host is IPv6-only and the pooler ports are firewalled from the build
+sandbox — a connection attempt hangs rather than refusing. Pulling the SQL
+through the chat instead is 544,355 characters, which is not a sane way to move
+a schema and risks arriving truncated.
 
-> Supabase dashboard → the `mkfiginpiesospsnktea` project → **Settings** →
-> **Database** → **Connection string** → **URI**
+Hand-rolling the DDL from catalog queries was considered and rejected: a subtly
+wrong schema is the exact failure this whole document exists to prevent, and
+`pg_dump` exists because getting it right is hard.
 
-```bash
-./scripts/dump-schema.sh "postgresql://postgres.<ref>:<password>@<host>:5432/postgres"
-```
+So it runs where there is both network and git — the laptop:
 
-`--schema-only`: structure only. **No client data ever leaves the database.**
+1. Put the connection string in `db-url.txt` next to `DUMP-SCHEMA.bat`, in the
+   Trainer App folder. One line, nothing else.
+   > Supabase → `symmetry-training` → **Settings** → **Database** →
+   > **Connection string** → **URI**. If it shows `[YOUR-PASSWORD]`, hit
+   > **Reset database password** first — nothing uses that password directly.
+2. Double-click **`DUMP-SCHEMA.bat`**.
 
-The string is a password. It is passed as an argument, used once, never
-committed, never echoed — the script redacts anything that looks like one
-before it reaches a log.
+It dumps `--schema-only` (structure only — **no client data ever leaves the
+database**), writes `supabase/schema/baseline.sql`, commits and pushes. It
+refuses to push a file that looks truncated, logs to `dump-schema-log.txt`,
+catches its own crashes, and redacts anything password-shaped before it can
+reach the log. `db-url.txt` never leaves the machine.
 
 ### Step 2 — his Supabase project
 
