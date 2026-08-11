@@ -140,6 +140,49 @@ tracked fields.
    any of this up: `MealPlanClient.tsx` and `NutritionAverages.tsx` run their
    own DB queries and their own maths. Worth fixing independently of micros.
 
+## 4b. AI coach loop — draft to Dustin, approve/edit, send, LEARN  ← NEW, NOT STARTED
+
+Dustin, 10 Aug (late): the AI should ask clients questions — "was this helpful?
+would you like me to help you somewhere else? how can I help keep you on
+track?" — learn each client's needs from the answers, and help them toward
+their goals with ideas, tips and advice. Crucially: **drafts go to Dustin's
+inbox as a special AI message for him to approve or edit before anything
+reaches the client**, so the AI learns how he wants each client handled.
+
+Half of this shipped in `429cbda`: the nudge voice now asks one short question
+per message and coaches what each client actually uses. The other half — the
+approval loop and the memory — is a real feature and was NOT attempted
+overnight, deliberately: it needs a new table, a review surface in the inbox,
+and send-on-approve plumbing. Half-landing that unsupervised is how main gets
+left fragile.
+
+**It should build on what already exists rather than starting fresh:**
+
+- `/api/ai-nudges` already runs preview-first (`send` defaults false, writes to
+  `ai_nudge_log` with `sent=false`, and digests to Dustin). That IS the
+  approve-before-send skeleton — it currently just lacks a way for him to say
+  yes.
+- `/api/attention-drafts` is the existing "AI drafts, trainer reviews" pattern
+  worth copying rather than reinventing.
+- `client_private_profiles.coach_notes` already exists and is trainer-only —
+  the natural home for learned per-client preferences, no new table needed for
+  v1.
+
+**Sketch:**
+
+1. Nudge/coach drafts land in Dustin's inbox as a distinct AI-draft message
+   type, with Approve / Edit / Skip.
+2. Approve sends it to the client under his name (the send path already
+   exists); Edit sends his version.
+3. **What he changed is the training signal.** Store the diff between draft and
+   sent, plus any Skip, against the client. Feed the last few into the next
+   draft's context so the AI converges on how he talks to that person.
+4. Client replies route back to him, and the useful ones get summarised into
+   `coach_notes` so the next draft knows what that client actually responds to.
+
+The learning is the point, and the diff between what the AI wrote and what
+Dustin actually sent is the highest-signal, lowest-effort version of it.
+
 ## 5. Pull from Garmin / Google / Apple
 
 `app_feedback` `95f11695`, 2026-07-29, from Todd Prine. Plan already written:

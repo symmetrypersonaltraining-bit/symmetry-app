@@ -5,7 +5,17 @@
 //   ai_usage_log(client_id, feature, model, tokens_in, tokens_out, cost_usd, created_at)
 //   client_app_settings.ai_daily_*_limit int columns (per-client overrides).
 
-export type AiFeature = "chat" | "parse" | "photo" | "plan_build" | "verify" | "workout_build";
+export type AiFeature =
+  | "chat"
+  | "parse"
+  | "photo"
+  | "plan_build"
+  | "verify"
+  | "workout_build"
+  // Reading a feedback screenshot. Added 10 Aug: it was the ONE AI route in the
+  // app spending tokens without recording them, so it was invisible to
+  // ai_usage_log, to this kill switch and to every per-client cap.
+  | "feedback_image";
 
 /** client_app_settings column that overrides the daily cap for each feature. */
 export const LIMIT_COLUMNS: Record<AiFeature, string> = {
@@ -15,6 +25,9 @@ export const LIMIT_COLUMNS: Record<AiFeature, string> = {
   plan_build: "ai_daily_plan_build_limit",
   verify: "ai_daily_verify_limit",
   workout_build: "workout_build_daily_limit",
+  // No settings column: this is not a feature a client chooses to spend, it is
+  // a side effect of reporting a bug. The default below is the only limit.
+  feedback_image: "",
 };
 
 /** Per-client per-day defaults when the settings column is null/missing. */
@@ -25,6 +38,9 @@ export const DEFAULT_LIMITS: Record<AiFeature, number> = {
   plan_build: 1,
   verify: 20,
   workout_build: 8,
+  // Generous — never make somebody ration bug reports — but finite, so a retry
+  // loop on the feedback form cannot quietly spend the month's budget.
+  feedback_image: 30,
 };
 
 /** Global kill switch: month-to-date spend at/over this pauses ALL AI features. */

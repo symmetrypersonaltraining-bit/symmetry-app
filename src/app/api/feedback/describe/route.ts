@@ -30,6 +30,7 @@ import { resolveAiScope } from "@/lib/ai/scope";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import Anthropic from "@anthropic-ai/sdk";
 import { HAIKU_MODEL } from "@/lib/ai/anthropic";
+import { logUsage } from "@/lib/ai/meter";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -112,6 +113,24 @@ export async function POST(req: Request) {
         },
       ],
     });
+    // METER IT. This was the one AI route in the app that spent tokens without
+    // recording them (audited 10 Aug): invisible to ai_usage_log, to the
+    // monthly kill switch and to every per-client cap. A budget that cannot see
+    // a route cannot stop it. Logging must never fail the description, so the
+    // usage write is best-effort like the rest of this handler.
+    try {
+      await logUsage(
+        // null: this route is trainer/scheduler-only and has no client session
+        // to attribute to. The spend still reaches ai_usage_log and the monthly
+        // total, which is the point — it just carries no per-client cap.
+        null,
+        "feedback_image",
+        msg.usage?.input_tokens ?? 0,
+        msg.usage?.output_tokens ?? 0,
+        HAIKU_MODEL,
+      );
+    } catch { /* never break a feedback report over bookkeeping */ }
+
     const text = msg.content
       .filter((c): c is Anthropic.TextBlock => c.type === "text")
       .map((c) => c.text)
