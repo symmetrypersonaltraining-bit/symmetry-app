@@ -182,10 +182,14 @@ export default function ExerciseLibraryClient({ exercises }: Props) {
   const [muscleFilter, setMuscleFilter] = useState("All");
   const [selected, setSelected] = useState<Exercise | null>(null);
 
+  // Every word, anywhere — same rule as the in-session swap search. A single
+  // substring cannot find "Box Glute Bridge" from "box bridge", which is how
+  // movements already in the library kept getting reported as missing.
+  const tokens = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+
   const filtered = exercises.filter((e) => {
-    const matchSearch =
-      e.name.toLowerCase().includes(search.toLowerCase()) ||
-      (e.muscle_group || "").toLowerCase().includes(search.toLowerCase());
+    const haystack = `${e.name} ${e.muscle_group || ""}`.toLowerCase();
+    const matchSearch = tokens.length === 0 || tokens.every((t) => haystack.includes(t));
     const matchMuscle =
       muscleFilter === "All" ||
       (e.muscle_group || "").toLowerCase().includes(muscleFilter.toLowerCase());

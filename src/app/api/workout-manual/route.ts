@@ -30,6 +30,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAiScope } from "@/lib/ai/scope";
+import { findExerciseIdByName } from "@/lib/exerciseLookup";
 
 export const dynamic = "force-dynamic";
 
@@ -68,18 +69,11 @@ async function resolveExerciseId(db: Db, clientId: string, rawName: string): Pro
   const name = rawName.trim();
   if (!name) return null;
 
-  const { data: exact } = await db
-    .from("exercises")
-    .select("id, client_owner_id")
-    .ilike("name", name)
-    .limit(5);
-  const rows = (exact as { id: string; client_owner_id: string | null }[] | null) || [];
-  // Prefer the shared library entry over a personal copy, so two clients doing
-  // "Goblet Squat" land on the same exercise and comparisons still work.
-  const shared = rows.find((r) => !r.client_owner_id);
-  if (shared) return shared.id;
-  const mine = rows.find((r) => r.client_owner_id === clientId);
-  if (mine) return mine.id;
+  // Exact name, then aliases; shared library row preferred over a personal copy
+  // so two clients doing "Goblet Squat" land on the same exercise and their
+  // comparisons still work. That preference now lives in the shared helper.
+  const existing = await findExerciseIdByName(db, name, clientId);
+  if (existing) return existing;
 
   const { data: made, error } = await db
     .from("exercises")

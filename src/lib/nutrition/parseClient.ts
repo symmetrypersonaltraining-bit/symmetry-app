@@ -48,8 +48,25 @@ function mapItem(raw: Record<string, unknown>): CustomItem | null {
  * Null still means "no usable result" so no call site has to change; the reason
  * rides alongside for the ones that want to say something true.
  */
-export type ParseFailure = "cap" | "paused" | "unavailable" | "empty" | null;
+export type ParseFailure = "cap" | "paused" | "config" | "unavailable" | "empty" | null;
 let lastFailure: ParseFailure = null;
+
+/**
+ * The server's own words, when it bothered to say something specific.
+ *
+ * 10 Aug: ANTHROPIC_API_KEY went missing from Vercel and EVERY AI feature in
+ * the app died for two and a half days. The server was saying exactly that -
+ * "AI is not configured yet. Ask Dustin to add ANTHROPIC_API_KEY to Vercel." -
+ * and this client threw the message away and rendered "AI estimating isn't
+ * reachable right now" instead. Dustin spent that time believing the parser
+ * was broken. A 503 is a CONFIGURATION problem, not a flaky network, and it
+ * should say so.
+ */
+let lastServerMessage: string | null = null;
+
+export function lastParseServerMessage(): string | null {
+  return lastServerMessage;
+}
 
 /** The reason the most recent parseFoodText returned null. */
 export function lastParseFailure(): ParseFailure {
@@ -62,6 +79,9 @@ export function parseFailureMessage(f: ParseFailure): string {
       return "You've used today's AI estimates. They reset at midnight — you can still add this by hand.";
     case "paused":
       return "AI is paused right now. You can still add this by hand.";
+    case "config":
+      // Deliberately shows the server's text: it names the missing setting.
+      return lastServerMessage || "AI isn't set up right now — this needs a fix on the server, not a retry.";
     case "unavailable":
       return "AI estimating isn't reachable right now. You can still add this by hand.";
     default:
@@ -71,6 +91,7 @@ export function parseFailureMessage(f: ParseFailure): string {
 
 export async function parseFoodText(text: string, clientId?: string): Promise<ParseResult | null> {
   lastFailure = null;
+  lastServerMessage = null;
   try {
     const res = await fetch("/api/nutrition-ai/parse", {
       method: "POST",
@@ -79,7 +100,11 @@ export async function parseFoodText(text: string, clientId?: string): Promise<Pa
     });
     const json = await res.json().catch(() => null);
     if (!res.ok) {
-      lastFailure = res.status === 429 || json?.capExceeded ? "cap" : "unavailable";
+      if (typeof json?.error === "string" && json.error.trim()) lastServerMessage = json.error.trim();
+      // 503 is "the server is not configured" - a real, fixable, NAMED problem.
+      // Collapsing it into the generic message is what cost two days.
+      lastFailure =
+        res.status === 429 || json?.capExceeded ? "cap" : res.status === 503 ? "config" : "unavailable";
       return null;
     }
     if (!json || json.error) {

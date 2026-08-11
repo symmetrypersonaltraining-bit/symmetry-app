@@ -21,6 +21,7 @@ import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope, Db } from "@/lib/ai/scope";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findExerciseIdByName } from "@/lib/exerciseLookup";
 
 export const runtime = "nodejs";
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
@@ -111,12 +112,14 @@ function validateReply(raw: unknown): Reply | null {
 
 // ── exercise resolve (library match, else client-owned) — mirrors workout-ai ──
 async function resolveExerciseId(db: Db, clientId: string, name: string): Promise<string | null> {
-  const { data: found } = await db.from("exercises").select("id").ilike("name", name).limit(1);
-  if (found && found[0]) return (found[0] as { id: string }).id;
+  // Exact name, then aliases. The alias pass is purely additive - it cannot
+  // redirect a name that already matched, only stop a duplicate being minted
+  // for a movement the library already knows under different wording.
+  const existing = await findExerciseIdByName(db, name, clientId);
+  if (existing) return existing;
   const { data: ins } = await db.from("exercises").insert({ name, client_owner_id: clientId, created_by: "trainer_ai", availability_status: "available" }).select("id").single();
   if (ins) return (ins as { id: string }).id;
-  const { data: again } = await db.from("exercises").select("id").ilike("name", name).limit(1);
-  return again && again[0] ? (again[0] as { id: string }).id : null;
+  return await findExerciseIdByName(db, name, clientId);
 }
 function trackingFor(type: string | undefined, reps: string | null, duration: string | null): { tracked: string[]; volume_type: string; volume_value: string | null } {
   if (type === "time") return { tracked: ["time"], volume_type: "duration", volume_value: duration || "1 min" };

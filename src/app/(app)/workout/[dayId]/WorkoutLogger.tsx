@@ -424,12 +424,27 @@ function SwapModal({ pe, onClose, onSwap }: { pe: PrescribedExercise; onClose: (
     const t = setTimeout(async () => {
       if (!query.trim()) { setResults([]); return; }
       setLoading(true);
-      const { data } = await supabase
+      // EVERY WORD, anywhere in the name — not the whole phrase as one blob.
+      //
+      // Dustin, 10 Aug, mid-session: tried to swap a lying leg curl for the
+      // seated leg curl machine and the search found nothing. That machine had
+      // been in the library since 14 July, as "Seated Hamstring Curl Machine".
+      // Same day: "add box bridge and ball bridge" — both already existed, as
+      // "Box Glute Bridge" and "Ball Glute Bridge". A single %box bridge%
+      // matches NEITHER of those, because "Glute" sits between the two words.
+      //
+      // Three "it's missing, add it" reports in one day, all the same cause: a
+      // library whose names carry an extra word in the middle, searched as one
+      // literal string. Matching each word independently finds all three, and
+      // stops him re-adding movements he already has.
+      let q = supabase
         .from("exercises")
         .select("id, name, modality, muscle_group, equipment_required, video_url, video_status")
-        .ilike("name", `%${query}%`)
-        .is("client_owner_id", null)
-        .limit(30);
+        .is("client_owner_id", null);
+      for (const token of query.trim().split(/\s+/).slice(0, 6)) {
+        q = q.ilike("name", `%${token}%`);
+      }
+      const { data } = await q.limit(30);
       setResults(data || []);
       setLoading(false);
     }, 300);
