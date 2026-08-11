@@ -403,9 +403,8 @@ MyFitnessPal / Cronometer / Lose It, uploaded in the app. No partner deal, no
 monthly fee, no terms breached. Live sync via an aggregator stays on the shelf
 until a client asks and a price is agreed (see §4).
 
-**D2 — Where do steps live?** `everfit_daily_steps` renamed to `daily_steps`, or a
-new `health_daily` and leave the Everfit table alone?
-Recommendation: new `health_daily`, leave the old table untouched; it is historical.
+**D2 — DECIDED 2026-08-11: new `health_daily`.** The Everfit table is left
+untouched as history. Dustin: "new table".
 
 **D3 — Where do OAuth tokens live?** Plain column, Supabase Vault, or a
 service-role-only schema?
@@ -433,6 +432,9 @@ me in a future session, the Apple account and the Garmin application both need t
 be in place first, and neither is something I can do.
 
 ---
+
+**Build plan for Health Connect: `docs/HEALTH-CONNECT-BUILD-PLAN.md`** (11 Aug) —
+phasing, where each surface lives in the app, and D8-D10 which are still open.
 
 ## 10. Suggested sequence
 
