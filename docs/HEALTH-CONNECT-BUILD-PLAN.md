@@ -111,31 +111,34 @@ The mechanical rules (from the research doc, §8) are settled:
 
 ## 5. Decisions I need before writing code
 
-**D8 — Does an unmatched imported workout count toward streaks and challenges?**
-A client runs 5k on Saturday, wearing a watch, nothing programmed. Options:
+**D8 — DECIDED 2026-08-11.** Dustin: *"does not count towards challenge unless
+the challenge is how many extra workouts you can do. and needs to be added as a
+logged workout in their schedule real time."*
 
-- **(a) No.** Streaks and challenges count only what you programmed and they
-  logged. Imported sessions are context for you, visible on their profile, but
-  they do not score. *Safest — nothing inflates, and the leaderboard keeps
-  meaning what it means today.*
-- **(b) Yes, as cardio.** It lands in `cardio_logs` and counts wherever cardio
-  already counts.
-- **(c) It depends on the challenge.** Most flexible, most to build.
+Two separate things, and the distinction is the whole design:
 
-I would start at **(a)** and loosen it once you have seen a month of real
-imported data. Tightening later means taking a streak away from someone, which
-is worse than granting one late.
+- **It IS a real logged workout.** An unmatched imported session creates a
+  `workout_logs` row and a completed `scheduled_workouts` row on the day it
+  happened, so it appears on the client's calendar and in their history like any
+  other session. Not a footnote on a profile — a session they did.
+- **It does NOT score by default.** Challenge scoring excludes
+  `source = 'health_connect'` unless that challenge is explicitly about extra
+  work. So `group_challenges` needs a flag — `counts_external` (default false) —
+  and the scoring query honours it. Without the flag, a client wearing a watch
+  through a programmed session cannot inflate the board.
+- **Real time** means on sync, not in a nightly job.
 
-**D9 — Who gets this first?** Everyone re-installs, or two or three volunteers?
-I would pilot: the install-and-grant-permissions flow is where people get stuck,
-and finding that out with 3 clients beats finding it out with 35.
+Note this must respect the pull-forward rule shipped in `7aa76b6`: an imported
+session that overlaps something programmed LINKS to it rather than adding a
+second. Only genuinely extra work creates a new row.
 
-**D10 — Sleep and HRV: pull them or not?** Health Connect exposes both. They are
-free to store and I would take them now even if nothing reads them yet — but
-they are also the most personal data in the set, and "we collect it because we
-can" is a bad answer if a client asks.
+**D9 — DECIDED: pilot with Dustin and Todd Prine.** Todd raised the original
+request, so he is the right first client. Two testers means the
+install-and-permissions flow gets found out before 35 people meet it.
 
----
+**D10 — DECIDED: yes, pull sleep and HRV.** Columns already in the `health_daily`
+design. Worth saying in the Connected apps screen exactly what is read, because
+this is the most personal data in the set.
 
 ## 6. Build sequence
 
