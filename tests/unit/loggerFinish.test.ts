@@ -193,13 +193,50 @@ test("the page finds the log for THAT day, not 'today or later'", () => {
 test("a resumed workout log id is verified before it is trusted", () => {
   assert.match(
     CODE,
-    /const \{ data: alive \} = await supabase\s*\n?\s*\.from\("workout_logs"\)\.select\("id"\)\.eq\("id", workoutLogId\)\.maybeSingle\(\);/,
+    // `completed` joined the select on 11 Aug (Lauren) — a resumed id now has
+    // to answer two questions, not one: are you real, and are you finished.
+    /const \{ data: alive \} = await supabase\s*\n?\s*\.from\("workout_logs"\)\.select\("id, completed"\)\.eq\("id", workoutLogId\)\.maybeSingle\(\);/,
     "a draft-restored id must be checked against the database, not assumed live",
   );
   assert.ok(
     !/if \(workoutLogId\) return workoutLogId;/.test(CODE),
     "the bare short-circuit is back — that is the bug",
   );
+});
+
+/**
+ * Lauren Standefer, 11 Aug 2026, 10:04am:
+ *
+ *   "Couldn't finish the workout: duplicate key value violates unique
+ *    constraint uq_workout_log_one_completed."
+ *
+ * Her workout completed at 10:03:28. At 10:04:02 the logger inserted a SECOND
+ * log for the same client/day/date, copied all 24 of her sets into it, and
+ * tried to complete that one — which uq_workout_log_one_completed refused. The
+ * database was protecting the workout that had saved, and the refusal was
+ * shown to her as her workout failing.
+ *
+ * Holding no log id is not evidence that no log exists. The draft is cleared
+ * on completion, so every remount after finishing looks exactly like a fresh
+ * start.
+ */
+test("no id in hand does not mean no log exists — ask before inserting", () => {
+  assert.match(
+    CODE,
+    /\.from\("workout_logs"\)\s*\n?\s*\.select\("id, completed, created_at"\)\s*\n?\s*\.eq\("client_id", clientId\)\.eq\("day_id", day\.id\)\.eq\("log_date", sessionDate\)/,
+    "the insert must be preceded by a lookup on client + day + sessionDate",
+  );
+  assert.match(CODE, /pickExistingLog\(/, "which row to resume belongs in the tested helper");
+});
+
+test("an already-completed session shows as finished instead of erroring", () => {
+  assert.match(CODE, /if \(alreadyCompleted\) \{/);
+});
+
+test("re-completing does not re-run the schedule block when a row already points at the log", () => {
+  // Re-running it would find "nothing scheduled today" and pull a FUTURE
+  // session forward onto today — the Sara Prince bug. Not trading one for it.
+  assert.match(CODE, /\.select\("id"\)\.eq\("workout_log_id", logId\)\.limit\(1\)/);
 });
 
 test("a dead id is discarded and the session continues on a fresh log", () => {

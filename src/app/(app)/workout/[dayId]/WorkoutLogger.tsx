@@ -17,6 +17,7 @@ import { fx } from "@/lib/fx";
 import { isDraftStale } from "@/lib/workoutDraft";
 import { useStableViewportHeight } from "@/lib/useStableViewportHeight";
 import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
+import { pickExistingLog, type ExistingLog } from "@/lib/workoutLogLookup";
 
 interface Exercise {
   id: string;
@@ -1200,7 +1201,7 @@ export default function WorkoutLogger({
     }
   }
 
-  async function ensureWorkoutLog(): Promise<string> {
+  async function ensureWorkoutLog(): Promise<{ id: string; alreadyCompleted: boolean }> {
     // Dustin, 2026-08-06, mid-session on Knee Stability P2 Day 2:
     //   "Couldn't finish the workout: insert or update on table
     //    scheduled_workouts violates foreign key constraint
@@ -1223,24 +1224,47 @@ export default function WorkoutLogger({
     // A resumed id is a claim about the database, not a fact. Check it.
     if (workoutLogId) {
       const { data: alive } = await supabase
-        .from("workout_logs").select("id").eq("id", workoutLogId).maybeSingle();
-      if (alive) return workoutLogId;
-      // Dead. Drop it and fall through to a fresh row rather than stranding
-      // the session — the sets are all still in component state and get
-      // written against the new log the moment it exists.
+        .from("workout_logs").select("id, completed").eq("id", workoutLogId).maybeSingle();
+      if (alive) return { id: alive.id, alreadyCompleted: !!(alive as { completed?: boolean }).completed };
+      // Dead. Drop it and fall through rather than stranding the session — the
+      // sets are all still in component state and get written against whatever
+      // log we settle on.
       setWorkoutLogId(null);
       __clearDraft();
     }
-    // sessionDate, NOT the clock. Logging yesterday's cardio this morning wrote
-    // log_date = today, so the make-up disappeared and today got credited for
-    // work that was not done.
+    // Lauren Standefer, 11 Aug, 10:04am:
+    //   "Couldn't finish the workout: duplicate key value violates unique
+    //    constraint uq_workout_log_one_completed."
+    //
+    // Her session HAD finished, thirty-four seconds earlier. What this function
+    // did next was insert a SECOND log for the same client, day and date,
+    // re-write all 24 of her sets into it, and try to complete that — which the
+    // unique index correctly refused. So the toast said the workout failed at
+    // the exact moment the database was protecting the workout that succeeded.
+    //
+    // The hole: having no id in hand was treated as proof that no log exists.
+    // It is not. The draft gets cleared on completion, and any remount arrives
+    // with empty state and a finished session sitting in the database.
+    //
+    // ASK before inserting. sessionDate, not the clock — logging yesterday's
+    // session this morning must find yesterday's log.
+    const { data: existing } = await supabase
+      .from("workout_logs")
+      .select("id, completed, created_at")
+      .eq("client_id", clientId).eq("day_id", day.id).eq("log_date", sessionDate)
+      .order("created_at", { ascending: false });
+    const found = pickExistingLog((existing as ExistingLog[]) || []);
+    if (found) {
+      setWorkoutLogId(found.id);
+      return { id: found.id, alreadyCompleted: !!found.completed };
+    }
     const { data, error } = await supabase.from("workout_logs").insert({
       client_id: clientId, day_id: day.id, log_date: sessionDate,
       started_at: new Date().toISOString(), completed: false,
     }).select("id").single();
     if (error) throw error;
     setWorkoutLogId(data.id);
-    return data.id;
+    return { id: data.id, alreadyCompleted: false };
   }
 
   const updateSet = useCallback((peId: string, si: number, field: keyof SetData, value: string | boolean) => {
@@ -1320,7 +1344,7 @@ export default function WorkoutLogger({
   async function logSet(peId: string, si: number) {
     setSaving(true);
     try {
-      const logId = await ensureWorkoutLog();
+      const { id: logId } = await ensureWorkoutLog();
       const s = sets[peId][si];
       await supabase.from("set_logs").upsert({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
@@ -1348,7 +1372,7 @@ export default function WorkoutLogger({
     if (!currentExercise) return;
     setSaving(true);
     try {
-      const logId = await ensureWorkoutLog();
+      const { id: logId } = await ensureWorkoutLog();
       const peId = currentExercise.id;
       const arr = sets[peId] || [];
       const rows = arr.map((s, i) => ({
@@ -1445,7 +1469,30 @@ export default function WorkoutLogger({
     setSaving(true);
     setCompleteError(null);
     try {
-      const logId = await ensureWorkoutLog();
+      const { id: logId, alreadyCompleted } = await ensureWorkoutLog();
+      if (alreadyCompleted) {
+        // This session is already finished in the database. Completing it a
+        // second time trips uq_workout_log_one_completed, and the logger then
+        // reports a SAVED workout as a failure — exactly what Lauren saw at
+        // 10:04 on 11 Aug, thirty-four seconds after her workout saved.
+        // Show her the finished state. Her sets are on this log already.
+        //
+        // One thing still worth checking: if the FIRST attempt died between
+        // writing the log and marking the schedule, the session is complete but
+        // the calendar still says it is not. Only then does the schedule block
+        // below need to run — and skipping it when a row already points here
+        // matters, because re-running it would look for "no session today" and
+        // pull a future session forward onto today. That is the Sara Prince
+        // failure, and we are not trading one bug for it.
+        const { data: __linked } = await (supabase as any)
+          .from("scheduled_workouts")
+          .select("id").eq("workout_log_id", logId).limit(1);
+        if (__linked && __linked.length) {
+          setWorkoutComplete(true);
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+          return;
+        }
+      }
       const { data: logRows, error: logErr } = await supabase.from("workout_logs").update({
         completed: true, completed_at: new Date().toISOString(), status: "Done as planned",
         note: sessionNote || null,
