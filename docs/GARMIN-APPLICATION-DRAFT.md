@@ -42,7 +42,7 @@ with minimal editing; the bracketed bits are the only parts that need your input
 ## Describe your application *(paste this)*
 
 > Symmetry is the private training app for a personal training studio in
-> [CITY, STATE]. It is used by one trainer and roughly thirty-five of his clients.
+> Princeton, Texas. It is used by one trainer and roughly thirty-five of his clients.
 > It is not a consumer product, is not sold, and is not available to the general
 > public — accounts are created by the trainer for people he trains in person.
 >
@@ -121,7 +121,7 @@ under their own agreement), which is discussed in
 
 ## Fill in before sending
 
-- [ ] City and state for the studio (one place, in the first paragraph)
+- [x] City and state for the studio — **Princeton, Texas**, filled in 2026-08-11
 - [ ] Confirm the privacy policy URL loads
 - [ ] Decide whether to give the app's Play Store listing URL — we do not have one
       yet (we sideload a debug APK). If the form demands a store URL, say the app
