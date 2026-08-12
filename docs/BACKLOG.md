@@ -177,10 +177,23 @@ Fixing the duplicate *programmes* without fixing whatever writes duplicate
 *schedule rows* leaves the real bug in place. Find the write path first.
 **Ask Dustin before deleting any programme.**
 
-## 3. Add box bridge and ball bridge to the library
+## 3. Add box bridge and ball bridge to the library — needs 30 seconds from Dustin
 
-`app_feedback` `8aa820a9`, 2026-08-05. Needs name, modality, video URL, default
-tracked fields.
+`app_feedback` `8aa820a9`, 2026-08-05.
+
+**Checked 2026-08-11.** Neither exists as asked. The library has *Stability Ball
+Bridge March Feet on Floor* — a specific variant, not the plain movement — and
+nothing matching "box bridge" at all.
+
+**Deliberately NOT added by guessing the names.** Rule 12 is exact movement
+names, and inventing two is how the library ends up with near-duplicates that
+do not come up in the swap search — precisely the failure Dustin hit trying to
+switch a lying leg curl for a seated one mid-session.
+
+What is needed, and it is quick: the **exact names** he programs them under,
+whether each is corrective-tagged, and a video URL if he has one. Modality and
+tracked fields can follow the ball-bridge row already in the library
+(`bodybuilding`, `["reps"]`).
 
 ## 4. Full nutrients in the food logger  ← IN PROGRESS
 
@@ -394,9 +407,17 @@ in the same commit.
   does NOT make him ranked — that is `clients.exclude_from_rankings`, untouched
   on purpose. Dustin should say whether joining should imply ranked.
 
-## 9. Security — outstanding
+## 9. Security — mostly CLEARED 2026-08-11
 
-- **Old GitHub PATs still in plaintext** inside `COWORK-INSTRUCTIONS.md`. The
-  live token was rotated 2026-08-07; these older ones were not removed.
-- A stray `.ghtoken` copy sits on the **Desktop** alongside ~8 obsolete
-  `push-sym*` helper files from the dead Chrome-token era. Delete them.
+- ~~**Old GitHub PATs in plaintext** inside `COWORK-INSTRUCTIONS.md`.~~
+  **Verified clean.** Scanned the whole Trainer App folder for token-shaped
+  strings across `.md`, `.txt`, `.sh`, `.ps1` and `.bat`: **zero matches.**
+  The only credential present is `.ghtoken` itself, which is the intended store.
+- ~~**~8 obsolete `push-sym*` helpers** from the dead Chrome-token era.~~
+  **Moved 2026-08-11** into `Trainer App\_to_delete\` — 12 files including
+  `push-symmetry-5.ps1/.sh`, `PUSH-NOW.bat`, the PUSH logs, and the stale
+  4- and 5-commit patch/diff pairs. `device_bash` cannot delete, so Dustin
+  removes that folder when convenient.
+- **STILL OPEN:** the stray `.ghtoken` copy on the **Desktop**. Not reachable
+  from a session (only the Trainer App and symmetry-app folders are mounted).
+  Dustin deletes it manually.
