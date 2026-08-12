@@ -187,3 +187,46 @@ test("finishing a session done EARLY moves its scheduled slot instead of adding 
     "the forward lookup must run BEFORE the insert, or an early session still creates a duplicate",
   );
 });
+
+test("the note you are typing is never the thing the keyboard covers", () => {
+  // Dustin, 12 Aug: "when adding notes in logger you cant see the text box."
+  //
+  // He was right, and it was the price of the rule two tests above: notes sit
+  // LAST so the keyboard eats them instead of a set row. That protects the
+  // sets and hides what you are typing. Both cannot be true in one column.
+  //
+  // So typing moved into a sheet whose input is at the TOP. The Android
+  // WebView already shrinks the layout viewport when the keyboard opens, so a
+  // fixed full-height panel occupies whatever is left and the field at its top
+  // stays visible — WITHOUT measuring anything. The logger behind is untouched
+  // because it is pinned to stableH.
+  //
+  // What must not happen: someone "simplifying" this back to an inline input
+  // in the card, which is the covered state Dustin reported.
+  assert.ok(
+    SRC.includes("noteSheetOpen"),
+    "the note sheet must exist — an inline input in the notes card is covered by the keyboard",
+  );
+
+  const sheet = SRC.indexOf("z-[1200]");
+  assert.notEqual(sheet, -1, "the note sheet must render as a fixed overlay above the logger");
+
+  // Inside the sheet, the input must come BEFORE the earlier-notes list. That
+  // ordering IS the fix: whatever is last is what the keyboard reaches first.
+  const input = SRC.indexOf("type=\"text\" autoFocus value={exNoteText}");
+  const prior = SRC.indexOf("Earlier notes fill whatever is left");
+  assert.ok(input > sheet, "the note input must live inside the sheet");
+  assert.ok(
+    input < prior,
+    "the input must come BEFORE the earlier-notes list in the sheet — last is what the keyboard covers",
+  );
+});
+
+test("the note sheet did not smuggle keyboard code back in", () => {
+  // The whole point is that it reacts to nothing. If a future change needs a
+  // measurement to keep the field visible, the layout is wrong, not the
+  // measurement missing.
+  assert.ok(!/visualViewport/.test(CODE), "still no visualViewport in the logger");
+  assert.ok(!/scrollIntoView/.test(CODE), "still no scrollIntoView in the logger");
+  assert.ok(!CODE.includes("useKeyboardInset"), "still no keyboard-inset hook in the logger");
+});

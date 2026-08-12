@@ -743,6 +743,8 @@ export default function WorkoutLogger({
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const trainerVoiceRef = useRef<{ stop?: () => void } | null>(null);
   const [showCue, setShowCue] = useState(false);
+  // Notes are typed in a sheet, not in the card — see the note at the card.
+  const [noteSheetOpen, setNoteSheetOpen] = useState(false);
 
   // ── NO KEYBOARD-CONDITIONED LAYOUT. READ THIS BEFORE ADDING ANY. ──────────
   //
@@ -2262,18 +2264,80 @@ export default function WorkoutLogger({
               ))}
             </div>
           )}
-          <div className="flex gap-2">
-            <input type="text" value={exNoteText} onChange={e => setExNoteText(e.target.value)}
-              onFocus={focusScroll} onBlur={focusBlur}
-              placeholder={'Pain, couldn\u2019t do it, form issue\u2026'}
-              className="flex-1 text-xs px-3 py-2 rounded-lg outline-none"
-              style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(255,255,255,0.15)" }} />
-            <button onClick={saveExerciseNote} disabled={savingExNote || !exNoteText.trim()}
-              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: exNoteSaved ? "#22c55e" : "var(--brand-primary)" }}>
-              <i className={`ti ${exNoteSaved ? "ti-check" : "ti-send"} text-sm text-white`} />
-            </button>
-          </div>
+          {/* Dustin, 12 Aug: "when adding notes in logger you cant see the text
+              box". He was right, and it was the cost of the rule directly
+              above — notes sit last SO the keyboard covers them instead of a
+              set row. That protects the sets and hides what you are typing.
+
+              Rather than trade one for the other, typing happens in a sheet.
+              Tapping here opens a panel whose input is at the TOP, so the
+              keyboard shrinks the panel from below and the field it is
+              shrinking towards stays visible.
+
+              No listener, no measurement, no scrolling: the Android WebView
+              already shrinks the layout viewport when the keyboard opens, and
+              a fixed full-height panel simply occupies whatever is left. The
+              logger behind it never moves, because it is pinned to stableH.
+              This is the same rule as ever — do not react to the keyboard —
+              applied to a surface where being covered is the actual problem. */}
+          <button
+            onClick={() => setNoteSheetOpen(true)}
+            className="w-full flex items-center gap-2 text-left text-xs px-3 py-2 rounded-lg"
+            style={{ background: "rgba(255,255,255,0.06)", color: exNoteText ? "white" : "rgba(255,255,255,0.45)", border: "1px solid rgba(255,255,255,0.15)" }}
+          >
+            <i className="ti ti-pencil text-sm flex-shrink-0" style={{ color: "var(--brand-primary)" }} />
+            <span className="flex-1 truncate">{exNoteText || 'Pain, couldn\u2019t do it, form issue\u2026'}</span>
+          </button>
+
+          {noteSheetOpen && (
+            <div
+              className="fixed left-0 right-0 top-0 bottom-0 z-[1200] flex flex-col"
+              style={{ background: "rgba(4,10,24,0.97)" }}
+            >
+              <div className="flex items-center justify-between px-4 pt-4 pb-2 flex-shrink-0">
+                <p className="text-sm font-bold" style={{ color: "white" }}>Notes on this movement</p>
+                <button
+                  onClick={() => { setNoteSheetOpen(false); focusBlur(); }}
+                  className="text-xs px-3 py-1.5 rounded-lg"
+                  style={{ background: "rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.85)" }}
+                >Close</button>
+              </div>
+
+              {/* The input is FIRST and pinned, so it is the one thing the
+                  keyboard can never reach. */}
+              <div className="px-4 pb-3 flex gap-2 flex-shrink-0">
+                <input
+                  type="text" autoFocus value={exNoteText}
+                  onChange={e => setExNoteText(e.target.value)}
+                  onFocus={focusScroll} onBlur={focusBlur}
+                  placeholder={'Pain, couldn\u2019t do it, form issue\u2026'}
+                  className="flex-1 text-sm px-3 py-3 rounded-lg outline-none"
+                  style={{ background: "rgba(255,255,255,0.08)", color: "white", border: "1px solid var(--brand-primary)" }}
+                />
+                <button
+                  onClick={async () => { await saveExerciseNote(); setNoteSheetOpen(false); }}
+                  disabled={savingExNote || !exNoteText.trim()}
+                  className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: exNoteSaved ? "#22c55e" : "var(--brand-primary)", opacity: (savingExNote || !exNoteText.trim()) ? 0.5 : 1 }}
+                >
+                  <i className={`ti ${exNoteSaved ? "ti-check" : "ti-send"} text-base text-white`} />
+                </button>
+              </div>
+
+              {/* Earlier notes fill whatever is left. The keyboard covering
+                  these is fine — they are reference, not what you are typing. */}
+              <div className="px-4 pb-4 space-y-1.5" style={{ flexGrow: 1, flexShrink: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+                {exNotePrior.length === 0 && (
+                  <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>No earlier notes on this movement.</p>
+                )}
+                {exNotePrior.map(n => (
+                  <div key={n.id} className="text-xs rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.7)" }}>
+                    <span style={{ color: "var(--brand-primary)" }}>{n.author === "trainer" ? "You" : "Client"}: </span>{n.note}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
         </div>
 
