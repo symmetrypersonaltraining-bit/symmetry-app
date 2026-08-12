@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
+import NumericInput from "@/components/NumericInput";
 import { createClient } from "@/lib/supabase/client";
 import GroceryListSheet from "./GroceryListSheet";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
@@ -1297,8 +1298,13 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
               {amountAdds.map((ad, i) => (
                 <div key={i} className="flex items-center gap-1.5 mt-2">
                   <span className="flex-1 text-sm truncate" style={{ color: "var(--brand-text)" }}>&#65291; {ad.name}</span>
-                  <input type="number" value={ad.amount ?? 1} inputMode="decimal"
-                    onChange={e => { const v = parseFloat(e.target.value); setAmountAdds(prev => prev.map((x, j) => j === i ? reServings({ ...x, amount: isFinite(v) && v >= 0 ? v : 0 }) : x)); }}
+                  {/* Same family as Claudine's recipe report (11 Aug): a
+                      number-controlled box where a half-typed value parses to
+                      NaN and snaps the field to 0, so clearing it to retype
+                      loses the entry. NumericInput holds the text while
+                      editing. */}
+                  <NumericInput value={ad.amount ?? 1}
+                    onChange={n => { const v = n == null || n < 0 ? 0 : n; setAmountAdds(prev => prev.map((x, j) => j === i ? reServings({ ...x, amount: v }) : x)); }}
                     className="w-14 text-center text-sm py-2 rounded-xl outline-none"
                     style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
                   <select value={ad.unit ?? "serving"} onChange={e => setAmountAdds(prev => prev.map((x, j) => j === i ? reServings({ ...x, unit: e.target.value }) : x))}

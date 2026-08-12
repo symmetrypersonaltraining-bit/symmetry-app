@@ -87,6 +87,38 @@ is `completed`. The orphan log and its 24 duplicate sets were removed, backed
 up first to `bak_lauren_orphan_log_20260811` and
 `bak_lauren_orphan_setlogs_20260811`.
 
+## 0b. Decimals could not be typed into a recipe — FIXED 2026-08-11
+
+Claudine Ocon, 9:08pm, with a photo of her screen: *"Recipe works but cant type
+decimals in weight for each ingredient."* She wanted 1.5 lbs of ground beef and
+could only ever get "1".
+
+The field was controlled straight off a NUMBER:
+
+```
+value={it.amount ?? ""}
+onChange={(e) => setIng(i, { amount: Number(e.target.value.replace(...)) })}
+```
+
+`Number("1.")` is `1`, so React re-rendered the box as `"1"` — **deleting the
+decimal point on the keystroke that typed it**. The second digit then had
+nothing to attach to. It is not rejecting decimals; it is erasing the point, so
+from the other side of the screen it reads as a broken keyboard rather than a
+bug. That is why it took a photo to report.
+
+The P/C/F boxes beside it had the same shape plus `|| 0`, so clearing one to
+retype snapped it back to 0.
+
+Fixed with `src/components/NumericInput.tsx` + `src/lib/numericField.ts`: while
+someone is typing, the TEXT is the source of truth and the number is derived
+from it. A half-typed `"1."` reports nothing rather than committing `1`, so
+totals never flicker mid-entry. 10 tests.
+
+**Same fix applied to the meal-plan added-food amount** (`MealPlanClient.tsx`),
+which had the same family of fault — `parseFloat("")` is NaN, which snapped the
+field to 0 the moment a client cleared it to retype. That one is on a screen
+clients use every day.
+
 ## 1. Custom workout from the schedule page  ← NEXT
 
 `app_feedback` `73fcd284`, 2026-08-06, client-app, from Dustin.

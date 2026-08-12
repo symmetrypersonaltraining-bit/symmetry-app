@@ -12,6 +12,7 @@
 // different one, and any row can be edited afterwards.
 
 import { useMemo, useState } from "react";
+import NumericInput from "@/components/NumericInput";
 import { createClient } from "@/lib/supabase/client";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import {
@@ -592,11 +593,16 @@ function RecipeBuilder({
                 style={{ flex: "0 0 auto", width: 32, height: 32, borderRadius: 9, border: "1px solid var(--brand-border)", background: "var(--brand-surface)", color: "#ef4444", cursor: "pointer" }}>×</button>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
-              <input value={it.amount ?? ""} onChange={(e) => setIng(i, { amount: e.target.value === "" ? null : Number(e.target.value.replace(/[^0-9.]/g, "")) })} inputMode="decimal" placeholder="amt" style={{ ...input, flex: 0.8 }} />
+              {/* Claudine, 11 Aug: "cant type decimals in weight for each
+                  ingredient." These were controlled straight off the number,
+                  so Number("1.") came back 1 and React re-rendered the box as
+                  "1" — deleting the decimal point on the keystroke that typed
+                  it. NumericInput keeps the text while editing. */}
+              <NumericInput value={it.amount} onChange={(n) => setIng(i, { amount: n })} placeholder="amt" style={{ ...input, flex: 0.8 }} />
               <input value={it.unit ?? ""} onChange={(e) => setIng(i, { unit: e.target.value })} placeholder="unit" style={{ ...input, flex: 0.9 }} />
-              <input value={it.protein || ""} onChange={(e) => setIng(i, { protein: Number(e.target.value.replace(/[^0-9.]/g, "")) || 0 })} inputMode="decimal" placeholder="P" style={{ ...input, flex: 0.7, textAlign: "center" }} />
-              <input value={it.carbs || ""} onChange={(e) => setIng(i, { carbs: Number(e.target.value.replace(/[^0-9.]/g, "")) || 0 })} inputMode="decimal" placeholder="C" style={{ ...input, flex: 0.7, textAlign: "center" }} />
-              <input value={it.fats || ""} onChange={(e) => setIng(i, { fats: Number(e.target.value.replace(/[^0-9.]/g, "")) || 0 })} inputMode="decimal" placeholder="F" style={{ ...input, flex: 0.7, textAlign: "center" }} />
+              <NumericInput value={it.protein} emptyAsZero onChange={(n) => setIng(i, { protein: n ?? 0 })} placeholder="P" style={{ ...input, flex: 0.7, textAlign: "center" }} />
+              <NumericInput value={it.carbs} emptyAsZero onChange={(n) => setIng(i, { carbs: n ?? 0 })} placeholder="C" style={{ ...input, flex: 0.7, textAlign: "center" }} />
+              <NumericInput value={it.fats} emptyAsZero onChange={(n) => setIng(i, { fats: n ?? 0 })} placeholder="F" style={{ ...input, flex: 0.7, textAlign: "center" }} />
             </div>
             {it.source === "ai" && (
               <div style={{ fontSize: 10.5, color: "#e0a83e", fontWeight: 700, marginTop: 5 }}>
