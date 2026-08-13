@@ -379,3 +379,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nudge run failed", detail: String(e).slice(0, 200) }, { status: 500 });
   }
 }
+
+/**
+ * The scheduled entry point.
+ *
+ * vercel.json has scheduled this route since it was written — Mondays at 15:00
+ * UTC — and it has NEVER ONCE RUN. Vercel Cron issues a GET; this route
+ * exported only POST, so Next answered 405 before a line of it executed. Every
+ * other cron route in the app exports both verbs; this one was the exception
+ * and nothing surfaced it, because a job that never runs and a job with nothing
+ * to do look identical from the outside.
+ *
+ * A GET carries no body, so `send` is absent, so it is a PREVIEW run: it
+ * segments the roster, writes the drafts to ai_nudge_log with sent=false, and
+ * digests them to the trainer. Nothing reaches a client. That is the correct
+ * default for a job whose first-ever execution is happening unattended — and
+ * `nudges_live` still has to be on before send:true means anything at all.
+ */
+export async function GET(req: NextRequest) {
+  return POST(req);
+}

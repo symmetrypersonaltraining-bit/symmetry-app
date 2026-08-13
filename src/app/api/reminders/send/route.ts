@@ -3,6 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { isCronRequest } from "@/lib/cron-auth";
 import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 
+// Scheduled in vercel.json. A route handler Next decides to render statically
+// is served from cache and never executes — the same shape of silence as the
+// nudge sweep's missing GET. This one reads request headers so it is dynamic in
+// practice; saying so explicitly means it cannot quietly stop being.
+export const dynamic = "force-dynamic";
+
 const RESEND_API_URL = "https://api.resend.com/emails";
 
 async function sendEmail(to: string, subject: string, html: string) {
