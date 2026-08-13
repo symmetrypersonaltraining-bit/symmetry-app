@@ -69,6 +69,63 @@ test("Done is pinned outside the scrolling region", () => {
   assert.match(CODE, /env\(safe-area-inset-bottom\)/);
 });
 
+/**
+ * THE ROTATION AND ITS MODULUS HAVE TO AGREE.
+ *
+ * `variant = seed % N` picks the concept, and every concept but the last is an
+ * `else if (variant === K)`. So N and the set of K are two halves of one fact
+ * written in two places, and nothing connects them.
+ *
+ * Both ways of getting it wrong are silent and neither shows up in review:
+ *
+ *   N too LOW  — the top concepts are simply unreachable. Ten screens written,
+ *                shipped, and never seen by a single client. Nothing errors.
+ *   N too HIGH — every unmatched index falls through to the terminal `else`, so
+ *                one concept starts appearing several times as often as the
+ *                rest. The rotation still "works", it just quietly stops being
+ *                a rotation.
+ *
+ * That is exactly what happened adding these ten: `% 28` was bumped to `% 38`
+ * and the blocks written separately. This makes the two agree or fail the build.
+ */
+test("every index the modulus can produce lands on a concept, and every concept is reachable", () => {
+  const mod = CODE.match(/const variant = seed % (\d+);/);
+  assert.ok(mod, "the variant rotation is no longer `seed % N` — this guard needs updating with it");
+  const n = Number(mod![1]);
+
+  const handled = [...CODE.matchAll(/variant === (\d+)/g)].map((m) => Number(m[1]));
+  const set = new Set(handled);
+  assert.equal(handled.length, set.size, `a variant index is handled twice: ${handled.join(", ")}`);
+
+  // The terminal `else` catches whatever is left, so the explicit blocks must
+  // cover 0..n-2 and the leftover must be exactly one index.
+  const missing: number[] = [];
+  for (let i = 0; i < n; i++) if (!set.has(i)) missing.push(i);
+  assert.equal(
+    missing.length,
+    1,
+    `${missing.length} indices fall through to the terminal else (${missing.join(", ")}) — ` +
+      `that concept shows ${missing.length}x as often as the rest. Bump or lower \`seed % ${n}\`.`,
+  );
+
+  const unreachable = handled.filter((k) => k >= n);
+  assert.deepEqual(
+    unreachable,
+    [],
+    `these concepts are written but can never be picked: ${unreachable.join(", ")} — \`seed % ${n}\` never reaches them`,
+  );
+});
+
+// A Texas gym. An invoice card once shipped reading "AMOUNT DUE £0.00" because
+// the person writing the joke was not thinking about where it would be read.
+// Cheap to check, invisible to spot in review, and clients see it full-screen.
+test("no foreign currency or metric units in the celebration copy", () => {
+  for (const bad of ["£", "€", "¥"]) {
+    assert.ok(!CODE.includes(bad), `celebration copy contains "${bad}" — this app is priced and weighed in US units`);
+  }
+  assert.ok(!/\bkg\b/.test(CODE), "celebration copy says kg — the whole app logs in lb");
+});
+
 test("the card still clips its own background art", () => {
   // overflow:hidden on the card is doing real work — the rays, the spotlight
   // gradient and the floor line all bleed past the rounded corners without it.

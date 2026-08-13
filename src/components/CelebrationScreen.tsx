@@ -10,10 +10,24 @@ import { sendGroupMessage } from "@/app/(app)/home/messageActions";
 import { fx } from "@/lib/fx";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import AiBadge from "@/components/AiBadge";
-import { winMood } from "@/lib/ai/faces";
+import { winMood, type Mood } from "@/lib/ai/faces";
 
 /**
- * CelebrationScreen — workout-complete celebration (28 rotating concepts,
+ * The AI's face, sized for a celebration card rather than a chat line.
+ *
+ * AiBadge's defaults are tuned for inline use — 30px, a purple ring, a "written
+ * by the app" tooltip. On a full-screen win card the ring reads as a border
+ * drawn around a sticker and the tooltip is noise, so this is the one wrapper
+ * the rotation uses. Several of the concepts below lean on the EXPRESSION to
+ * carry the tone, which is why they resolve through the same mood registry as
+ * every other AI surface rather than hard-coding a file.
+ */
+function Face({ mood, size = 60 }: { mood: Mood; size?: number }) {
+  return <AiBadge size={size} mood={mood} ring={false} title="" />;
+}
+
+/**
+ * CelebrationScreen — workout-complete celebration (38 rotating concepts,
  * chosen per client+day, plus one PR-gated takeover that sits outside the
  * rotation — see "The Apparition"). Fully self-contained and presentational: it
  * computes volume from the raw sets object with defensive guards and never
@@ -133,10 +147,16 @@ export default function CelebrationScreen({
 
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const seed = hashStr(String(clientId || "") + today);
-  // 25 original concepts + The Ledger (24) + Full Send (25) + Coach Mode (26);
-  // the terminal else (Gains Facts) catches 27. Every earlier concept stays in
-  // the rotation exactly as it was — this only widens the wheel.
-  const variant = seed % 28;
+  // 25 original concepts + The Ledger (24) + Full Send (25) + Coach Mode (26),
+  // then ten more added 14 Aug (27-36); the terminal else (Gains Facts) catches
+  // 37. Dustin: "I also want to add about ten more to rotate through, and we
+  // need to make sure they all have the new AI icons."
+  //
+  // Every earlier concept stays in the rotation exactly as it was — this only
+  // widens the wheel. The ten new ones all read from the SESSION'S OWN numbers
+  // rather than being generic art, because a screen that says the same thing to
+  // everybody is a screen people stop reading after a fortnight.
+  const variant = seed % 38;
 
   const [tapIdx, setTapIdx] = useState(0);
   const [reroll, setReroll] = useState(0);
@@ -840,6 +860,205 @@ export default function CelebrationScreen({
 
         <div style={{ position: "relative", zIndex: 1, background: "#E53935", color: "#fff", fontSize: 9.5, fontWeight: 900, letterSpacing: 2.5, padding: "5px 14px", borderRadius: "8px 8px 0 0" }}>
           COACH APPROVED
+        </div>
+      </div>
+    );
+  } else if (variant === 27) {
+    // ── The Receipt Total — one number, made enormous. The whole concept is
+    // that volume is a big number and nobody ever sees it written large.
+    content = (
+      <div style={{ ...bigCard, background: "linear-gradient(160deg,#101826,#1b2942)", color: "#fff" }}>
+        <Face mood={winMood({ isPr: prCount > 0, streakDays, fullDayLogged: true })} size={64} />
+        <div style={{ fontSize: 10.5, letterSpacing: 3, color: "#8ea0be", marginTop: 14 }}>TODAY YOU MOVED</div>
+        <div style={{ fontSize: 52, fontWeight: 900, lineHeight: 1, margin: "8px 0", fontVariantNumeric: "tabular-nums" }}>{vStr}</div>
+        <div style={{ fontSize: 13, color: "#8ea0be" }}>pounds</div>
+        <div style={{ marginTop: 16, fontSize: 12.5, color: "#c8d4e8", maxWidth: 260, lineHeight: 1.5 }}>
+          Across {setCount} set{setCount === 1 ? "" : "s"}. You will not feel that number tomorrow. You will feel it the day after.
+        </div>
+      </div>
+    );
+  } else if (variant === 28) {
+    // ── The Quiet One. No confetti, no joke. Some sessions do not want a party
+    // and the rotation should be able to just nod at you.
+    content = (
+      <div style={{ ...bigCard, background: "var(--brand-surface)", padding: 26 }}>
+        <Face mood="confident" size={78} />
+        <div style={{ fontSize: 19, fontWeight: 800, color: "var(--brand-text)", marginTop: 18, lineHeight: 1.3, maxWidth: 280 }}>
+          That is {setCount} more set{setCount === 1 ? "" : "s"} than the version of you that stayed home.
+        </div>
+        <div style={{ fontSize: 12.5, color: "var(--brand-text-secondary)", marginTop: 12, maxWidth: 260, lineHeight: 1.6 }}>
+          Nothing dramatic. Just done, on a day it would have been easy not to.
+        </div>
+      </div>
+    );
+  } else if (variant === 29) {
+    // ── The Streak Ladder — only interesting if the streak is real, so it says
+    // so plainly when it is not rather than inflating a 1 into a milestone.
+    const rungs = [3, 7, 14, 30, 60];
+    const next = rungs.find((r) => r > streakDays) ?? null;
+    content = (
+      <div style={{ ...bigCard, background: "#0b1220", color: "#fff", justifyContent: "flex-start", paddingTop: 24 }}>
+        <Face mood={streakDays >= 30 ? "streak" : streakDays >= 7 ? "cool" : "happy"} size={62} />
+        <div style={{ fontSize: 34, fontWeight: 900, marginTop: 12, fontVariantNumeric: "tabular-nums" }}>{streakDays || 1}</div>
+        <div style={{ fontSize: 10.5, letterSpacing: 3, color: "#8ea0be" }}>DAY{(streakDays || 1) === 1 ? "" : "S"} RUNNING</div>
+        <div style={{ display: "flex", gap: 6, marginTop: 18, flexWrap: "wrap", justifyContent: "center" }}>
+          {rungs.map((r) => (
+            <div key={r} style={{
+              padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 800,
+              background: streakDays >= r ? "#16A34A" : "#1b2536",
+              color: streakDays >= r ? "#fff" : "#5c6b82",
+            }}>{r}</div>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: "#8ea0be", marginTop: 16, maxWidth: 250, lineHeight: 1.5 }}>
+          {next ? `${next - streakDays} more and the next one lights up.` : "Every rung lit. There is no higher one — you built the ladder."}
+        </div>
+      </div>
+    );
+  } else if (variant === 30) {
+    // ── Certificate of Showing Up. Deadpan formality about something small.
+    content = (
+      <div style={{ ...bigCard, background: "#fdfaf3", color: "#3b3629", border: "6px double #a4443c", padding: 22 }}>
+        <div style={{ fontSize: 9.5, letterSpacing: 4, color: "#a4443c", fontWeight: 800 }}>CERTIFICATE OF</div>
+        <div style={{ fontSize: 25, fontWeight: 900, fontFamily: "Georgia, serif", margin: "6px 0 12px" }}>Showing Up</div>
+        <Face mood="confident" size={58} />
+        <div style={{ fontSize: 13, fontFamily: "Georgia, serif", marginTop: 12, lineHeight: 1.7, maxWidth: 270 }}>
+          Awarded to <b>{firstName}</b>, who did {setCount} set{setCount === 1 ? "" : "s"}
+          {min > 0 ? ` in ${min} minutes` : ""}, having been offered several perfectly
+          reasonable opportunities not to.
+        </div>
+        <div style={{ fontSize: 10, color: "#8a7f6b", marginTop: 14, fontStyle: "italic" }}>Signed, {COACH_FIRST_NAME}. Unframed, as is tradition.</div>
+      </div>
+    );
+  } else if (variant === 31) {
+    // ── The Weather Report. Session conditions, forecast tomorrow.
+    content = (
+      <div style={{ ...bigCard, background: "linear-gradient(160deg,#1e3a5f,#0b1220)", color: "#fff", justifyContent: "flex-start", paddingTop: 22 }}>
+        <div style={{ fontSize: 10, letterSpacing: 3, color: "#8ea0be" }}>TODAY&rsquo;S CONDITIONS</div>
+        <Face mood={prCount > 0 ? "pr" : "lifting"} size={60} />
+        <div style={{ width: "100%", maxWidth: 280, marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+          {[
+            ["Volume", `${vStr} lb`],
+            ["Sets", String(setCount)],
+            ...(min > 0 ? [["Duration", `${min} min`]] : []),
+            ["Chance of soreness", prCount > 0 ? "100%" : setCount >= 15 ? "90%" : "70%"],
+          ].map(([k, v]) => (
+            <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, borderBottom: "1px solid rgba(255,255,255,.09)", paddingBottom: 6 }}>
+              <span style={{ color: "#8ea0be" }}>{k}</span><b>{v}</b>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11.5, color: "#8ea0be", marginTop: 14, maxWidth: 260, lineHeight: 1.5 }}>
+          Tomorrow: stiff early, fine by lunch. Long-range outlook strong.
+        </div>
+      </div>
+    );
+  } else if (variant === 32) {
+    // ── Two Versions Of You. The comparison people actually respond to is not
+    // against anybody else.
+    content = (
+      <div style={{ ...bigCard, background: "#0b1220", color: "#fff", padding: 20 }}>
+        <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: 300 }}>
+          <div style={{ flex: 1, background: "#161f2f", borderRadius: 14, padding: 14, opacity: 0.55 }}>
+            <div style={{ fontSize: 9.5, letterSpacing: 2, color: "#8ea0be" }}>THE ONE WHO SKIPPED</div>
+            <div style={{ fontSize: 30, fontWeight: 900, margin: "8px 0" }}>0</div>
+            <div style={{ fontSize: 11, color: "#8ea0be" }}>sets · 0 lb · same evening either way</div>
+          </div>
+          <div style={{ flex: 1, background: "linear-gradient(160deg,#16A34A,#0d7a37)", borderRadius: 14, padding: 14 }}>
+            <div style={{ fontSize: 9.5, letterSpacing: 2, opacity: 0.85 }}>YOU, ACTUALLY</div>
+            <div style={{ fontSize: 30, fontWeight: 900, margin: "8px 0" }}>{setCount}</div>
+            <div style={{ fontSize: 11, opacity: 0.9 }}>sets · {vStr} lb · one better</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 16 }}><Face mood="cool" size={54} /></div>
+        <div style={{ fontSize: 12, color: "#8ea0be", marginTop: 10, maxWidth: 250, lineHeight: 1.5 }}>
+          Same day, same tiredness, same excuses available. Different column.
+        </div>
+      </div>
+    );
+  } else if (variant === 33) {
+    // ── The Group Chat Leak — the muscles again, but on a rest-day argument.
+    // Kept short; the joke does not improve with length.
+    content = (
+      <div style={{ ...bigCard, background: "#0b0f17", color: "#fff", justifyContent: "flex-start", padding: 16 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>📱 Nervous System &middot; 3 unread</div>
+        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+          <div style={{ alignSelf: "flex-start", maxWidth: "84%", background: "#2a3346", padding: "9px 12px", borderRadius: "14px 14px 14px 4px" }}>
+            that was {setCount} sets. i counted. i count everything
+          </div>
+          <div style={{ alignSelf: "flex-start", maxWidth: "84%", background: "#2a3346", padding: "9px 12px", borderRadius: "14px 14px 14px 4px" }}>
+            {vStr} lb. i&rsquo;m putting it in the group
+          </div>
+          <div style={{ alignSelf: "flex-end", maxWidth: "84%", background: "linear-gradient(135deg,#0EA5E9,#0F4C81)", padding: "9px 12px", borderRadius: "14px 14px 4px 14px" }}>
+            please don&rsquo;t
+          </div>
+        </div>
+        <div style={{ marginTop: 14 }}><Face mood="happy" size={52} /></div>
+      </div>
+    );
+  } else if (variant === 34) {
+    // ── The Invoice. Billed to yourself, paid in effort.
+    content = (
+      <div style={{ ...bigCard, background: "#fff", color: "#111", padding: 20, fontFamily: "ui-monospace, Menlo, monospace" }}>
+        <div style={{ width: "100%", maxWidth: 290, textAlign: "left" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "2px solid #111", paddingBottom: 6 }}>
+            <b style={{ fontSize: 15 }}>INVOICE</b><span style={{ fontSize: 11 }}>#{String(setCount).padStart(3, "0")}</span>
+          </div>
+          <div style={{ fontSize: 10.5, color: "#666", margin: "8px 0 12px" }}>BILLED TO: {firstName.toUpperCase()}</div>
+          {[
+            ["Sets rendered", String(setCount)],
+            ["Weight moved", `${vStr} lb`],
+            ...(prCount > 0 ? [["Records broken", String(prCount)]] : []),
+            ["Excuses accepted", "0"],
+          ].map(([k, v]) => (
+            <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, borderBottom: "1px dotted #bbb", padding: "5px 0" }}>
+              <span>{k}</span><b>{v}</b>
+            </div>
+          ))}
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 900, borderTop: "2px solid #111", marginTop: 8, paddingTop: 8 }}>
+            <span>AMOUNT DUE</span><span>$0.00</span>
+          </div>
+          <div style={{ fontSize: 9.5, color: "#666", marginTop: 8, lineHeight: 1.5 }}>
+            Settled in full at the time of service. Payment method: showing up.
+          </div>
+        </div>
+      </div>
+    );
+  } else if (variant === 35) {
+    // ── The Long Game. Deliberately the least jokey in the set — the one that
+    // lands on a day somebody needed a reason rather than a laugh.
+    content = (
+      <div style={{ ...bigCard, background: "linear-gradient(160deg,#12233b,#0a1120)", color: "#fff", padding: 24 }}>
+        <Face mood="thinking" size={68} />
+        <div style={{ fontSize: 17.5, fontWeight: 800, marginTop: 16, lineHeight: 1.45, maxWidth: 280 }}>
+          Nothing you did today will show up tomorrow.
+        </div>
+        <div style={{ fontSize: 13, color: "#9fb2cd", marginTop: 12, maxWidth: 275, lineHeight: 1.65 }}>
+          That is not a problem with today. It is how the whole thing works. {setCount} sets,
+          {" "}{vStr} lb, filed away somewhere you cannot see yet.
+        </div>
+        <div style={{ fontSize: 11.5, color: "#6f83a0", marginTop: 14, fontStyle: "italic" }}>Come back and do it again.</div>
+      </div>
+    );
+  } else if (variant === 36) {
+    // ── The Scoreboard. Big, loud, and the only one in the ten that shouts.
+    content = (
+      <div style={{ ...bigCard, background: "#08111e", color: "#fff", padding: 18 }}>
+        <div style={{ fontSize: 10, letterSpacing: 4, color: "#f59e0b", fontWeight: 900 }}>FINAL</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 12 }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 9.5, color: "#8ea0be", letterSpacing: 2 }}>{firstName.toUpperCase()}</div>
+            <div style={{ fontSize: 46, fontWeight: 900, lineHeight: 1, color: "#16A34A" }}>{setCount}</div>
+          </div>
+          <div style={{ fontSize: 20, color: "#3b4a63", fontWeight: 900 }}>&ndash;</div>
+          <div style={{ textAlign: "center", opacity: 0.6 }}>
+            <div style={{ fontSize: 9.5, color: "#8ea0be", letterSpacing: 2 }}>THE COUCH</div>
+            <div style={{ fontSize: 46, fontWeight: 900, lineHeight: 1 }}>0</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 14 }}><Face mood="hype" size={58} /></div>
+        <div style={{ fontSize: 12, color: "#8ea0be", marginTop: 10, maxWidth: 260, lineHeight: 1.5 }}>
+          {prCount > 0 ? `${prCount} record${prCount === 1 ? "" : "s"} broken in the process. Unsportsmanlike.` : "The couch remains undefeated against everyone who did not turn up."}
         </div>
       </div>
     );
