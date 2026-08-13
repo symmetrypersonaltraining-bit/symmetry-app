@@ -117,6 +117,79 @@ reads the trend. This is a new `client_goals` table plus chart work.
 
 ---
 
+## Notification settings — who gets told what, how, and who decides  ← AFTER GOALS
+
+Dustin, 2026-08-13: "lets look at optoins for notification settings for everyone
+in terms of what they get notified on and how, what they have a choice of and
+what i say is built in, where that setting should live, etc." Then: "also add
+options for them to get notifications on emojis on thier group chat comments
+within the notification settings."
+
+**Explicit ordering: goals first, this second.**
+
+### What actually exists today (checked, not assumed)
+
+Push is real and working — FCM via `src/lib/push.ts`, `sendPushToUser()`. But it
+fires from exactly **one** file, `home/messageActions.ts`, in four places:
+
+| Event | Who gets it |
+|---|---|
+| Coach messages a client | that client |
+| Client messages the coach | Dustin |
+| Announcement | every client |
+| Group message | everyone in the group |
+
+That is the whole notification surface. **Nothing else in the app pushes at
+all** — not a workout reminder, not a nudge, not a payment, not a birthday, and
+not a reaction on your group message.
+
+There is **no per-event preference anywhere**. The only related switches are
+`client_app_settings.nudges_enabled` (AI nudges, which are messages not pushes)
+and the new `checkin_nudges_off` / `checkin_snoozed_until` from the go-quiet
+screen. So today the honest answer to "what can they turn off?" is: nothing,
+except by switching off notifications for the whole app at the OS level — which
+is exactly the outcome a missing settings screen produces.
+
+`message_reactions` (`message_id, user_id, emoji`) exists and is written by
+`MessageReactions.tsx` under RLS from the browser. **No push fires on insert**,
+so the kudos feature is invisible unless you happen to be looking. That is
+Dustin's emoji ask, and it is genuinely the highest-value one on this list —
+👊 on someone's win is the whole point of the group chat, and right now the
+person who earned it never finds out.
+
+### The design questions, which are the actual work
+
+1. **Which events even become notifiable?** Messages · group messages ·
+   announcements · **reactions on your own message** · workout reminder ·
+   missed-log nudge · payment due · birthday · challenge results · a reply from
+   Dustin to an escalated coach question.
+2. **Which are Dustin's to force and which are the client's to choose?** His
+   words: "what they have a choice of and what i say is built in." Payment
+   reminders are plainly his. Reactions are plainly theirs. The middle is the
+   conversation.
+3. **Where does the screen live?** Settings today is one `SettingsClient.tsx`
+   plus `ExperienceSettings`. Probably its own Settings → Notifications page,
+   because a per-event matrix does not fit inside an existing card.
+4. **Quiet hours**, and whether Dustin can override them for something urgent.
+5. **Does the trainer get a separate set?** He is the only person who receives
+   from thirty people rather than one.
+
+### Notes for whoever builds it
+
+- Storage should be a per-client, per-event table rather than more boolean
+  columns on `client_app_settings` — that column list is already 25 wide and
+  every new event would add another.
+- **Default ON, opt-out per event.** A notification system nobody has heard of
+  does nothing; one that cannot be turned off gets killed at the OS level, and
+  then the payment reminders stop arriving too.
+- Reaction pushes need coalescing (five 👊 in a minute is one notification, not
+  five) and must never notify you about your own reaction.
+- `sendPushToUser` is currently called with no preference check at all. Whatever
+  lands should route every send through one gate, so a new caller cannot bypass
+  preferences by simply not knowing they exist.
+
+---
+
 ## AI build — night of 2026-08-12/13
 
 Dustin: "i want the ai functions in this app to feel so accurate and personal
