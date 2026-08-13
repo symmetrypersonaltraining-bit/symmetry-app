@@ -26,7 +26,7 @@
 
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resolveAiScope } from "@/lib/ai/scope";
+import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import Anthropic from "@anthropic-ai/sdk";
 import { HAIKU_MODEL } from "@/lib/ai/anthropic";
@@ -62,6 +62,11 @@ export async function POST(req: Request) {
     const scoped = await resolveAiScope(null);
     if (!scoped.ok) return scoped.response;
   }
+
+  // Kill switch. This route could spend after every client-facing feature had
+  // already paused — the cap meant nothing here.
+  const paused = await enforceMeter(null, "feedback_image");
+  if (paused) return paused;
 
   let body: { feedbackId?: string; imageUrl?: string };
   try {

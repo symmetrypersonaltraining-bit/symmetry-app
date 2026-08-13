@@ -20,7 +20,7 @@
 // exactly the mismatch that made a client's breakfast look doubled.
 
 import { NextRequest, NextResponse } from "next/server";
-import { resolveAiScope } from "@/lib/ai/scope";
+import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { callClaudeJson, HAIKU_MODEL } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { kcalOf } from "@/lib/recipes";
@@ -94,6 +94,11 @@ function validate(raw: unknown): Reply | null {
 export async function POST(req: NextRequest) {
   const scoped = await resolveAiScope(null);
   if (!scoped.ok) return scoped.response;
+
+  // Kill switch. This route could spend after every client-facing feature had
+  // already paused — the cap meant nothing here.
+  const paused = await enforceMeter(null, "recipe_ai");
+  if (paused) return paused;
 
   let body: { mode?: string; text?: string; ingredients?: { food: string; amount?: number | null; unit?: string | null }[]; title?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }

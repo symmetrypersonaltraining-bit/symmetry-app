@@ -39,7 +39,7 @@ import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { isCronRequest } from "@/lib/cron-auth";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
-import { resolveAiScope, type Db } from "@/lib/ai/scope";
+import { enforceMeter, resolveAiScope, type Db } from "@/lib/ai/scope";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import {
   BIRTHDAY_SYSTEM, centralToday, effectiveMonthDay, fallbackLine, isPrintable,
@@ -218,6 +218,12 @@ async function handle(req: NextRequest) {
   }
   const db = createAdminClient() as unknown as Db;
   const sp = new URL(req.url).searchParams;
+  // Kill switch. Unattended jobs were the ONE place it did not apply, which is
+  // the worst possible exemption: they run on a schedule with nobody watching,
+  // so an overspend is discovered on the invoice. No per-client cap — there is
+  // no single client to charge for a sweep across the whole roster.
+  const paused = await enforceMeter(null, "birthday_post");
+  if (paused) return paused;
   try {
     const out = await runBirthdays(db, {
       force: sp.get("force") === "1",

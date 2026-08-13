@@ -27,7 +27,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { fetchWeeklyComparison } from "@/lib/ai/weekly-context";
-import { resolveAiScope } from "@/lib/ai/scope";
+import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { isCronRequest } from "@/lib/cron-auth";
 import { WEEKLY_WRITER_RULES, weekStartOf } from "@/lib/ai/weekly-numbers";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
@@ -280,6 +280,10 @@ export async function GET(req: NextRequest) {
     // ?draft=1 on Saturday: write focus DRAFTS for Dustin to approve rather
     // than publishing 35 lines of coaching copy nobody has read.
     const sp = new URL(req.url).searchParams;
+    // Kill switch. This route could spend after every client-facing feature had
+    // already paused — the cap meant nothing here.
+    const paused = await enforceMeter(null, "weekly_sweep");
+    if (paused) return paused;
     const out = await runSweep({
       onlyClientId: sp.get("clientId"),
       draftFocus: sp.get("draft") === "1",
@@ -304,6 +308,11 @@ export async function POST(req: NextRequest) {
     }
   }
   const body = await req.json().catch(() => ({}));
+  // Same gate as the scheduled GET. A manual sweep is one model call per client
+  // — the most expensive single action in the app — so it respects the cap for
+  // exactly the same reason the cron does.
+  const paused = await enforceMeter(null, "weekly_sweep");
+  if (paused) return paused;
   try {
     const out = await runSweep({
       onlyClientId: typeof body?.clientId === "string" ? body.clientId : null,

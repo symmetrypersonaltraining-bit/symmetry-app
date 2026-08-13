@@ -151,6 +151,25 @@ test("a route's meter feature matches the feature it logs usage under", () => {
   assert.deepEqual(offenders, [], offenders.join("\n"));
 });
 
+test("every AI route checks the kill switch before it spends", () => {
+  // Six routes could spend past the $95 cap: ai-nudges, the three crons,
+  // feedback/describe and recipes/ai. Four of those are UNATTENDED jobs, which
+  // is the worst possible exemption — they run on a schedule with nobody
+  // watching, so an overspend is discovered on the invoice. A cap that four
+  // scheduled jobs ignore is not a cap.
+  const offenders: string[] = [];
+  for (const { file, src } of aiRoutes()) {
+    const gated = /(enforceMeter|checkAndLog|assertNotPaused)\s*\(/.test(src);
+    if (!gated) offenders.push(path.relative(process.cwd(), file));
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `These routes call Claude without checking the kill switch:\n  ${offenders.join("\n  ")}\n` +
+      `Add: const paused = await enforceMeter(clientIdOrNull, "<feature>"); if (paused) return paused;`
+  );
+});
+
 test("every registry entry is complete and internally consistent", () => {
   for (const key of AI_FEATURE_KEYS) {
     const spec = AI_FEATURES[key];

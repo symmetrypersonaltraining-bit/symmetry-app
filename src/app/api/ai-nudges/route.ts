@@ -25,7 +25,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
-import { Db, TRAINER_EMAIL } from "@/lib/ai/scope";
+import { Db, TRAINER_EMAIL, enforceMeter } from "@/lib/ai/scope";
 import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
@@ -138,6 +138,13 @@ export async function POST(req: NextRequest) {
       wantSend = false;
     }
   }
+
+  // Kill switch. This was the ONLY route in the app that never checked it at
+  // all — a weekly sweep across the whole roster, unattended, able to spend
+  // after every client-facing feature had already paused. No per-client cap:
+  // the sweep decides for itself who gets a message and how often.
+  const paused = await enforceMeter(null, "nudge_sweep");
+  if (paused) return paused;
 
   const today = CT_TODAY();
   const since30 = shiftDays(today, -29);
