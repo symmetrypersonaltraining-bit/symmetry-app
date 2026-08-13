@@ -76,6 +76,7 @@ that it blows plps minds." What landed, and what is deliberately still open.
 | `0a7f138` | Workout edits are undoable; `applyProposal` de-duplicated (it existed twice) |
 | `5962d33` | The celebration's AI line wears the matching face |
 | `778c98c` | Coaching-voice routes moved to Sonnet, extraction stays on Haiku |
+| `3c1f1eb` | `/settings/ai-health` — every surface, what has never run, what is failing, spend vs the cap |
 
 ### The ripple bug, because it will be tempting to "simplify" it back
 
@@ -107,10 +108,7 @@ positioning one is only applied to elements that are already `static`.
    inbox with a link back to the conversation. Agreed as one build.
 4. **The logger ✦.** Its own commit, hidden when the keyboard is up.
    `GlobalCoach` deliberately excludes `/workout/<id>` today.
-5. **`/settings/ai-health`.** One page showing all 23 features: last call, last
-   failure, spend against the cap. The data exists (`ai_usage_log` now records
-   failures and per-feature labels); nothing reads it yet.
-6. **Legacy food-photo path.** `MealPlanClient` posts to `/api/analyze-meal-photo`
+5. **Legacy food-photo path.** `MealPlanClient` posts to `/api/analyze-meal-photo`
    with no `clientId`, so a trainer-viewed photo bills the trainer. Every client
    is on `nutrition_v3`, so this is unreachable today — fix it or delete the
    legacy logger.
