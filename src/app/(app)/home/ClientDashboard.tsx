@@ -302,14 +302,38 @@ function MetricModal({
   const dates = metrics.filter(m => m[metricKey] != null).map(m => m.metric_date);
 
   return (
+    // Lauren, on an iPhone, 2026-08-13: "can't scroll down to log weight."
+    //
+    // Three things were wrong with this sheet, and all three are the kind that
+    // only show up on a real phone:
+    //
+    //  1. `85vh` on iOS is measured against the LARGE viewport — the one that
+    //     assumes the browser chrome is hidden. So the panel was taller than
+    //     the space actually on screen, and the bottom of it, including the
+    //     button she needed, sat below the fold with nothing to scroll: the
+    //     panel was not overflowing, the viewport was. `dvh` is the visible
+    //     height, which is what was meant all along.
+    //  2. The panel is bottom-anchored and the client layout has a FIXED bottom
+    //     nav on top of it, so the last ~80px were covered even once the height
+    //     was right. It now pads past the nav and the home indicator.
+    //  3. z-50 put it BELOW the floating coach (z-1100), which is why the
+    //     coach's face was sitting on her Low tile. Every other sheet in the
+    //     app is 1200; this one is now too.
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      className="fixed inset-0 z-[1200] flex items-end justify-center"
       style={{ background: "rgba(0,0,0,0.5)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-lg rounded-t-3xl p-6 pb-8"
-        style={{ background: "var(--brand-bg)", maxHeight: "85vh", overflowY: "auto" }}
+        className="w-full max-w-lg rounded-t-3xl p-6"
+        style={{
+          background: "var(--brand-bg)",
+          maxHeight: "85dvh",
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+          overscrollBehavior: "contain",
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 92px)",
+        }}
       >
         <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: "var(--brand-border)" }} />
         <div className="flex items-center justify-between mb-5">
