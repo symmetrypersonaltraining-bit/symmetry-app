@@ -323,7 +323,7 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
             style={{
               width: "100%",
               maxWidth: 560,
-              maxHeight: "88vh",
+              maxHeight: "88dvh",
               overflowY: "auto",
               background: "var(--brand-bg)",
               borderTopLeftRadius: 20,

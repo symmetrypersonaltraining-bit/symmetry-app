@@ -259,7 +259,7 @@ export default function AchievementCard({ clientId, name }: { clientId: string; 
               borderRadius: "22px 22px 0 0",
               padding: 16,
               paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
-              maxHeight: "92vh",
+              maxHeight: "92dvh",
               overflowY: "auto",
               WebkitOverflowScrolling: "touch",
             }}

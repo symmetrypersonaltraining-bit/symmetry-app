@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
       ],
       validate: validateActReply,
     });
-    await logUsage(clientId, "coach_action", extraction.tokensIn, extraction.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "coach_action", extraction.tokensIn, extraction.tokensOut, HAIKU_MODEL, { latencyMs: extraction.latencyMs, startedAt: extraction.startedAt });
 
     // Even a failed extraction should degrade to Q&A, not an error bubble.
     const act: ActReply = extraction.value
@@ -257,7 +257,7 @@ export async function POST(req: NextRequest) {
       ],
       validate: validateCoachReply,
     });
-    await logUsage(clientId, "coach_action", coach.tokensIn, coach.tokensOut, SONNET_MODEL);
+    await logUsage(clientId, "coach_action", coach.tokensIn, coach.tokensOut, SONNET_MODEL, { latencyMs: coach.latencyMs, startedAt: coach.startedAt });
 
     if (coach.value) {
       // Written AFTER the reply, so a failure here can never cost the client

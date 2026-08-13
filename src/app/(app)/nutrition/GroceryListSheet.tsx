@@ -228,7 +228,7 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
 
   return (
     <div className="fixed inset-0 z-[1200] flex items-end" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
-      <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)", maxHeight: "90vh", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: "calc(28px + env(safe-area-inset-bottom))" }} onClick={e => e.stopPropagation()}>
+      <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)", maxHeight: "90dvh", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: "calc(28px + env(safe-area-inset-bottom))" }} onClick={e => e.stopPropagation()}>
         <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>Grocery list &amp; meal prep</h3>

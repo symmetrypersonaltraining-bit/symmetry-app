@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
       validate: validatePlanDraft,
     });
 
-    await logUsage(clientId, "plan_build", result.tokensIn, result.tokensOut, SONNET_MODEL);
+    await logUsage(clientId, "plan_build", result.tokensIn, result.tokensOut, SONNET_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
     if (!result.value) {
       return NextResponse.json(

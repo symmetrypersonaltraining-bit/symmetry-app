@@ -1,0 +1,180 @@
+# Client update — group message draft
+
+**Status:** DRAFT, not sent. Copy the block below the line into the group chat.
+Add to it as tonight's items land; the "Still coming" section is the parking
+spot for anything not shipped yet.
+
+**Last updated:** 13 Aug 2026, from `4df0802` (live).
+
+---
+
+Big update — a lot has changed in the app over the last two days, and most of it
+needs you to actually poke at it before I know it's right. Everything below is
+live right now. Force-close the app and open it again so you get the new version.
+
+**Please break it and tell me.** Screenshot anything that looks wrong, and say
+what phone you're on. That's how the last round of these got fixed.
+
+---
+
+**1. There's a coach in the app now, and it's on every screen**
+
+Look bottom-right — the little round picture of me. Tap it anywhere.
+
+It knows *your* stuff: your program, what you've lifted, your macros, your
+logging, your weight trend. Not general fitness advice — yours.
+
+It also knows which screen you're on. Open it on your workout and it asks about
+today's session. Open it on Nutrition and it's on your meals. Open it on
+Progress and it'll tell you what your numbers actually mean.
+
+Ask it anything. "Is this weight right for me?" "Am I losing fat or is that
+water?" "What should I focus on this week?" "My shoulder's bugging me." If it's
+something that needs a real decision from me, it'll tell you to come ask me
+rather than guess — that's on purpose.
+
+**Test it:** open it on three different screens and ask something real. Tell me
+if an answer is wrong, vague, or sounds like a robot.
+
+---
+
+**2. It remembers you now**
+
+This is the big one. Anything you tell it, it keeps — permanently.
+
+Tell it once that you travel Tuesdays, that you can't stand cottage cheese, that
+overhead pressing bothers your left shoulder, that you only have dumbbells at
+home. You never have to say it again. Weeks later it'll still know, and it'll
+factor it in without being reminded.
+
+Before this it started from scratch every single time you opened it.
+
+**Test it:** tell it something about yourself today. Come back tomorrow, ask a
+related question, and see whether it remembered. Tell me if it forgets.
+
+---
+
+**3. On Nutrition, it can actually change things for you**
+
+On the Nutrition tab only, the coach can do the work instead of just talking
+about it. Say it in plain English:
+
+- "Swap M4 for salmon and rice"
+- "I ate a cookie"
+- "Move M2 to after my workout"
+- "I only ate half of M3"
+
+It'll show you exactly what it's about to do and wait for you to tap Confirm.
+**Nothing changes until you confirm it.** On other tabs it'll tell you to come
+to Nutrition to do it.
+
+**Test it:** log a real off-plan thing by just typing what you ate.
+
+---
+
+**4. You can log a weigh-in again**
+
+This one was properly broken and I'm sorry — there was no way to enter a weight
+from anywhere in the app.
+
+Now: **Home → tap your Body Weight card → "Log a weigh-in."** Date, weight, body
+fat if you have it. Your recent weigh-ins are right underneath.
+
+iPhone people: the card also wouldn't scroll far enough to reach the button.
+Fixed.
+
+**Test it:** log your current weight. If anything about that screen is awkward,
+tell me.
+
+---
+
+**5. Swapping a workout no longer forces the AI to build you one**
+
+If you're travelling, the gym's packed, or you just want to do something else,
+you now get a choice instead of one option.
+
+**Workout tab → "Create / Replace Workout."** The AI options are still there
+(build me a substitute, use what I have, log what I did), and underneath them
+there's now **"OR SKIP THE AI"**:
+
+- **Swap for one I pick** — choose a cardio or basic session from the library. Nothing generated, no invented warm-up.
+- **I did something else** — just type it. Recorded straight away, I see it.
+
+This was Lauren's catch — she swapped the stair master for a walk and it wanted
+to build a whole new session around it.
+
+**Also:** to change *one* movement inside a session without touching the rest,
+open the workout and tap the **swap arrows** on the exercise. That's always
+worked and it's the right tool for "the leg press is taken."
+
+---
+
+**6. Buttons that did nothing now do something**
+
+There was a bug making floating buttons jump off-screen the instant you pressed
+them — so the press never registered. It hit sixteen buttons, including **"Start
+session and log"** and every X to close a chart or video.
+
+If something's been ignoring your taps for a while, that was probably it. Try it
+again and tell me if anything still doesn't respond.
+
+---
+
+**7. You should stop getting logged out**
+
+The app was quietly signing you out about once an hour. That's fixed — you
+should stay signed in now. Tell me if you get kicked to the login screen again.
+
+---
+
+**8. The end-of-workout screen is personal now**
+
+When you finish a session, the line you get is written from that day's actual
+numbers — your sets, your volume, your streak, your PR — not a stock phrase. The
+face changes to match: hit a PR and you get the one flexing.
+
+---
+
+**9. Smaller things from the last couple of days**
+
+- **Per-set rest timer** in the logger — it now follows the set it's timing.
+- **Distance** is a real field, so walks, runs and rows record properly.
+- Your **calendar and program** look six months ahead instead of three.
+- **Notes** in the logger — you can see what you're typing again.
+- **Assisted machines** (assisted pull-ups, assisted dips) now count a PR the
+  right way round: less help is progress, not less weight.
+- Your **meal plan** shows eight weeks ahead instead of flipping over each morning.
+- **Help & Tutorials** in Settings if you're stuck on anything.
+- Logging a workout for **yesterday** now records it on yesterday, not on the
+  clock time you typed it.
+
+---
+
+**What I need from you**
+
+Use it normally for a couple of days and tell me:
+
+1. Anything that doesn't respond when you tap it — and what phone you're on.
+2. Anything the coach says that's wrong, or that you had to repeat yourself about.
+3. Anything you went looking for and couldn't find.
+
+Reply here or message me directly. — Dustin
+
+---
+
+## STILL COMING (do not send — working list)
+
+Items to fold into the message above as they land tonight:
+
+1. Response-time tracking on the AI surfaces *(trainer-side only — probably not for this message)*
+2. Sheet-height sweep — the same iPhone scrolling problem on twelve other pop-up cards
+3. Ten more end-of-workout celebration screens
+4. Coach escalation — routing a question to Dustin's inbox with the conversation attached
+5. The coach inside the workout logger itself
+6. The check-in screen for someone who's gone quiet *(copy needs Dustin's review before it can fire)*
+
+## DELIBERATELY EXCLUDED (trainer-only, not client-facing)
+
+AI health page, undo on workout edits, spend cap and per-feature metering, model
+routing, the client-memory internals. Move any of these up if you want clients
+to know about them.

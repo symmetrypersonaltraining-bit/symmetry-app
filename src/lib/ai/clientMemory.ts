@@ -258,7 +258,7 @@ export async function foldMemory(db: Db, clientId: string, apiKey: string): Prom
       ],
       validate: validateFold,
     });
-    await logUsage(clientId, "memory_fold", res.tokensIn, res.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "memory_fold", res.tokensIn, res.tokensOut, HAIKU_MODEL, { latencyMs: res.latencyMs, startedAt: res.startedAt });
     if (!res.value) return false;
 
     await db.from("ai_client_memory").upsert(

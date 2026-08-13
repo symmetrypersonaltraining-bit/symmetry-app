@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       validate: validateFocus,
     });
 
-    await logUsage(clientId, "coach_read", result.tokensIn, result.tokensOut, SONNET_MODEL);
+    await logUsage(clientId, "coach_read", result.tokensIn, result.tokensOut, SONNET_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
     if (!result.value) {
       return NextResponse.json({ error: "Coach's Read couldn't generate right now — try again shortly." }, { status: 502 });

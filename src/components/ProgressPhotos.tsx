@@ -507,7 +507,7 @@ export default function ProgressPhotos({ clientId, clientName }: { clientId: str
       {lightbox && (
         <div onClick={() => setLightbox(null)} style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(10,12,20,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={lightbox.photo_url} alt="" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "100%", maxHeight: "72vh", borderRadius: 12, objectFit: "contain" }} />
+          <img src={lightbox.photo_url} alt="" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "100%", maxHeight: "72dvh", borderRadius: 12, objectFit: "contain" }} />
           <div style={{ color: "#fff", fontSize: 13, fontWeight: 700, marginTop: 10 }}>{poseLabel(lightbox.pose)} · {pretty(lightbox.taken_date)}</div>
           {lightbox.notes && <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 3 }}>{lightbox.notes}</div>}
           <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", gap: 10, marginTop: 14 }}>

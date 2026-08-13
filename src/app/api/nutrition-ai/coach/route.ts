@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       validate: validateCoachReply,
     });
 
-    await logUsage(clientId, "coach_card", result.tokensIn, result.tokensOut, SONNET_MODEL);
+    await logUsage(clientId, "coach_card", result.tokensIn, result.tokensOut, SONNET_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
     if (!result.value) {
       // Salvage: a plain-text reply is still useful for a chat surface.

@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       validate: validateVerifyResult,
     });
 
-    await logUsage(clientId, "verify_food", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "verify_food", result.tokensIn, result.tokensOut, HAIKU_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
     if (!result.value) {
       return NextResponse.json({ error: "Verification didn't return usable data — try again." }, { status: 502 });

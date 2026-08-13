@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       validate: validateSuggestions,
     });
 
-    await logUsage(clientId, "focus_suggest", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "focus_suggest", result.tokensIn, result.tokensOut, HAIKU_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
     if (!result.value) {
       return NextResponse.json({ error: "Couldn't generate focus options right now." }, { status: 502 });

@@ -188,7 +188,7 @@ async function runSweep(opts: {
         validate: validateWeekly,
       });
 
-      await logUsage(c.id, "weekly_sweep", result.tokensIn, result.tokensOut, SONNET_MODEL);
+      await logUsage(c.id, "weekly_sweep", result.tokensIn, result.tokensOut, SONNET_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
       if (!result.value) {
         results.push({ clientId: c.id, name, status: "failed", detail: "model returned no usable JSON" });

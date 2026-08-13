@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
     messages: [{ role: "user", content: `CLIENT'S SCHEDULED WORKOUTS (server-assembled, trusted):\n${context}\n\nDUSTIN'S REQUEST:\n${message}` }],
     validate: validateReply,
   });
-  await logUsage(clientId, "workout_assist", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+  await logUsage(clientId, "workout_assist", result.tokensIn, result.tokensOut, HAIKU_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
   if (!result.value) return NextResponse.json({ error: "Couldn't process that — try rephrasing." }, { status: 502 });
 

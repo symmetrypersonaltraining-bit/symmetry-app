@@ -44,7 +44,7 @@ export default function VideoZoom() {
   if (!src) return null;
   return (
     <div data-zoom-overlay onClick={() => setSrc(null)} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 14, cursor: "zoom-out", animation: "symm-rise .18s ease both" }}>
-      <video src={src} controls autoPlay playsInline onClick={(e) => e.stopPropagation()} style={{ width: "96vw", maxWidth: 760, maxHeight: "86vh", borderRadius: 14, background: "#000", boxShadow: "0 24px 70px rgba(0,0,0,.6)" }} />
+      <video src={src} controls autoPlay playsInline onClick={(e) => e.stopPropagation()} style={{ width: "96vw", maxWidth: 760, maxHeight: "86dvh", borderRadius: 14, background: "#000", boxShadow: "0 24px 70px rgba(0,0,0,.6)" }} />
       <button aria-label="Close video" onClick={() => setSrc(null)} style={{ position: "fixed", top: 16, right: 16, width: 42, height: 42, borderRadius: 12, border: "none", background: "var(--brand-primary)", color: "#fff", fontSize: 22, cursor: "pointer", zIndex: 2001 }}>{"\u00d7"}</button>
     </div>
   );

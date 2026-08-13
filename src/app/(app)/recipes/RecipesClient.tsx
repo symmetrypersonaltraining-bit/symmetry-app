@@ -321,7 +321,7 @@ function RecipeView({ rec, planMeals, onClose }: { rec: RecipeRow; planMeals: { 
   const s = Number(rec.servings) || 1;
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 95, background: "rgba(8,10,18,0.75)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto", background: "var(--brand-bg)", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, maxHeight: "90dvh", overflowY: "auto", background: "var(--brand-bg)", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16 }}>
         {rec.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={rec.image_url} alt="" style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 14, marginBottom: 12 }} />

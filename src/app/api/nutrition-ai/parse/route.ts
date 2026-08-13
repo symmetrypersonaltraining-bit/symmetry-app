@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       fallbackSystem: FALLBACK_SYSTEM_PROMPT,
     });
 
-    await logUsage(clientId, "food_parse", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "food_parse", result.tokensIn, result.tokensOut, HAIKU_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
     if (!result.value) {
       return NextResponse.json(

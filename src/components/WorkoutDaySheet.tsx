@@ -149,7 +149,7 @@ export default function WorkoutDaySheet({
           padding: "14px 14px 20px",
           maxWidth: 520,
           margin: "0 auto",
-          maxHeight: "85vh",
+          maxHeight: "85dvh",
           WebkitOverflowScrolling: "touch",
           overflowY: "auto",
         }}

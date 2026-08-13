@@ -40,6 +40,17 @@ export interface JsonCallResult<T> {
   rawText: string;
   tokensIn: number;
   tokensOut: number;
+  /**
+   * How long the call took, and when it started.
+   *
+   * This helper already measured both — but only used them when the call FAILED,
+   * so every successful row in ai_usage_log had a null latency and the health
+   * page could only ever show a dash for "typical time". Returned now so the
+   * caller's logUsage can carry it. Pass them straight through; do not re-time
+   * around the call, or the number includes whatever else the route was doing.
+   */
+  latencyMs: number;
+  startedAt: Date;
 }
 
 /**
@@ -114,7 +125,7 @@ export async function callClaudeJson<T>(opts: {
 
       const parsed = extractJson(rawText);
       const valid = parsed == null ? null : opts.validate(parsed);
-      if (valid) return { value: valid, rawText, tokensIn, tokensOut };
+      if (valid) return { value: valid, rawText, tokensIn, tokensOut, latencyMs: Date.now() - t0, startedAt };
 
       // One corrective retry: show the model its own reply and demand pure JSON.
       messages = [
@@ -144,7 +155,7 @@ export async function callClaudeJson<T>(opts: {
         resp.content[0]?.type === "text" ? resp.content[0].text : "";
       const parsed = extractJson(fbText);
       const valid = parsed == null ? null : opts.validate(parsed);
-      if (valid) return { value: valid, rawText: fbText, tokensIn, tokensOut };
+      if (valid) return { value: valid, rawText: fbText, tokensIn, tokensOut, latencyMs: Date.now() - t0, startedAt };
       rawText = fbText || rawText;
     }
 
@@ -159,7 +170,7 @@ export async function callClaudeJson<T>(opts: {
             : " (empty reply)"),
       ),
     );
-    return { value: null, rawText, tokensIn, tokensOut };
+    return { value: null, rawText, tokensIn, tokensOut, latencyMs: Date.now() - t0, startedAt };
   } catch (e) {
     // Network, auth, rate limit, timeout, overload. Record it, then rethrow so
     // the caller's own error handling is completely unchanged.
