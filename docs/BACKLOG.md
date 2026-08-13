@@ -59,6 +59,64 @@ Also done directly in the database:
 
 ---
 
+## AI build — night of 2026-08-12/13
+
+Dustin: "i want the ai functions in this app to feel so accurate and personal
+that it blows plps minds." What landed, and what is deliberately still open.
+
+### Landed
+
+| SHA | What |
+|---|---|
+| `7948046`–`f271fa9` | The nine from earlier that night: usage failures logged, one feature name per route (23, was 5), the $95 cap applied to six routes that ignored it, the weekly focus can reach a client, the Monday nudge sweep can actually run, movement screens are kept, the trainer agent stops forgetting, `${COACH_FIRST_NAME}` in two quoted strings |
+| `49997f0` | Twenty faces + the mood registry (`src/lib/ai/faces.ts`) |
+| `f19a7c2` | **The tap ripple was throwing every floating button off-screen mid-press** — see below |
+| `efca005` | Faces re-cut on the grid so nothing is clipped; `CoachFab` |
+| `45ea82d` | `GlobalCoach` — one ✦ on every client screen |
+| `0a7f138` | Workout edits are undoable; `applyProposal` de-duplicated (it existed twice) |
+| `5962d33` | The celebration's AI line wears the matching face |
+| `778c98c` | Coaching-voice routes moved to Sonnet, extraction stays on Haiku |
+
+### The ripple bug, because it will be tempting to "simplify" it back
+
+`InteractionFX` added one class, `.cw-ripple-host`, which set BOTH
+`overflow: hidden` and `position: relative`. On a `position: fixed` button the
+second half drops it into normal document flow the instant a finger lands on
+it: the button teleports, pointerup lands elsewhere, the browser fires `click`
+on the common ancestor, and the handler never runs. The class is never removed,
+so it stays broken. Sixteen positioned buttons were affected including "Start
+session and log". Clipping and positioning are now separate classes and the
+positioning one is only applied to elements that are already `static`.
+`tests/unit/ripplePositioning.test.ts` fails if they are merged again.
+
+### Open — spec'd, not built
+
+1. **Lapse takeover.** "If somebody does not log for three days or more."
+   The RULE is built and tested (`lapseMood` in `src/lib/ai/faces.ts`): the
+   ladder is relative to each client's own normal, so a client who never logged
+   is never nudged, a twice-a-week logger is not treated like a daily one, and
+   there are exactly two rungs — concerned, then stern. The loudest face
+   (`callout`) is deliberately unreachable from missed logging. What does NOT
+   exist is the takeover itself; `ClientTakeovers` has five (birthday,
+   challenge, winner, announcement, birthday-ask) and no lapse one. A
+   full-screen interruption that fires wrongly hits every client at once, so
+   this wants Dustin's eyes on the copy before it ships.
+2. **Ten more celebration variants.** The existing ones stay; the AI line and
+   its face are already wired, so new variants are copy plus layout.
+3. **The Outbox + memory layer.** The coach escalating a question to Dustin's
+   inbox with a link back to the conversation. Agreed as one build.
+4. **The logger ✦.** Its own commit, hidden when the keyboard is up.
+   `GlobalCoach` deliberately excludes `/workout/<id>` today.
+5. **`/settings/ai-health`.** One page showing all 23 features: last call, last
+   failure, spend against the cap. The data exists (`ai_usage_log` now records
+   failures and per-feature labels); nothing reads it yet.
+6. **Legacy food-photo path.** `MealPlanClient` posts to `/api/analyze-meal-photo`
+   with no `clientId`, so a trainer-viewed photo bills the trainer. Every client
+   is on `nutrition_v3`, so this is unreachable today — fix it or delete the
+   legacy logger.
+
+---
+
 ## 0. Logger reported a SAVED workout as a failure — FIXED 2026-08-11
 
 **Shipped `39fc4a8`.** Lauren Standefer, 11 Aug 10:04am, mid-session:
