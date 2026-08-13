@@ -10,17 +10,24 @@ import { lengthFromHtml, videoId, MAX_SECONDS } from "../../src/app/api/video-ca
  * Dustin, 2026-08-13: "All videos need to be under thirty seconds, preferably
  * under twenty seconds."
  *
- * 151 candidates were found by agents searching YouTube. The search half is
- * cheap to get right and cheap to get wrong — a wrong candidate is one bad row
- * in a staging table. The DURATION half is the part that reaches a client: the
- * failure is somebody tapping play mid-set and getting a fourteen-minute
- * talking-head review of the movement instead of a five-second demo.
+ * Videos now fill themselves in — he asked for that explicitly, after the first
+ * version parked all 151 behind an approval queue: "you put all videos in the
+ * app that are currently there without my checking every one why cant you do it
+ * now?" He was right; the 553 already in the library went in unreviewed, so the
+ * queue was holding new videos to a standard nothing else met, and it would
+ * have sat there.
  *
- * And the duration is the part most likely to break silently, because it is
- * scraped out of a watch page rather than read from an API. The day YouTube
- * renames the field, every check starts returning "cannot tell" — and the only
- * thing standing between that and the whole queue being waved through is the
- * approve guard. So both halves are pinned here.
+ * What did NOT relax, and is what this file is about: the LENGTH. A candidate
+ * whose duration could not be read is never applied. The failure it prevents is
+ * a client tapping play mid-set and getting a fourteen-minute talking-head
+ * review of the movement instead of a five-second demo.
+ *
+ * That is exactly the guard most likely to erode, because it is now the only
+ * thing standing between an automatic writer and 250 client-facing screens —
+ * and because the duration is SCRAPED out of a watch page rather than read from
+ * an API. The day YouTube renames the field, every check starts returning
+ * "cannot tell". If that ever came to mean "apply anyway", the whole library
+ * would fill with unmeasured videos in one run, silently.
  */
 
 const ROOT = process.cwd();
@@ -48,14 +55,34 @@ test("approving stashes the URL it overwrote, so it can be undone", () => {
   assert.match(code, /action === "undo"[\s\S]{0,400}video_url: c\.previous_video_url/, "undo must restore it");
 });
 
-test("only the decide route writes a video URL onto an exercise", () => {
-  // The whole staging design collapses if anything upstream can write straight
-  // to exercises.video_url — that is what keeps a web-search result from
-  // reaching a client without a human looking at it.
-  assert.ok(
-    !/\.from\("exercises"\)[\s\S]{0,120}video_url:/.test(strip(VERIFY)),
-    "the verify route writes video_url onto an exercise — it must only touch the candidates table",
+test("the automatic fill only ever writes a MEASURED, in-ceiling candidate", () => {
+  const code = strip(VERIFY);
+  // The query that feeds the writer. Both filters are load-bearing: without
+  // `not null` an unmeasured row is eligible, without `lte` a two-hour video is.
+  assert.match(
+    code,
+    /\.eq\("status", "pending"\)\s*\.not\("duration_sec", "is", null\)\s*\.lte\("duration_sec", MAX_SECONDS\)/,
+    "the auto-fill no longer restricts itself to measured candidates under the ceiling — " +
+      "one run would fill the library with unmeasured videos",
   );
+});
+
+test("the automatic fill never replaces a video that is already there", () => {
+  const code = strip(VERIFY);
+  // Overwriting a demo Dustin chose, or one that has worked for months, with a
+  // search result is a regression nobody notices until a client does.
+  assert.match(code, /\.filter\(\(e\) => !e\.video_url\)/, "the empty-only filter is gone");
+  assert.match(code, /if \(!empty\.has\(c\.exercise_id\)\) continue/, "candidates are no longer screened against it");
+});
+
+test("the fill picks the best candidate per exercise, not an arbitrary one", () => {
+  const code = strip(VERIFY);
+  assert.match(code, /CONF_RANK/, "confidence is no longer part of the choice");
+  // Shortest wins ties: his stated preference is "preferably under twenty".
+  assert.match(code, /a\[0\] < b\[0\] \|\| \(a\[0\] === b\[0\] && a\[1\] < b\[1\]\)/);
+  // And the runners-up must be closed out, or the next run flips the video back
+  // and forth between two candidates forever.
+  assert.match(code, /status: "superseded"/, "losing candidates stay pending and will re-apply");
 });
 
 test("the length parser reads a real watch-page payload", () => {

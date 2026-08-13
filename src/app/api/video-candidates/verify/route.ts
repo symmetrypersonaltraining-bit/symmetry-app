@@ -1,4 +1,4 @@
-// POST /api/video-candidates/verify — put a real duration on each candidate.
+// POST /api/video-candidates/verify — measure each candidate, then FILL IT IN.
 //
 // 252 of the 847 exercises in the library have no demo video. A client who taps
 // play on one of those gets nothing, mid-set, and the app looks half-finished
@@ -8,24 +8,34 @@
 // have videos... All videos need to be under thirty seconds, preferably under
 // twenty seconds."
 //
-// The search half of that is done — 151 candidates are staged in
-// exercise_video_candidates. The DURATION half could not be: the sandbox those
-// searches ran in has no route to youtube.com at all (every request dies at the
-// proxy), so not one of the 151 has a verified length. A "demo video" that
-// turns out to be an eleven-minute talking-head review is worse than no video,
-// because it ships looking fine and only fails in front of a client.
+// This route first shipped as measurement only, with every candidate parked in
+// a 151-item review queue for Dustin to approve one at a time. He pushed back,
+// correctly: "you put all videos in the app that are currently there without my
+// checking every one why cant you do it now? find vidoes for each movement and
+// make sure they are under 30 second videos then put them in there."
 //
-// So the check runs HERE, on Vercel, where the network is real. This route is
-// the same trick as /api/cron/check-videos: no API key, no quota, no Google
-// project to set up and no key for Dustin to rotate later.
+// He is right, and the reason is worth keeping. The 553 videos ALREADY in the
+// library went in without anyone reviewing them one by one. Holding the next
+// 250 to a stricter standard than the 553 they sit beside is not caution, it is
+// just the job not getting done — and the queue would have sat there.
+//
+// So a measured candidate under the ceiling now applies itself, and the review
+// screen becomes "here is what went in, undo anything wrong" rather than
+// "approve 151 things". `applied_at` marks them so that screen can exist.
+//
+// WHAT IS STILL GATED, and this part does not move: the LENGTH. A candidate
+// whose duration could not be read is never applied. That is the entire point
+// of measuring — an eleven-minute talking-head review of a movement is worse
+// than no video, because it ships looking fine and only fails in front of a
+// client mid-set. Unmeasured means unknown, and unknown does not go in.
+//
+// The check runs HERE, on Vercel, where the network is real. The sandbox this
+// was built in has no route to youtube.com at all — every request dies at the
+// proxy, curl included. Same trick as /api/cron/check-videos: no API key, no
+// quota, no Google project to stand up, nothing to rotate later.
 //
 //   oEmbed  → does it exist at all (404 = removed/private/account gone)
 //   watch page → "lengthSeconds":"NN" out of ytInitialPlayerResponse
-//
-// The watch-page regex is the fragile part and it is treated as fragile: a page
-// that does not yield a length is recorded as 'unverified', NEVER as a pass.
-// Nothing reaches a client's screen off the back of a guess — a candidate has
-// to have a number on it before it can be approved.
 //
 // Batched, because 151 sequential page fetches do not fit in a function
 // timeout. Call it until `remaining` comes back 0.
@@ -34,6 +44,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isTrainerUser } from "@/lib/trainer";
+import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -131,17 +142,101 @@ async function verifyOne(url: string): Promise<Verdict> {
   }
 }
 
+/** high beats medium beats low. Anything unlabelled sorts last. */
+const CONF_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+type Cand = {
+  id: string;
+  exercise_id: string;
+  url: string;
+  duration_sec: number | null;
+  confidence: string | null;
+};
+
+/**
+ * Fill in every exercise that now has a measured candidate under the ceiling.
+ *
+ * Only touches exercises with NO video — an exercise that already has one is
+ * left completely alone, because replacing a demo Dustin chose (or that has
+ * been working for months) with a search result is not an improvement, it is a
+ * regression nobody would notice until a client did.
+ *
+ * Best candidate per exercise = highest confidence, then shortest. Shortest
+ * because his actual preference is "preferably under twenty seconds", and among
+ * two equally-good matches the shorter one is the better demo every time.
+ */
+async function applyMeasured(db: ReturnType<typeof createAdminClient>) {
+  const { data } = await db
+    .from("exercise_video_candidates")
+    .select("id, exercise_id, url, duration_sec, confidence")
+    .eq("status", "pending")
+    .not("duration_sec", "is", null)
+    .lte("duration_sec", MAX_SECONDS);
+
+  const cands = (data as Cand[] | null) || [];
+  if (!cands.length) return { applied: 0, skippedHadVideo: 0 };
+
+  // Which of those exercises are actually empty right now.
+  const ids = [...new Set(cands.map((c) => c.exercise_id))];
+  const { data: exRows } = await db
+    .from("exercises")
+    .select("id, video_url")
+    .in("id", ids);
+  const empty = new Set(
+    ((exRows as { id: string; video_url: string | null }[] | null) || [])
+      .filter((e) => !e.video_url)
+      .map((e) => e.id),
+  );
+
+  const best = new Map<string, Cand>();
+  for (const c of cands) {
+    if (!empty.has(c.exercise_id)) continue;
+    const cur = best.get(c.exercise_id);
+    if (!cur) { best.set(c.exercise_id, c); continue; }
+    const a = [CONF_RANK[c.confidence ?? ""] ?? 3, c.duration_sec ?? 9999];
+    const b = [CONF_RANK[cur.confidence ?? ""] ?? 3, cur.duration_sec ?? 9999];
+    if (a[0] < b[0] || (a[0] === b[0] && a[1] < b[1])) best.set(c.exercise_id, c);
+  }
+
+  const now = new Date().toISOString();
+  let applied = 0;
+  for (const c of best.values()) {
+    const { error } = await db
+      .from("exercises")
+      .update({ video_url: c.url, video_status: "ok", video_checked_at: now })
+      .eq("id", c.exercise_id);
+    if (error) continue;
+    applied += 1;
+    await db
+      .from("exercise_video_candidates")
+      .update({ status: "approved", applied_at: now, reviewed_at: now, previous_video_url: null })
+      .eq("id", c.id);
+    // The runners-up for that exercise are moot now. Left pending they would
+    // re-apply on the next run and quietly flip the video back and forth.
+    await db
+      .from("exercise_video_candidates")
+      .update({ status: "superseded", reviewed_at: now })
+      .eq("exercise_id", c.exercise_id)
+      .neq("id", c.id)
+      .in("status", ["pending", "too_long"]);
+  }
+
+  return { applied, skippedHadVideo: ids.length - empty.size };
+}
+
 export async function POST(req: NextRequest) {
-  // Trainer-only, and checked against the session rather than anything in the
-  // body. This route makes outbound requests in a loop; it is not something a
-  // client account should be able to spin.
+  // Trainer, Vercel cron, or the database scheduler. The last one matters: it
+  // is what lets this be driven to completion without a human holding a button
+  // down for 151 candidates.
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const authedAsTrainer = isTrainerUser(user);
-  const authedAsCron = req.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;
-  if (!authedAsTrainer && !authedAsCron) {
+  const authed =
+    isTrainerUser(user) ||
+    req.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}` ||
+    (await isDbSchedulerRequest(req));
+  if (!authed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -190,11 +285,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { count } = await db
-    .from("exercise_video_candidates")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending")
-    .is("duration_sec", null);
+  // Fill in whatever this batch just made eligible. Runs every call rather than
+  // once at the end, so a run that dies half way still leaves real videos on
+  // real exercises instead of a table full of measurements and nothing to show.
+  const { applied } = await applyMeasured(db);
 
-  return NextResponse.json({ checked: rows.length, ...tally, remaining: count ?? 0 });
+  const [{ count: remaining }, { count: stillEmpty }] = await Promise.all([
+    db
+      .from("exercise_video_candidates")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending")
+      .is("duration_sec", null),
+    db
+      .from("exercises")
+      .select("id", { count: "exact", head: true })
+      .or("video_url.is.null,video_url.eq."),
+  ]);
+
+  return NextResponse.json({
+    checked: rows.length,
+    ...tally,
+    applied,
+    remaining: remaining ?? 0,
+    exercisesStillWithoutVideo: stillEmpty ?? 0,
+  });
 }

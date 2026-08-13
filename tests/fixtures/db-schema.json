@@ -486,7 +486,8 @@
     "found_by",
     "created_at",
     "reviewed_at",
-    "previous_video_url"
+    "previous_video_url",
+    "applied_at"
   ],
   "exercises": [
     "id",
