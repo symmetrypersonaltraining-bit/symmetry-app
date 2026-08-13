@@ -4,7 +4,8 @@
 Add to it as tonight's items land; the "Still coming" section is the parking
 spot for anything not shipped yet.
 
-**Last updated:** 13 Aug 2026, from `18744e3` (live).
+**Last updated:** 13 Aug 2026 — everything below is live. Every numbered item
+in the message is shipped; nothing in it is aspirational.
 
 ---
 
@@ -161,7 +162,22 @@ tap "Don't show again" and then tell me — that's a bug on my end, not on yours
 
 ---
 
-**10. Birthdays**
+**10. You can hand any answer straight to me**
+
+Under everything the coach says there's a small **"Send this to Dustin."** Tap
+it and I get your question *and* the answer it gave you, in Messages, and I'll
+come back to you there.
+
+Use it whenever the answer doesn't fit your situation, or you just want it from
+me. That's what it's for — you're not going over anyone's head.
+
+**The AI never does this on its own.** Nothing from your chat reaches me unless
+you tap that. If you want me to see something, tap it; if you don't, I never
+know it was asked.
+
+---
+
+**11. Birthdays**
 
 If it's your birthday you'll get the screen when you open the app, and you'll get
 a shout in the group chat. If I don't have your date yet the app will ask you
@@ -169,7 +185,7 @@ once, and "not now" costs you nothing — it'll ask again in a month.
 
 ---
 
-**11. Smaller things from the last couple of days**
+**12. Smaller things from the last couple of days**
 
 - **Per-set rest timer** in the logger — it now follows the set it's timing.
 - **Distance** is a real field, so walks, runs and rows record properly.
@@ -200,17 +216,19 @@ Reply here or message me directly. — Dustin
 
 ## STILL COMING (do not send — working list)
 
-Items to fold into the message above as they land tonight:
+**All six are now done.** Kept for the record of what each became.
 
 ~~1. Response-time tracking~~ DONE (trainer-side, not in the client message)
-~~2. Sheet-height sweep~~ DONE for client screens — folded into item 11. The
+~~2. Sheet-height sweep~~ DONE for client screens — folded into item 12. The
    workout logger is still on the old sizing and gets its own commit.
 ~~3. Ten more end-of-workout celebration screens~~ DONE (`111a9cb`) — folded
    into item 8 above. 38 in the rotation now.
-4. Coach escalation — routing a question to Dustin's inbox with the conversation attached
+~~4. Coach escalation~~ DONE — client-approved only, per Dustin's call on the
+   trigger ("Client taps 'Send this to Dustin'") and the exclusions ("only what
+   client apporve to be escalated"). Now item 10 above.
 ~~5. The coach inside the workout logger itself~~ DONE (`47da1c3`) — already
    covered by item 1's "it's on every screen", so no separate item needed.
-~~6. The go-quiet check-in~~ DONE and live — now items 9 and 10 above.
+~~6. The go-quiet check-in~~ DONE and live — now item 9 above.
 
 **Not for the client message, but worth Dustin knowing before he sends it:**
 exercise demo videos. 252 of 847 exercises have no video; 151 now have a

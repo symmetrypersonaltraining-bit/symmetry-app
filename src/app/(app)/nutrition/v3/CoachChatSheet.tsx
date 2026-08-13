@@ -305,6 +305,11 @@ export default function CoachChatSheet({
   const [applied, setApplied] = useState<Set<string>>(new Set()); // "msgIdx:sugIdx"
   const [applying, setApplying] = useState<string | null>(null);
   const [acting, setActing] = useState<number | null>(null); // msg index of the executing action
+  // "Send this to Dustin" — see /api/coach-escalate for why this is the ONLY
+  // way anything reaches his inbox from here. The coach never forwards by
+  // itself; Dustin's rule was "only what client approve to be escalated".
+  const [escalated, setEscalated] = useState<Set<number>>(new Set());
+  const [escalating, setEscalating] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -494,6 +499,58 @@ export default function CoachChatSheet({
     }
   }
 
+  /**
+   * Hand this exchange to Dustin.
+   *
+   * Sends the client's question AND the answer they were given, because he
+   * needs to know they have already been told something — otherwise he repeats
+   * it, or contradicts it, and either one makes the app look like it is not
+   * talking to him.
+   *
+   * The reply in the chat matters as much as the send does. Without it the
+   * client has no idea whether a human is coming, so they rephrase the same
+   * question at the AI three more times. "He'll come back to you here" tells
+   * them the waiting is the right thing to do, and where to look.
+   */
+  async function escalate(mi: number) {
+    if (escalating != null || escalated.has(mi)) return;
+    const answer = msgs[mi]?.text || "";
+    // The nearest thing they said above this. On the greeting there is nothing
+    // above it, which is why the control is not offered there.
+    let question = "";
+    for (let i = mi - 1; i >= 0; i--) {
+      if (msgs[i].role === "client") { question = msgs[i].text; break; }
+    }
+    setEscalating(mi);
+    try {
+      const res = await fetch("/api/coach-escalate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question, answer, surface }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || "");
+      setEscalated((s) => new Set(s).add(mi));
+      setMsgs((m) => [
+        ...m,
+        {
+          role: "coach" as const,
+          text: "Sent to " + COACH_FIRST_NAME + " — he'll come back to you in Messages. No need to ask me again in the meantime.",
+        },
+      ]);
+    } catch (e) {
+      const why = e instanceof Error && e.message ? e.message : "";
+      setMsgs((m) => [
+        ...m,
+        {
+          role: "coach" as const,
+          text: "I couldn't get that to " + COACH_FIRST_NAME + (why ? " — " + why : "") + ". Message him directly from the Messages tab and it'll reach him.",
+        },
+      ]);
+    } finally {
+      setEscalating(null);
+    }
+  }
+
   function cancelAction(mi: number) {
     const msg = msgs[mi];
     if (!msg?.action || msg.actionState !== "pending" || acting != null) return;
@@ -556,6 +613,39 @@ export default function CoachChatSheet({
                   >
                     {msg.text}
                   </div>
+                  {/* The way out of the AI, on every answer it gives.
+                      Deliberately quiet — a small line of text, not a button
+                      competing with the answer above it. It is an escape hatch,
+                      not a call to action; most answers do not need Dustin and
+                      the UI should not imply they do.
+                      Not offered on the greeting (mi === 0 — nothing has been
+                      asked yet) or on a pending change (the client is mid-
+                      decision; forwarding it half-made helps nobody). */}
+                  {msg.role !== "client" && mi > 0 && !msg.action && (
+                    <button
+                      onClick={() => escalate(mi)}
+                      disabled={escalating != null || escalated.has(mi)}
+                      className="mt-1 text-left"
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        minHeight: 32,
+                        padding: "2px 2px",
+                        background: "transparent",
+                        border: "none",
+                        color: escalated.has(mi) ? "#16A34A" : "var(--brand-text-secondary)",
+                        textDecoration: escalated.has(mi) ? "none" : "underline",
+                        opacity: escalating === mi ? 0.5 : 1,
+                        cursor: escalated.has(mi) ? "default" : "pointer",
+                      }}
+                    >
+                      {escalated.has(mi)
+                        ? "✓ Sent to " + COACH_FIRST_NAME
+                        : escalating === mi
+                          ? "Sending…"
+                          : "Send this to " + COACH_FIRST_NAME}
+                    </button>
+                  )}
                   {msg.action && (
                     <div
                       className="mt-1.5"

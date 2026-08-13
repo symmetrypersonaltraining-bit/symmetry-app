@@ -1,5 +1,28 @@
 # Backlog — the single work queue
 
+> ## ⛔ START HERE — FIRST WORK OF THE NEXT SESSION
+>
+> **Finish the exercise library videos.** Dustin, 13 Aug: *"make sure next
+> session we start from here picks up on continuing the exercise library."*
+>
+> Do this **before anything else in this file**, and do it **before burning any
+> WebSearch calls on other work** — that is the whole reason it is stranded.
+> `WebSearch` is capped at **200 calls per SESSION** and does **not** reset
+> mid-session. The 13 Aug session spent its 200 on the first 151 exercises; five
+> agents spawned afterwards for the remaining 101 all returned instantly with
+> *"budget used: 200 of 200"*. Nothing was wrong with the pipeline. It ran out
+> of a per-session resource, and the only fix is a session that still has one.
+>
+> 101 exercises × one search each fits inside a fresh 200 comfortably — but only
+> if nothing else eats it first.
+>
+> Full detail, the SQL to get the list, the agent instructions, and the seven
+> rows to skip: **"Exercise demo videos"** section below.
+>
+> Second thing, and it takes Dustin ten minutes rather than you: the 151
+> candidates already found are waiting at **Library → Exercise Videos**. He
+> presses "Check lengths" once, then works the queue.
+
 **This file is the only work queue.** Not Notion, not the loose `*-LIST-*.md`
 files in the Trainer App folder, not a chat scrollback. If it is not here, it is
 not tracked. Last consolidated 2026-08-07.
