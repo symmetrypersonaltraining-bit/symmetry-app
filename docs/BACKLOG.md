@@ -59,6 +59,41 @@ Also done directly in the database:
 
 ---
 
+## Goal-driven progress charts + a coach that drives toward the goal  ← NEXT BIG ONE, needs mock-ups
+
+Dustin, 2026-08-14 (Thursday afternoon): "id like to revamp the progress charts
+to have goals me and clients can set and have the charts reflect where they are
+on the journey towards the goal with the ai card on progress screen keeping up
+with them to help encourage them to hit that goal and guide them on what needs
+to happen to get there based on real numbers."
+
+Deliberately parked until the current list is clear, because it wants mock-ups
+first — this is the one screen a client will open specifically to feel something
+about their progress, and the chart IS the feature.
+
+What it has to do, in his words and unpacked:
+
+- **Goals both sides can set.** He sets one; the client can set one. Needs a
+  target value, a target date, and which metric — weight, body fat, lean mass,
+  a lift, sessions per week.
+- **The chart shows the JOURNEY, not just the line.** Where they started, where
+  they are, where the goal sits, and whether the current trajectory actually
+  arrives. A trend line that lands short is the most useful thing on the screen.
+- **The AI card keeps up with them.** Not a generic "keep going" — it reads the
+  real numbers against the goal and says what has to happen from here: the rate
+  they need, whether the current rate gets there, what to change.
+
+Open questions for the mock-up round:
+- One goal at a time per metric, or several running at once?
+- What happens when a goal is missed — does it roll, close, or get re-set?
+- Does the client see a goal Dustin set for them, and can they refuse it?
+- Weekly rate as the unit, or "on track / behind / ahead"?
+
+Prerequisite already in place: `metrics` has the history, and the coach already
+reads the trend. This is a new `client_goals` table plus chart work.
+
+---
+
 ## AI build — night of 2026-08-12/13
 
 Dustin: "i want the ai functions in this app to feel so accurate and personal
