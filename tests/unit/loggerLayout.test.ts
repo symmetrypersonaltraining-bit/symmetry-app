@@ -376,3 +376,53 @@ test("a finished timer hands its value straight to logSet", () => {
     "the interval must reach logSet through a ref kept current every render",
   );
 });
+
+// The coach reached the logger on 14 Aug, and it is the ONE screen where it is
+// not the floating button used everywhere else.
+//
+// CoachFab reads the keyboard height so it can hide itself. This screen's oldest
+// rule — the one broken most often — is that nothing in here reacts to the
+// keyboard: it pins its container instead. A button that lives in the exercise
+// header cannot cover anything and cannot move when the keyboard opens, so both
+// things are true at once.
+test("the logger's coach is a header button, not a floating one", () => {
+  assert.ok(
+    !CODE.includes("CoachFab"),
+    "CoachFab is mounted in the logger — it reads keyboard height, which this screen must never do",
+  );
+  assert.ok(
+    CODE.includes("setCoachOpen(true)"),
+    "nothing opens the coach from the logger any more",
+  );
+  assert.ok(
+    /title="Ask your coach"/.test(SRC),
+    "the coach button lost its label; it sits with History and Swap in the exercise header",
+  );
+  // startOpen means the sheet renders with no button of its own, so there is
+  // exactly one trigger on this screen.
+  assert.ok(
+    /startOpen/.test(SRC),
+    "the sheet would render its own floating button on top of the logger",
+  );
+});
+
+test("the coach is told which movement it was opened from", () => {
+  // "You're on Barbell Row" is the difference between a coach that is present
+  // and a chat box that happens to be on this screen.
+  assert.ok(
+    /contextLine=\{/.test(SRC) && /currentExercise\?\.exercises\?\.name/.test(SRC),
+    "the logger's coach no longer knows which exercise you were looking at",
+  );
+});
+
+test("the coach gets the session's date, not a fresh clock read", () => {
+  // Same rule as the finish path: one answer to "what day is this". A make-up
+  // session logged for yesterday must not hand the coach today.
+  const at = SRC.indexOf("<CoachChatSheet");
+  assert.ok(at > -1, "the coach sheet is gone from the logger");
+  const block = SRC.slice(at, SRC.indexOf("/>", at));
+  assert.ok(
+    /selectedDate=\{sessionDate\}/.test(block),
+    "the logger's coach is computing its own date again",
+  );
+});

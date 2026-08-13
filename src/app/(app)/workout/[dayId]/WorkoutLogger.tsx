@@ -16,6 +16,7 @@ import WakeLock from "@/components/WakeLock";
 import { fx } from "@/lib/fx";
 import { isDraftStale } from "@/lib/workoutDraft";
 import { useStableViewportHeight } from "@/lib/useStableViewportHeight";
+import CoachChatSheet, { type CoachActions } from "@/app/(app)/nutrition/v3/CoachChatSheet";
 import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
 import { pickExistingLog, type ExistingLog } from "@/lib/workoutLogLookup";
 import { feetToMeters, metersToFeet } from "@/lib/distanceField";
@@ -175,6 +176,17 @@ function WheelColumn({ values, selected, onChange }: {
 // WheelColumn is kept — TimePickerSheet still uses it to set a set's time.
 
 // \u2500\u2500\u2500 EXERCISE HISTORY DRAWER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+/** Nothing in the logger can execute a meal action, and none of these run. */
+const NO_COACH_ACTIONS: CoachActions = {
+  swapMealCustom: async () => {},
+  moveMeal: async () => {},
+  copyMeal: async () => {},
+  deleteMeal: async () => {},
+  addExtraParsed: async () => {},
+  logMeal: async () => {},
+  unlogMeal: async () => {},
+};
+
 function ExerciseHistory({ exerciseId, exId, clientId, exerciseName, onClose, onPrefill }: {
   exerciseId: string;
   exId?: string | null;
@@ -227,7 +239,7 @@ function ExerciseHistory({ exerciseId, exId, clientId, exerciseName, onClose, on
   return (
     <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
       <div className="w-full rounded-t-3xl flex flex-col"
-        style={{ background: "var(--brand-surface)", maxHeight: "85vh" }} onClick={e => e.stopPropagation()}>
+        style={{ background: "var(--brand-surface)", maxHeight: "85dvh" }} onClick={e => e.stopPropagation()}>
         {/* Fixed header */}
         <div className="p-5 pb-3 flex-shrink-0">
           <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
@@ -642,6 +654,9 @@ export default function WorkoutLogger({
   const [exNotePrior, setExNotePrior] = useState<{ id: string; note: string; author: string; created_at: string }[]>([]);
   const [localSections, setLocalSections] = useState<Section[]>(sections);
   const [swapTargetPe, setSwapTargetPe] = useState<PrescribedExercise | null>(null);
+  // The coach, opened from the exercise header. See the button for why it is
+  // not the floating one used on every other screen.
+  const [coachOpen, setCoachOpen] = useState(false);
   // V6 consolidated logger: feedback sheet (both roles) → app_feedback; AI note sheet
   // (trainer only) → trainer_notes; cue collapsed behind an ⓘ toggle to shorten the header.
   //
@@ -2020,6 +2035,29 @@ export default function WorkoutLogger({
         )}
         {timePick && <TimePickerSheet initial={parseTimeToSecs(sets[timePick.peId]?.[timePick.si]?.time || "") || 0} onSet={(secs) => { updateSet(timePick.peId, timePick.si, "time", fmtSecs(secs)); setTimePick(null); }} onClose={() => setTimePick(null)} />}
         {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
+        {coachOpen && clientId && (
+          <CoachChatSheet
+            clientId={clientId}
+            dayContext={[]}
+            actions={NO_COACH_ACTIONS}
+            onApplySuggestion={async () => {}}
+            // sessionDate, never a fresh clock read. The logger has exactly one
+            // answer to "what day is this" and computing a second one here is
+            // the bug this file's tests exist to prevent — a make-up session
+            // logged for yesterday would have handed the coach today's date.
+            selectedDate={sessionDate}
+            canAct={false}
+            claimsSlot={false}
+            surface="logger"
+            contextLine={
+              currentExercise?.exercises?.name
+                ? `You're on ${currentExercise.exercises.name}.`
+                : undefined
+            }
+            startOpen
+            onClose={() => setCoachOpen(false)}
+          />
+        )}
 
         {/* Feedback sheet (both roles) -> app_feedback for fast fixes */}
         {showFeedback && (
@@ -2214,6 +2252,23 @@ export default function WorkoutLogger({
               className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }} title="Swap exercise">
               <i className="ti ti-switch-horizontal text-base" style={{ color: "#e0a83e" }} />
+            </button>
+            {/* The coach, in the row with the other per-exercise tools —
+                deliberately NOT the floating button used everywhere else.
+                
+                CoachFab reads the keyboard height so it can hide itself, and
+                this screen's oldest rule is that nothing here reacts to the
+                keyboard: it pins its container instead, and every attempt to be
+                clever about the keyboard in here has broken the layout. A button
+                that is part of the row cannot cover anything and cannot move
+                when the keyboard opens, so the rule stays intact and the coach
+                is still one tap away mid-set.
+                
+                It also opens knowing which movement you are on. */}
+            <button onClick={() => setCoachOpen(true)}
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }} title="Ask your coach">
+              <i className="ti ti-sparkles text-base" style={{ color: "#7ee0a8" }} />
             </button>
           </div>
         </div>

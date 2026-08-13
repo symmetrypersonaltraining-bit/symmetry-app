@@ -206,6 +206,9 @@ export default function CoachChatSheet({
   fabMood = "nutrition",
   claimsSlot = true,
   surface = "nutrition",
+  contextLine,
+  startOpen = false,
+  onClose,
 }: {
   clientId: string;
   /** The day as rendered — sent with every message so /act can resolve references. */
@@ -263,6 +266,24 @@ export default function CoachChatSheet({
   claimsSlot?: boolean;
   /** Which screen this is mounted on — chooses the opening line and the chips. */
   surface?: string;
+  /**
+   * One extra sentence on the greeting naming what the client is actually
+   * looking at — "You're on Barbell Row, set 2." The surface opener says what
+   * the coach can help with here; this says what "here" IS. Only worth passing
+   * where the screen has a single obvious subject.
+   */
+  contextLine?: string;
+  /**
+   * Mount already open, with no floating button of its own.
+   *
+   * For screens that own their trigger — the workout logger puts the coach in
+   * its exercise header rather than floating it, because CoachFab reads the
+   * keyboard height and that screen's oldest rule is that nothing in it reacts
+   * to the keyboard.
+   */
+  startOpen?: boolean;
+  /** Told when the sheet closes, so the owner can drop it. */
+  onClose?: () => void;
 }) {
   const todayCT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const isToday = selectedDate === todayCT;
@@ -272,11 +293,11 @@ export default function CoachChatSheet({
     : new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
   const opener = OPENERS[surface] ?? OPENERS.app;
-  const GREETING = opener.greeting;
+  const GREETING = contextLine ? `${contextLine} ${opener.greeting}` : opener.greeting;
 
   const supabase = useMemo(() => createClient(), []);
   const [enabled, setEnabled] = useState(true); // client_app_settings.coach_enabled
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [msgs, setMsgs] = useState<Msg[]>([{ role: "coach", text: GREETING }]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -502,10 +523,10 @@ export default function CoachChatSheet({
     <>
       {/* The shared button — placement, z-order and the hide-under-the-keyboard
           rule live in CoachFab so every mount of the coach behaves the same. */}
-      {!open && <CoachFab onClick={openChat} mood={fabMood} />}
+      {!open && !startOpen && <CoachFab onClick={openChat} mood={fabMood} />}
 
       {open && (
-        <Sheet title="✦ Coach" subtitle="Grounded in your logs, targets & trends" onClose={() => setOpen(false)}>
+        <Sheet title="✦ Coach" subtitle="Grounded in your logs, targets & trends" onClose={() => { setOpen(false); onClose?.(); }}>
           <style>{`@keyframes coachdot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }`}</style>
           <div style={{ display: "flex", flexDirection: "column", height: "62vh" }}>
             {/* messages */}
