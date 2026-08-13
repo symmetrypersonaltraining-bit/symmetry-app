@@ -472,6 +472,22 @@
     "resolved",
     "created_at"
   ],
+  "exercise_video_candidates": [
+    "id",
+    "exercise_id",
+    "exercise_name",
+    "url",
+    "title",
+    "channel",
+    "duration_sec",
+    "confidence",
+    "note",
+    "status",
+    "found_by",
+    "created_at",
+    "reviewed_at",
+    "previous_video_url"
+  ],
   "exercises": [
     "id",
     "name",
