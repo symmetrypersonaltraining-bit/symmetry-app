@@ -151,9 +151,20 @@ describe("(f) the call sites", () => {
     }
   });
 
-  it("the query window is built from the look-ahead, not hardcoded to the date", () => {
+  it("there is NO query window — nothing caps how far ahead a plan can be read", () => {
+    // Was: "the query window is built from the look-ahead." Dustin, 12 Aug:
+    // "there is no limit to me looking ahead at programming scheduled thats
+    // ridiculous it was ever set up that way on meal plan or workouts."
+    //
+    // The cap was never what stopped a not-yet-started plan showing early —
+    // pickPlanForDate does that, against the VIEWED date, and is asserted
+    // throughout this file. So removing the cap costs nothing and fixes the
+    // original complaint properly.
     const src = read("src/lib/nutrition/resolvePlan.ts");
-    assert.match(src, /\.lte\("effective_date", shiftDate\(dateStr, Math\.max\(0, lookaheadDays\)\)\)/);
+    assert.ok(
+      !/\.lte\("effective_date"/.test(src),
+      "fetchLivePlans must not filter effective_date at all",
+    );
   });
 
   it("a scheduled menu is labelled as scheduled, not shown as if it were live", () => {

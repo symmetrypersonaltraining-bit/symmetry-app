@@ -82,6 +82,18 @@ export function pickPlanForDate<T extends { day_group?: number[] | null; effecti
  */
 export const PLAN_LOOKAHEAD_DAYS = 56;
 
+/**
+ * ...and it is no longer a ceiling. Dustin, 12 Aug: "there is no limit to me
+ * looking ahead at programming scheduled thats ridiculous it was ever set up
+ * that way on meal plan or workouts."
+ *
+ * fetchLivePlans no longer filters on effective_date at all. The constant
+ * stays because callers pass it and it still describes the intent of the
+ * screen, but nothing truncates. pickPlanForDate compares effective_date
+ * against the VIEWED date, so a plan that has not started still cannot leak
+ * into an earlier day — the cap was never what protected that.
+ */
+
 /** dateStr shifted by n days, calendar-safe, no Date parsing of the string. */
 export function shiftDate(dateStr: string, days: number): string {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -114,7 +126,6 @@ export async function fetchLivePlans(
     .select(sel)
     .eq("client_id", clientId)
     .eq("status", "live")
-    .lte("effective_date", shiftDate(dateStr, Math.max(0, lookaheadDays)))
     .order("effective_date", { ascending: false })
     .order("created_at", { ascending: false });
   return (data as unknown as DayGroupPlan[]) || [];

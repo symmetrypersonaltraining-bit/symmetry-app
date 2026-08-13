@@ -18,9 +18,6 @@ async function isClientMode(asMarker?: string): Promise<boolean> {
   return cookieStore.get("symmetry_client_mode")?.value === "1";
 }
 
-/** How far the workout calendar looks forward. See the note at its query. */
-const CAL_DAYS_AHEAD = 180;
-
 export default async function WorkoutPage(props: {
   searchParams?: Promise<{ as?: string }>;
 }) {
@@ -111,29 +108,26 @@ export default async function WorkoutPage(props: {
     });
   }
 
-  // Calendar data: 30 days back to 180 days ahead.
+  // Calendar data: 30 days back, and NO forward limit.
   //
-  // 12 Aug: this was 90 days, and 26 sessions for one client were already
-  // scheduled beyond it (from 12 Nov). They worked fine when the date arrived
-  // — they simply were not on the calendar until they fell inside the window,
-  // so a programme block longer than three months could not be read end to end.
-  // Looking ahead is the point of scheduling ahead.
+  // Dustin, 12 Aug: "there is no limit to me looking ahead at programming
+  // scheduled thats ridiculous it was ever set up that way." The window was 90
+  // days, and 26 sessions for one client already sat beyond it — scheduled,
+  // working, simply invisible until they drifted inside three months.
   //
-  // 180 not unlimited: the query is one round trip on a page a client opens
-  // every session, and half a year is past any block Dustin actually programmes.
+  // There is no upper bound now. If it is on the calendar it can be looked at.
+  // The row count is bounded by what has actually been programmed, not by a
+  // number someone picked.
   let calWorkouts: CalWorkout[] = [];
   if (clientId) {
     const back = new Date(); back.setDate(back.getDate() - 30);
-    const ahead = new Date(); ahead.setDate(ahead.getDate() + CAL_DAYS_AHEAD);
     const backStr = back.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-    const aheadStr = ahead.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
     const { data: calRows } = await (supabase as any)
       .from("scheduled_workouts")
       .select("id, day_id, scheduled_date, status, days(label)")
       .is("deleted_at", null)
       .eq("client_id", clientId)
       .gte("scheduled_date", backStr)
-      .lte("scheduled_date", aheadStr)
       .order("scheduled_date");
     calWorkouts = (calRows || []).map((w: any) => ({
       id: w.id as string,

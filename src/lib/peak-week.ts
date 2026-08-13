@@ -35,7 +35,23 @@ export const PEAK_WEEK = {
  * everyone, which is exactly the failure this replaces. The safe default for a
  * freeze is "off".
  */
-export function isPeakWeekLocked(date: string, ownerClientId: string | null | undefined): boolean {
-  if (!ownerClientId || ownerClientId !== PEAK_WEEK.clientId) return false;
-  return date >= PEAK_WEEK.start && date <= PEAK_WEEK.end;
+export function isPeakWeekLocked(_date: string, _ownerClientId: string | null | undefined): boolean {
+  // OFF, PERMANENTLY. Dustin, 12 Aug: "we did have that problem w workouts. it
+  // happened w my peak week I could not look at it ahead of time bc it was
+  // 'locked'... there is no limit to me looking ahead at programming scheduled
+  // thats ridiculous it was ever set up that way."
+  //
+  // He is right, and the file said so itself: "a stopgap for one person's shoot
+  // week [that] should be deleted after it, not extended." The shoot was 9 Aug.
+  // It also cost Tyler Dorsett a session at 5:17am ("My workouts are locked and
+  // it won't let me access them") and stopped Todd pulling a missed workout
+  // forward.
+  //
+  // Returning false here rather than unpicking twenty-two call sites in
+  // ScheduleBoard and WorkoutDaySheet is deliberate: every one of them is
+  // shaped `if (locked) { refuse }`, so a constant false makes them all inert
+  // with no chance of disturbing a board layout that has its own history of
+  // regressions. The call sites can be deleted whenever someone is already in
+  // those files. What matters is that nothing can freeze a date again.
+  return false;
 }

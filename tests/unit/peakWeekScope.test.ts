@@ -78,13 +78,18 @@ test("the freeze fails OPEN — an unknown owner locks nothing", () => {
   assert.equal(isPeakWeekLocked(inside, "some-other-client-id"), false, "another client must not lock");
 });
 
-test("the freeze still applies to the client it belongs to", () => {
-  assert.equal(isPeakWeekLocked(PEAK_WEEK.start, PEAK_WEEK.clientId), true);
-  assert.equal(isPeakWeekLocked(PEAK_WEEK.end, PEAK_WEEK.clientId), true);
-  assert.equal(isPeakWeekLocked("2026-08-05", PEAK_WEEK.clientId), true);
-  // Boundaries are inclusive, and a day either side is free.
-  assert.equal(isPeakWeekLocked("2026-08-02", PEAK_WEEK.clientId), false);
-  assert.equal(isPeakWeekLocked("2026-08-10", PEAK_WEEK.clientId), false);
+test("the freeze is OFF for everyone, including its own client", () => {
+  // Was: "the freeze still applies to the client it belongs to." Dustin turned
+  // it off entirely on 12 Aug — "there is no limit to me looking ahead at
+  // programming scheduled thats ridiculous it was ever set up that way." The
+  // shoot was 9 Aug; the file always said this was a stopgap to be deleted
+  // after it, not extended. It cost Tyler a session and blocked Todd.
+  //
+  // The scoping tests above are kept because they describe how a freeze must
+  // behave IF one is ever reintroduced: fail open, never guess the owner.
+  assert.equal(isPeakWeekLocked(PEAK_WEEK.start, PEAK_WEEK.clientId), false);
+  assert.equal(isPeakWeekLocked(PEAK_WEEK.end, PEAK_WEEK.clientId), false);
+  assert.equal(isPeakWeekLocked("2026-08-05", PEAK_WEEK.clientId), false);
 });
 
 test("every component that can freeze a day takes an owner", () => {
