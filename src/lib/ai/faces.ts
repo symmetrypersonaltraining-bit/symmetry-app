@@ -105,7 +105,10 @@ export type LapseInput = {
  * really logged gets no lapse nudge at all here — they belong in the occasional
  * gentle prompt, not the escalation ladder.
  */
-export function lapseMood({ daysSinceLog, priorLoggedDays28 }: LapseInput): Mood | null {
+/** The only two rungs. Narrower than Mood so callers can switch on it exhaustively. */
+export type LapseTier = "concerned" | "stern";
+
+export function lapseMood({ daysSinceLog, priorLoggedDays28 }: LapseInput): LapseTier | null {
   // Never established a habit — nothing to have fallen off of.
   if (priorLoggedDays28 < 8) return null;
 

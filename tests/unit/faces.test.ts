@@ -72,3 +72,38 @@ test("each mounted surface has a face of its own", () => {
   assert.equal(surfaceMood("home"), "plan");
   assert.equal(surfaceMood("anything-new"), "neutral");
 });
+
+// The takeover that uses this rule is the only full-screen one that is not good
+// news, so the blast radius of getting it wrong is every client at once. These
+// pin the two things that would make it a nuisance.
+test("the lapse takeover shows at most twice per lapse, then stops", async () => {
+  const fs2 = await import("node:fs");
+  const src = fs2.readFileSync(process.cwd() + "/src/components/ClientTakeovers.tsx", "utf8");
+
+  // The seen-key carries the date of their LAST LOG, so it is one key per
+  // lapse rather than per day. A date-of-today key would re-fire every morning
+  // for as long as they stayed away, which is the definition of pestering.
+  assert.match(
+    src,
+    /lapse-\$\{tier\}-\$\{lastLog\}/,
+    "the lapse seen-key is no longer stamped with the last-log date — it will re-fire daily"
+  );
+  assert.doesNotMatch(src, /lapse-\$\{tier\}-\$\{todayCT\}/, "stamping with today re-fires every morning");
+});
+
+test("the copy never mentions weight, and never frames it as a broken streak", async () => {
+  const fs2 = await import("node:fs");
+  const src = fs2.readFileSync(process.cwd() + "/src/components/ClientTakeovers.tsx", "utf8");
+  const at = src.indexOf('pick.kind === "lapse"');
+  // Style props are not copy: `fontWeight` is not the app mentioning weight.
+  const block = src
+    .slice(at, src.indexOf("const ch = pick.challenge", at))
+    .replace(/\bfontWeight\b/g, "")
+    .replace(/\bwindow\.location\.href = "[^"]*"/g, "");
+  for (const banned of ["streak", "lbs", "pounds", "weight", "failed", "disappoint", "should have"]) {
+    assert.ok(
+      !new RegExp(`\\b${banned}\\b`, "i").test(block),
+      `the lapse takeover says "${banned}" — this is the one screen that catches someone at their worst week`
+    );
+  }
+});

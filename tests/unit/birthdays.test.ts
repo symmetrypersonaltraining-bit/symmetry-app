@@ -199,9 +199,14 @@ test("the ask-for-a-birthday screen comes back if it is skipped", () => {
   // Order of the setPick calls in the query pass — the Pick type union at the
   // top of the file lists them in a different order and is not the priority.
   const order = [...src.matchAll(/setPick\(\{\s*kind: "(\w+)"/g)].map((m) => m[1]);
+  // `lapse` joined on 13 Aug, second from last. It has the longest shelf life
+  // of anything with an expiry — it stays true until they log again — so it
+  // yields to every dated thing above it. It still outranks "when is your
+  // birthday", because a client who has gone quiet is a bigger deal than a
+  // missing field, and because that one asks again in thirty days anyway.
   assert.deepEqual(
     order,
-    ["birthday", "winner", "challenge", "announcement", "askdob"],
+    ["birthday", "winner", "challenge", "announcement", "lapse", "askdob"],
     "priority is by shelf life: a birthday is true for one day and goes first; asking for something goes last",
   );
 });

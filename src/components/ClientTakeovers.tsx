@@ -32,6 +32,8 @@ import { createClient } from "@/lib/supabase/client";
 import { fx } from "@/lib/fx";
 import Confetti from "@/components/Confetti";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import AiBadge from "@/components/AiBadge";
+import { lapseMood } from "@/lib/ai/faces";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function pretty(iso: string): string {
@@ -73,6 +75,7 @@ type Pick =
   | { kind: "winner"; key: string; winner: Winner }
   | { kind: "challenge"; key: string; challenge: Challenge; myScore: number; myRank: number | null; total: number; people: number; joined: boolean }
   | { kind: "announcement"; key: string; announcement: Announcement }
+  | { kind: "lapse"; key: string; firstName: string; tier: "concerned" | "stern"; daysSince: number; priorDays: number }
   | null;
 
 const LAUNCH_KEY = "challenge-launch-2026-08";
@@ -220,7 +223,64 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
           return;
         }
 
-        // ── 4. "When's your birthday?" ───────────────────────────────────
+        // ── 4. They were logging, and then they stopped ──────────────────
+        //
+        // Dustin, 2026-08-12: "I have several clients that don't do it at all.
+        // I don't want the AI to keep pestering them about that... try to keep
+        // it only to people that were logging consistently and fell off, not
+        // ones that have never logged before at all."
+        //
+        // So this is measured against THEIR OWN normal, never an absolute
+        // count of missed days. The rule lives in lib/ai/faces (lapseMood) and
+        // is unit-tested there; this screen only supplies the two numbers.
+        //
+        // Dry run against live data, 13 Aug: fires for 3 of 30 clients, all at
+        // the gentle tier. It stays silent for the two people who have been
+        // quiet the LONGEST (27 and 25 days) because neither ever logged
+        // regularly — which is the entire point.
+        //
+        // The seen-key is stamped with the date of their last log, so it is one
+        // key per LAPSE, not per day: gentle once, firm once, and then nothing
+        // until they log again and later fall off afresh.
+        const { data: lastMeal } = await supabase
+          .from("meal_adherence_logs").select("log_date")
+          .eq("client_id", cid).order("log_date", { ascending: false }).limit(1);
+        const { data: lastWk } = await supabase
+          .from("workout_logs").select("log_date")
+          .eq("client_id", cid).eq("completed", true)
+          .order("log_date", { ascending: false }).limit(1);
+        const lastLog = [
+          ((lastMeal as { log_date: string }[]) ?? [])[0]?.log_date,
+          ((lastWk as { log_date: string }[]) ?? [])[0]?.log_date,
+        ].filter(Boolean).sort().pop();
+
+        if (lastLog) {
+          const dayMs = 86400000;
+          const daysSince = Math.round((Date.parse(todayCT) - Date.parse(lastLog)) / dayMs);
+          const windowStart = new Date(Date.parse(lastLog) - 28 * dayMs).toISOString().slice(0, 10);
+          const [{ data: mealDays }, { data: wkDays }] = await Promise.all([
+            supabase.from("meal_adherence_logs").select("log_date")
+              .eq("client_id", cid).gt("log_date", windowStart).lte("log_date", lastLog),
+            supabase.from("workout_logs").select("log_date")
+              .eq("client_id", cid).eq("completed", true).gt("log_date", windowStart).lte("log_date", lastLog),
+          ]);
+          const distinct = new Set<string>();
+          for (const r of ((mealDays as { log_date: string }[]) ?? [])) distinct.add(r.log_date);
+          for (const r of ((wkDays as { log_date: string }[]) ?? [])) distinct.add(r.log_date);
+          const tier = lapseMood({ daysSinceLog: daysSince, priorLoggedDays28: distinct.size });
+          const lapseKey = tier ? `lapse-${tier}-${lastLog}` : "";
+          if (tier && !seen.has(lapseKey) && alive) {
+            setMeId(cid);
+            setPick({
+              kind: "lapse", key: lapseKey,
+              firstName: (meC?.name || "").split(" ")[0] || "you",
+              tier, daysSince, priorDays: distinct.size,
+            });
+            return;
+          }
+        }
+
+        // ── 5. "When's your birthday?" ───────────────────────────────────
         // 18 of Dustin's 34 clients have no date on file, and a birthday bot
         // that skips half the room reads as favouritism. This asks.
         //
@@ -479,6 +539,61 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
   }
 
   // ── CHALLENGE LAUNCH ──────────────────────────────────────────────────────
+  // ── THEY WERE LOGGING, AND THEN THEY STOPPED ─────────────────────────────
+  // The one takeover that is not good news, so it is the one that most needs to
+  // sound like a person and not a system. Two tiers, and only ever two: this
+  // shows once when it goes quiet, once more if it stays quiet, and then not
+  // again until they log and later fall off afresh.
+  //
+  // It names THEIR number, not a target. "You logged 15 of the 28 days before
+  // this" is a fact about them; "you should log daily" is a lecture, and they
+  // have already heard it.
+  //
+  // No guilt, no streak-broken framing, and no mention of body weight. The way
+  // back is one tap.
+  if (pick.kind === "lapse") {
+    const stern = pick.tier === "stern";
+    return shell(
+      <div style={{ padding: "calc(46px + env(safe-area-inset-top)) 20px 30px", maxWidth: 460, margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <AiBadge size={104} mood={pick.tier} ring={false} title="" />
+        </div>
+        <div style={{ fontSize: 23, fontWeight: 900, color: "var(--brand-text)", marginTop: 20, lineHeight: 1.2, textAlign: "center" }}>
+          {stern
+            ? `${pick.firstName}, it has been ${pick.daysSince} days.`
+            : `Everything alright, ${pick.firstName}?`}
+        </div>
+        <p style={{ fontSize: 14.5, color: "var(--brand-text-secondary)", marginTop: 14, lineHeight: 1.6, textAlign: "center" }}>
+          {stern ? (
+            <>
+              You were logging {pick.priorDays} of every 28 days before this, so I know it is not
+              that you cannot. Something got in the way. Tell {COACH_FIRST_NAME} what it was —
+              he would rather fix the plan than watch it go quiet.
+            </>
+          ) : (
+            <>
+              You logged {pick.priorDays} of the 28 days before this and then it went quiet{" "}
+              {pick.daysSince} days ago. No lecture — if this week got away from you, it got away
+              from you. Picking it back up today counts for exactly as much as never stopping.
+            </>
+          )}
+        </p>
+
+        <div style={{ marginTop: 26 }}>
+          <button style={primaryBtn} onClick={() => dismiss(() => { fx("tap"); window.location.href = "/nutrition"; })}>
+            Log today
+          </button>
+          <button style={quietBtn} onClick={() => dismiss(() => { window.location.href = "/messages"; })}>
+            Message {COACH_FIRST_NAME}
+          </button>
+          <button style={{ ...quietBtn, border: "none" }} onClick={() => dismiss()}>
+            Not right now
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const ch = pick.challenge;
   const unit = ch.metric === "logging" ? "days logged" : "days trained";
   const left = ch.days_left ?? 0;
