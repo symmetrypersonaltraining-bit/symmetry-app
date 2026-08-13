@@ -20,22 +20,32 @@
 // Same artwork as Coach Bot in the group chat, deliberately — one AI face
 // across the whole app, so clients learn it once.
 
-const SRC = "/coachbot.png";
+// One face across the app, but not one EXPRESSION. Which sticker gets used is
+// decided by mood in src/lib/ai/faces.ts — read the header there for why the
+// expression is carrying part of the message rather than decorating it.
+import { faceSrc, type Mood } from "@/lib/ai/faces";
 
 export default function AiBadge({
   size = 30,
   ring = true,
   title = "Written by the app",
+  mood = "neutral",
 }: {
   size?: number;
   /** Purple ring — the same tint bot messages get in the group chat. */
   ring?: boolean;
   title?: string;
+  /**
+   * Which face. Defaults to the plain portrait so every call site that predates
+   * the sticker set keeps its current look; surfaces that know the emotional
+   * register of what they are showing pass their own.
+   */
+  mood?: Mood;
 }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={SRC}
+      src={faceSrc(mood)}
       alt=""
       title={title}
       width={size}
