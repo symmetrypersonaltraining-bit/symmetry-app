@@ -13,7 +13,7 @@ import { APP_GUIDE_TRAINER } from "@/lib/ai/app-guide";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { SONNET_MODEL } from "@/lib/ai/anthropic";
-import { logUsage } from "@/lib/ai/meter";
+import { logUsage, logFailure } from "@/lib/ai/meter";
 import { resolveAiScope, enforceMeter, missingKeyResponse, Db } from "@/lib/ai/scope";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TRAINER_TOOLS, execTrainerTool } from "@/lib/ai/agent-tools";
@@ -153,10 +153,29 @@ export async function POST(req: NextRequest) {
 
   const system = body.pageContext ? `${SYSTEM}\n\nCurrent page context (what ${COACH_FIRST_NAME} is looking at): ${body.pageContext}` : SYSTEM;
 
-  const client = new Anthropic({ apiKey });
+  /**
+ * How many model round-trips one turn may take. Each round is a Sonnet call
+ * that may run a database tool, so this is the real cost and latency ceiling.
+ *
+ * Raised from 14 to 20 alongside the timeout: a genuine request like "swap the
+ * lunges out of Bobbie's next three sessions" is a lookup, a programme read, a
+ * schedule read and three writes before it can even answer, and hitting the
+ * wall mid-task was the single biggest reason this felt broken.
+ */
+const MAX_TOOL_ROUNDS = 20;
+
+const client = new Anthropic({ apiKey });
   let tokensIn = 0, tokensOut = 0;
+  const startedAt = new Date();
+  const t0 = Date.now();
+
+  // Everything the agent did this turn, in the order it did it. Used to tell
+  // Dustin what happened when the work outlives the budget, instead of the
+  // canned line that used to be returned.
+  const toolTrail: string[] = [];
+
   try {
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < MAX_TOOL_ROUNDS; i++) {
       const resp = await client.messages.create({ model: SONNET_MODEL, max_tokens: 1600, system, tools: TRAINER_TOOLS, messages });
       tokensIn += resp.usage?.input_tokens ?? 0;
       tokensOut += resp.usage?.output_tokens ?? 0;
@@ -166,6 +185,7 @@ export async function POST(req: NextRequest) {
         const results: Anthropic.ToolResultBlockParam[] = [];
         for (const block of resp.content) {
           if (block.type === "tool_use") {
+            toolTrail.push(block.name);
             const out = await execTrainerTool(admin, block.name, (block.input as Record<string, unknown>) || {});
             results.push({ type: "tool_result", tool_use_id: block.id, content: out });
           }
@@ -181,16 +201,67 @@ export async function POST(req: NextRequest) {
       // unlogged — invisible to the $95 monthly kill switch, which is the one
       // thing meant to stop a runaway bill. logUsage takes a null client_id and
       // the spend rollups group by month, not by client.
-      await logUsage(scope.clientId ?? null, "trainer_agent", tokensIn, tokensOut, SONNET_MODEL);
+      await logUsage(scope.clientId ?? null, "trainer_agent", tokensIn, tokensOut, SONNET_MODEL, {
+        latencyMs: Date.now() - t0,
+        startedAt,
+      });
       return NextResponse.json({ message: text || "(done)" });
     }
-    await logUsage(scope.clientId ?? null, "trainer_agent", tokensIn, tokensOut, SONNET_MODEL);
-    return NextResponse.json({ message: "That took several steps — tell me the next thing and I'll keep going." });
+
+    // ── Out of rounds ────────────────────────────────────────────────────────
+    // This branch is why the agent "forgets what you asked". It used to return
+    //
+    //     "That took several steps — tell me the next thing and I'll keep going."
+    //
+    // and — critically — it was the ONE exit path that never called
+    // saveSession. So the reply sounded like an offer to continue while the
+    // route discarded the entire conversation; the next message started cold.
+    // ai_chat_sessions had zero rows because the only real run in the app's
+    // history ended here.
+    //
+    // Now it says what it actually did, and it saves. A wall you can see is a
+    // pause; a wall you cannot see is amnesia.
+    const used = [...new Set(toolTrail)];
+    const ranOut =
+      `I got a long way into that but ran out of steps before finishing.\n\n` +
+      (used.length ? `What I did: ${used.join(", ")}.\n\n` : "") +
+      `Ask me to carry on and I'll pick up where this left off — I've kept the thread.`;
+    await saveSession(admin, incoming, ranOut);
+    await logUsage(scope.clientId ?? null, "trainer_agent", tokensIn, tokensOut, SONNET_MODEL, {
+      latencyMs: Date.now() - t0,
+      startedAt,
+    });
+    return NextResponse.json({ message: ranOut, incomplete: true, toolsUsed: used });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("agent failed:", msg);
+    // Save the thread even on failure. Losing the conversation on top of losing
+    // the answer is how a recoverable error becomes "this thing is useless" —
+    // and the tokens spent before the failure were real, so they get recorded
+    // against the kill switch rather than vanishing.
+    await saveSession(
+      admin,
+      incoming,
+      `Something went wrong on my side partway through that. The conversation is still here — ask me to try again.`
+    );
+    await logFailure(scope.clientId ?? null, "trainer_agent", SONNET_MODEL, e, {
+      latencyMs: Date.now() - t0,
+      startedAt,
+      tokensIn,
+      tokensOut,
+    });
     return NextResponse.json({ error: `Agent error — ${msg.slice(0, 140)}` }, { status: 500 });
   }
 }
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Fourteen sequential Sonnet calls, each of which may run a database tool, on
+ * Vercel's DEFAULT timeout — which this route never overrode. Every cron in the
+ * app sets one (60s, 60s, 300s) and the recipe parser sets 45s; the single
+ * longest-running route in the codebase got whatever the platform gave it.
+ *
+ * 300s matches the weekly sweep, the other long job here.
+ */
+export const maxDuration = 300;

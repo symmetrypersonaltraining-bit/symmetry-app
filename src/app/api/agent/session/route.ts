@@ -26,11 +26,18 @@ export const CONTEXT_TYPE = "trainer_agent";
 export const MAX_TURNS = 40;
 
 /**
- * Conversations go stale. Coming back the next morning to yesterday's
- * half-finished thought about a different client is worse than a clean start —
- * the model would carry that context into an unrelated question.
+ * How old a thread can be before the drawer treats it as yesterday's.
+ *
+ * This used to DISCARD the thread past 12 hours: walk in on Monday morning and
+ * Sunday evening's conversation was simply gone, with nothing to say it had
+ * ever existed. Dustin asked for the opposite — a rolling thread he clears
+ * himself, that can tell him when it is old instead of silently starting over.
+ *
+ * So the thread is always returned now. `stale` is a flag ON it rather than a
+ * reason to throw it away, and the drawer can say "this was yesterday, still on
+ * Bobbie?" and let him decide.
  */
-const MAX_AGE_HOURS = 12;
+const STALE_AFTER_HOURS = 12;
 
 export async function GET() {
   const scoped = await resolveAiScope(null);
@@ -50,12 +57,12 @@ export async function GET() {
   if (!row) return NextResponse.json({ messages: [] });
 
   const ageHours = (Date.now() - Date.parse(row.updated_at)) / 3_600_000;
-  if (!Number.isFinite(ageHours) || ageHours > MAX_AGE_HOURS) {
-    return NextResponse.json({ messages: [], stale: true });
-  }
+  const stale = !Number.isFinite(ageHours) || ageHours > STALE_AFTER_HOURS;
 
   const messages = Array.isArray(row.messages) ? row.messages : [];
-  return NextResponse.json({ messages, updated_at: row.updated_at });
+  // The thread comes back either way. Losing a conversation without saying so
+  // is the behaviour this route existed to fix in the first place.
+  return NextResponse.json({ messages, updated_at: row.updated_at, stale, ageHours: Math.round(ageHours) });
 }
 
 export async function DELETE() {
