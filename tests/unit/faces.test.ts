@@ -143,3 +143,70 @@ test("the copy never mentions weight, and never frames it as a broken streak", a
     );
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE WHOLE POINT OF A REGISTRY IS THAT NOTHING BYPASSES IT.
+//
+// Dustin, 2026-08-13: "so the nutrition coach card, workout coach card,
+// homescreen coach card all have new avatars and new voice w memory correct?"
+//
+// The honest answer at the time was "mostly", and the gaps were exactly the
+// kind nobody spots: four surfaces still resolved a face without going through
+// this file. Three called <AiBadge /> with no mood, which is not broken — it is
+// the new art, just permanently neutral, so the face stops carrying any part of
+// the message. The fourth, the bot in the group chat, was still pointing at
+// /coachbot.png: the pre-sticker-set cartoon, so the same bot looked like two
+// different characters depending on which screen you met it on.
+//
+// Neither shows up as an error. Both are only visible by looking at every
+// surface at once, which is what this test does instead.
+// ─────────────────────────────────────────────────────────────────────────────
+test("nothing outside the registry points at the old cartoon", async () => {
+  const { execSync } = await import("node:child_process");
+  const hits = execSync(
+    `grep -rn "coachbot.png" src/ --include=*.tsx --include=*.ts || true`,
+    { encoding: "utf8", cwd: process.cwd() },
+  )
+    .split("\n")
+    .filter(Boolean)
+    // faces.ts owns FALLBACK_FACE; CoachBadge's mention is a comment telling
+    // people NOT to wire it in.
+    .filter((l) => !l.startsWith("src/lib/ai/faces.ts"))
+    // Comment lines are not call sites. Covers //, {/* and a * continuation,
+    // which is how every remaining mention of the old file is written: as a
+    // note explaining why NOT to use it.
+    .filter((l) => !/^\S+:\d+:\s*(\/\/|\{?\/\*|\*)/.test(l));
+  assert.deepEqual(
+    hits,
+    [],
+    "a surface resolves the old cartoon directly instead of through faceSrc():\n  " + hits.join("\n  "),
+  );
+});
+
+test("the AI face on a client-facing card is never left at the default", async () => {
+  const { execSync } = await import("node:child_process");
+  // <AiBadge /> with no mood renders `neutral` forever. That is fine for a
+  // decorative byline and wrong for a card whose whole job is to react to
+  // something — a lapse, a PR, a nudge, this week's plan. Every call site has to
+  // have made a choice; add new ones to this list only after checking that
+  // "always neutral" is genuinely what that surface wants.
+  const NEUTRAL_ON_PURPOSE = [
+    // (empty — every current call site names a mood)
+  ];
+  const sites = execSync(`grep -rn "<AiBadge" src/ --include=*.tsx || true`, {
+    encoding: "utf8",
+    cwd: process.cwd(),
+  })
+    .split("\n")
+    .filter(Boolean)
+    .filter((l) => !/^\S+:\d+:\s*(\/\/|\{?\/\*|\*)/.test(l))
+    .filter((l) => !l.includes("src/components/AiBadge.tsx"));
+
+  const moodless = sites.filter((l) => !/\bmood=/.test(l));
+  const unexpected = moodless.filter((l) => !NEUTRAL_ON_PURPOSE.some((ok) => l.includes(ok)));
+  assert.deepEqual(
+    unexpected,
+    [],
+    "these AI faces will render neutral no matter what is happening:\n  " + unexpected.join("\n  "),
+  );
+});

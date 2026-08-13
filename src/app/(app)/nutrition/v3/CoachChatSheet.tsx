@@ -23,7 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import AiBadge from "@/components/AiBadge";
 import CoachFab from "@/components/CoachFab";
-import type { Mood } from "@/lib/ai/faces";
+import { surfaceMood, type Mood } from "@/lib/ai/faces";
 import { claimCoachSlot } from "@/lib/ai/coachMount";
 import { kcalOf } from "@/lib/nutrition/dailyTotals";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
@@ -596,7 +596,7 @@ export default function CoachChatSheet({
                       always knows whether they are reading Dustin or the app. */}
                   {msg.role !== "client" && (mi === 0 || msgs[mi - 1].role === "client") && (
                     <div className="flex items-center gap-1.5 mb-1">
-                      <AiBadge size={20} />
+                      <AiBadge size={20} mood={surfaceMood(surface)} />
                       <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, color: "var(--brand-text-secondary)" }}>COACH</span>
                     </div>
                   )}

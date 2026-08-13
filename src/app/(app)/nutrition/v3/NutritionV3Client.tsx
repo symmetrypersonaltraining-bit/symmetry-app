@@ -1483,7 +1483,7 @@ export default function NutritionV3Client(props: Props) {
       {weekFood && !weekFoodDismissed && coachOn && !coachDismissed && (
         <div className="mx-4 mt-2.5 p-3" style={{ ...CARD, borderLeft: "3px solid var(--brand-primary)", animation: "v3fadeup 0.35s ease" }}>
           <div className="flex items-start gap-2.5">
-            <AiBadge size={26} />
+            <AiBadge size={26} mood="nutrition" />
             <div className="flex-1">
               <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.1, color: "var(--brand-primary)", marginBottom: 4 }}>YOUR WEEK</p>
               <p className="text-xs leading-relaxed" style={{ color: "var(--brand-text-secondary)" }}>{weekFood}</p>
@@ -1508,7 +1508,7 @@ export default function NutritionV3Client(props: Props) {
       {/* coach card */}
       {coach && (
         <div className="mx-4 mt-2.5 flex items-start gap-2.5 p-3" style={{ ...CARD, borderLeft: `3px solid ${coach.kind === "push" ? ORANGE : GREEN}`, animation: "v3fadeup 0.35s ease" }}>
-          <AiBadge size={26} />
+          <AiBadge size={26} mood={coach.kind === "push" ? "nutrition" : "happy"} />
           <p className="flex-1 text-xs leading-relaxed" style={{ color: "var(--brand-text-secondary)" }}>{coach.html}</p>
           <button onClick={() => setCoachDismissed(true)} aria-label="dismiss" style={{ color: "var(--brand-text-secondary)", fontSize: 12, padding: "2px 6px" }}>✕</button>
         </div>

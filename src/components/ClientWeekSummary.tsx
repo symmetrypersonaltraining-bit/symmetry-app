@@ -207,7 +207,7 @@ export default function ClientWeekSummary() {
         </div>
         {(focusText || s.totalThis > 0) && (
           <div className="focus-panel" style={{ padding: 9 }}>
-            {focusIsAi ? <AiBadge size={30} /> : <CoachBadge size={30} />}
+            {focusIsAi ? <AiBadge size={30} mood="plan" /> : <CoachBadge size={30} />}
             <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
               <b>Focus:</b> {focusText || (s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " on the calendar this week — let's go.")}
             </div>
@@ -232,7 +232,7 @@ export default function ClientWeekSummary() {
             </div>
             <div style={{ fontWeight: 800, fontSize: 14, color: "var(--brand-text)", marginTop: 2 }}>This week's focus</div>
             <div className="focus-panel" style={{ padding: 11 }}>
-              {focusIsAi ? <AiBadge size={30} /> : <CoachBadge size={30} />}
+              {focusIsAi ? <AiBadge size={30} mood="plan" /> : <CoachBadge size={30} />}
               <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
                 <b>{focusIsAi ? "Your focus:" : `${COACH_FIRST_NAME}:`}</b> {focusText || ("You've got " + s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " scheduled this week. Show up and stack another good one.")}
               </div>

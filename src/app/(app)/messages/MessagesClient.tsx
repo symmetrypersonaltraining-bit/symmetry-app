@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import MessageReactions from "@/components/MessageReactions";
 import GroupChallenge from "@/components/GroupChallenge";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { faceSrc } from "@/lib/ai/faces";
 
 interface Message {
   id: string;
@@ -266,8 +267,13 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                       <p className="text-[11px] font-bold mb-0.5 flex items-center gap-1.5" style={{ color: isMe ? "rgba(255,255,255,0.85)" : isBot ? "#a78bfa" : "var(--brand-primary)" }}>
                         {isBot ? (
                           <>
+                            {/* Was a hard-coded /coachbot.png — the last place in
+                                the app still wearing the pre-sticker-set cartoon,
+                                so the bot in the group chat did not look like the
+                                same bot as everywhere else. Through the registry
+                                now, like every other AI face. */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src="/coachbot.png" alt="" width={18} height={18} style={{ borderRadius: "50%", objectFit: "cover" }} />
+                            <img src={faceSrc("messages")} alt="" width={18} height={18} style={{ borderRadius: "50%", objectFit: "cover" }} />
                             Coach Bot
                           </>
                         ) : nameForFrom(m)}
