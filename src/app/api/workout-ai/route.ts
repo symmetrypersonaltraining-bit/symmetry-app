@@ -225,8 +225,87 @@ export async function POST(req: NextRequest) {
   // ─── persist as a CLIENT-OWNED library day (+ sections + prescribed_exercises) ───
   const today = CT_TODAY();
   const originMap: Record<string, string> = { replace: "ai_replace", equipment: "ai_equipment", activity: "ai_activity" };
+  /**
+   * How long after logging an activity a second call still counts as fixing the
+   * first one rather than logging a new one.
+   *
+   * Jennifer's correction came 52 seconds later. Twenty minutes is generous
+   * enough to cover somebody re-reading it, deciding the number is wrong and
+   * saying so — and far short of the gap between two activities anyone would
+   * actually do in one day.
+   */
+  const EDIT_WINDOW_MIN = 20;
   let dayIdNew: string;
+  // BUG A — CORRECTING A LOGGED ACTIVITY USED TO LOG IT TWICE.
+  //
+  // Jennifer Day, 30 Jul: two complete days + scheduled_workouts + workout_logs
+  // triples, 52 SECONDS apart, both marked completed — "Baby Stroller Walk"
+  // 45 min and "Baby Stroller Walk" 120 min. She logged 45, realised it was
+  // wrong, and said 120. Her day now reads 165 minutes across two sessions.
+  // She did one walk.
+  //
+  // There is no edit endpoint and there never was: correcting an activity means
+  // re-running this route, and this route only ever inserted. So every
+  // correction anybody has made since the feature shipped is sitting in the
+  // data as a second session, quietly inflating their adherence and volume.
+  //
+  // WHEN IS A SECOND CALL A CORRECTION, AND WHEN IS IT A SECOND WALK? That is
+  // the whole question, and getting it wrong in the permissive direction
+  // deletes a real session. Two signals, either one is enough:
+  //
+  //   · the SAME activity name on the same day — "I said 45, I meant 120"; the
+  //     title matching is what makes it the same thing rather than a new one;
+  //   · anything logged within EDIT_WINDOW_MIN — a correction made while the
+  //     screen is still open, whatever the model chose to call it. Dustin's
+  //     6 Aug case needed this one: his edit changed the movement name too
+  //     (Outdoor Walk → Walk (2 Miles)), so a title match alone would have
+  //     missed it.
+  //
+  // Two genuinely different activities — a morning walk and an evening bike —
+  // have different names and are hours apart, so they still get their own row.
+  let reusedDayId: string | null = null;
+  if (mode === "activity") {
+    try {
+      const { data: prior } = await admin
+        .from("days")
+        .select("id, label, created_at")
+        .eq("client_owner_id", clientId)
+        .eq("origin", "ai_activity")
+        .order("created_at", { ascending: false })
+        .limit(12);
+      const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+      const cutoff = Date.now() - EDIT_WINDOW_MIN * 60_000;
+      for (const p of ((prior as { id: string; label: string | null; created_at: string }[] | null) || [])) {
+        // Only rows already scheduled for TODAY are candidates. Yesterday's
+        // walk is not a draft of today's.
+        const { data: sw } = await admin
+          .from("scheduled_workouts")
+          .select("id")
+          .eq("client_id", clientId)
+          .eq("day_id", p.id)
+          .eq("scheduled_date", today)
+          .is("deleted_at", null)
+          .limit(1);
+        if (!sw || !sw.length) continue;
+        const sameName = norm(p.label || "") === norm(workout.title);
+        const justNow = Date.parse(p.created_at) >= cutoff;
+        if (sameName || justNow) { reusedDayId = p.id; break; }
+      }
+    } catch {
+      // Never block a client's log over the de-duplication. Worst case is the
+      // old behaviour, which is a duplicate — recoverable. A thrown error here
+      // would lose the session entirely, which is not.
+    }
+  }
   try {
+    if (reusedDayId) {
+      // Rewrite the contents in place. sections cascade-delete their
+      // prescribed_exercises, and activity days carry no set_logs (verified:
+      // zero across every ai_activity day), so nothing logged is lost.
+      dayIdNew = reusedDayId;
+      await admin.from("days").update({ label: workout.title }).eq("id", dayIdNew);
+      await admin.from("sections").delete().eq("day_id", dayIdNew);
+    } else {
     const { data: posRow } = await admin.from("days").select("position").eq("phase_id", phaseId).order("position", { ascending: false }).limit(1);
     const nextPos = ((posRow && posRow[0] ? (posRow[0] as { position: number }).position : 0) || 0) + 1;
     const { data: dayRow, error: dayErr } = await admin.from("days").insert({
@@ -235,6 +314,7 @@ export async function POST(req: NextRequest) {
     }).select("id").single();
     if (dayErr || !dayRow) throw dayErr || new Error("day insert failed");
     dayIdNew = (dayRow as { id: string }).id;
+    }
 
     let sPos = 0;
     for (const sec of workout.sections) {
@@ -271,16 +351,59 @@ export async function POST(req: NextRequest) {
       // your training" while leaving a completed scheduled_workouts row pointing at no log.
       // Streaks and session counts read workout_logs; the weekly done-count reads
       // scheduled_workouts - so the two disagreed permanently with nothing surfaced.
-      const { data: wl, error: wlErr } = await admin.from("workout_logs").insert({
-        client_id: clientId, day_id: dayIdNew, log_date: today, started_at: new Date().toISOString(),
-        completed: true, completed_at: new Date().toISOString(), status: "Done as planned", source: "client",
-        note: workout.focus || null,
-      }).select("id").single();
-      if (wlErr) throw wlErr;
-      await admin.from("scheduled_workouts").insert({
-        client_id: clientId, day_id: dayIdNew, scheduled_date: today, status: "completed",
-        workout_log_id: wl ? (wl as { id: string }).id : null, source: "client_self_assign",
-      });
+      // A CORRECTION UPDATES THE EXISTING LOG. It does not add a second one.
+      // This is the half of Bug A that actually corrupts the numbers: streaks
+      // and session counts read workout_logs, so a duplicate row is a session
+      // the client did not do, counted forever. Jennifer's 30 Jul reads 165
+      // minutes across two walks; she took one.
+      let existingLogId: string | null = null;
+      if (reusedDayId) {
+        const { data: prevLog } = await admin
+          .from("workout_logs")
+          .select("id")
+          .eq("client_id", clientId)
+          .eq("day_id", dayIdNew)
+          .eq("log_date", today)
+          .order("started_at", { ascending: true })
+          .limit(1);
+        existingLogId = ((prevLog as { id: string }[] | null) || [])[0]?.id ?? null;
+      }
+
+      let wl: { id: string } | null = null;
+      if (existingLogId) {
+        const { error: upErr } = await admin
+          .from("workout_logs")
+          .update({
+            completed: true, completed_at: new Date().toISOString(),
+            status: "Done as planned", note: workout.focus || null,
+          })
+          .eq("id", existingLogId);
+        if (upErr) throw upErr;
+        wl = { id: existingLogId };
+      } else {
+        const { data: inserted, error: wlErr } = await admin.from("workout_logs").insert({
+          client_id: clientId, day_id: dayIdNew, log_date: today, started_at: new Date().toISOString(),
+          completed: true, completed_at: new Date().toISOString(), status: "Done as planned", source: "client",
+          note: workout.focus || null,
+        }).select("id").single();
+        if (wlErr) throw wlErr;
+        wl = inserted as { id: string } | null;
+      }
+      // Same for the schedule row. A second insert here would also violate
+      // uq_scheduled_workout_one_per_day (client_id, day_id, scheduled_date)
+      // WHERE deleted_at IS NULL — so on a reuse this is an update by
+      // necessity as well as by correctness.
+      if (reusedDayId) {
+        await admin.from("scheduled_workouts")
+          .update({ status: "completed", workout_log_id: wl?.id ?? null, updated_at: new Date().toISOString() })
+          .eq("client_id", clientId).eq("day_id", dayIdNew).eq("scheduled_date", today)
+          .is("deleted_at", null);
+      } else {
+        await admin.from("scheduled_workouts").insert({
+          client_id: clientId, day_id: dayIdNew, scheduled_date: today, status: "completed",
+          workout_log_id: wl ? (wl as { id: string }).id : null, source: "client_self_assign",
+        });
+      }
       logged = true;
     } else {
       // Replacement → schedule the new workout for today so it appears + counts when logged,
