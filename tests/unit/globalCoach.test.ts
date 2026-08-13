@@ -156,3 +156,38 @@ test("the meal action chips only appear where a meal can actually be changed", (
     '"Swap a meal" is offered on screens that cannot swap a meal'
   );
 });
+
+
+// Dustin, 2026-08-13: "we need to put a function on that screen for them to
+// click don't show again... or maybe snooze for thirty days." The rule can only
+// infer from behaviour; the client is the one who knows what the silence means.
+// A check-in you cannot switch off is a nag.
+test("the go-quiet check-in can be snoozed and switched off, and listens", () => {
+  const src = fs.readFileSync(path.join(ROOT, "src/components/ClientTakeovers.tsx"), "utf8");
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  assert.match(code, /setCheckinPref\("snooze"\)/, "no way to snooze the check-in");
+  assert.match(code, /setCheckinPref\("off"\)/, "no way to turn the check-in off for good");
+  assert.match(code, /checkin_nudges_off/, "the screen does not read whether it was switched off");
+  assert.match(code, /checkin_snoozed_until/, "the screen does not read whether it was snoozed");
+
+  // Reading the preference AFTER choosing what to show would still flash the
+  // takeover at somebody who asked never to see it again.
+  const prefAt = code.indexOf("checkin_nudges_off");
+  const decideAt = code.indexOf("lapseMood(");
+  assert.ok(prefAt > -1 && decideAt > -1);
+  assert.ok(prefAt < decideAt, "the check-in is chosen before their opt-out is read");
+});
+
+test("archived clients get no takeovers at all", () => {
+  // Tina was archived on 13 Aug and would otherwise have been the
+  // longest-silent person in the room.
+  const src = fs.readFileSync(path.join(ROOT, "src/components/ClientTakeovers.tsx"), "utf8");
+  assert.match(src, /archived_at/, "archived clients are back in the takeover pool");
+});
+
+test("the birthday screen wears a real face", () => {
+  const src = fs.readFileSync(path.join(ROOT, "src/components/ClientTakeovers.tsx"), "utf8");
+  const bday = src.slice(src.indexOf('pick.kind === "birthday"'), src.indexOf("See the group chat"));
+  assert.match(bday, /<AiBadge size=\{\d+\} mood="hype"/, "the birthday takeover is back to a bare emoji");
+});

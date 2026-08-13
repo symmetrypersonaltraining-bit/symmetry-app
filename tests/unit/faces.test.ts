@@ -30,14 +30,25 @@ test("an unknown mood degrades to the old cartoon instead of a broken image", ()
 //
 // The failure mode is not a wrong picture. It is the app nagging a client who
 // never signed up for food logging, every day, forever.
-test("a client who never logged is never nudged about lapsing", () => {
-  for (const daysSinceLog of [3, 7, 14, 60]) {
+test("a client who never logged is never nudged ABOUT LOGGING", () => {
+  // The original rule, and still the important half: someone who never built
+  // the habit is never told off for breaking it. What changed on 13 Aug is that
+  // total silence now gets a different screen, which does not mention logging —
+  // so the assertion is about the TIER, not merely about being left alone.
+  for (const daysSinceLog of [3, 7, 14]) {
     assert.equal(
       lapseMood({ daysSinceLog, priorLoggedDays28: 0 }),
       null,
       `nudged a client with no logging history after ${daysSinceLog} days`
     );
     assert.equal(lapseMood({ daysSinceLog, priorLoggedDays28: 5 }), null, "5 days in 28 is not a habit to have fallen off");
+  }
+  // Past three weeks it is no longer about logging at all.
+  for (const daysSinceLog of [21, 60]) {
+    const tier = lapseMood({ daysSinceLog, priorLoggedDays28: 0 });
+    assert.equal(tier, "quiet", `after ${daysSinceLog} days of total silence somebody should say hello`);
+    assert.notEqual(tier, "concerned");
+    assert.notEqual(tier, "stern");
   }
 });
 
@@ -47,6 +58,31 @@ test("the ladder is relative to the client's own normal, not an absolute count",
   // Twice-a-week logger, same three days — completely unremarkable.
   assert.equal(lapseMood({ daysSinceLog: 3, priorLoggedDays28: 9 }), null);
   assert.equal(lapseMood({ daysSinceLog: 6, priorLoggedDays28: 9 }), "concerned");
+});
+
+// Robert had been silent 25 days and the ladder said nothing, because he never
+// logged regularly enough to have "fallen off". Correct by the rule, wrong about
+// the person. Dustin: "Robert could definitely get a little nudge."
+test("total silence gets its own gentler screen, whatever their logging history", () => {
+  // Never logged, three weeks of nothing at all.
+  assert.equal(lapseMood({ daysSinceLog: 25, priorLoggedDays28: 4 }), "quiet");
+  assert.equal(lapseMood({ daysSinceLog: 21, priorLoggedDays28: 0 }), "quiet");
+
+  // But it must stay much slower than the logging rungs — a light user who
+  // trained a fortnight ago is not missing.
+  assert.equal(lapseMood({ daysSinceLog: 14, priorLoggedDays28: 4 }), null);
+  assert.equal(lapseMood({ daysSinceLog: 3, priorLoggedDays28: 4 }), null);
+
+  // Someone who WAS logging never gets the quiet screen — they get the ladder,
+  // which knows more about them.
+  assert.equal(lapseMood({ daysSinceLog: 25, priorLoggedDays28: 24 }), "stern");
+});
+
+test("the quiet screen never wears the disappointed face", async () => {
+  // Someone who never logged has done nothing to disappoint anyone.
+  const { faceSrc } = await import("../../src/lib/ai/faces");
+  assert.notEqual(faceSrc("quiet"), faceSrc("concerned"));
+  assert.notEqual(faceSrc("quiet"), faceSrc("stern"));
 });
 
 test("it escalates once, and stops", () => {

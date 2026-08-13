@@ -18,6 +18,7 @@
 export type Mood =
   // — the everyday face —
   | "neutral"      // default; the AI is just talking
+  | "quiet"        // long silence, no judgement — see LapseTier
   | "thinking"     // working on it, generating, loading
   | "explaining"   // walking someone through the app
   | "plan"         // programme / weekly focus / anything scheduled
@@ -44,6 +45,9 @@ export type Mood =
 /** Mood → asset. Every value must exist in /public/bots. */
 const ART: Record<Mood, string> = {
   neutral: "neutral",
+  // `quiet` deliberately does NOT use the disappointed face. Someone who never
+  // logged has done nothing to disappoint anyone.
+  quiet: "thinking",
   thinking: "thinking",
   explaining: "explaining",
   plan: "plan",
@@ -105,12 +109,35 @@ export type LapseInput = {
  * really logged gets no lapse nudge at all here — they belong in the occasional
  * gentle prompt, not the escalation ladder.
  */
-/** The only two rungs. Narrower than Mood so callers can switch on it exhaustively. */
-export type LapseTier = "concerned" | "stern";
+/**
+ * The rungs. Narrow enough that callers can switch on it exhaustively.
+ *
+ * `quiet` was added 13 Aug for a case the other two deliberately miss. Robert
+ * had been silent 25 days and the ladder said nothing, because he never logged
+ * regularly enough to have "fallen off" — correct by the rule, wrong about the
+ * person. Dustin: "Robert could definitely get a little nudge."
+ *
+ * So it is a different question, and it says so. concerned/stern are about
+ * LOGGING going quiet. `quiet` is about the CLIENT going quiet — no session, no
+ * meal, nothing, for weeks — and it never mentions logging at all, because for
+ * someone who never logged that would be a complaint about a habit they never
+ * had.
+ */
+export type LapseTier = "concerned" | "stern" | "quiet";
+
+/**
+ * Silent this long and somebody should say hello, whatever their logging
+ * history. Deliberately much longer than either logging rung: three weeks of
+ * nothing at all is not a slip, and anything shorter would catch people who are
+ * simply light users.
+ */
+export const QUIET_DAYS = 21;
 
 export function lapseMood({ daysSinceLog, priorLoggedDays28 }: LapseInput): LapseTier | null {
-  // Never established a habit — nothing to have fallen off of.
-  if (priorLoggedDays28 < 8) return null;
+  // Never established a habit — nothing to have fallen off of. But total
+  // silence for weeks is its own thing, and gets its own, gentler screen that
+  // does not mention logging.
+  if (priorLoggedDays28 < 8) return daysSinceLog >= QUIET_DAYS ? "quiet" : null;
 
   const wasDaily = priorLoggedDays28 >= 20;
   // Someone who logs most days is "late" sooner than someone who logs twice a

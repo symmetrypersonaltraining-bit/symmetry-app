@@ -33,7 +33,7 @@ import { fx } from "@/lib/fx";
 import Confetti from "@/components/Confetti";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import AiBadge from "@/components/AiBadge";
-import { lapseMood } from "@/lib/ai/faces";
+import { lapseMood, type LapseTier } from "@/lib/ai/faces";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function pretty(iso: string): string {
@@ -75,7 +75,7 @@ type Pick =
   | { kind: "winner"; key: string; winner: Winner }
   | { kind: "challenge"; key: string; challenge: Challenge; myScore: number; myRank: number | null; total: number; people: number; joined: boolean }
   | { kind: "announcement"; key: string; announcement: Announcement }
-  | { kind: "lapse"; key: string; firstName: string; tier: "concerned" | "stern"; daysSince: number; priorDays: number }
+  | { kind: "lapse"; key: string; firstName: string; tier: LapseTier; daysSince: number; priorDays: number }
   | null;
 
 const LAUNCH_KEY = "challenge-launch-2026-08";
@@ -97,6 +97,21 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
         const { data: me } = await supabase.rpc("my_client_id");
         const cid = (me as string | null) ?? null;
         if (!cid) return;
+
+        // Archived clients get nothing. Tina was archived on 13 Aug and would
+        // otherwise have been the longest-silent person in the room.
+        // Also read what they have already told us about check-ins: a screen you
+        // cannot switch off is a nag, so "don't show again" and "snooze" are
+        // checked BEFORE anything is chosen, not after.
+        const { data: meGate } = await supabase
+          .from("clients").select("archived_at").eq("id", cid).maybeSingle();
+        if ((meGate as { archived_at: string | null } | null)?.archived_at) return;
+
+        const { data: prefRow } = await supabase
+          .from("client_app_settings")
+          .select("checkin_nudges_off, checkin_snoozed_until")
+          .eq("client_id", cid).maybeSingle();
+        const pref = prefRow as { checkin_nudges_off?: boolean | null; checkin_snoozed_until?: string | null } | null;
 
         const { data: seenRows } = await supabase
           .from("client_announcements_seen")
@@ -242,6 +257,10 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
         // The seen-key is stamped with the date of their last log, so it is one
         // key per LAPSE, not per day: gentle once, firm once, and then nothing
         // until they log again and later fall off afresh.
+        const checkinsAllowed =
+          pref?.checkin_nudges_off !== true &&
+          !(pref?.checkin_snoozed_until && pref.checkin_snoozed_until >= todayCT);
+
         const { data: lastMeal } = await supabase
           .from("meal_adherence_logs").select("log_date")
           .eq("client_id", cid).order("log_date", { ascending: false }).limit(1);
@@ -254,7 +273,7 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
           ((lastWk as { log_date: string }[]) ?? [])[0]?.log_date,
         ].filter(Boolean).sort().pop();
 
-        if (lastLog) {
+        if (lastLog && checkinsAllowed) {
           const dayMs = 86400000;
           const daysSince = Math.round((Date.parse(todayCT) - Date.parse(lastLog)) / dayMs);
           const windowStart = new Date(Date.parse(lastLog) - 28 * dayMs).toISOString().slice(0, 10);
@@ -321,6 +340,21 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
     [supabase, meId, pick],
   );
 
+  /**
+   * Send back what they said about check-ins. Fire-and-forget on purpose: the
+   * screen closes either way, and a client who tapped "don't show again"
+   * should not be held on a spinner or shown an error about it.
+   */
+  async function setCheckinPref(action: "snooze" | "off") {
+    try {
+      await fetch("/api/checkin-preference", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+    } catch { /* they still get the rest of the month off via the seen-key */ }
+  }
+
   async function saveDob() {
     if (busy) return;
     // A date they have to fix later is worse than no date. Reject the two
@@ -383,7 +417,15 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
       <>
         <Confetti />
         <div style={{ background: "var(--grad-hero, var(--brand-primary))", color: "#fff", padding: "calc(40px + env(safe-area-inset-top)) 20px 34px", textAlign: "center" }}>
-          <div style={{ fontSize: 58, lineHeight: 1 }}>🎂</div>
+          {/* The cake was a placeholder from before the sticker set existed.
+              Dustin, 2026-08-13: "Make sure that we use the new avatars for the
+              birthday screen as well." `hype` is the arms-up one — the loudest
+              face in the set, and the one day of the year it is unarguably the
+              right call. */}
+          <div style={{ display: "flex", justifyContent: "center", position: "relative" }}>
+            <AiBadge size={112} mood="hype" ring={false} title="" />
+            <span style={{ position: "absolute", right: "calc(50% - 74px)", top: -4, fontSize: 34, lineHeight: 1 }}>🎂</span>
+          </div>
           <div style={{ fontSize: 26, fontWeight: 900, marginTop: 12, lineHeight: 1.15 }}>
             Happy birthday, {pick.firstName}.
           </div>
@@ -553,18 +595,31 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
   // back is one tap.
   if (pick.kind === "lapse") {
     const stern = pick.tier === "stern";
+    // `quiet` is a different question and must not read as a telling-off. It is
+    // for someone who has been silent for weeks and never really logged — so it
+    // never mentions logging, because for them that is a complaint about a habit
+    // they never had. Robert is the reason it exists.
+    const quiet = pick.tier === "quiet";
     return shell(
       <div style={{ padding: "calc(46px + env(safe-area-inset-top)) 20px 30px", maxWidth: 460, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "center" }}>
           <AiBadge size={104} mood={pick.tier} ring={false} title="" />
         </div>
         <div style={{ fontSize: 23, fontWeight: 900, color: "var(--brand-text)", marginTop: 20, lineHeight: 1.2, textAlign: "center" }}>
-          {stern
-            ? `${pick.firstName}, it has been ${pick.daysSince} days.`
-            : `Everything alright, ${pick.firstName}?`}
+          {quiet
+            ? `Still with us, ${pick.firstName}?`
+            : stern
+              ? `${pick.firstName}, it has been ${pick.daysSince} days.`
+              : `Everything alright, ${pick.firstName}?`}
         </div>
         <p style={{ fontSize: 14.5, color: "var(--brand-text-secondary)", marginTop: 14, lineHeight: 1.6, textAlign: "center" }}>
-          {stern ? (
+          {quiet ? (
+            <>
+              It has been about {pick.daysSince} days since anything came through — no sessions, nothing.
+              That might be exactly as it should be, and if so, say so below and I will leave you to it.
+              If life got in the way, {COACH_FIRST_NAME} would rather hear it than guess.
+            </>
+          ) : stern ? (
             <>
               You were logging {pick.priorDays} of every 28 days before this, so I know it is not
               that you cannot. Something got in the way. Tell {COACH_FIRST_NAME} what it was —
@@ -580,12 +635,30 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
         </p>
 
         <div style={{ marginTop: 26 }}>
-          <button style={primaryBtn} onClick={() => dismiss(() => { fx("tap"); window.location.href = "/nutrition"; })}>
-            Log today
+          <button style={primaryBtn} onClick={() => dismiss(() => { fx("tap"); window.location.href = quiet ? "/workout" : "/nutrition"; })}>
+            {quiet ? "Show me today" : "Log today"}
           </button>
           <button style={quietBtn} onClick={() => dismiss(() => { window.location.href = "/messages"; })}>
-            Message {COACH_FIRST_NAME}
+            Tell {COACH_FIRST_NAME} why
           </button>
+
+          {/* The rule can only infer from behaviour; the client is the one who
+              knows what the silence means. Both of these are answers, and the
+              app has to take them — see /api/checkin-preference. */}
+          <div className="flex gap-2" style={{ marginTop: 10 }}>
+            <button
+              style={{ ...quietBtn, marginTop: 0, flex: 1 }}
+              onClick={() => { void setCheckinPref("snooze"); dismiss(); }}
+            >
+              Not for a month
+            </button>
+            <button
+              style={{ ...quietBtn, marginTop: 0, flex: 1 }}
+              onClick={() => { void setCheckinPref("off"); dismiss(); }}
+            >
+              Don&rsquo;t show again
+            </button>
+          </div>
           <button style={{ ...quietBtn, border: "none" }} onClick={() => dismiss()}>
             Not right now
           </button>
