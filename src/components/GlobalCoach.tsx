@@ -103,6 +103,10 @@ export default function GlobalCoach() {
       onApplySuggestion={async () => {}}
       selectedDate={today}
       canAct={false}
+      // Never. We are the instance that gets hidden when the slot is claimed,
+      // so claiming it ourselves is an infinite mount/unmount loop — it froze
+      // the whole client app on 13 Aug. See the prop's note.
+      claimsSlot={false}
       fabMood={surfaceMood(surface)}
     />
   );

@@ -152,6 +152,7 @@ export default function CoachChatSheet({
   selectedDate,
   canAct = true,
   fabMood = "nutrition",
+  claimsSlot = true,
 }: {
   clientId: string;
   /** The day as rendered — sent with every message so /act can resolve references. */
@@ -190,6 +191,23 @@ export default function CoachChatSheet({
   canAct?: boolean;
   /** The face on the floating button — the surface's own mood. */
   fabMood?: Mood;
+  /**
+   * Whether this instance owns the ✦ slot for its screen.
+   *
+   * MUST be false for the instance GlobalCoach renders, and the reason is a
+   * production outage on 13 Aug rather than a preference:
+   *
+   *   GlobalCoach renders this component, and this component claimed the slot
+   *   on mount. GlobalCoach hides itself when the slot is claimed. So it
+   *   mounted us, we claimed, it unmounted us, the claim released, it mounted
+   *   us again — a render loop that froze the home screen solid and made the
+   *   button flicker. It is in the app layout, so it took every client screen
+   *   with it.
+   *
+   * Only a screen that mounts its OWN better-informed coach claims. The global
+   * one is the fallback and never competes with itself.
+   */
+  claimsSlot?: boolean;
 }) {
   const todayCT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const isToday = selectedDate === todayCT;
@@ -230,7 +248,10 @@ export default function CoachChatSheet({
   // This screen's coach knows today's meals and can actually change them, so it
   // outranks the global one. Claiming the slot hides that button while we are
   // here — see coachMount for why it is a count and not a flag.
-  useEffect(() => claimCoachSlot(), []);
+  useEffect(() => {
+    if (!claimsSlot) return;
+    return claimCoachSlot();
+  }, [claimsSlot]);
 
   // Keep the newest message in view.
   useEffect(() => {

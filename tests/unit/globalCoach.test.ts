@@ -90,3 +90,30 @@ test("the global mount cannot execute actions and does not pretend to", () => {
     "an action intent is no longer diverted when the surface cannot act — it will render a Confirm button that does nothing"
   );
 });
+
+// PRODUCTION OUTAGE, 13 Aug. Dustin: "app is partially crashed... the ai icon
+// in the bottom right is flickering... it freezed on home screen cant click
+// anything", and a client could not open her workout.
+//
+// GlobalCoach renders CoachChatSheet. CoachChatSheet claimed the ✦ slot on
+// mount. GlobalCoach hides itself when the slot is claimed. So: mount, claim,
+// hide, unmount, release, mount — a render loop that pinned the main thread.
+// GlobalCoach lives in the app layout, so it took every client screen with it.
+//
+// Both halves are asserted, because either one alone reopens the loop.
+test("the global coach never claims the slot it watches", () => {
+  const gc = fs.readFileSync(path.join(ROOT, "src/components/GlobalCoach.tsx"), "utf8");
+  assert.match(
+    gc,
+    /claimsSlot=\{false\}/,
+    "GlobalCoach is claiming the slot again — it hides itself when the slot is claimed, so this is an infinite mount/unmount loop"
+  );
+
+  const sheet = fs.readFileSync(path.join(ROOT, "src/app/(app)/nutrition/v3/CoachChatSheet.tsx"), "utf8");
+  const code = sheet.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.match(
+    code,
+    /if \(!claimsSlot\) return;/,
+    "the sheet claims unconditionally again, so the prop cannot switch it off"
+  );
+});
