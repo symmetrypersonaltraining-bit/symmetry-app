@@ -303,6 +303,26 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
         </section>
         )}
 
+      {/* Is the AI actually working? Every AI surface in this app degrades
+          quietly by design — a coach card that fails just does not appear — so
+          the only way to find a dead one is to come and look. Trainer only.
+          Sits above the QR because it is the one that needs checking. */}
+      {isTrainer && !isInClientMode && (
+        <section>
+          <p className="section-header">AI</p>
+          <a href="/settings/ai-health" className="card p-4 flex items-center gap-3" style={{ textDecoration: "none" }}>
+            <i className="ti ti-activity-heartbeat text-2xl" style={{ color: "var(--brand-primary)" }} />
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-semibold" style={{ color: "var(--brand-text)" }}>AI health</span>
+              <span className="block text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
+                Every AI surface: what has run, what has failed, what has never been used, and the spend against the cap.
+              </span>
+            </span>
+            <i className="ti ti-chevron-right" style={{ color: "var(--brand-text-secondary)" }} />
+          </a>
+        </section>
+      )}
+
       {/* Where the install QR lives. Dustin asked "where do I find the qr code
           to have clients download this" — the per-client one only appears on a
           client who has never had a login, so this is the one that works for
