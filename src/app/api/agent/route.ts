@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
 
   // Only the global kill switch applies to the trainer's own agent — no per-client
   // daily cap (passing null skips the cap, keeps the kill switch).
-  const paused = await enforceMeter(null, "chat");
+  const paused = await enforceMeter(null, "trainer_agent");
   if (paused) return paused;
 
   const admin = createAdminClient() as unknown as Db;
@@ -181,10 +181,10 @@ export async function POST(req: NextRequest) {
       // unlogged — invisible to the $95 monthly kill switch, which is the one
       // thing meant to stop a runaway bill. logUsage takes a null client_id and
       // the spend rollups group by month, not by client.
-      await logUsage(scope.clientId ?? null, "chat", tokensIn, tokensOut, SONNET_MODEL);
+      await logUsage(scope.clientId ?? null, "trainer_agent", tokensIn, tokensOut, SONNET_MODEL);
       return NextResponse.json({ message: text || "(done)" });
     }
-    await logUsage(scope.clientId ?? null, "chat", tokensIn, tokensOut, SONNET_MODEL);
+    await logUsage(scope.clientId ?? null, "trainer_agent", tokensIn, tokensOut, SONNET_MODEL);
     return NextResponse.json({ message: "That took several steps — tell me the next thing and I'll keep going." });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";

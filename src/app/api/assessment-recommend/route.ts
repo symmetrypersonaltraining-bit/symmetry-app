@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const scoped = await resolveAiScope(null);
   if (!scoped.ok) return scoped.response;
   if (!scoped.scope.isTrainer) return NextResponse.json({ error: 'Trainer only' }, { status: 403 });
-  const paused = await enforceMeter(null, 'chat');
+  const paused = await enforceMeter(null, "assessment_rec");
   if (paused) return paused;
 
   const data = await req.json();
@@ -58,7 +58,7 @@ Respond with JSON only:
     messages: [{ role: 'user', content: prompt }],
   });
 
-  await logUsage(null, 'chat', message.usage?.input_tokens ?? 0, message.usage?.output_tokens ?? 0, 'claude-haiku-4-5-20251001');
+  await logUsage(null, "assessment_rec", message.usage?.input_tokens ?? 0, message.usage?.output_tokens ?? 0, 'claude-haiku-4-5-20251001');
 
   const text = message.content[0].type === 'text' ? message.content[0].text : '';
   const jsonMatch = text.match(/\{[\s\S]*\}/);

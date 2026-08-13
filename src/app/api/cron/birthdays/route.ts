@@ -176,7 +176,7 @@ export async function runBirthdays(
           return m ? { message: m } : null;
         },
       });
-      await logUsage(null, "chat", tokensIn, tokensOut, HAIKU_MODEL);
+      await logUsage(null, "birthday_post", tokensIn, tokensOut, HAIKU_MODEL);
       if (value && isPrintable(value.message, fresh)) {
         body = value.message;
         usedAi = true;

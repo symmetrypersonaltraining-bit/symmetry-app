@@ -323,7 +323,7 @@ export async function POST(req: NextRequest) {
   const message = typeof body.message === "string" ? body.message.trim() : "";
   if (!message) return NextResponse.json({ error: "Ask a question or describe the adjustment." }, { status: 400 });
 
-  const metered = await enforceMeter(clientId, "chat");
+  const metered = await enforceMeter(clientId, "workout_assist");
   if (metered) return metered;
 
   const context = await buildContext(admin, clientId, body.focusWorkoutId ?? null);
@@ -335,7 +335,7 @@ export async function POST(req: NextRequest) {
     messages: [{ role: "user", content: `CLIENT'S SCHEDULED WORKOUTS (server-assembled, trusted):\n${context}\n\nDUSTIN'S REQUEST:\n${message}` }],
     validate: validateReply,
   });
-  await logUsage(clientId, "chat", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+  await logUsage(clientId, "workout_assist", result.tokensIn, result.tokensOut, HAIKU_MODEL);
 
   if (!result.value) return NextResponse.json({ error: "Couldn't process that — try rephrasing." }, { status: 502 });
 

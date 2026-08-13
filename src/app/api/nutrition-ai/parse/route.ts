@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     if (!scoped.ok) return scoped.response;
     const { clientId } = scoped.scope;
 
-    const metered = await enforceMeter(clientId, "parse");
+    const metered = await enforceMeter(clientId, "food_parse");
     if (metered) return metered;
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       fallbackSystem: FALLBACK_SYSTEM_PROMPT,
     });
 
-    await logUsage(clientId, "parse", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "food_parse", result.tokensIn, result.tokensOut, HAIKU_MODEL);
 
     if (!result.value) {
       return NextResponse.json(

@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
     // ── the AI line. Best-effort from here down. ──
     let line: string | null = null;
     if (!brief.empty && process.env.ANTHROPIC_API_KEY) {
-      const gate = await enforceMeter(clientId, "chat");
+      const gate = await enforceMeter(clientId, "session_brief");
       if (!gate) {
         try {
           const facts = {
@@ -228,7 +228,7 @@ export async function POST(req: NextRequest) {
             validate,
           });
           line = value?.line ?? null;
-          await logUsage(clientId, "chat", tokensIn, tokensOut, HAIKU_MODEL);
+          await logUsage(clientId, "session_brief", tokensIn, tokensOut, HAIKU_MODEL);
         } catch (e) {
           console.error("weekly-brief: AI line failed (continuing without it)", e);
         }

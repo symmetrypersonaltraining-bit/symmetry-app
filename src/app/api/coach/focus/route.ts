@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: c.ai_focus, question: openQuestion, date: today, cached: true });
     }
 
-    const metered = await enforceMeter(clientId, "chat");
+    const metered = await enforceMeter(clientId, "coach_read");
     if (metered) return metered;
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
       validate: validateFocus,
     });
 
-    await logUsage(clientId, "chat", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "coach_read", result.tokensIn, result.tokensOut, HAIKU_MODEL);
 
     if (!result.value) {
       return NextResponse.json({ error: "Coach's Read couldn't generate right now — try again shortly." }, { status: 502 });

@@ -89,27 +89,32 @@ test("negative token counts clamp to zero", () => {
 });
 
 console.log("\nmeter-core: daily limits");
+// Feature labels were split one-per-route on 2026-08-13 (see AI_FEATURES in
+// meter-core). The CAPS are unchanged — these assert the same ceilings under
+// the new names, so a regression in the rename shows up here too.
 test("defaults are 15/15/20/1 (+20 verify)", () => {
-  assert.strictEqual(core.resolveDailyLimit(null, "chat"), 15);
-  assert.strictEqual(core.resolveDailyLimit(undefined, "parse"), 15);
-  assert.strictEqual(core.resolveDailyLimit({}, "photo"), 20);
+  assert.strictEqual(core.resolveDailyLimit(null, "coach_action"), 15);
+  assert.strictEqual(core.resolveDailyLimit(undefined, "food_parse"), 15);
+  assert.strictEqual(core.resolveDailyLimit({}, "food_photo"), 20);
   assert.strictEqual(core.resolveDailyLimit({}, "plan_build"), 1);
-  assert.strictEqual(core.resolveDailyLimit({}, "verify"), 20);
+  assert.strictEqual(core.resolveDailyLimit({}, "verify_food"), 20);
 });
 test("client_app_settings columns override defaults", () => {
-  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: 3 }, "chat"), 3);
+  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: 3 }, "coach_action"), 3);
   assert.strictEqual(core.resolveDailyLimit({ ai_daily_plan_build_limit: 0 }, "plan_build"), 0);
-  assert.strictEqual(core.resolveDailyLimit({ ai_daily_photo_limit: "25" }, "photo"), 25);
+  assert.strictEqual(core.resolveDailyLimit({ ai_daily_photo_limit: "25" }, "food_photo"), 25);
 });
 test("garbage settings values fall back to defaults", () => {
-  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: "lots" }, "chat"), 15);
-  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: -2 }, "chat"), 15);
-  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: null }, "chat"), 15);
+  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: "lots" }, "coach_action"), 15);
+  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: -2 }, "coach_action"), 15);
+  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: null }, "coach_action"), 15);
 });
 test("assertUnderCap: under → ok, at/over → CapExceeded with details", () => {
-  core.assertUnderCap("chat", 14, 15); // no throw
-  assert.throws(() => core.assertUnderCap("chat", 15, 15), (e) => e instanceof core.CapExceeded && e.code === "CAP_EXCEEDED" && e.limit === 15 && e.used === 15);
+  core.assertUnderCap("coach_action", 14, 15); // no throw
+  assert.throws(() => core.assertUnderCap("coach_action", 15, 15), (e) => e instanceof core.CapExceeded && e.code === "CAP_EXCEEDED" && e.limit === 15 && e.used === 15);
   assert.throws(() => core.assertUnderCap("plan_build", 1, 1), core.CapExceeded);
+  // Uncapped surfaces (trainer tools, cron jobs) never throw.
+  core.assertUnderCap("trainer_agent", 9999, null);
 });
 
 console.log("\nmeter-core: kill switch");

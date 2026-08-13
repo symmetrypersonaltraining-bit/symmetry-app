@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     // ---- metering: global kill switch always; per-client daily cap when scoped ----
     try {
-      if (clientId) await checkAndLog(clientId, 'photo');
+      if (clientId) await checkAndLog(clientId, "food_photo");
       else await assertNotPaused();
     } catch (e) {
       if (e instanceof AiPaused) return NextResponse.json(pausedBody());
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     const result = extractJson(responseText);
 
     // Log usage regardless of parse outcome — the tokens were spent.
-    await logUsage(clientId, 'photo', message.usage?.input_tokens ?? 0, message.usage?.output_tokens ?? 0, MODEL);
+    await logUsage(clientId, "food_photo", message.usage?.input_tokens ?? 0, message.usage?.output_tokens ?? 0, MODEL);
 
     if (!result || typeof result !== 'object' || result.calories == null) {
       return NextResponse.json({ error: 'Could not read the photo — try again or enter macros manually.' });

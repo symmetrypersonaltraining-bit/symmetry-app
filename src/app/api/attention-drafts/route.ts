@@ -337,7 +337,7 @@ export async function POST(req: NextRequest) {
     trainerClientId = null;
   }
 
-  const gate = await enforceMeter(trainerClientId, "chat");
+  const gate = await enforceMeter(trainerClientId, "outbox_draft");
   if (gate) {
     // Over cap or globally paused: still useful, just not AI-written.
     return NextResponse.json({ drafts: FALLBACK[tag](firstName), ai: false, tag, name: firstName, metered: true });
@@ -359,7 +359,7 @@ export async function POST(req: NextRequest) {
     });
 
     try {
-      await logUsage(trainerClientId, "chat", tokensIn, tokensOut, HAIKU_MODEL);
+      await logUsage(trainerClientId, "outbox_draft", tokensIn, tokensOut, HAIKU_MODEL);
     } catch {
       /* metering must never break the feature */
     }

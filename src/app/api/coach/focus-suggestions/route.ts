@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     if (!isTrainer) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     if (!clientId) return NextResponse.json({ error: "Pick a client first." }, { status: 400 });
 
-    const metered = await enforceMeter(clientId, "chat");
+    const metered = await enforceMeter(clientId, "focus_suggest");
     if (metered) return metered;
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       validate: validateSuggestions,
     });
 
-    await logUsage(clientId, "chat", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "focus_suggest", result.tokensIn, result.tokensOut, HAIKU_MODEL);
 
     if (!result.value) {
       return NextResponse.json({ error: "Couldn't generate focus options right now." }, { status: 502 });

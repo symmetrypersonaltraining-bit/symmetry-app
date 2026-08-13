@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Pick a client first — the coach needs a client's data." }, { status: 400 });
     }
 
-    const metered = await enforceMeter(clientId, "chat");
+    const metered = await enforceMeter(clientId, "coach_card");
     if (metered) return metered;
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       validate: validateCoachReply,
     });
 
-    await logUsage(clientId, "chat", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "coach_card", result.tokensIn, result.tokensOut, HAIKU_MODEL);
 
     if (!result.value) {
       // Salvage: a plain-text reply is still useful for a chat surface.

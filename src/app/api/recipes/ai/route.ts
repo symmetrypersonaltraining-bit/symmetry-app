@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
     messages: [{ role: "user", content: prompt }],
     validate,
   });
-  await logUsage(scoped.scope.clientId ?? null, "parse", tokensIn, tokensOut, HAIKU_MODEL);
+  await logUsage(scoped.scope.clientId ?? null, "recipe_ai", tokensIn, tokensOut, HAIKU_MODEL);
 
   if (!value) return NextResponse.json({ error: "Couldn't read that — try describing the ingredients one per line." }, { status: 422 });
 

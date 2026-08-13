@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     if (!scoped.ok) return scoped.response;
     const { clientId } = scoped.scope;
 
-    const metered = await enforceMeter(clientId, "verify");
+    const metered = await enforceMeter(clientId, "verify_food");
     if (metered) return metered;
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       validate: validateVerifyResult,
     });
 
-    await logUsage(clientId, "verify", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "verify_food", result.tokensIn, result.tokensOut, HAIKU_MODEL);
 
     if (!result.value) {
       return NextResponse.json({ error: "Verification didn't return usable data — try again." }, { status: 502 });

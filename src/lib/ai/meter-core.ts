@@ -5,43 +5,92 @@
 //   ai_usage_log(client_id, feature, model, tokens_in, tokens_out, cost_usd, created_at)
 //   client_app_settings.ai_daily_*_limit int columns (per-client overrides).
 
-export type AiFeature =
-  | "chat"
-  | "parse"
-  | "photo"
-  | "plan_build"
-  | "verify"
-  | "workout_build"
-  // Reading a feedback screenshot. Added 10 Aug: it was the ONE AI route in the
-  // app spending tokens without recording them, so it was invisible to
-  // ai_usage_log, to this kill switch and to every per-client cap.
-  | "feedback_image";
+// ---------------------------------------------------------------------------
+// THE FEATURE REGISTRY — one entry per AI surface in the app.
+//
+// Until 13 Aug this was seven labels for twenty-three routes, and FOURTEEN of
+// them logged as the single word "chat". That made the question "is the AI
+// working everywhere?" unanswerable from the data: 487 `chat` rows told you
+// nothing about which surface produced them, so spend could not be attributed
+// and a broken surface could not be spotted.
+//
+// One name per route. Adding a surface means adding a row here — the health
+// page, the caps and the spend report all read from this and nothing else.
+//
+// IMPORTANT: every entry below inherits the EXACT cap column and default that
+// its old label carried, so this rename changes no behaviour whatsoever. The
+// per-client caps that applied yesterday apply identically today.
+// ---------------------------------------------------------------------------
+
+/** Which app a surface belongs to. Drives grouping on the health page. */
+export type AiSurface = "client" | "trainer" | "scheduled";
+
+export interface AiFeatureSpec {
+  /** Human label for the health page. */
+  label: string;
+  /** Which app it lives in. */
+  surface: AiSurface;
+  /** client_app_settings column overriding the daily cap. "" = no override. */
+  limitColumn: string;
+  /**
+   * Per-client per-day default. `null` means no per-client cap at all — the
+   * global kill switch is the only ceiling. Used for trainer-only surfaces and
+   * unattended jobs, which have no client to charge.
+   */
+  defaultLimit: number | null;
+}
+
+export const AI_FEATURES = {
+  // ── Client app ───────────────────────────────────────────────────────────
+  coach_action:    { label: "Coach chat (action)",     surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  coach_card:      { label: "Coach card",              surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  coach_read:      { label: "Coach's read",            surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  client_assistant:{ label: "Client assistant",        surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  celebration:     { label: "Session celebration",     surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  food_parse:      { label: "Food parse",              surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 15 },
+  food_photo:      { label: "Meal photo",              surface: "client",    limitColumn: "ai_daily_photo_limit",      defaultLimit: 20 },
+  plan_build:      { label: "Meal plan builder",       surface: "client",    limitColumn: "ai_daily_plan_build_limit", defaultLimit: 1  },
+  verify_food:     { label: "Food catalog auditor",    surface: "client",    limitColumn: "ai_daily_verify_limit",     defaultLimit: 20 },
+  workout_build:   { label: "Create / replace workout",surface: "client",    limitColumn: "workout_build_daily_limit", defaultLimit: 8  },
+  recipe_ai:       { label: "Recipe builder",          surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 15 },
+  movement_explain:{ label: "Movement explanation",    surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+
+  // ── Trainer app ──────────────────────────────────────────────────────────
+  trainer_agent:   { label: "Trainer assistant",       surface: "trainer",   limitColumn: "", defaultLimit: null },
+  workout_assist:  { label: "Workout assist",          surface: "trainer",   limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  session_brief:   { label: "Session brief",           surface: "trainer",   limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  focus_suggest:   { label: "Focus suggestions",       surface: "trainer",   limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  assessment_rec:  { label: "Assessment recommendation",surface: "trainer",  limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  outbox_draft:    { label: "Outbox drafts",           surface: "trainer",   limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  // Not a feature a client chooses to spend — a side effect of reporting a bug.
+  // Generous, so nobody rations bug reports, but finite so a retry loop on the
+  // feedback form cannot quietly spend the month's budget.
+  feedback_image:  { label: "Screenshot reader",       surface: "trainer",   limitColumn: "", defaultLimit: 30 },
+
+  // ── Unattended / scheduled ───────────────────────────────────────────────
+  // No client to charge, so no per-client cap. The kill switch is the ceiling,
+  // and as of 13 Aug these actually check it.
+  weekly_sweep:    { label: "Saturday sweep",          surface: "scheduled", limitColumn: "", defaultLimit: null },
+  nudge_sweep:     { label: "Nudge sweep",             surface: "scheduled", limitColumn: "", defaultLimit: null },
+  birthday_post:   { label: "Birthday bot",            surface: "scheduled", limitColumn: "", defaultLimit: null },
+  coachbot_post:   { label: "Coach bot",               surface: "scheduled", limitColumn: "", defaultLimit: null },
+  smoke_test:      { label: "Smoke test",              surface: "scheduled", limitColumn: "", defaultLimit: null },
+} as const satisfies Record<string, AiFeatureSpec>;
+
+export type AiFeature = keyof typeof AI_FEATURES;
+
+/** Every feature key, for the health page and the guard tests. */
+export const AI_FEATURE_KEYS = Object.keys(AI_FEATURES) as AiFeature[];
 
 /** client_app_settings column that overrides the daily cap for each feature. */
-export const LIMIT_COLUMNS: Record<AiFeature, string> = {
-  chat: "ai_daily_chat_limit",
-  parse: "ai_daily_parse_limit",
-  photo: "ai_daily_photo_limit",
-  plan_build: "ai_daily_plan_build_limit",
-  verify: "ai_daily_verify_limit",
-  workout_build: "workout_build_daily_limit",
-  // No settings column: this is not a feature a client chooses to spend, it is
-  // a side effect of reporting a bug. The default below is the only limit.
-  feedback_image: "",
-};
+export const LIMIT_COLUMNS: Record<AiFeature, string> = Object.fromEntries(
+  AI_FEATURE_KEYS.map((k) => [k, AI_FEATURES[k].limitColumn])
+) as Record<AiFeature, string>;
 
 /** Per-client per-day defaults when the settings column is null/missing. */
-export const DEFAULT_LIMITS: Record<AiFeature, number> = {
-  chat: 15,
-  parse: 15,
-  photo: 20,
-  plan_build: 1,
-  verify: 20,
-  workout_build: 8,
-  // Generous — never make somebody ration bug reports — but finite, so a retry
-  // loop on the feedback form cannot quietly spend the month's budget.
-  feedback_image: 30,
-};
+export const DEFAULT_LIMITS: Record<AiFeature, number | null> = Object.fromEntries(
+  AI_FEATURE_KEYS.map((k) => [k, AI_FEATURES[k].defaultLimit])
+) as Record<AiFeature, number | null>;
 
 /** Global kill switch: month-to-date spend at/over this pauses ALL AI features. */
 export const MONTHLY_COST_CAP_USD = 95;
@@ -86,18 +135,32 @@ export class AiPaused extends Error {
   }
 }
 
-/** Resolve the effective daily limit from a client_app_settings row (or null). */
+/**
+ * Resolve the effective daily limit from a client_app_settings row (or null).
+ *
+ * Returns `null` for surfaces that carry no per-client cap — trainer-only tools
+ * and unattended jobs, which have no client to charge. Those are bounded by the
+ * global kill switch alone.
+ */
 export function resolveDailyLimit(
   settings: Record<string, unknown> | null | undefined,
   feature: AiFeature
-): number {
-  const raw = settings ? settings[LIMIT_COLUMNS[feature]] : undefined;
+): number | null {
+  const col = LIMIT_COLUMNS[feature];
+  const raw = settings && col ? settings[col] : undefined;
   const n = typeof raw === "number" ? raw : raw == null ? NaN : Number(raw);
   return Number.isFinite(n) && n >= 0 ? n : DEFAULT_LIMITS[feature];
 }
 
-/** Throws CapExceeded when used >= limit. */
-export function assertUnderCap(feature: AiFeature, used: number, limit: number): void {
+/**
+ * Throws CapExceeded when used >= limit.
+ *
+ * A `null` limit means "no per-client cap" and never throws. Note this is NOT
+ * the same as a limit of 0, which blocks everything — the distinction matters
+ * because getting it backwards would either brick a surface or uncap it.
+ */
+export function assertUnderCap(feature: AiFeature, used: number, limit: number | null): void {
+  if (limit == null) return;
   if (used >= limit) throw new CapExceeded(feature, limit, used);
 }
 

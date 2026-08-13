@@ -308,7 +308,7 @@ export async function POST(req: NextRequest) {
         // This route writes messages to clients and never logged a token, so
         // its spend did not count toward the $95 ceiling. It runs per client
         // per sweep, which is exactly the shape that adds up unnoticed.
-        await logUsage(r.id, "chat", tokensIn, tokensOut, HAIKU_MODEL);
+        await logUsage(r.id, "nudge_sweep", tokensIn, tokensOut, HAIKU_MODEL);
         text = value?.body ?? null;
       } catch {
         text = null;

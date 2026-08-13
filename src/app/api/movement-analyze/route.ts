@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     // Honour the global kill switch. null client = no per-client daily cap,
     // just the monthly ceiling.
-    const paused = await enforceMeter(null, 'chat');
+    const paused = await enforceMeter(null, "movement_explain");
     if (paused) return paused;
 
     const body = (await req.json()) as {
@@ -176,7 +176,7 @@ Return STRICT JSON:
       max_tokens: 1600,
       messages: [{ role: 'user', content: prompt }],
     });
-    await logUsage(null, 'chat', msg.usage?.input_tokens ?? 0, msg.usage?.output_tokens ?? 0, 'claude-sonnet-4-6');
+    await logUsage(null, "movement_explain", msg.usage?.input_tokens ?? 0, msg.usage?.output_tokens ?? 0, 'claude-sonnet-4-6');
     const text = msg.content[0]?.type === 'text' ? msg.content[0].text : '';
     const m = text.match(/\{[\s\S]*\}/);
     const layers = (m ? JSON.parse(m[0]) : {}) as EducationLayers;

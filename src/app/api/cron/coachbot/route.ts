@@ -143,7 +143,7 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
     messages: [{ role: "user", content: `TODAY: ${CT_TODAY()}\n\nFACTS (all true, use only these):\n${JSON.stringify(facts, null, 2)}\n\nWrite one Coach Bot message.` }],
     validate,
   });
-  await logUsage(null, "chat", tokensIn, tokensOut, HAIKU_MODEL);
+  await logUsage(null, "coachbot_post", tokensIn, tokensOut, HAIKU_MODEL);
   if (!value) return { posted: false, reason: "model returned nothing usable" };
 
   // ── The guarantee ────────────────────────────────────────────────────────

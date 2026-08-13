@@ -243,7 +243,7 @@ export async function POST(req: NextRequest) {
     // ── the AI line. Everything from here is best-effort. ──
     let line: string | null = null;
     if (process.env.ANTHROPIC_API_KEY) {
-      const gate = await enforceMeter(clientId, "chat");
+      const gate = await enforceMeter(clientId, "celebration");
       if (!gate) {
         try {
           // NOTE: deliberately does NOT persist generated lines anywhere.
@@ -279,7 +279,7 @@ export async function POST(req: NextRequest) {
           });
           line = value?.line ?? null;
           try {
-            await logUsage(clientId, "chat", tokensIn, tokensOut, HAIKU_MODEL);
+            await logUsage(clientId, "celebration", tokensIn, tokensOut, HAIKU_MODEL);
           } catch {
             /* metering must not break the celebration */
           }

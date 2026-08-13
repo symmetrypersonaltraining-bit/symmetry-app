@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     // surprising bill.
     const scoped = await resolveAiScope(null);
     if (!scoped.ok) return scoped.response;
-    const capped = await enforceMeter(scoped.scope.clientId, "chat");
+    const capped = await enforceMeter(scoped.scope.clientId, "client_assistant");
     if (capped) return capped;
 
     const body = await req.json();
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
     await logUsage(
       scoped.scope.clientId ?? null,
-      "chat",
+      "client_assistant",
       response.usage?.input_tokens ?? 0,
       response.usage?.output_tokens ?? 0,
       "claude-haiku-4-5-20251001",

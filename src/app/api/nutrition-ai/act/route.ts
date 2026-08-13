@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Pick a client first — the coach needs a client's data." }, { status: 400 });
     }
 
-    const metered = await enforceMeter(clientId, "chat");
+    const metered = await enforceMeter(clientId, "coach_action");
     if (metered) return metered;
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
       ],
       validate: validateActReply,
     });
-    await logUsage(clientId, "chat", extraction.tokensIn, extraction.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "coach_action", extraction.tokensIn, extraction.tokensOut, HAIKU_MODEL);
 
     // Even a failed extraction should degrade to Q&A, not an error bubble.
     const act: ActReply = extraction.value
@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
       ],
       validate: validateCoachReply,
     });
-    await logUsage(clientId, "chat", coach.tokensIn, coach.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "coach_action", coach.tokensIn, coach.tokensOut, HAIKU_MODEL);
 
     if (coach.value) {
       return NextResponse.json({ intent: "none", message: coach.value.message, suggestions: coach.value.suggestions });

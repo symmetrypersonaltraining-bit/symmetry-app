@@ -157,7 +157,10 @@ export async function checkAndLog(clientId: string, feature: AiFeature): Promise
 
   await assertNotPaused(db);
 
-  let limit: number;
+  // null = this surface carries no per-client cap (trainer tools, unattended
+  // jobs). assertUnderCap treats null as "no cap" rather than "cap of zero" —
+  // getting that backwards would brick the surface entirely.
+  let limit: number | null;
   let used: number;
   try {
     const { data: settings } = await db
