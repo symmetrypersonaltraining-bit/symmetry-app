@@ -38,3 +38,35 @@ test("it sits above the floating coach, like every other sheet", () => {
   assert.match(SHEET, /z-\[1200\]/, "the metric sheet is below the coach button again");
   assert.doesNotMatch(SHEET, /inset-0 z-50\b/, "z-50 is under the floating coach");
 });
+
+// The scrolling was only the symptom. Fixing the sheet's height got Lauren to
+// the button, and the button was "View Full Progress" — a read-only dashboard.
+//
+// /log is a complete weigh-in and cardio screen that has been in the app the
+// whole time with NOTHING linking to it: no button, no nav item, and the one
+// deep link that pointed at logging (/progress?log=weight, from the Sunday
+// reminder) went to a page that never read the parameter. A client could not
+// enter a weight from anywhere.
+test("there is a route from the app to the screen that takes a weigh-in", () => {
+  // Comments do not ship, and both of these fixes document the old behaviour by
+  // quoting it — a naive search matches its own explanation.
+  const code = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.match(code, /href="\/log"/, "the metric sheet no longer offers a way to log a weigh-in");
+  const logAt = code.indexOf('href="/log"');
+  const progressAt = code.indexOf("View Full Progress");
+  assert.ok(logAt < progressAt, "logging should come before the chart on a card somebody opened by tapping their weight");
+});
+
+test("the Sunday reminder points at the screen that can take the number", () => {
+  const rem = fs
+    .readFileSync(path.join(process.cwd(), "src/components/SundayWeighInReminder.tsx"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  assert.doesNotMatch(rem, /progress\?log=weight/, "the reminder points at a parameter no page reads");
+  assert.match(rem, /window\.location\.href = "\/log"/, "the weigh-in reminder does not lead to the weigh-in screen");
+});
+
+test("/log still exists and still writes a metric", () => {
+  const log = fs.readFileSync(path.join(process.cwd(), "src/app/(app)/log/LogClient.tsx"), "utf8");
+  assert.match(log, /from\("metrics"\)\s*\.upsert\(/s, "the weigh-in screen no longer saves anything");
+});

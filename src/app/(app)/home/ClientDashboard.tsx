@@ -358,11 +358,32 @@ function MetricModal({
           </button>
         </div>
         <FullChart values={values} dates={dates} color={color} label={label} unit={unit} />
+        {/* Lauren, 2026-08-13: "can't scroll down to log weight."
+            Fixing the sheet's height got her to the button — and the button was
+            "View Full Progress", which goes to a read-only dashboard. There was
+            no way to enter a weigh-in from anywhere in the client app.
+
+            /log is a complete, working weigh-in and cardio screen. It has been
+            there the whole time with NOTHING linking to it: no button, no nav
+            item, no deep link that resolves. The Sunday reminder pointed at
+            /progress?log=weight, and /progress never read that parameter.
+
+            So logging comes first here and the chart is secondary, which is the
+            right order for a card somebody opened by tapping their own weight. */}
         <Link
-          href={`${basePath}/progress`}
+          href="/log"
           onClick={onClose}
           className="flex items-center justify-center gap-2 mt-5 py-3 rounded-2xl text-sm font-semibold"
           style={{ background: "var(--brand-primary)", color: "white" }}
+        >
+          <i className="ti ti-scale" />
+          Log a weigh-in
+        </Link>
+        <Link
+          href={`${basePath}/progress`}
+          onClick={onClose}
+          className="flex items-center justify-center gap-2 mt-2 py-3 rounded-2xl text-sm font-semibold"
+          style={{ background: "var(--brand-surface)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}
         >
           <i className="ti ti-chart-line" />
           View Full Progress

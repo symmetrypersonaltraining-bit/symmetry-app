@@ -84,7 +84,9 @@ export default function SundayWeighInReminder() {
         </div>
         <div style={{ flex: 1 }} />
         <button
-          onClick={() => { window.location.href = "/progress?log=weight"; }}
+          onClick={() => { // /progress never read ?log=weight, so this button landed on a read-only
+            // dashboard. /log is the screen that actually takes a weigh-in.
+            window.location.href = "/log"; }}
           style={{ width: "100%", background: "var(--brand-primary)", color: "#fff", fontWeight: 800, padding: 15, borderRadius: 15, fontSize: 15.5, border: "none", cursor: "pointer" }}>
           Log my weigh-in →
         </button>
