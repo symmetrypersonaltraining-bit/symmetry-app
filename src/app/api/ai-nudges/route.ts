@@ -23,7 +23,7 @@
 // x-cron-secret. Never callable by a client.
 
 import { NextRequest, NextResponse } from "next/server";
-import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, TRAINER_EMAIL, enforceMeter } from "@/lib/ai/scope";
 import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
@@ -307,7 +307,7 @@ export async function POST(req: NextRequest) {
         const { value, tokensIn, tokensOut } = await callClaudeJson<{ body: string }>({
           meter: { clientId: r.id, feature: "nudge_sweep" },
           apiKey: process.env.ANTHROPIC_API_KEY,
-          model: HAIKU_MODEL,
+          model: SONNET_MODEL,
           system: SYSTEM,
           maxTokens: 220,
           messages: [{ role: "user", content: `CLIENT FACTS:\n${JSON.stringify(facts)}\n\nWrite the message as strict JSON.` }],
@@ -316,7 +316,7 @@ export async function POST(req: NextRequest) {
         // This route writes messages to clients and never logged a token, so
         // its spend did not count toward the $95 ceiling. It runs per client
         // per sweep, which is exactly the shape that adds up unnoticed.
-        await logUsage(r.id, "nudge_sweep", tokensIn, tokensOut, HAIKU_MODEL);
+        await logUsage(r.id, "nudge_sweep", tokensIn, tokensOut, SONNET_MODEL);
         text = value?.body ?? null;
       } catch {
         text = null;

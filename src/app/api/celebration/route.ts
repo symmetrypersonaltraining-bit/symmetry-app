@@ -21,7 +21,7 @@
 // the existing "chat" feature so it shares the same daily cap and kill switch.
 
 import { NextRequest, NextResponse } from "next/server";
-import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
           const { value, tokensIn, tokensOut } = await callClaudeJson<{ line: string }>({
             meter: { clientId: clientId, feature: "celebration" },
             apiKey: process.env.ANTHROPIC_API_KEY,
-            model: HAIKU_MODEL,
+            model: SONNET_MODEL,
             system: SYSTEM,
             maxTokens: 160,
             messages: [
@@ -280,7 +280,7 @@ export async function POST(req: NextRequest) {
           });
           line = value?.line ?? null;
           try {
-            await logUsage(clientId, "celebration", tokensIn, tokensOut, HAIKU_MODEL);
+            await logUsage(clientId, "celebration", tokensIn, tokensOut, SONNET_MODEL);
           } catch {
             /* metering must not break the celebration */
           }

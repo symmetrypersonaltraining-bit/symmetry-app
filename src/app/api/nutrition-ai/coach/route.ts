@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
-import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { validateCoachReply } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
@@ -47,14 +47,14 @@ export async function POST(req: NextRequest) {
     const result = await callClaudeJson({
       meter: { clientId: clientId, feature: "coach_card" },
       apiKey,
-      model: HAIKU_MODEL,
+      model: SONNET_MODEL,
       system: COACH_SYSTEM_PROMPT,
       maxTokens: 900,
       messages: [{ role: "user", content: userText }],
       validate: validateCoachReply,
     });
 
-    await logUsage(clientId, "coach_card", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "coach_card", result.tokensIn, result.tokensOut, SONNET_MODEL);
 
     if (!result.value) {
       // Salvage: a plain-text reply is still useful for a chat surface.

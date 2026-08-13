@@ -16,7 +16,7 @@
 // Auth-checked, client-scoped, metered (feature 'chat'), Haiku.
 
 import { NextRequest, NextResponse } from "next/server";
-import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { HAIKU_MODEL, SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import {
   ActDayMeal, ActReply, finalizeAct, validateActReply, validateCoachReply,
 } from "@/lib/ai/nutrition-json";
@@ -177,11 +177,23 @@ export async function POST(req: NextRequest) {
     }
 
     // ---- intent 'none' = a question → the existing coach behavior ----------
+    //
+    // TWO MODELS, ON PURPOSE. The extraction above is a fixed-schema pull out of
+    // a short list of meals: Haiku is both right and fast at it, and the client
+    // is waiting on it before anything else happens.
+    //
+    // This call is the opposite job. It reads fourteen days of logging, the
+    // weight trend, the plan and the targets, and has to say something true and
+    // useful about them. Dustin, 2026-08-12: "i want the ai functions in this
+    // app to feel so accurate and personal that it blows plps minds." That is a
+    // judgement task, and it is the ONE call in the client app where the model
+    // is the product. Thirty days of every AI call in the whole app cost $2.84
+    // against a $95 cap, so the constraint here was never money.
     const context = await assembleCoachContext(supabase, clientId);
     const coach = await callClaudeJson({
       meter: { clientId: clientId, feature: "coach_action" },
       apiKey,
-      model: HAIKU_MODEL,
+      model: SONNET_MODEL,
       system: COACH_SYSTEM_PROMPT,
       maxTokens: 900,
       messages: [
@@ -193,7 +205,7 @@ export async function POST(req: NextRequest) {
       ],
       validate: validateCoachReply,
     });
-    await logUsage(clientId, "coach_action", coach.tokensIn, coach.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "coach_action", coach.tokensIn, coach.tokensOut, SONNET_MODEL);
 
     if (coach.value) {
       return NextResponse.json({ intent: "none", message: coach.value.message, suggestions: coach.value.suggestions });

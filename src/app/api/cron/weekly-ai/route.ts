@@ -7,7 +7,7 @@
 // So this runs itself. Every Sunday at 6 AM Central (vercel.json), for every
 // active client, it derives last week vs this week from real logs
 // (fetchWeeklyComparison — the same summariser the client's own screen uses),
-// hands those pre-computed numbers to one Haiku call, and stores three pieces
+// hands those pre-computed numbers to one Sonnet call, and stores three pieces
 // of copy:
 //   clients.weekly_focus     → the Focus line on the client's week card
 //   clients.ai_focus         → seeds the home "Coach's Read" for the new week
@@ -24,7 +24,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { fetchWeeklyComparison } from "@/lib/ai/weekly-context";
 import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
@@ -172,7 +172,7 @@ async function runSweep(opts: {
       const result = await callClaudeJson({
         meter: { clientId: c.id, feature: "weekly_sweep" },
         apiKey,
-        model: HAIKU_MODEL,
+        model: SONNET_MODEL,
         system: WEEKLY_SYSTEM_PROMPT,
         maxTokens: 800,
         messages: [
@@ -188,7 +188,7 @@ async function runSweep(opts: {
         validate: validateWeekly,
       });
 
-      await logUsage(c.id, "weekly_sweep", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+      await logUsage(c.id, "weekly_sweep", result.tokensIn, result.tokensOut, SONNET_MODEL);
 
       if (!result.value) {
         results.push({ clientId: c.id, name, status: "failed", detail: "model returned no usable JSON" });

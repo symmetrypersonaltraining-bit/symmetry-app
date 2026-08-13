@@ -20,7 +20,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { CT_TODAY, assembleTrainingContext } from "@/lib/ai/coach-context";
-import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     const result = await callClaudeJson({
       meter: { clientId: clientId, feature: "coach_read" },
       apiKey,
-      model: HAIKU_MODEL,
+      model: SONNET_MODEL,
       system: FOCUS_SYSTEM_PROMPT,
       maxTokens: 500,
       messages: [{
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       validate: validateFocus,
     });
 
-    await logUsage(clientId, "coach_read", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+    await logUsage(clientId, "coach_read", result.tokensIn, result.tokensOut, SONNET_MODEL);
 
     if (!result.value) {
       return NextResponse.json({ error: "Coach's Read couldn't generate right now — try again shortly." }, { status: 502 });

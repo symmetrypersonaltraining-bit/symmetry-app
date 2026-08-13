@@ -22,7 +22,7 @@
 // else — that's the only write this route performs.
 
 import { NextRequest, NextResponse } from "next/server";
-import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import {
@@ -222,14 +222,14 @@ export async function POST(req: NextRequest) {
           const { value, tokensIn, tokensOut } = await callClaudeJson<{ line: string }>({
             meter: { clientId: clientId, feature: "session_brief" },
             apiKey: process.env.ANTHROPIC_API_KEY,
-            model: HAIKU_MODEL,
+            model: SONNET_MODEL,
             system: SYSTEM,
             maxTokens: 200,
             messages: [{ role: "user", content: JSON.stringify(facts) }],
             validate,
           });
           line = value?.line ?? null;
-          await logUsage(clientId, "session_brief", tokensIn, tokensOut, HAIKU_MODEL);
+          await logUsage(clientId, "session_brief", tokensIn, tokensOut, SONNET_MODEL);
         } catch (e) {
           console.error("weekly-brief: AI line failed (continuing without it)", e);
         }

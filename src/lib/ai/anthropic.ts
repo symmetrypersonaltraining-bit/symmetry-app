@@ -7,6 +7,31 @@ import { logFailure } from "@/lib/ai/meter";
 import type { AiFeature } from "@/lib/ai/meter-core";
 
 // Aliases track the latest snapshot; dated ids elsewhere in the app keep working.
+// WHICH MODEL GOES WHERE
+//
+// Dustin asked, 2026-08-13: "should we upgrade the model of ai for this stuff
+// for better function?" Thirty days of every AI call in the entire app — 672
+// calls across both models — cost $2.84 against a $95 monthly cap. So price was
+// never the thing deciding this, and pretending otherwise was making the app
+// worse for a rounding error.
+//
+// The split is by JOB, not by importance:
+//
+//   HAIKU — pulling a fixed shape out of short text. Parsing a meal, extracting
+//   an action intent from one sentence against a list of meals, reading a
+//   barcode payload, describing a screenshot. The answer is checkable, the
+//   schema is validated, and the client is WAITING on it. Speed is the feature.
+//
+//   SONNET — anything a person reads as coaching. The coach's answer to a real
+//   question, the weekly focus, the Sunday sweep, the nudge, the sentence on the
+//   celebration screen. These read fourteen days of logging, a weight trend, a
+//   plan and a set of targets, and have to say something true and specific about
+//   them. "i want the ai functions in this app to feel so accurate and personal
+//   that it blows plps minds" — that is this list, and on this list the model IS
+//   the product.
+//
+// /api/nutrition-ai/act runs BOTH in one request, in that order, for exactly
+// this reason. See the comment at its fall-through.
 export const HAIKU_MODEL = "claude-haiku-4-5";
 export const SONNET_MODEL = "claude-sonnet-4-6";
 
