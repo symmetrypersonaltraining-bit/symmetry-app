@@ -1,6 +1,9 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Symmetry Movement Method — camera assessment schema
--- DRAFT migration (2026-07-18). DO NOT APPLY until Dustin reviews.
+-- DRAFT migration (2026-07-18). NEVER APPLIED — superseded by
+-- 20260813_movement_assessments_live.sql, which fixes the hardcoded trainer
+-- email in the RLS below (see the 11 Aug "trainer is a setting" work).
+-- Kept for history. Do not run this file.
 -- Adds: movement_assessments, movement_assessment_frames (audit),
 --       client_assessments severity/confidence/source columns,
 --       clients.movement_screen_enabled (trainer tester toggle).

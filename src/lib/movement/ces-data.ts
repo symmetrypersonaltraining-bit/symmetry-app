@@ -278,3 +278,69 @@ export function violatesSurfaceLanguage(text: string): string[] {
   const lower = text.toLowerCase();
   return BANNED_USER_TERMS.filter((t) => lower.includes(t.toLowerCase()));
 }
+
+/**
+ * Plain-English stand-in for each banned term.
+ *
+ * Longest phrases first — "anterior pelvic tilt" has to be replaced before
+ * anything inside it is, or the result is a half-scrubbed sentence.
+ *
+ * An empty string means "delete the word": some terms have no client-facing
+ * equivalent because the concept itself should not be in the sentence.
+ */
+const SURFACE_REPLACEMENTS: Array<[string, string]> = [
+  ['anterior pelvic tilt', 'hips tipped forward'],
+  ['lower crossed', 'this pattern'],
+  ['upper crossed', 'this pattern'],
+  ['pes planus', 'flat foot'],
+  ['Trendelenburg', 'hip drop'],
+  ['pathological', ''],
+  ['dysfunction', 'restriction'],
+  ['diagnosis', 'assessment'],
+  ['diagnose', 'assess'],
+  ['abnormal', 'off pattern'],
+  ['syndrome', 'pattern'],
+  ['kyphosis', 'rounded upper back'],
+  ['lordosis', 'arched lower back'],
+  ['treatment', 'plan'],
+  ['therapy', 'training'],
+  ['valgus', 'knee drifting in'],
+  ['varus', 'knee drifting out'],
+  ['rehab', 'corrective work'],
+  ['Janda', ''],
+  ['NASM', ''],
+  ['OHSA', 'movement screen'],
+  ['CES', ''],
+];
+
+/**
+ * Remove clinical language from a client-facing string.
+ *
+ * This exists because the guard that was here before did nothing. It computed
+ * which banned terms had leaked and then assigned the string back to itself:
+ *
+ *     if (leaks.length) layers[k] = `${layers[k]}`;
+ *
+ * So every leak was detected and none was ever removed — and because the
+ * intent was so clearly commented, nobody re-read the line. The movement
+ * screen is the one surface where a stray "dysfunction" or "abnormal" reads to
+ * a client as a medical opinion, which is exactly what this app must never
+ * give.
+ *
+ * Returns the cleaned text plus what was found, so the trainer can see that the
+ * model reached for clinical language even though the client never will.
+ */
+export function scrubSurfaceLanguage(text: string): { text: string; leaked: string[] } {
+  const leaked = violatesSurfaceLanguage(text);
+  if (leaked.length === 0) return { text, leaked };
+
+  let out = text;
+  for (const [term, plain] of SURFACE_REPLACEMENTS) {
+    // Escape regex metacharacters; match whole words, case-insensitively.
+    const safe = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp(`\\b${safe}\\b`, 'gi'), plain);
+  }
+  // Deleting a word can leave doubled spaces or a space before punctuation.
+  out = out.replace(/\s{2,}/g, ' ').replace(/\s+([,.;:!?])/g, '$1').trim();
+  return { text: out, leaked };
+}

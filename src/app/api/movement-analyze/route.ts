@@ -13,12 +13,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { enforceMeter } from '@/lib/ai/scope';
-import { logUsage } from '@/lib/ai/meter';
+import { logUsage, logFailure } from '@/lib/ai/meter';
+import { SONNET_MODEL } from '@/lib/ai/anthropic';
 import { createClient } from '@/lib/supabase/server';
 import { analyze, type AnalyzeInput } from '@/lib/movement/analyze';
 import { buildProgram } from '@/lib/movement/program';
 import { doseForPain } from '@/lib/movement/dose';
-import { CHECKPOINT_LABELS, SURFACE_COPY, violatesSurfaceLanguage } from '@/lib/movement/ces-data';
+import { CHECKPOINT_LABELS, SURFACE_COPY, scrubSurfaceLanguage } from '@/lib/movement/ces-data';
 import { isTrainerEmail } from "@/lib/trainer";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -109,7 +110,9 @@ export async function POST(req: NextRequest) {
           keyframes: engine.keyframes,
           overall_confidence: engine.overallConfidence,
           ensemble,
-          ai_diagnosis: { layers: education.layers },
+          // languageLeaks: terms the model reached for that were scrubbed before
+          // the client saw them. Trainer-visible; never rendered to the client.
+          ai_diagnosis: { layers: education.layers, languageLeaks: education.languageLeaks ?? [] },
           proposed_program: program,
           routed_program: program.routedProgram,
           status: 'analyzed',
@@ -134,7 +137,7 @@ async function writeEducation(
   engine: ReturnType<typeof analyze>,
   program: ReturnType<typeof buildProgram>,
   painLevel: number,
-): Promise<{ layers: EducationLayers; visionAgreement?: number; reasoningConfidence?: number; agree?: boolean }> {
+): Promise<{ layers: EducationLayers; visionAgreement?: number; reasoningConfidence?: number; agree?: boolean; languageLeaks?: string[] }> {
   const present = engine.findings.filter((f) => f.present);
   const chainText = engine.chain
     .filter((n) => n.role !== 'clean')
@@ -167,28 +170,53 @@ Return STRICT JSON:
  "headline": "one warm sentence summarizing the whole thing"
 }`;
 
+  const startedAt = new Date();
+  const t0 = Date.now();
   try {
     const msg = await anthropic.messages.create({
-      // Strong model for the diagnosis/education brain (Dustin OK'd higher tier).
-      // Using the vision-grade model already verified in this repo; bump to the
-      // strongest available Opus once confirmed in the account.
-      model: 'claude-sonnet-4-6',
+      // Strong model for the education brain (Dustin OK'd the higher tier).
+      // Comes from the shared constant so a future model change reaches this
+      // route too — it used to be a string literal, which meant it would have
+      // been silently left behind.
+      model: SONNET_MODEL,
       max_tokens: 1600,
       messages: [{ role: 'user', content: prompt }],
     });
-    await logUsage(null, "movement_explain", msg.usage?.input_tokens ?? 0, msg.usage?.output_tokens ?? 0, 'claude-sonnet-4-6');
+    await logUsage(null, "movement_explain", msg.usage?.input_tokens ?? 0, msg.usage?.output_tokens ?? 0, SONNET_MODEL, {
+      latencyMs: Date.now() - t0,
+      startedAt,
+    });
     const text = msg.content[0]?.type === 'text' ? msg.content[0].text : '';
     const m = text.match(/\{[\s\S]*\}/);
     const layers = (m ? JSON.parse(m[0]) : {}) as EducationLayers;
-    // Surface-language guard — scrub any leaked banned terms per field.
+
+    // Surface-language guard. The previous version of this loop computed which
+    // banned terms had leaked and then assigned the string back to itself, so
+    // every leak was detected and none was ever removed. This one replaces them
+    // with plain English and reports what it found — the client sees clean
+    // copy, the trainer sees that the model reached for clinical language.
+    const leaked: string[] = [];
     for (const k of Object.keys(layers) as (keyof EducationLayers)[]) {
-      const leaks = violatesSurfaceLanguage(String(layers[k] ?? ''));
-      if (leaks.length) layers[k] = `${layers[k]}`; // flagged for trainer; kept but noted
+      const scrubbed = scrubSurfaceLanguage(String(layers[k] ?? ''));
+      layers[k] = scrubbed.text;
+      leaked.push(...scrubbed.leaked);
     }
-    return { layers, reasoningConfidence: engine.overallConfidence, agree: true };
-  } catch {
+    return {
+      layers,
+      reasoningConfidence: engine.overallConfidence,
+      agree: true,
+      languageLeaks: [...new Set(leaked)],
+    };
+  } catch (e) {
+    // A failed education call used to leave no trace: the fallback copy renders,
+    // the screen looks completely normal, and nothing records that the most
+    // expensive call in the app just failed.
+    await logFailure(null, "movement_explain", SONNET_MODEL, e, {
+      latencyMs: Date.now() - t0,
+      startedAt,
+    });
     // Fallback: deterministic education from SURFACE_COPY (no model dependency).
-    return { layers: fallbackEducation(engine, program), reasoningConfidence: engine.overallConfidence, agree: true };
+    return { layers: fallbackEducation(engine, program), reasoningConfidence: engine.overallConfidence, agree: true, languageLeaks: [] };
   }
 }
 
