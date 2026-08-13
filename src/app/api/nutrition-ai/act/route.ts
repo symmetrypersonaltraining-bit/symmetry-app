@@ -22,6 +22,7 @@ import {
 } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
 import {
   loadMemory, loadRecentTurns, memoryBlock, recordTurns,
@@ -205,7 +206,22 @@ export async function POST(req: NextRequest) {
     // Both are best-effort. A coach that forgets is a worse coach; a coach that
     // 500s because a memory read failed is not a coach at all.
     const context = await assembleCoachContext(supabase, clientId);
-    const memory = await loadMemory(supabase, clientId);
+
+    // MEMORY GOES THROUGH THE ADMIN CLIENT, NOT THE CLIENT'S OWN.
+    //
+    // `scope.supabase` is the cookie-scoped client, so it is bound by RLS —
+    // and ai_chat_turns / ai_client_memory deliberately have SELECT policies
+    // and NO insert or update policy, because a client editing what their coach
+    // remembers about them, from the browser, is not a feature.
+    //
+    // Which meant the first version wrote nothing at all. Every insert was
+    // refused, and recordTurns swallows its errors by design (a lost turn must
+    // never cost someone their answer), so it failed in total silence: the
+    // coach replied perfectly and ai_chat_turns stayed on zero rows. Caught by
+    // querying the table after a real conversation rather than by reading the
+    // code, which is the only way this one was ever going to show up.
+    const memDb = createAdminClient();
+    const memory = await loadMemory(memDb, clientId);
     const remembered = memoryBlock(memory);
     // The sheet only sends what is still on screen, and it clears on close. The
     // transcript is what carries EARLIER conversations in.
@@ -216,7 +232,7 @@ export async function POST(req: NextRequest) {
     // on your first question and forget you on your second. The two are merged
     // by content instead, so a turn that appears in both is only sent once.
     const liveText = new Set(history.map((h) => h.content.trim()));
-    const priorTurns = (await loadRecentTurns(supabase, clientId)).filter(
+    const priorTurns = (await loadRecentTurns(memDb, clientId)).filter(
       (t) => !liveText.has(t.content.trim().slice(0, 700))
     );
 
@@ -248,13 +264,13 @@ export async function POST(req: NextRequest) {
       // their answer — and awaited rather than fired-and-forgotten, because a
       // serverless function is frozen the moment the response is returned and
       // a detached promise would simply never run.
-      await persist(supabase, clientId, message, coach.value.message, apiKey);
+      await persist(memDb, clientId, message, coach.value.message, apiKey);
       return NextResponse.json({ intent: "none", message: coach.value.message, suggestions: coach.value.suggestions });
     }
     // Salvage: a plain-text reply (or the extractor's placeholder) still helps.
     const fallback = coach.rawText.replace(/```(?:json)?|```/g, "").trim() || act.reply;
     if (fallback) {
-      await persist(supabase, clientId, message, fallback.slice(0, 1200), apiKey);
+      await persist(memDb, clientId, message, fallback.slice(0, 1200), apiKey);
       return NextResponse.json({ intent: "none", message: fallback.slice(0, 1200) });
     }
     return NextResponse.json({ error: "The coach couldn't answer right now — try again in a moment." }, { status: 502 });

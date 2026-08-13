@@ -104,3 +104,28 @@ test("the memory prompt refuses to duplicate what the coach already reads live",
   assert.match(MEM, /Memory is for what they SAID, not what they DID/);
   assert.match(MEM, /Medical conclusions/, "the fold is free to write a diagnosis into a client's permanent record");
 });
+
+// Found by querying the table after a real conversation, not by reading code.
+//
+// The first version passed `scope.supabase` — the cookie-scoped client, bound
+// by RLS. ai_chat_turns and ai_client_memory have SELECT policies and NO insert
+// or update policy on purpose: a client editing what their coach remembers
+// about them, from the browser, is not a feature. So every write was refused.
+//
+// And recordTurns swallows its errors by design, because a lost turn must never
+// cost somebody their answer. The result was total silence: the coach replied
+// perfectly, and ai_chat_turns sat on zero rows. Nothing on any screen, in any
+// log, or in any test would have said so.
+test("memory is written with the admin client, which RLS does not refuse", () => {
+  assert.match(ACT, /const memDb = createAdminClient\(\)/, "memory no longer uses the service-role client");
+  for (const call of ["loadMemory(", "loadRecentTurns(", "persist("]) {
+    const at = ACT.indexOf(call);
+    assert.ok(at > -1, `${call} is gone from the route`);
+    const args = ACT.slice(at, ACT.indexOf(")", at));
+    assert.doesNotMatch(
+      args,
+      /\bsupabase\b/,
+      `${call} is back on the cookie-scoped client — RLS will refuse the write and the failure is swallowed`
+    );
+  }
+});
