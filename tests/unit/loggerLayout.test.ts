@@ -239,18 +239,140 @@ test("the log button does not look like a play button", () => {
   // the same row, a play triangle next to a time is actively misleading about
   // which control starts the timer.
   //
-  // The one legitimate play icon left in this file is the timer's own
-  // Start/Pause button, which is why this asserts the COUNT rather than
-  // banning the icon outright.
+  // There is now no play triangle anywhere on this screen at all. The detached
+  // TimerWheel owned the last one; the per-set timer starts with a clock and
+  // pauses with two bars, because a ▶ sitting next to a countdown is exactly
+  // the ambiguity being removed.
   const plays = (CODE.match(/ti-player-play/g) ?? []).length;
   assert.equal(
-    plays, 1,
-    "exactly one play icon belongs in the logger — the timer's Start button. " +
-    "The set-log button must read as a check, not a play triangle.",
+    plays, 0,
+    "no play icon belongs in the logger — the set button logs, the timer button starts a clock",
   );
+  // 13 Aug, from the mockups: the BARE check, no enclosing circle. Biggest and
+  // most legible at the distance this is actually read from.
   assert.match(
     SRC,
-    /ti ti-circle-check/,
-    "the unlogged set button must draw a hollow check — the same shape the logged state animates into",
+    /ti ti-check/,
+    "the unlogged set button must draw a check",
+  );
+  assert.ok(
+    !/ti ti-circle-check/.test(SRC),
+    "the circle around the check was dropped on 13 Aug — bare check, chosen from the mockups",
+  );
+  assert.ok(
+    !/<circle cx="26" cy="26"/.test(SRC),
+    "the logged-state animation draws the bare tick too; the ring came off with it",
+  );
+});
+
+/**
+ * THE PER-SET TIMER.
+ *
+ * Dustin, 12 Aug: "movements that track time you set timer or stop watch right
+ * there where you log it, hit start, when time is up it logs as complete."
+ * 13 Aug: "we need to be able to toggle from timer to stopwatch starting from
+ * zero", and the switch goes above the sets.
+ *
+ * A running clock is the first thing on this screen that changes state over
+ * time, which is a new way for the layout bugs above to come back. These pin
+ * the properties that stop it.
+ */
+test("the timer never reacts to the keyboard or moves the view", () => {
+  // Same three bans as everywhere else in this file, restated here so a future
+  // "the timer should scroll its row into view" change fails loudly.
+  assert.ok(!/visualViewport/.test(CODE), "the timer must not listen to the visual viewport");
+  assert.ok(!/scrollIntoView/.test(CODE), "the timer must not scroll anything into view");
+  assert.ok(!CODE.includes("useKeyboardInset"), "the timer must not measure the keyboard");
+});
+
+test("the timer is driven by the wall clock, not by counting ticks", () => {
+  // setInterval(() => secs--, 1000) throttles when the phone backgrounds or the
+  // screen locks, so a 60-second hold comes back reading 41. The interval here
+  // only forces a repaint; every number is derived from Date.now() inside
+  // src/lib/setTimer.ts, which is unit-tested against ten-minute jumps.
+  assert.ok(
+    SRC.includes('from "@/lib/setTimer"'),
+    "the timer logic lives in src/lib/setTimer.ts, where it can be tested without waiting in real time",
+  );
+  assert.ok(
+    /only has to force a render/.test(SRC),
+    "keep the note explaining why the interval does not drive the clock",
+  );
+  assert.ok(
+    !/setInterval\([^)]*\)\s*=>\s*set\w*\(\w+\s*[-+]/.test(CODE),
+    "no interval may increment or decrement the displayed time",
+  );
+});
+
+test("the timer switch only appears on movements that track time", () => {
+  // Dustin, 13 Aug: "yes hide it on non-time movements, but it needs to come up
+  // if we toggle time on."
+  //
+  // Both halves come from the same condition: the switch is rendered off the
+  // LIVE field list, so a weight-and-reps movement never pays the ~34px, and
+  // switching the Time chip on brings it up in the same tap. Making it
+  // unconditional is the tempting simplification and it costs every exercise
+  // height that the set rows need.
+  assert.ok(
+    SRC.includes('{xFields.includes("time") && renderTimerModeSwitch(currentExercise.id)}'),
+    "session view: the mode switch must be conditional on the live tracked-field list",
+  );
+  assert.ok(
+    SRC.includes("{sTimer && renderTimerModeSwitch(pe.id)}"),
+    "list view: same rule",
+  );
+  assert.ok(
+    SRC.includes('{xFields.includes("time") && renderSetTimerButton(currentExercise.id, si)}'),
+    "the per-set timer button is conditional too — a reps-only row has no clock",
+  );
+});
+
+test("the column headers sit over the boxes they name", () => {
+  // Both views listed TIME and DIST in the opposite order to the inputs
+  // underneath, so "DIST (ft)" sat over the seconds box and vice versa. It was
+  // unreachable until 12 Aug — no movement could carry both fields, because
+  // distance was not renderable — and became visible the moment it could.
+  //
+  // Asserted as ORDER rather than exact markup so a restyle does not fail it.
+  const before = (a: string, b: string, label: string) => {
+    const ia = SRC.indexOf(a), ib = SRC.indexOf(b);
+    assert.notEqual(ia, -1, `expected to find ${a}`);
+    assert.notEqual(ib, -1, `expected to find ${b}`);
+    assert.ok(ia < ib, label);
+  };
+  // Session view renders time, then distance.
+  before(
+    'style={{ color: "rgba(255,255,255,0.3)" }}>TIME (min)',
+    'style={{ color: "rgba(255,255,255,0.3)" }}>DIST (ft)',
+    "session header: TIME must come before DIST, matching the inputs",
+  );
+  // List view renders distance, then time.
+  before(
+    'style={{ color: "var(--brand-text-secondary)" }}>DIST (ft)',
+    'style={{ color: "var(--brand-text-secondary)" }}>TIME (min)',
+    "list header: DIST must come before TIME, matching the inputs",
+  );
+});
+
+test("a finished timer hands its value straight to logSet", () => {
+  // logSet reads `sets` from the render that created it. updateSet() followed
+  // by logSet() therefore writes the time the box held BEFORE the timer touched
+  // it — a 30-second hold recorded as whatever was there previously. The
+  // override argument is the only version that cannot race the state update.
+  assert.ok(
+    /async function logSet\(peId: string, si: number, overrides\?: Partial<SetData>\)/.test(SRC),
+    "logSet must accept an override so a timer can log the value it just measured",
+  );
+  assert.ok(
+    SRC.includes("logSetRef.current(peId, si, { time: text })"),
+    "the expiry path must pass the measured time in rather than relying on state having settled",
+  );
+  // ...and through a ref, because that call site lives inside an interval that
+  // is only rebuilt when a clock starts or stops. Calling logSet directly there
+  // logs the weight the box held when the timer started, not the one typed
+  // during the hold.
+  assert.ok(
+    SRC.includes("logSetRef.current = logSet"),
+    "the interval must reach logSet through a ref kept current every render",
   );
 });

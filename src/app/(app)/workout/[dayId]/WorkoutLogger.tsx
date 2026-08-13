@@ -20,6 +20,11 @@ import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
 import { pickExistingLog, type ExistingLog } from "@/lib/workoutLogLookup";
 import { feetToMeters, metersToFeet } from "@/lib/distanceField";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import {
+  newTimer, start as tStart, pause as tPause, setMode as tSetMode,
+  displaySecs, isExpired, isRunning, outcomeOnStop,
+  type SetTimerState, type SetTimerMode,
+} from "@/lib/setTimer";
 
 interface Exercise {
   id: string;
@@ -156,120 +161,18 @@ function WheelColumn({ values, selected, onChange }: {
   );
 }
 
-function TimerWheel({ onClose }: { onClose: () => void }) {
-  const [mode, setMode] = useState<"timer" | "stopwatch">("timer");
-  const [timerMins, setTimerMins] = useState(1);
-  const [timerSecs, setTimerSecs] = useState(30);
-  const [running, setRunning] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [expired, setExpired] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const totalTimerSecs = timerMins * 60 + timerSecs;
-
-  function start() {
-    setElapsed(mode === "timer" ? totalTimerSecs : 0);
-    setExpired(false);
-    setRunning(true);
-  }
-  function pause() { setRunning(false); }
-  function reset() {
-    setRunning(false);
-    setElapsed(mode === "timer" ? totalTimerSecs : 0);
-    setExpired(false);
-  }
-
-  useEffect(() => {
-    if (!running) {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      return;
-    }
-    intervalRef.current = setInterval(() => {
-      setElapsed(prev => {
-        if (mode === "stopwatch") return prev + 1;
-        const next = prev - 1;
-        if (next <= 0) {
-          setRunning(false);
-          setExpired(true);
-          if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-          return 0;
-        }
-        return next;
-      });
-    }, 1000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [running, mode]);
-
-  const displaySecs = elapsed;
-  const m = Math.floor(displaySecs / 60);
-  const s = displaySecs % 60;
-  const mins = Array.from({ length: 100 }, (_, i) => i);
-  const secs = Array.from({ length: 60 }, (_, i) => i);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
-      <div className="w-full rounded-t-3xl p-5 pb-10" style={{ background: "var(--brand-surface)" }} onClick={e => e.stopPropagation()}>
-        <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
-
-        {/* Mode toggle */}
-        <div className="flex rounded-xl overflow-hidden mb-6 border" style={{ borderColor: "var(--brand-border)" }}>
-          {(["timer", "stopwatch"] as const).map(md => (
-            <button key={md} onClick={() => { setMode(md); reset(); }}
-              className="flex-1 py-2.5 text-sm font-semibold transition-all capitalize"
-              style={mode === md
-                ? { background: "var(--brand-primary)", color: "white" }
-                : { background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}>
-              {md === "timer" ? "\u23f1 Timer" : "\u23f2 Stopwatch"}
-            </button>
-          ))}
-        </div>
-
-        {!running && !expired && mode === "timer" ? (
-          <div className="relative flex items-center justify-center gap-4 mb-4" style={{ userSelect: "none" }}>
-            {/* Selection highlight */}
-            <div className="absolute left-0 right-0 pointer-events-none rounded-xl"
-              style={{ top: "50%", transform: "translateY(-50%)", height: 56, background: "var(--brand-primary)", opacity: 0.1, zIndex: 1 }} />
-            <div style={{ flex: 1 }}>
-              <p className="text-center text-xs uppercase tracking-widest mb-1" style={{ color: "var(--brand-text-secondary)" }}>MIN</p>
-              <WheelColumn values={mins} selected={timerMins} onChange={setTimerMins} />
-            </div>
-            <div className="text-3xl font-bold" style={{ color: "var(--brand-text-secondary)", zIndex: 2 }}>:</div>
-            <div style={{ flex: 1 }}>
-              <p className="text-center text-xs uppercase tracking-widest mb-1" style={{ color: "var(--brand-text-secondary)" }}>SEC</p>
-              <WheelColumn values={secs} selected={timerSecs} onChange={setTimerSecs} />
-            </div>
-          </div>
-        ) : (
-          <div className={`text-center py-6 ${expired ? "animate-pulse" : ""}`}>
-            <div className="text-7xl font-black tabular-nums tracking-tight"
-              style={{ color: expired ? "#ef4444" : "var(--brand-primary)" }}>
-              {String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
-            </div>
-            {expired && <p className="text-sm font-semibold mt-2" style={{ color: "#ef4444" }}>Time&apos;s up!</p>}
-            {mode === "stopwatch" && (
-              <p className="text-xs mt-2" style={{ color: "var(--brand-text-secondary)" }}>
-                {Math.floor(elapsed / 3600) > 0 && `${Math.floor(elapsed / 3600)}h `}elapsed
-              </p>
-            )}
-          </div>
-        )}
-
-        <div className="flex gap-3 mt-2">
-          <button onClick={reset} className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)" }}>
-            <i className="ti ti-rotate-clockwise text-lg" style={{ color: "var(--brand-text-secondary)" }} />
-          </button>
-          <button onClick={running ? pause : start}
-            className="flex-1 h-12 rounded-2xl font-bold text-white text-sm flex items-center justify-center gap-2"
-            style={{ background: expired ? "#ef4444" : "var(--brand-primary)" }}>
-            <i className={`ti ${running ? "ti-player-pause" : "ti-player-play"} text-lg`} />
-            {running ? "Pause" : expired ? "Restart" : "Start"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+// THE DETACHED STOPWATCH IS GONE.
+//
+// TimerWheel used to live here: a full-screen timer/stopwatch opened by a clock
+// button in the header. It worked, and it was still the wrong shape — it had no
+// idea which set you were on, so the number it produced had to be carried back
+// to the right row in your head, and typed in by hand.
+//
+// Dustin, 12 Aug: "for timer lets have it function from where you set the
+// actual time. that way we can get rid of the timer button at the top."
+//
+// Replaced by the per-set timer in the set rows below (src/lib/setTimer.ts).
+// WheelColumn is kept — TimePickerSheet still uses it to set a set's time.
 
 // \u2500\u2500\u2500 EXERCISE HISTORY DRAWER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function ExerciseHistory({ exerciseId, exId, clientId, exerciseName, onClose, onPrefill }: {
@@ -710,7 +613,25 @@ export default function WorkoutLogger({
   const [historyExercise, setHistoryExercise] = useState<{ id: string; exId?: string | null; name: string } | null>(null);
   const [sessionNote, setSessionNote] = useState("");
   const [listening, setListening] = useState(false);
-  const [showTimer, setShowTimer] = useState(false);
+  // ─── PER-SET TIMER ────────────────────────────────────────────────────────
+  // Dustin, 12 Aug: "movements that track time you set timer or stop watch
+  // right there where you log it, hit start, when time is up it logs as
+  // complete." This replaces the clock button that used to sit in the header
+  // and open a stopwatch with no idea which set you were on.
+  //
+  // Two pieces of state. `setTimers` is per SET, keyed `${peId}:${si}`.
+  // `movementTimerMode` is per MOVEMENT, because the switch sits above the
+  // sets and flips the whole exercise (13 Aug: "1 — switch above the sets").
+  //
+  // Neither of them measures the keyboard, moves the view, or changes the size
+  // of anything — see tests/unit/loggerLayout.test.ts for why that matters on
+  // this screen specifically.
+  const [setTimers, setSetTimers] = useState<Record<string, SetTimerState>>({});
+  const [movementTimerMode, setMovementTimerMode] = useState<Record<string, SetTimerMode>>({});
+  // Bumped by the repaint interval. The DISPLAYED time is derived from the wall
+  // clock, never from a count of ticks, so this only has to force a render — a
+  // beat missed while the phone is asleep cannot make the number wrong.
+  const [timerNow, setTimerNow] = useState(() => Date.now());
   const [trainerNoteText, setTrainerNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
@@ -1348,11 +1269,21 @@ export default function WorkoutLogger({
     } catch { /* the box is already clear; the next log rewrites the row */ }
   }
 
-  async function logSet(peId: string, si: number) {
+  /**
+   * `overrides` exists for the per-set timer.
+   *
+   * A timer that finishes has to write its time AND log the set. Calling
+   * updateSet() then logSet() does not work: logSet reads `sets` out of the
+   * render it was created in, so it would upsert the time the box held BEFORE
+   * the timer touched it — a 30-second hold recorded as whatever was there
+   * previously. Handing the value straight in is the only version that cannot
+   * race the state update.
+   */
+  async function logSet(peId: string, si: number, overrides?: Partial<SetData>) {
     setSaving(true);
     try {
       const { id: logId } = await ensureWorkoutLog();
-      const s = sets[peId][si];
+      const s = { ...sets[peId][si], ...(overrides ?? {}) };
       await supabase.from("set_logs").upsert({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
         exercise_id: allFlat.find(p => p.id === peId)?.exercises?.id ?? null,
@@ -1375,6 +1306,203 @@ export default function WorkoutLogger({
     } catch(e) { console.error(e); }
     finally { setSaving(false); }
   }
+
+  // ─── PER-SET TIMER — controls ─────────────────────────────────────────────
+
+  const tKey = (peId: string, si: number) => `${peId}:${si}`;
+
+  /**
+   * The mode this particular set will actually run in.
+   *
+   * The switch is per movement, but a set with no time in its box has nothing
+   * to count DOWN from, so it runs as a stopwatch regardless of where the
+   * switch is. The button turns amber to say so rather than sitting there
+   * disabled — a dead button is a thing you tap twice and then complain about.
+   */
+  function timerModeFor(peId: string, si: number): SetTimerMode {
+    const movement = movementTimerMode[peId] ?? "timer";
+    if (movement === "stopwatch") return "stopwatch";
+    const target = parseTimeToSecs(sets[peId]?.[si]?.time || "");
+    return target && target > 0 ? "timer" : "stopwatch";
+  }
+
+  /** The live state for a set, built from its time box the first time it runs. */
+  function timerFor(peId: string, si: number): SetTimerState {
+    const existing = setTimers[tKey(peId, si)];
+    const mode = timerModeFor(peId, si);
+    const target = mode === "timer" ? parseTimeToSecs(sets[peId]?.[si]?.time || "") : null;
+    if (existing && existing.mode === mode && existing.targetSecs === target) return existing;
+    // The time box was edited, or the switch moved: rebuild from what it says
+    // now. Carrying banked seconds across a retyped target would show a
+    // countdown that does not match the number above it.
+    return { ...newTimer(target), mode };
+  }
+
+  /** Start, or stop and record. The whole control is this one function. */
+  function toggleSetTimer(peId: string, si: number) {
+    const key = tKey(peId, si);
+    const cur = timerFor(peId, si);
+    const now = Date.now();
+
+    if (isRunning(cur)) {
+      const out = outcomeOnStop(cur, now);
+      setSetTimers(t => ({ ...t, [key]: tPause(cur, now) }));
+      if (out.seconds != null) {
+        const text = fmtSecs(out.seconds);
+        updateSet(peId, si, "time", text);
+        // The write and the log go together, with the value handed straight to
+        // logSet — see the note on `overrides` there.
+        if (out.shouldLog) { fx("log"); logSet(peId, si, { time: text }); }
+      }
+      return;
+    }
+
+    const started = tStart(cur, now);
+    if (!isRunning(started)) return;   // a countdown with no time to run
+    // One clock at a time. Everything else banks what it has and stops.
+    setSetTimers(t => {
+      const next: Record<string, SetTimerState> = {};
+      for (const k of Object.keys(t)) next[k] = k === key ? t[k] : tPause(t[k], now);
+      next[key] = started;
+      return next;
+    });
+    setTimerNow(now);
+  }
+
+  /** The switch above the sets. Flipping it stops and clears every set's clock. */
+  function flipMovementTimerMode(peId: string, mode: SetTimerMode) {
+    if ((movementTimerMode[peId] ?? "timer") === mode) return;
+    const now = Date.now();
+    setMovementTimerMode(m => ({ ...m, [peId]: mode }));
+    setSetTimers(t => {
+      const next: Record<string, SetTimerState> = {};
+      for (const k of Object.keys(t)) {
+        next[k] = k.startsWith(`${peId}:`) ? tSetMode(tPause(t[k], now), mode) : tPause(t[k], now);
+      }
+      return next;
+    });
+  }
+
+  const anyTimerRunning = Object.values(setTimers).some(isRunning);
+
+  /**
+   * The auto-log below runs from inside an interval, and logSet closes over
+   * `sets` from the render that built it. That interval is only rebuilt when
+   * something starts or stops running — so a weight typed WHILE a hold counts
+   * down would be written from a stale copy, and the set would log with
+   * whatever the box held when the clock started. The ref keeps the callback
+   * current without restarting the interval on every keystroke.
+   */
+  const logSetRef = useRef(logSet);
+  logSetRef.current = logSet;
+
+  const setTimerRunning = (peId: string, si: number) => isRunning(setTimers[tKey(peId, si)] ?? newTimer(null));
+
+  /**
+   * What the time box shows.
+   *
+   * While a clock is running it shows that clock; otherwise it shows what is
+   * stored on the set. The box never changes width — it is already
+   * tabular-nums — so a ticking number cannot reflow the row. That is not a
+   * detail on this screen: see tests/unit/loggerLayout.test.ts.
+   */
+  function timeBoxText(peId: string, si: number, stored: string): string {
+    const st = setTimers[tKey(peId, si)];
+    if (!st || !isRunning(st)) return stored;
+    return fmtSecs(displaySecs(st, timerNow));
+  }
+
+  /** The timer control that sits beside the log button. */
+  function renderSetTimerButton(peId: string, si: number, small = false) {
+    const st = timerFor(peId, si);
+    const running = isRunning(st);
+    const sw = st.mode === "stopwatch";
+    // Amber = this set is a stopwatch, blue = it is counting down. A set with
+    // no time in the box is amber even with the switch on Timer, because that
+    // is what it will actually do.
+    const tint = running ? "#f5b34a" : sw ? "#f5c77a" : "#8ec2ff";
+    return (
+      <button type="button" onClick={e => { e.stopPropagation(); toggleSetTimer(peId, si); }}
+        aria-label={running ? "Stop timer" : sw ? "Start stopwatch" : "Start countdown"}
+        className={`${small ? "w-9 h-9" : "w-10 h-10"} rounded-xl flex items-center justify-center flex-shrink-0`}
+        style={{
+          background: running ? "#f5b34a" : sw ? "rgba(245,179,74,0.16)" : "rgba(96,165,250,0.16)",
+          border: `1px solid ${running ? "#f5b34a" : sw ? "rgba(245,179,74,0.4)" : "rgba(96,165,250,0.4)"}`,
+          color: running ? "#20140a" : tint,
+        }}>
+        <i className={`ti ${running ? "ti-player-pause" : "ti-clock"} text-base`} />
+      </button>
+    );
+  }
+
+  /**
+   * The Timer / Stopwatch switch, above the sets.
+   *
+   * Rendered ONLY for a movement that tracks time — a weight-and-reps exercise
+   * has no use for it and every row of chrome on this screen costs height that
+   * the sets need. It is driven by the caller's live field list, so switching
+   * the Time chip on brings it up in the same tap.
+   */
+  function renderTimerModeSwitch(peId: string) {
+    const mode = movementTimerMode[peId] ?? "timer";
+    return (
+      <div className="flex gap-1 p-0.5 rounded-xl mb-2" style={{ background: "rgba(255,255,255,0.05)" }}>
+        {([["timer", "Timer"], ["stopwatch", "Stopwatch"]] as [SetTimerMode, string][]).map(([m, label]) => (
+          <button key={m} type="button" onClick={e => { e.stopPropagation(); flipMovementTimerMode(peId, m); }}
+            className="flex-1 py-1.5 rounded-lg text-xs font-semibold"
+            style={{
+              background: mode === m ? "var(--brand-primary)" : "transparent",
+              color: mode === m ? "white" : "rgba(255,255,255,0.5)",
+              border: "none",
+            }}>
+            {label}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  /**
+   * Repaint while something is running, and log a countdown that reaches zero.
+   *
+   * 250ms rather than 1000ms so the last second does not visibly hang, and the
+   * interval is not created at all when nothing is running — an idle logger
+   * must not wake up four times a second.
+   *
+   * This deliberately does NOT drive the clock. It only re-renders; every
+   * number comes from Date.now(). That is what makes a backgrounded phone
+   * come back with the right time instead of however many ticks it managed.
+   */
+  useEffect(() => {
+    if (!anyTimerRunning) return;
+    const id = setInterval(() => {
+      const now = Date.now();
+      setTimerNow(now);
+      setSetTimers(prev => {
+        let changed = false;
+        const next = { ...prev };
+        for (const [k, st] of Object.entries(prev)) {
+          if (!isRunning(st) || !isExpired(st, now)) continue;
+          const [peId, siRaw] = k.split(":");
+          const si = Number(siRaw);
+          next[k] = tPause(st, now);
+          changed = true;
+          const out = outcomeOnStop(st, now);
+          if (out.seconds != null && out.shouldLog) {
+            const text = fmtSecs(out.seconds);
+            updateSet(peId, si, "time", text);
+            fx("log");
+            logSetRef.current(peId, si, { time: text });
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, 250);
+    return () => clearInterval(id);
+    // logSet/updateSet are stable enough for this: the effect only restarts
+    // when something starts or stops running, which is exactly when it should.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anyTimerRunning]);
 
   async function logAllCurrentSets() {
     if (!currentExercise) return;
@@ -1890,7 +2018,6 @@ export default function WorkoutLogger({
             onClose={() => setHistoryExercise(null)}
             onPrefill={(w, r) => prefillSets(currentExercise.id, w, r)} />
         )}
-        {showTimer && <TimerWheel onClose={() => setShowTimer(false)} />}
         {timePick && <TimePickerSheet initial={parseTimeToSecs(sets[timePick.peId]?.[timePick.si]?.time || "") || 0} onSet={(secs) => { updateSet(timePick.peId, timePick.si, "time", fmtSecs(secs)); setTimePick(null); }} onClose={() => setTimePick(null)} />}
         {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
 
@@ -1992,11 +2119,6 @@ export default function WorkoutLogger({
               className="w-9 h-9 rounded-full flex items-center justify-center"
               style={{ background: "rgba(245,158,11,0.16)", border: "1px solid rgba(245,158,11,0.4)" }}>
               <i className="ti ti-flag text-base" style={{ color: "#f5b34a" }} />
-            </button>
-            <button onClick={() => setShowTimer(true)} aria-label="Timer / stopwatch"
-              className="w-9 h-9 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(96,165,250,0.16)", border: "1px solid rgba(96,165,250,0.4)" }}>
-              <i className="ti ti-clock text-base" style={{ color: "#8ec2ff" }} />
             </button>
           </div>
         </div>
@@ -2150,14 +2272,22 @@ export default function WorkoutLogger({
               );
             })}
           </div>
+          {/* Timer / Stopwatch — only on a movement that tracks time, and it
+              appears the moment the Time chip above is switched on. */}
+          {xFields.includes("time") && renderTimerModeSwitch(currentExercise.id)}
           <div className="flex gap-2 mb-2">
             <div className="w-8" />
             {xFields.includes("weight") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>{isPerHandLoad(currentExercise) ? "WEIGHT (lb/hand)" : "WEIGHT (lb)"}</div>}
             {xFields.includes("reps") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>REPS</div>}
-            {xFields.includes("distance") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>DIST (ft)</div>}
+            {/* TIME before DIST — the row below renders them in that order, and a
+                header that disagrees puts "DIST (ft)" over the seconds box. Only
+                reachable since distance became a real field on 12 Aug, because
+                until then no movement could carry both. */}
             {xFields.includes("time") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>TIME (min)</div>}
+            {xFields.includes("distance") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>DIST (ft)</div>}
             {xFields.includes("speed") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>SPEED (mph)</div>}
             {xFields.includes("hr") && <div className="flex-1 text-center text-xs font-medium" style={{ color: "rgba(255,255,255,0.3)" }}>HR (bpm)</div>}
+            {xFields.includes("time") && <div className="w-10" />}
             <div className="w-12" />
           </div>
           
@@ -2183,14 +2313,20 @@ export default function WorkoutLogger({
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="numeric" />)}
-              {xFields.includes("time") && (<input type="text" value={setEntry.time} readOnly
-                onClick={() => setTimePick({ peId: currentExercise.id, si })}
+              {xFields.includes("time") && (<input type="text" value={timeBoxText(currentExercise.id, si, setEntry.time)} readOnly
+                /* Tapping the box still opens the picker — the time stays
+                   editable, logged or not. It is only inert while its own
+                   clock is running, where a tap means "I want to change the
+                   number that is currently counting" and there is no sane
+                   answer to that. Stop it first. */
+                onClick={() => { if (!setTimerRunning(currentExercise.id, si)) setTimePick({ peId: currentExercise.id, si }); }}
                 /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder="0:00"
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
                 style={{
-                  background: setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
-                  color: setEntry.done ? "#22c55e" : "white",
-                  border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
+                  background: setTimerRunning(currentExercise.id, si) ? "rgba(245,179,74,0.14)" : setEntry.done ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.06)",
+                  color: setTimerRunning(currentExercise.id, si) ? "#ffe1b2" : setEntry.done ? "#22c55e" : "white",
+                  border: setTimerRunning(currentExercise.id, si) ? "1px solid rgba(245,179,74,0.55)" : setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
+                  fontVariantNumeric: "tabular-nums",
                 }} inputMode="decimal" />)}
               {xFields.includes("distance") && (<input type="text" value={setEntry.distance} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); }}
                 onChange={e => updateSet(currentExercise.id, si, "distance", e.target.value)}
@@ -2219,6 +2355,7 @@ export default function WorkoutLogger({
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="numeric" />)}
+              {xFields.includes("time") && renderSetTimerButton(currentExercise.id, si)}
               <button onClick={() => { if (setEntry.done) { unlogSet(currentExercise.id, si); } else { fx("log"); logSet(currentExercise.id, si); } }}
                 disabled={saving}
                 data-fx-own
@@ -2228,8 +2365,13 @@ export default function WorkoutLogger({
                     "recorded", not merely "highlighted". Falls back to the plain
                     icon under prefers-reduced-motion via the .cw-check rules. */}
                 {setEntry.done ? (
-                  <svg className="cw-check" width="22" height="22" viewBox="0 0 52 52" aria-hidden>
-                    <circle cx="26" cy="26" r="24" fill="none" stroke="#fff" strokeWidth="4" opacity="0.55" />
+                  /* No enclosing circle any more: the icon Dustin picked is the
+                     bare check. `.cw-check path` still draws it, and the CSS
+                     degrades to a plain tick under prefers-reduced-motion. */
+                  <svg className="cw-check" width="26" height="26" viewBox="0 0 52 52" aria-hidden>
+                    {/* Same geometry as before — its length is ~35, which is what
+                        `.cw-check path`'s stroke-dasharray: 36 is cut for. A longer
+                        path would repeat the dash and never look finished. */}
                     <path d="M14 27l8 8 16-17" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 ) : (
@@ -2237,14 +2379,16 @@ export default function WorkoutLogger({
                      to log stuff needs to change icons, that's confusing."
                      He is right — it never played anything. It logs the set,
                      and the timer is a separate control. A play triangle next
-                     to a countdown is actively misleading.
+                     to a countdown is actively misleading about which one
+                     starts the clock.
 
-                     A hollow circle-check reads as "tap to complete" and is
-                     the same shape the logged state draws itself into, so the
-                     tick animation now looks like the outline filling in
-                     rather than one icon swapping for a different one. List
-                     mode already used a check; this is what was out of step. */
-                  <i className="ti ti-circle-check text-xl" style={{ color: "rgba(255,255,255,0.9)" }} />
+                     13 Aug, from the mockups: a BARE check, no circle — the
+                     biggest, most legible mark at arm's length, which is the
+                     distance this is actually read from. Unlogged it is drawn
+                     faint; logging it draws the same tick solid, so the
+                     animation reads as the mark being made rather than one
+                     icon being swapped for a different one. */
+                  <i className="ti ti-check text-2xl" style={{ color: "rgba(255,255,255,0.45)" }} />
                 )}
               </button>
             </div>
@@ -2457,7 +2601,6 @@ export default function WorkoutLogger({
           onPrefill={(w, r) => prefillSets(historyExercise.id, w, r)} />
       )}
       {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
-      {showTimer && <TimerWheel onClose={() => setShowTimer(false)} />}
         {timePick && <TimePickerSheet initial={parseTimeToSecs(sets[timePick.peId]?.[timePick.si]?.time || "") || 0} onSet={(secs) => { updateSet(timePick.peId, timePick.si, "time", fmtSecs(secs)); setTimePick(null); }} onClose={() => setTimePick(null)} />}
       {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
 
@@ -2486,11 +2629,6 @@ export default function WorkoutLogger({
             <h1 className="text-white font-bold text-base">{day.label}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowTimer(true)}
-              className="w-9 h-9 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(255,255,255,0.15)" }}>
-              <i className="ti ti-clock text-white text-base" />
-            </button>
             <button onClick={() => { setSessionCancelled(false); setSessionMode(true); }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
               style={{ background: "rgba(255,255,255,0.2)", color: "white" }}>
@@ -2532,7 +2670,12 @@ export default function WorkoutLogger({
           const cardio = isCardioEx(pe);
           const sFields: string[] = cardio ? [] : (fieldCfg[pe.id] || defaultTrackedFields(pe));
           const nCols = ["weight", "reps", "time", "distance"].filter(f => sFields.includes(f)).length;
-          const sGrid = nCols > 0 ? `28px repeat(${nCols}, 1fr) 40px` : "28px 1fr 40px";
+          // A timed movement gets one more fixed column for its timer button.
+          // Fixed, not 1fr, so the input columns keep the width they had.
+          const sTimer = sFields.includes("time");
+          const sGrid = nCols > 0
+            ? `28px repeat(${nCols}, 1fr)${sTimer ? " 40px" : ""} 40px`
+            : "28px 1fr 40px";
           const cardioFields: string[] = fieldCfg[pe.id] || (((pe as any).tracked_fields && (pe as any).tracked_fields.some((f: string) => ["time","speed","hr"].includes(f))) ? (pe as any).tracked_fields : ["time", "speed", "hr"]);
           return (
             <div key={pe.id} className="rounded-2xl mb-3 overflow-hidden cursor-pointer"
@@ -2603,12 +2746,14 @@ export default function WorkoutLogger({
                       &ldquo;{pe.cue}&rdquo;
                     </p>
                   )}
-                  {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { unlogSet(pe.id, si); } else { logSet(pe.id, si); } }} disabled={saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="flex items-center gap-1.5 mb-1 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["weight","Weight"],["reps","Reps"],["time","Time"],["distance","Distance"],["each_side","Each side"]] as [string,string][]).map(([f, lab]) => { const on = sFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? sFields.filter((x: string) => x !== f) : [...sFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div><div className="grid mb-2" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
+                  {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { unlogSet(pe.id, si); } else { logSet(pe.id, si); } }} disabled={saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="flex items-center gap-1.5 mb-1 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["weight","Weight"],["reps","Reps"],["time","Time"],["distance","Distance"],["each_side","Each side"]] as [string,string][]).map(([f, lab]) => { const on = sFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? sFields.filter((x: string) => x !== f) : [...sFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{sTimer && renderTimerModeSwitch(pe.id)}<div className="grid mb-2" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
                     <div />
                     {sFields.includes("weight") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>{isPerHandLoad(pe) ? "LBS/HAND" : "LBS"}</div>}
                     {sFields.includes("reps") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>REPS</div>}
-                    {sFields.includes("time") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>TIME (min)</div>}
+                    {/* DIST before TIME — this view renders them in that order. */}
                     {sFields.includes("distance") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>DIST (ft)</div>}
+                    {sFields.includes("time") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>TIME (min)</div>}
+                    {sTimer && <div />}
                     <div />
                   </div>
                   {peSets.map((setEntry, si) => (
@@ -2644,20 +2789,23 @@ export default function WorkoutLogger({
                           color: setEntry.done ? "#22c55e" : "var(--brand-text)",
                           border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
                         }} inputMode="decimal" />)}
-                      {sFields.includes("time") && (<input type="text" value={setEntry.time} readOnly
-                        onClick={e => { e.stopPropagation(); setTimePick({ peId: pe.id, si }); }}
+                      {sFields.includes("time") && (<input type="text" value={timeBoxText(pe.id, si, setEntry.time)} readOnly
+                        /* inert only while its own clock runs — see the session view */
+                        onClick={e => { e.stopPropagation(); if (!setTimerRunning(pe.id, si)) setTimePick({ peId: pe.id, si }); }}
                         /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={'0:00'}
                         className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
-                          background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
-                          color: setEntry.done ? "#22c55e" : "var(--brand-text)",
-                          border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
+                          background: setTimerRunning(pe.id, si) ? "rgba(245,179,74,0.14)" : setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
+                          color: setTimerRunning(pe.id, si) ? "#d08a12" : setEntry.done ? "#22c55e" : "var(--brand-text)",
+                          border: `1px solid ${setTimerRunning(pe.id, si) ? "rgba(245,179,74,0.55)" : setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
+                          fontVariantNumeric: "tabular-nums",
                         }} inputMode="decimal" />)}
+                      {sTimer && renderSetTimerButton(pe.id, si)}
                       <button onClick={e => { e.stopPropagation(); if (setEntry.done) { unlogSet(pe.id, si); } else { logSet(pe.id, si); } }}
                         disabled={saving}
                         className="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
                         style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}>
-                        <i className="ti ti-check text-sm text-white" />
+                        <i className="ti ti-check text-lg text-white" style={{ opacity: setEntry.done ? 1 : 0.5 }} />
                       </button>
                     </div>
                   ))}</>)}

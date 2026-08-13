@@ -175,7 +175,7 @@ which had the same family of fault — `parseFloat("")` is NaN, which snapped th
 field to 0 the moment a client cleared it to retype. That one is on a screen
 clients use every day.
 
-## 0c. Per-set timer, in the row you log — DECIDED 12 Aug, NOT BUILT  ← BUILD FIRST
+## 0c. Per-set timer, in the row you log — BUILT AND SHIPPED 13 Aug
 
 Dustin: *"for timer lets have it function from where you set the actual time.
 that way we can get rid of the timer button at the top. movements that track
@@ -211,10 +211,36 @@ the time box is empty — every set can be flipped either way:
   a hold abandoned at 8 of 30 seconds is information, not a completed set
 - a stopwatch face reads 0:00 before it is started, never the programmed target
 
-**STILL TO CONFIRM:** how the toggle is reached. Three ways mocked and sent
-13 Aug (`timer-a-remock.html`): (1) one Timer/Stopwatch switch above the sets,
-per movement; (2) long-press the timer button, per set; (3) the timer button
-opens a strip with the toggle in it, per set.
+**SETTLED 13 Aug — the toggle.** Three ways were mocked; Dustin picked
+**(1) a Timer/Stopwatch switch above the sets**, per movement. It is rendered
+only for a movement that tracks time — *"yes hide it on non-time movements, but
+it needs to come up if we toggle time on"* — and both halves of that come from
+the same condition, so switching the Time chip on brings it up in the same tap.
+
+**SETTLED 13 Aug — the icon.** The log button is now a **bare check**, no
+circle, chosen from four candidates. Unlogged it is drawn faint; logging draws
+the same tick solid, so the animation reads as the mark being made rather than
+one icon swapping for another.
+
+**SHIPPED.** Timer button beside the log button in both the session view and the
+list view; the top clock button and `TimerWheel` are deleted. Extra rules the
+build settled:
+
+- a stop within **2 seconds** is treated as a fumbled button, not a set —
+  without it a mis-tap rewrites a 0:30 target to 0:02 and the first anyone knows
+  is a log that reads wrong (`CANCEL_WINDOW_SECS`)
+- the time box stays tappable and editable, logged or not; it is inert only
+  while its own clock is running
+- `logSet` gained an `overrides` argument. It closes over `sets` from the render
+  that built it, so `updateSet()` then `logSet()` would have written the time the
+  box held BEFORE the timer touched it. The auto-log path reaches it through a
+  ref as well, because that call site lives inside an interval that is only
+  rebuilt when a clock starts or stops.
+
+**Found and fixed on the way:** both views listed TIME and DIST in the opposite
+order to the input boxes underneath, so `DIST (ft)` sat over the seconds box.
+Unreachable until 12 Aug — no movement could carry both fields, because distance
+was not renderable — and visible the moment one could.
 
 **BUILT 13 Aug — the engine.** `src/lib/setTimer.ts`, 18 unit tests. Pure, no
 React, no UI decision baked in, so it fits whichever toggle wins.

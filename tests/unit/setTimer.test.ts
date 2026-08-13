@@ -140,6 +140,26 @@ test("stopping a clock that never ran writes nothing", () => {
   assert.deepEqual(outcomeOnStop(newTimer(30), T0), { seconds: null, shouldLog: false });
 });
 
+test("a stop within a couple of seconds is a fumbled button, not a set", () => {
+  // Without this, a mis-tap two seconds into a 0:30 hold rewrites the set's
+  // time to 0:02 and the first anyone knows is a log that reads wrong.
+  const cd = start(newTimer(30), T0);
+  assert.deepEqual(outcomeOnStop(cd, T0 + 1_500), { seconds: null, shouldLog: false });
+  assert.deepEqual(outcomeOnStop(cd, T0 + 2_000), { seconds: null, shouldLog: false });
+  assert.deepEqual(outcomeOnStop(cd, T0 + 3_000), { seconds: 3, shouldLog: false }, "past the window it records again");
+
+  const sw = start(newTimer(null), T0);
+  assert.deepEqual(outcomeOnStop(sw, T0 + 2_000), { seconds: null, shouldLog: false });
+  assert.deepEqual(outcomeOnStop(sw, T0 + 3_000), { seconds: 3, shouldLog: true });
+});
+
+test("a SHORT programmed hold still completes normally", () => {
+  // The cancel window must not swallow a genuinely short target — a 2-second
+  // hold that runs to zero is a finished set, not a fumble.
+  const st = start(newTimer(2), T0);
+  assert.deepEqual(outcomeOnStop(st, T0 + 2_000), { seconds: 2, shouldLog: true });
+});
+
 // ─── only one clock at a time ────────────────────────────────────────────────
 
 test("starting one set pauses the others rather than refusing the tap", () => {

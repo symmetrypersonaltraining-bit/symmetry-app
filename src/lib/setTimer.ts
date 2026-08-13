@@ -120,6 +120,18 @@ export function toggleMode(st: SetTimerState): SetTimerState {
   return setMode(st, st.mode === "timer" ? "stopwatch" : "timer");
 }
 
+/**
+ * Stop inside this window and nothing is recorded at all.
+ *
+ * Stopping a countdown writes the time actually worked into the set — 22 of a
+ * programmed 30 seconds is real information, and the programmed target is still
+ * on the exercise pill above. But that means a mis-tap two seconds after
+ * starting would replace a 0:30 target with 0:02, and the first anyone knows of
+ * it is a log that reads wrong. Nobody holds a plank for a second and a half,
+ * so a stop that fast is a fumbled button, not a set.
+ */
+export const CANCEL_WINDOW_SECS = 2;
+
 export interface TimerOutcome {
   /** Seconds to write into the set's time box. Null = leave it alone. */
   seconds: number | null;
@@ -143,10 +155,12 @@ export function outcomeOnStop(st: SetTimerState, now: number): TimerOutcome {
   const elapsed = elapsedSecs(st, now);
   if (st.mode === "timer") {
     if (st.targetSecs == null) return { seconds: null, shouldLog: false };
+    // Reaching zero is not a mis-tap however fast the target was.
     if (remainingSecs(st, now) === 0) return { seconds: st.targetSecs, shouldLog: true };
-    return { seconds: elapsed > 0 ? elapsed : null, shouldLog: false };
+    if (elapsed <= CANCEL_WINDOW_SECS) return { seconds: null, shouldLog: false };
+    return { seconds: elapsed, shouldLog: false };
   }
-  if (elapsed <= 0) return { seconds: null, shouldLog: false };
+  if (elapsed <= CANCEL_WINDOW_SECS) return { seconds: null, shouldLog: false };
   return { seconds: elapsed, shouldLog: true };
 }
 
