@@ -141,15 +141,68 @@ removes the bookkeeping entirely. Prone W Hold 0:20 × 3 becomes three taps.
   control starts the timer.
 - **Remove the top clock button** once the per-set timer is in. Not before.
 
-**STILL TO CONFIRM:** what an EMPTY time box does. The read is: a value present
-counts DOWN from it; empty counts UP as a stopwatch, and stopping writes the
-elapsed time into the box. One control, both behaviours, nothing extra to tap.
+**CONFIRMED 13 Aug — placement.** Dustin picked **Option A** from the three
+mocked placements: a small timer button in the row, beside the log button.
+
+**CONFIRMED 13 Aug — modes.** *"we need to be able to toggle from timer to
+stopwatch starting from zero."* So the behaviour is not inferred from whether
+the time box is empty — every set can be flipped either way:
+
+- a programmed time **counts down** from it and logs the set at zero
+- **stopwatch** counts up from **zero** and logs what it measured on stop
+- a set with no programmed time simply starts as a stopwatch
+- stopping a countdown EARLY records the time worked but does **not** log it —
+  a hold abandoned at 8 of 30 seconds is information, not a completed set
+- a stopwatch face reads 0:00 before it is started, never the programmed target
+
+**STILL TO CONFIRM:** how the toggle is reached. Three ways mocked and sent
+13 Aug (`timer-a-remock.html`): (1) one Timer/Stopwatch switch above the sets,
+per movement; (2) long-press the timer button, per set; (3) the timer button
+opens a strip with the toggle in it, per set.
+
+**BUILT 13 Aug — the engine.** `src/lib/setTimer.ts`, 18 unit tests. Pure, no
+React, no UI decision baked in, so it fits whichever toggle wins.
+
+It is **wall-clock derived, not a tick counter**. The obvious build,
+`setInterval(() => secs--, 1000)`, is wrong on a phone: background the app
+mid-plank or let the screen lock and the timers throttle, so a 60-second hold
+comes back reading 41. State holds the epoch millisecond the run started and
+every reading derives from `now`; the interval only forces a repaint. A missed
+beat, or twenty in one second, cannot change the number on screen. `startOnly`
+keeps exactly one clock running — starting a set pauses the others rather than
+refusing the tap.
 
 **Care needed.** This is `WorkoutLogger.tsx`, the file with the worst regression
 history here — `tests/unit/loggerLayout.test.ts` names five separate shipped
 bugs. A running timer is the first thing on this screen that changes state over
 time, so it must not resize anything, must survive backgrounding the app, and
 must not fight the pinned viewport height.
+
+## 0d. Library tracked-field defaults — DONE 13 Aug
+
+Dustin, 12 Aug: *"make all holds in library default to this"* (weight + time,
+from the screenshot), then three overrides: *"suitecase do distance, single arm
+overhead do sets and 1 min each side, hamstring curl hold weight and time 5 sec
+holds."*
+
+Verified in the database 13 Aug. Every `%Hold%` row carries a sensible pair;
+`Single-Arm Dumbbell Overhead Waiter's Hold` is `time + each_side` and
+`Hamstring Curl Isometric Hold` is `weight + time`, both as asked.
+
+One was still wrong: **Suitcase Carry** was `duration + weight`. A carry is
+programmed by how far you walk, and `distance` only became a field the logger
+could render on 12 Aug — so it now reads `weight + distance`. Backed up to
+`bak_exercises_tracked_2026_08_13` first.
+
+**Left alone, needs a word from Dustin:** `Suitcase Hold` is a separate library
+row and is still `reps + time`. That is right for a stationary hold, but if
+"suitcase" meant this row rather than the carry, it wants `weight + distance`
+too — or the two rows want merging.
+
+**Cosmetic, not urgent:** some library rows still use the legacy key
+`duration` where everything else says `time`. The logger maps `duration` → `time`
+on read (`defaultTrackedFields`), so nothing is broken; it is just two names for
+one field, which will eventually mislead somebody reading the table.
 
 ## 1. Custom workout from the schedule page  ← NEXT
 
