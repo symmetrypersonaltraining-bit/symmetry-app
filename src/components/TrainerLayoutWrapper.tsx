@@ -8,6 +8,7 @@ import HeaderAssist from "./HeaderAssist";
 import SessionDock from "./SessionDock";
 import AppBottomNav, { type NavItem } from "./AppBottomNav";
 import RefreshHandle from "./RefreshHandle";
+import GlobalCoach from "./GlobalCoach";
 import { COACH_NAME } from "@/lib/trainer";
 
 interface Props {
@@ -124,6 +125,11 @@ export default function TrainerLayoutWrapper({ children }: Props) {
         </div>
 
         <SessionDock />
+
+        {/* Client View is the client app, so it gets the client's coach too —
+            otherwise the one surface Dustin actually tests on is the one
+            surface without it. */}
+        <GlobalCoach />
 
         {/* Client bottom nav — the SAME shared component as the real client
             BottomNav (identical tabs/order/icons/active-state + Messages unread

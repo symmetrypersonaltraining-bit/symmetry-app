@@ -54,6 +54,18 @@ export default function SessionDock() {
     return () => clearInterval(id);
   }, [pathname]);
 
+  // Tell the floating coach how much room this bar is taking, so it lifts above
+  // it instead of sitting on top of the "tap to resume" text. A CSS variable
+  // rather than a prop or a context: the dock is mounted in the layout and the
+  // coach is mounted in the layout, and neither should have to know the other
+  // exists beyond one number. Cleared on unmount so the coach drops back.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!active) { root.style.removeProperty("--sym-dock-lift"); return; }
+    root.style.setProperty("--sym-dock-lift", "68px");
+    return () => { root.style.removeProperty("--sym-dock-lift"); };
+  }, [active]);
+
   if (!active) return null;
 
   const resume = () => {

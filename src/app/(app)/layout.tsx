@@ -10,6 +10,7 @@ import PushRegister from "@/components/PushRegister";
 import MessageNotifier from "@/components/MessageNotifier";
 import { NotificationProvider } from "@/lib/useNotificationFeed";
 import RefreshHandle from "@/components/RefreshHandle";
+import GlobalCoach from "@/components/GlobalCoach";
 import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function AppLayout({
@@ -61,6 +62,10 @@ export default async function AppLayout({
       {/* Registers the service worker and offers the install where the
           platform allows it. Renders nothing once installed or dismissed. */}
       <InstallPrompt />
+      {/* One coach, every client screen. It steps aside where a screen mounts a
+          better-informed one (nutrition) and never appears on the logger — see
+          GlobalCoach. */}
+      <GlobalCoach />
       <BottomNav />
     </div>
     </NotificationProvider>

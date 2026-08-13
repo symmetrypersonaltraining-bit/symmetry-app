@@ -22,6 +22,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import AiBadge from "@/components/AiBadge";
+import CoachFab from "@/components/CoachFab";
+import type { Mood } from "@/lib/ai/faces";
+import { claimCoachSlot } from "@/lib/ai/coachMount";
 import { kcalOf } from "@/lib/nutrition/dailyTotals";
 import Sheet from "./Sheet";
 
@@ -147,6 +150,8 @@ export default function CoachChatSheet({
   actions,
   onApplySuggestion,
   selectedDate,
+  canAct = true,
+  fabMood = "nutrition",
 }: {
   clientId: string;
   /** The day as rendered — sent with every message so /act can resolve references. */
@@ -171,6 +176,20 @@ export default function CoachChatSheet({
    * below names the actual date whenever it is not today.
    */
   selectedDate: string;
+  /**
+   * Whether confirmed actions can actually be executed here.
+   *
+   * The same chat is mounted globally, where there is no meal list to change
+   * and none of the `actions` write helpers exist. The model does not know
+   * that, so it will still happily extract "log M2" from a message typed on the
+   * Progress tab. Rendering a Confirm button that runs a no-op and then says
+   * "Done" is the worst possible answer: the client believes their day is
+   * logged and it is not. When this is false, an action intent comes back as a
+   * plain sentence pointing at the tab that can do it.
+   */
+  canAct?: boolean;
+  /** The face on the floating button — the surface's own mood. */
+  fabMood?: Mood;
 }) {
   const todayCT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const isToday = selectedDate === todayCT;
@@ -207,6 +226,11 @@ export default function CoachChatSheet({
     })();
     return () => { on = false; };
   }, [supabase, clientId]);
+
+  // This screen's coach knows today's meals and can actually change them, so it
+  // outranks the global one. Claiming the slot hides that button while we are
+  // here — see coachMount for why it is a count and not a flag.
+  useEffect(() => claimCoachSlot(), []);
 
   // Keep the newest message in view.
   useEffect(() => {
@@ -278,6 +302,16 @@ export default function CoachChatSheet({
         return;
       }
       // Action intent → coach reply + confirmation card. Nothing mutates here.
+      if (res.ok && json?.intent && json.intent !== "none" && json.confirmation && json.params && !canAct) {
+        // Off the nutrition tab there is nothing to change and nothing to
+        // change it with. Say so instead of offering a button that lies.
+        setMsgs((m) => [...m, {
+          role: "coach",
+          text: (json.reply ? json.reply + " " : "") +
+            "I can set that up on the Nutrition tab — open it and tell me again there.",
+        }]);
+        return;
+      }
       if (res.ok && json?.intent && json.intent !== "none" && json.confirmation && json.params) {
         setMsgs((m) => [...m, {
           role: "coach",
@@ -295,7 +329,7 @@ export default function CoachChatSheet({
         setMsgs((m) => [...m, { role: "coach", text: json.error! }]);
         return;
       }
-      setMsgs((m) => [...m, { role: "coach", text: json.message!, suggestions: parseSuggestions(json.suggestions) }]);
+      setMsgs((m) => [...m, { role: "coach", text: json.message!, suggestions: canAct ? parseSuggestions(json.suggestions) : undefined }]);
     } catch {
       setMsgs((m) => [...m, { role: "coach", text: "Network hiccup — check your connection and try again." }]);
     } finally {
@@ -387,27 +421,9 @@ export default function CoachChatSheet({
 
   return (
     <>
-      {!open && (
-        <button
-          onClick={openChat}
-          aria-label="Ask your coach"
-          className="fixed flex items-center justify-center"
-          style={{
-            right: 16,
-            bottom: "calc(env(safe-area-inset-bottom) + 82px)", // clears the bottom nav
-            zIndex: 1100, // under the sheets (z-1200)
-            width: 52,
-            height: 52,
-            borderRadius: "50%",
-            background: "var(--brand-primary)",
-            color: "#fff",
-            fontSize: 22,
-            boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-          }}
-        >
-          ✦
-        </button>
-      )}
+      {/* The shared button — placement, z-order and the hide-under-the-keyboard
+          rule live in CoachFab so every mount of the coach behaves the same. */}
+      {!open && <CoachFab onClick={openChat} mood={fabMood} />}
 
       {open && (
         <Sheet title="✦ Coach" subtitle="Grounded in your logs, targets & trends" onClose={() => setOpen(false)}>
