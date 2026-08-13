@@ -25,7 +25,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { Db } from "@/lib/ai/scope";
-import { applyProposal, loadDayTree, CT_TODAY, Proposal } from "@/lib/ai/workoutAdjust";
+import { applyProposal, loadDayTree, CT_TODAY, Proposal, type WorkoutUndoStep } from "@/lib/ai/workoutAdjust";
 import { assembleCoachContext, assembleTrainingContext } from "@/lib/ai/coach-context";
 import { getValidAccessToken, gcalFetch } from "@/lib/gcal";
 import { COACH_FIRST_NAME } from "../trainer";
@@ -303,11 +303,14 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
       };
       const scope = input.scope === "series" ? "series" : "one";
       const res = await applyProposal(db, clientId, proposal, scope);
-      // No undo payload: applyProposal rewrites a day tree and there is no
-      // faithful inverse. Said plainly rather than offering an undo that would
-      // half-work — a half-working undo on programming is worse than none.
-      await logAction(db, "adjust_workout", clientId, `${proposal.summary} (${scope})`, null);
-      return res.message + " (Note: workout edits cannot be auto-undone — re-adjust to change them back.)";
+      // Workout edits used to be the one thing here with no way back — "there
+      // is no faithful inverse". There is: applyProposal now records the prior
+      // state of every row it touches, or, when it cloned the day, the two
+      // steps that put the sessions back on the original and drop the copy.
+      // Dustin's first requirement of this agent was "anything you can do in
+      // the app, with undo on all of it"; programming was the gap in "all".
+      await logAction(db, "adjust_workout", clientId, `${proposal.summary} (${scope})`, res.undo);
+      return res.message + (res.undo ? " Say \"undo that\" if it is not right." : "");
     }
 
     if (name === "set_macro_targets") {
@@ -541,6 +544,26 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
           if (u.new_id) await db.from("program_assignments").update({ active: false }).eq("id", u.new_id as string);
           const prev = u.previous as { id: string } | null;
           if (prev?.id) await db.from("program_assignments").update({ active: true }).eq("id", prev.id);
+        } else if (u.kind === "workout_adjust") {
+          // Newest-first: a later change can depend on an earlier one, so the
+          // reversal has to run backwards through the list. A step that fails
+          // because the row is already gone is not a reason to abandon the
+          // rest — half-undone is worse than fully undone with one no-op.
+          const steps = (u.steps as WorkoutUndoStep[]) || [];
+          const failures: string[] = [];
+          for (let i = steps.length - 1; i >= 0; i--) {
+            const st = steps[i];
+            try {
+              if (st.op === "reinsert") await db.from(st.table).insert(st.values);
+              else if (st.op === "restore") await db.from(st.table).update(st.values).eq("id", st.id);
+              else if (st.op === "delete") await db.from(st.table).delete().eq("id", st.id);
+              else if (st.op === "repoint") await db.from("scheduled_workouts").update({ day_id: st.day_id }).in("id", st.ids);
+            } catch (e) { failures.push(`${st.op}: ${(e as Error).message}`); }
+          }
+          if (failures.length === steps.length) throw new Error(failures[0] || "nothing could be reversed");
+          if (failures.length) {
+            await db.from("ai_action_log").update({ undo_error: failures.join("; ").slice(0, 300) }).eq("id", row.id);
+          }
         } else if (u.kind === "gcal_delete") {
           const { token } = await getValidAccessToken();
           await gcalFetch(token, `/calendars/primary/events/${encodeURIComponent(u.gcal_event_id as string)}`, { method: "DELETE" });
