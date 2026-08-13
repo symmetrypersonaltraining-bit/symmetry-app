@@ -4,7 +4,7 @@
 Add to it as tonight's items land; the "Still coming" section is the parking
 spot for anything not shipped yet.
 
-**Last updated:** 13 Aug 2026, from `4df0802` (live).
+**Last updated:** 13 Aug 2026, from `18744e3` (live).
 
 ---
 
@@ -135,7 +135,34 @@ face changes to match: hit a PR and you get the one flexing.
 
 ---
 
-**9. Smaller things from the last couple of days**
+**9. If you go quiet, you'll hear from me — and you can tell it to stop**
+
+If it's been a while since anything came through, you'll get a one-screen
+check-in when you open the app. It's measured against *your* normal, not a fixed
+number of days — if you've never been a daily logger, you won't get told off for
+not being one.
+
+**It has an off switch, and I mean it.** Three options on that screen:
+
+- **Not for a month** — snoozes it for 30 days.
+- **Don't show again** — turns it off permanently.
+- **Tell Dustin why** — opens Messages, and honestly this is the most useful one.
+
+It can only appear twice per quiet spell, then it stops on its own until you're
+back and later drop off again. If it ever shows up at a moment that feels wrong,
+tap "Don't show again" and then tell me — that's a bug on my end, not on yours.
+
+---
+
+**10. Birthdays**
+
+If it's your birthday you'll get the screen when you open the app, and you'll get
+a shout in the group chat. If I don't have your date yet the app will ask you
+once, and "not now" costs you nothing — it'll ask again in a month.
+
+---
+
+**11. Smaller things from the last couple of days**
 
 - **Per-set rest timer** in the logger — it now follows the set it's timing.
 - **Distance** is a real field, so walks, runs and rows record properly.
@@ -147,6 +174,8 @@ face changes to match: hit a PR and you get the one flexing.
 - **Help & Tutorials** in Settings if you're stuck on anything.
 - Logging a workout for **yesterday** now records it on yesterday, not on the
   clock time you typed it.
+- **iPhone pop-up cards** — several would run off the bottom of the screen so you
+  couldn't reach the buttons. Nine of them fixed. If you find another, tell me.
 
 ---
 
@@ -166,12 +195,13 @@ Reply here or message me directly. — Dustin
 
 Items to fold into the message above as they land tonight:
 
-1. Response-time tracking on the AI surfaces *(trainer-side only — probably not for this message)*
-2. Sheet-height sweep — the same iPhone scrolling problem on twelve other pop-up cards
+~~1. Response-time tracking~~ DONE (trainer-side, not in the client message)
+~~2. Sheet-height sweep~~ DONE for client screens — folded into item 11. The
+   workout logger is still on the old sizing and gets its own commit.
 3. Ten more end-of-workout celebration screens
 4. Coach escalation — routing a question to Dustin's inbox with the conversation attached
 5. The coach inside the workout logger itself
-6. The check-in screen for someone who's gone quiet *(copy needs Dustin's review before it can fire)*
+~~6. The go-quiet check-in~~ DONE and live — now items 9 and 10 above.
 
 ## DELIBERATELY EXCLUDED (trainer-only, not client-facing)
 
