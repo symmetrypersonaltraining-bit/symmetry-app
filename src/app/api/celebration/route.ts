@@ -21,7 +21,8 @@
 // the existing "chat" feature so it shares the same daily cap and kill switch.
 
 import { NextRequest, NextResponse } from "next/server";
-import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
+import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
@@ -264,10 +265,12 @@ export async function POST(req: NextRequest) {
             goal: stats.goal,
           };
 
+          // Tier-aware — see tests/unit/aiTier.test.ts.
+          const celebModel = modelFor("coach", await aiTierFor(admin, clientId));
           const { value, tokensIn, tokensOut } = await callClaudeJson<{ line: string }>({
             meter: { clientId: clientId, feature: "celebration" },
             apiKey: process.env.ANTHROPIC_API_KEY,
-            model: SONNET_MODEL,
+            model: celebModel,
             system: SYSTEM,
             maxTokens: 160,
             messages: [
@@ -280,7 +283,7 @@ export async function POST(req: NextRequest) {
           });
           line = value?.line ?? null;
           try {
-            await logUsage(clientId, "celebration", tokensIn, tokensOut, SONNET_MODEL);
+            await logUsage(clientId, "celebration", tokensIn, tokensOut, celebModel);
           } catch {
             /* metering must not break the celebration */
           }

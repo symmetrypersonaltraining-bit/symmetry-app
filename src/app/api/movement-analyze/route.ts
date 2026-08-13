@@ -14,7 +14,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { enforceMeter } from '@/lib/ai/scope';
 import { logUsage, logFailure } from '@/lib/ai/meter';
-import { SONNET_MODEL } from '@/lib/ai/anthropic';
+import { modelFor } from '@/lib/ai/anthropic';
+import { aiTierFor } from '@/lib/ai/tier';
 import { createClient } from '@/lib/supabase/server';
 import { analyze, type AnalyzeInput } from '@/lib/movement/analyze';
 import { buildProgram } from '@/lib/movement/program';
@@ -64,7 +65,11 @@ export async function POST(req: NextRequest) {
     // 3. AI education narrative (5 layers) via the strong model.
     //    Given ONLY structured findings — the model writes plain-language,
     //    Symmetry-voice copy; a guard strips any banned framework/condition terms.
-    const education = await writeEducation(engine, program, painLevel);
+    // Tier-aware. This route already ran a stronger model than the default for
+    // everyone; the tier can raise it further for a client who depends on the
+    // AI as their interface rather than as an assistant.
+    const moveModel = modelFor("coach", await aiTierFor(supabase, body.clientId));
+    const education = await writeEducation(engine, program, painLevel, moveModel);
 
     // 4. Ensemble confidence: engine + (vision cross-check placeholder) reconcile.
     const ensemble = {
@@ -137,6 +142,12 @@ async function writeEducation(
   engine: ReturnType<typeof analyze>,
   program: ReturnType<typeof buildProgram>,
   painLevel: number,
+  /**
+   * Passed in rather than resolved here: the client id and the Supabase handle
+   * both live in POST, and threading the model down is cheaper than threading
+   * two things up.
+   */
+  moveModel: string,
 ): Promise<{ layers: EducationLayers; visionAgreement?: number; reasoningConfidence?: number; agree?: boolean; languageLeaks?: string[] }> {
   const present = engine.findings.filter((f) => f.present);
   const chainText = engine.chain
@@ -178,11 +189,11 @@ Return STRICT JSON:
       // Comes from the shared constant so a future model change reaches this
       // route too — it used to be a string literal, which meant it would have
       // been silently left behind.
-      model: SONNET_MODEL,
+      model: moveModel,
       max_tokens: 1600,
       messages: [{ role: 'user', content: prompt }],
     });
-    await logUsage(null, "movement_explain", msg.usage?.input_tokens ?? 0, msg.usage?.output_tokens ?? 0, SONNET_MODEL, {
+    await logUsage(null, "movement_explain", msg.usage?.input_tokens ?? 0, msg.usage?.output_tokens ?? 0, moveModel, {
       latencyMs: Date.now() - t0,
       startedAt,
     });
@@ -211,7 +222,7 @@ Return STRICT JSON:
     // A failed education call used to leave no trace: the fallback copy renders,
     // the screen looks completely normal, and nothing records that the most
     // expensive call in the app just failed.
-    await logFailure(null, "movement_explain", SONNET_MODEL, e, {
+    await logFailure(null, "movement_explain", moveModel, e, {
       latencyMs: Date.now() - t0,
       startedAt,
     });

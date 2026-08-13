@@ -10,7 +10,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { CT_TODAY } from "@/lib/ai/coach-context";
-import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
+import { aiTierFor } from "@/lib/ai/tier";
 import { validatePlanDraft } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
@@ -118,17 +119,20 @@ export async function POST(req: NextRequest) {
       userText = `CONSULT MODE — first recommend daily macro targets with brief reasoning, then build the 5-meal plan.\n\nClient data (server-assembled):\n${ctx}\n\nConsult answers from the client:\n${answersStr}`;
     }
 
+      // Tier-aware — see tests/unit/aiTier.test.ts for why partial coverage is
+      // the failure worth guarding against.
+    const planModel = modelFor("coach", await aiTierFor(supabase, clientId));
     const result = await callClaudeJson({
       meter: { clientId: clientId, feature: "plan_build" },
       apiKey,
-      model: SONNET_MODEL,
+      model: planModel,
       system: SYSTEM_PROMPT,
       maxTokens: 8000,
       messages: [{ role: "user", content: userText }],
       validate: validatePlanDraft,
     });
 
-    await logUsage(clientId, "plan_build", result.tokensIn, result.tokensOut, SONNET_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
+    await logUsage(clientId, "plan_build", result.tokensIn, result.tokensOut, planModel, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
     if (!result.value) {
       return NextResponse.json(

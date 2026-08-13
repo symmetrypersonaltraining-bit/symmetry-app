@@ -24,7 +24,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
+import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
 import { fetchWeeklyComparison } from "@/lib/ai/weekly-context";
 import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
@@ -169,10 +170,15 @@ async function runSweep(opts: {
         continue;
       }
 
+  // Tier-aware. "Across the entire app" means this surface too — a client who
+  // gets the higher model in the coach chat and the standard one here
+  // experiences an assistant that is inconsistently clever, which is more
+  // confusing than one that is consistently ordinary.
+      const sweepModel = modelFor("coach", await aiTierFor(db, c.id));
       const result = await callClaudeJson({
         meter: { clientId: c.id, feature: "weekly_sweep" },
         apiKey,
-        model: SONNET_MODEL,
+        model: sweepModel,
         system: WEEKLY_SYSTEM_PROMPT,
         maxTokens: 800,
         messages: [
@@ -188,7 +194,7 @@ async function runSweep(opts: {
         validate: validateWeekly,
       });
 
-      await logUsage(c.id, "weekly_sweep", result.tokensIn, result.tokensOut, SONNET_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
+      await logUsage(c.id, "weekly_sweep", result.tokensIn, result.tokensOut, sweepModel, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
       if (!result.value) {
         results.push({ clientId: c.id, name, status: "failed", detail: "model returned no usable JSON" });

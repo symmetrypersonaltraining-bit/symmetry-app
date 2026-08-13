@@ -22,7 +22,8 @@
 // else — that's the only write this route performs.
 
 import { NextRequest, NextResponse } from "next/server";
-import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
+import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import {
@@ -219,17 +220,22 @@ export async function POST(req: NextRequest) {
             newMovements: movements.filter((m) => !m.everLogged).map((m) => m.name),
             lastWeek: { scheduled: lastWeekScheduled, completed: lastWeekCompleted },
           };
+  // Tier-aware. "Across the entire app" means this surface too — a client who
+  // gets the higher model in the coach chat and the standard one here
+  // experiences an assistant that is inconsistently clever, which is more
+  // confusing than one that is consistently ordinary.
+          const briefModel = modelFor("coach", await aiTierFor(admin, clientId));
           const { value, tokensIn, tokensOut } = await callClaudeJson<{ line: string }>({
             meter: { clientId: clientId, feature: "session_brief" },
             apiKey: process.env.ANTHROPIC_API_KEY,
-            model: SONNET_MODEL,
+            model: briefModel,
             system: SYSTEM,
             maxTokens: 200,
             messages: [{ role: "user", content: JSON.stringify(facts) }],
             validate,
           });
           line = value?.line ?? null;
-          await logUsage(clientId, "session_brief", tokensIn, tokensOut, SONNET_MODEL);
+          await logUsage(clientId, "session_brief", tokensIn, tokensOut, briefModel);
         } catch (e) {
           console.error("weekly-brief: AI line failed (continuing without it)", e);
         }

@@ -16,7 +16,8 @@
 // Auth-checked, client-scoped, metered (feature 'chat'), Haiku.
 
 import { NextRequest, NextResponse } from "next/server";
-import { HAIKU_MODEL, SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { HAIKU_MODEL, modelFor, callClaudeJson } from "@/lib/ai/anthropic";
+import { aiTierFor } from "@/lib/ai/tier";
 import {
   ActDayMeal, ActReply, finalizeAct, validateActReply, validateCoachReply,
 } from "@/lib/ai/nutrition-json";
@@ -142,11 +143,20 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return missingKeyResponse();
 
+    // The tier, resolved once for both passes below.
+    //
+    // For an advanced-tier client this raises the EXTRACTION model, not the
+    // coach one — see the note in lib/ai/anthropic.ts. Their failure mode is
+    // the app misreading "move Friday to Saturday", not the coaching being
+    // shallow, and a wrong parse is the app doing the wrong thing to their
+    // schedule rather than merely a weak answer.
+    const tier = await aiTierFor(supabase, clientId);
+
     // ---- pass 1: intent extraction against the day context -----------------
     const extraction = await callClaudeJson({
       meter: { clientId: clientId, feature: "coach_action" },
       apiKey,
-      model: HAIKU_MODEL,
+      model: modelFor("extract", tier),
       system: ACT_SYSTEM_PROMPT,
       maxTokens: 800,
       messages: [
@@ -160,7 +170,7 @@ export async function POST(req: NextRequest) {
       ],
       validate: validateActReply,
     });
-    await logUsage(clientId, "coach_action", extraction.tokensIn, extraction.tokensOut, HAIKU_MODEL, { latencyMs: extraction.latencyMs, startedAt: extraction.startedAt });
+    await logUsage(clientId, "coach_action", extraction.tokensIn, extraction.tokensOut, modelFor("extract", tier), { latencyMs: extraction.latencyMs, startedAt: extraction.startedAt });
 
     // Even a failed extraction should degrade to Q&A, not an error bubble.
     const act: ActReply = extraction.value
@@ -239,7 +249,10 @@ export async function POST(req: NextRequest) {
     const coach = await callClaudeJson({
       meter: { clientId: clientId, feature: "coach_action" },
       apiKey,
-      model: SONNET_MODEL,
+      // Every coach surface in the app funnels through this route, so resolving
+      // the tier here is what makes "a lot higher model across the entire app"
+      // true rather than true-on-the-screens-someone-remembered.
+      model: modelFor("coach", tier),
       system: COACH_SYSTEM_PROMPT,
       maxTokens: 900,
       messages: [
@@ -257,7 +270,7 @@ export async function POST(req: NextRequest) {
       ],
       validate: validateCoachReply,
     });
-    await logUsage(clientId, "coach_action", coach.tokensIn, coach.tokensOut, SONNET_MODEL, { latencyMs: coach.latencyMs, startedAt: coach.startedAt });
+    await logUsage(clientId, "coach_action", coach.tokensIn, coach.tokensOut, modelFor("coach", tier), { latencyMs: coach.latencyMs, startedAt: coach.startedAt });
 
     if (coach.value) {
       // Written AFTER the reply, so a failure here can never cost the client

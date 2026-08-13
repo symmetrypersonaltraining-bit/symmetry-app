@@ -20,7 +20,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { CT_TODAY, assembleTrainingContext } from "@/lib/ai/coach-context";
-import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
+import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
@@ -104,10 +105,15 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return missingKeyResponse();
 
     const context = await assembleTrainingContext(supabase, clientId);
+  // Tier-aware. "Across the entire app" means this surface too — a client who
+  // gets the higher model in the coach chat and the standard one here
+  // experiences an assistant that is inconsistently clever, which is more
+  // confusing than one that is consistently ordinary.
+    const focusModel = modelFor("coach", await aiTierFor(supabase, clientId));
     const result = await callClaudeJson({
       meter: { clientId: clientId, feature: "coach_read" },
       apiKey,
-      model: SONNET_MODEL,
+      model: focusModel,
       system: FOCUS_SYSTEM_PROMPT,
       maxTokens: 500,
       messages: [{
@@ -117,7 +123,7 @@ export async function POST(req: NextRequest) {
       validate: validateFocus,
     });
 
-    await logUsage(clientId, "coach_read", result.tokensIn, result.tokensOut, SONNET_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
+    await logUsage(clientId, "coach_read", result.tokensIn, result.tokensOut, focusModel, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
     if (!result.value) {
       return NextResponse.json({ error: "Coach's Read couldn't generate right now — try again shortly." }, { status: 502 });

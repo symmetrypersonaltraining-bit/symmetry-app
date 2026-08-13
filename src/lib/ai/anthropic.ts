@@ -35,6 +35,69 @@ import type { AiFeature } from "@/lib/ai/meter-core";
 export const HAIKU_MODEL = "claude-haiku-4-5";
 export const SONNET_MODEL = "claude-sonnet-4-6";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// THE ADVANCED TIER — for clients who use the AI *as* the interface
+//
+// Dustin, 2026-08-13, about his parents Gerard (71) and Sharon:
+//
+//   "I need their AI to be able to do anything they need to do in that app for
+//    them so they don't have to figure it out."
+//
+// and, on the budget:
+//
+//   "I need them to have this access, but I don't wanna go over that ninety
+//    five dollars a month. So we need to use a better model than everybody
+//    else, but don't take it too far."
+//
+// THE FIRST VERSION OF THIS PUT THEM ON OPUS. The real usage log says that was
+// wrong, and by a lot. Averages over the last 30 days: a coach call is 5,139 in
+// / 546 out, an extraction is 1,452 / 155. So:
+//
+//   ten AI interactions a day, each         Opus coach   $72/mo
+//   twenty a day, each                      Opus coach  $144/mo
+//   thirty a day, each                      Opus coach  $216/mo
+//
+// against a $95 ceiling that also has to cover the other thirty clients. Two
+// people who use the app by talking to it will clear ten a day without trying.
+// The tier would have tripped the cap and silently degraded them to the
+// fallback — landing on exactly the two clients least able to cope with a worse
+// answer, and neither of them would report it. They would conclude the app had
+// got confusing and stop opening it.
+//
+// SO THE TIER RAISES COMPREHENSION, NOT PRICE.
+//
+// Their failure mode is not "the coaching advice is not deep enough". Sonnet is
+// already the top coaching model here and it is genuinely good at that. Their
+// failure mode is the app MISUNDERSTANDING WHAT THEY SAID — "move Friday to
+// Saturday", "my back is bad today", "I don't want to do this one". That is the
+// EXTRACTION step, and extraction runs on Haiku for everybody because it is
+// fast and the client is waiting.
+//
+// For these two, that trade is backwards. A wrong parse is not a slow answer,
+// it is the app doing the wrong thing to their schedule — and they have no
+// fallback UI to go and fix it with. So the advanced tier moves EXTRACTION up
+// to Sonnet and leaves the coach answer where it already was.
+//
+//   ten a day each, both steps on Sonnet    $18/mo
+//   twenty a day each                       $36/mo
+//
+// Comfortably inside the ceiling, and it targets the thing that actually breaks
+// for them. "A better model than everybody else, but don't take it too far" —
+// this is exactly that, aimed at the right half of the request.
+export type AiTier = "standard" | "advanced";
+
+/**
+ * The model for a job, given the client's tier.
+ *
+ * `kind` is the JOB — the split the file header describes. The tier only ever
+ * moves a job UP, and today it moves exactly one: extraction, from Haiku to
+ * Sonnet, for clients who talk to the app instead of navigating it.
+ */
+export function modelFor(kind: "extract" | "coach", tier: AiTier = "standard"): string {
+  if (kind === "extract") return tier === "advanced" ? SONNET_MODEL : HAIKU_MODEL;
+  return SONNET_MODEL;
+}
+
 export interface JsonCallResult<T> {
   value: T | null;
   rawText: string;

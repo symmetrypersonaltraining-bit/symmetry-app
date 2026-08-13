@@ -14,7 +14,8 @@
 // Auth-checked, client-scoped, metered (feature 'workout_build').
 
 import { NextRequest, NextResponse } from "next/server";
-import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
+import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope, TRAINER_EMAIL, Db } from "@/lib/ai/scope";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -209,16 +210,21 @@ export async function POST(req: NextRequest) {
     text: `CLIENT PROGRAMMING CONTEXT:\n${context}\n\nCLIENT REQUEST (${mode}):\n${userText || "(none provided)"}\n\nDesign the workout now as strict JSON.`,
   });
 
+  // Tier-aware. "Across the entire app" means this surface too — a client who
+  // gets the higher model in the coach chat and the standard one here
+  // experiences an assistant that is inconsistently clever, which is more
+  // confusing than one that is consistently ordinary.
+  const buildModel = modelFor("coach", await aiTierFor(admin, clientId));
   const { value: workout, tokensIn, tokensOut } = await callClaudeJson<AiWorkout>({
     meter: { clientId: clientId, feature: "workout_build" },
     apiKey: process.env.ANTHROPIC_API_KEY,
-    model: SONNET_MODEL,
+    model: buildModel,
     system: systemPrompt(mode),
     maxTokens: 1600,
     messages: [{ role: "user", content: userContent }],
     validate: validateWorkout,
   });
-  await logUsage(clientId, "workout_build", tokensIn, tokensOut, SONNET_MODEL);
+  await logUsage(clientId, "workout_build", tokensIn, tokensOut, buildModel);
 
   if (!workout) return NextResponse.json({ error: "The AI couldn't design a workout from that — try adding a bit more detail." }, { status: 502 });
 

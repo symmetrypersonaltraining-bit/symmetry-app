@@ -38,12 +38,18 @@ function read(rel: string): string {
   return fs.readFileSync(path.join(API, rel), "utf8");
 }
 
-test("everything a person reads as coaching runs on Sonnet", () => {
+test("everything a person reads as coaching runs on the coaching model", () => {
+  // These used to name SONNET_MODEL directly. They now go through
+  // modelFor("coach", tier), which returns Sonnet for every tier — the doctrine
+  // is unchanged, the indirection exists so a per-client tier can raise a job
+  // without each route having to know about tiers. What still must never happen
+  // is a coaching route reaching for the fast model.
   const wrong: string[] = [];
   for (const rel of COACHING) {
     const src = read(rel);
-    if (/\bHAIKU_MODEL\b/.test(src)) wrong.push(rel);
-    if (!/\bSONNET_MODEL\b/.test(src)) wrong.push(`${rel} (no model at all)`);
+    if (/\bHAIKU_MODEL\b/.test(src)) wrong.push(`${rel} (on the fast model)`);
+    const declared = /\bSONNET_MODEL\b/.test(src) || /modelFor\(\s*"coach"/.test(src);
+    if (!declared) wrong.push(`${rel} (no model at all)`);
   }
   assert.deepEqual(
     wrong,
@@ -65,14 +71,19 @@ test("extraction stays on Haiku, because the client is waiting on it", () => {
   );
 });
 
-test("the coach chat extracts on Haiku and answers on Sonnet, in that order", () => {
+test("the coach chat extracts first, then answers — in that order", () => {
+  // Both calls now resolve through modelFor, because an advanced-tier client
+  // gets a stronger EXTRACTOR (see lib/ai/anthropic.ts). What the order
+  // protects is unchanged and is the thing that keeps this route cheap: a
+  // simple "log M2" must be settled by the extraction pass and never reach the
+  // reasoning call at all.
   const src = read("nutrition-ai/act/route.ts");
-  const haiku = src.indexOf("model: HAIKU_MODEL");
-  const sonnet = src.indexOf("model: SONNET_MODEL");
-  assert.ok(haiku > -1, "the action extractor is no longer on Haiku — every message now waits on the slower model");
-  assert.ok(sonnet > -1, "the coach's answer dropped back to Haiku; this is the one call where the model is the product");
+  const extract = src.indexOf('model: modelFor("extract"');
+  const coach = src.indexOf('model: modelFor("coach"');
+  assert.ok(extract > -1, "the action extractor no longer routes through modelFor('extract')");
+  assert.ok(coach > -1, "the coach's answer no longer routes through modelFor('coach')");
   assert.ok(
-    haiku < sonnet,
+    extract < coach,
     "the order flipped: extraction must come first so a simple 'log M2' never pays for a reasoning call"
   );
 });

@@ -13,7 +13,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
-import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
+import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
+import { aiTierFor } from "@/lib/ai/tier";
 import { validateCoachReply } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
@@ -44,17 +45,20 @@ export async function POST(req: NextRequest) {
       ? `CONTEXT (server-assembled, trusted):\n${context}\n\nCLIENT QUESTION:\n${question}`
       : `CONTEXT (server-assembled, trusted):\n${context}\n\nNo question was asked. Produce ONE proactive insight for the client's coach card: the single most useful observation from the data right now (trend, gap vs targets, consistency win worth reinforcing), spoken to them by name, with suggestions only if clearly warranted.`;
 
+      // Tier-aware — see tests/unit/aiTier.test.ts for why partial coverage is
+      // the failure worth guarding against.
+    const cardModel = modelFor("coach", await aiTierFor(supabase, clientId));
     const result = await callClaudeJson({
       meter: { clientId: clientId, feature: "coach_card" },
       apiKey,
-      model: SONNET_MODEL,
+      model: cardModel,
       system: COACH_SYSTEM_PROMPT,
       maxTokens: 900,
       messages: [{ role: "user", content: userText }],
       validate: validateCoachReply,
     });
 
-    await logUsage(clientId, "coach_card", result.tokensIn, result.tokensOut, SONNET_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
+    await logUsage(clientId, "coach_card", result.tokensIn, result.tokensOut, cardModel, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
     if (!result.value) {
       // Salvage: a plain-text reply is still useful for a chat surface.
