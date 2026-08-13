@@ -9,6 +9,8 @@ import ShareToGroup from "@/components/ShareToGroup";
 import { sendGroupMessage } from "@/app/(app)/home/messageActions";
 import { fx } from "@/lib/fx";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import AiBadge from "@/components/AiBadge";
+import { winMood } from "@/lib/ai/faces";
 
 /**
  * CelebrationScreen — workout-complete celebration (28 rotating concepts,
@@ -146,6 +148,9 @@ export default function CelebrationScreen({
   // concepts gain personalisation without any of them being rewritten. Every
   // failure path leaves aiLine null and the screen behaves exactly as before.
   const [aiLine, setAiLine] = useState<string | null>(null);
+  // Only used to pick which face sits next to that line — a 30-day streak
+  // deserves the one that is on fire.
+  const [streakDays, setStreakDays] = useState<number>(0);
   const [aiPrs, setAiPrs] = useState<{ movement: string; weight: number; reps: number; previous: number | null; assistance?: boolean }[]>([]);
   // 80f43c91: "Add how many coach Dustin's you lifted for workout celebrations."
   // His real weigh-in, served by /api/celebration, so the joke tracks his cut
@@ -166,10 +171,12 @@ export default function CelebrationScreen({
           line?: string | null;
           prs?: { movement: string; weight: number; reps: number; previous: number | null }[];
           coachWeight?: number | null;
+          stats?: { streakDays?: number | null } | null;
         };
         if (cancelled) return;
         if (j.line) setAiLine(j.line);
         if (typeof j.coachWeight === "number" && j.coachWeight > 0) setCoachWeight(j.coachWeight);
+        if (typeof j.stats?.streakDays === "number") setStreakDays(j.stats.streakDays);
         if (Array.isArray(j.prs) && j.prs.length) {
           setAiPrs(j.prs.slice(0, 3));
           fx("pr");
@@ -965,8 +972,21 @@ export default function CelebrationScreen({
         </div>
       ) : null}
 
-      {/* One personal sentence from the AI, grounded in tonight's numbers. */}
-      {aiLine ? <div style={aiLineBox}>{aiLine}</div> : null}
+      {/* One personal sentence from the AI, grounded in tonight's numbers — and
+          the face that matches what it is saying. Dustin: "Celebration screen
+          at the end needs to be one of the happier ones congratulating them or
+          encouraging them to keep going", and "if it's a PR use a muscle one".
+          The badge is also doing the honest work AiBadge exists for: this
+          sentence was written by the app, not by him, and the photo variants
+          elsewhere on this screen are him. */}
+      {aiLine ? (
+        <div style={aiLineBox}>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <AiBadge size={34} mood={winMood({ isPr: !!topPr, streakDays, hitGoal: bigPr, fullDayLogged: true })} title="Written by the app" />
+            <span style={{ flex: 1, minWidth: 0 }}>{aiLine}</span>
+          </div>
+        </div>
+      ) : null}
 
       {StatRow}
 
