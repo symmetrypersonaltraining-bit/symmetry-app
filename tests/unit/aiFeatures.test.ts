@@ -105,6 +105,52 @@ test("no route reintroduces one of the old catch-all labels", () => {
   assert.deepEqual(offenders, [], `Retired catch-all label used:\n  ${offenders.join("\n  ")}`);
 });
 
+test("every callClaudeJson call passes a meter, so its failures get recorded", () => {
+  // `logUsage` only ever ran on the SUCCESS path. A call that threw, or came
+  // back as unparseable JSON three attempts running, spent tokens and left no
+  // trace — indistinguishable in the data from nobody using the feature. The
+  // `meter` option closes that, and this test stops the next route forgetting
+  // it: the failure would be invisible again and nobody would notice for weeks.
+  const offenders: string[] = [];
+  for (const { file, src } of aiRoutes()) {
+    const calls = src.match(/callClaudeJson(?:<[^>]*>)?\(\{[\s\S]{0,600}/g) || [];
+    for (const call of calls) {
+      // Look only at the head of the options object, before any nested call.
+      const head = call.slice(0, call.indexOf("validate:") + 1 || 600);
+      if (!/meter\s*:/.test(head)) {
+        offenders.push(path.relative(process.cwd(), file));
+      }
+    }
+  }
+  assert.deepEqual(
+    [...new Set(offenders)],
+    [],
+    `These routes call callClaudeJson without a meter, so their failures are invisible:\n  ` +
+      `${[...new Set(offenders)].join("\n  ")}\n` +
+      `Add: meter: { clientId, feature: "<your feature>" }`
+  );
+});
+
+test("a route's meter feature matches the feature it logs usage under", () => {
+  // A mismatch would file the successes under one name and the failures under
+  // another, which is worse than not recording failures at all — the health
+  // page would show a surface that is always fine next to one that always
+  // fails, and both would be the same route.
+  const offenders: string[] = [];
+  for (const { file, src } of aiRoutes()) {
+    const meterFeatures = new Set(
+      [...src.matchAll(/meter\s*:\s*\{[^}]*feature\s*:\s*["']([a-z_]+)["']/g)].map((m) => m[1])
+    );
+    const logged = new Set(labelsIn(src));
+    for (const f of meterFeatures) {
+      if (logged.size > 0 && !logged.has(f)) {
+        offenders.push(`${path.relative(process.cwd(), file)}: meter "${f}" not in ${[...logged]}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], offenders.join("\n"));
+});
+
 test("every registry entry is complete and internally consistent", () => {
   for (const key of AI_FEATURE_KEYS) {
     const spec = AI_FEATURES[key];

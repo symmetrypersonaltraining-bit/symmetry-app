@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
       : `CONTEXT (server-assembled, trusted):\n${context}\n\nNo question was asked. Produce ONE proactive insight for the client's coach card: the single most useful observation from the data right now (trend, gap vs targets, consistency win worth reinforcing), spoken to them by name, with suggestions only if clearly warranted.`;
 
     const result = await callClaudeJson({
+      meter: { clientId: clientId, feature: "coach_card" },
       apiKey,
       model: HAIKU_MODEL,
       system: COACH_SYSTEM_PROMPT,

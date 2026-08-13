@@ -63,7 +63,11 @@
     "tokens_out",
     "cost_usd",
     "model",
-    "created_at"
+    "created_at",
+    "status",
+    "error",
+    "latency_ms",
+    "started_at"
   ],
   "ai_usage_monthly": [
     "month",

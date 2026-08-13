@@ -119,6 +119,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await callClaudeJson({
+      meter: { clientId: clientId, feature: "plan_build" },
       apiKey,
       model: SONNET_MODEL,
       system: SYSTEM_PROMPT,

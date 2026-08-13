@@ -194,13 +194,17 @@ export async function checkAndLog(clientId: string, feature: AiFeature): Promise
  * Record a completed AI call. Cost: Haiku $1/$5 per MTok in/out, Sonnet $3/$15.
  * Never throws — a logging failure must not fail the user's request.
  * Returns the computed cost in USD.
+ *
+ * `opts.latencyMs` is optional; pass it when the caller timed the call, so the
+ * health page can show which surfaces are slow as well as which are broken.
  */
 export async function logUsage(
   clientId: string | null,
   feature: AiFeature,
   tokensIn: number,
   tokensOut: number,
-  model: string
+  model: string,
+  opts?: { latencyMs?: number; startedAt?: Date }
 ): Promise<number> {
   const cost = computeCostUsd(model, tokensIn, tokensOut);
   try {
@@ -217,12 +221,95 @@ export async function logUsage(
       tokens_in: Math.max(0, Math.round(tokensIn)),
       tokens_out: Math.max(0, Math.round(tokensOut)),
       cost_usd: cost,
+      status: "ok",
+      latency_ms: opts?.latencyMs != null ? Math.max(0, Math.round(opts.latencyMs)) : null,
+      started_at: (opts?.startedAt ?? new Date()).toISOString(),
     });
     if (error) console.error("meter: logUsage insert failed", error.message);
   } catch (e) {
     console.error("meter: logUsage failed", e);
   }
   return cost;
+}
+
+/**
+ * Record an AI call that FAILED.
+ *
+ * Until 13 Aug this had no equivalent: `logUsage` ran only after a successful
+ * call, so a route broken for a week was indistinguishable from a route nobody
+ * used. That is precisely how the 8 Aug outage ran unnoticed for two days, and
+ * it is why the movement screen could discard every result it produced without
+ * anything surfacing it.
+ *
+ * Costs nothing (a failed call bills no tokens) so it never moves the kill
+ * switch — it exists purely so the failure is a row rather than a silence.
+ * Never throws.
+ */
+export async function logFailure(
+  clientId: string | null,
+  feature: AiFeature,
+  model: string,
+  err: unknown,
+  opts?: { latencyMs?: number; startedAt?: Date; tokensIn?: number; tokensOut?: number }
+): Promise<void> {
+  try {
+    const db = admin();
+    if (!db) return;
+    const message =
+      err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown error";
+    // A call that reached the model and then failed validation still SPENT
+    // those tokens. Recording them as zero would under-count the kill switch,
+    // which is the one thing meant to stop a runaway bill — and a retry loop
+    // that fails validation every time is exactly the shape of a runaway bill.
+    const tokensIn = Math.max(0, Math.round(opts?.tokensIn ?? 0));
+    const tokensOut = Math.max(0, Math.round(opts?.tokensOut ?? 0));
+    const { error } = await db.from("ai_usage_log").insert({
+      client_id: clientId,
+      used_on: chicagoToday(),
+      feature,
+      model,
+      tokens_in: tokensIn,
+      tokens_out: tokensOut,
+      cost_usd: computeCostUsd(model, tokensIn, tokensOut),
+      status: "error",
+      // Bounded: some provider errors carry an entire request body, and a
+      // multi-megabyte string in a log row helps nobody.
+      error: message.slice(0, 500),
+      latency_ms: opts?.latencyMs != null ? Math.max(0, Math.round(opts.latencyMs)) : null,
+      started_at: (opts?.startedAt ?? new Date()).toISOString(),
+    });
+    if (error) console.error("meter: logFailure insert failed", error.message);
+  } catch (e) {
+    console.error("meter: logFailure failed", e);
+  }
+}
+
+/**
+ * Time an AI call and record it either way.
+ *
+ * The shape most routes want: run the model call, log a success with real
+ * latency, or log the failure and rethrow so the route's own error handling is
+ * unchanged. A route that adopts this can never again fail silently.
+ */
+export async function withUsage<T>(
+  clientId: string | null,
+  feature: AiFeature,
+  model: string,
+  fn: () => Promise<{ value: T; tokensIn: number; tokensOut: number }>
+): Promise<T> {
+  const startedAt = new Date();
+  const t0 = Date.now();
+  try {
+    const { value, tokensIn, tokensOut } = await fn();
+    await logUsage(clientId, feature, tokensIn, tokensOut, model, {
+      latencyMs: Date.now() - t0,
+      startedAt,
+    });
+    return value;
+  } catch (e) {
+    await logFailure(clientId, feature, model, e, { latencyMs: Date.now() - t0, startedAt });
+    throw e;
+  }
 }
 
 /** Friendly body for the global-pause state (HTTP 200 so UIs render the message). */

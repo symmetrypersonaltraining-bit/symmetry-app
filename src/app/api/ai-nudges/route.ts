@@ -298,6 +298,7 @@ export async function POST(req: NextRequest) {
       let text: string | null = null;
       try {
         const { value, tokensIn, tokensOut } = await callClaudeJson<{ body: string }>({
+          meter: { clientId: r.id, feature: "nudge_sweep" },
           apiKey: process.env.ANTHROPIC_API_KEY,
           model: HAIKU_MODEL,
           system: SYSTEM,

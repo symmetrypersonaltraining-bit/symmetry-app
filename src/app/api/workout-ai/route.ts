@@ -210,6 +210,7 @@ export async function POST(req: NextRequest) {
   });
 
   const { value: workout, tokensIn, tokensOut } = await callClaudeJson<AiWorkout>({
+    meter: { clientId: clientId, feature: "workout_build" },
     apiKey: process.env.ANTHROPIC_API_KEY,
     model: SONNET_MODEL,
     system: systemPrompt(mode),

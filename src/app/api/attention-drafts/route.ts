@@ -345,6 +345,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { value, tokensIn, tokensOut } = await callClaudeJson<{ drafts: string[] }>({
+      meter: { clientId: trainerClientId, feature: "outbox_draft" },
       apiKey: process.env.ANTHROPIC_API_KEY,
       model: HAIKU_MODEL,
       system: SYSTEM,

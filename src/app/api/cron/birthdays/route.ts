@@ -160,6 +160,7 @@ export async function runBirthdays(
   if (apiKey) {
     try {
       const { value, tokensIn, tokensOut } = await callClaudeJson<{ message: string }>({
+        meter: { clientId: null, feature: "birthday_post" },
         apiKey,
         model: HAIKU_MODEL,
         system: BIRTHDAY_SYSTEM,

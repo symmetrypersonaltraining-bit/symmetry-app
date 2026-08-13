@@ -136,6 +136,7 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
   if (!apiKey) return { posted: false, reason: "no api key" };
 
   const { value, tokensIn, tokensOut } = await callClaudeJson<Reply>({
+    meter: { clientId: null, feature: "coachbot_post" },
     apiKey,
     model: HAIKU_MODEL,
     system: SYSTEM,

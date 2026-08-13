@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { value, tokensIn, tokensOut } = await callClaudeJson<Reply>({
+    meter: { clientId: scoped.scope.clientId ?? null, feature: "recipe_ai" },
     apiKey,
     model: HAIKU_MODEL,
     system: SYSTEM,

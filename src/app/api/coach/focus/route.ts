@@ -105,6 +105,7 @@ export async function POST(req: NextRequest) {
 
     const context = await assembleTrainingContext(supabase, clientId);
     const result = await callClaudeJson({
+      meter: { clientId: clientId, feature: "coach_read" },
       apiKey,
       model: HAIKU_MODEL,
       system: FOCUS_SYSTEM_PROMPT,

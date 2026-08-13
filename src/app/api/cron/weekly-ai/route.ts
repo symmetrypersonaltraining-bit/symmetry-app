@@ -170,6 +170,7 @@ async function runSweep(opts: {
       }
 
       const result = await callClaudeJson({
+        meter: { clientId: c.id, feature: "weekly_sweep" },
         apiKey,
         model: HAIKU_MODEL,
         system: WEEKLY_SYSTEM_PROMPT,

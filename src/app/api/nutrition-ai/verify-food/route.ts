@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await callClaudeJson({
+      meter: { clientId: clientId, feature: "verify_food" },
       apiKey,
       model: HAIKU_MODEL,
       system: SYSTEM_PROMPT,

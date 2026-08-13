@@ -220,6 +220,7 @@ export async function POST(req: NextRequest) {
             lastWeek: { scheduled: lastWeekScheduled, completed: lastWeekCompleted },
           };
           const { value, tokensIn, tokensOut } = await callClaudeJson<{ line: string }>({
+            meter: { clientId: clientId, feature: "session_brief" },
             apiKey: process.env.ANTHROPIC_API_KEY,
             model: HAIKU_MODEL,
             system: SYSTEM,

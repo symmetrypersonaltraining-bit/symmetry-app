@@ -265,6 +265,7 @@ export async function POST(req: NextRequest) {
           };
 
           const { value, tokensIn, tokensOut } = await callClaudeJson<{ line: string }>({
+            meter: { clientId: clientId, feature: "celebration" },
             apiKey: process.env.ANTHROPIC_API_KEY,
             model: HAIKU_MODEL,
             system: SYSTEM,

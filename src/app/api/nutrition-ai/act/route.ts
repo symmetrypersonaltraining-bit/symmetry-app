@@ -139,6 +139,7 @@ export async function POST(req: NextRequest) {
 
     // ---- pass 1: intent extraction against the day context -----------------
     const extraction = await callClaudeJson({
+      meter: { clientId: clientId, feature: "coach_action" },
       apiKey,
       model: HAIKU_MODEL,
       system: ACT_SYSTEM_PROMPT,
@@ -178,6 +179,7 @@ export async function POST(req: NextRequest) {
     // ---- intent 'none' = a question → the existing coach behavior ----------
     const context = await assembleCoachContext(supabase, clientId);
     const coach = await callClaudeJson({
+      meter: { clientId: clientId, feature: "coach_action" },
       apiKey,
       model: HAIKU_MODEL,
       system: COACH_SYSTEM_PROMPT,

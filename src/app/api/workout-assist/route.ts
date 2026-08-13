@@ -328,6 +328,7 @@ export async function POST(req: NextRequest) {
 
   const context = await buildContext(admin, clientId, body.focusWorkoutId ?? null);
   const result = await callClaudeJson({
+    meter: { clientId: clientId, feature: "workout_assist" },
     apiKey: process.env.ANTHROPIC_API_KEY,
     model: HAIKU_MODEL,
     system: SYSTEM_PROMPT,

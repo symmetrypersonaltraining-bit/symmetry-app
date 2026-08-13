@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return missingKeyResponse();
 
     const result = await callClaudeJson({
+      meter: { clientId: clientId, feature: "food_parse" },
       apiKey,
       model: HAIKU_MODEL,
       system: SYSTEM_PROMPT,
