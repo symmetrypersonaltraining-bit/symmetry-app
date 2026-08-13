@@ -93,6 +93,7 @@ export default async function AiHealthPage() {
       label: spec.label,
       surface: spec.surface,
       dailyLimit: spec.defaultLimit,
+      dormant: "dormant" in spec && spec.dormant === true,
       calls: mine.length,
       failures: failed.length,
       recentFailed,

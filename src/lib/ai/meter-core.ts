@@ -38,6 +38,15 @@ export interface AiFeatureSpec {
    * unattended jobs, which have no client to charge.
    */
   defaultLimit: number | null;
+  /**
+   * The route exists and is metered, but nothing in the app calls it yet.
+   *
+   * Without this, the health page shouts NEVER USED at a surface that is
+   * never-used ON PURPOSE, forever. One permanent false alarm is all it takes
+   * for the page to stop being read, and the page only earns its place by
+   * being believed.
+   */
+  dormant?: true;
 }
 
 export const AI_FEATURES = {
@@ -50,7 +59,10 @@ export const AI_FEATURES = {
   food_parse:      { label: "Food parse",              surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 15 },
   food_photo:      { label: "Meal photo",              surface: "client",    limitColumn: "ai_daily_photo_limit",      defaultLimit: 20 },
   plan_build:      { label: "Meal plan builder",       surface: "client",    limitColumn: "ai_daily_plan_build_limit", defaultLimit: 1  },
-  verify_food:     { label: "Food catalog auditor",    surface: "client",    limitColumn: "ai_daily_verify_limit",     defaultLimit: 20 },
+  // Audited 2026-08-13: the route works and is metered, but NOTHING calls it —
+  // no button, no cron, no other route. Marked dormant rather than deleted
+  // because the food catalog still wants an auditor; wire it and drop the flag.
+  verify_food:     { label: "Food catalog auditor",    surface: "client",    limitColumn: "ai_daily_verify_limit",     defaultLimit: 20, dormant: true },
   workout_build:   { label: "Create / replace workout",surface: "client",    limitColumn: "workout_build_daily_limit", defaultLimit: 8  },
   recipe_ai:       { label: "Recipe builder",          surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 15 },
   movement_explain:{ label: "Movement explanation",    surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
@@ -74,7 +86,8 @@ export const AI_FEATURES = {
   nudge_sweep:     { label: "Nudge sweep",             surface: "scheduled", limitColumn: "", defaultLimit: null },
   birthday_post:   { label: "Birthday bot",            surface: "scheduled", limitColumn: "", defaultLimit: null },
   coachbot_post:   { label: "Coach bot",               surface: "scheduled", limitColumn: "", defaultLimit: null },
-  smoke_test:      { label: "Smoke test",              surface: "scheduled", limitColumn: "", defaultLimit: null },
+  // smoke_test removed 2026-08-13: reserved for a harness that was never
+  // built, so nothing could ever emit it and it sat in NEVER USED as noise.
 } as const satisfies Record<string, AiFeatureSpec>;
 
 export type AiFeature = keyof typeof AI_FEATURES;

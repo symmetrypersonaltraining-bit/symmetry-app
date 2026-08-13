@@ -59,3 +59,24 @@ test("there is a way to reach it", () => {
   const gate = SETTINGS.lastIndexOf("isTrainer && !isInClientMode", linkAt);
   assert.ok(linkAt - gate < 900, "the AI health link is not behind the trainer gate — clients can see it in Settings");
 });
+
+// Audited 2026-08-13 by cross-referencing the registry against (a) what emits
+// each label and (b) what calls each route. Two surfaces were permanently
+// silent for reasons that are NOT faults: `smoke_test` had no emitter at all
+// (a harness that was never built) and `verify_food` has a working, metered
+// route that nothing in the app calls. Both would have sat in NEVER USED
+// forever. One permanent false alarm is all it takes for a health page to stop
+// being read.
+test("a surface that is silent on purpose is not reported as a fault", async () => {
+  const { AI_FEATURES } = await import("../../src/lib/ai/meter-core");
+  const specs = AI_FEATURES as Record<string, { dormant?: true }>;
+  assert.equal(specs.smoke_test, undefined, "smoke_test is back; nothing can emit it, so it is permanent noise");
+  assert.equal(specs.verify_food?.dormant, true, "verify_food has no caller in the app and will read as broken");
+
+  assert.match(TABLE, /Not wired up yet/, "dormant surfaces have nowhere to go but the alarm list");
+  assert.match(
+    TABLE,
+    /const live = features\.filter\(\(f\) => !f\.dormant\)/,
+    "the never-used and failing buckets are computed over ALL features again, dormant ones included"
+  );
+});

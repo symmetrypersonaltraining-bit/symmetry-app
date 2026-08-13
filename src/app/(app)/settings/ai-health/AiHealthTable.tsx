@@ -12,6 +12,8 @@ export interface FeatureHealth {
   label: string;
   surface: "client" | "trainer" | "scheduled";
   dailyLimit: number | null;
+  /** Route exists, nothing calls it yet — expected to be silent. */
+  dormant: boolean;
   calls: number;
   failures: number;
   recentFailed: number;
@@ -60,9 +62,13 @@ export default function AiHealthTable({
 }) {
   const [open, setOpen] = useState<string | null>(null);
 
-  const never = features.filter((f) => f.calls === 0);
-  const failing = features.filter((f) => f.calls > 0 && (f.recentFailed > 0 || !f.lastOk));
-  const working = features
+  // Dormant surfaces are silent on purpose, so they are their own list. Mixing
+  // them into NEVER USED is how a health page becomes a page nobody opens.
+  const dormant = features.filter((f) => f.dormant);
+  const live = features.filter((f) => !f.dormant);
+  const never = live.filter((f) => f.calls === 0);
+  const failing = live.filter((f) => f.calls > 0 && (f.recentFailed > 0 || !f.lastOk));
+  const working = live
     .filter((f) => rank(f) === 2)
     .sort((a, b) => Date.parse(b.lastOk || "0") - Date.parse(a.lastOk || "0"));
 
@@ -117,6 +123,17 @@ export default function AiHealthTable({
           tone="bad"
           note="Recent calls are erroring. Tap one for the last error."
           items={failing}
+          open={open}
+          setOpen={setOpen}
+        />
+      )}
+
+      {dormant.length > 0 && (
+        <Section
+          title="Not wired up yet"
+          tone="ok"
+          note="The route exists and is metered, but nothing in the app calls it. Silent on purpose — not a fault."
+          items={dormant}
           open={open}
           setOpen={setOpen}
         />
