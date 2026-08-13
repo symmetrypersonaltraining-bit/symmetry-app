@@ -1193,7 +1193,11 @@ button:active, [role="button"]:active, .cw-tap:active { transform: scale(.94); }
 button:disabled:active { transform: none; }
 
 /* ── Ripple (mounted by InteractionFX) ─────────────────────────────────── */
-.cw-ripple-host { position: relative; overflow: hidden; }
+/* Two classes, not one. `overflow` is safe on anything; `position` is NOT —
+   see InteractionFX for the floating button it threw off-screen mid-press.
+   Never merge these back together. */
+.cw-ripple-clip { overflow: hidden; }
+.cw-ripple-host { position: relative; }
 .cw-ripple {
   position: absolute; border-radius: 50%; pointer-events: none;
   background: currentColor; opacity: .28; transform: scale(0);

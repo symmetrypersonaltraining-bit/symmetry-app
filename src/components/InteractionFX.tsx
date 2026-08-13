@@ -42,8 +42,27 @@ export default function InteractionFX() {
         const r = el.getBoundingClientRect();
         if (r.width < 8 || r.height < 8) return;
 
-        // The host must clip the ripple. Only add the class, never restyle.
-        el.classList.add("cw-ripple-host");
+        // The ripple is absolutely positioned inside the button, so the button
+        // has to be a containing block and has to clip the overflow. Those are
+        // two separate jobs, and they are applied separately now, because doing
+        // both from one class broke every floating button in the app.
+        //
+        // `position: relative` landing on a button that was `position: fixed`
+        // drops it out of the viewport and into normal document flow, MID-PRESS.
+        // The pointer goes down on the button, the button teleports to wherever
+        // it falls in the page, pointerup lands on whatever is now under the
+        // finger, and the browser fires `click` on their common ancestor
+        // instead. The handler never runs. The class is never removed, so it
+        // stays that way.
+        //
+        // Dustin, of the nutrition ✦: "the button disappears when you click it,
+        // nothing happens." It was doing precisely that, literally.
+        //
+        // Clipping is always safe. The containing block is only needed when the
+        // element is `static`; anything already positioned is a containing block
+        // already, and re-declaring it is the whole of the damage.
+        el.classList.add("cw-ripple-clip");
+        if (getComputedStyle(el).position === "static") el.classList.add("cw-ripple-host");
 
         const d = Math.max(r.width, r.height);
         const span = document.createElement("span");
