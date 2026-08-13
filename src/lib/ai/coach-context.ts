@@ -448,7 +448,10 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
   for (const t of trajectoryLines(metrics)) lines.push(t);
   lines.push(
     daysSinceWeighIn == null
-      ? "WEIGH-INS: none on file yet — a first weigh-in would let ${COACH_FIRST_NAME} track progress."
+      // Double-quoted, so ${COACH_FIRST_NAME} went to the model as those literal
+      // characters. Every client with no weigh-in on file had that token sitting
+      // in their coach context instead of his name.
+      ? `WEIGH-INS: none on file yet — a first weigh-in would let ${COACH_FIRST_NAME} track progress.`
       : `WEIGH-INS: last one was ${daysSinceWeighIn} day${daysSinceWeighIn === 1 ? "" : "s"} ago (${latestWeighIn!.metric_date}).${daysSinceWeighIn >= 10 ? " That's getting stale — a fresh weigh-in would help." : ""}`
   );
   lines.push(`FOOD-LOGGING CONSISTENCY: logged on ${loggedDays14} of the last 14 days (context only — do not give a nutrition breakdown here).`);

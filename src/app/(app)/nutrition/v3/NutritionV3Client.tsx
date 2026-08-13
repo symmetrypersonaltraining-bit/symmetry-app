@@ -2621,7 +2621,7 @@ function PlanAdjustSheet({
         📌 Save to my plan — every day
       </button>
       <p className="text-center mt-2" style={{ fontSize: 11, color: "var(--brand-text-secondary)", lineHeight: 1.4 }}>
-        Keeps this meal the way you just set it. ${COACH_FIRST_NAME}&rsquo;s original plan is saved to your history, not overwritten.
+        Keeps this meal the way you just set it. {COACH_FIRST_NAME}&rsquo;s original plan is saved to your history, not overwritten.
       </p>
     </Sheet>
   );
