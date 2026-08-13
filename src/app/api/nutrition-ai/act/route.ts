@@ -23,6 +23,10 @@ import {
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
+import {
+  loadMemory, loadRecentTurns, memoryBlock, recordTurns,
+  countUnfolded, shouldFold, foldMemory,
+} from "@/lib/ai/clientMemory";
 
 const ACT_SYSTEM_PROMPT = `You are the action extractor for the nutrition coach chat inside the Symmetry Personal Training app. The client sends a free-text message plus DAY CONTEXT: the viewed day's meals as JSON [{position, label, name, logged, kcal, p, c, f}] ("label" is the on-screen name like "M2"; "position" is the stable id you must use in params).
 
@@ -189,7 +193,33 @@ export async function POST(req: NextRequest) {
     // judgement task, and it is the ONE call in the client app where the model
     // is the product. Thirty days of every AI call in the whole app cost $2.84
     // against a $95 cap, so the constraint here was never money.
+    // WHAT THEY HAVE TOLD YOU, as opposed to what they have logged.
+    //
+    // assembleCoachContext is their DATA — fourteen days of logging, the weight
+    // trend, targets, plan. It made the coach sound informed while it had no
+    // idea the client had ever spoken to it. This is the other half: the
+    // running picture of what they have actually said, permanent and
+    // per-client, plus the tail of the last real conversation so picking up
+    // mid-thought feels like picking up mid-thought.
+    //
+    // Both are best-effort. A coach that forgets is a worse coach; a coach that
+    // 500s because a memory read failed is not a coach at all.
     const context = await assembleCoachContext(supabase, clientId);
+    const memory = await loadMemory(supabase, clientId);
+    const remembered = memoryBlock(memory);
+    // The sheet only sends what is still on screen, and it clears on close. The
+    // transcript is what carries EARLIER conversations in.
+    //
+    // Both are loaded every time, not one or the other: dropping the transcript
+    // as soon as a live thread existed meant the second message of a session
+    // silently lost every previous conversation — the coach would remember you
+    // on your first question and forget you on your second. The two are merged
+    // by content instead, so a turn that appears in both is only sent once.
+    const liveText = new Set(history.map((h) => h.content.trim()));
+    const priorTurns = (await loadRecentTurns(supabase, clientId)).filter(
+      (t) => !liveText.has(t.content.trim().slice(0, 700))
+    );
+
     const coach = await callClaudeJson({
       meter: { clientId: clientId, feature: "coach_action" },
       apiKey,
@@ -197,10 +227,16 @@ export async function POST(req: NextRequest) {
       system: COACH_SYSTEM_PROMPT,
       maxTokens: 900,
       messages: [
+        ...priorTurns.map((t) => ({
+          role: (t.role === "client" ? "user" : "assistant") as "user" | "assistant",
+          content: t.content.slice(0, 700),
+        })),
         ...history,
         {
           role: "user",
-          content: `CONTEXT (server-assembled, trusted):\n${context}\n\nMEALS ON ${logDate} (${dayName}):\n${JSON.stringify(day)}\n\nCLIENT QUESTION:\n${message}`,
+          content:
+            (remembered ? remembered + "\n\n" : "") +
+            `CONTEXT (server-assembled, trusted):\n${context}\n\nMEALS ON ${logDate} (${dayName}):\n${JSON.stringify(day)}\n\nCLIENT QUESTION:\n${message}`,
         },
       ],
       validate: validateCoachReply,
@@ -208,16 +244,55 @@ export async function POST(req: NextRequest) {
     await logUsage(clientId, "coach_action", coach.tokensIn, coach.tokensOut, SONNET_MODEL);
 
     if (coach.value) {
+      // Written AFTER the reply, so a failure here can never cost the client
+      // their answer — and awaited rather than fired-and-forgotten, because a
+      // serverless function is frozen the moment the response is returned and
+      // a detached promise would simply never run.
+      await persist(supabase, clientId, message, coach.value.message, apiKey);
       return NextResponse.json({ intent: "none", message: coach.value.message, suggestions: coach.value.suggestions });
     }
     // Salvage: a plain-text reply (or the extractor's placeholder) still helps.
     const fallback = coach.rawText.replace(/```(?:json)?|```/g, "").trim() || act.reply;
-    if (fallback) return NextResponse.json({ intent: "none", message: fallback.slice(0, 1200) });
+    if (fallback) {
+      await persist(supabase, clientId, message, fallback.slice(0, 1200), apiKey);
+      return NextResponse.json({ intent: "none", message: fallback.slice(0, 1200) });
+    }
     return NextResponse.json({ error: "The coach couldn't answer right now — try again in a moment." }, { status: 502 });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("nutrition-ai/act failed:", msg);
     return NextResponse.json({ error: `Coach failed — ${msg.slice(0, 120)}` }, { status: 500 });
+  }
+}
+
+/**
+ * Store the exchange, and redraw the running picture when enough has been said.
+ *
+ * Both halves are swallowed on failure: the client already has their answer,
+ * and losing a turn is not worth turning a good reply into an error.
+ */
+async function persist(
+  db: Parameters<typeof recordTurns>[0],
+  clientId: string,
+  clientSaid: string,
+  coachSaid: string,
+  apiKey: string
+): Promise<void> {
+  try {
+    await recordTurns(
+      db,
+      clientId,
+      [
+        { role: "client", content: clientSaid },
+        { role: "coach", content: coachSaid },
+      ],
+      "coach"
+    );
+    const mem = await loadMemory(db, clientId);
+    const unfolded = await countUnfolded(db, clientId, mem.foldedThrough);
+    if (shouldFold(mem, unfolded)) await foldMemory(db, clientId, apiKey);
+  } catch (e) {
+    console.error("act: persisting the exchange failed", e);
   }
 }
 

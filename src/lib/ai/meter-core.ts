@@ -66,6 +66,12 @@ export const AI_FEATURES = {
   workout_build:   { label: "Create / replace workout",surface: "client",    limitColumn: "workout_build_daily_limit", defaultLimit: 8  },
   recipe_ai:       { label: "Recipe builder",          surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 15 },
   movement_explain:{ label: "Movement explanation",    surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  // Redrawing what the coach remembers about a client. Its own label because
+  // it is the surface most likely to break silently — nothing on screen changes
+  // when a fold fails, the coach just quietly stops learning. No per-client cap:
+  // capping it would mean a chatty client's coach stops remembering them, which
+  // is precisely backwards.
+  memory_fold:     { label: "Client memory",           surface: "client",    limitColumn: "", defaultLimit: null },
 
   // ── Trainer app ──────────────────────────────────────────────────────────
   trainer_agent:   { label: "Trainer assistant",       surface: "trainer",   limitColumn: "", defaultLimit: null },
