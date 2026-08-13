@@ -110,7 +110,12 @@ export default function AiHealthTable({
         <Section
           title="Never used"
           tone="warn"
-          note="No successful call, ever. Either nobody has found it, or it is broken in a way nothing reports — every AI surface here fails quietly on purpose."
+          note={
+            "No successful call under this name. Either nobody has found it, or it is broken in a way " +
+            "nothing reports — every AI surface here fails quietly on purpose. " +
+            "One caveat while this list is long: until 13 Aug every route logged under one of five coarse " +
+            "names, so a surface can be busy and still show nothing here simply because its own name is new."
+          }
           items={never}
           open={open}
           setOpen={setOpen}

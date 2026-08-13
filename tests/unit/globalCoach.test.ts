@@ -117,3 +117,42 @@ test("the global coach never claims the slot it watches", () => {
     "the sheet claims unconditionally again, so the prop cannot switch it off"
   );
 });
+
+// Dustin, 2026-08-13, with a screenshot of the coach open on the workout
+// logger showing "swap M4 for salmon and rice": "this is the ai in workout
+// logger talking about nutrition. we shoukd have capability of doing anythijg
+// in app from any page but the initial opening shoukd be specific to the page
+// its in."
+//
+// Capability and opener are separate concerns. The endpoint has the client's
+// whole picture and answers anything from anywhere — that does not change. The
+// OPENER is the part that should know where it is standing.
+test("each screen opens with its own line, not the nutrition one", async () => {
+  const sheet = fs.readFileSync(path.join(ROOT, "src/app/(app)/nutrition/v3/CoachChatSheet.tsx"), "utf8");
+  const { surfaceFor } = await import("../../src/components/GlobalCoach");
+
+  const openersAt = sheet.indexOf("const OPENERS");
+  assert.ok(openersAt > -1, "the per-surface openers are gone — every screen is back to one greeting");
+  const openers = sheet.slice(openersAt, sheet.indexOf("\n};", openersAt));
+
+  // Every surface GlobalCoach can produce must have an opener, or it silently
+  // falls back to a generic one nobody wrote on purpose.
+  for (const p of ["/workout", "/progress", "/home", "/messages", "/settings", "/help", "/nutrition", "/anything"]) {
+    const s = surfaceFor(p);
+    if (!s) continue;
+    assert.match(openers, new RegExp(`\\n  ${s}:`), `no opener for the ${s} surface (${p})`);
+  }
+
+  // And the meal-specific greeting must not be the one a lifter sees.
+  const workoutBlock = openers.slice(openers.indexOf("  workout:"), openers.indexOf("  logger:"));
+  assert.doesNotMatch(workoutBlock, /salmon|M4|cookie|meal/i, "the workout opener still talks about meals");
+});
+
+test("the meal action chips only appear where a meal can actually be changed", () => {
+  const sheet = fs.readFileSync(path.join(ROOT, "src/app/(app)/nutrition/v3/CoachChatSheet.tsx"), "utf8");
+  assert.match(
+    sheet,
+    /\[\.\.\.\(canAct \? ACTION_CHIPS : \[\]\)/,
+    '"Swap a meal" is offered on screens that cannot swap a meal'
+  );
+});

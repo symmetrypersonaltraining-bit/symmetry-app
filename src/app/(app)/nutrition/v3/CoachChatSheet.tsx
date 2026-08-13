@@ -26,6 +26,7 @@ import CoachFab from "@/components/CoachFab";
 import type { Mood } from "@/lib/ai/faces";
 import { claimCoachSlot } from "@/lib/ai/coachMount";
 import { kcalOf } from "@/lib/nutrition/dailyTotals";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 import Sheet from "./Sheet";
 
 export interface CoachSuggestion {
@@ -102,16 +103,67 @@ interface Msg {
 }
 
 const ACTION_CHIPS = ["Swap a meal", "Move a meal", "I ate something extra"];
-const QUICK_CHIPS = [
-  "How's my adherence this week?",
-  "Am I on track with protein today?",
-  "What should I adjust?",
-];
+
+/**
+ * How the coach OPENS, per screen.
+ *
+ * Dustin, 2026-08-13, with a screenshot of the workout logger: "this is the ai
+ * in workout logger talking about nutrition. we shoukd have capability of doing
+ * anythijg in app from any page but the initial opening shoukd be specific to
+ * the page its in."
+ *
+ * Exactly right, and the two halves are separate concerns. CAPABILITY is
+ * unchanged — the endpoint answers anything from anywhere, because it has the
+ * client's whole picture regardless of which tab they happen to be on. What was
+ * wrong is the OPENING: the same greeting and the same three meal chips
+ * everywhere, so a client standing over a barbell got "swap M4 for salmon and
+ * rice". That is not a wrong answer, it is not answering.
+ *
+ * The opener is the one thing that should know where it is standing.
+ */
+const OPENERS: Record<string, { greeting: string; chips: string[] }> = {
+  nutrition: {
+    greeting:
+      "Hey — I'm your coach. I can see your logs, targets and trends. Ask me anything — or tell me what to change (\"swap M4 for salmon and rice\", \"I ate a cookie\") and I'll set it up for you to confirm.",
+    chips: ["How's my adherence this week?", "Am I on track with protein today?", "What should I adjust?"],
+  },
+  workout: {
+    greeting:
+      "I've got today's session and everything you've lifted before it. Ask me about a movement, a weight, or how this one should feel.",
+    chips: ["Is this weight right for me?", "How should today feel?", "Something's bothering me"],
+  },
+  logger: {
+    greeting: "Mid-set questions are the best kind. Ask away — I can see this session and your history on every lift in it.",
+    chips: ["Should I go up?", "Swap this movement", "This doesn't feel right"],
+  },
+  progress: {
+    greeting: "I can see your whole trend, not just the last weigh-in. Ask me what the numbers actually mean.",
+    chips: ["Am I losing fat or water?", "How's my trend really going?", "What should change?"],
+  },
+  home: {
+    greeting: "Ask me anything about your week — what to focus on, how it's going, or what to do about it.",
+    chips: ["What should I focus on this week?", "How did last week go?", "What am I behind on?"],
+  },
+  messages: {
+    greeting: "Ask me anything. If it needs a real decision from " + COACH_FIRST_NAME + ", I'll tell you to ask him rather than guess.",
+    chips: ["What should I ask " + COACH_FIRST_NAME + "?", "How's my week going?", "What should I focus on?"],
+  },
+  settings: {
+    greeting: "Ask me how anything in here works — or anything about your training and eating, same as always.",
+    chips: ["How do I log a meal?", "How do I change my plan?", "How's my week going?"],
+  },
+  help: {
+    greeting: "Ask me how anything in the app works. Plain answers, no jargon.",
+    chips: ["How do I log a workout?", "How do I log a meal?", "Where do I see my progress?"],
+  },
+  app: {
+    greeting: "I'm your coach — I can see your training, your eating and your trend. Ask me anything.",
+    chips: ["How's my week going?", "What should I focus on?", "What should I change?"],
+  },
+};
 
 const CAP_MESSAGE =
   "You've maxed out Coach for today — I'll be back with fresh answers tomorrow. Everything you log still counts as normal.";
-const GREETING =
-  "Hey — I'm your coach. I can see your logs, targets and trends. Ask me anything — or tell me what to change (\"swap M4 for salmon and rice\", \"I ate a cookie\") and I'll set it up for you to confirm.";
 
 function num(v: unknown): number {
   const n = Number(v);
@@ -153,6 +205,7 @@ export default function CoachChatSheet({
   canAct = true,
   fabMood = "nutrition",
   claimsSlot = true,
+  surface = "nutrition",
 }: {
   clientId: string;
   /** The day as rendered — sent with every message so /act can resolve references. */
@@ -208,6 +261,8 @@ export default function CoachChatSheet({
    * one is the fallback and never competes with itself.
    */
   claimsSlot?: boolean;
+  /** Which screen this is mounted on — chooses the opening line and the chips. */
+  surface?: string;
 }) {
   const todayCT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const isToday = selectedDate === todayCT;
@@ -215,6 +270,9 @@ export default function CoachChatSheet({
   const dayLabel = isToday
     ? "today"
     : new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+
+  const opener = OPENERS[surface] ?? OPENERS.app;
+  const GREETING = opener.greeting;
 
   const supabase = useMemo(() => createClient(), []);
   const [enabled, setEnabled] = useState(true); // client_app_settings.coach_enabled
@@ -568,7 +626,7 @@ export default function CoachChatSheet({
 
             {/* quick chips — action starters first, then the Q&A chips */}
             <div className="flex gap-1.5 pt-2 pb-2" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", flexShrink: 0 }}>
-              {[...ACTION_CHIPS, ...QUICK_CHIPS].map((q) => (
+              {[...(canAct ? ACTION_CHIPS : []), ...opener.chips].map((q) => (
                 <button
                   key={q}
                   onClick={() => send(q)}

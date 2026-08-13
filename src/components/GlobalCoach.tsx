@@ -108,6 +108,8 @@ export default function GlobalCoach() {
       // the whole client app on 13 Aug. See the prop's note.
       claimsSlot={false}
       fabMood={surfaceMood(surface)}
+      // The opener is the one thing that should know which screen it is on.
+      surface={surface}
     />
   );
 }
