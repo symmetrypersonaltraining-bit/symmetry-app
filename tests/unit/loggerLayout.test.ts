@@ -230,3 +230,27 @@ test("the note sheet did not smuggle keyboard code back in", () => {
   assert.ok(!/scrollIntoView/.test(CODE), "still no scrollIntoView in the logger");
   assert.ok(!CODE.includes("useKeyboardInset"), "still no keyboard-inset hook in the logger");
 });
+
+test("the log button does not look like a play button", () => {
+  // Dustin, 12 Aug: "that button that looks like a play button to log stuff
+  // needs to change icons, that's confusing."
+  //
+  // It never played anything — it logs the set. With a countdown arriving in
+  // the same row, a play triangle next to a time is actively misleading about
+  // which control starts the timer.
+  //
+  // The one legitimate play icon left in this file is the timer's own
+  // Start/Pause button, which is why this asserts the COUNT rather than
+  // banning the icon outright.
+  const plays = (CODE.match(/ti-player-play/g) ?? []).length;
+  assert.equal(
+    plays, 1,
+    "exactly one play icon belongs in the logger — the timer's Start button. " +
+    "The set-log button must read as a check, not a play triangle.",
+  );
+  assert.match(
+    SRC,
+    /ti ti-circle-check/,
+    "the unlogged set button must draw a hollow check — the same shape the logged state animates into",
+  );
+});

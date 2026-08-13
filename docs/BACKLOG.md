@@ -119,6 +119,38 @@ which had the same family of fault — `parseFloat("")` is NaN, which snapped th
 field to 0 the moment a client cleared it to retype. That one is on a screen
 clients use every day.
 
+## 0c. Per-set timer, in the row you log — DECIDED 12 Aug, NOT BUILT  ← BUILD FIRST
+
+Dustin: *"for timer lets have it function from where you set the actual time.
+that way we can get rid of the timer button at the top. movements that track
+time you set timer or stop watch right there where you log it, hit start, when
+time is up it logs as complete but just like everywhere else you can still
+manually log or unlog it as well as edit the time."*
+
+**Why it is right.** Today the clock at the top opens a detached stopwatch that
+has no idea which set you are on, so you carry the number in your head. A timer
+that starts from the row's own time value and logs that set when it finishes
+removes the bookkeeping entirely. Prone W Hold 0:20 × 3 becomes three taps.
+
+**DECIDED:**
+- **The timer gets its OWN control**, separate from the log button. Dustin,
+  12 Aug. So the fast path — log it now, no waiting — is never taken away.
+- **The log button no longer looks like a play button.** DONE, shipped: it is a
+  hollow circle-check that animates into the drawn tick. That change had to come
+  first, because a play triangle next to a countdown is misleading about which
+  control starts the timer.
+- **Remove the top clock button** once the per-set timer is in. Not before.
+
+**STILL TO CONFIRM:** what an EMPTY time box does. The read is: a value present
+counts DOWN from it; empty counts UP as a stopwatch, and stopping writes the
+elapsed time into the box. One control, both behaviours, nothing extra to tap.
+
+**Care needed.** This is `WorkoutLogger.tsx`, the file with the worst regression
+history here — `tests/unit/loggerLayout.test.ts` names five separate shipped
+bugs. A running timer is the first thing on this screen that changes state over
+time, so it must not resize anything, must survive backgrounding the app, and
+must not fight the pinned viewport height.
+
 ## 1. Custom workout from the schedule page  ← NEXT
 
 `app_feedback` `73fcd284`, 2026-08-06, client-app, from Dustin.

@@ -2233,7 +2233,18 @@ export default function WorkoutLogger({
                     <path d="M14 27l8 8 16-17" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 ) : (
-                  <i className="ti ti-player-play text-lg text-white" />
+                  /* Dustin, 12 Aug: "that button that looks like a play button
+                     to log stuff needs to change icons, that's confusing."
+                     He is right — it never played anything. It logs the set,
+                     and the timer is a separate control. A play triangle next
+                     to a countdown is actively misleading.
+
+                     A hollow circle-check reads as "tap to complete" and is
+                     the same shape the logged state draws itself into, so the
+                     tick animation now looks like the outline filling in
+                     rather than one icon swapping for a different one. List
+                     mode already used a check; this is what was out of step. */
+                  <i className="ti ti-circle-check text-xl" style={{ color: "rgba(255,255,255,0.9)" }} />
                 )}
               </button>
             </div>
