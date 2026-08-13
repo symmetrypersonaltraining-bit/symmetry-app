@@ -127,11 +127,18 @@ should stay signed in now. Tell me if you get kicked to the login screen again.
 
 ---
 
-**8. The end-of-workout screen is personal now**
+**8. The end-of-workout screen is personal now, and there's a lot more of it**
 
 When you finish a session, the line you get is written from that day's actual
 numbers — your sets, your volume, your streak, your PR — not a stock phrase. The
 face changes to match: hit a PR and you get the one flexing.
+
+There are now **38 different finish screens** and you'll get a different one
+most sessions. Some are jokes. A couple deliberately aren't — you'll know the
+ones when they land.
+
+**Test it:** finish a few sessions and tell me if any of them read wrong for the
+day you'd just had. That's the one I most want to hear about.
 
 ---
 
@@ -198,10 +205,18 @@ Items to fold into the message above as they land tonight:
 ~~1. Response-time tracking~~ DONE (trainer-side, not in the client message)
 ~~2. Sheet-height sweep~~ DONE for client screens — folded into item 11. The
    workout logger is still on the old sizing and gets its own commit.
-3. Ten more end-of-workout celebration screens
+~~3. Ten more end-of-workout celebration screens~~ DONE (`111a9cb`) — folded
+   into item 8 above. 38 in the rotation now.
 4. Coach escalation — routing a question to Dustin's inbox with the conversation attached
-5. The coach inside the workout logger itself
+~~5. The coach inside the workout logger itself~~ DONE (`47da1c3`) — already
+   covered by item 1's "it's on every screen", so no separate item needed.
 ~~6. The go-quiet check-in~~ DONE and live — now items 9 and 10 above.
+
+**Not for the client message, but worth Dustin knowing before he sends it:**
+exercise demo videos. 252 of 847 exercises have no video; 151 now have a
+candidate waiting for review at **Library → Exercise Videos**. Press "Check
+lengths" once, then work the queue — it takes about a second a decision. Once
+that queue is worked, item 11's list can gain a line about demo videos.
 
 ## DELIBERATELY EXCLUDED (trainer-only, not client-facing)
 

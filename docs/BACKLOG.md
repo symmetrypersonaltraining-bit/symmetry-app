@@ -127,26 +127,95 @@ positioning one is only applied to elements that are already `static`.
 
 ### Open — spec'd, not built
 
-1. **Lapse takeover.** "If somebody does not log for three days or more."
-   The RULE is built and tested (`lapseMood` in `src/lib/ai/faces.ts`): the
-   ladder is relative to each client's own normal, so a client who never logged
-   is never nudged, a twice-a-week logger is not treated like a daily one, and
-   there are exactly two rungs — concerned, then stern. The loudest face
-   (`callout`) is deliberately unreachable from missed logging. What does NOT
-   exist is the takeover itself; `ClientTakeovers` has five (birthday,
-   challenge, winner, announcement, birthday-ask) and no lapse one. A
-   full-screen interruption that fires wrongly hits every client at once, so
-   this wants Dustin's eyes on the copy before it ships.
-2. **Ten more celebration variants.** The existing ones stay; the AI line and
-   its face are already wired, so new variants are copy plus layout.
-3. **The Outbox + memory layer.** The coach escalating a question to Dustin's
-   inbox with a link back to the conversation. Agreed as one build.
-4. **The logger ✦.** Its own commit, hidden when the keyboard is up.
-   `GlobalCoach` deliberately excludes `/workout/<id>` today.
+1. ~~**Lapse takeover.**~~ **DONE 13 Aug**, and it grew a third rung on the way.
+   `lapseMood` now returns `quiet` for a client who has been silent 21 days but
+   never logged regularly — Robert's case, where the original two-rung ladder
+   said nothing because he had no habit to have fallen off. Correct by the rule,
+   wrong about the person. The `quiet` screen never mentions logging and never
+   wears the disappointed face. Snooze / off / tell-Dustin all live
+   (`/api/checkin-preference`). Dry-run against real data before shipping: fires
+   for 3 of 30, all gentle.
+2. ~~**Ten more celebration variants.**~~ **DONE 13 Aug (`111a9cb`).** 38 in the
+   rotation now, all wearing the sticker set. `celebrationLayout.test.ts` fails
+   the build if the modulus and the `variant ===` blocks ever drift apart —
+   which they silently did while writing these.
+3. **The Outbox.** The coach escalating a question to Dustin's inbox with a link
+   back to the conversation. The memory half of this is DONE and live
+   (`src/lib/ai/clientMemory.ts` — append-only transcript plus a folded running
+   summary, verified against real rows in `ai_chat_turns`). What is left is the
+   escalation: when the coach decides something needs Dustin, it should land
+   somewhere he actually reads, carrying the exchange that prompted it. Needs
+   decisions from him on trigger, destination and whether the client is told.
+4. ~~**The logger ✦.**~~ **DONE 13 Aug (`47da1c3`).** Header button, not a FAB,
+   so the keyboard question never arises.
 5. **Legacy food-photo path.** `MealPlanClient` posts to `/api/analyze-meal-photo`
    with no `clientId`, so a trainer-viewed photo bills the trainer. Every client
    is on `nutrition_v3`, so this is unreachable today — fix it or delete the
    legacy logger.
+
+---
+
+## Exercise demo videos — 252 missing, half-sourced  ← NEEDS A FRESH SESSION
+
+Dustin, 13 Aug: "We have a ton of exercises in the library that do not have
+videos... All videos need to be under thirty seconds, preferably under twenty."
+
+252 of 847 exercises have no `video_url`. A client tapping play on one of those
+gets nothing, mid-set.
+
+**Built and shipped (`2d108bb`)** — the whole review pipeline:
+
+- `exercise_video_candidates` — staging table, trainer-only RLS.
+- `POST /api/video-candidates/verify` — batched duration check.
+- `POST /api/video-candidates/decide` — the only thing that writes
+  `exercises.video_url`. Refuses any candidate with no verified length.
+- `/library/videos` — the queue. Thumbnail, length, two buttons.
+
+**Sourced so far:** 151 candidates covering 151 exercises. **None have a
+verified duration yet** — run "Check lengths" on `/library/videos` once, from
+the live app, and the queue sorts itself shortest-first.
+
+**Why the duration check runs on Vercel and not here:** a Cowork cloud sandbox
+has no network route to youtube.com at all. Every request dies at the proxy,
+`curl` included. This is the same class of thing as the git-push 403 — do not
+re-diagnose it, and do not build anything whose duration check runs in the
+sandbox.
+
+**WHAT IS LEFT, and the exact reason it is left:** 101 exercises have no
+candidate at all. `WebSearch` is capped at **200 calls per session** and that
+cap does NOT reset mid-session — it was spent by the first round of agents.
+Five agents spawned for the remaining 101 all returned zero, immediately, with
+"budget used: 200 of 200".
+
+So this is a **first-thing-in-a-fresh-session** job: 101 exercises at one search
+each fits inside a fresh 200 comfortably. Get the list with:
+
+```sql
+select e.id, e.name from exercises e
+left join exercise_video_candidates c on c.exercise_id = e.id
+where (e.video_url is null or e.video_url = '') and c.id is null
+order by e.name;
+```
+
+Instruct the agents: **one** WebSearch per exercise, no retrying with different
+phrasing, never invent a video id, leave `duration_sec` NULL.
+
+**Skip these — they are not movements.** Seven rows in `exercises` are fragments
+of a pasted programme script that got parsed as exercise names. None is used by
+any programme (`prescribed_exercises` count 0 for all seven), so they are safe
+to hide, but **nothing has been deleted — that needs Dustin's say-so:**
+
+- `Olympic / power lifts (cleans, snatches, jerks, high pulls, push press`
+- `Pull: Superman (3×15) · Alternating Superman (3×12 ea) · Prone Cobra (3×12`
+- `Warm-up: Body Weight Glute Bridge (2×15) · Cat Cow (1×10) · Prone Cobra (2×12`
+- `Cable Half Kneeling Single Arm High Row — 3×12 ea`
+- `Seated Leg Extension (partial range, VMO`
+- `Dumbbell Reverse Lunge — confirm`
+- `Dumbbell Seated Overhead Tricep Extension (Male`
+
+Also skipped on purpose: `Sandbag Clean & Jerk`, `Dumbbell Squat Clean`,
+`Dumbbell Push Press` — Olympic/power lifts are on the never-program list, so
+sourcing demos for them is work that can only ever be wasted.
 
 ---
 
