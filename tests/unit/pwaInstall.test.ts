@@ -113,8 +113,16 @@ test("the install and policy URLs are reachable without a session", () => {
     assert.ok(mw.includes(p), `middleware must let ${p} through unauthenticated`);
   }
   // And they have to sit ABOVE the redirect, or the allowance never runs.
+  //
+  // Matched loosely on purpose: the redirect became redirectKeepingSession on
+  // 13 Aug (it was dropping refreshed auth cookies and signing people out), and
+  // the old exact-string search then compared against indexOf's -1. That
+  // happened to fail loudly here; the same pattern the other way round would
+  // have PASSED silently forever.
+  const loginRedirect = mw.search(/(NextResponse\.redirect|redirectKeepingSession)\(new URL\("\/login"/);
+  assert.ok(loginRedirect > -1, "no login redirect found in middleware at all — this test is not checking anything");
   assert.ok(
-    mw.indexOf('pathname === "/privacy"') < mw.indexOf('NextResponse.redirect(new URL("/login"'),
+    mw.indexOf('pathname === "/privacy"') < loginRedirect,
     "the public allowance must come before the login redirect",
   );
 });
@@ -135,7 +143,7 @@ test("a first-time client reaches first-run however they signed in", () => {
   // the home-screen install. The flag decides, not the route they arrived by.
   const mw = read("src/middleware.ts");
   assert.match(mw, /first_login_completed === false/);
-  assert.match(mw, /NextResponse\.redirect\(new URL\("\/welcome", request\.url\)\)/);
+  assert.match(mw, /(NextResponse\.redirect|redirectKeepingSession)\(new URL\("\/welcome", request\.url\)/);
   // First run comes BEFORE the intake questionnaire.
   assert.ok(
     mw.indexOf('new URL("/welcome"') < mw.indexOf('new URL("/onboarding"'),

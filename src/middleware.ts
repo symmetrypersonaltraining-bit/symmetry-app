@@ -2,6 +2,33 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isTrainerEmail } from "@/lib/trainer";
 
+/**
+ * Redirect WITHOUT throwing away a freshly-rotated session.
+ *
+ * Dustin, 2026-08-13: "Can we add a stay signed in function to that app so that
+ * I don't have to keep logging in every time."
+ *
+ * It is not a missing feature, it is this. `supabase.auth.getUser()` below
+ * refreshes the access token when it is due, and Supabase ROTATES the refresh
+ * token when it does — the old one is spent the moment the new one is issued.
+ * The new pair is written onto `supabaseResponse` by the setAll callback.
+ *
+ * Every redirect in this file used to build a brand-new response and return
+ * that instead, silently discarding those cookies. So any navigation that both
+ * refreshed the token AND redirected left the browser holding a refresh token
+ * that had already been consumed. The next refresh failed, and the app threw
+ * them back to /login for no reason they could see. Roughly hourly, and more
+ * often for clients, whose every navigation can hit the onboarding redirects.
+ *
+ * Copying the cookies across is the whole fix. Anything that redirects from
+ * here must go through this.
+ */
+function redirectKeepingSession(url: URL, carrying: NextResponse): NextResponse {
+  const res = NextResponse.redirect(url);
+  for (const cookie of carrying.cookies.getAll()) res.cookies.set(cookie);
+  return res;
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -60,13 +87,13 @@ export async function middleware(request: NextRequest) {
 
   // Login page
   if (pathname === "/login") {
-    if (user) return NextResponse.redirect(new URL("/home", request.url));
+    if (user) return redirectKeepingSession(new URL("/home", request.url), supabaseResponse);
     return supabaseResponse;
   }
 
   // Protected — must be logged in
   if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return redirectKeepingSession(new URL("/login", request.url), supabaseResponse);
   }
 
   // Trainer skips all client checks
@@ -108,11 +135,11 @@ export async function middleware(request: NextRequest) {
         | null;
       const row = Array.isArray(settings) ? settings[0] : settings;
       if (row && row.first_login_completed === false) {
-        return NextResponse.redirect(new URL("/welcome", request.url));
+        return redirectKeepingSession(new URL("/welcome", request.url), supabaseResponse);
       }
 
       if (clientRow.onboarding_complete === false) {
-        return NextResponse.redirect(new URL("/onboarding", request.url));
+        return redirectKeepingSession(new URL("/onboarding", request.url), supabaseResponse);
       }
     }
   }

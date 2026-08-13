@@ -123,8 +123,11 @@ test("sign-in fields are 16px, so iOS does not zoom the page on focus", () => {
 test("/install is reachable without signing in", () => {
   const mw = read("src/middleware.ts");
   assert.ok(mw.includes('pathname === "/install"'), "the QR target must not redirect to /login");
+  // Either redirect form — see the note in pwaInstall.test.ts.
+  const loginRedirect = mw.search(/(NextResponse\.redirect|redirectKeepingSession)\(new URL\("\/login"/);
+  assert.ok(loginRedirect > -1, "no login redirect found in middleware at all — this test is not checking anything");
   assert.ok(
-    mw.indexOf('pathname === "/install"') < mw.indexOf('NextResponse.redirect(new URL("/login"'),
+    mw.indexOf('pathname === "/install"') < loginRedirect,
     "the allowance has to sit above the redirect or it never runs",
   );
 });
