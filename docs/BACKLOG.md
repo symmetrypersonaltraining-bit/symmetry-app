@@ -82,7 +82,108 @@ Also done directly in the database:
 
 ---
 
-## Goal-driven progress charts + a coach that drives toward the goal  ← NEXT BIG ONE, needs mock-ups
+## Two write-path bugs from the programming chat  ← TONIGHT, BEFORE GOALS
+
+Filed by Dustin's programming session on 2026-08-13, full brief in Supabase:
+
+```sql
+select body from claude_handoff
+where title = 'APP BUG BRIEF 2026-08-13 — SWAP/REPLACE + ACTIVITY EDIT';
+```
+
+**Both re-verified here against the live rows before being written down** — the
+brief is accurate on every claim checked, including the exact timestamps.
+
+### Bug B — swap/replace leaves a stale label (higher priority)
+
+The swap forks a `days` row and repoints the existing `scheduled_workouts` at
+the fork, which is right. It then never renames the fork and never bumps
+`updated_at`. Confirmed:
+
+| | |
+|---|---|
+| day | `eecfddf2-9c75-42b9-8fbe-3ebc7e0ad384` |
+| `days.label` | **"Deload — Cardio (20 min Walk)"** |
+| actual content | **Elliptical Trainer 20 min** |
+| `sw.created_at` | 2026-07-14 15:00:42 |
+| `sw.updated_at` | 2026-07-14 15:00:42 — *unbumped, though `day_id` changed 13 Aug* |
+
+Second client (Claudine Ocon, 31 Jul) shows the same shape, so it is not
+account-specific.
+
+Why it is the priority: the label is what the UI shows and what any adherence
+calc or AI summary reads if it does not walk through to `prescribed_exercises`.
+The app is currently misreporting what was done. It also manufactures fake
+"duplicate day" groups — same label, different content — which are
+indistinguishable from a real duplication bug without opening both.
+
+Fix: rename the fork from its new contents (or store `swapped_from_day_id` and
+derive the display name from contents), bump `updated_at` on the repoint, record
+the swap in `schedule_change_proposals`, and set `created_by` truthfully —
+`library_fork` rows claim `trainer` even when the app did it.
+
+Test: swap a scheduled workout to a different modality; assert the label
+describes the new content, `sw.updated_at > sw.created_at`, and the original day
+is untouched with its logs intact.
+
+### Bug A — editing a logged activity INSERTS instead of UPDATES
+
+Editing the duration of a logged activity creates a whole new
+`days` + `scheduled_workouts` + `workout_logs` triple. Confirmed on Jennifer
+Day, 30 Jul — two complete triples **52 seconds apart**, both `completed`, both
+with their own log:
+
+- `90286d4e…` created 12:30:27 — Baby Stroller Walk, 45 min
+- `a4cdf2a3…` created 12:31:19 — Baby Stroller Walk, 120 min
+
+She logged 45 and corrected it to 120. Her 30 Jul now reads 165 minutes across
+two sessions; she did one. This corrupts adherence and volume totals for anyone
+who has ever corrected an entry.
+
+Fix: update `prescribed_exercises.volume_value` (or `set_logs.duration_seconds`)
+in place, bump `updated_at`, and never create a second `days` row for the same
+client + date + activity.
+
+Test: log a 20 min walk, edit to 45, assert the `ai_activity` day count for that
+client is unchanged by the edit and exactly one `workout_logs` row exists.
+
+### Before touching any row — the FK map
+
+`days.id` is referenced by: `scheduled_workouts`, `workout_logs`,
+`trainer_notes`, `exercise_notes`, `published_workouts`, `sections`,
+`schedule_change_proposals`, `client_training_patterns`.
+`prescribed_exercises.id` by: `set_logs`, `exercise_notes`, `trainer_notes`,
+`prescribed_exercises.alternate_of`.
+
+The last two on each list are the non-obvious ones and caused a failed migration
+on 13 Aug. Repoint everything before moving or deleting.
+
+Also: `uq_scheduled_workout_one_per_day (client_id, day_id, scheduled_date)
+WHERE deleted_at IS NULL`. Always filter `deleted_at IS NULL` when reading
+`scheduled_workouts`, and note this constraint makes one of the four day-pairs
+below impossible to merge while both rows exist.
+
+### DO NOT bulk-clean the data
+
+Four day-pairs share a label with different content. They are **not**
+duplicates, and which record survives is Dustin's call:
+
+- Dustin "Deload — Cardio (20 min Walk)" — Aug 12 Outdoor Walk 20 / Aug 13 Elliptical 20 (Bug B)
+- Dustin "Outdoor Walk" — Aug 6 Walk (2 Miles) 45 / Aug 7 Outdoor Walk 30 (Bug A)
+- Dustin "Fat Loss Cardio Phase 3: Stair Master" — identical content but TWO logged Aug 1 sessions, both with set data; **cannot be merged** while both exist
+- Jennifer Day "Baby Stroller Walk" — Jul 30, 45 min / 120 min (the genuine double-count)
+
+### Context only — already fixed, do not re-diagnose
+
+A batch-build bug created one `days` row per scheduled date instead of reusing
+one — 179 orphans across Christine Latham, Tyler Dorsett, Steph Gautreaux and
+Dustin. Repaired 13 Aug (1113 → 934 days, zero data loss, backups
+`bak_*_20260813b`). The correct pattern for any date-looping build: insert the
+day ONCE, capture the id, loop only the `scheduled_workouts` insert.
+
+---
+
+## Goal-driven progress charts + a coach that drives toward the goal  ← MOCK-UPS DONE, awaiting review
 
 Dustin, 2026-08-14 (Thursday afternoon): "id like to revamp the progress charts
 to have goals me and clients can set and have the charts reflect where they are
@@ -106,11 +207,41 @@ What it has to do, in his words and unpacked:
   real numbers against the goal and says what has to happen from here: the rate
   they need, whether the current rate gets there, what to change.
 
-Open questions for the mock-up round:
-- One goal at a time per metric, or several running at once?
-- What happens when a goal is missed — does it roll, close, or get re-set?
-- Does the client see a goal Dustin set for them, and can they refuse it?
-- Weekly rate as the unit, or "on track / behind / ahead"?
+**Decided 13 Aug** (Dustin, via the mock-up round):
+
+- **Metrics:** body weight, and body fat % / lean mass. Not lifts, not
+  consistency — those can come later.
+- **Who sets:** both. His goals are visible as his, and the client can push
+  back rather than just accept. "Keeps it a conversation instead of a target
+  dropped on them."
+- **Off-track tone:** honest, plus one specific fix in real numbers. *"At
+  0.4 lb/wk you'll land ~4 lb short. 0.9/wk gets you there — roughly 200 fewer
+  cals a day."* Not soft, not blunt.
+- **Missed deadline:** rolls forward at the achieved pace and keeps the old
+  attempt visible on the chart. Nothing framed as a failure, nothing hidden.
+
+**Mock-up:** `docs/mockups/goals-progress.html` — eight states, built on real
+weigh-ins from `metrics` rather than invented numbers, so the awkward cases show
+up instead of hiding.
+
+**The finding that came out of building it, and it changes the shape of the
+feature:** there are 95 weigh-ins in the whole database across 23 clients —
+about four each. Robert has four; Lauren has five. **A projection from four
+points is a guess wearing a suit.** So the design refuses to draw one under six
+readings and says why. Which means the real prerequisite here is not chart code,
+it is weigh-in frequency — worth deciding whether the goal screen should ask for
+one when it is stale.
+
+Also settled while building: rate must be computed from the **last six weeks**,
+not lifetime. Lauren's lifetime rate says 0.9 lb/wk; her last three weigh-ins
+are the same number. Lifetime rate is a fact about the past — recent rate is the
+only one that answers "does this arrive?", which is the entire question.
+
+Still open for Dustin after he reads it:
+- Does the "behind pace" wording land right? (Lauren's and Robert's cards.)
+- Is the projection line useful or alarming?
+- Should a goal he sets be genuinely refusable, or only discussable?
+- Does the progress meter earn its space, or does the chart already say it?
 
 Prerequisite already in place: `metrics` has the history, and the coach already
 reads the trend. This is a new `client_goals` table plus chart work.

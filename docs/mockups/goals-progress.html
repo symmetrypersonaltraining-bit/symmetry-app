@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Symmetry — Goals on the Progress screen (mock-up)</title>
+<style>
+  :root{
+    --bg:#EDF2F7; --surface:#FFFFFF; --card:#DDEEFF;
+    --primary:#0F4C81; --accent:#0EA5E9;
+    --text:#0D1B2E; --text2:#4E6080; --border:#C8D8EC;
+    --good:#15803D; --warn:#B45309; --bad:#B91C1C;
+    --grid:#E6EDF5;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);font-family:var(--font);color:var(--text);
+       -webkit-font-smoothing:antialiased}
+  .page{max-width:1400px;margin:0 auto;padding:28px 20px 80px}
+  h1{font-size:24px;margin:0 0 4px}
+  .sub{color:var(--text2);font-size:14px;margin:0 0 6px;line-height:1.6;max-width:74ch}
+  .note{background:#FEF9E7;border:1px solid #F0DFA8;border-radius:12px;padding:12px 14px;
+        font-size:13px;line-height:1.6;color:#5A4A18;margin:18px 0 26px;max-width:88ch}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:26px;align-items:start}
+  .phone{background:var(--surface);border:1px solid var(--border);border-radius:22px;overflow:hidden;
+         box-shadow:0 4px 22px rgba(15,76,129,.10)}
+  .phone-hd{background:var(--primary);color:#fff;padding:13px 16px}
+  .phone-hd h2{font-size:16px;margin:0;font-weight:600}
+  .phone-hd p{margin:2px 0 0;font-size:12px;color:rgba(255,255,255,.66)}
+  .phone-body{padding:14px;background:var(--bg);display:flex;flex-direction:column;gap:12px}
+  .caselabel{font-size:11px;font-weight:800;letter-spacing:1.4px;color:var(--text2);
+             padding:0 2px 7px;text-transform:uppercase}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px}
+
+  .goalhd{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:2px}
+  .metric{font-size:12px;font-weight:800;letter-spacing:1.1px;color:var(--primary)}
+  .owner{font-size:10.5px;font-weight:700;color:var(--text2);background:var(--card);
+         padding:3px 8px;border-radius:999px;white-space:nowrap}
+  .hero{display:flex;align-items:baseline;gap:9px;margin:6px 0 2px}
+  .hero .val{font-size:40px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .hero .unit{font-size:14px;color:var(--text2);font-weight:600}
+  .hero .delta{font-size:13px;font-weight:700;margin-left:auto;font-variant-numeric:tabular-nums}
+  .since{font-size:11.5px;color:var(--text2);margin-bottom:10px}
+
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;
+        padding:5px 10px;border-radius:999px;line-height:1}
+  .chip.good{background:#E7F5EC;color:var(--good)}
+  .chip.warn{background:#FBF1E3;color:var(--warn)}
+  .chip.flat{background:#EEF2F7;color:var(--text2)}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:0 0 auto}
+
+  svg{display:block;width:100%;height:auto;overflow:visible}
+  .axlab{font-size:9.5px;fill:var(--text2);font-family:var(--font)}
+  .plab{font-size:10.5px;font-weight:800;font-family:var(--font);fill:var(--text)}
+  .plab2{font-size:9.5px;font-weight:600;font-family:var(--font);fill:var(--text2)}
+
+  .meterwrap{margin-top:12px}
+  .meterrow{display:flex;justify-content:space-between;font-size:10.5px;color:var(--text2);
+            font-weight:700;margin-bottom:5px}
+  .track{height:8px;border-radius:99px;background:#E6EDF5;overflow:hidden}
+  .fill{height:100%;border-radius:99px}
+
+  .ai{display:flex;gap:10px;align-items:flex-start;background:var(--surface);
+      border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:16px;padding:13px}
+  .face{width:34px;height:34px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;
+        font-size:17px;background:#EDE9FE}
+  .ai .kicker{font-size:9.5px;font-weight:800;letter-spacing:1.1px;color:var(--accent);margin-bottom:4px}
+  .ai p{margin:0;font-size:12.5px;line-height:1.6;color:var(--text)}
+  .ai .fix{margin-top:8px;padding:9px 11px;background:var(--card);border-radius:11px;
+           font-size:12px;line-height:1.55;color:var(--text)}
+  .ai .fix b{color:var(--primary)}
+
+  .btnrow{display:flex;gap:8px;margin-top:11px}
+  .btn{flex:1;text-align:center;font-size:12.5px;font-weight:800;padding:11px 8px;border-radius:11px;
+       border:1px solid var(--border);background:var(--surface);color:var(--text);min-height:44px;
+       display:grid;place-items:center}
+  .btn.pri{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .btn.ghost{color:var(--text2)}
+
+  .empty{text-align:center;padding:22px 14px}
+  .empty .big{font-size:15px;font-weight:800;margin-bottom:6px}
+  .empty p{font-size:12.5px;color:var(--text2);line-height:1.6;margin:0 auto;max-width:30ch}
+
+  .hist{margin-top:11px;border-top:1px solid var(--border);padding-top:10px}
+  .hist .h{font-size:9.5px;font-weight:800;letter-spacing:1.1px;color:var(--text2);margin-bottom:7px}
+  .hist .row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text2);
+             padding:4px 0;border-bottom:1px dotted var(--border)}
+  .hist .row b{color:var(--text);font-variant-numeric:tabular-nums}
+
+  .ask{background:#FFF8E6;border:1px solid #F0DFA8;border-radius:12px;padding:11px 12px;margin-top:11px}
+  .ask p{margin:0;font-size:12px;line-height:1.55;color:#5A4A18}
+
+  table.tv{width:100%;border-collapse:collapse;margin-top:10px;font-size:11px}
+  table.tv th,table.tv td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--border);
+                          color:var(--text2);font-variant-numeric:tabular-nums}
+  table.tv th{font-weight:800;color:var(--text)}
+  details.tvw{margin-top:9px}
+  details.tvw summary{font-size:11px;color:var(--text2);cursor:pointer;font-weight:700}
+
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;font-size:10.5px;color:var(--text2)}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .k{width:16px;height:0;border-top-width:2px;border-top-style:solid;display:inline-block}
+
+  .annot{font-size:12px;color:var(--text2);line-height:1.6;padding:10px 2px 0}
+  .annot b{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Goals on the Progress screen</h1>
+  <p class="sub">
+    Mock-up, 13 Aug 2026. Every number below is <b>real data pulled from the live database</b> —
+    Dustin, Lauren and Robert's actual weigh-ins — because a mock-up with invented numbers hides
+    exactly the cases that matter. These three are genuinely different situations, and the screen
+    has to handle all three without lying to anyone.
+  </p>
+
+  <div class="note">
+    <b>The honest constraint, up front:</b> there are 95 weigh-ins in the whole database across 23
+    clients — about four each. Robert has four. Lauren has five. A projection drawn from four points
+    is a guess wearing a suit, so the design says so out loud rather than drawing a confident dashed
+    line through thin air: under six weigh-ins the projection is replaced by "log a few more and I
+    can tell you where this lands." <b>The feature that makes goals work is more frequent weigh-ins.</b>
+    Worth deciding whether the goal screen should ask for one when it's stale.
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <p class="annot" style="max-width:88ch;margin-top:30px">
+    <b>What I'd want your eye on:</b> whether the "behind pace" wording lands right — that's Lauren's
+    and Robert's cards. Whether the projection dashed line is useful or alarming. Whether a goal you
+    set should really be refusable, or just discussable. And whether the progress meter helps or
+    whether the chart alone says it.
+  </p>
+</div>
+
+<script type="module">
+// ─────────────────────────────────────────────────────────────────────────────
+// Real weigh-ins, straight out of public.metrics on 13 Aug 2026.
+// ─────────────────────────────────────────────────────────────────────────────
+const DUSTIN = [
+  ["2026-05-04",212],["2026-05-11",208],["2026-05-18",207.8],["2026-05-25",203.2],
+  ["2026-06-07",196.4],["2026-06-14",196.2],["2026-06-22",193.2],["2026-06-28",195],
+  ["2026-07-05",193.8],["2026-07-12",192.8],["2026-07-20",197],["2026-07-26",191.4],
+  ["2026-08-02",188.6],
+];
+const LAUREN = [
+  ["2026-05-04",158],["2026-06-23",153],["2026-06-30",150.2],["2026-07-20",146.2],
+  ["2026-08-05",146.2],
+];
+const ROBERT = [
+  ["2026-06-02",266],["2026-07-11",267],["2026-07-13",266.2],["2026-07-23",263],
+];
+const DUSTIN_BF = [
+  ["2026-05-04",18.9],["2026-05-11",19.3],["2026-05-18",15.2],["2026-05-25",13.5],
+  ["2026-06-07",13.5],["2026-06-14",11.5],["2026-06-22",10.1],["2026-06-28",7.2],
+  ["2026-07-05",6.5],["2026-07-12",5.8],["2026-07-26",7.5],["2026-08-02",5.2],
+];
+
+const day = 86400000;
+const d = (s) => new Date(s + "T12:00:00").getTime();
+const fmtD = (t) => new Date(t).toLocaleDateString("en-US",{month:"short",day:"numeric"});
+const round1 = (n) => Math.round(n*10)/10;
+
+/**
+ * Rate from the LAST SIX WEEKS, not from the whole history.
+ *
+ * This is the single most consequential decision in the maths. Lifetime rate
+ * tells Lauren she is losing 0.9 lb/wk; her last three weigh-ins are the same
+ * number. Lifetime rate is a fact about the past. Recent rate is the only one
+ * that answers "does this arrive?", which is the question the screen exists to
+ * answer.
+ */
+function recentRate(series, windowDays = 42) {
+  const last = series[series.length-1];
+  const cutoff = d(last[0]) - windowDays*day;
+  const win = series.filter(p => d(p[0]) >= cutoff);
+  if (win.length < 2) return null;
+  const a = win[0], b = win[win.length-1];
+  const wks = (d(b[0]) - d(a[0])) / (7*day);
+  if (wks <= 0) return null;
+  return (b[1]-a[1]) / wks;                       // negative = losing
+}
+
+function analyse(series, target, targetDate) {
+  const start = series[0], last = series[series.length-1];
+  const now = last[1];
+  const rate = recentRate(series);               // lb per week, signed
+  const weeksLeft = (d(targetDate) - d(last[0])) / (7*day);
+  const remaining = now - target;                 // positive when still above target
+  const needRate = weeksLeft > 0 ? remaining/weeksLeft : Infinity;
+  const projected = rate == null ? null : now + rate*weeksLeft;
+  const shortBy = projected == null ? null : projected - target;
+  const total = start[1] - target;
+  const pct = total === 0 ? 100 : Math.max(0, Math.min(100, ((start[1]-now)/total)*100));
+  // "Thin" = fewer than six readings. Four points cannot support a projection.
+  const thin = series.length < 6;
+  const arrives = rate != null && rate < 0 ? d(last[0]) + (remaining/-rate)*7*day : null;
+  return {start,last,now,rate,weeksLeft,remaining,needRate,projected,shortBy,pct,thin,arrives};
+}
+
+/**
+ * The chart.
+ *
+ * x runs from the FIRST weigh-in to the TARGET DATE — not to today. That is what
+ * makes it a journey rather than a line: the goal is always on the right edge,
+ * and the empty space between "now" and the edge is the part still to do. A
+ * chart that ends at today can never show you that.
+ */
+function chart(series, target, targetDate, a, opts={}) {
+  const W = 340, H = 168, L = 34, R = 58, T = 14, B = 22;
+  const pw = W-L-R, ph = H-T-B;
+  const x0 = d(series[0][0]), x1 = d(targetDate);
+  const vals = series.map(p=>p[1]).concat([target], a.projected!=null?[a.projected]:[]);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = Math.max(1.2,(hi-lo)*0.16); lo-=pad; hi+=pad;
+  const X = t => L + ((t-x0)/(x1-x0))*pw;
+  const Y = v => T + (1-(v-lo)/(hi-lo))*ph;
+
+  const pts = series.map(p=>[X(d(p[0])),Y(p[1])]);
+  const line = pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+  const area = line + ` L${pts[pts.length-1][0].toFixed(1)},${(T+ph).toFixed(1)} L${pts[0][0].toFixed(1)},${(T+ph).toFixed(1)} Z`;
+
+  const goalY = Y(target), lastP = pts[pts.length-1];
+  const status = opts.status || "good";
+  const statusHex = status==="good" ? "var(--good)" : "var(--warn)";
+
+  // Gridlines: three, on clean numbers, hairline and recessive.
+  const ticks = [lo+(hi-lo)*0.15, (lo+hi)/2, hi-(hi-lo)*0.15].map(v=>Math.round(v));
+  const uniq = [...new Set(ticks)];
+
+  const proj = (!a.thin && a.projected!=null)
+    ? `<path d="M${lastP[0].toFixed(1)},${lastP[1].toFixed(1)} L${X(x1).toFixed(1)},${Y(a.projected).toFixed(1)}"
+             fill="none" stroke="${statusHex}" stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round" opacity=".85"/>
+       <circle cx="${X(x1).toFixed(1)}" cy="${Y(a.projected).toFixed(1)}" r="4.5" fill="${statusHex}" stroke="var(--surface)" stroke-width="2"/>`
+    : "";
+
+  const projLab = (!a.thin && a.projected!=null)
+    ? `<text class="plab" x="${(X(x1)+7).toFixed(1)}" y="${(Y(a.projected)+3).toFixed(1)}" fill="${statusHex}">${round1(a.projected)}</text>
+       <text class="plab2" x="${(X(x1)+7).toFixed(1)}" y="${(Y(a.projected)+15).toFixed(1)}">at this rate</text>`
+    : `<text class="plab2" x="${(lastP[0]+9).toFixed(1)}" y="${(lastP[1]+4).toFixed(1)}">need more<tspan x="${(lastP[0]+9).toFixed(1)}" dy="11">weigh-ins</tspan></text>`;
+
+  return `
+  <svg viewBox="0 0 ${W} ${H}" role="img"
+       aria-label="${opts.aria || "Progress toward goal"}">
+    ${uniq.map(v=>`<line x1="${L}" x2="${L+pw}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/>
+       <text class="axlab" x="${L-6}" y="${(Y(v)+3).toFixed(1)}" text-anchor="end">${v}</text>`).join("")}
+
+    <!-- the goal, as a place on the chart rather than a number in the corner -->
+    <line x1="${L}" x2="${(L+pw+4).toFixed(1)}" y1="${goalY.toFixed(1)}" y2="${goalY.toFixed(1)}"
+          stroke="var(--primary)" stroke-width="1.5" stroke-dasharray="2 3" opacity=".55"/>
+    <text class="plab" x="${(L+pw+7).toFixed(1)}" y="${(goalY-6).toFixed(1)}" fill="var(--primary)">${target}</text>
+    <text class="plab2" x="${(L+pw+7).toFixed(1)}" y="${(goalY+6).toFixed(1)}">goal</text>
+
+    <path d="${area}" fill="var(--primary)" opacity=".08"/>
+    <path d="${line}" fill="none" stroke="var(--primary)" stroke-width="2"
+          stroke-linejoin="round" stroke-linecap="round"/>
+    ${proj}
+    ${pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${i===pts.length-1?5:3.2}"
+        fill="var(--primary)" stroke="var(--surface)" stroke-width="2"/>`).join("")}
+
+    <text class="plab" x="${pts[0][0].toFixed(1)}" y="${(pts[0][1]-11).toFixed(1)}" text-anchor="start">${series[0][1]}</text>
+    <text class="plab2" x="${pts[0][0].toFixed(1)}" y="${(H-6)}" text-anchor="start">${fmtD(d(series[0][0]))}</text>
+    <text class="plab2" x="${(L+pw).toFixed(1)}" y="${(H-6)}" text-anchor="middle">${fmtD(x1)}</text>
+    ${projLab}
+  </svg>
+  <div class="legend">
+    <span><i class="k" style="border-color:var(--primary)"></i> weigh-ins</span>
+    ${!a.thin && a.projected!=null ? `<span><i class="k" style="border-color:${statusHex};border-top-style:dashed"></i> where this rate lands</span>`:""}
+    <span><i class="k" style="border-color:var(--primary);border-top-style:dotted;opacity:.6"></i> goal</span>
+  </div>`;
+}
+
+function table(series,unit){
+  return `<details class="tvw"><summary>See the numbers</summary>
+  <table class="tv"><thead><tr><th>Date</th><th>${unit}</th><th>Change</th></tr></thead><tbody>
+  ${series.map((p,i)=>`<tr><td>${fmtD(d(p[0]))}</td><td>${p[1]}</td>
+    <td>${i?((p[1]-series[i-1][1])>0?"+":"")+round1(p[1]-series[i-1][1]):"—"}</td></tr>`).join("")}
+  </tbody></table></details>`;
+}
+
+function meter(a,status){
+  const hex = status==="good"?"var(--good)":"var(--warn)";
+  return `<div class="meterwrap">
+    <div class="meterrow"><span>${Math.round(a.pct)}% of the way there</span>
+      <span>${round1(Math.abs(a.remaining))} to go</span></div>
+    <div class="track"><div class="fill" style="width:${a.pct}%;background:${hex}"></div></div>
+  </div>`;
+}
+
+function goalCard(o){
+  const a = analyse(o.series,o.target,o.targetDate);
+  const status = o.status;
+  const lost = round1(a.start[1]-a.now);
+  return `<div class="card">
+    <div class="goalhd">
+      <div class="metric">${o.metric}</div>
+      <div class="owner">${o.owner}</div>
+    </div>
+    <div class="hero">
+      <span class="val">${a.now}</span><span class="unit">${o.unit}</span>
+      <span class="delta" style="color:var(--good)">−${lost} ${o.unit}</span>
+    </div>
+    <div class="since">since ${fmtD(d(a.start[0]))} · goal ${o.target} ${o.unit} by ${new Date(d(o.targetDate)).toLocaleDateString("en-US",{month:"long",day:"numeric"})}</div>
+    <div class="chip ${status}"><span class="dot"></span>${o.statusText}</div>
+    <div style="margin-top:12px">${chart(o.series,o.target,o.targetDate,a,{status,aria:o.aria})}</div>
+    ${meter(a,status)}
+    ${table(o.series,o.unit)}
+  </div>`;
+}
+
+function aiCard(o){
+  return `<div class="ai">
+    <div class="face">${o.face}</div>
+    <div style="flex:1">
+      <div class="kicker">YOUR COACH</div>
+      <p>${o.body}</p>
+      ${o.fix?`<div class="fix">${o.fix}</div>`:""}
+    </div>
+  </div>`;
+}
+
+function phone(label,title,sub,inner){
+  return `<div>
+    <div class="caselabel">${label}</div>
+    <div class="phone">
+      <div class="phone-hd"><h2>${title}</h2><p>${sub}</p></div>
+      <div class="phone-body">${inner}</div>
+    </div>
+    ${/* the annotation is for Dustin, not for the app */""}
+  </div>`;
+}
+
+const cards = [];
+
+// ── A. On track. Dustin, real numbers, arriving early. ───────────────────────
+{
+  const a = analyse(DUSTIN,185,"2026-09-30");
+  cards.push(phone("A · On track","Progress","Dustin Gautreaux",
+    goalCard({metric:"BODY WEIGHT",owner:"your goal",unit:"lb",series:DUSTIN,
+      target:185,targetDate:"2026-09-30",status:"good",
+      statusText:`On track — arriving ~${fmtD(a.arrives)}`,
+      aria:"Body weight falling from 212 to 188.6, goal 185 by September 30, projected to arrive early"})
+    + aiCard({face:"💪",
+      body:`23.4 lb down since May, and the last six weeks are running at <b>${round1(Math.abs(a.rate))} lb a week</b>. You only need ${round1(a.needRate)} a week to hit 185 by Sept 30 — you're well ahead of that.`,
+      fix:`<b>What matters now:</b> you're 3.6 lb out with 8 weeks of room. Slow it down. Dropping faster than 1 lb/wk this close to the end costs lean mass, and your body fat has already come from 18.9% to 5.2%. Hold the current intake and let the last of it come off.`})
+  ));
+}
+
+// ── B. Stalled. Lauren — the case a lifetime average would lie about. ────────
+{
+  const a = analyse(LAUREN,140,"2026-10-15");
+  cards.push(phone("B · Stalled — the case that breaks naive maths","Progress","Lauren Standefer",
+    goalCard({metric:"BODY WEIGHT",owner:"your goal",unit:"lb",series:LAUREN,
+      target:140,targetDate:"2026-10-15",status:"warn",
+      statusText:"Behind pace — flat 3 weeks",
+      aria:"Body weight fell from 158 to 146.2 then held flat for three weeks, goal 140 by October 15"})
+    + aiCard({face:"🤔",
+      body:`11.8 lb down since May — that part is working. But your last two weigh-ins are the <b>same number</b>, 16 days apart. Averaged over the whole run you look like you're losing 0.9 a week; over the last three weeks you're at zero.`,
+      fix:`<b>What has to change:</b> 0.7 lb a week gets you to 140 by Oct 15 — that's about 350 calories a day, or two extra sessions a week. A plateau after 12 lb usually means intake has drifted back to maintenance without anything feeling different. Worth logging a normal week honestly before changing anything — <b>ask ${"Dustin"} if you want me to look at it with him.</b>`})
+  ));
+}
+
+// ── C. Too little data to project. Robert — four weigh-ins. ──────────────────
+{
+  cards.push(phone("C · Not enough data to promise anything","Progress","Robert Miller",
+    goalCard({metric:"BODY WEIGHT",owner:"Dustin set this",unit:"lb",series:ROBERT,
+      target:245,targetDate:"2026-12-01",status:"warn",
+      statusText:"Only 4 weigh-ins — can't project yet",
+      aria:"Body weight 266 to 263 over four readings, goal 245 by December 1, too few readings to project"})
+    + aiCard({face:"📋",
+      body:`3 lb down since June — that's real, and starting is the hardest part. I'm not going to draw you a line to December off four weigh-ins though, because it would be a guess.`,
+      fix:`<b>The one thing that unlocks this screen:</b> step on the scale once a week, same morning, same conditions. Four more and I can tell you honestly whether Dec 1 is on. Right now, 18 lb over 19 weeks needs about <b>1 lb a week</b> — which is a normal, sustainable rate, not a crash.`})
+  ));
+}
+
+// ── D. A goal Dustin set, not yet agreed. ────────────────────────────────────
+{
+  const a = analyse(LAUREN,138,"2026-12-20");
+  cards.push(phone("D · Dustin set it — the client can push back","Progress","Lauren Standefer",
+    `<div class="card">
+      <div class="goalhd"><div class="metric">BODY WEIGHT</div><div class="owner">from Dustin</div></div>
+      <div class="hero"><span class="val">146.2</span><span class="unit">lb</span></div>
+      <div class="since">Dustin suggested <b>138 lb by December 20</b> — 0.4 lb a week from here.</div>
+      <div class="ask"><p><b>Does that sound right to you?</b> It's a suggestion, not a decision. If the
+      number or the date feels wrong, say so — that's more useful to me than agreeing and quietly not doing it.</p></div>
+      <div class="btnrow">
+        <div class="btn pri">Yes, set it</div>
+        <div class="btn">Talk about it</div>
+      </div>
+      <div class="btnrow"><div class="btn ghost">Set my own instead</div></div>
+    </div>`
+    + aiCard({face:"🗓️",
+      body:`For context: 138 by December is <b>0.4 lb a week</b> — about half the pace you managed May to July. He's picked something with room in it rather than something aggressive.`})
+  ));
+}
+
+// ── E. Deadline passed, rolled forward, history kept. ────────────────────────
+{
+  const a = analyse(DUSTIN,190,"2026-08-01");
+  cards.push(phone("E · Target date passed — rolls forward, nothing hidden","Progress","Dustin Gautreaux",
+    `<div class="card">
+      <div class="goalhd"><div class="metric">BODY WEIGHT</div><div class="owner">rolled forward</div></div>
+      <div class="hero"><span class="val">188.6</span><span class="unit">lb</span>
+        <span class="delta" style="color:var(--good)">−23.4 lb</span></div>
+      <div class="since">Goal was <b>190 by Aug 1</b>. You got there Aug 2 — one day over.</div>
+      <div class="chip good"><span class="dot"></span>Hit it, a day late</div>
+      <div class="hist">
+        <div class="h">GOAL HISTORY</div>
+        <div class="row"><span>190 lb by Aug 1</span><b>hit Aug 2 · 1.9 lb/wk</b></div>
+        <div class="row"><span>200 lb by Jun 15</span><b>hit Jun 7 · 2.4 lb/wk</b></div>
+        <div class="row" style="border:none"><span>185 lb by Sep 30</span><b>running now</b></div>
+      </div>
+      <div class="btnrow"><div class="btn pri">Set the next one</div><div class="btn">Keep going to 185</div></div>
+    </div>`
+    + aiCard({face:"🎉",
+      body:`Two goals in a row, both hit. The interesting number isn't 188.6 — it's that you've held <b>1.9 lb a week for three months</b> without the rate collapsing, which is the part most people can't do.`,
+      fix:`<b>Nothing is being hidden here.</b> A missed goal rolls forward the same way and stays in this list at the pace you actually achieved. The history is the point — it's the only honest way to set the next target.`})
+  ));
+}
+
+// ── F. Body fat, second metric on the same screen. ───────────────────────────
+{
+  const a = analyse(DUSTIN_BF,6,"2026-09-30");
+  cards.push(phone("F · Composition, not the scale","Progress","Dustin Gautreaux",
+    goalCard({metric:"BODY FAT",owner:"your goal",unit:"%",series:DUSTIN_BF,
+      target:6,targetDate:"2026-09-30",status:"good",
+      statusText:"Already through it",
+      aria:"Body fat from 18.9 percent to 5.2 percent, goal 6 percent by September 30, already passed"})
+    + aiCard({face:"😎",
+      body:`18.9% to 5.2%. You passed the 6% target on Aug 2, seven weeks early — and you did it while the scale only moved 23 lb, which means most of what left was fat.`,
+      fix:`<b>Worth a conversation rather than a new number:</b> 5.2% is very low and hard to hold. This is the point where the goal probably stops being "lower" and starts being "hold this while the lifts go back up."`})
+  ));
+}
+
+// ── G. No goal yet. ──────────────────────────────────────────────────────────
+{
+  cards.push(phone("G · No goal set","Progress","Jenn Day",
+    `<div class="card empty">
+      <div style="font-size:26px;margin-bottom:8px">🎯</div>
+      <div class="big">No goal yet</div>
+      <p>Charts show you where you've been. A goal is what turns that into where you're going —
+      and it's what lets me tell you whether what you're doing is actually working.</p>
+      <div class="btnrow" style="margin-top:14px"><div class="btn pri">Set a goal</div></div>
+      <div class="btnrow"><div class="btn ghost">Ask Dustin to set one with me</div></div>
+    </div>`
+    + aiCard({face:"🙂",
+      body:`No pressure on this one. Plenty of people train for years without a number on it, and consistency beats a target every time. But if there <b>is</b> a number in your head, telling me means I can point at it instead of guessing.`})
+  ));
+}
+
+// ── H. Trainer side. ─────────────────────────────────────────────────────────
+{
+  cards.push(phone("H · Your side — setting one for a client","Set a goal","for Robert Miller",
+    `<div class="card">
+      <div class="metric" style="margin-bottom:9px">METRIC</div>
+      <div class="btnrow" style="margin-top:0">
+        <div class="btn pri">Body weight</div><div class="btn">Body fat</div><div class="btn">Lean mass</div>
+      </div>
+      <div class="metric" style="margin:14px 0 7px">TARGET</div>
+      <div style="display:flex;gap:9px">
+        <div style="flex:1"><div style="border:1px solid var(--border);border-radius:11px;padding:11px;font-size:16px;font-weight:800">245 lb</div>
+          <div style="font-size:10.5px;color:var(--text2);margin-top:4px">now 263 · −18 lb</div></div>
+        <div style="flex:1"><div style="border:1px solid var(--border);border-radius:11px;padding:11px;font-size:16px;font-weight:800">Dec 1</div>
+          <div style="font-size:10.5px;color:var(--text2);margin-top:4px">19 weeks out</div></div>
+      </div>
+      <div class="ask" style="background:#EEF6FF;border-color:var(--border)">
+        <p style="color:var(--text)"><b>That's 0.95 lb a week.</b> Sustainable, and roughly what he
+        managed in his first six weeks. His last four weigh-ins average 0.4 lb/wk, so this needs the
+        rate to roughly double — worth saying that to him when it lands.</p>
+      </div>
+      <div class="btnrow"><div class="btn pri">Send it to Robert</div><div class="btn">Save as draft</div></div>
+      <div style="font-size:11px;color:var(--text2);margin-top:9px;line-height:1.55">
+        He sees it as a suggestion from you and can accept, discuss, or set his own.
+      </div>
+    </div>`
+  ));
+}
+
+document.getElementById("grid").innerHTML = cards.join("");
+</script>
+</body>
+</html>
