@@ -227,6 +227,38 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
         </div>
       )}
 
+      {/* ─── The two NON-AI ways out, shown alongside the AI ones ───
+          Lauren Standefer, 2026-08-13, having swapped the stair master for a
+          walk outside: "it like wouldn't let me replace it without generating a
+          whole thing — is it possible to just add it and not have ai make a
+          warm up and all that? Like have the option to generate a workout or
+          just switch it to another?"
+
+          Both of those options already existed. They were rendered under
+          `!aiOn` — so turning the AI ON took them away, as though generating
+          and choosing were rivals. They are not: "build me something" and
+          "I'll pick, thanks" are different moods on different days, and a
+          client with AI enabled needs the second one MORE often, not less,
+          because the AI path is the one that adds a warm-up she did not ask
+          for. Same two buttons, no longer an either/or. */}
+      {aiOn && mode === "menu" && (
+        <div className="p-2 mt-2" style={{ ...box, borderStyle: "dashed" }}>
+          <p className="text-[10px] font-extrabold tracking-widest px-2.5 pt-1 pb-1.5" style={{ color: "var(--brand-text-secondary)" }}>
+            OR SKIP THE AI
+          </p>
+          <button onClick={openSwap} className="w-full flex items-center gap-3 p-2.5 text-left rounded-2xl">
+            <span className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0" style={{ background: "#e8edfd" }}>⇄</span>
+            <span><span className="block text-sm font-bold" style={{ color: "var(--brand-text)" }}>Swap for one I pick</span>
+            <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>Choose a cardio or basic session from the library — nothing generated</span></span>
+          </button>
+          <button onClick={() => setMode("type")} className="w-full flex items-center gap-3 p-2.5 text-left rounded-2xl">
+            <span className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0" style={{ background: "#fef3c7" }}>✍️</span>
+            <span><span className="block text-sm font-bold" style={{ color: "var(--brand-text)" }}>I did something else</span>
+            <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>Type it — recorded straight away, {COACH_FIRST_NAME} sees it. No warm-up invented.</span></span>
+          </button>
+        </div>
+      )}
+
       {aiOn && (mode === "replace" || mode === "equipment" || mode === "activity") && (
         <div className="p-3 mt-2" style={box}>
           {!result && <>
