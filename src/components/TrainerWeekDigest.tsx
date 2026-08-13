@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { isExcludedFromRoster } from "@/lib/demoClient";
+import AiBadge from "@/components/AiBadge";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -264,7 +265,11 @@ export default function TrainerWeekDigest() {
             <div style={{ marginLeft: 54, marginTop: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-text-secondary)" }}>
-                  {aiLoading === r.id ? "✨ Writing options…" : aiOpts[r.id] ? "✨ AI options — tap to use, then tweak:" : "Suggested — tap to use, then tweak:"}
+                  {aiLoading === r.id ? (
+                    <><AiBadge size={16} mood="thinking" title="" /> Writing options…</>
+                  ) : aiOpts[r.id] ? (
+                    <><AiBadge size={16} mood="plan" title="" /> AI options — tap to use, then tweak:</>
+                  ) : "Suggested — tap to use, then tweak:"}
                 </div>
                 {aiOpts[r.id] && aiLoading !== r.id && (
                   <button onClick={() => loadAiOptions(r.id, true)} style={{ fontSize: 10.5, fontWeight: 700, color: "var(--brand-primary)", background: "none", border: "none", cursor: "pointer" }}>↻ New ideas</button>

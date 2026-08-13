@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { sendMessage } from "@/app/(app)/home/messageActions";
 import { fx } from "@/lib/fx";
+import AiBadge from "@/components/AiBadge";
 
 /**
  * AttentionFeed — "Who needs you today". Trainer home, 2026-07-25.
@@ -343,7 +344,8 @@ function DraftPanel({
 
   if (state.loading) {
     return (
-      <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--brand-text-secondary)" }}>
+      <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--brand-text-secondary)", display: "flex", alignItems: "center", gap: 7 }}>
+        <AiBadge size={20} mood="thinking" title="" />
         Writing five options for {row.name}…
       </div>
     );
@@ -351,7 +353,9 @@ function DraftPanel({
 
   if (state.error) {
     return (
-      <div style={{ marginTop: 8, fontSize: 11.5, color: "#ef4444" }}>{state.error}</div>
+      <div style={{ marginTop: 8, fontSize: 11.5, color: "#ef4444", display: "flex", alignItems: "center", gap: 7 }}>
+        <AiBadge size={20} mood="concerned" title="" />{state.error}
+      </div>
     );
   }
 
@@ -370,6 +374,14 @@ function DraftPanel({
         overscrollBehavior: "contain",
       }}
     >
+      {/* These are model-written messages Dustin sends AS HIMSELF, so the face
+          belongs on the panel, not on the sent message. He is the author the
+          moment he taps send; before that they are the app's suggestions and
+          the screen should say so. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 9.5, fontWeight: 800,
+                    letterSpacing: 1, color: "var(--brand-text-secondary)" }}>
+        <AiBadge size={18} mood="explaining" title="" />DRAFTED FOR YOU — EDIT ANYTHING BEFORE SENDING
+      </div>
       {state.drafts.map((d, i) => {
         const isEditing = state.editing === i;
         return (

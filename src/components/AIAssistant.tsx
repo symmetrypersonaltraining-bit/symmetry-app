@@ -5,6 +5,7 @@ import { startDictation } from "@/lib/dictation";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { isTrainerEmail } from "@/lib/trainer";
+import AiBadge from "@/components/AiBadge";
 
 interface Change { op: string }
 interface Proposal { scheduled_workout_id: string; reason: string; summary: string; changes: Change[] }
@@ -267,7 +268,7 @@ export default function AIAssistant() {
           style={{ background: "var(--brand-primary)" }}
           aria-label="Open AI assistant"
         >
-          <i className="ti ti-sparkles text-2xl" style={{ color: "white" }} />
+          <AiBadge size={40} mood="neutral" ring={false} title="" />
         </button>
       )}
 
@@ -294,9 +295,11 @@ export default function AIAssistant() {
             {/* Header */}
             <div className="flex items-center gap-3 px-4 py-3 rounded-t-2xl flex-shrink-0"
               style={{ background: "var(--brand-primary)", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                <i className="ti ti-sparkles text-sm" style={{ color: "white" }} />
-              </div>
+              {/* The face, not a sparkles glyph. This is the trainer's own AI and
+                  it was the only assistant in the app with no face at all —
+                  which made it the one surface where "is this the app or a
+                  person" had no visual answer. */}
+              <AiBadge size={32} mood="explaining" ring={false} title="" />
               <div className="flex-1">
                 <p className="text-white font-semibold text-sm">Symmetry AI</p>
                 <p className="text-white/60 text-xs">Powered by Claude</p>
@@ -319,13 +322,7 @@ export default function AIAssistant() {
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {isEmpty && (
                 <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-                    style={{ background: "var(--brand-primary)" + "20" }}>
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="var(--brand-primary)" aria-hidden="true">
-                      <path d="M12 2l1.7 4.6L18 8.3l-4.3 1.7L12 14.6l-1.7-4.6L6 8.3l4.3-1.7z"/>
-                      <path d="M18.5 13l.85 2.15L21.5 16l-2.15.85L18.5 19l-.85-2.15L15.5 16l2.15-.85z"/>
-                    </svg>
-                  </div>
+                  <div className="mb-4"><AiBadge size={64} mood="neutral" ring={false} title="" /></div>
                   <p className="font-semibold text-sm mb-1" style={{ color: "var(--brand-text)" }}>Symmetry AI Assistant</p>
                   <p className="text-xs mb-4" style={{ color: "var(--brand-text-secondary)" }}>
                     Ask me about programming, exercises, client progress, or any training question.
@@ -367,13 +364,7 @@ export default function AIAssistant() {
                 <div key={i}>
                   <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                     {m.role === "assistant" && (
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center mr-2 mt-1 flex-shrink-0"
-                        style={{ background: "var(--brand-primary)" }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                          <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
-                          <path d="M12 16v-4M12 8h.01"/>
-                        </svg>
-                      </div>
+                      <div className="mr-2 mt-1 flex-shrink-0"><AiBadge size={28} mood="explaining" title="" /></div>
                     )}
                     <div
                       className="max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap leading-relaxed"
@@ -415,13 +406,9 @@ export default function AIAssistant() {
 
               {loading && (
                 <div className="flex justify-start">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center mr-2 mt-1 flex-shrink-0"
-                    style={{ background: "var(--brand-primary)" }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                      <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
-                      <path d="M12 16v-4M12 8h.01"/>
-                    </svg>
-                  </div>
+                  {/* `thinking` while it thinks — the mood registry exists so the
+                      face can carry state the copy hasn't got round to saying. */}
+                  <div className="mr-2 mt-1 flex-shrink-0"><AiBadge size={28} mood="thinking" title="" /></div>
                   <div className="rounded-2xl px-4 py-3 flex items-center gap-1.5"
                     style={{ background: "var(--brand-card)", borderRadius: "4px 18px 18px 18px" }}>
                     {[0, 1, 2].map(d => (

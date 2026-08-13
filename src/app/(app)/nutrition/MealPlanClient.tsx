@@ -7,6 +7,7 @@ import GroceryListSheet from "./GroceryListSheet";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 import { useKeyboardInset, scrollFocusedIntoView } from "@/lib/useKeyboardInset";
 import { adherencePct, kcalOf } from "@/lib/nutrition/dailyTotals";
+import AiBadge from "@/components/AiBadge";
 
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
@@ -1200,9 +1201,10 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
               }
             </button>
             {photoResult && (
-              <div className="mb-3 px-3 py-2 rounded-xl text-xs"
+              <div className="mb-3 px-3 py-2 rounded-xl text-xs flex items-start gap-2"
                 style={{ background: "#0EA5E910", color: "#0EA5E9", border: "1px solid #0EA5E930" }}>
-                {photoResult}
+                <AiBadge size={18} mood="nutrition" title="" />
+                <span>{photoResult}</span>
               </div>
             )}
             {offPlanPhotoPreview && (

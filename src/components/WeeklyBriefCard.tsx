@@ -20,6 +20,7 @@
 // The card must read fine with no AI line at all; `line` is garnish.
 
 import { useEffect, useState } from "react";
+import AiBadge from "@/components/AiBadge";
 
 interface Change {
   kind: "phase" | "new-movement" | "progressed" | "stalled" | "adherence";
@@ -58,7 +59,7 @@ const FOCUS_LABEL: Record<NonNullable<Brief["focus"]>["source"], string> = {
 
 const ICON: Record<Change["kind"], string> = {
   phase: "ti-stairs-up",
-  "new-movement": "ti-sparkles",
+  "new-movement": "ti-star",
   progressed: "ti-trending-up",
   stalled: "ti-alert-triangle",
   adherence: "ti-calendar-x",
@@ -140,7 +141,7 @@ export default function WeeklyBriefCard({ clientId }: { clientId: string }) {
   return (
     <div style={{ background: "#111827", color: "#e5e7eb" }} className="px-4 pt-3 pb-3">
       <div className="flex items-start gap-2 mb-2">
-        <i className="ti ti-clipboard-text text-base mt-0.5" style={{ color: "#9ca3af" }} />
+        <div className="mt-0.5 shrink-0"><AiBadge size={20} mood="plan" title="" /></div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold" style={{ color: "#f9fafb" }}>
             This week for {first}

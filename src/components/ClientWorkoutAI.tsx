@@ -7,6 +7,7 @@
 // session — the master library is never touched. Trainer-only surface.
 
 import { useState } from "react";
+import AiBadge from "@/components/AiBadge";
 
 interface Change { op: string; to_exercise?: string; exercise?: string; }
 interface Proposal { scheduled_workout_id: string; reason: string; summary: string; changes: Change[]; }
@@ -73,8 +74,7 @@ export default function ClientWorkoutAI({ clientId, clientName }: { clientId: st
   return (
     <div style={card}>
       <button onClick={() => setOpen((v) => !v)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-        <span style={{ fontSize: 16 }}>🤖</span>
-        <span style={{ flex: 1, textAlign: "left", fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>AI Workout Assist</span>
+        <AiBadge size={20} mood="lifting" title="" /><span style={{ flex: 1, textAlign: "left", fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>AI Workout Assist</span>
         <i className={`ti ti-chevron-${open ? "up" : "down"}`} style={{ fontSize: 16, color: "var(--brand-text-secondary)" }} />
       </button>
 
@@ -88,6 +88,15 @@ export default function ClientWorkoutAI({ clientId, clientName }: { clientId: st
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10, maxHeight: 380, overflowY: "auto" }}>
               {turns.map((t, i) => (
                 <div key={i}>
+                  {/* The AI's turns wear the face; yours don't. Without it this
+                      reads as two anonymous voices, and it is the surface where
+                      the app proposes changes to a real client's programme. */}
+                  {t.role !== "you" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
+                      <AiBadge size={18} mood="lifting" title="" />
+                      <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: .5, color: "var(--brand-text-secondary)" }}>COACH AI</span>
+                    </div>
+                  )}
                   <div style={{ alignSelf: t.role === "you" ? "flex-end" : "flex-start", background: t.role === "you" ? "var(--brand-primary)" : "var(--brand-card)", color: t.role === "you" ? "#fff" : "var(--brand-text)", borderRadius: 12, padding: "9px 12px", fontSize: 13, lineHeight: 1.5, maxWidth: "90%", marginLeft: t.role === "you" ? "auto" : 0 }}>
                     {t.text}
                   </div>

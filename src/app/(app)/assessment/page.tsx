@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { startDictation } from '@/lib/dictation';
+import AiBadge from "@/components/AiBadge";
 
 // \u2500\u2500\u2500 Types \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
@@ -769,7 +770,7 @@ export default function AssessmentPage() {
         if (aiLoading) {
           return (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <div className="w-16 h-16 rounded-full border-4 border-purple-500/30 border-t-purple-500 animate-spin" />
+              <AiBadge size={64} mood="thinking" ring={false} title="" />
               <p className="text-sm" style={{ color: 'var(--brand-text-secondary)' }}>Analyzing assessment data...</p>
             </div>
           );
@@ -778,10 +779,7 @@ export default function AssessmentPage() {
         if (!aiResult) {
           return (
             <div className="flex flex-col items-center justify-center py-20 gap-6">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: 'rgba(168,85,247,0.15)' }}>
-                <i className="ti ti-robot text-4xl" style={{ color: '#7c3aed' }} />
-              </div>
+              <AiBadge size={80} mood="neutral" ring={false} title="" />
               <div className="text-center">
                 <h3 className="text-lg font-semibold text-white mb-2">Ready for AI Analysis</h3>
                 <p className="text-sm" style={{ color: 'var(--brand-text-secondary)' }}>
@@ -794,7 +792,6 @@ export default function AssessmentPage() {
                 className="px-6 py-3 rounded-xl font-semibold text-white transition-all"
                 style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)' }}
               >
-                <i className="ti ti-sparkles mr-2" />
                 Generate Recommendation
               </button>
             </div>

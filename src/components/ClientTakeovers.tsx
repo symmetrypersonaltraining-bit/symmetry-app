@@ -459,7 +459,7 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
     return shell(
       <>
         <div style={{ background: "var(--grad-hero, var(--brand-primary))", color: "#fff", padding: "calc(34px + env(safe-area-inset-top)) 20px 26px", textAlign: "center" }}>
-          <div style={{ fontSize: 46, lineHeight: 1 }}>🎂</div>
+          <AiBadge size={88} mood="happy" ring={false} title="" />
           <div style={{ fontSize: 22, fontWeight: 900, marginTop: 10, lineHeight: 1.2 }}>
             When&rsquo;s your birthday?
           </div>
@@ -506,7 +506,10 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
     return shell(
       <>
         <div style={{ background: "var(--grad-hero, var(--brand-primary))", color: "#fff", padding: "calc(30px + env(safe-area-inset-top)) 20px 28px", textAlign: "center" }}>
-          <div style={{ fontSize: 50, lineHeight: 1 }}>🏆</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <AiBadge size={72} mood="hype" ring={false} title="" />
+            <span style={{ fontSize: 44, lineHeight: 1 }}>🏆</span>
+          </div>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, opacity: 0.85, marginTop: 10 }}>
             {w.emoji ? w.emoji + " " : ""}
             {w.title.toUpperCase()}
@@ -555,7 +558,7 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
     return shell(
       <>
         <div style={{ background: "var(--grad-hero, var(--brand-primary))", color: "#fff", padding: "calc(28px + env(safe-area-inset-top)) 20px 24px" }}>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, opacity: 0.85 }}>📣 FROM DUSTIN</div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, opacity: 0.85 }}>📣 FROM {COACH_FIRST_NAME.toUpperCase()}</div>
           <div style={{ fontSize: 12.5, opacity: 0.9, marginTop: 6 }}>
             {new Date(a.created_at).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
           </div>

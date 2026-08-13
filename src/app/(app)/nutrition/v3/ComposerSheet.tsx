@@ -8,6 +8,7 @@ import { useState } from "react";
 import { CustomItem, Macros, customMealMacros } from "@/lib/nutrition/dailyTotals";
 import { parseFoodText, lastParseFailure, parseFailureMessage } from "@/lib/nutrition/parseClient";
 import Sheet from "./Sheet";
+import AiBadge from "@/components/AiBadge";
 
 export default function ComposerSheet({
   title,
@@ -81,7 +82,7 @@ export default function ComposerSheet({
       </button>
       {parsing && (
         <div className="flex items-center gap-3 mt-3 rounded-2xl p-3" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
-          <span className="inline-block w-5 h-5 rounded-full animate-spin" style={{ border: "2.5px solid var(--brand-border)", borderTopColor: "var(--brand-primary)" }} />
+          <AiBadge size={22} mood="thinking" title="" />
           <span className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>Analyzing…</span>
         </div>
       )}

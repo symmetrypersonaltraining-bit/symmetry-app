@@ -18,6 +18,7 @@ import CommunityPair from "@/components/CommunityPair";
 import ClientTakeovers from "@/components/ClientTakeovers";
 import { RestDaySlip } from "@/components/FunMoments";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
+import AiBadge from "@/components/AiBadge";
 
 interface MetricPoint {
   metric_date: string;
@@ -853,7 +854,7 @@ export default function ClientDashboard({
         {isOwnTrainerView && (
           <div className="rounded-2xl p-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
             <div className="flex items-center gap-2 mb-2">
-              <i className="ti ti-brain text-base" style={{ color: "var(--brand-primary)" }} />
+              <AiBadge size={20} mood="explaining" title="" />
               <span className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>AI Insights</span>
               <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "color-mix(in srgb, var(--brand-primary) 13%, transparent)", color: "var(--brand-primary)" }}>Trainer View</span>
             </div>

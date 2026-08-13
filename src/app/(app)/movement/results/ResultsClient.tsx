@@ -5,6 +5,7 @@
 // (just-captured) or is passed a persisted assessment.
 import { useEffect, useState } from 'react';
 import BodyMapResults from '@/components/movement/BodyMapResults';
+import AiBadge from "@/components/AiBadge";
 
 interface AnyResult { [k: string]: unknown }
 
@@ -28,7 +29,14 @@ export default function ResultsClient({ initial }: { initial?: AnyResult | null 
 
   return (
     <div style={{ maxWidth: 560, margin: '0 auto', padding: '18px 14px 60px', color: '#eaf2ff' }}>
-      <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10, color: '#67d9ff', letterSpacing: 1.5 }}>YOUR MOVEMENT SCREEN</div>
+      {/* The whole page is model-written — headline, chain, the five education
+          layers, the keyframe notes, the proposed programme. It said none of
+          that anywhere, which on a page a client will read as a diagnosis is
+          the place it matters most. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <AiBadge size={26} mood="explaining" title="" />
+        <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10, color: '#67d9ff', letterSpacing: 1.5 }}>YOUR MOVEMENT SCREEN</div>
+      </div>
       <h1 style={{ fontSize: 22, margin: '4px 0 10px' }}>{edu.headline ?? 'Here’s what’s happening'}</h1>
 
       {/* anatomy body map with the findings pinned on */}

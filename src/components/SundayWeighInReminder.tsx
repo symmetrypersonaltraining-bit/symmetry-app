@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { fetchOwnClientRow } from "@/lib/ownClient";
+import AiBadge from "@/components/AiBadge";
 
 function todayCT(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
@@ -67,7 +68,10 @@ export default function SundayWeighInReminder() {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 85, background: "var(--brand-bg)", display: "flex", flexDirection: "column", overflowY: "auto" }}>
       <div style={{ background: "linear-gradient(135deg,var(--brand-primary),#6366f1)", color: "#fff", padding: "26px 20px 22px" }}>
-        <div style={{ fontSize: 12, opacity: 0.9, fontWeight: 700, letterSpacing: 0.5 }}>SUNDAY CHECK-IN</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <AiBadge size={26} mood="plan" ring={false} title="" />
+          <div style={{ fontSize: 12, opacity: 0.9, fontWeight: 700, letterSpacing: 0.5 }}>SUNDAY CHECK-IN</div>
+        </div>
         <div style={{ fontSize: 26, fontWeight: 800, marginTop: 4 }}>Time to weigh in ⚖️</div>
         <div style={{ fontSize: 13.5, opacity: 0.92, marginTop: 6, lineHeight: 1.5 }}>
           It&rsquo;s Sunday — your weekly weigh-in day. One number, same time, same routine. This is how we track what&rsquo;s working and dial in your next week.

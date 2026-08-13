@@ -204,6 +204,7 @@ export default function CoachChatSheet({
   selectedDate,
   canAct = true,
   fabMood = "nutrition",
+  fabLiftPx = 0,
   claimsSlot = true,
   surface = "nutrition",
   contextLine,
@@ -247,6 +248,19 @@ export default function CoachChatSheet({
   canAct?: boolean;
   /** The face on the floating button — the surface's own mood. */
   fabMood?: Mood;
+  /**
+   * Extra lift for the floating button, in px.
+   *
+   * Messages needs it: the composer is pinned to the bottom of that screen and
+   * the send button lands in exactly the corner the coach floats in, so the
+   * coach was sitting on top of it. Dustin, 13 Aug, with a screenshot: "the ai
+   * bot [is] over a button blocking it, it needs to be mounted in a better spot
+   * on that messaging page."
+   *
+   * The number lives at the mount site rather than inside CoachFab, because
+   * what it has to clear is a property of the SCREEN, not of the button.
+   */
+  fabLiftPx?: number;
   /**
    * Whether this instance owns the ✦ slot for its screen.
    *
@@ -580,7 +594,7 @@ export default function CoachChatSheet({
     <>
       {/* The shared button — placement, z-order and the hide-under-the-keyboard
           rule live in CoachFab so every mount of the coach behaves the same. */}
-      {!open && !startOpen && <CoachFab onClick={openChat} mood={fabMood} />}
+      {!open && !startOpen && <CoachFab onClick={openChat} mood={fabMood} liftPx={fabLiftPx} />}
 
       {open && (
         <Sheet title="✦ Coach" subtitle="Grounded in your logs, targets & trends" onClose={() => { setOpen(false); onClose?.(); }}>
@@ -725,7 +739,8 @@ export default function CoachChatSheet({
                 </div>
               ))}
               {sending && (
-                <div className="flex mb-2">
+                <div className="flex mb-2 items-end gap-1.5">
+                  <AiBadge size={20} mood="thinking" title="" />
                   <div className="flex items-center gap-1" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", borderRadius: "16px 16px 16px 4px", padding: "12px 14px" }} aria-label="Coach is typing">
                     {[0, 1, 2].map((i) => (
                       <span key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--brand-text-secondary)", display: "inline-block", animation: `coachdot 1.1s ease-in-out ${i * 0.18}s infinite` }} />

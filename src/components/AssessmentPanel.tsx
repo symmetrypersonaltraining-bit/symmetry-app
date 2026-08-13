@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import AiBadge from "@/components/AiBadge";
 
 type Assessment = Record<string, unknown> & {
   assessed_at?: string | null;
@@ -100,7 +101,10 @@ export default function AssessmentPanel({ clientId }: { clientId: string }) {
         <div className="mt-3 space-y-2">
           {a.ai_assessment_summary ? (
             <div className="text-xs rounded-xl px-3 py-2" style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }}>
-              <span className="font-semibold" style={{ color: "var(--brand-primary)" }}>AI summary: </span>{String(a.ai_assessment_summary)}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, verticalAlign: "-5px" }}>
+                <AiBadge size={17} title="" mood="explaining" />
+                <span className="font-semibold" style={{ color: "var(--brand-primary)" }}>AI summary:</span>
+              </span>{" "}{String(a.ai_assessment_summary)}
             </div>
           ) : null}
           {details.map(d => (

@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from "react";
 import { sendClientMessage } from "@/app/(app)/home/messageActions";
-import CoachBadge from "@/components/CoachBadge";
+import AiBadge from "@/components/AiBadge";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 interface FocusData { message: string; question: string | null; }
@@ -92,12 +92,20 @@ export default function CoachFocusCard() {
   return (
     <div style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", borderRadius: 18, padding: 14, boxShadow: "0 8px 26px rgba(20,30,55,0.08)", marginBottom: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <div style={{ fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>🧠 Coach&rsquo;s Read</div>
+        {/* Was 🧠 + CoachBadge — Dustin's real photograph — on a paragraph
+            written by Sonnet in /api/coach/focus. CoachBadge is reserved for
+            things he actually wrote; using it here is the strongest possible
+            claim of authorship attached to the weakest possible evidence.
+            ClientWeekSummary already does this correctly by branching on
+            focusIsAi; this is that pattern, applied. */}
+        <div style={{ fontWeight: 800, fontSize: 14, color: "var(--brand-text)", display: "flex", alignItems: "center", gap: 7 }}>
+          <AiBadge size={22} mood="plan" title="" />Your read for today
+        </div>
         <div style={{ fontSize: 10, color: "var(--brand-text-secondary)", fontWeight: 600, letterSpacing: 0.3 }}>TODAY</div>
       </div>
 
       <div className="focus-panel" style={{ padding: 11 }}>
-        <CoachBadge size={30} />
+        <AiBadge size={30} mood="plan" />
         <div style={{ fontSize: 12.5, lineHeight: 1.55, color: "var(--brand-text)" }}>{data.message}</div>
       </div>
 

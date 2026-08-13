@@ -80,7 +80,6 @@ export default function ExperienceSettings({ isTrainer }: { isTrainer: boolean }
   const [haptics, setHaptics] = useState(true);
   const [board, setBoard] = useState(false);
   const [nudges, setNudges] = useState(true);
-  const [nudgesLive, setNudgesLive] = useState(false);
   const [coachbotLive, setCoachbotLive] = useState(false);
   const [clientId, setClientId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -109,10 +108,8 @@ export default function ExperienceSettings({ isTrainer }: { isTrainer: boolean }
           }
         }
         if (isTrainer) {
-          const { data: f } = await supabase.from("app_flags").select("enabled").eq("key", "nudges_live").maybeSingle();
           const { data: cb } = await supabase.from("app_flags").select("enabled").eq("key", "coachbot_live").maybeSingle();
           setCoachbotLive((cb as { enabled: boolean } | null)?.enabled === true);
-          setNudgesLive((f as { enabled: boolean } | null)?.enabled === true);
         }
       } catch {
         /* leave defaults */
@@ -205,32 +202,20 @@ export default function ExperienceSettings({ isTrainer }: { isTrainer: boolean }
           <p className="text-xs font-bold mb-1 mt-2" style={{ color: "var(--brand-text-secondary)", letterSpacing: 1 }}>
             AUTOMATION · TRAINER ONLY
           </p>
+          {/* The "send AI check-ins to clients" switch is GONE, not defaulted
+              off — /api/ai-nudges cannot message a client any more whatever
+              this said. Leaving a toggle that promises delivery the code
+              refuses to perform is worse than having no toggle: it is a lie in
+              the settings screen, and the first person to notice would be a
+              client who never got the message it claimed to send.
+              What the engine still does is described below, truthfully. */}
           <Row
-            icon="ti-robot"
-            title="Send AI check-ins to clients"
-            sub={
-              nudgesLive
-                ? "LIVE — the nightly run messages clients in your name. Caps and rehab guards still apply."
-                : "Preview only. The nightly run drafts everything and messages the summary to you, but sends nothing to clients."
-            }
-            on={nudgesLive}
-            disabled={!ready}
-            onToggle={() => {
-              const next = !nudgesLive;
-              setNudgesLive(next);
-              fx(next ? "pr" : "tap");
-              (async () => {
-                try {
-                  const { error } = await supabase
-                    .from("app_flags")
-                    .update({ enabled: next, updated_at: new Date().toISOString() })
-                    .eq("key", "nudges_live");
-                  if (error) setNudgesLive(!next);
-                } catch {
-                  setNudgesLive(!next);
-                }
-              })();
-            }}
+            icon="ti-list-check"
+            title="Weekly re-engagement digest"
+            sub="Drafts what would be worth saying to anyone drifting and sends the list to you — nothing goes to a client. Send it in your own words, or don't."
+            on
+            disabled
+            onToggle={() => {}}
           />
 
           <Row

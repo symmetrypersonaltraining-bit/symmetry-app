@@ -15,6 +15,7 @@ import { useMemo, useState } from "react";
 import NumericInput from "@/components/NumericInput";
 import { createClient } from "@/lib/supabase/client";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import AiBadge from "@/components/AiBadge";
 import {
   perServing, recipeTotals, validateRecipe, visibilityLabel,
   type RecipeIngredient, type RecipeVisibility,
@@ -644,9 +645,13 @@ function RecipeBuilder({
             style={{ ...input, marginTop: 4, resize: "vertical" }} />
           <button onClick={runAi} disabled={aiBusy || !aiText.trim()}
             style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 10, border: "1px solid var(--brand-primary)", background: "transparent", color: "var(--brand-primary)", fontWeight: 800, fontSize: 13, cursor: aiBusy ? "default" : "pointer", opacity: aiBusy || !aiText.trim() ? 0.55 : 1 }}>
-            {aiBusy ? "Working out the numbers…" : "✨ Work out the numbers for me"}
+            {aiBusy ? "Working out the numbers…" : "Work out the numbers for me"}
           </button>
-          {aiNote && <p style={{ fontSize: 11.5, color: "var(--brand-text-secondary)", marginTop: 6, lineHeight: 1.45 }}>{aiNote}</p>}
+          {aiNote && (
+            <p style={{ fontSize: 11.5, color: "var(--brand-text-secondary)", marginTop: 6, lineHeight: 1.45, display: "flex", gap: 6, alignItems: "flex-start" }}>
+              <AiBadge size={17} mood="nutrition" title="" />{aiNote}
+            </p>
+          )}
         </div>
       </div>
 

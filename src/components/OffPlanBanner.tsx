@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { startDictation } from "@/lib/dictation";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import AiBadge from "@/components/AiBadge";
 
 interface SwapDay { id: string; label: string; }
 interface OffPlanRow { id: string; description: string; details: string | null; status: string; }
@@ -291,7 +292,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
             <button onClick={() => generate(mode)} disabled={busy || (mode !== "replace" && !aiPrompt.trim() && !(mode === "equipment" && image))}
               className="w-full mt-2 py-2.5 rounded-full text-xs font-bold text-white"
               style={{ background: "var(--brand-primary)", opacity: busy ? 0.6 : 1 }}>
-              {busy ? "🤖 Designing…" : mode === "activity" ? "Log it with AI ✨" : "Build my workout ✨"}
+              {busy ? "Designing…" : mode === "activity" ? "Log it with AI" : "Build my workout"}
             </button>
             <p className="text-center mt-2" style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>AI checks your current program so it fits and doesn’t clash with what’s coming up.</p>
           </>}

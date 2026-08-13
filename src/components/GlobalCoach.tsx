@@ -53,6 +53,23 @@ export function surfaceFor(pathname: string): string | null {
   return "app";
 }
 
+/**
+ * Screens with something already pinned in the bottom-right, and how far the
+ * coach has to rise to clear it.
+ *
+ * Messages pins a composer — text field, camera, send — across the bottom, and
+ * the send button is in the same corner the coach floats in. It was sitting on
+ * top of it, so the button could not be pressed. Screenshot from Dustin,
+ * 13 Aug: "the ai bot [is] over a button blocking it."
+ *
+ * 64 clears the composer and still leaves the coach below the last message
+ * bubble. It is a per-screen fact, so it lives here at the mount site rather
+ * than inside CoachFab, which has no idea what is underneath it.
+ */
+const FAB_LIFT: Record<string, number> = {
+  messages: 64,
+};
+
 /** Nothing on this screen can execute an action, and none of these are called. */
 const NO_ACTIONS: CoachActions = {
   swapMealCustom: async () => {},
@@ -108,6 +125,7 @@ export default function GlobalCoach() {
       // the whole client app on 13 Aug. See the prop's note.
       claimsSlot={false}
       fabMood={surfaceMood(surface)}
+      fabLiftPx={FAB_LIFT[surface] ?? 0}
       // The opener is the one thing that should know which screen it is on.
       surface={surface}
     />

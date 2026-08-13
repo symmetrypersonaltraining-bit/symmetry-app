@@ -17,6 +17,7 @@ import { createDetector, estimateDistanceFt, keypointQuality, type PoseDetectorH
 const LiveAnatomy3D = dynamic(() => import('@/components/movement/LiveAnatomy3D'), { ssr: false });
 import { VIEW_SCRIPTS, MOVEMENT_DEMOS, evaluateGate, gatePassed, nextCoachingCue, speak } from '@/lib/movement/coach';
 import type { Frame, Keypoint, ViewCapture, ViewName } from '@/lib/movement/types';
+import AiBadge from "@/components/AiBadge";
 
 type Phase = 'intro' | 'demo' | 'setup' | 'recording' | 'between' | 'analyzing' | 'done';
 const VIEW_SEQUENCE: ViewName[] = ['front', 'side_left', 'side_right', 'wedge'];
@@ -275,7 +276,7 @@ export default function CaptureClient({ clientId, clientName, capturedBy }: { cl
 
         {phase === 'analyzing' && (
           <Overlay>
-            <div className="pulse" style={{ fontSize: 34 }}>◍</div>
+            <div className="pulse"><AiBadge size={72} mood="thinking" ring={false} title="" /></div>
             <h2 style={h2}>Reading your movement…</h2>
             <p style={sub}>Fusing your views, checking the chain, finding the driver. A few seconds.</p>
           </Overlay>
@@ -283,6 +284,7 @@ export default function CaptureClient({ clientId, clientName, capturedBy }: { cl
 
         {error && (
           <Overlay>
+            <AiBadge size={64} mood="concerned" ring={false} title="" />
             <h2 style={{ ...h2, color: '#ff9db1' }}>Something interrupted the screen</h2>
             <p style={sub}>{error}</p>
           </Overlay>

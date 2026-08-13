@@ -5,6 +5,7 @@ import { pausePaymentReminder } from './actions';
 import { createClient } from '@/lib/supabase/client';
 import { submitFeedback } from '@/lib/feedback';
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import AiBadge from "@/components/AiBadge";
 
 type TodaySession = { id: string; clientId: string; clientName: string; workoutLabel: string; dayId: string; status: string; };
 type Client = { id: string; name: string };
@@ -195,7 +196,7 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
             tests/unit/appEvents.test.ts now fails the build on a dispatch with
             no listener. */}
         <button onClick={() => window.dispatchEvent(new CustomEvent('symmetry:open-ai'))} title='AI assistant' style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--brand-primary)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,156,245,.35)' }}>
-          <i className='ti ti-sparkles' style={{ fontSize: 20, color: '#fff' }} />
+          <AiBadge size={26} mood="explaining" ring={false} title="" />
         </button>
         <button onClick={() => setFeedbackOpen(true)} title='App Feedback' style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--brand-card)', border: '1.5px solid var(--brand-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(20,30,55,.10)' }}>
           <i className='ti ti-message-2' style={{ fontSize: 18, color: 'var(--brand-text-secondary)' }} />

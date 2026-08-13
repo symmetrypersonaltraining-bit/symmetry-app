@@ -1,37 +1,45 @@
-// POST /api/ai-nudges   body: { send?: boolean }
+// POST /api/ai-nudges
 //
-// The re-engagement engine. Segments every active client from real data,
-// writes one personal message per client who needs one, and sends Dustin a
-// digest of anyone past the point where automated messages help.
+// The re-engagement engine: segments every active client from real data, drafts
+// what would be worth saying to each of them, and gives Dustin the list.
 //
-// ── SAFETY: PREVIEW BY DEFAULT ────────────────────────────────────────────
-// send defaults to FALSE. In preview mode it does everything except deliver to
-// clients: it generates the copy, logs it to ai_nudge_log with sent=false, and
-// still sends Dustin the digest so he can read exactly what WOULD have gone
-// out. Nothing reaches a client until the caller passes send:true.
+// ── IT DOES NOT MESSAGE CLIENTS. AT ALL. ──────────────────────────────────
+// Dustin, 13 Aug: "go ahead and kill client dm from ai path completely. keep
+// engine."
 //
-// ── THESE ARE SIGNED AS THE BOT, NOT AS DUSTIN (changed 13 Aug) ───────────
-// This header used to say the messages "go out in Dustin's name" as though it
-// were a safety property. It was the defect. Bobbie Page, reading one in her
-// own thread: "Is this ai or Dustin chatting?"
+// The engine stays because the segmentation is genuinely good — it is right
+// about who is slipping, and that is the hard part. The DELIVERY is gone, by
+// deletion rather than by a flag, because a flag is a thing somebody flips back
+// on a quiet evening without re-reading why it was off.
 //
-// If a client cannot tell a message Dustin wrote from one a model wrote, then
-// every message he actually writes loses its weight — and a client who works
-// it out later does not just discount the nudge, they discount the last real
-// one too. So every insert below carries sender_kind:'coachbot' and renders as
-// Coach Bot. Do not remove it to make the nudges feel "more personal"; that
-// trade is exactly backwards.
+// It went for two reasons, and the second is the one that settled it:
 //
-// ── GUARDRAILS (all enforced here, not left to the prompt) ────────────────
-//  - one nudge per client per 48h, max 3 per rolling 7 days
+//   1. It was signed as Dustin. Bobbie Page, reading one in her own thread with
+//      him: "Is this ai or Dustin chatting?" Labelling it as the bot fixed the
+//      honesty and left the rest untouched.
+//
+//   2. It is the wrong CHANNEL. A DM arrives uninvited, lands in the same
+//      thread as his real coaching, and — once it is honestly labelled a bot —
+//      amounts to software texting somebody to point out they have not logged.
+//      Every other AI surface in this app talks to a person who has already
+//      opened it: the coach on each screen, the go-quiet check-in, the weigh-in
+//      nudge, the cards on Home, Nutrition and Progress. Those arrive when
+//      somebody is receptive. A push into a private thread does the opposite,
+//      and spends his credibility doing it.
+//
+// So the copy is still written, still logged to ai_nudge_log, and still reaches
+// HIM in the digest — where he can send it in his own words if he wants to,
+// which was always the version worth having.
+//
+// ── GUARDRAILS (kept; they shape what the digest recommends) ──────────────
+//  - one per client per 48h, max 3 per rolling 7 days
 //  - client kill switch: client_app_settings.nudges_enabled
 //  - rehab / pain-relief clients only ever get the gentle tone
 //  - thriving clients get nothing at all
-//  - clients silent 10+ days are NOT messaged; they go to the trainer digest
+//  - clients silent 10+ days are flagged for a personal text, not a draft
 //  - never mentions body weight, body fat or appearance (prompt + review)
 //
-// Auth: trainer-only, or a scheduled task using the service role via
-// x-cron-secret. Never callable by a client.
+// Auth: trainer-only, or a scheduled task. Never callable by a client.
 
 import { NextRequest, NextResponse } from "next/server";
 import { SONNET_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
@@ -115,11 +123,10 @@ function validate(raw: unknown): { body: string } | null {
 }
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => ({}))) as { send?: boolean };
-  // Two locks, both must be open. The caller has to ASK to send, and the
-  // trainer-controlled master switch (Settings → Experience → Automation) has
-  // to be on. Either one off means preview.
-  let wantSend = body?.send === true;
+  // There is no `send` parameter any more, and that is the point. This route
+  // cannot deliver to a client whatever it is passed — see the note above the
+  // (deleted) insert below. A caller still passing { send: true } gets a
+  // digest, silently and correctly.
 
   // ── auth: a scheduler invocation OR a signed-in trainer ──
   // This one was already correct (it failed closed on an unset secret); it now
@@ -139,16 +146,6 @@ export async function POST(req: NextRequest) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return NextResponse.json({ error: "Not configured" }, { status: 500 });
   const admin = createAdminClient(url, key, { auth: { persistSession: false } }) as unknown as Db;
-
-  // Master switch. Absent or false => preview, whatever the caller asked for.
-  if (wantSend) {
-    try {
-      const { data: flag } = await admin.from("app_flags").select("enabled").eq("key", "nudges_live").maybeSingle();
-      if ((flag as { enabled: boolean } | null)?.enabled !== true) wantSend = false;
-    } catch {
-      wantSend = false;
-    }
-  }
 
   // Kill switch. This was the ONLY route in the app that never checked it at
   // all — a weekly sweep across the whole roster, unattended, able to spend
@@ -334,39 +331,40 @@ export async function POST(req: NextRequest) {
       }
       if (!text) continue;
 
-      let didSend = false;
-      if (wantSend && trainerAuth) {
-        const c = clients.find((x) => x.id === r.id);
-        if (c?.auth_user_id) {
-          const { error } = await admin.from("messages").insert({
-            from_id: trainerAuth,
-            to_id: c.auth_user_id,
-            client_id: r.id,
-            is_group: false,
-            // MARKED AS THE BOT. Bobbie Page, 13 Aug, replying in her own
-            // thread: "Is this ai or Dustin chatting?"
-            //
-            // She was right to ask, and that she had to is the bug. The header
-            // of this file used to say these "go out in Dustin's name" as
-            // though it were a safety note; it was the defect. A client cannot
-            // tell a written-by-Dustin message from a generated one, so every
-            // message he actually writes loses its weight — and a client who
-            // works out later that the warm personal check-in was automatic
-            // does not just distrust the nudge, they distrust the last real
-            // one too.
-            //
-            // sender_kind takes precedence over from_id in MessagesClient, so
-            // this alone makes it render as Coach Bot with the AI face.
-            sender_kind: "coachbot",
-            body: text,
-          });
-          didSend = !error;
-        }
-      }
+      // ── NOTHING IS SENT TO A CLIENT FROM HERE. EVER. ───────────────────
+      //
+      // Dustin, 13 Aug: "go ahead and kill client dm from ai path completely.
+      // keep engine."
+      //
+      // The engine is genuinely good — the segmentation is right about who is
+      // slipping, and it stays. What is gone is the delivery, and it is gone by
+      // DELETION rather than by a flag, because a flag is a thing someone flips
+      // back on a quiet evening without re-reading why it was off.
+      //
+      // Two reasons it had to go, and the second is the one that killed it:
+      //
+      //   1. It was signed as Dustin. Bobbie Page, reading one: "Is this ai or
+      //      Dustin chatting?" Marking it as the bot fixed the honesty, but
+      //      left the second problem untouched.
+      //
+      //   2. It is the wrong channel. A DM arrives uninvited, sits in the same
+      //      thread as his real coaching, and — once it is honestly labelled as
+      //      a bot — amounts to software texting somebody to say they have not
+      //      logged. Every other AI surface in this app speaks to a person who
+      //      has already opened it: the coach on each screen, the go-quiet
+      //      check-in, the weigh-in nudge, the cards on Home, Nutrition and
+      //      Progress. Those reach people at the moment they are receptive. A
+      //      push into a private thread does the opposite and spends his
+      //      credibility to do it.
+      //
+      // So the copy is still written, still logged to ai_nudge_log, and still
+      // reaches HIM in the digest below — where he can send it in his own words
+      // if he wants to, which was always the version worth having.
+      const didSend = false;
 
       await admin.from("ai_nudge_log").insert({
         client_id: r.id, segment: seg, tone, body: text, sent: didSend,
-        suppressed: didSend ? null : wantSend ? "send_failed" : "preview_mode",
+        suppressed: "digest_only",
       });
       previews.push({ name: r.name || "?", segment: seg, tone, body: text, sent: didSend });
     }
@@ -374,7 +372,7 @@ export async function POST(req: NextRequest) {
     // ── digest to ${COACH_FIRST_NAME} ──
     if (trainerAuth) {
       const lines: string[] = [
-        wantSend ? "🤖 Nudges sent tonight:" : "🤖 Nudge PREVIEW (nothing was sent to clients):",
+        "Who's drifting — nothing was sent to anyone:",
         ...previews.map((p) => `• ${p.name} [${p.segment}/${p.tone}] — "${p.body}"`),
       ];
       if (escalations.length) {
@@ -396,7 +394,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      mode: wantSend ? "sent" : "preview",
+      mode: "digest_only",
       considered: rows.length,
       generated: previews.length,
       escalated: escalations.length,

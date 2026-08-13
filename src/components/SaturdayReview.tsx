@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fx } from "@/lib/fx";
+import AiBadge from "@/components/AiBadge";
 
 interface Draft {
   id: string;
@@ -166,7 +167,7 @@ export default function SaturdayReview() {
             textAlign: "left",
           }}
         >
-          <span style={{ fontSize: 16 }}>📝</span>
+          <AiBadge size={22} mood="plan" title="" />
           <span style={{ flex: 1, fontSize: 12.5, fontWeight: 800, color: "var(--brand-text)" }}>
             {drafts.length} focus {drafts.length === 1 ? "line" : "lines"} waiting on you for next week
           </span>
@@ -186,7 +187,10 @@ export default function SaturdayReview() {
           flex: "0 0 auto",
         }}
       >
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, opacity: 0.85 }}>SATURDAY REVIEW</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <AiBadge size={22} mood="plan" ring={false} title="" />
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, opacity: 0.85 }}>SATURDAY REVIEW</div>
+        </div>
         <div style={{ fontSize: 21, fontWeight: 900, marginTop: 3 }}>Next week&apos;s focus — {drafts.length} to approve</div>
         <div style={{ fontSize: 12, opacity: 0.9, marginTop: 5, lineHeight: 1.45 }}>
           Written from each client&apos;s real numbers. Tap any line to edit it. Anything you don&apos;t get to publishes

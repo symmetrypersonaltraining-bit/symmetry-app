@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { fx } from "@/lib/fx";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import AiBadge from "@/components/AiBadge";
 
 interface OpenQuestion {
   id: string;
@@ -99,8 +100,14 @@ export default function ProgrammingQuestion() {
         padding: 16,
       }}
     >
+      {/* This said "CHECK-IN FROM DUSTIN" over a question CLAUDE wrote, in
+          /api/cron/weekly-ai. Same lie as the nudges that had Bobbie asking
+          "is this ai or Dustin chatting?", on a different screen: the label
+          spends his credibility on words he never saw.
+          It is still worth asking — the ANSWER goes to him — so the framing is
+          now truthful about both halves: the app asked, he reads it. */}
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-        <span style={{ fontSize: 15 }}>📋</span>
+        <AiBadge size={22} mood="plan" title="" />
         <span
           style={{
             fontSize: 10.5,
@@ -109,7 +116,7 @@ export default function ProgrammingQuestion() {
             color: "var(--brand-primary)",
           }}
         >
-          CHECK-IN FROM DUSTIN
+          A QUESTION FOR YOU · {COACH_FIRST_NAME.toUpperCase()} READS THE ANSWER
         </span>
       </div>
 
