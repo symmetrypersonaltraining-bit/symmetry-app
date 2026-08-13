@@ -8,8 +8,19 @@
 // send defaults to FALSE. In preview mode it does everything except deliver to
 // clients: it generates the copy, logs it to ai_nudge_log with sent=false, and
 // still sends Dustin the digest so he can read exactly what WOULD have gone
-// out. Nothing reaches a client until the caller passes send:true. This is
-// deliberate — these messages go out in Dustin's name.
+// out. Nothing reaches a client until the caller passes send:true.
+//
+// ── THESE ARE SIGNED AS THE BOT, NOT AS DUSTIN (changed 13 Aug) ───────────
+// This header used to say the messages "go out in Dustin's name" as though it
+// were a safety property. It was the defect. Bobbie Page, reading one in her
+// own thread: "Is this ai or Dustin chatting?"
+//
+// If a client cannot tell a message Dustin wrote from one a model wrote, then
+// every message he actually writes loses its weight — and a client who works
+// it out later does not just discount the nudge, they discount the last real
+// one too. So every insert below carries sender_kind:'coachbot' and renders as
+// Coach Bot. Do not remove it to make the nudges feel "more personal"; that
+// trade is exactly backwards.
 //
 // ── GUARDRAILS (all enforced here, not left to the prompt) ────────────────
 //  - one nudge per client per 48h, max 3 per rolling 7 days
@@ -54,7 +65,7 @@ function daysBetween(a: string, b: string): number {
   return Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 }
 
-const SYSTEM = `You write short re-engagement messages from ${COACH_FIRST_NAME}, a personal trainer, to his client inside the Symmetry app. They arrive in the client's message inbox and look like ${COACH_FIRST_NAME} wrote them.
+const SYSTEM = `You are the Symmetry app's coach assistant, writing a short re-engagement message to one of ${COACH_FIRST_NAME}'s clients inside the app. It arrives in their inbox clearly labelled as coming from the app, NOT from ${COACH_FIRST_NAME} — so never write as though you are him, never sign as him, and never say "I" about something only he would know or do. Refer to him in the third person, and hand anything that needs his judgement to him by name.
 
 Respond with ONLY valid JSON, no markdown, no fences:
 {"body": string}
@@ -332,6 +343,21 @@ export async function POST(req: NextRequest) {
             to_id: c.auth_user_id,
             client_id: r.id,
             is_group: false,
+            // MARKED AS THE BOT. Bobbie Page, 13 Aug, replying in her own
+            // thread: "Is this ai or Dustin chatting?"
+            //
+            // She was right to ask, and that she had to is the bug. The header
+            // of this file used to say these "go out in Dustin's name" as
+            // though it were a safety note; it was the defect. A client cannot
+            // tell a written-by-Dustin message from a generated one, so every
+            // message he actually writes loses its weight — and a client who
+            // works out later that the warm personal check-in was automatic
+            // does not just distrust the nudge, they distrust the last real
+            // one too.
+            //
+            // sender_kind takes precedence over from_id in MessagesClient, so
+            // this alone makes it render as Coach Bot with the AI face.
+            sender_kind: "coachbot",
             body: text,
           });
           didSend = !error;
@@ -363,6 +389,8 @@ export async function POST(req: NextRequest) {
         to_id: trainerAuth,
         client_id: null,
         is_group: false,
+        // The digest is the app talking to Dustin about itself. Same rule.
+        sender_kind: "coachbot",
         body: lines.join("\n").slice(0, 4000),
       });
     }

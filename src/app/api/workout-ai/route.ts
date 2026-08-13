@@ -318,6 +318,10 @@ export async function POST(req: NextRequest) {
       const verb = mode === "activity" ? "logged an extra activity" : mode === "equipment" ? "AI-built a workout from available equipment" : "AI-replaced today's workout";
       await admin.from("messages").insert({
         from_id: scope.userId, to_id: trainerAuth, client_id: clientId, is_group: false,
+        // The app wrote this, not the client whose id is on from_id. It only
+        // goes to Dustin so the stakes are lower than the client nudges — but
+        // it is the same rule, and an exception is how a rule erodes.
+        sender_kind: "coachbot",
         body: `🤖 [AI Workout] ${verb}: "${workout.title}". ${workout.rationale || workout.focus || ""}`.trim().slice(0, 500),
       });
     }
