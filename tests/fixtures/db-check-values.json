@@ -1,0 +1,417 @@
+{
+  "ai_chat_sessions": {
+    "context_type": [
+      "general",
+      "programming",
+      "intake",
+      "billing",
+      "scheduling",
+      "notes"
+    ]
+  },
+  "ai_chat_turns": {
+    "role": [
+      "client",
+      "coach"
+    ]
+  },
+  "ai_program_drafts": {
+    "status": [
+      "draft",
+      "pending_review",
+      "approved",
+      "rejected"
+    ]
+  },
+  "app_users": {
+    "role": [
+      "trainer",
+      "client"
+    ]
+  },
+  "appointments": {
+    "source": [
+      "trainer",
+      "client",
+      "gcal_import",
+      "gcal"
+    ],
+    "status": [
+      "scheduled",
+      "completed",
+      "cancelled_client",
+      "cancelled_trainer",
+      "no_show"
+    ]
+  },
+  "birthday_posts": {
+    "kind": [
+      "group",
+      "heads_up"
+    ]
+  },
+  "cardio_logs": {
+    "source": [
+      "client",
+      "trainer_backfill",
+      "claude",
+      "migration"
+    ]
+  },
+  "client_app_settings": {
+    "ai_tier": [
+      "standard",
+      "advanced"
+    ]
+  },
+  "client_assessments": {
+    "status": [
+      "pending_signup",
+      "active",
+      "declined"
+    ]
+  },
+  "client_goals": {
+    "metric": [
+      "weight",
+      "body_fat_pct",
+      "lean_mass"
+    ],
+    "set_by": [
+      "trainer",
+      "client"
+    ],
+    "status": [
+      "proposed",
+      "active",
+      "hit",
+      "rolled",
+      "declined",
+      "closed"
+    ]
+  },
+  "clients": {
+    "billing_type": [
+      "per_session",
+      "flat",
+      "none"
+    ]
+  },
+  "daily_logs": {
+    "source": [
+      "client",
+      "trainer_backfill",
+      "claude",
+      "migration"
+    ]
+  },
+  "exercise_video_candidates": {
+    "confidence": [
+      "high",
+      "medium",
+      "low"
+    ],
+    "status": [
+      "pending",
+      "approved",
+      "rejected",
+      "too_long",
+      "dead",
+      "superseded"
+    ]
+  },
+  "exercises": {
+    "availability_status": [
+      "available",
+      "confirm_equipment",
+      "excluded"
+    ],
+    "modality": [
+      "powerlifting",
+      "bodybuilding",
+      "functional/athletic",
+      "conditioning",
+      "mobility"
+    ]
+  },
+  "food_catalog": {
+    "source": [
+      "usda",
+      "off",
+      "brand",
+      "restaurant",
+      "community",
+      "client"
+    ]
+  },
+  "foods": {
+    "source": [
+      "seed",
+      "ai",
+      "trainer",
+      "client",
+      "claude"
+    ]
+  },
+  "group_challenges": {
+    "metric": [
+      "sessions",
+      "logging"
+    ],
+    "scoring_stat": [
+      "workout_count",
+      "streak_days",
+      "pr_count",
+      "protein_days",
+      "cardio_minutes",
+      "mobility_sessions",
+      "group_shares",
+      "team_total",
+      "improvement"
+    ],
+    "status": [
+      "draft",
+      "live",
+      "scoring",
+      "complete"
+    ]
+  },
+  "health_connections": {
+    "status": [
+      "active",
+      "revoked",
+      "error"
+    ]
+  },
+  "integrity_checks": {
+    "severity": [
+      "critical",
+      "warn",
+      "info"
+    ]
+  },
+  "meal_adherence_logs": {
+    "adherence": [
+      "Full",
+      "3/4",
+      "1/2",
+      "1/4",
+      "Partial",
+      "Off-plan",
+      "Skipped"
+    ],
+    "source": [
+      "client",
+      "trainer_backfill",
+      "claude",
+      "migration"
+    ]
+  },
+  "meal_items": {
+    "basis": [
+      "cooked",
+      "raw"
+    ]
+  },
+  "meal_plans": {
+    "status": [
+      "draft",
+      "pending",
+      "live",
+      "archived"
+    ]
+  },
+  "message_reactions": {
+    "emoji": [
+      "👊",
+      "💪",
+      "🔥",
+      "👏",
+      "❤️",
+      "😂"
+    ]
+  },
+  "metrics": {
+    "source": [
+      "client",
+      "trainer_backfill",
+      "claude",
+      "migration",
+      "smart_scale",
+      "InBody",
+      "caliper"
+    ]
+  },
+  "offplan_workout_logs": {
+    "status": [
+      "pending",
+      "rolled_up"
+    ]
+  },
+  "payment_reminders": {
+    "notification_status": [
+      "pending",
+      "awaiting_approval",
+      "approved",
+      "sent",
+      "skipped",
+      "paused",
+      "paid"
+    ]
+  },
+  "prescribed_exercises": {
+    "volume_type": [
+      "reps",
+      "rep_range",
+      "duration",
+      "distance",
+      "hold_pattern"
+    ]
+  },
+  "programs": {
+    "category": [
+      "corrective track",
+      "training layer",
+      "split",
+      "maintenance"
+    ],
+    "status": [
+      "draft",
+      "pending",
+      "live",
+      "archived"
+    ],
+    "structure_type": [
+      "phased-corrective",
+      "phased-split",
+      "level-based",
+      "single-session"
+    ]
+  },
+  "progression_events": {
+    "event_type": [
+      "phase up",
+      "regression",
+      "swap",
+      "hold",
+      "refer out"
+    ]
+  },
+  "published_workouts": {
+    "status": [
+      "draft",
+      "published",
+      "archived"
+    ],
+    "visibility": [
+      "all_clients",
+      "assigned"
+    ]
+  },
+  "recipe_ingredients": {
+    "source": [
+      "manual",
+      "database",
+      "ai"
+    ]
+  },
+  "recipes": {
+    "visibility": [
+      "private",
+      "submitted",
+      "public",
+      "rejected"
+    ]
+  },
+  "reminders": {
+    "type": [
+      "weigh_in_weekly",
+      "body_fat_monthly",
+      "custom"
+    ]
+  },
+  "schedule_change_proposals": {
+    "confidence": [
+      "one_off",
+      "pattern"
+    ],
+    "reason": [
+      "moved",
+      "cancelled",
+      "uncovered",
+      "orphaned",
+      "pattern_shift",
+      "retired"
+    ],
+    "status": [
+      "pending",
+      "approved",
+      "rejected",
+      "superseded"
+    ]
+  },
+  "schedule_generation_log": {
+    "action": [
+      "inserted",
+      "skipped_existing",
+      "skipped_no_assignment"
+    ]
+  },
+  "scheduled_workouts": {
+    "source": [
+      "trainer",
+      "client_self_assign",
+      "claude",
+      "migration"
+    ],
+    "status": [
+      "scheduled",
+      "completed",
+      "skipped",
+      "moved"
+    ]
+  },
+  "sections": {
+    "client_facing_name": [
+      "Warm-Up",
+      "Strength",
+      "Accessory",
+      "Cardio"
+    ],
+    "internal_name": [
+      "Inhibit",
+      "Lengthen",
+      "Activate",
+      "Integrate",
+      "Corrective Warm-Up",
+      "Primary Strength",
+      "Accessory Strength",
+      "Cardio"
+    ]
+  },
+  "session_notes": {
+    "note_type": [
+      "workout",
+      "assessment",
+      "general",
+      "regression",
+      "progression",
+      "concern"
+    ]
+  },
+  "workout_logs": {
+    "source": [
+      "client",
+      "trainer_backfill",
+      "claude",
+      "migration"
+    ],
+    "status": [
+      "Done as planned",
+      "Modified",
+      "Partial",
+      "Skipped",
+      "Rest day"
+    ]
+  }
+}

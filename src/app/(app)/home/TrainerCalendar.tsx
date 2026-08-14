@@ -684,7 +684,23 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
               setBulkCancelling(true);
               const supabase = createClient();
               const ids = Array.from(selectedIds);
-              await supabase.from("appointments").update({ status: "cancelled" }).in("id", ids);
+              // "cancelled" is NOT a value appointments_status_check accepts, so
+              // this update returned 23514 and changed nothing — for every bulk
+              // cancel ever performed. The error was never read: the next lines
+              // recolour Google Calendar orange and close the sheet, so it LOOKED
+              // like it worked while all 4,471 rows stayed 'scheduled'. Zero rows
+              // in the table have ever had status 'cancelled'.
+              //
+              // cancelled_client is the canonical full cancel everywhere else,
+              // and it is what gcal-sync maps colour 6 back to — so the two-way
+              // sync below now round-trips instead of contradicting the database.
+              const { error: bulkErr } = await supabase
+                .from("appointments").update({ status: "cancelled_client" }).in("id", ids);
+              if (bulkErr) {
+                setBulkCancelling(false);
+                alert(`Couldn't cancel those sessions: ${bulkErr.message}`);
+                return;
+              }
               // Two-way sync: push each cancel to Google Calendar (orange).
               for (const id of ids) { try { await setGCalEventColor({ appointmentId: id, colorId: "6" }); } catch {} }
               // The per-appointment billing_adjustments credit loop that used to

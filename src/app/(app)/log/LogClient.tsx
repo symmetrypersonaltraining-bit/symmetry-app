@@ -48,7 +48,12 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
         body_fat_pct: bf,
         lean_mass: lean,
         fat_mass: fat,
-        source: "client_app",
+        // "client_app" is not a value metrics_source_check accepts, so every
+        // weigh-in saved from this form returned 23514 and the client got
+        // "Couldn't save your weigh-in. Please try again." forever. The column
+        // has never held a single 'client_app' row. 'client' is what the other
+        // 29 client-logged rows use.
+        source: "client",
       }, { onConflict: "client_id,metric_date" }).select().single();
       if (error) {
         setErrorMsg(error.message || "Couldn't save your weigh-in. Please try again.");
@@ -76,7 +81,10 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
         distance: distance ? parseFloat(distance) : null,
         calories: cardioKcal ? parseFloat(cardioKcal) : null,
         avg_hr: avgHr ? parseInt(avgHr) : null,
-        source: "client_app",
+        // Same 23514 as the weigh-in above. cardio_logs holds 30 'migration'
+        // rows and 10 'claude' rows and NOT ONE from a client — because this,
+        // the only place a client can log cardio themselves, could never write.
+        source: "client",
       }).select().single();
       if (error) {
         setErrorMsg(error.message || "Couldn't save your cardio. Please try again.");

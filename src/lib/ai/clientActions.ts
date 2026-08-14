@@ -377,7 +377,16 @@ export async function runClientTool(
         scheduled_date: date,
         position: pos,
         status: "scheduled",
-        source: "client",
+        // NOT "client". That is not a value the column accepts, and this row
+        // was the ONLY caller that used it — so every add_my_workout call in
+        // existence died at the database with a 23514 the model reported back
+        // as "Couldn't add it: new row ... violates check constraint". The tool
+        // was reachable, gated and correct right up to the insert, and nothing
+        // caught it because nobody had ever successfully run it.
+        // scheduled_workouts_source_check allows exactly:
+        //   trainer | client_self_assign | claude | migration
+        // AddWorkoutButton already used client_self_assign for this same case.
+        source: "client_self_assign",
       });
       if (error) return `Couldn't add it: ${error.message}`;
       return pos > 1

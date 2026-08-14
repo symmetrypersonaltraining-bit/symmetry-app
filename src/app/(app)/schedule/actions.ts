@@ -41,11 +41,16 @@ export async function logStrengthSession(data: {
       .update({ status: "completed" })
       .eq("id", data.scheduledWorkoutId);
   } else {
+    // workout_logs.status is prose, not a state machine: the check allows
+    // 'Done as planned' | 'Modified' | 'Partial' | 'Skipped' | 'Rest day'.
+    // "completed" was rejected with 23514 on every call, and the result is not
+    // checked, so marking an unscheduled session done silently logged nothing.
+    // All 964 rows in the table say 'Done as planned'.
     await supabase.from("workout_logs").insert({
       client_id: data.clientId,
       log_date: data.logDate,
       completed: true,
-      status: "completed",
+      status: "Done as planned",
       source: "client",
     });
   }
