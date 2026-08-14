@@ -375,6 +375,28 @@ export default function CoachChatSheet({
     setOpen(true);
   }
 
+  /**
+   * Let something outside this subtree open the coach.
+   *
+   * Added for the pool-gated clients (Gerard and Sharon), who get a large
+   * in-flow bar on their home screen instead of hunting for a 56px circle in
+   * the corner. That bar is rendered by ClientDashboard, a completely separate
+   * subtree, so an event is the honest mechanism: lifting `open` to a common
+   * ancestor would mean restructuring the client layout to serve two people.
+   *
+   * It calls openChat() rather than setOpen(true) so an externally-opened
+   * conversation starts in exactly the same state as a tapped one — same
+   * greeting, same not-today warning. Two ways in, one behaviour.
+   */
+  useEffect(() => {
+    const onExternalOpen = () => { if (!open) openChat(); };
+    window.addEventListener("symmetry:open-coach", onExternalOpen);
+    return () => window.removeEventListener("symmetry:open-coach", onExternalOpen);
+    // openChat closes over isToday/dayLabel, so re-register when they move or a
+    // client opening the bar on a past day would miss the warning.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isToday, dayLabel]);
+
   async function send(q: string) {
     const question = q.trim();
     if (!question || sending || capped) return;

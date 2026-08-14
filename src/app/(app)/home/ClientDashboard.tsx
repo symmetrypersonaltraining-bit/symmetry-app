@@ -19,6 +19,7 @@ import ClientTakeovers from "@/components/ClientTakeovers";
 import { RestDaySlip } from "@/components/FunMoments";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
 import AiBadge from "@/components/AiBadge";
+import BigCoachBar from "@/components/BigCoachBar";
 
 interface MetricPoint {
   metric_date: string;
@@ -682,6 +683,13 @@ export default function ClientDashboard({
           )}
           </div>
         </div>
+
+        {/* A large, in-flow way into the coach — renders for pool-gated clients
+            ONLY (Gerard and Sharon) and returns null for everyone else. In-flow
+            on purpose: it pushes content down rather than floating over it, so
+            it cannot cover a control the way a bigger corner FAB would. See the
+            component header for why enlarging CoachFab was the wrong answer. */}
+        <BigCoachBar />
 
         {/* Payment Notifications */}
         {notifications.length > 0 && (
