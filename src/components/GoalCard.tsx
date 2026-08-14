@@ -58,7 +58,14 @@ export default function GoalCard({
   const W = 340, H = 172, L = 32, R = 56, T = 14, B = 22;
   const pw = W - L - R, ph = H - T - B;
   const sorted = [...readings].sort((x, y) => ms(x.date) - ms(y.date));
-  const x0 = ms(goal.startDate ?? sorted[0].date);
+  // The domain has to cover every point it draws. Taking x0 straight off
+  // goal.startDate put Dustin's pre-goal weigh-ins at a NEGATIVE x, and because
+  // the svg is overflow:visible for the labels, the line ran out of the left
+  // edge of the card and across the page. Widen to the earliest thing on the
+  // chart instead of dropping readings — history before the goal was set is
+  // still part of the journey, and hiding it would make the card disagree with
+  // the weight chart directly underneath it.
+  const x0 = Math.min(ms(goal.startDate ?? sorted[0].date), ms(sorted[0].date));
   const x1 = ms(goal.targetDate);
   const vals = sorted.map((r) => r.value).concat([goal.targetValue], a.projected != null ? [a.projected] : []);
   let lo = Math.min(...vals), hi = Math.max(...vals);
@@ -72,6 +79,18 @@ export default function GoalCard({
   const area = `${line} L${pts[pts.length - 1].x.toFixed(1)},${(T + ph).toFixed(1)} L${pts[0].x.toFixed(1)},${(T + ph).toFixed(1)} Z`;
   const goalY = Y(goal.targetValue);
   const last = pts[pts.length - 1];
+
+  // Both right-edge labels — the goal and where this rate lands — sit at the
+  // same x, so when the projection is close to the target they print on top of
+  // each other. On the live screen it read "185 g̶o̶a̶l̶ 182.2 / this rate", which
+  // is the one thing this card cannot do: be unreadable about the two numbers
+  // the client came here for. Nudge the projection's TEXT clear while its dot
+  // stays on the true value.
+  const projY = a.projected != null ? Y(a.projected) : null;
+  const projTextY =
+    projY == null ? 0
+    : Math.abs(projY - goalY) >= 24 ? projY
+    : projY >= goalY ? goalY + 24 : goalY - 24;
   const ticks = [...new Set([lo + (hi - lo) * 0.15, (lo + hi) / 2, hi - (hi - lo) * 0.15].map((v) => Math.round(v)))];
 
   function onMove(e: React.MouseEvent | React.TouchEvent) {
@@ -154,8 +173,8 @@ export default function GoalCard({
               <path d={`M${last.x.toFixed(1)},${last.y.toFixed(1)} L${X(x1).toFixed(1)},${Y(a.projected).toFixed(1)}`}
                 fill="none" stroke={tone} strokeWidth={2} strokeDasharray="5 4" strokeLinecap="round" opacity={0.9} />
               <circle cx={X(x1)} cy={Y(a.projected)} r={4.5} fill={tone} stroke="var(--brand-surface)" strokeWidth={2} />
-              <text x={X(x1) + 7} y={Y(a.projected) + 3} style={{ fontSize: 10, fontWeight: 800, fill: tone }}>{a.projected}</text>
-              <text x={X(x1) + 7} y={Y(a.projected) + 14} style={{ fontSize: 9, fontWeight: 600, fill: "var(--brand-text-secondary)" }}>this rate</text>
+              <text x={X(x1) + 7} y={projTextY + 3} style={{ fontSize: 10, fontWeight: 800, fill: tone }}>{a.projected}</text>
+              <text x={X(x1) + 7} y={projTextY + 14} style={{ fontSize: 9, fontWeight: 600, fill: "var(--brand-text-secondary)" }}>this rate</text>
             </>
           )}
           {a.projected == null && (
@@ -170,7 +189,7 @@ export default function GoalCard({
           ))}
           {hover && <circle cx={hover.x} cy={hover.y} r={6.5} fill="none" stroke="var(--brand-primary)" strokeWidth={2} />}
 
-          <text x={pts[0].x} y={pts[0].y - 10} style={{ fontSize: 10, fontWeight: 800, fill: "var(--brand-text)" }}>{a.start}</text>
+          <text x={pts[0].x} y={Math.max(9, pts[0].y - 10)} style={{ fontSize: 10, fontWeight: 800, fill: "var(--brand-text)" }}>{a.start}</text>
           <text x={pts[0].x} y={H - 5} style={{ fontSize: 9, fontWeight: 600, fill: "var(--brand-text-secondary)" }}>{fmtD(x0)}</text>
           <text x={L + pw} y={H - 5} textAnchor="middle" style={{ fontSize: 9, fontWeight: 600, fill: "var(--brand-text-secondary)" }}>{fmtD(x1)}</text>
         </svg>
