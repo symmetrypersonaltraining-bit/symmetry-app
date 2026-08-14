@@ -31,6 +31,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { startDictation } from "@/lib/dictation";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 export default function MicButton({
   onText,
@@ -38,6 +39,7 @@ export default function MicButton({
   disabled = false,
   style,
   onNotice,
+  onListeningChange,
 }: {
   /** Called with the transcript. Callers APPEND — never replace what was typed. */
   onText: (text: string) => void;
@@ -46,13 +48,32 @@ export default function MicButton({
   style?: React.CSSProperties;
   /** Shown instead of alert() where the surface has somewhere better to put it. */
   onNotice?: (msg: string) => void;
+  /**
+   * Mirrors the listening state out to the parent.
+   *
+   * Only here so surfaces that show their own "🎤 Listening…" line next to the
+   * box could adopt this component WITHOUT losing it. Without this the swap
+   * would have been a downgrade for them, and a downgrade is how a shared
+   * component gets refused and a fifth copy gets written instead.
+   */
+  onListeningChange?: (listening: boolean) => void;
 }) {
-  const [listening, setListening] = useState(false);
+  const [listening, setListeningState] = useState(false);
   const recRef = useRef<{ stop?: () => void } | null>(null);
+  const notifyRef = useRef(onListeningChange);
+  notifyRef.current = onListeningChange;
+
+  function setListening(v: boolean) {
+    setListeningState(v);
+    notifyRef.current?.(v);
+  }
 
   // A recogniser left running after the sheet closes holds Android's single
   // recogniser slot, and the NEXT mic anywhere in the app then fails to start.
-  useEffect(() => () => { try { recRef.current?.stop?.(); } catch { /* noop */ } }, []);
+  useEffect(() => () => {
+    try { recRef.current?.stop?.(); } catch { /* noop */ }
+    notifyRef.current?.(false);
+  }, []);
 
   function toggle() {
     if (listening) {
@@ -66,14 +87,26 @@ export default function MicButton({
       onEnd: () => setListening(false),
       onUnavailable: (reason: string) => {
         setListening(false);
+        // Wording lifted from FeedbackButton, which had the best version of this
+        // in the app: it names the app so the person can find the right settings
+        // screen, and it says what to do next instead of just what went wrong.
+        // Promoting it here means every mic gets it rather than one.
         const msg = /not-allowed|denied|permission/i.test(reason)
-          ? "Microphone permission is off for this app — turn it on in your phone settings, or type it instead."
-          : "Voice isn't available on this device — you can type it instead.";
+          ? "Microphone permission is off for Symmetry. Turn it on in your phone's app settings, then tap the mic again — or just type it instead."
+          : `Voice input couldn't start — ${reason || "unknown"}.\n\nYou can type it instead. If it keeps happening, send ${COACH_FIRST_NAME} this message.`;
         if (onNotice) onNotice(msg);
         else alert(msg);
       },
     }) as { stop?: () => void } | null;
   }
+
+  // While recording the button shows moving sound bars in a pulsing halo
+  // instead of a stop icon. Dustin, after testing on the phone: "mic seems to
+  // work but needs animation while recording." A static red button is a state;
+  // it does not answer "is it still listening to me", which is the only thing
+  // you want to know while you are talking at a phone. Keyframes live in
+  // globals.css (.mic-live / .mic-wave).
+  const waveHeight = Math.max(8, Math.round(size * 0.34));
 
   return (
     <button
@@ -83,23 +116,27 @@ export default function MicButton({
       aria-label={listening ? "Stop dictation" : "Dictate"}
       aria-pressed={listening}
       title={listening ? "Stop" : "Speak"}
-      className="flex items-center justify-center flex-shrink-0"
+      className={`flex items-center justify-center flex-shrink-0${listening ? " mic-live" : ""}`}
       style={{
         width: size,
         height: size,
         borderRadius: Math.round(size / 3),
         background: listening ? "#ef4444" : "var(--brand-bg)",
         color: listening ? "#fff" : "var(--brand-text)",
-        border: "1px solid var(--brand-border)",
+        border: listening ? "1px solid #ef4444" : "1px solid var(--brand-border)",
         opacity: disabled ? 0.5 : 1,
         cursor: disabled ? "default" : "pointer",
+        transition: "background 120ms ease, color 120ms ease",
         ...style,
       }}
     >
-      <i
-        className={`ti ${listening ? "ti-player-stop-filled" : "ti-microphone"}`}
-        style={{ fontSize: Math.round(size / 2) }}
-      />
+      {listening ? (
+        <span className="mic-wave" style={{ height: waveHeight }} aria-hidden="true">
+          <span /><span /><span /><span />
+        </span>
+      ) : (
+        <i className="ti ti-microphone" style={{ fontSize: Math.round(size / 2) }} />
+      )}
     </button>
   );
 }

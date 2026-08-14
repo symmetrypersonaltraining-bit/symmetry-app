@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { startDictation } from "@/lib/dictation";
+import MicButton from "@/components/MicButton";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import AiBadge from "@/components/AiBadge";
 
@@ -30,17 +30,8 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
   const [aiError, setAiError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const recRef = useRef<{ stop?: () => void } | null>(null);
-
-  function toggleMic() {
-    if (listening) { try { recRef.current?.stop?.(); } catch { /* noop */ } setListening(false); return; }
-    recRef.current = startDictation({
-      onResult: (t: string) => setAiPrompt((p) => (p ? p + " " + t : t)),
-      onStart: () => setListening(true),
-      onEnd: () => setListening(false),
-      onUnavailable: () => { setListening(false); alert("Voice isn't available here yet — you can type instead."); },
-    }) as { stop?: () => void } | null;
-  }
+  // The recogniser ref and toggleMic that used to sit here are MicButton's job
+  // now; `listening` stays because this screen shows its own line under the box.
 
   useEffect(() => {
     let on = true;
@@ -145,7 +136,9 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
   const box: React.CSSProperties = { background: "var(--brand-surface)", border: "1px solid var(--brand-border)", borderRadius: 18 };
   const field: React.CSSProperties = { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" };
 
-  function reset() { try { recRef.current?.stop?.(); } catch { /* noop */ } setListening(false); setMode("menu"); setAiPrompt(""); setImage(null); setResult(null); setAiError(null); }
+  // No recogniser to stop by hand any more: leaving these modes unmounts
+  // MicButton, and its own cleanup releases Android's single recogniser slot.
+  function reset() { setListening(false); setMode("menu"); setAiPrompt(""); setImage(null); setResult(null); setAiError(null); }
 
   const resultCard = result && (
     <div className="p-3 mt-2" style={box}>
@@ -281,11 +274,17 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
               <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} rows={2}
                 placeholder={mode === "replace" ? "Speak or type — e.g. In a hotel with dumbbells only, keep it upper body" : mode === "equipment" ? "Speak or type what you have — e.g. Pull-up bar, bands, one 30lb dumbbell" : "Speak or type — e.g. Played beach volleyball for about an hour"}
                 className="w-full rounded-2xl p-3 text-sm outline-none resize-none" style={{ ...field, paddingRight: 44 }} />
-              <button type="button" onClick={toggleMic} aria-label={listening ? "Stop voice" : "Speak"}
-                className="absolute flex items-center justify-center rounded-full"
-                style={{ right: 8, bottom: 8, width: 32, height: 32, background: listening ? "#ef4444" : "var(--brand-primary)", border: "none" }}>
-                <i className={`ti ${listening ? "ti-player-stop-filled" : "ti-microphone"} text-sm text-white`} />
-              </button>
+              {/* Shared component now, so the recording animation Dustin asked
+                  for lands here too. onListeningChange keeps this screen's own
+                  "Listening…" line below, which the swap would otherwise cost. */}
+              <div className="absolute" style={{ right: 8, bottom: 8 }}>
+                <MicButton
+                  size={32}
+                  onText={(t) => setAiPrompt((p) => (p ? p + " " + t : t))}
+                  onListeningChange={setListening}
+                  style={{ borderRadius: 999, border: "none", background: listening ? "#ef4444" : "var(--brand-primary)", color: "#fff" }}
+                />
+              </div>
             </div>
             {listening && <p className="text-[11px] mt-1" style={{ color: "var(--brand-primary)" }}>🎤 Listening… tap the mic to stop.</p>}
             {aiError && <p className="text-xs mt-2" style={{ color: "#ef4444" }}>{aiError}</p>}

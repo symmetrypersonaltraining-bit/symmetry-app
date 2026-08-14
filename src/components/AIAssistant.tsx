@@ -1,6 +1,6 @@
 "use client";
 import { createClient } from "@/lib/supabase/client";
-import { startDictation } from "@/lib/dictation";
+import MicButton from "@/components/MicButton";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
@@ -89,7 +89,6 @@ export default function AIAssistant() {
   const restored = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
   const pathname = usePathname();
   // On a workout page (/workout/<scheduled-workout-id>) the assistant becomes a
   // workout-aware programming partner scoped to THAT workout + its client.
@@ -230,23 +229,15 @@ export default function AIAssistant() {
     } finally { setApplyingIdx(null); }
   }, [applyingIdx, focusWorkoutId]);
 
-  const startVoice = useCallback(() => {
-    // Unified dictation: works in the native app (Capacitor speech plugin) AND
-    // the browser. The raw webkitSpeechRecognition path is dead inside the APK.
-    recognitionRef.current = startDictation({
-      onStart: () => setListening(true),
-      onEnd: () => setListening(false),
-      onResult: (transcript) => {
-        if (transcript) { setInput(transcript); sendMessage(transcript); }
-      },
-      onUnavailable: () => { setListening(false); setError("Voice input isn't available here."); },
-    });
+  // Dictation lives in MicButton now, so this drawer gets the recording
+  // animation with everything else. What is preserved DELIBERATELY is that this
+  // one mic SENDS on release rather than filling the box: it is the trainer
+  // drawer, used one-handed between sets, and "speak the question, get the
+  // answer" is the whole point. It is the only mic in the app that does not
+  // append — see the note in everyAiInputHasAMic.test.ts.
+  const onVoice = useCallback((transcript: string) => {
+    if (transcript) { setInput(transcript); sendMessage(transcript); }
   }, [sendMessage]);
-
-  const stopVoice = useCallback(() => {
-    recognitionRef.current?.stop();
-    setListening(false);
-  }, []);
 
   // Clearing has to reach the SERVER now, or the thread comes back on the next
   // open and the bin button reads as broken.
@@ -466,18 +457,18 @@ export default function AIAssistant() {
                 }}
                 disabled={loading}
               />
-              <button
-                onClick={listening ? stopVoice : startVoice}
-                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"
+              <MicButton
+                size={40}
+                onText={onVoice}
+                onListeningChange={setListening}
+                onNotice={setError}
                 style={{
+                  borderRadius: 12,
                   background: listening ? "#ef4444" : "var(--brand-card)",
+                  color: listening ? "#fff" : "var(--brand-text-secondary)",
                   border: "1px solid var(--brand-border)",
                 }}
-                title={listening ? "Stop recording" : "Voice input"}
-              >
-                <i className={`ti ${listening ? "ti-microphone-off" : "ti-microphone"} text-base`}
-                  style={{ color: listening ? "white" : "var(--brand-text-secondary)" }} />
-              </button>
+              />
               <button
                 onClick={() => sendMessage(input)}
                 disabled={(!input.trim() && !pendingImage) || loading}

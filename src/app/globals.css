@@ -2579,3 +2579,67 @@ option:hover {
   margin-bottom: 0;
   height: 100%;
 }
+
+/* ==========================================================================
+   MIC — RECORDING ANIMATION
+   Dustin, 14 Aug, after testing on the phone: "mic seems to work but needs
+   animation while recording."
+
+   A red button with a stop icon is a STATE. It does not tell you the app is
+   still listening to you, and standing in a gym holding a phone at arm's
+   length, "did that actually start?" is the only question that matters. So
+   while dictation is live the button shows moving sound bars inside a pulsing
+   halo — the bars say "hearing you", the halo says "still going" and is
+   readable from across the room.
+
+   Pure CSS, no JS timers: the Capacitor WebView drives these on the compositor
+   and a dropped frame costs nothing. Honoured by prefers-reduced-motion below.
+   ========================================================================== */
+
+@keyframes mic-halo {
+  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); }
+  70%  { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+@keyframes mic-bar {
+  0%, 100% { transform: scaleY(0.32); }
+  50%      { transform: scaleY(1); }
+}
+
+.mic-live {
+  animation: mic-halo 1.5s ease-out infinite;
+}
+
+.mic-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 100%;
+}
+
+.mic-wave > span {
+  display: block;
+  width: 2px;
+  height: 100%;
+  border-radius: 2px;
+  background: currentColor;
+  transform-origin: center;
+  animation: mic-bar 0.85s ease-in-out infinite;
+}
+
+/* Staggered so it reads as a waveform rather than four things blinking at
+   once. The middle bars lead, which is roughly how a level meter behaves. */
+.mic-wave > span:nth-child(1) { animation-delay: 0s;    }
+.mic-wave > span:nth-child(2) { animation-delay: 0.18s; }
+.mic-wave > span:nth-child(3) { animation-delay: 0.09s; }
+.mic-wave > span:nth-child(4) { animation-delay: 0.27s; }
+
+/* Someone who has asked their phone to stop moving things still needs to know
+   the mic is on, so the bars hold at full height and the halo sits static
+   rather than disappearing. */
+@media (prefers-reduced-motion: reduce) {
+  .mic-live { animation: none; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35); }
+  .mic-wave > span { animation: none; transform: scaleY(0.7); }
+}

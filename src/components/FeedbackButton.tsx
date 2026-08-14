@@ -1,8 +1,8 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { submitFeedback } from "@/lib/feedback";
-import { startDictation, type DictationHandle } from "@/lib/dictation";
+import MicButton from "@/components/MicButton";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 export default function FeedbackButton() {
@@ -11,27 +11,10 @@ export default function FeedbackButton() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
-  const dictRef = useRef<DictationHandle | null>(null);
-
-  function toggleMic() {
-    if (listening) { dictRef.current?.stop(); setListening(false); return; }
-    dictRef.current = startDictation({
-      onResult: (t) => setMsg(m => (m ? m.trim() + " " : "") + t),
-      onStart: () => setListening(true),
-      onEnd: () => setListening(false),
-      // Say WHICH failure. This button reported the same sentence for a denied
-      // microphone, a missing engine and a dead recognizer, which is how "the
-      // mic doesn't work" got reported three times with nothing to act on.
-      onUnavailable: (reason) => {
-        setListening(false);
-        alert(
-          reason && reason.startsWith("browser-error: not-allowed")
-            ? "Microphone permission is off for Symmetry. Turn it on in your phone's app settings, then tap the mic again."
-            : "Voice input couldn't start — " + (reason || "unknown") + `\n\nYou can type your feedback instead. If it keeps happening, send ${COACH_FIRST_NAME} this message.`,
-        );
-      },
-    });
-  }
+  // The dictation handle and toggleMic that used to live here are MicButton's
+  // job now. `listening` stays only to tint this button's own chrome. The
+  // "which failure is it" wording this file pioneered was promoted INTO
+  // MicButton, so every mic in the app says it now instead of just this one.
 
   async function submit() {
     if (!msg.trim()) return;
@@ -89,18 +72,17 @@ export default function FeedbackButton() {
                 }}
               />
               <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                <button
-                  onClick={toggleMic}
-                  aria-label={listening ? "Stop dictation" : "Dictate feedback"}
+                <MicButton
+                  size={44}
+                  onText={(t) => setMsg((m) => (m ? m.trim() + " " : "") + t)}
+                  onListeningChange={setListening}
                   style={{
-                    flex: "0 0 44px", width: 44, background: listening ? "#e5393518" : "var(--brand-bg,#f4f6fb)",
-                    color: listening ? "#e53935" : "var(--brand-primary,#7c9cf5)", border: "1px solid var(--brand-border,#e3e9f3)",
-                    borderRadius: 10, fontSize: 18, cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flex: "0 0 44px", borderRadius: 10,
+                    background: listening ? "#ef4444" : "var(--brand-bg,#f4f6fb)",
+                    color: listening ? "#fff" : "var(--brand-primary,#7c9cf5)",
+                    border: "1px solid var(--brand-border,#e3e9f3)",
                   }}
-                >
-                  <i className={`ti ${listening ? "ti-player-stop-filled" : "ti-microphone"}`} />
-                </button>
+                />
                 <button
                   onClick={submit}
                   disabled={sending || !msg.trim()}

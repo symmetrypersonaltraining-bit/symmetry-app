@@ -23,7 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import AiBadge from "@/components/AiBadge";
 import CoachFab from "@/components/CoachFab";
-import { startDictation } from "@/lib/dictation";
+import MicButton from "@/components/MicButton";
 import { surfaceMood, type Mood } from "@/lib/ai/faces";
 import { claimCoachSlot } from "@/lib/ai/coachMount";
 import { kcalOf } from "@/lib/nutrition/dailyTotals";
@@ -336,21 +336,11 @@ export default function CoachChatSheet({
   // assessment and the feedback box all had one. Which meant the surface most
   // likely to be used mid-set, one-handed, was the surface you had to type into.
   //
-  // Appends rather than replaces, so a second burst of speech continues the
-  // sentence instead of wiping it, and it degrades to a plain alert rather than
-  // a dead button on a browser without SpeechRecognition.
-  const [listening, setListening] = useState(false);
-  const recRef = useRef<{ stop?: () => void } | null>(null);
-
-  function toggleMic() {
-    if (listening) { try { recRef.current?.stop?.(); } catch { /* noop */ } setListening(false); return; }
-    recRef.current = startDictation({
-      onResult: (t: string) => setInput((p) => (p ? p + " " + t : t)),
-      onStart: () => setListening(true),
-      onEnd: () => setListening(false),
-      onUnavailable: () => { setListening(false); alert("Voice isn't available here yet — you can type instead."); },
-    }) as { stop?: () => void } | null;
-  }
+  // The wiring that used to sit here — listening state, a recogniser ref and a
+  // toggleMic — is gone. It was a hand-rolled copy of MicButton, which is the
+  // component every other AI input uses, and a copy is how the recording
+  // animation would have been added everywhere EXCEPT the screen clients use
+  // most. See the render, below the composer input.
   const [msgs, setMsgs] = useState<Msg[]>([{ role: "coach", text: GREETING }]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -857,23 +847,16 @@ export default function CoachChatSheet({
                   outline: "none",
                 }}
               />
-              <button
-                onClick={toggleMic}
+              {/* Was a hand-rolled copy of MicButton — the sixth place in the
+                  app with its own mic wiring. It is the shared component now,
+                  so the recording animation Dustin asked for after testing on
+                  his phone lands here too, and there is one mic left to fix if
+                  a mic ever needs fixing. */}
+              <MicButton
+                size={44}
                 disabled={capped}
-                aria-label={listening ? "Stop dictation" : "Dictate"}
-                title={listening ? "Stop" : "Speak"}
-                style={{
-                  width: 44, height: 44, borderRadius: 14, flexShrink: 0,
-                  border: "1px solid var(--brand-border)",
-                  background: listening ? "var(--brand-primary)" : "var(--brand-bg)",
-                  color: listening ? "#fff" : "var(--brand-text)",
-                  cursor: capped ? "not-allowed" : "pointer",
-                  opacity: capped ? 0.5 : 1,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}
-              >
-                <i className={`ti ${listening ? "ti-player-stop-filled" : "ti-microphone"}`} style={{ fontSize: 18 }} />
-              </button>
+                onText={(t) => setInput((p) => (p ? p + " " + t : t))}
+              />
               <button
                 onClick={() => send(input)}
                 disabled={!canSend}
