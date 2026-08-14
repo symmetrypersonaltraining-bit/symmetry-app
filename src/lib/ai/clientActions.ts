@@ -412,7 +412,18 @@ export async function runClientTool(
       // One reading per client per day. metrics already carries a unique index
       // on (client_id, metric_date); upserting rather than inserting is what
       // stops "actually it was 188.6" creating a second row for the same day.
-      const patch: Record<string, unknown> = { client_id: clientId, metric_date: date, source: "ai_assistant" };
+      // NOT "ai_assistant". metrics_source_check allows exactly:
+      //   client | trainer_backfill | claude | migration | smart_scale | InBody | caliper
+      // so every log_my_weight call returned 23514 and the client was told
+      // "Couldn't log that: new row for relation metrics violates check
+      // constraint metrics_source_check". Never once succeeded.
+      //
+      // 'claude' rather than 'client' on purpose: it is the established "an AI
+      // wrote this row" marker (metrics already holds four), and it keeps the
+      // provenance that a number arrived by talking to the coach rather than
+      // being typed into the weigh-in form. Dustin — one word to change if you
+      // would rather these read as plain client entries.
+      const patch: Record<string, unknown> = { client_id: clientId, metric_date: date, source: "claude" };
       if (hasW) patch.weight = Math.round(w * 10) / 10;
       if (hasBf) patch.body_fat_pct = Math.round(bf * 10) / 10;
       const { error } = await db.from("metrics").upsert(patch, { onConflict: "client_id,metric_date" });

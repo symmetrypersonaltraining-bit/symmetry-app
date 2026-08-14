@@ -143,10 +143,28 @@ function scan(): Finding[] {
 
       const w = span.search(/\.(insert|update|upsert)\(/);
       if (w === -1) continue;
-      const objStart = span.indexOf("{", w);
-      if (objStart === -1) continue;
-      const obj = balancedObject(span, objStart);
-      if (!obj) continue;
+      const call = span.slice(w);
+
+      let obj: string | null = null;
+      let objStart = -1;
+
+      // `.upsert(patch, ...)` — the argument is a bare identifier, so follow it
+      // back to `const patch ... = { ... }`. Skipping this cost a sixth bug:
+      // log_my_weight wrote metrics.source "ai_assistant" from exactly this
+      // shape and the first version of this scanner walked straight past it.
+      const byRef = /^\.(?:insert|update|upsert)\(\s*([A-Za-z_$][\w$]*)\s*[,)]/.exec(call);
+      if (byRef) {
+        const decl = new RegExp(`\\b(?:const|let|var)\\s+${byRef[1]}\\b[^=]*=\\s*\\{`).exec(src);
+        if (decl) {
+          const at = src.indexOf("{", decl.index);
+          obj = balancedObject(src, at);
+          objStart = at - m.index;
+        }
+      } else {
+        objStart = span.indexOf("{", w);
+        if (objStart !== -1) obj = balancedObject(span, objStart);
+      }
+      if (!obj || objStart === -1) continue;
 
       for (const [col, vals] of Object.entries(cols)) {
         const kv = new RegExp(`(^|[{,\\s])${col}\\s*:\\s*["'\`]([^"'\`]*)["'\`]`, "g");
