@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import MetricCards from "@/components/MetricCards";
+import GoalsSection from "@/components/GoalsSection";
 import ClientSelector from "@/components/ClientSelector";
 import ConsistencyCalendar from "@/components/ConsistencyCalendar";
 import AchievementCard from "@/components/AchievementCard";
@@ -77,6 +78,14 @@ export default async function ProgressPage({
           // edge. The Streak tile's halo and the Consistency card's strip were
           // meeting in the middle of the gap.
           <div className="space-y-5">
+            {/* Goals sit ABOVE everything that was already here, and nothing
+                below this line changed. That is the whole containment strategy:
+                the feature is one new component, so no existing chart can
+                regress. GoalsSection renders nothing at all for a client with
+                no goal and no stale weigh-in, and swallows its own errors — a
+                Progress screen that broke because an optional new card failed
+                would be a bad trade. */}
+            <GoalsSection clientId={clientId} />
             <MetricCards clientId={clientId} />
             <ConsistencyCalendar clientId={clientId} />
             <AchievementCard clientId={clientId} name={clientName} />
