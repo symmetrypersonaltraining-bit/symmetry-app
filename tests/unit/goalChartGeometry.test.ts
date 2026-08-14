@@ -45,6 +45,22 @@ test("the x domain covers every point the chart draws", () => {
   );
 });
 
+test("the leftmost dot is labelled with its own value, not the goal's start", () => {
+  // Once the domain widened to cover pre-goal weigh-ins, a.start and the first
+  // plotted point stopped being the same number — and the chart labelled a
+  // 198 lb dot "212".
+  assert.match(CODE, /\{pts\[0\]\.r\.value\}/);
+  assert.ok(
+    !/y=\{Math\.max\(9, pts\[0\]\.y - 10\)\}[^>]*>\{a\.start\}/.test(CODE),
+    "the first point is labelled with the goal's start value again",
+  );
+});
+
+test("the right-hand date label is anchored at its end", () => {
+  // Centred, it spilled past the plot area and printed through "this rate".
+  assert.match(CODE, /x=\{L \+ pw\} y=\{H - 5\} textAnchor="end"/);
+});
+
 test("the two right-edge labels cannot print on top of each other", () => {
   assert.match(CODE, /projTextY/, "the projection label no longer de-collides with the goal label");
   assert.ok(

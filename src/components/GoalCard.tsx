@@ -189,9 +189,17 @@ export default function GoalCard({
           ))}
           {hover && <circle cx={hover.x} cy={hover.y} r={6.5} fill="none" stroke="var(--brand-primary)" strokeWidth={2} />}
 
-          <text x={pts[0].x} y={Math.max(9, pts[0].y - 10)} style={{ fontSize: 10, fontWeight: 800, fill: "var(--brand-text)" }}>{a.start}</text>
+          {/* The FIRST PLOTTED POINT'S own value — not a.start.
+              Once the domain widened to cover weigh-ins from before the goal
+              was set, those two stopped being the same number, and the chart
+              was labelling a 198 lb dot "212". The goal's start value is
+              already on the card twice over (the −23.4 delta and the meter);
+              what the leftmost dot needs is the truth about itself. */}
+          <text x={pts[0].x} y={Math.max(9, pts[0].y - 10)} style={{ fontSize: 10, fontWeight: 800, fill: "var(--brand-text)" }}>{pts[0].r.value}</text>
           <text x={pts[0].x} y={H - 5} style={{ fontSize: 9, fontWeight: 600, fill: "var(--brand-text-secondary)" }}>{fmtD(x0)}</text>
-          <text x={L + pw} y={H - 5} textAnchor="middle" style={{ fontSize: 9, fontWeight: 600, fill: "var(--brand-text-secondary)" }}>{fmtD(x1)}</text>
+          {/* Anchored at its END, not centred. Centred, it spilled to the right
+              of the plot area and printed straight through "this rate". */}
+          <text x={L + pw} y={H - 5} textAnchor="end" style={{ fontSize: 9, fontWeight: 600, fill: "var(--brand-text-secondary)" }}>{fmtD(x1)}</text>
         </svg>
 
         {hover && (
