@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { fx } from "@/lib/fx";
+import { notifyMessageReaction } from "@/app/(app)/home/messageActions";
 
 /**
  * MessageReactions — kudos on group-chat messages. 2026-07-25.
@@ -131,6 +132,11 @@ export default function MessageReactions({
             .eq("emoji", emoji);
         } else {
           await supabase.from("message_reactions").insert({ message_id: messageId, user_id: userId, emoji });
+          // Tell the author, if they want to hear about it. Deliberately not
+          // awaited: the reaction is already saved, the UI has already moved,
+          // and a slow or failed push must not hold up the reconcile below or
+          // make a saved reaction look like it failed.
+          void notifyMessageReaction(messageId, emoji).catch(() => {});
         }
       } catch {
         /* fall through to the reconcile below */

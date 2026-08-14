@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { NotificationEvent } from "@/lib/notificationEvents";
 
 // Firebase Cloud Messaging (HTTP v1) sender — dependency-free.
 // INERT until the env var FCM_SERVICE_ACCOUNT_JSON is set (the full Firebase
@@ -145,12 +146,52 @@ export async function sendPushDiagnostics(
   }
 }
 
-// Fire-and-forget wrapper — used by message sends. Never throws / never blocks.
+/**
+ * Has this user switched this event off?
+ *
+ * A MISSING ROW MEANS ENABLED. Only deliberate opt-outs are stored, so the
+ * table holds disagreements rather than a row per person per event.
+ *
+ * Fails OPEN on any error. A push that should have arrived and did not is worse
+ * than one extra buzz: silence is indistinguishable from "nothing happened",
+ * and this is how someone misses a message from their coach. The gate exists to
+ * honour a choice, not to be a second point of failure.
+ */
+async function isMuted(userId: string, event: NotificationEvent): Promise<boolean> {
+  if (event.forced) return false;
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("notification_preferences")
+      .select("enabled")
+      .eq("user_id", userId)
+      .eq("event_key", event.key)
+      .maybeSingle();
+    if (error) return false;
+    return (data as { enabled?: boolean } | null)?.enabled === false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fire-and-forget push. Never throws, never blocks.
+ *
+ * `event` is REQUIRED and is a NotificationEvent rather than a string, which is
+ * the point: before this, sendPushToUser was called with no preference check at
+ * all, and a new caller could bypass preferences simply by not knowing they
+ * existed. Now the type system makes you name the event, and naming it routes
+ * you through the gate. There is one door.
+ */
 export async function sendPushToUser(
   userId: string,
+  event: NotificationEvent,
   title: string,
   body: string,
   data?: Record<string, string>,
 ): Promise<void> {
-  try { await sendPushDiagnostics(userId, title, body, data); } catch { /* push must never break the caller */ }
+  try {
+    if (await isMuted(userId, event)) return;
+    await sendPushDiagnostics(userId, title, body, data);
+  } catch { /* push must never break the caller */ }
 }
