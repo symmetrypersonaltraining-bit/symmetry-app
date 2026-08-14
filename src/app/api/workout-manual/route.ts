@@ -188,6 +188,8 @@ export async function POST(req: Request) {
     date?: string;
     exercises?: ManualExercise[];
     markDone?: boolean;
+    /** Free text for an already-finished session with no structured exercises. */
+    note?: string;
     replaceDayId?: string | null;
   };
   try {
@@ -209,7 +211,27 @@ export async function POST(req: Request) {
   if (!title) return NextResponse.json({ error: "Give the workout a name." }, { status: 400 });
 
   const exercises = (body.exercises || []).filter((e) => e && typeof e.name === "string" && e.name.trim());
-  if (!exercises.length) return NextResponse.json({ error: "Add at least one exercise." }, { status: 400 });
+  const note = (body.note || "").trim().slice(0, 2000);
+
+  // A FINISHED session may have no structured exercises, and that is the whole
+  // point of the "just type what I did" path.
+  //
+  // Dustin, 14 Aug: "when they add a custom workout it needs to add as logged
+  // on schedule. this has been an ongoing issue. if they add a workout through
+  // any route it needs to show up period."
+  //
+  // Free text used to go to offplan_workout_logs, which nothing on the schedule
+  // reads and nothing has processed since 2026-07-29. Todd Prine typed a run
+  // into it and reasonably concluded it had not saved. Routing that text
+  // through HERE instead gives it the same day / workout_log /
+  // scheduled_workouts shape as every other way of adding a workout, so it
+  // lands on the calendar like anything else.
+  //
+  // Still required for a workout that has NOT happened yet: a plan with no
+  // movements in it is not a plan, and would open to an empty logger.
+  if (!exercises.length && !(body.markDone && note)) {
+    return NextResponse.json({ error: "Add at least one exercise." }, { status: 400 });
+  }
   if (exercises.length > 40) return NextResponse.json({ error: "That's more than 40 exercises." }, { status: 400 });
 
   const date = /^\d{4}-\d{2}-\d{2}$/.test(body.date || "") ? (body.date as string) : CT_TODAY();
@@ -318,6 +340,10 @@ export async function POST(req: Request) {
           started_at: at,
           status: "Done as planned",
           source: "client",
+          // The client's own words. For a typed session this IS the workout —
+          // "Norwegian 4x4 run, 26min, 2.31 miles" is the whole record, and
+          // dropping it would leave a bare title on the calendar.
+          note: note || null,
         })
         .select("id")
         .single();
@@ -338,9 +364,11 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, dayId, date, markedDone: !!body.markDone });
   } catch (err) {
-    // All-or-nothing. A day with no exercises still LOOKS like a workout in the
+    // All-or-nothing. A half-created day still LOOKS like a workout in the
     // list, so leaving one behind is worse than reporting the failure — the
-    // client taps it, finds nothing, and has no idea why.
+    // client taps it, finds nothing, and has no idea why. (A DELIBERATELY
+    // exercise-free day from the typed path is a different thing: it is
+    // complete, it is marked done, and its record is the note on its log.)
     if (created.days) {
       try {
         const { data: secs } = await db.from("sections").select("id").eq("day_id", created.days);

@@ -181,3 +181,80 @@ test("what you logged is still there when you look again", () => {
       "that is where it has to appear.",
   );
 });
+
+/**
+ * EVERY ROUTE THAT ADDS A WORKOUT PUTS IT ON THE SCHEDULE.
+ *
+ * Dustin, 14 Aug: "when they add a custom workout it needs to add as logged on
+ * schedule. this has been an ongoing issue. if they add a workout through any
+ * route it needs to show up period."
+ *
+ * The free-text paths — AddWorkoutButton's "Just type what I did" and
+ * OffPlanBanner's "I did something else" — wrote a row to
+ * offplan_workout_logs and stopped. Nothing on the schedule reads that table.
+ * Its status stayed 'pending' waiting on a rollup that no longer exists, so the
+ * session counted toward no adherence figure, appeared in no week, and reached
+ * the trainer only as a message.
+ *
+ * /api/workout-manual already wrote the full shape — client-owned day,
+ * completed workout_log, scheduled_workouts row — for the manual builder. Both
+ * free-text paths now go through it, so there is ONE way a workout gets added
+ * and it is the one that lands on the calendar.
+ */
+
+const FREE_TEXT_PATHS = [
+  "src/components/AddWorkoutButton.tsx",
+  "src/components/OffPlanBanner.tsx",
+];
+
+for (const rel of FREE_TEXT_PATHS) {
+  test(`${rel} puts a typed workout on the schedule`, () => {
+    const src = read(rel);
+    assert.match(
+      src,
+      /fetch\("\/api\/workout-manual"/,
+      `${rel} no longer routes typed workouts through /api/workout-manual — the only ` +
+        `path that creates the day, the completed log AND the scheduled_workouts row. ` +
+        `Without it the session never reaches the calendar.`,
+    );
+    assert.ok(
+      !/from\("offplan_workout_logs"\)[\s\S]{0,200}\.insert\(/.test(src),
+      `${rel} writes to offplan_workout_logs again. Nothing on the schedule reads that ` +
+        `table and nothing processes its 'pending' rows, so a workout written there is ` +
+        `invisible everywhere that counts.`,
+    );
+  });
+}
+
+test("a FINISHED typed session may have no structured exercises", () => {
+  // "Norwegian 4x4 run, 26min, 2.31 miles" is a complete record of a session
+  // that already happened. Demanding exercises would push it straight back to
+  // the dead table.
+  const route = read("src/app/api/workout-manual/route.ts");
+  assert.match(
+    route,
+    /if \(!exercises\.length && !\(body\.markDone && note\)\)/,
+    "the route rejects a completed free-text session again. That forces the typed " +
+      "paths back onto offplan_workout_logs, which is the bug.",
+  );
+  assert.match(
+    route,
+    /note: note \|\| null/,
+    "the client's text is no longer carried onto the workout log. For a typed session " +
+      "that text IS the workout — without it the calendar shows a bare title.",
+  );
+});
+
+test("a workout that has NOT happened still needs exercises", () => {
+  // The relaxation is scoped to markDone. A future plan with no movements opens
+  // to an empty logger, which is a different and worse failure.
+  const route = read("src/app/api/workout-manual/route.ts");
+  const idx = route.indexOf("if (!exercises.length");
+  assert.ok(idx > -1, "the exercise guard is gone entirely");
+  assert.match(
+    route.slice(idx, idx + 160),
+    /body\.markDone && note/,
+    "the empty-exercise allowance is no longer scoped to a completed session — an " +
+      "unfinished workout with no movements would open to an empty logger",
+  );
+});

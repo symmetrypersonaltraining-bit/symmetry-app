@@ -145,8 +145,38 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
     try {
       const cid = await effectiveClientId();
       if (!cid) { window.alert("Could not find your client profile."); return; }
-      const ins = await (supabase as any).from("offplan_workout_logs").insert({ client_id: cid, log_date: pickedDate, description: text.trim().slice(0, 80), details: text.trim(), status: "pending" });
-      if (ins.error) { window.alert(scheduleWriteError(ins.error, "add")); return; }
+
+      // IT HAS TO LAND ON THE SCHEDULE. Dustin, 14 Aug: "if they add a workout
+      // through any route it needs to show up period."
+      //
+      // This used to insert straight into offplan_workout_logs — a table the
+      // schedule does not read and that nothing has processed since
+      // 2026-07-29. Todd Prine typed a run into it, saw his week unchanged,
+      // and reported it as not saving. He was right about the effect and wrong
+      // only about the cause.
+      //
+      // /api/workout-manual is the one path that writes the full shape: a
+      // client-owned day, a completed workout_log carrying the text, and a
+      // scheduled_workouts row. Same machinery the manual builder and the AI
+      // builder use, so this session is not a second-class one.
+      const firstLine = text.trim().split("\n")[0].trim();
+      const res = await fetch("/api/workout-manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: clientId || undefined,
+          title: (firstLine || "Logged workout").slice(0, 120),
+          date: pickedDate,
+          exercises: [],
+          markDone: true,
+          note: text.trim(),
+        }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok || !j?.ok) {
+        window.alert(j?.error || "Could not save that workout — try again.");
+        return;
+      }
 
       // SAY SO. This used to insert and then reload the page, and nothing on
       // Home renders offplan_workout_logs — so the screen came back looking

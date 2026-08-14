@@ -85,15 +85,40 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
     setBusy(true);
     try {
       const today = CT_TODAY();
-      const { data } = await supabase.from("offplan_workout_logs").insert({
-        client_id: clientId, log_date: today, description: typed.trim(), details: details.trim() || null,
-      }).select().single();
-      if (data) setPendingRows((prev) => [...prev, data as OffPlanRow]);
+
+      // "I did something else" now lands on the calendar like every other way
+      // of adding a workout. Dustin, 14 Aug: "if they add a workout through any
+      // route it needs to show up period." This wrote only to
+      // offplan_workout_logs, which the schedule does not read and which
+      // nothing has processed since 2026-07-29 — so the client's week looked
+      // untouched afterwards and the session counted toward nothing.
+      const full = [typed.trim(), details.trim()].filter(Boolean).join("\n");
+      const res = await fetch("/api/workout-manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId,
+          title: typed.trim().slice(0, 120),
+          date: today,
+          exercises: [],
+          markDone: true,
+          note: full,
+        }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok || !j?.ok) {
+        setAiError(j?.error || "Could not save that — try again.");
+        return;
+      }
+      // The planned session it replaces is skipped, same as before. Second, and
+      // tolerated if it fails: what they DID is now safely recorded, and losing
+      // that would be the worse outcome.
       try {
         await (supabase as any).from("scheduled_workouts").update({ status: "skipped" })
           .eq("client_id", clientId).eq("day_id", dayId).eq("scheduled_date", today).eq("status", "scheduled");
-      } catch { /* off-plan log still saved even if this fails */ }
+      } catch { /* the session is logged; this is bookkeeping */ }
       setTyped(""); setDetails(""); setMode("closed");
+      window.location.reload();
     } finally { setBusy(false); }
   }
 
