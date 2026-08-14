@@ -1,5 +1,58 @@
 # Backlog — the single work queue
 
+> ## ⛔⛔ READ THIS FIRST — 14 Aug, midday
+>
+> **Six writes in this app had never once succeeded.** Not "worked sometimes",
+> not "regressed" — zero successful executions, ever, each confirmed by counting
+> rows and finding none. Every one was a string literal the database's CHECK
+> constraint refuses:
+>
+> | where | column | wrote | should be | rows it ever wrote |
+> |---|---|---|---|---|
+> | `clientActions` add_my_workout | `scheduled_workouts.source` | `client` | `client_self_assign` | 0 |
+> | `clientActions` log_my_weight | `metrics.source` | `ai_assistant` | `claude` | 0 |
+> | `TrainerCalendar` bulk cancel | `appointments.status` | `cancelled` | `cancelled_client` | 0 |
+> | `LogClient` weigh-in | `metrics.source` | `client_app` | `client` | 0 |
+> | `LogClient` cardio | `cardio_logs.source` | `client_app` | `client` | 0 |
+> | `schedule/actions` mark done | `workout_logs.status` | `completed` | `Done as planned` | 0 |
+>
+> Fixed in `07268f5` and `0b213ed`. **The method is the transferable part**, and
+> it is the only reason any of it is known: run the real statement against the
+> real database inside a `DO $$ ... $$` block that ends in `RAISE EXCEPTION`.
+> The raise aborts the transaction, so nothing is committed, and the message
+> carries the result out. Nothing else — not tsc, not 991 tests, not review, not
+> a shipped build — had caught any of these.
+>
+> **Why they hid so well:** the readers tolerate values their own writers cannot
+> produce. `TrainerCalendar` tests `status === "cancelled"` in five places. And
+> `source` accepts `client` on `workout_logs`, `cardio_logs`, `daily_logs`,
+> `meal_adherence_logs` and `metrics` — but NOT on `scheduled_workouts`. Same
+> column name, one table where the obvious value is silently wrong.
+>
+> `tests/unit/dbCheckConstraintValues.test.ts` now pins this, with the live
+> CHECK sets snapshotted to `tests/fixtures/db-check-values.json` (39 tables, 55
+> columns) and the regeneration query in the header. **Regenerate it after any
+> migration that touches a CHECK.** Its scanner is deliberately narrow — it
+> reads inline object literals and follows a bare identifier back to its
+> `const` — so a write assembled any other way is still invisible. That
+> limitation already cost one bug (the sixth). Do not assume a green run means
+> a table is safe.
+>
+> **All four client AI write tools are now proven** against real tables by that
+> method: `move_my_workout`, `swap_my_workout`, `add_my_workout`,
+> `log_my_weight`. Still unproven: any of them run **as a real client** rather
+> than as Dustin, and Gerard's and Sharon's pool gate on their own accounts.
+>
+> **Mics are on every AI input** (`0e8dbc6`, `8bdd119`). Voice logging had been
+> dead in the APK — `NutritionV3Client` built `webkitSpeechRecognition` inline
+> and that API does not exist in the Capacitor WebView, so it failed on every
+> client's phone and passed in every desktop browser. All surfaces now use
+> `MicButton` → `lib/dictation`. Verified live on the deployed app end to end
+> (fake engine injected, real click, transcript appended). **The one unverified
+> thing is a human speaking into a real phone.**
+
+---
+
 > ## ⛔ START HERE — 14 Aug (night 2)
 >
 > **Read `docs/OVERNIGHT-8-14-NIGHT2.md` first.** Three things in it change what
