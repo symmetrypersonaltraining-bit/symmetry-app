@@ -137,6 +137,7 @@
   "food_catalog": {
     "source": [
       "usda",
+      "usda_generic",
       "off",
       "brand",
       "restaurant",

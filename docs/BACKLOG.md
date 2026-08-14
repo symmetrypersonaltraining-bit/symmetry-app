@@ -1,5 +1,62 @@
 # Backlog — the single work queue
 
+> ## 14 Aug, late — USDA is in. What it can and cannot do.
+>
+> **Answer to "can we pull all micros from USDA?": half yes, and the half that
+> matters most is the yes.**
+>
+> Measured on the live API, not assumed:
+>
+> | USDA data type | foods | nutrients per food |
+> |---|---|---|
+> | SR Legacy | ~7,800 | **128** |
+> | Survey (FNDDS) | ~7,700 | **65** |
+> | Foundation | ~300 | 26 |
+> | **Branded** | ~1.9M | **13** |
+>
+> Branded is 13 because a US nutrition label legally carries about fifteen
+> items and nobody assays the selenium in a particular brand of chips. That
+> data does not exist at USDA, at Open Food Facts, or anywhere — it was never
+> measured. Any app showing full micros on a barcode product is estimating.
+>
+> **`import_usda_generic()` is live on cron**, pulling the ~15,000 generic foods
+> with full panels. Verified against known values before it inserted anything:
+> raw almonds came back calcium 269mg, iron 3.71mg, magnesium 270mg, potassium
+> 733mg, vitamin E 25.63mg — all matching reference data. Acerola juice returns
+> vitamin C 1600mg, which is correct (it is the richest known source) and which
+> the ceilings correctly allow. ~27 nutrients per food, `micros_source='measured'`.
+>
+> **THIS COVERS 100% OF DUSTIN'S PLAN FOODS**, which are all generic whole
+> foods — White rice (cooked), Almonds, Salmon (cooked), Mixed berries, Olive
+> oil. That is the actual fix for #44.
+>
+> **Two dialect traps, both of which produced silent zero-row imports:**
+> USDA speaks two nutrient languages depending on endpoint — `/food/{id}`
+> returns `nutrient.id` (1087 = calcium), `/foods/list` returns the legacy NDB
+> `number` ("301" = calcium). The map keyed only on ids, so the list endpoint
+> matched nothing: "fetched 50, inserted 0". Fixed, then the SAME bug appeared
+> in the macro extraction, so `usda_amount()` is now shared. If an importer ever
+> reports fetched > 0 and inserted 0, suspect a dialect mismatch first.
+>
+> **Also caught by a CHECK constraint**, on the very day six of them were found:
+> `source='usda_generic'` was not an allowed value. It announced itself loudly
+> because this caller surfaces the error — which is the whole argument for not
+> swallowing them.
+>
+> ### NEXT: the branded estimator (Dustin approved, 14 Aug)
+> He chose "estimate from the generic match, clearly labelled". The plumbing is
+> in — `food_catalog.micros_source` is `NULL | 'measured' | 'estimated:<name>'`,
+> and there is a trigram index on `name` for matching. What remains is the
+> matcher itself, and it deliberately was NOT rushed out at the end of a long
+> session: it writes to 1.2M rows and its whole value depends on matching
+> quality, so it needs its own pass with real spot-checks. **The generic import
+> must finish first — it is the reference set.**
+>
+> Do not let the estimated values render without the badge. That was the
+> explicit condition of his approval.
+
+---
+
 > ## 14 Aug, evening — #44 micronutrients: running, and the honest ceiling
 >
 > **`food_catalog.micros` was NULL on all 1.26M rows.** Not sparse — empty. That
