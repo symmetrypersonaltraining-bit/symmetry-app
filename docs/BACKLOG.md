@@ -1,5 +1,19 @@
 # Backlog — the single work queue
 
+> ## 👉 START AT `docs/HANDOFF-2026-08-14.md`
+>
+> Written 14 Aug after a full day on live data. It carries the three rules this
+> session learned the hard way (updates go to the GROUP CHAT as ONE message,
+> verify by running statements not reading code, a silent success is as bad as a
+> silent failure), the seven writes that had never once succeeded, and the
+> Claudine incident — whose ROOT CAUSE IS STILL OPEN.
+>
+> **The single most urgent open item:** Claudine had two active program
+> assignments and 10 sessions she was never programmed. The extras are removed
+> and backed up, but nobody has checked whether other clients are in the same
+> state. The query is in the handoff.
+
+
 > ## 14 Aug, late — USDA is in. What it can and cannot do.
 >
 > **Answer to "can we pull all micros from USDA?": half yes, and the half that

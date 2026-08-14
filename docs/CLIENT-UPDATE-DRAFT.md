@@ -1,30 +1,28 @@
 # Client update — group message draft
 
-> # ⛔ ON HOLD — DO NOT SEND, 14 Aug 2026
+> # ✅ SENT — 14 Aug 2026, 4:24pm
 >
-> **Dustin: "I don't wanna send that message out to the group until the AI is
-> working the way that we're saying that it's working."**
+> Posted to the GROUP CHAT as ONE message (`messages.is_group = true`,
+> id `a4900327-b2ea-437c-a3a8-cff40bff2a16`, 11,176 chars).
 >
-> He is right, and the reason is in item 1 of this very message. It tells 35
-> people the coach "knows *your* stuff" and invites them to ask it real
-> questions. Then he asked it, from the client app, to adapt his session to a
-> hotel gym — the exact use case the conversational layer was built for — and it
-> told him to message his trainer. He *is* the trainer.
+> **NOT as a per-client broadcast.** I had 29 individual `is_broadcast` rows
+> queued and Dustin stopped it: *"Updates go in the group message that goes to
+> everybody. All updates always go to the group chat."* The takeover channel
+> exists and works; it is not for updates. Remember this next time.
 >
-> The cause is not the prompt. **The five client action tools shipped in
-> `0636890` are unreachable by anyone**: `/api/ai-assistant` grants them only
-> when `!isTrainer`, while both buttons that open it
-> (`HeaderAssist.tsx:116`, `FloatingDock.tsx:111`) render only when
-> `isTrainer && !clientMode`. Clients cannot open it; trainers who can are given
-> no tools. The ✦ Coach that IS reachable has `canAct={false}` and no workout
-> tools at all.
+> ## (original clearance note)
 >
-> **Sending this message now would advertise a capability nobody can reach.**
-> That is worse than saying nothing: it invites 35 people to try the one thing
-> that is guaranteed to disappoint them, on the day we drew attention to it.
+> The block on this message was that item 1 advertised a coach that could act,
+> and the five client action tools were unreachable by anyone. That is fixed and
+> PROVEN, not assumed: all four write tools were exercised against the real
+> tables (move, swap, add, log weight), a real client's writes were verified
+> under real RLS, and `add_my_workout` turned out to be writing a `source` value
+> the database rejects — every call had failed since it shipped. Fixed in
+> `07268f5` / `0b213ed`.
 >
-> **Unblock:** make the tool-capable AI reachable from the client app, verify a
-> real swap end to end, then send. Tracked as task #19.
+> Dustin gave the go-ahead at 4pm on 14 Aug. **Every numbered claim below has
+> been checked against live data today.** Two were edited because they had
+> become false since drafting — see the video section.
 
 **Status:** DRAFT, not sent. Copy the block below the line into the group chat.
 Add to it as tonight's items land; the "Still coming" section is the parking
@@ -86,19 +84,23 @@ related question, and see whether it remembered. Tell me if it forgets.
 
 ---
 
-**3. On Nutrition, it can actually change things for you**
+**3. It can actually change things for you — meals AND workouts**
 
-On the Nutrition tab only, the coach can do the work instead of just talking
-about it. Say it in plain English:
+The coach can do the work instead of just talking about it. Say it in plain
+English:
 
-- "Swap M4 for salmon and rice"
-- "I ate a cookie"
-- "Move M2 to after my workout"
-- "I only ate half of M3"
+Meals: *"Swap M4 for salmon and rice"* · *"I ate a cookie"* · *"Move M2 to after
+my workout"* · *"I only ate half of M3"*
+
+Workouts: *"Move Friday's session to Saturday"* · *"Swap tomorrow for something
+I can do in a hotel room"* · *"Add a second walk today"* · *"Log my weight at
+183"*
 
 It'll show you exactly what it's about to do and wait for you to tap Confirm.
-**Nothing changes until you confirm it.** On other tabs it'll tell you to come
-to Nutrition to do it.
+**Nothing changes until you confirm it.**
+
+If you're on a corrective programme, it will only ever offer you sessions I've
+cleared for you — that's enforced on my side, not left up to the AI.
 
 **Test it:** log a real off-plan thing by just typing what you ate.
 
@@ -236,9 +238,10 @@ once, and "not now" costs you nothing — it'll ask again in a month.
 **Demo videos on a lot more exercises**
 
 If you've ever tapped an exercise name expecting to see how it's done and got
-nothing, that's mostly fixed. A hundred-odd exercises that had no demo now have
-one, and they're short on purpose — about eighteen seconds on average, none over
-thirty. You want to see the movement mid-set, not watch someone talk.
+nothing, that's mostly fixed. **788 of 839 exercises now have a demo**, up from
+595 two days ago. They're short on purpose — most are under half a minute, and
+none run past a minute. You want to see the movement mid-set, not watch someone
+talk.
 
 There are still some without one. If you hit an exercise where the video is
 missing — or, worse, where it's the *wrong* movement — tell me which one. A
@@ -249,8 +252,8 @@ wrong demo is worse than none and I'd rather pull it than leave it up.
 **The food database is now enormous, and getting bigger every minute**
 
 Searching for food should stop coming up empty. It's gone from about 180,000
-foods to several hundred thousand, with brand names and barcodes, and it's still
-importing — it'll be into the millions in a day or so.
+foods to **over 1.35 million**, nearly all with barcodes, and it's still
+importing every minute.
 
 That means: scan a barcode, get the actual product. Search a brand name, find
 it. Full nutrition on each one, and you can set your own serving size instead of
@@ -259,6 +262,50 @@ being stuck with whatever it assumes.
 **Test it:** search for the most obscure thing in your cupboard. If it's not in
 there, screenshot it and send it to me — that's exactly the gap I want to know
 about.
+
+---
+
+**Talk to it instead of typing — every AI box has a microphone now**
+
+Anywhere you can type to the coach, there's a mic button next to it. Tap it,
+say it, tap it again. It adds to whatever you'd already typed rather than wiping
+it, and while it's listening the button goes red and moves so you can tell from
+arm's length that it's actually hearing you.
+
+This one was properly broken before today and I didn't know: voice logging your
+food worked perfectly on a computer and did nothing at all on a phone. If you
+tried it once and gave up, try it again.
+
+**Test it:** log a meal by talking. Tell me if it mishears you badly or if the
+button ever looks stuck.
+
+---
+
+**Typing a workout in now actually puts it on your calendar**
+
+If you did something off-plan and typed it in — a run, a class, a hike — it used
+to save somewhere I could see but your schedule couldn't. Your week looked
+untouched afterwards and it counted toward nothing.
+
+Now it lands on your calendar as a completed session, the same as anything else,
+and it counts. Todd found this one today.
+
+**Anything you typed in before today has been moved over** — you don't need to
+re-enter it.
+
+---
+
+**Full nutrition detail, not just the four numbers**
+
+Foods are getting fibre, sugar, sodium, cholesterol, potassium, calcium, iron,
+magnesium, the B vitamins, vitamin D — around thirty nutrients where the data
+exists. Every whole food in there (chicken, rice, almonds, salmon, the things
+your plan is built from) now has the full lab panel behind it.
+
+Packaged and barcoded products are patchier, and that's not something I can fix
+by trying harder — a nutrition label legally only has to list about fifteen
+things, so for most branded products nobody ever measured the rest. Where I show
+you a number, it's a real one.
 
 ---
 
