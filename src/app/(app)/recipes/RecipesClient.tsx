@@ -478,6 +478,14 @@ function RecipeBuilder({
 
   // AI + database helpers
   const [aiText, setAiText] = useState("");
+  // "Build me one" — Megan Gautreaux, 14 Aug: "would be cool to put in
+  // ingredients and have it make the recipe to fit macros."
+  const [have, setHave] = useState("");
+  const [tP, setTP] = useState("");
+  const [tC, setTC] = useState("");
+  const [tF, setTF] = useState("");
+  const [buildBusy, setBuildBusy] = useState(false);
+  const [buildResult, setBuildResult] = useState<{ onTarget: boolean; per: { protein: number; carbs: number; fats: number; kcal: number } } | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiNote, setAiNote] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -518,6 +526,45 @@ function RecipeBuilder({
       setAiText("");
     } catch { setError("Network error."); }
     finally { setAiBusy(false); }
+  }
+
+  // Fills the SAME builder the manual and estimate paths fill. The point is
+  // that a generated recipe is not a different kind of object — it lands in the
+  // form, every quantity is editable, and it is not saved until they say so.
+  async function buildForMacros() {
+    if (!have.trim() || buildBusy) return;
+    const target = { protein: Number(tP) || 0, carbs: Number(tC) || 0, fats: Number(tF) || 0 };
+    if (!target.protein && !target.carbs && !target.fats) {
+      setError("Put in at least one macro to aim at."); return;
+    }
+    setBuildBusy(true); setError(null); setAiNote(null); setBuildResult(null);
+    try {
+      const res = await fetch("/api/recipes/ai", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "create", have, target,
+          servings: Number(servings) > 0 ? Number(servings) : 1,
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) { setError((json && json.error) || "Couldn't build that one."); return; }
+
+      const r = json.recipe || {};
+      if (r.title) setTitle(r.title);
+      if (r.description) setDescription(r.description);
+      if (r.servings) setServings(String(r.servings));
+      if (r.prep_minutes) setPrep(String(r.prep_minutes));
+      if (r.cook_minutes) setCook(String(r.cook_minutes));
+      if (Array.isArray(r.instructions) && r.instructions.length) setSteps(r.instructions);
+      // REPLACES the ingredient list rather than appending. This wrote the
+      // whole recipe; adding it underneath whatever was already there would
+      // double every quantity and quietly ruin the macros it just solved for.
+      setIngs(json.ingredients || []);
+      setBuildResult({ onTarget: !!json.onTarget, per: json.perServing });
+      setAiNote(json.notes || null);
+      setHave("");
+    } catch { setError("Network error."); }
+    finally { setBuildBusy(false); }
   }
 
   async function search(text: string) {
@@ -679,6 +726,53 @@ function RecipeBuilder({
               {h.name} <span style={{ color: "var(--brand-text-secondary)" }}>· {h.serving_desc || "1 serving"} · {r0(Number(h.protein))}P/{r0(Number(h.carbs))}C/{r0(Number(h.fats))}F</span>
             </button>
           ))}
+        </div>
+
+        {/* BUILD ME ONE — the thing Megan asked for. Sits ABOVE "type it out"
+            because it is the more useful of the two when you are standing in
+            the kitchen with food and a number to hit. */}
+        <div style={{ marginTop: 14, padding: 12, borderRadius: 14, border: "1px solid var(--brand-primary)", background: "color-mix(in srgb, var(--brand-primary) 6%, transparent)" }}>
+          <span style={{ ...lbl, display: "flex", alignItems: "center", gap: 6 }}>
+            <AiBadge size={17} mood="nutrition" title="" />BUILD ME ONE THAT HITS MY MACROS
+          </span>
+          <textarea value={have} onChange={(e) => setHave(e.target.value)} rows={3}
+            placeholder={"What have you got?\nground beef, rice, black beans, peppers, greek yogurt, olive oil"}
+            style={{ ...input, marginTop: 4, resize: "vertical" }} />
+          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+            <input value={tP} onChange={(e) => setTP(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric"
+              placeholder="Protein" style={{ ...input, textAlign: "center" }} />
+            <input value={tC} onChange={(e) => setTC(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric"
+              placeholder="Carbs" style={{ ...input, textAlign: "center" }} />
+            <input value={tF} onChange={(e) => setTF(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric"
+              placeholder="Fat" style={{ ...input, textAlign: "center" }} />
+          </div>
+          <p style={{ fontSize: 11, color: "var(--brand-text-secondary)", marginTop: 4 }}>
+            Grams, <strong>per serving</strong> — it uses the servings number above.
+          </p>
+          <button onClick={buildForMacros} disabled={buildBusy || !have.trim()}
+            style={{ width: "100%", marginTop: 8, padding: 11, borderRadius: 10, border: "none", background: "var(--brand-primary)", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: buildBusy ? "default" : "pointer", opacity: buildBusy || !have.trim() ? 0.55 : 1 }}>
+            {buildBusy ? "Working out quantities…" : "Build me a recipe →"}
+          </button>
+
+          {buildResult && (
+            /* The honest bit. The numbers shown are computed from the
+               ingredient rows, not taken from the AI — it has been caught
+               reporting the target back instead of what it wrote. If it missed,
+               it says so here rather than leaving them to do the subtraction. */
+            <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 10,
+              background: buildResult.onTarget ? "rgba(34,197,94,0.12)" : "rgba(245,158,11,0.14)",
+              border: `1px solid ${buildResult.onTarget ? "rgba(34,197,94,0.45)" : "rgba(245,158,11,0.5)"}` }}>
+              <p style={{ fontSize: 12, fontWeight: 800, color: buildResult.onTarget ? "#16a34a" : "#b45309" }}>
+                {buildResult.onTarget ? "✓ Lands on your target" : "⚠ Close, but not quite"}
+              </p>
+              <p style={{ fontSize: 12, color: "var(--brand-text)", marginTop: 2 }}>
+                Per serving: <strong>{buildResult.per.protein}P · {buildResult.per.carbs}C · {buildResult.per.fats}F</strong> · {buildResult.per.kcal} cal
+              </p>
+              <p style={{ fontSize: 11, color: "var(--brand-text-secondary)", marginTop: 3, lineHeight: 1.4 }}>
+                Worked out from the ingredients below, not guessed. Edit any amount and the totals follow.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* AI */}
