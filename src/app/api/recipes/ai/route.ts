@@ -94,7 +94,33 @@ Rules:
 - instructions: 3–8 steps, each one plain and short, the way you would say it out loud. No numbering — the app numbers them.
 - title: what a person would call it, not a description. "Chipotle Beef Rice Bowl", not "High Protein Beef And Rice Dish With Vegetables".
 - description: one sentence, under 140 characters.
-- Real cooking. Ordinary equipment, ordinary technique, nothing that needs a scale for every step.`;
+- Real cooking. Ordinary equipment, ordinary technique, nothing that needs a scale for every step.
+- NEVER state per-serving macros or calories in notes. The app computes those from your ingredient rows and shows them; saying them yourself only creates a second number that disagrees with the first.
+- notes is for what you assumed, what you added from the storecupboard, and what is short if you could not hit the target. Nothing else.`;
+
+// The correction pass, sent when the first attempt misses, with the arithmetic
+// already done for it.
+//
+// Measured on the very first live call this route ever made: asked for 45/55/18
+// per serving, it wrote a recipe totalling 49/71.3/22.8 -- thirty percent over
+// on carbs -- and its own notes read "protein 46 g, carbs 54 g, fat 17 g. This
+// lands almost exactly on target." It reported the TARGET back rather than what
+// it had written. That is why totals are computed here and never trusted from
+// the reply, and why one arithmetic-aware retry earns its second call: the
+// numbers landing IS the feature. Without it this is a recipe generator that
+// lies about the one thing it was asked to do.
+const FIX_SYSTEM = `You are correcting the quantities in a recipe so it hits a macro target.
+
+Return ONLY valid JSON in the SAME shape you were given, no markdown, no fences.
+
+You will be told the target, and the ACTUAL per-serving totals computed from the ingredient rows you returned. Those actuals are arithmetic on your own numbers -- they are right and yours were wrong. Do not argue with them.
+
+Rules:
+- Change AMOUNTS, and the macros that follow from them. Keep the same foods, the same method, the same title.
+- Scale the macros with the amounts. Halving the rice halves its carbs.
+- Fix the biggest miss first. Sixteen grams over on carbs matters more than two on fat.
+- If the target genuinely cannot be reached with these foods, get as close as possible and say so plainly in notes.
+- NEVER state per-serving macros in notes. The app computes them.`;
 
 function validate(raw: unknown): Reply | null {
   if (!raw || typeof raw !== "object") return null;
@@ -241,21 +267,101 @@ export async function POST(req: NextRequest) {
   }));
 
   if (body.mode === "create") {
-    // Totals are computed HERE from the ingredient rows, never taken from the
-    // model. It is the only way to tell the person honestly how close it landed
-    // — and a model asked to hit a target will sometimes report the target back
-    // rather than what it actually wrote.
-    const sv = value.servings && value.servings > 0 ? value.servings : 1;
-    const tot = ingredients.reduce(
-      (a, i) => ({ p: a.p + i.protein, c: a.c + i.carbs, f: a.f + i.fats }),
-      { p: 0, c: 0, f: 0 },
-    );
-    const per = {
-      protein: Math.round((tot.p / sv) * 10) / 10,
-      carbs: Math.round((tot.c / sv) * 10) / 10,
-      fats: Math.round((tot.f / sv) * 10) / 10,
-      kcal: kcalOf(tot.p / sv, tot.c / sv, tot.f / sv),
+    const t2 = body.target || {};
+    const want = {
+      protein: Number(t2.protein) || 0,
+      carbs: Number(t2.carbs) || 0,
+      fats: Number(t2.fats) || 0,
     };
+
+    // Totals are computed HERE from the ingredient rows, never taken from the
+    // model. See the note on FIX_SYSTEM for what happened the first time this
+    // route ran against the real API.
+    const perServing = (rows: typeof ingredients, servings: number) => {
+      const s = servings > 0 ? servings : 1;
+      const tot = rows.reduce(
+        (a, i) => ({ p: a.p + i.protein, c: a.c + i.carbs, f: a.f + i.fats }),
+        { p: 0, c: 0, f: 0 },
+      );
+      return {
+        protein: Math.round((tot.p / s) * 10) / 10,
+        carbs: Math.round((tot.c / s) * 10) / 10,
+        fats: Math.round((tot.f / s) * 10) / 10,
+        kcal: kcalOf(tot.p / s, tot.c / s, tot.f / s),
+      };
+    };
+
+    // How far off is "off"? Six grams or twelve percent, whichever is kinder,
+    // on each macro actually asked for. Tight enough to catch a real miss,
+    // loose enough not to spend a second call correcting two grams of fat.
+    const missed = (x: { protein: number; carbs: number; fats: number }) =>
+      (["protein", "carbs", "fats"] as const).some(
+        (k) => !!want[k] && Math.abs(x[k] - want[k]) > Math.max(6, want[k] * 0.12),
+      );
+    const dist = (x: { protein: number; carbs: number; fats: number }) =>
+      (["protein", "carbs", "fats"] as const).reduce(
+        (a, k) => a + (want[k] ? Math.abs(x[k] - want[k]) : 0), 0,
+      );
+
+    let sv = value.servings && value.servings > 0 ? value.servings : 1;
+    let rows = ingredients;
+    let per = perServing(rows, sv);
+    let corrected = false;
+
+    if (missed(per)) {
+      const fixPrompt =
+        `Target per serving: protein ${want.protein} g, carbs ${want.carbs} g, fat ${want.fats} g.\n` +
+        `Your recipe ACTUALLY comes to: protein ${per.protein} g, carbs ${per.carbs} g, ` +
+        `fat ${per.fats} g per serving across ${sv} servings.\n\nHere is what you returned:\n` +
+        JSON.stringify({
+          title: value.title,
+          servings: sv,
+          description: value.description,
+          prep_minutes: value.prep_minutes,
+          cook_minutes: value.cook_minutes,
+          instructions: value.instructions,
+          ingredients: rows.map((i) => ({
+            food: i.food, amount: i.amount, unit: i.unit,
+            protein: i.protein, carbs: i.carbs, fats: i.fats, note: i.note,
+          })),
+        }) +
+        `\n\nAdjust the amounts so it lands on the target.`;
+
+      const fix = await callClaudeJson<Reply>({
+        meter: { clientId: scoped.scope.clientId ?? null, feature: "recipe_ai" },
+        apiKey,
+        model: HAIKU_MODEL,
+        system: FIX_SYSTEM,
+        maxTokens: 2200,
+        messages: [{ role: "user", content: fixPrompt }],
+        validate,
+      });
+      await logUsage(scoped.scope.clientId ?? null, "recipe_ai", fix.tokensIn, fix.tokensOut, HAIKU_MODEL);
+
+      if (fix.value && fix.value.ingredients.length) {
+        const fixedRows = fix.value.ingredients.map((i) => ({
+          ...i, source: "ai" as const, kcal: kcalOf(i.protein, i.carbs, i.fats),
+        }));
+        const fixedSv = fix.value.servings && fix.value.servings > 0 ? fix.value.servings : sv;
+        const fixedPer = perServing(fixedRows, fixedSv);
+        // Only take the correction if it is actually CLOSER. A retry that makes
+        // it worse is worse than not retrying at all.
+        if (dist(fixedPer) < dist(per)) {
+          rows = fixedRows;
+          sv = fixedSv;
+          per = fixedPer;
+          corrected = true;
+          value.title = fix.value.title || value.title;
+          value.description = fix.value.description || value.description;
+          value.instructions =
+            fix.value.instructions && fix.value.instructions.length
+              ? fix.value.instructions
+              : value.instructions;
+          value.notes = fix.value.notes || value.notes;
+        }
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       recipe: {
@@ -266,8 +372,14 @@ export async function POST(req: NextRequest) {
         cook_minutes: value.cook_minutes,
         instructions: value.instructions || [],
       },
-      ingredients,
+      ingredients: rows,
       perServing: per,
+      target: want,
+      // The UI shows this. Somebody deciding whether to cook it is entitled to
+      // be told it came out over, rather than shown a number and left to do the
+      // subtraction themselves.
+      onTarget: !missed(per),
+      corrected,
       notes: value.notes,
     });
   }
