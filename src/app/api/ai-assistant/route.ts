@@ -9,6 +9,8 @@ import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 import { modelFor } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { assistantContext } from "@/lib/ai/assistantContext";
+import { CLIENT_TOOLS, runClientTool } from "@/lib/ai/clientActions";
+import { CT_TODAY } from "@/lib/ai/coach-context";
 
 const SYSTEM_PROMPT = SYMMETRY_SYSTEM_PROMPT;
 
@@ -72,22 +74,63 @@ export async function POST(req: NextRequest) {
     // an outage cannot quietly put thirty-five people on the expensive model.
     const model = modelFor("chat", await aiTierFor(supabase, scoped.scope.clientId));
 
-    const response = await anthropic.messages.create({
-      model,
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: messages.slice(-20),
-    });
+    // ── THE TOOL LOOP ────────────────────────────────────────────────────────
+    //
+    // Dustin, on his parents: "I need their AI to be able to do anything they
+    // need to do in that app for them so they don't have to figure it out."
+    // Answering accurately was half of it; this is the half where it can
+    // actually move a workout rather than describing where the button is.
+    //
+    // Tools are offered ONLY to a resolved client. A trainer here goes to
+    // /api/agent, which has its own much larger toolset — and CLIENT_TOOLS is a
+    // separate list rather than a filtered view of that one, precisely so that
+    // send_message and set_macro_targets are not names this route could utter
+    // even if something talked it into trying.
+    //
+    // Four rounds, not unbounded. Every tool here is a single read or a single
+    // write; a model still going at round five is looping, and the honest
+    // outcome is the text it has rather than a bill.
+    const canAct = !isTrainer && !!scoped.scope.clientId;
+    const today = CT_TODAY();
+    const convo: Anthropic.MessageParam[] = messages.slice(-20).map((m) => ({ role: m.role, content: m.content }));
 
-    await logUsage(
-      scoped.scope.clientId ?? null,
-      "client_assistant",
-      response.usage?.input_tokens ?? 0,
-      response.usage?.output_tokens ?? 0,
-      model,
-    );
+    let totalIn = 0;
+    let totalOut = 0;
+    let text = "";
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "";
+    for (let round = 0; round < 4; round++) {
+      const response: Anthropic.Message = await anthropic.messages.create({
+        model,
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: convo,
+        ...(canAct ? { tools: CLIENT_TOOLS } : {}),
+      });
+      totalIn += response.usage?.input_tokens ?? 0;
+      totalOut += response.usage?.output_tokens ?? 0;
+
+      text = response.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.TextBlock).text).join("\n").trim() || text;
+
+      const calls = response.content.filter((b) => b.type === "tool_use") as Anthropic.ToolUseBlock[];
+      if (!calls.length) break;
+
+      convo.push({ role: "assistant", content: response.content });
+      const results: Anthropic.ToolResultBlockParam[] = [];
+      for (const c of calls) {
+        const out = await runClientTool(
+          supabase,
+          scoped.scope.clientId as string,
+          c.name,
+          (c.input || {}) as Record<string, unknown>,
+          today,
+        );
+        results.push({ type: "tool_result", tool_use_id: c.id, content: out });
+      }
+      convo.push({ role: "user", content: results });
+    }
+
+    await logUsage(scoped.scope.clientId ?? null, "client_assistant", totalIn, totalOut, model);
+
     return NextResponse.json({ message: text });
   } catch (err: any) {
     console.error("AI assistant error:", err);

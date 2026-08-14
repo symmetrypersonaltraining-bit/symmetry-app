@@ -53,7 +53,7 @@ test("the drawer no longer hard-codes a model", () => {
   );
   assert.match(ROUTE, /modelFor\("chat", await aiTierFor\(/);
   // And the usage log records what actually ran, not what used to.
-  assert.match(ROUTE, /"client_assistant",[\s\S]{0,160}\n\s*model,/);
+  assert.match(ROUTE, /logUsage\([^)]*"client_assistant"[^)]*model\)/);
 });
 
 test("a gated client's cleared list is the only thing the model is handed", () => {
