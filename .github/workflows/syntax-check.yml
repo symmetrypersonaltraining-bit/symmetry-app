@@ -17,8 +17,21 @@ jobs:
       - run: npm ci
       - name: Check for syntax/parse errors only
         run: |
+          # The pattern is bounded to TS1000-TS1499 on purpose.
+          #
+          # It used to be a bare `grep "error TS1"`, which also matched TS15xx,
+          # TS16xx, TS17xx and TS18xx — those are CONFIG and flag errors, not
+          # parse errors, so the job stopped doing what its own name says. Two
+          # TS1501s ("regular expression flag is only available when targeting
+          # es2018 or later") in test files failed this check on EVERY push to
+          # main for weeks, one failure email per commit, while the code itself
+          # parsed fine. A gate that cries wolf on every green commit is worse
+          # than no gate: it trains you to ignore the mail.
+          #
+          # TS1000-TS1499 is TypeScript's syntactic range — genuinely broken
+          # code, which is all this job is meant to stop.
           TSC_OUT=$(npx tsc --noEmit --skipLibCheck 2>&1 || true)
-          SYNTAX=$(echo "$TSC_OUT" | grep "error TS1" || true)
+          SYNTAX=$(echo "$TSC_OUT" | grep -E "error TS1[0-4][0-9][0-9]:" || true)
           if [ -n "$SYNTAX" ]; then
             echo "SYNTAX ERRORS DETECTED - fix before pushing:"
             echo "$SYNTAX"
