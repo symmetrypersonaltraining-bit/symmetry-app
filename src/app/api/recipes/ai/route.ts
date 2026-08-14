@@ -308,11 +308,31 @@ export async function POST(req: NextRequest) {
     let per = perServing(rows, sv);
     let corrected = false;
 
-    if (missed(per)) {
+    // Up to TWO rounds. One pass reliably fixes the macro it is pointed at and
+    // can leave another short; a second lands the rest. Three is not worth the
+    // spend — by then it is oscillating rather than converging.
+    for (let round = 0; round < 2 && missed(per); round++) {
+      // Name the gap and its DIRECTION. The first correction pass fixed carbs
+      // perfectly and left protein 10 g short — it treated "hit the target" as
+      // one instruction instead of three, and fixed the loudest. Telling it
+      // "you are 10 g UNDER on protein, increase a protein source" is a
+      // different and much easier request than "land on the target".
+      const gaps = (["protein", "carbs", "fats"] as const)
+        .filter((k) => !!want[k])
+        .map((k) => {
+          const d = Math.round((per[k] - want[k]) * 10) / 10;
+          if (Math.abs(d) < 1) return `${k}: on target, leave it alone`;
+          return d > 0
+            ? `${k}: ${d} g OVER — reduce a ${k === "protein" ? "protein" : k === "carbs" ? "carb" : "fat"} source`
+            : `${k}: ${Math.abs(d)} g UNDER — increase a ${k === "protein" ? "protein" : k === "carbs" ? "carb" : "fat"} source`;
+        })
+        .join("\n  ");
+
       const fixPrompt =
         `Target per serving: protein ${want.protein} g, carbs ${want.carbs} g, fat ${want.fats} g.\n` +
         `Your recipe ACTUALLY comes to: protein ${per.protein} g, carbs ${per.carbs} g, ` +
-        `fat ${per.fats} g per serving across ${sv} servings.\n\nHere is what you returned:\n` +
+        `fat ${per.fats} g per serving across ${sv} servings.\n\n` +
+        `Fix ALL of these, not just the biggest:\n  ${gaps}\n\nHere is what you returned:\n` +
         JSON.stringify({
           title: value.title,
           servings: sv,
@@ -358,7 +378,14 @@ export async function POST(req: NextRequest) {
               ? fix.value.instructions
               : value.instructions;
           value.notes = fix.value.notes || value.notes;
+        } else {
+          // No improvement. `per` is unchanged, so another round would send a
+          // byte-identical prompt and get the same answer back — a paid call
+          // for a guaranteed no-op. Stop and report honestly instead.
+          break;
         }
+      } else {
+        break;
       }
     }
 
