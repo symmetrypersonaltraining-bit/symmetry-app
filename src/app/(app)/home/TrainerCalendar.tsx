@@ -276,7 +276,7 @@ function AddSessionModal({ date, timeStr, clients, onClose, onSaved }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}
+    <div className="fixed inset-0 z-[1000] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-lg rounded-t-2xl p-5 pb-8 space-y-4"
         style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
@@ -389,7 +389,7 @@ function SessionDetailPopup({ ev, clients, workoutMap, onClose, onSaved }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center px-4"
       style={{ background: "rgba(0,0,0,0.45)" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl"

@@ -51,7 +51,7 @@ function WorkoutChooserModal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      className="fixed inset-0 z-[1000] flex items-end justify-center"
       style={{ background: "rgba(0,0,0,0.55)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();

@@ -161,7 +161,7 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
   return (
     <div
       onClick={handleBackdrop}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
     >
       <div
@@ -390,7 +390,7 @@ function NewPaymentModal({ clients, onClose, onCreated }: NewPaymentModalProps) 
   return (
     <div
       onClick={handleBackdrop}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
     >
       <div

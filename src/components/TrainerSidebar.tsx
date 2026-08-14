@@ -258,7 +258,7 @@ export default function TrainerSidebar({
 
       {/* Mobile drawer */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-[1000] flex">
           <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.5)" }}
             onClick={() => setMobileOpen(false)} />
           <div className="relative w-72 max-w-[85vw] h-full overflow-y-auto shadow-2xl">

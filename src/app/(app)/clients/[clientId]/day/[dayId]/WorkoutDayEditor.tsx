@@ -99,7 +99,7 @@ function AddExerciseDrawer({
   const selectedEx = exercises.find(e => e.id === selectedExId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[1000] flex items-end justify-center" onClick={onClose}>
       <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.5)" }} />
       <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-t-2xl overflow-hidden"
         style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}

@@ -12,6 +12,7 @@ import { COACH_FIRST_NAME } from "../trainer";
 import { Db } from "@/lib/ai/scope";
 import { computeDayTotals, kcalOf, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
 import { weeklyNumbersBlockSafe } from "@/lib/ai/weekly-context";
+import { goalContextBlock } from "@/lib/ai/goalContext";
 
 // Every date the AI sees must be America/Chicago. log_date is written in Central time, so a
 // UTC "today" is already tomorrow from ~7pm CDT — the exact hours clients log their food.
@@ -389,7 +390,7 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
   const win7 = ctShiftDays(today, -6);
   const win14 = ctShiftDays(today, -13);
 
-  const [profile, swRes, metricsRes, adherenceRes, weekBlock] = await Promise.all([
+  const [profile, swRes, metricsRes, adherenceRes, weekBlock, goalBlock] = await Promise.all([
     fetchClientProfile(db, clientId),
     db
       .from("scheduled_workouts")
@@ -412,6 +413,7 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
       .gte("log_date", win14)
       .lte("log_date", today),
     weeklyNumbersBlockSafe(db, clientId),
+    goalContextBlock(db, clientId, today),
   ]);
 
   const sw = (swRes.data as { scheduled_date: string; status: string | null }[]) || [];
@@ -442,6 +444,7 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
 
   const lines: string[] = [nowBlock(), `Today's date: ${today}`];
   if (profile?.line) lines.push(profile.line);
+  if (goalBlock) lines.push(goalBlock);
   lines.push(
     `WORKOUT ADHERENCE: last 30 days ${done30}/${total30} scheduled sessions completed; last 7 days ${done7}/${total7} completed. Current completed-session streak: ${streak} day${streak === 1 ? "" : "s"}.`
   );
@@ -496,7 +499,7 @@ async function fetchTodayMealProgress(
 
 export async function assembleCoachContext(db: Db, clientId: string): Promise<string> {
   const today = CT_TODAY();
-  const [dailyTotals, targetRes, metricsRes, planSummary, profile, weekBlock, mealProgress] = await Promise.all([
+  const [dailyTotals, targetRes, metricsRes, planSummary, profile, weekBlock, goalBlock, mealProgress] = await Promise.all([
     fetchDailyTotals(db, clientId, 14),
     db
       .from("macro_targets")
@@ -515,6 +518,11 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
     fetchMealPlanSummary(db, clientId),
     fetchClientProfile(db, clientId),
     weeklyNumbersBlockSafe(db, clientId),
+    // The goal block. Computed by lib/goals.ts — the SAME analysis the Progress
+    // card renders from — precisely so the coach cannot say "on track" under a
+    // chip that says "behind". Returns null when the client has no goal, and
+    // never throws.
+    goalContextBlock(db, clientId, today),
     // How much of today is still ahead of them. Without this the model sees two
     // logged meals and no idea whether that is the whole plan or the first
     // third of it — which is how "only 914 kcal across 2 meals" became a verdict
@@ -529,6 +537,10 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
 
   const lines: string[] = [nowBlock(mealProgress.planned, mealProgress.logged), `Today's date: ${today}`];
   if (profile?.line) lines.push(profile.line);
+  // High up, right under who they are: a goal is the frame everything else on
+  // this screen is read through. A client with a target date does not want an
+  // observation about their protein average that ignores it.
+  if (goalBlock) lines.push(goalBlock);
   lines.push(
     target
       ? `Daily macro targets: ${target.calories} kcal, ${target.protein}g protein, ${target.carbs}g carbs, ${target.fats}g fat.`

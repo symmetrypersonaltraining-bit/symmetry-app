@@ -56,7 +56,7 @@ function ExerciseDrawer({ ex, onClose }: { ex: Exercise; onClose: () => void }) 
   const ytId = ex.video_url ? (ex.video_url.match(/(?:watch\?v=|youtu\.be\/|embed\/|shorts\/)([^&?#]+)/)?.[1] || null) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
+    <div className="fixed inset-0 z-[1000] flex items-end lg:items-center justify-center"
       onClick={onClose}>
       <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.5)" }} />
       <div className="relative w-full lg:w-[480px] rounded-t-2xl lg:rounded-2xl overflow-hidden"

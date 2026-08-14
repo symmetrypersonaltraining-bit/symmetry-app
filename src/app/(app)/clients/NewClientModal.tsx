@@ -78,7 +78,7 @@ export default function NewClientModal({ onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+    <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl"
         style={{ background: "var(--brand-card)", border: "1px solid var(--brand-border)", maxHeight: "90vh" }}>

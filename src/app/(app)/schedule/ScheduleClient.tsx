@@ -337,7 +337,7 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
     
 
       {selectedDate && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,0.5)"}} onClick={() => setSelectedDate(null)}>
+        <div className="fixed inset-0 z-[1000] flex items-end justify-center" style={{background:"rgba(0,0,0,0.5)"}} onClick={() => setSelectedDate(null)}>
           <div className="w-full rounded-t-2xl p-6" style={{background:"#fff",maxWidth:480}} onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <div>

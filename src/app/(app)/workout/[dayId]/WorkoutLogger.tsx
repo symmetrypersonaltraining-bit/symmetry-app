@@ -238,9 +238,9 @@ function ExerciseHistory({ exerciseId, exId, clientId, exerciseName, onClose, on
   const lastReps = lastSession?.sets?.[0]?.reps;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
+    <div className="fixed inset-0 z-[1000] flex items-end" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
       <div className="w-full rounded-t-3xl flex flex-col"
-        style={{ background: "var(--brand-surface)", maxHeight: "85dvh" }} onClick={e => e.stopPropagation()}>
+        style={{ background: "var(--brand-surface)", maxHeight: "85dvh", paddingBottom: "env(safe-area-inset-bottom)" }} onClick={e => e.stopPropagation()}>
         {/* Fixed header */}
         <div className="p-5 pb-3 flex-shrink-0">
           <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
@@ -309,7 +309,7 @@ function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => void })
   const m = Math.floor(remaining / 60);
   const s = remaining % 60;
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+    <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center"
       style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(8px)" }}>
       <p className="text-white/50 text-sm mb-6 uppercase tracking-widest">Rest</p>
       <div className="relative w-40 h-40 mb-6">
@@ -374,9 +374,9 @@ function SwapModal({ pe, onClose, onSwap }: { pe: PrescribedExercise; onClose: (
   }, [query]); // eslint-disable-line
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
-      <div className="w-full rounded-t-3xl p-5 pb-10 max-h-[80vh] flex flex-col"
-        style={{ background: "var(--brand-surface)" }} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[1000] flex items-end" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
+      <div className="w-full rounded-t-3xl p-5 max-h-[80vh] flex flex-col"
+        style={{ background: "var(--brand-surface)", paddingBottom: "calc(40px + env(safe-area-inset-bottom))" }} onClick={e => e.stopPropagation()}>
         <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -452,8 +452,8 @@ function TimePickerSheet({ initial, onSet, onClose }: { initial: number; onSet: 
   const mins = Array.from({ length: 60 }, (_, i) => i);
   const secs = Array.from({ length: 60 }, (_, i) => i);
   return (
-    <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
-      <div className="w-full rounded-t-3xl p-5 pb-10" style={{ background: "var(--brand-surface)" }} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[1000] flex items-end" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
+      <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)", paddingBottom: "calc(40px + env(safe-area-inset-bottom))" }} onClick={e => e.stopPropagation()}>
         <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
         <p className="text-center text-xs uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Set Time</p>
         <div className="relative flex items-center justify-center gap-4 mb-4" style={{ userSelect: "none" }}>
