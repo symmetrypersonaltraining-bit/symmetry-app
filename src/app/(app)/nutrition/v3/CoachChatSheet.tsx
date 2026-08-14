@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import AiBadge from "@/components/AiBadge";
 import CoachFab from "@/components/CoachFab";
+import { startDictation } from "@/lib/dictation";
 import { surfaceMood, type Mood } from "@/lib/ai/faces";
 import { claimCoachSlot } from "@/lib/ai/coachMount";
 import { kcalOf } from "@/lib/nutrition/dailyTotals";
@@ -326,6 +327,30 @@ export default function CoachChatSheet({
   const supabase = useMemo(() => createClient(), []);
   const [enabled, setEnabled] = useState(true); // client_app_settings.coach_enabled
   const [open, setOpen] = useState(startOpen);
+
+  // Dictation. Dustin, 14 Aug: "Any AI that we interact with in the app needs to
+  // have mics added, and you need to make sure they're working."
+  //
+  // This is the coach on every screen and it was the one AI input in the app
+  // WITHOUT a mic — the logger, the food logger, the assistant drawer, the
+  // assessment and the feedback box all had one. Which meant the surface most
+  // likely to be used mid-set, one-handed, was the surface you had to type into.
+  //
+  // Appends rather than replaces, so a second burst of speech continues the
+  // sentence instead of wiping it, and it degrades to a plain alert rather than
+  // a dead button on a browser without SpeechRecognition.
+  const [listening, setListening] = useState(false);
+  const recRef = useRef<{ stop?: () => void } | null>(null);
+
+  function toggleMic() {
+    if (listening) { try { recRef.current?.stop?.(); } catch { /* noop */ } setListening(false); return; }
+    recRef.current = startDictation({
+      onResult: (t: string) => setInput((p) => (p ? p + " " + t : t)),
+      onStart: () => setListening(true),
+      onEnd: () => setListening(false),
+      onUnavailable: () => { setListening(false); alert("Voice isn't available here yet — you can type instead."); },
+    }) as { stop?: () => void } | null;
+  }
   const [msgs, setMsgs] = useState<Msg[]>([{ role: "coach", text: GREETING }]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -832,6 +857,23 @@ export default function CoachChatSheet({
                   outline: "none",
                 }}
               />
+              <button
+                onClick={toggleMic}
+                disabled={capped}
+                aria-label={listening ? "Stop dictation" : "Dictate"}
+                title={listening ? "Stop" : "Speak"}
+                style={{
+                  width: 44, height: 44, borderRadius: 14, flexShrink: 0,
+                  border: "1px solid var(--brand-border)",
+                  background: listening ? "var(--brand-primary)" : "var(--brand-bg)",
+                  color: listening ? "#fff" : "var(--brand-text)",
+                  cursor: capped ? "not-allowed" : "pointer",
+                  opacity: capped ? 0.5 : 1,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <i className={`ti ${listening ? "ti-player-stop-filled" : "ti-microphone"}`} style={{ fontSize: 18 }} />
+              </button>
               <button
                 onClick={() => send(input)}
                 disabled={!canSend}

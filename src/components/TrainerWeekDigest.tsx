@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { isExcludedFromRoster } from "@/lib/demoClient";
 import AiBadge from "@/components/AiBadge";
+import MicButton from "@/components/MicButton";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -280,7 +281,13 @@ export default function TrainerWeekDigest() {
                   <button key={i} onClick={() => setDraft(sug)} style={{ textAlign: "left", fontSize: 12, lineHeight: 1.4, color: "var(--brand-text)", background: "var(--brand-bg)", border: "1px solid var(--brand-border)", borderRadius: 10, padding: "8px 10px", cursor: "pointer", opacity: aiLoading === r.id && !aiOpts[r.id] ? 0.55 : 1 }}>{sug}</button>
                 ))}
               </div>
-              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder="Pick one above or write your own…" style={{ width: "100%", fontSize: 12.5, padding: 8, borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-bg)", color: "var(--brand-text)", resize: "vertical" }} />
+              <div style={{ position: "relative" }}>
+                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder="Pick one above or write your own…" style={{ width: "100%", fontSize: 12.5, padding: 8, paddingRight: 42, borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-bg)", color: "var(--brand-text)", resize: "vertical" }} />
+                {/* Dustin writes these one-handed between sessions. */}
+                <div style={{ position: "absolute", right: 6, bottom: 9 }}>
+                  <MicButton size={28} onText={(t) => setDraft((p) => (p ? p + " " + t : t))} />
+                </div>
+              </div>
               <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                 <button onClick={() => saveFocus(r.id)} disabled={saving} style={{ fontSize: 12, fontWeight: 700, color: "#fff", background: "var(--brand-primary)", border: "none", borderRadius: 9, padding: "5px 12px", cursor: "pointer" }}>{saving ? "Saving…" : "Save"}</button>
                 <button onClick={() => { setEditing(null); setDraft(""); }} style={{ fontSize: 12, fontWeight: 700, color: "var(--brand-text-secondary)", background: "none", border: "none", cursor: "pointer" }}>Cancel</button>

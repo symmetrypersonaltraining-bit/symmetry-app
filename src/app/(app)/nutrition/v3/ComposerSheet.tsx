@@ -9,6 +9,7 @@ import { CustomItem, Macros, customMealMacros } from "@/lib/nutrition/dailyTotal
 import { parseFoodText, lastParseFailure, parseFailureMessage } from "@/lib/nutrition/parseClient";
 import Sheet from "./Sheet";
 import AiBadge from "@/components/AiBadge";
+import MicButton from "@/components/MicButton";
 
 export default function ComposerSheet({
   title,
@@ -70,13 +71,21 @@ export default function ComposerSheet({
       {askName && (
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Meal name — e.g. Salmon power bowl" style={{ ...inputStyle, marginBottom: 8 }} />
       )}
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Type items with amounts… e.g. 8 oz chicken breast, 1 cup jasmine rice, 1 tbsp olive oil"
-        rows={3}
-        style={{ ...inputStyle, resize: "none", fontFamily: "inherit" }}
-      />
+      {/* Voice sits ON the box, not on a previous screen. Somebody standing at a
+          counter reciting what they just ate should not have to back out of the
+          composer to find the microphone. */}
+      <div style={{ position: "relative" }}>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Type items with amounts… e.g. 8 oz chicken breast, 1 cup jasmine rice, 1 tbsp olive oil"
+          rows={3}
+          style={{ ...inputStyle, resize: "none", fontFamily: "inherit", paddingRight: 48 }}
+        />
+        <div style={{ position: "absolute", right: 8, bottom: 10 }}>
+          <MicButton size={32} onText={(t) => setText((p) => (p ? p + ", " + t : t))} />
+        </div>
+      </div>
       <button onClick={runParse} disabled={parsing || !text.trim()} className="w-full mt-2 py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)", opacity: text.trim() && !parsing ? 1 : 0.6 }}>
         {parsing ? "Parsing items & estimating macros…" : "AI parse items →"}
       </button>

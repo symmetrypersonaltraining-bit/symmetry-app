@@ -53,13 +53,12 @@ function prettyDate(iso: string): string {
   return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][p[1] - 1] + " " + p[2];
 }
 
-// Extend Window for Web Speech API
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
-}
+// The Web Speech `declare global` that used to sit here is gone. This file has
+// called startDictation since the native shell shipped, and lib/dictation casts
+// `window` locally — so the only thing a global `webkitSpeechRecognition: any`
+// on Window still did was make it easy for the NEXT component to reach for the
+// browser API directly and ship a mic that is dead inside the APK. Which is
+// exactly what NutritionV3Client had done.
 
 export default function AIAssistant() {
   const [_ok, _setOk] = useState(false);

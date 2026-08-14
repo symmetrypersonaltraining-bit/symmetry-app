@@ -13,6 +13,8 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import Confetti from "@/components/Confetti";
+import MicButton from "@/components/MicButton";
+import { startDictation } from "@/lib/dictation";
 import {
   PlanMeal, LogRow, CustomMeta, CustomItem, ItemOverrides, Macros,
   computeDayTotals, planMealMacros, customMealMacros, adherencePct,
@@ -2996,27 +2998,36 @@ function OffPlanFlow({
   const fileRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [listening, setListening] = useState(false);
+  const micRef = useRef<{ stop?: () => void } | null>(null);
+  // A recogniser left running when the sheet closes holds Android's single
+  // recogniser slot, and the next mic anywhere in the app then fails to start.
+  useEffect(() => () => { try { micRef.current?.stop?.(); } catch { /* noop */ } }, []);
 
+  // VOICE LOGGING WAS DEAD ON THE REAL APP.
+  //
+  // This function used to construct `webkitSpeechRecognition` itself. That API
+  // does not exist in the Capacitor WebView — the shell Dustin's clients
+  // actually run — so "Say it out loud" fell straight through to the
+  // "isn't supported on this device" toast on every phone, while working
+  // perfectly in the desktop browser anyone would have tested it in.
+  //
+  // lib/dictation already knew about the native bridge; this screen just never
+  // called it. Never re-implement speech here — there is a guard test.
   function startMic() {
-    // Voice logging: dictate into the typed flow (Web Speech API where available).
-    const w = window as unknown as { webkitSpeechRecognition?: new () => any; SpeechRecognition?: new () => any };
-    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) { setMode("typed"); toast("Voice input isn't supported on this device — type it instead"); return; }
-    try {
-      const rec = new SR();
-      rec.lang = "en-US";
-      rec.interimResults = false;
-      rec.onresult = (ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
-        const heard = Array.from(ev.results as ArrayLike<ArrayLike<{ transcript: string }>>).map((rr) => rr[0]?.transcript || "").join(" ").trim();
+    setMode("typed");
+    micRef.current = startDictation({
+      onResult: (t: string) => setText((p) => (p ? p + ", " + t : t)),
+      onStart: () => setListening(true),
+      onEnd: () => setListening(false),
+      onUnavailable: (reason: string) => {
         setListening(false);
-        if (heard) { setMode("typed"); setText((t) => (t ? t + ", " : "") + heard); }
-      };
-      rec.onerror = () => { setListening(false); setMode("typed"); };
-      rec.onend = () => setListening(false);
-      setListening(true);
-      setMode("typed");
-      rec.start();
-    } catch { setListening(false); setMode("typed"); }
+        // Say WHICH no it is — a denied permission and a missing engine need
+        // opposite things from the person holding the phone.
+        toast(/not-allowed|denied|permission/i.test(reason)
+          ? "Microphone permission is off — turn it on in your phone settings, or type it instead"
+          : "Voice input isn't supported on this device — type it instead");
+      },
+    });
   }
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
@@ -3115,9 +3126,17 @@ function OffPlanFlow({
               <span className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>Listening… say what you ate</span>
             </div>
           )}
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3}
-            placeholder="e.g. 8 oz chicken breast, 1 cup jasmine rice, 1 tbsp olive oil — or 'chipotle bowl, double chicken'"
-            style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 12, padding: "10px 12px", fontSize: 13, width: "100%", outline: "none", resize: "none", fontFamily: "inherit" }} />
+          {/* The mic used to exist ONLY as a row on the previous screen. Once you
+              were here typing, there was no way to switch to voice without
+              backing out and losing what you had written. */}
+          <div style={{ position: "relative" }}>
+            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3}
+              placeholder="e.g. 8 oz chicken breast, 1 cup jasmine rice, 1 tbsp olive oil — or 'chipotle bowl, double chicken'"
+              style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 12, padding: "10px 12px", paddingRight: 48, fontSize: 13, width: "100%", outline: "none", resize: "none", fontFamily: "inherit" }} />
+            <div style={{ position: "absolute", right: 8, bottom: 10 }}>
+              <MicButton size={32} onText={(t) => setText((p) => (p ? p + ", " + t : t))} onNotice={(m) => toast(m)} />
+            </div>
+          </div>
           <button onClick={runTyped} disabled={busy || !text.trim()} className="w-full mt-2 py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)", opacity: text.trim() && !busy ? 1 : 0.6 }}>
             {busy ? "Analyzing…" : "AI parse & estimate →"}
           </button>

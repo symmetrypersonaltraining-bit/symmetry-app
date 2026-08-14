@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { sendClientMessage } from "@/app/(app)/home/messageActions";
 import AiBadge from "@/components/AiBadge";
+import MicButton from "@/components/MicButton";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 interface FocusData { message: string; question: string | null; }
@@ -125,6 +126,10 @@ export default function CoachFocusCard() {
               placeholder={`Your answer for ${COACH_FIRST_NAME}…`}
               style={{ flex: 1, fontSize: 13, padding: "10px 12px", borderRadius: 12, border: "1px solid var(--brand-border)", background: "var(--brand-card)", color: "var(--brand-text)", outline: "none" }}
             />
+            {/* This answer goes to Dustin's inbox. It is the one place in the app
+                a client writes a sentence TO a person, so it is the last place
+                that should require a keyboard. */}
+            <MicButton size={40} onText={(t) => setAnswer((p) => (p ? p + " " + t : t))} />
             <button
               onClick={submitAnswer}
               disabled={sending || !answer.trim()}
