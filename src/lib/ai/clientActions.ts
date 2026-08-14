@@ -197,8 +197,13 @@ export async function runClientTool(
         .limit(60);
       const rows = (data as { id: string; scheduled_date: string; status: string | null; days: { id: string; label: string | null } | null }[] | null) || [];
       if (!rows.length) return "Nothing scheduled in that range.";
+      // day_id is emitted, not just fetched. It used to be selected and then
+      // dropped when formatting, so the model could SEE a session and still not
+      // name it: "add a second walk today" ended at "I need the day_id for the
+      // 20-minute walk" about a walk that was right there on the schedule it had
+      // just read. You cannot duplicate what you cannot refer to.
       return rows
-        .map((r) => `[id ${r.id}] ${r.scheduled_date} — ${r.days?.label || "workout"}${r.status && r.status !== "scheduled" ? ` (${r.status})` : ""}`)
+        .map((r) => `[id ${r.id}] [day_id ${r.days?.id || "?"}] ${r.scheduled_date} — ${r.days?.label || "workout"}${r.status && r.status !== "scheduled" ? ` (${r.status})` : ""}`)
         .join("\n");
     }
 
@@ -341,9 +346,22 @@ export async function runClientTool(
           return "That session isn't one of this client's cleared options. Do NOT add it. Tell them which sessions they can have and offer to pass the request to their coach.";
         }
       } else {
+        // Swappable, OR something already on their own schedule.
+        //
+        // The second half matters: a client asking for a SECOND copy of a
+        // session they are already doing is not being handed anything new, and
+        // most prescribed days are not marked swappable. Without this, "add
+        // another walk" was refused for a walk already sitting on the same day.
+        // Still their own days only — never another client's, never a master
+        // library row.
         const { data: d } = await db
           .from("days").select("id").eq("id", dayId).eq("client_owner_id", clientId).eq("swappable", true).maybeSingle();
-        if (!d) return "That session isn't one of this client's options.";
+        if (!d) {
+          const { data: mine } = await db
+            .from("scheduled_workouts").select("id")
+            .eq("client_id", clientId).eq("day_id", dayId).is("deleted_at", null).limit(1).maybeSingle();
+          if (!mine) return "That session isn't one of this client's options.";
+        }
       }
 
       // Its own slot, so putting the same session on twice is a second row
