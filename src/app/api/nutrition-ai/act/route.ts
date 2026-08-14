@@ -53,6 +53,7 @@ Rules:
 - Use "position" values EXACTLY as given in DAY CONTEXT. If the client names a meal instead, put their words in the *_name field and leave position null.
 - If the message asks for an action but the target meal is ambiguous (several plausible matches) or required details are missing (e.g. "swap a meal" with no food), respond intent "none" with params {"clarify":true} and ONE short clarifying question in "reply". Never guess.
 - If the message is a question or general chat, respond intent "none" with params {"clarify":false} and a brief placeholder in "reply" (a fuller coach answer is generated separately).
+- TRAINING IS NOT YOURS. Anything about workouts, sessions, cardio, the schedule, moving/swapping/rescheduling a SESSION, or what to train today is handled by another part of the same coach. For those, respond intent "none" with params {"clarify":false} and an EMPTY "reply" — never a clarifying question, and never a sentence describing yourself as the meal or macro tracker. You are one part of one coach; the client must never be told to pick which part they are talking to. The word "move" is the trap: "move my cardio to tomorrow" is training, not a meal.
 - "confirmation" (action intents only): ONE human sentence describing exactly what will happen, including estimated kcal and P/C/F where relevant, e.g. "Swap M4 → Salmon + rice (est 520 kcal · 42P/45C/16F)?". For intent "none" use null.
 - "reply": a short, friendly coach response (1-2 sentences) to show above the confirmation card.
 - You act on THE DAY BEING VIEWED, which is stated in the user turn as LOG DATE. It is usually today; it is sometimes an earlier day the client is catching up on. Either way DAY CONTEXT is that day's meals, and any action you extract applies to it. Requests about a DIFFERENT day, the plan itself, or targets → intent "none" (answer as chat).
@@ -190,11 +191,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Clarifying question (ambiguous/missing reference) — return it directly.
-    if (act.params.clarify && act.reply) {
-      return NextResponse.json({ intent: "none", message: act.reply });
-    }
-
     // ---- ONE AI: the workout tools, offered before the nutrition answer -----
     //
     // Dustin, 12 Aug: "one AI that does all of it." Until now there were two,
@@ -259,12 +255,44 @@ export async function POST(req: NextRequest) {
 
         if (run.toolsUsed > 0 && run.text) {
           await logUsage(clientId, "coach_workout_tools", run.tokensIn, run.tokensOut, toolModel);
+          // THE WORKOUT PATH MUST REMEMBER TOO.
+          //
+          // The first cut of this branch returned here directly and skipped
+          // persist(), so every workout conversation was forgotten the moment
+          // it ended: ask to move Friday, then say "actually make it Saturday",
+          // and the coach had no idea what "it" was. Caught by counting rows in
+          // ai_chat_turns after four real conversations and finding only two —
+          // the nutrition one. The same way the original memory bug was caught,
+          // and it would have failed just as silently, because persist()
+          // swallows its errors by design.
+          await persist(memDbFor(), clientId, message, run.text, apiKey);
           return NextResponse.json({ intent: "none", message: run.text });
         }
       } catch {
         // A failure here must never cost someone their nutrition answer. Fall
         // through to the coach exactly as if the tools had not been offered.
       }
+    }
+
+    // Clarifying question (ambiguous/missing reference) — return it directly.
+    //
+    // ⛔ THIS RUNS AFTER THE WORKOUT TOOLS, ON PURPOSE. It used to run before
+    // them, and that put the whole feature back where it started.
+    //
+    // "Move it ill do it later today" — about a CARDIO session — was read by
+    // the nutrition extractor as a possible move_meal it could not resolve, so
+    // it returned its clarifying question and the workout tools were never
+    // reached. Dustin got "is this a nutrition log request, or are you asking
+    // me to reschedule your workout plan? I'm the meal & macro tracker here."
+    // One turn earlier the same chat had correctly warned him he would end up
+    // with two cardio sessions in a day, so the tools plainly worked; they were
+    // simply one branch too far down.
+    //
+    // Order now: definite nutrition action → tools → nutrition clarification →
+    // coach. A training request can no longer be intercepted by a guess about
+    // meals.
+    if (act.params.clarify && act.reply) {
+      return NextResponse.json({ intent: "none", message: act.reply });
     }
 
     // ---- intent 'none' = a question → the existing coach behavior ----------
@@ -399,6 +427,18 @@ async function persist(
   } catch (e) {
     console.error("act: persisting the exchange failed", e);
   }
+}
+
+/**
+ * The admin client for memory writes.
+ *
+ * ai_chat_turns / ai_client_memory have SELECT policies and deliberately NO
+ * insert or update policy — a client editing what their coach remembers about
+ * them, from the browser, is not a feature. So memory has to go through the
+ * service role, and both call sites need the same one.
+ */
+function memDbFor() {
+  return createAdminClient();
 }
 
 export const dynamic = "force-dynamic";

@@ -122,3 +122,72 @@ test("safety is delegated, never reimplemented", () => {
       "ever comes from the model, a user can talk their way into another client's data",
   );
 });
+
+test("the workout path remembers the exchange, same as the nutrition path", () => {
+  /**
+   * The first cut of the tool branch returned directly and skipped persist(),
+   * so every workout conversation was forgotten the moment it ended: ask to
+   * move Friday, say "actually make it Saturday", and the coach had no idea
+   * what "it" was.
+   *
+   * Caught by counting rows in ai_chat_turns after four real conversations and
+   * finding only two — the nutrition one. Exactly how the ORIGINAL memory bug
+   * on this route was found, and it would have failed just as silently, because
+   * persist() swallows its errors by design so a lost turn never costs someone
+   * their answer.
+   */
+  const idx = ACT.indexOf("run.toolsUsed > 0");
+  assert.ok(idx > -1, "the tool-result branch is gone");
+  const branch = ACT.slice(idx, idx + 600);
+
+  assert.match(
+    branch,
+    /await persist\(/,
+    "the workout branch returns without calling persist() — workout conversations are " +
+      "forgotten, while nutrition ones are remembered, and nothing anywhere errors",
+  );
+  // persist must come BEFORE the return, or it never runs.
+  assert.ok(
+    branch.indexOf("await persist(") < branch.indexOf("return NextResponse.json"),
+    "persist() is called after the return, so it never executes",
+  );
+});
+
+test("the workout tools run BEFORE the nutrition clarifying question", () => {
+  /**
+   * This ordering IS the feature. With the clarify return first, "Move it ill
+   * do it later today" — about a cardio session — was read by the nutrition
+   * extractor as a move_meal it could not resolve, so it asked a clarifying
+   * question and the workout tools were never reached. Dustin got "is this a
+   * nutrition log request, or are you asking me to reschedule your workout
+   * plan? I'm the meal & macro tracker here", one turn after the same chat had
+   * correctly warned him about double-booking his cardio.
+   *
+   * The tools worked. They were one branch too far down. Put the clarify back
+   * in front and the whole feature returns to being unreachable for exactly the
+   * phrasings people actually use.
+   */
+  const tools = ACT.indexOf("runClientAssistant(");
+  const clarify = ACT.indexOf("act.params.clarify && act.reply");
+  assert.ok(tools > -1 && clarify > -1, "one of the two branches is gone");
+  assert.ok(
+    tools < clarify,
+    "the nutrition clarifying question runs BEFORE the workout tools again — a training " +
+      "request phrased with the word 'move' will be intercepted by a guess about meals",
+  );
+});
+
+test("the extractor is told training is not its business", () => {
+  assert.match(
+    ACT,
+    /TRAINING IS NOT YOURS/,
+    "the intent extractor no longer knows to stay out of training requests, so it will " +
+      "keep guessing move_meal on 'move my cardio'",
+  );
+  assert.match(
+    ACT,
+    /never a sentence describing yourself as the meal or macro tracker/,
+    "the extractor may again introduce itself as the meal tracker. It is ONE coach; a " +
+      "client must never be asked to pick which part of it they are talking to",
+  );
+});
