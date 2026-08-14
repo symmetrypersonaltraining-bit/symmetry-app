@@ -118,6 +118,45 @@ export const DEFAULT_LIMITS: Record<AiFeature, number | null> = Object.fromEntri
 /** Global kill switch: month-to-date spend at/over this pauses ALL AI features. */
 export const MONTHLY_COST_CAP_USD = 95;
 
+/**
+ * Warning line. Crossing this emails Dustin ONCE for the month; nothing pauses.
+ *
+ * Added 14 Aug 2026 because the cap had exactly one notification and it was the
+ * one that says AI is ALREADY off for all 35 clients. There was no warning
+ * shot — the first he would know is a client asking why the coach stopped
+ * answering.
+ *
+ * $60 is not a round number picked for looks. It is ~63% of the cap, and at the
+ * actual observed run rate (Aug: $3.63 across the first 14 days, ~$0.42/day
+ * over the busiest four) crossing $60 leaves weeks of notice, not hours. Set it
+ * much higher and the warning arrives too late to do anything but watch; much
+ * lower and it fires in a normal month and gets ignored, which is worse than no
+ * warning at all.
+ */
+export const WARN_COST_USD = 60;
+
+/**
+ * True only in the band between the warning line and the cap.
+ *
+ * Deliberately NOT `>= WARN`: past the cap the pause email is the correct and
+ * more urgent message, and sending both would bury it.
+ */
+export function warnThresholdCrossed(monthToDateUsd: number): boolean {
+  return monthToDateUsd >= WARN_COST_USD && monthToDateUsd < MONTHLY_COST_CAP_USD;
+}
+
+/**
+ * Straight-line projection of where the month lands, for the warning email.
+ *
+ * Naive on purpose — spend per day so far, times days in the month. A client
+ * base that grows mid-month makes this an UNDER-estimate, which is the safe
+ * direction for a number whose only job is "should you look at this today".
+ */
+export function projectedMonthEndUsd(monthToDateUsd: number, dayOfMonth: number, daysInMonth: number): number {
+  const elapsed = Math.max(1, dayOfMonth);
+  return Math.round((monthToDateUsd / elapsed) * daysInMonth * 100) / 100;
+}
+
 // USD per million tokens (input / output). Matched by substring so dated model
 // ids ("claude-haiku-4-5-20251001") and future minor bumps still price correctly.
 const PRICING: Array<{ match: RegExp; inPerMTok: number; outPerMTok: number }> = [

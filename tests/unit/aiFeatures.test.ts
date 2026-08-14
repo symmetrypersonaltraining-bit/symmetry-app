@@ -10,6 +10,10 @@ import {
   assertUnderCap,
   resolveDailyLimit,
   CapExceeded,
+  warnThresholdCrossed,
+  projectedMonthEndUsd,
+  WARN_COST_USD,
+  MONTHLY_COST_CAP_USD,
 } from "../../src/lib/ai/meter-core";
 
 // Until 13 Aug the app had 23 routes calling Claude and SEVEN labels between
@@ -225,4 +229,85 @@ test("resolveDailyLimit honours a per-client override and falls back to the defa
   assert.equal(resolveDailyLimit({}, "food_photo"), 20);
   // Uncapped surfaces stay uncapped even if a stray column exists.
   assert.equal(resolveDailyLimit({ ai_daily_chat_limit: 5 }, "trainer_agent"), null);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE $60 WARNING
+//
+// Added 14 Aug 2026. Until then the $95 cap had exactly ONE notification, and
+// it was the one that says AI is already off for all 35 clients. Dustin's first
+// warning that he had a spend problem would have been a client asking why the
+// coach stopped answering.
+//
+// For scale: August's first 14 days cost $3.63 across 754 calls. The cap is not
+// close. But the per-client daily limits (15 chat, 20 photos, 15 parses, 8
+// workout builds, 1 plan build) would permit roughly $880/month if all 35
+// clients maxed everything — so the per-client caps are NOT what holds spend
+// under $95. The global switch is, and a hard stop with no warning is a bad
+// last line of defence on its own.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test("the warning fires below the cap and gets out of the way above it", () => {
+  // Past the cap the PAUSE email is the correct, more urgent message. Sending
+  // both would bury it under a heads-up about a thing that already happened.
+  assert.equal(warnThresholdCrossed(59.99), false, "warned before crossing $60");
+  assert.equal(warnThresholdCrossed(60), true, "did not warn exactly at $60");
+  assert.equal(warnThresholdCrossed(94.99), true, "stopped warning inside the band");
+  assert.equal(warnThresholdCrossed(95), false, "warned at the cap — the pause email owns this case");
+  assert.equal(warnThresholdCrossed(200), false, "warned far past the cap");
+});
+
+test("the warning line leaves room to react, and is not so low it cries wolf", () => {
+  // Both directions matter. Too high and it lands with hours of notice; too low
+  // and it fires every normal month until it is filtered, which is worse than
+  // having no warning at all.
+  assert.ok(WARN_COST_USD < MONTHLY_COST_CAP_USD, "the warning is at or above the cap — it can never fire");
+  assert.ok(
+    WARN_COST_USD >= MONTHLY_COST_CAP_USD * 0.5 && WARN_COST_USD <= MONTHLY_COST_CAP_USD * 0.8,
+    `the warning at $${WARN_COST_USD} is outside 50–80% of the $${MONTHLY_COST_CAP_USD} cap. ` +
+      `Below that band it fires in ordinary months and gets ignored; above it, it arrives too late to act on.`,
+  );
+});
+
+test("the projection is honest about a part-finished month", () => {
+  // Day 10 of 30 at $30 → $90, not "$30 so we're fine".
+  assert.equal(projectedMonthEndUsd(30, 10, 30), 90);
+  assert.equal(projectedMonthEndUsd(3.63, 14, 31), 8.04);
+  // Day 0 would divide by zero and report Infinity into an email.
+  assert.equal(projectedMonthEndUsd(10, 0, 30), 300);
+});
+
+test("the warning cannot become an email storm", () => {
+  // Vercel runs many instances, so a module-level boolean dedupes nothing
+  // across them. The lock has to be in the database, and the marker has to be
+  // written BEFORE the send — a missed warning is recoverable, thirty identical
+  // emails at 6am is not.
+  const meter = fs.readFileSync(path.join(process.cwd(), "src/lib/ai/meter.ts"), "utf8");
+  const fn = meter.slice(meter.indexOf("async function notifyTrainerApproaching"));
+  const body = fn.slice(0, fn.indexOf("\n}\n"));
+
+  assert.match(body, /WARN_NOTICE_FEATURE/, "the warning no longer records a durable marker row");
+  assert.match(body, /chicagoMonthStartUtc\(\)/,
+    "the warning's guard is no longer scoped to the MONTH — a daily heads-up is one people filter");
+  assert.ok(
+    body.indexOf("insert(") < body.indexOf("RESEND_API_URL"),
+    "the marker is written after the email is sent, so a failure between them repeats the send",
+  );
+  assert.ok(
+    body.indexOf("if (insErr) return") < body.indexOf("RESEND_API_URL"),
+    "a failed marker insert no longer stops the email — that is exactly the storm case",
+  );
+});
+
+test("warning failure can never cost a client their answer", () => {
+  const meter = fs.readFileSync(path.join(process.cwd(), "src/lib/ai/meter.ts"), "utf8");
+  const idx = meter.indexOf("warnThresholdCrossed(mtd)");
+  assert.ok(idx > -1, "assertNotPaused no longer checks the warning threshold at all");
+  const around = meter.slice(idx, idx + 260);
+  assert.match(
+    around,
+    /\.catch\(/,
+    "the warning call is unguarded inside assertNotPaused, which runs before EVERY AI request. " +
+      "An email provider having a bad afternoon would take the coach down with it.",
+  );
 });

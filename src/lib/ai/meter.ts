@@ -21,6 +21,9 @@ import {
   chicagoToday,
   computeCostUsd,
   killSwitchTripped,
+  warnThresholdCrossed,
+  projectedMonthEndUsd,
+  MONTHLY_COST_CAP_USD,
   resolveDailyLimit,
 } from "@/lib/ai/meter-core";
 import { TRAINER_EMAIL, COACH_FIRST_NAME } from "@/lib/trainer";
@@ -30,6 +33,8 @@ export type { AiFeature } from "@/lib/ai/meter-core";
 const RESEND_API_URL = "https://api.resend.com/emails";
 // Marker "feature" for the once-per-day pause notification (cost 0, no client).
 const PAUSE_NOTICE_FEATURE = "kill_switch_notice";
+// Marker "feature" for the once-per-MONTH $60 heads-up (cost 0, no client).
+const WARN_NOTICE_FEATURE = "budget_warning_notice";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, any, any>;
@@ -134,6 +139,99 @@ async function notifyTrainerPaused(db: Db, monthToDateUsd: number): Promise<void
   }
 }
 
+/**
+ * "You're at $60 of $95" — once for the month, nothing paused.
+ *
+ * The cap used to have exactly one notification and it was the one that says
+ * AI is ALREADY off for all 35 clients. This is the warning shot.
+ *
+ * ONCE PER MONTH, not per day. The pause notice repeats daily because the
+ * situation is live and unresolved; this one is a heads-up, and a heads-up that
+ * arrives every morning for two weeks is something you filter.
+ *
+ * Same durable-marker trick as the pause notice: a zero-cost row in
+ * ai_usage_log is the lock, because Vercel runs many instances and a
+ * module-level boolean dedupes nothing across them.
+ */
+async function notifyTrainerApproaching(db: Db, monthToDateUsd: number): Promise<void> {
+  const monthStart = chicagoMonthStartUtc().toISOString();
+  const { data: existing, error: readErr } = await db
+    .from("ai_usage_log")
+    .select("id")
+    .eq("feature", WARN_NOTICE_FEATURE)
+    .gte("created_at", monthStart)
+    .limit(1);
+  if (readErr) return; // can't verify → skip rather than risk spamming
+  if (existing && existing.length > 0) return;
+
+  const { error: insErr } = await db.from("ai_usage_log").insert({
+    client_id: null,
+    used_on: chicagoToday(),
+    feature: WARN_NOTICE_FEATURE,
+    model: "none",
+    tokens_in: 0,
+    tokens_out: 0,
+    cost_usd: 0,
+  });
+  // Marker first, email second. If the marker fails we send nothing — a missed
+  // warning is recoverable, thirty identical emails is not.
+  if (insErr) return;
+
+  if (!process.env.RESEND_API_KEY) return;
+
+  const now = new Date();
+  const chicago = new Date(now.toLocaleString("en-US", { timeZone: "America/Chicago" }));
+  const dayOfMonth = chicago.getDate();
+  const daysInMonth = new Date(chicago.getFullYear(), chicago.getMonth() + 1, 0).getDate();
+  const projected = projectedMonthEndUsd(monthToDateUsd, dayOfMonth, daysInMonth);
+  const willTrip = projected >= MONTHLY_COST_CAP_USD;
+
+  const html = `
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:24px">
+  <div style="background:#F5B34A;border-radius:12px 12px 0 0;padding:20px;text-align:center">
+    <h1 style="color:#fff;margin:0;font-size:20px;font-weight:700">Symmetry — AI spend heads-up</h1>
+  </div>
+  <div style="background:#fff;border:1px solid #eee;border-top:none;border-radius:0 0 12px 12px;padding:24px">
+    <p style="color:#333;font-size:15px;margin:0 0 12px">
+      This month's Anthropic spend is at <strong>$${monthToDateUsd.toFixed(2)}</strong>
+      of the <strong>$95</strong> cap, on day ${dayOfMonth} of ${daysInMonth}.
+      <strong>Nothing is paused</strong> — everything is working normally.
+    </p>
+    <p style="color:#333;font-size:15px;margin:0 0 12px">
+      At this rate the month lands around <strong>$${projected.toFixed(2)}</strong>.
+      ${willTrip
+        ? `That would hit the cap before month end, which pauses AI for all clients until the 1st.`
+        : `That stays under the cap, so this is a heads-up rather than something to act on.`}
+    </p>
+    <p style="color:#555;font-size:14px;margin:0 0 12px">
+      If it does hit $95, clients see a friendly "taking a break" message and can still log
+      everything by hand — but the coach, photo analysis and food parsing all stop.
+      You can raise the cap in <code>meter-core.ts</code> (MONTHLY_COST_CAP_USD), or lower
+      the per-client daily limits in client_app_settings to slow the burn.
+    </p>
+    <p style="color:#999;font-size:12px;margin:0">Sent once per month, the first time spend crosses $60.</p>
+  </div>
+</div>`.trim();
+
+  try {
+    await fetch(RESEND_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Symmetry Corrective <noreply@symmetrypersonaltraining.com>",
+        to: [TRAINER_EMAIL],
+        subject: `AI spend at $${monthToDateUsd.toFixed(2)} of $95 — heads-up, nothing paused`,
+        html,
+      }),
+    });
+  } catch (e) {
+    console.error("meter: warn email failed", e);
+  }
+}
+
 /** Throws AiPaused when the global monthly kill switch has tripped. */
 export async function assertNotPaused(db?: Db): Promise<void> {
   const d = db ?? admin();
@@ -142,6 +240,13 @@ export async function assertNotPaused(db?: Db): Promise<void> {
   if (killSwitchTripped(mtd)) {
     await notifyTrainerPaused(d, mtd).catch((e) => console.error("meter: notify failed", e));
     throw new AiPaused(mtd);
+  }
+  // The warning rides on the month-to-date figure that was just computed for
+  // the kill switch, so it costs no extra query on a path that runs before
+  // every AI call. It never throws and never blocks: a failure to warn must
+  // not be a failure to answer a client.
+  if (warnThresholdCrossed(mtd)) {
+    await notifyTrainerApproaching(d, mtd).catch((e) => console.error("meter: warn failed", e));
   }
 }
 
