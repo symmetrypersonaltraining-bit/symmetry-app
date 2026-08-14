@@ -911,12 +911,33 @@ export default function NutritionV3Client(props: Props) {
   // the underlying helper has one). CoachChatSheet only calls these after the
   // client taps Confirm.
   function aiItemsToCustom(items: CoachActionItem[]): CustomItem[] {
-    return items.map((it) => ({
-      n: it.name,
-      a: it.amount != null ? `${it.amount}${it.unit ? " " + it.unit : ""}` : null,
-      p: it.p, c: it.c, f: it.f, k: it.kcal || kcalOf(it.p, it.c, it.f),
-      est: true,
-    }));
+    return items.map((it) => {
+      // The model is asked for these and validateActReply keeps them; this
+      // mapping used to drop them on the floor, which is why a meal logged
+      // through the coach recorded no fibre or sodium while the identical meal
+      // built in the food sheet recorded both.
+      //
+      // Absent stays absent. Writing 0 for a nutrient the model did not report
+      // is a claim the food contains none of it, and that quietly drags the
+      // day's total down — the one rule the whole nutrient path is built on.
+      const m = it.micros || undefined;
+      const num = (v: unknown): number | undefined => {
+        const n = typeof v === "number" ? v : Number(v);
+        return Number.isFinite(n) && n >= 0 ? n : undefined;
+      };
+      return {
+        n: it.name,
+        a: it.amount != null ? `${it.amount}${it.unit ? " " + it.unit : ""}` : null,
+        p: it.p, c: it.c, f: it.f, k: it.kcal || kcalOf(it.p, it.c, it.f),
+        est: true,
+        ...(m ? {
+          ...(num(m.fiber)   !== undefined ? { fi: num(m.fiber) }   : {}),
+          ...(num(m.sugar)   !== undefined ? { su: num(m.sugar) }   : {}),
+          ...(num(m.sodium)  !== undefined ? { so: num(m.sodium) }  : {}),
+          ...(num(m.sat_fat) !== undefined ? { sf: num(m.sat_fat) } : {}),
+        } : {}),
+      };
+    });
   }
   function rowByPosition(position: number): Row {
     const row = rows.find((x) => x.position === position);

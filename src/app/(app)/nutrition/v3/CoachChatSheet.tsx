@@ -55,6 +55,20 @@ export interface CoachActionItem {
   p: number;
   c: number;
   f: number;
+  /**
+   * Nutrients keyed by the registry (fiber, sugar, sodium, sat_fat, …).
+   *
+   * The parse route has asked the model for these since `da30c87`, and
+   * `validateActReply` already sanitises and keeps them — but this interface
+   * had no field for them, so they were dropped the moment a parsed item
+   * crossed into the UI. Everything downstream was correct and there was simply
+   * nothing left to carry: 28 of the 34 custom meals logged since 11 Aug
+   * arrived with no nutrients at all.
+   *
+   * Optional because a model reply may legitimately omit it, and absent must
+   * keep meaning UNKNOWN rather than zero all the way to the day's total.
+   */
+  micros?: Record<string, number | null> | null;
 }
 
 export type CoachActionAdherence = "Full" | "3/4" | "1/2" | "1/4" | "Skipped";
