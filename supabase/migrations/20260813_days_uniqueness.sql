@@ -1,0 +1,102 @@
+-- THE ROOT CAUSE OF THE RECURRING DUPLICATE-ROW BUG, AND THE END OF IT.
+--
+-- Dustin, 2026-08-13: "id like you to figure out why we keep getting these
+-- duplicated rows whatever that is and fix the damn problem bc it seems to be a
+-- very consistent problem throughout the app in general."
+--
+-- He is right on both counts. It has been "fixed" at least twice by deleting
+-- the rows, and it came back within a day both times — because deleting rows is
+-- not a fix, it is tidying up after the thing that is actually wrong.
+--
+-- ── THE FINDING ────────────────────────────────────────────────────────────
+--
+-- Sweeping every table that could hold duplicates:
+--
+--   metrics             HAS a unique index          →   0 duplicates
+--   scheduled_workouts  HAS a unique index          →   0 duplicates
+--   sections            children, created together  →   0 duplicates
+--   days                NO unique index at all      → 109 extra rows
+--
+-- The correlation is perfect and it is the whole answer. Every table the
+-- DATABASE protects is clean. Every table left to the discipline of whoever
+-- writes the insert is not — and those inserts are written ad hoc, by different
+-- sessions, weeks apart. No amount of care upstream fixes that, because care is
+-- exactly the thing that does not reproduce.
+--
+-- The specific mistake it kept letting through: a build loop that inserts a
+-- `days` row INSIDE the date loop instead of inserting the day once and looping
+-- only `scheduled_workouts`. Six weeks of dates gives six identical days. On
+-- 13 Aug it gave Gerard and Sharon 41 copies each of one mobility session.
+--
+-- ── WHY THIS KEY ───────────────────────────────────────────────────────────
+--
+-- (client_owner_id, phase_id, label, position), checked against live data
+-- before choosing rather than after: it flags exactly the 9 genuine duplicate
+-- groups and nothing else. The tempting narrower key (phase_id, position) would
+-- have flagged 68 groups and 201 perfectly legitimate rows.
+--
+-- NULLS NOT DISTINCT is the load-bearing half, and the reason this bug was
+-- invisible for so long. Postgres treats NULL as distinct from every other NULL
+-- in a unique index BY DEFAULT — so a plain index would do nothing whatsoever
+-- for library days, which have client_owner_id NULL, and those are the rows a
+-- bulk build is most likely to duplicate.
+--
+-- That is not a hypothetical. It is exactly why workout_logs already has
+-- `uq_workout_log_one_completed ON (client_id, day_id, log_date)` — an index
+-- that looks completely correct, has existed for months, and has never once
+-- fired on the rows that matter, because their day_id is NULL.
+--
+-- ── WHAT IS DELIBERATELY *NOT* CONSTRAINED ─────────────────────────────────
+--
+-- workout_logs looked like the bigger problem: 52 "duplicate" groups against
+-- days' 9. It is not a problem at all, and adding the matching constraint would
+-- have destroyed real client history.
+--
+-- Robert Miller, 2024-08-31 — four rows, one date, day_id NULL:
+--     Stage 1 Elliptical            33 min
+--     Cutting Shoulders and Arms     4 min
+--     Cutting Back                  48 min
+--     Stage 1 Stairmaster           31 min
+--
+-- Four different sessions. He trained four times that day. EVERY one of the 52
+-- groups has distinct notes and distinct durations — separate real sessions
+-- that share a date and have no day attached, which is what an ad-hoc log IS.
+-- Grouping by (client, date, day_id) makes them look identical; opening them
+-- shows they are not.
+--
+-- So the absence of a NULL-covering constraint on workout_logs is CORRECT and
+-- must stay. Anyone who reads the duplicate counts later and "finishes the job"
+-- will delete three of Robert's four sessions, and it will look like tidying.
+--
+-- ── THE CLEANUP THAT PRECEDED THIS ─────────────────────────────────────────
+--
+-- 108 duplicate days removed. Every row backed up first to
+-- bak_dupfix_days_20260813 / bak_dupfix_logs_20260813, all eight tables that
+-- reference days.id repointed to the surviving row, and nothing deleted until a
+-- reference count came back zero.
+--
+-- One pair could not be merged: two of Dustin's day rows share a label and BOTH
+-- carry a completed 1 Aug session with set data, so merging would have to
+-- destroy one. His own brief says which record survives is his call. Rather
+-- than leave a permanent hole in the constraint for it, the later row was
+-- RENAMED — nothing lost, both sessions intact, and the decision now visible in
+-- the UI instead of buried in a table.
+
+create unique index if not exists uq_days_no_identical_twin
+  on public.days (client_owner_id, phase_id, label, position)
+  nulls not distinct;
+
+comment on index public.uq_days_no_identical_twin is
+  'Stops the recurring duplicate-days bug at the database rather than in each build script: a loop that inserts one day per scheduled date instead of reusing one now fails loudly on the second insert. NULLS NOT DISTINCT is essential — library days have a NULL owner, and a default unique index ignores NULLs entirely. Do NOT add the equivalent to workout_logs: multiple ad-hoc sessions on one date are legitimate and common (see this migration''s header).';
+
+-- THE CORRECT PATTERN for any build that schedules one workout across N dates,
+-- written down because getting it wrong is what caused all of this:
+--
+--   insert into days (...) values (...) returning id into v_day;   -- ONCE
+--   foreach v_date in array v_dates loop
+--     insert into scheduled_workouts (client_id, day_id, scheduled_date, ...)
+--     values (v_client, v_day, v_date, ...);                       -- per date
+--   end loop;
+--
+-- The day is the TEMPLATE. The schedule row is the occurrence. One template,
+-- many occurrences.
