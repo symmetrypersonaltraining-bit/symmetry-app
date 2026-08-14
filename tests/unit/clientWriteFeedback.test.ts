@@ -142,3 +142,42 @@ test("the client's notes stay distinguishable from the trainer's", () => {
       "as instructions from the coach rather than as reports from the person training.",
   );
 });
+
+test("what you logged is still there when you look again", () => {
+  /**
+   * The confirmation in AddWorkoutButton stops the moment of doubt. It does not
+   * stop the doubt RETURNING tomorrow, when Todd opens the app and his run is
+   * nowhere on the screen — which was the actual state of things: nothing on
+   * home rendered offplan_workout_logs at all, and the only component that did
+   * (OffPlanBanner) mounts inside a specific workout's logger page, which is
+   * not where anyone would think to look for a run they typed in from home.
+   *
+   * OffPlanToday is the fix, and it is deliberately ADDITIVE: its own card,
+   * fetching its own data, rendering null when empty. Dustin's standing rule on
+   * this dashboard — the reason the Goals work was built the same way — is that
+   * nothing new may put an existing card at risk.
+   */
+  const card = read("src/components/OffPlanToday.tsx");
+  assert.match(card, /from\("offplan_workout_logs"\)/, "OffPlanToday no longer reads the table it exists to show");
+  assert.match(
+    card,
+    /if \(!rows\.length\) return null/,
+    "OffPlanToday renders something when there is nothing logged — an empty card on " +
+      "every rest day is noise, and noise is what gets a card ignored on the day it matters",
+  );
+  assert.match(
+    card,
+    /r\.details \|\| r\.description/,
+    "the card shows `description`, which is truncated to 80 characters at write time. " +
+      "Showing someone a clipped version of what they typed is its own quiet 'did that " +
+      "save properly?' — `details` holds the full text",
+  );
+
+  const home = read("src/app/(app)/home/ClientDashboard.tsx");
+  assert.match(
+    home,
+    /<OffPlanToday\s*\/>/,
+    "OffPlanToday is not mounted on the home screen. Todd typed his run in from home; " +
+      "that is where it has to appear.",
+  );
+});

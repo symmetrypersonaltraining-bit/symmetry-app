@@ -1,5 +1,6 @@
 "use client";
 import AddWorkoutButton from "@/components/AddWorkoutButton";
+import OffPlanToday from "@/components/OffPlanToday";
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -698,6 +699,9 @@ export default function ClientDashboard({
 
         {/* Add workout (client can add an extra workout to today) */}
         <div style={{ marginBottom: 12 }}><AddWorkoutButton /></div>
+        {/* Renders nothing unless something off-plan was logged today. Additive
+            card so the Today's Workout block below is untouched. */}
+        <OffPlanToday />
         {/* Week overview */}
         <div className="metric-card">
           <div className="flex items-center justify-between mb-1">
