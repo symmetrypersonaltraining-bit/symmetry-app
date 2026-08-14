@@ -125,6 +125,24 @@ export default function VideoQueueClient({
    * from a build sandbox: the machine these candidates were found on has no
    * route to youtube.com at all. Capped so a pathological loop cannot run away
    * with someone's function budget.
+   *
+   * ⚠️ WHY THERE IS A NO-PROGRESS BREAK, 14 Aug 2026
+   *
+   * The count cap alone was not enough. A row that comes back `unverified`
+   * writes nothing on purpose — that is what makes the next run retry it. So
+   * when YouTube stops answering Vercel entirely, EVERY row is unverified,
+   * `remaining` never falls, and the oldest 30 rows are handed back on every
+   * pass. The loop then ran its full 25 rounds against the SAME 30 URLs: 750
+   * fetches, 25 function invocations, nothing written — and finished by
+   * printing "Done — 0 videos added from 750 checked", which reads like
+   * success.
+   *
+   * Observed live on this date: `{checked:30, ok:0, dead:0, too_long:0,
+   * unverified:30, remaining:237}` — a total block, not a flaky row.
+   *
+   * So the loop now stops the moment a round fails to reduce `remaining`, and
+   * says which of the two things happened. A run that cannot measure anything
+   * must not be indistinguishable from a run with nothing left to measure.
    */
   async function runFill() {
     setRunning(true);
@@ -133,6 +151,9 @@ export default function VideoQueueClient({
       let guard = 25;
       let filled = 0;
       let seen = 0;
+      let unmeasurable = 0;
+      let prevRemaining = Infinity;
+      let stalled = false;
       while (guard-- > 0) {
         const res = await fetch("/api/video-candidates/verify", { method: "POST" });
         const j = await res.json();
@@ -142,11 +163,28 @@ export default function VideoQueueClient({
         }
         filled += j.applied || 0;
         seen += j.checked || 0;
-        setUnverified(j.remaining ?? 0);
-        setRunMsg(`${filled} videos in · ${j.remaining} left to measure`);
-        if (!j.checked || !j.remaining) break;
+        unmeasurable += j.unverified || 0;
+        const remaining = j.remaining ?? 0;
+        setUnverified(remaining);
+        setRunMsg(`${filled} videos in · ${remaining} left to measure`);
+        if (!j.checked || !remaining) break;
+        // Nothing came off the queue this round. Retrying cannot help — the
+        // next pass gets the same rows back — so stop rather than spin.
+        if (remaining >= prevRemaining) {
+          stalled = true;
+          break;
+        }
+        prevRemaining = remaining;
       }
-      setRunMsg(`Done — ${filled} videos added from ${seen} checked. Reload to see them.`);
+      setRunMsg(
+        stalled
+          ? `Stopped — none of the last ${seen} could be measured. YouTube is not ` +
+            `answering, so no length could be read and nothing was changed. ` +
+            `${filled ? `${filled} went in before that. ` : ""}Try again later.`
+          : `Done — ${filled} videos added from ${seen} checked.` +
+            `${unmeasurable ? ` ${unmeasurable} could not be measured and were left alone.` : ""}` +
+            ` Reload to see them.`,
+      );
     } finally {
       setRunning(false);
     }
