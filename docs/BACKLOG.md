@@ -37,6 +37,65 @@ already tracked below as items 1, 3, 4 and 5. Nothing new.
 
 ---
 
+## Shipped 2026-08-13 → 14 (overnight) — do not redo
+
+| SHA | What |
+|---|---|
+| `879890d` | `client_goals` table + the goal maths (`src/lib/goals.ts`) |
+| `938e1a8` | Goal card, chart, weigh-in nudge, mounted on Progress |
+| `8071135` | Goal chart width cap — the viewBox was scaling axis labels to ~40px on a desktop column |
+| `1cbee42` | Goal chart: pre-goal weigh-ins kept inside the plot; right-edge labels de-collided |
+| `52b2414` | Goal context for the coach (both assemblies) + **every modal raised above the bottom nav** |
+| `49f129f` | **Meal-plan history is no longer rewritten by an edit made today** (Claudine) |
+| `e026f87` | Goals end to end: set/propose/accept/decline/adjust + roll-forward cron. Permanent plan changes announce themselves; `plan-restore` makes "restorable anytime" true |
+| `160b09c` | Goal chart: leftmost dot labelled with its own value; target-date label anchored so it stops printing through "this rate" |
+
+### Two fault classes closed, both with guard tests
+
+**Modals sat at the bottom nav's z-index.** `AppBottomNav` is `z-50`; every
+bottom sheet in the app was also `z-50`, and a sheet rendered inside the page
+comes first in document order — so at a tie the nav won and parked itself over
+the sheet's confirm button. Eleven modal roots across nine files. Found on the
+logger's time picker, where the covered control was the only way out.
+`tests/unit/modalsAboveNav.test.ts` fails if any modal goes back to `z-50`, and
+separately if `AppBottomNav`'s own z-index moves out from under the rule.
+
+**Plan history was resolved against the current plan.** Editing a
+trainer-authored meal clones the plan and archives the original (correct — the
+prescription must never be mutated), but the resolver fetched `status = 'live'`
+only, so the archived version left the candidate set and every past day fell
+through `?? mealPlan` to today's plan. Two consequences: last week's menu was
+redrawn as this week's, and every zeroed item came back, because
+`item_overrides` are keyed by `meal_item` ID and the clone minted new rows.
+A version's reign is `[effective_date, next version's)`; live vs archived says
+which is *current*, not which governed last Tuesday.
+`tests/unit/planHistoryIsNotRewritten.test.ts`, built from Claudine's real ids.
+
+### Goals — what exists now
+
+`client_goals` · `src/lib/goals.ts` (the maths, single source for card, chart
+and coach) · `GoalCard` / `GoalsSection` / `GoalsPanel` / `GoalSetSheet` /
+`WeighInNudge` · `POST /api/goals` (set · accept · decline · adjust · close) ·
+`GET/POST /api/cron/goals` (daily 12:00 UTC roll-forward) ·
+`src/lib/ai/goalContext.ts` feeding both coach assemblies.
+
+Rules worth not relitigating: a stall of 14 days overrides the six-week trend
+and the projection draws FLAT · under 5 readings or 30 days of span there is no
+projection at all · a trainer-set goal is `proposed` and only the client may
+answer it · start value/date are stored, not derived · a rolled goal is not
+re-proposed · a stalled client's roll-forward does not extrapolate from zero.
+
+### Open, from this session
+
+- **Claudine's 13 Aug totals** were computed while her zeroed items were back.
+  Today's row is keyed to the current plan's item ids so it should be right —
+  have her reload and confirm before reading anything into the number.
+- **Exercise videos: 101 exercises still unsearched.** Needs a FRESH session;
+  see the banner at the top of this file. This session spent its WebSearch
+  budget elsewhere.
+
+---
+
 ## How code ships from a cloud session
 
 A Cowork **cloud** session cannot push to GitHub. Verified 2026-08-07 across
