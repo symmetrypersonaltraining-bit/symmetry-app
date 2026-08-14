@@ -1,0 +1,97 @@
+{
+  "ai_chat_turns": [
+    "client_id",
+    "role",
+    "content"
+  ],
+  "appointments": [
+    "scheduled_at"
+  ],
+  "cardio_logs": [
+    "client_id",
+    "log_date"
+  ],
+  "clients": [
+    "name"
+  ],
+  "days": [
+    "phase_id",
+    "position"
+  ],
+  "exercises": [
+    "name"
+  ],
+  "food_catalog": [
+    "name"
+  ],
+  "meal_adherence_logs": [
+    "client_id",
+    "log_date",
+    "meal_position"
+  ],
+  "meal_items": [
+    "meal_id",
+    "food"
+  ],
+  "message_reactions": [
+    "message_id",
+    "user_id",
+    "emoji"
+  ],
+  "messages": [
+    "from_id",
+    "to_id",
+    "body"
+  ],
+  "metrics": [
+    "client_id",
+    "metric_date"
+  ],
+  "notification_preferences": [
+    "user_id",
+    "event_key"
+  ],
+  "offplan_workout_logs": [
+    "client_id",
+    "log_date",
+    "description"
+  ],
+  "payment_reminders": [
+    "due_date",
+    "amount_due"
+  ],
+  "prescribed_exercises": [
+    "section_id",
+    "exercise_id",
+    "position"
+  ],
+  "program_assignments": [
+    "client_id",
+    "program_id"
+  ],
+  "progress_photos": [
+    "client_id",
+    "photo_url",
+    "taken_date"
+  ],
+  "scheduled_workouts": [
+    "client_id",
+    "scheduled_date"
+  ],
+  "set_logs": [
+    "workout_log_id"
+  ],
+  "skinfold_logs": [
+    "client_id",
+    "method",
+    "sites"
+  ],
+  "trainer_notes": [
+    "client_id",
+    "note"
+  ],
+  "workout_logs": [
+    "client_id",
+    "log_date"
+  ]
+}
