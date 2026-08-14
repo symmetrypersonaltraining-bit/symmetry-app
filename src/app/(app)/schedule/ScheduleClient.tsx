@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { updateGCalEvent, deleteGCalEvent } from "./scheduleActions";
 import { centralIso } from "@/lib/central-time";
 import { logCardioSession, logStrengthSession } from "./actions";
+import ManualWorkoutBuilder from "@/components/ManualWorkoutBuilder";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -238,9 +239,10 @@ interface MonthViewProps {
 }
 
 function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, upcomingDays, paymentReminders, isTrainer, clientId = null, monthScheduledWorkouts = [] }: MonthViewProps) {
+  const router = useRouter();
   const [showPayments, setShowPayments] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [logStep, setLogStep] = useState<"choose" | "cardio" | "strength">("choose");
+  const [logStep, setLogStep] = useState<"choose" | "cardio" | "strength" | "build">("choose");
   const [cardioType, setCardioType] = useState("Run");
   const [durationMin, setDurationMin] = useState("");
   const [distanceMi, setDistanceMi] = useState("");
@@ -347,16 +349,50 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
               <button onClick={() => setSelectedDate(null)} className="w-8 h-8 flex items-center justify-center rounded-full" style={{background:"var(--brand-bg)"}}><i className="ti ti-x" style={{color:"var(--brand-text-secondary)"}} /></button>
             </div>
             {logStep === "choose" && (
-              <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setLogStep("cardio")} className="flex flex-col items-center gap-2 py-5 rounded-xl border-2" style={{background:"#FFF5F5",borderColor:"#FC8181"}}>
-                  <i className="ti ti-run text-3xl" style={{color:"#E53E3E"}} />
-                  <span className="text-sm font-semibold" style={{color:"var(--brand-text)"}}>Cardio</span>
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setLogStep("cardio")} className="flex flex-col items-center gap-2 py-5 rounded-xl border-2" style={{background:"#FFF5F5",borderColor:"#FC8181"}}>
+                    <i className="ti ti-run text-3xl" style={{color:"#E53E3E"}} />
+                    <span className="text-sm font-semibold" style={{color:"var(--brand-text)"}}>Cardio</span>
+                  </button>
+                  <button onClick={() => setLogStep("strength")} className="flex flex-col items-center gap-2 py-5 rounded-xl border-2" style={{background:"#EBF8FF",borderColor:"#63B3ED"}}>
+                    <i className="ti ti-barbell text-3xl" style={{color:"var(--brand-primary)"}} />
+                    <span className="text-sm font-semibold" style={{color:"var(--brand-text)"}}>Strength</span>
+                  </button>
+                </div>
+                {/* BUILD ONE FROM SCRATCH — app_feedback 73fcd284, 6 Aug:
+                    "Nedd full add workout custom from schedule page not just
+                    pick from library."
+                    This sheet offered exactly two things, and both of them were
+                    ways to LOG something that had already happened. There was no
+                    way to put a workout ON a day from the one screen that is
+                    entirely about which day things are on — a trainer planning
+                    Thursday had to leave, go to the client's profile, and pick
+                    the date again there.
+                    The builder already existed and already takes a date; it was
+                    mounted on Home, the workout tab and the client profile, and
+                    not here. So this is the same component, not a second one —
+                    a hand-built workout stays one shape everywhere. */}
+                <button
+                  onClick={() => setLogStep("build")}
+                  className="w-full mt-3 flex items-center gap-3 py-4 px-4 rounded-xl border-2"
+                  style={{background:"var(--brand-bg)",borderColor:"var(--brand-primary)"}}
+                >
+                  <i className="ti ti-pencil-plus text-2xl" style={{color:"var(--brand-primary)"}} />
+                  <span className="text-left">
+                    <span className="block text-sm font-semibold" style={{color:"var(--brand-text)"}}>Build a workout for this day</span>
+                    <span className="block text-xs" style={{color:"var(--brand-text-secondary)"}}>Type the exercises yourself &mdash; no library, no AI</span>
+                  </span>
                 </button>
-                <button onClick={() => setLogStep("strength")} className="flex flex-col items-center gap-2 py-5 rounded-xl border-2" style={{background:"#EBF8FF",borderColor:"#63B3ED"}}>
-                  <i className="ti ti-barbell text-3xl" style={{color:"var(--brand-primary)"}} />
-                  <span className="text-sm font-semibold" style={{color:"var(--brand-text)"}}>Strength</span>
-                </button>
-              </div>
+              </>
+            )}
+            {logStep === "build" && (
+              <ManualWorkoutBuilder
+                clientId={clientId ?? undefined}
+                date={selectedDate}
+                onCancel={() => setLogStep("choose")}
+                onDone={() => { setSelectedDate(null); setLogStep("choose"); router.refresh(); }}
+              />
             )}
             {logStep === "cardio" && (
               <div className="space-y-4">
