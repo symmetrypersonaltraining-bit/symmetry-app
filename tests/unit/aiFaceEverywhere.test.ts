@@ -56,14 +56,9 @@ test("no sparkles, robot or brain icon stands in for the AI's face", () => {
       // ExperienceSettings' remaining chatbot icon labels the GROUP CHAT BOT
       // toggle, which is a settings row about a feature, not the AI speaking.
       if (b === "ti-message-chatbot" && line.includes("ExperienceSettings")) continue;
-      // THE WORKOUT LOGGER IS OFF LIMITS WITHOUT PER-ITEM PERMISSION — his
-      // standing rule, and it has held since the day it was written. Two AI
-      // marks live in there: the "Ask your coach" header button (ti-sparkles)
-      // and the "AI Programming Note" sheet (ti-brain). Both SHOULD wear the
-      // face by the rule this file enforces, and neither is changed until he
-      // says so specifically. Listed rather than filtered out silently, so it
-      // stays a question somebody has to answer instead of a gap.
-      if (line.includes("workout/[dayId]/WorkoutLogger.tsx")) continue;
+      // The logger's two exceptions are GONE — Dustin gave per-item permission
+      // on 14 Aug and both now wear the face, so there is no exemption here any
+      // more. Every AI mark in the app goes through the registry.
       // Not AI: an anatomical finding in the assessment checklist.
       if (line.includes("assessment/page.tsx") && line.includes("balance_deficits")) continue;
       hits.push(line.trim());

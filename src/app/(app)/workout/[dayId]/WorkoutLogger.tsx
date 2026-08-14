@@ -21,6 +21,7 @@ import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
 import { pickExistingLog, type ExistingLog } from "@/lib/workoutLogLookup";
 import { feetToMeters, metersToFeet } from "@/lib/distanceField";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import AiBadge from "@/components/AiBadge";
 import {
   newTimer, start as tStart, pause as tPause, setMode as tSetMode,
   displaySecs, isExpired, isRunning, outcomeOnStop,
@@ -2099,7 +2100,11 @@ export default function WorkoutLogger({
             <div className="w-full rounded-t-3xl p-5" style={{ background: "var(--brand-surface)", paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }} onClick={e => e.stopPropagation()}>
               <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: "var(--brand-border)" }} />
               <div className="flex items-center gap-2 mb-1">
-                <i className="ti ti-brain text-base" style={{ color: "#8b5cf6" }} />
+                {/* Trainer-only. Worth noting this one is AI *input*, not AI
+                    output — what Dustin dictates here lands in trainer_notes
+                    and becomes context the AI programs from later. The face is
+                    still right: it is the thing that will remember it. */}
+                <AiBadge size={20} mood="thinking" title="" />
                 <h3 className="font-bold text-base" style={{ color: "var(--brand-text)" }}>AI Programming Note</h3>
               </div>
               <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>Saved to {clientName ? clientName.split(" ")[0] + "'s" : "this client's"} programming notes ({currentExercise.exercises?.name}) for your Command Center chat.</p>
@@ -2268,7 +2273,13 @@ export default function WorkoutLogger({
             <button onClick={() => setCoachOpen(true)}
               className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }} title="Ask your coach">
-              <i className="ti ti-sparkles text-base" style={{ color: "#7ee0a8" }} />
+              {/* The face, not a sparkle. This was one of the last two AI marks
+                  in the app still wearing a generic glyph — deliberately left
+                  until Dustin gave per-item permission for the logger, which he
+                  did on 14 Aug. Same button, same 36px box, same row: only what
+                  is inside it changed, so nothing about this screen's layout or
+                  its keyboard behaviour moves. */}
+              <AiBadge size={22} mood="lifting" title="" />
             </button>
           </div>
         </div>
@@ -2458,7 +2469,7 @@ export default function WorkoutLogger({
           <button type="button" onClick={logAllCurrentSets} className="flex-1 h-10 rounded-xl text-sm font-semibold text-white" style={{ background: "var(--brand-primary)" }}>Check all</button>
           {isTrainerSession && (
             <button type="button" onClick={() => setShowAiNote(true)} className="flex items-center gap-1 px-3 h-10 rounded-xl text-xs font-semibold flex-shrink-0" style={{ background: "rgba(139,92,246,0.16)", color: "#b79cf7", border: "1px solid rgba(139,92,246,0.3)" }}>
-              <i className="ti ti-brain text-sm" /> AI note
+              <AiBadge size={16} mood="thinking" title="" /> AI note
             </button>
           )}
         </div>
@@ -2875,7 +2886,7 @@ export default function WorkoutLogger({
           <div className="rounded-2xl p-4 mb-3"
             style={{ background: "var(--brand-surface)", border: "1px solid rgba(139,92,246,0.3)" }}>
             <div className="flex items-center gap-2 mb-3">
-              <i className="ti ti-brain text-sm" style={{ color: "#8b5cf6" }} />
+              <AiBadge size={18} mood="thinking" title="" />
               <p className="text-xs font-semibold" style={{ color: "#8b5cf6" }}>AI Programming Note</p>
             </div>
             <div className="flex gap-2">
