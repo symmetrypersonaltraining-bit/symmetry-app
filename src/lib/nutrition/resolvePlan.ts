@@ -22,7 +22,11 @@ import { isoWeekdayFromDateStr } from "./weekday";
 // The exact meal/meal_items select the nutrition pages use, PLUS day_group +
 // effective_date so the resolver (and client-side date-nav) can pick correctly.
 export const PLAN_SELECT =
-  "id, version_number, title, day_group, effective_date, " +
+  // `status` is load-bearing now that superseded versions are fetched too —
+  // pickPlanForDate uses it to make sure a live plan is never out-sorted by an
+  // archived one. Drop it from this list and every client silently starts
+  // resolving history against whatever has the newest date, cancelled or not.
+  "id, version_number, title, day_group, effective_date, status, " +
   // `micros` matters: without it in the select list, meal_items arrive with no
   // nutrient panel and computeDayTotals reports every planned meal's sodium as
   // unknown even though the row has it. An omitted column reads exactly like an
@@ -55,7 +59,7 @@ export interface DayGroupPlan {
 //
 // Getting this wrong shows next week's menu today, so it is checked against the
 // DATE BEING VIEWED and nothing else.
-export function pickPlanForDate<T extends { day_group?: number[] | null; effective_date?: string | null }>(
+export function pickPlanForDate<T extends { day_group?: number[] | null; effective_date?: string | null; status?: string | null }>(
   candidates: T[],
   dateStr: string,
 ): T | null {
@@ -65,12 +69,27 @@ export function pickPlanForDate<T extends { day_group?: number[] | null; effecti
     (p) => p.effective_date == null || p.effective_date <= dateStr,
   );
   const wd = isoWeekdayFromDateStr(dateStr);
-  const tagged = list.find((p) => Array.isArray(p.day_group) && p.day_group.includes(wd));
-  if (tagged) return tagged;
-  const everyday = list.find(
-    (p) => p.day_group == null || (Array.isArray(p.day_group) && p.day_group.length === 0),
-  );
-  return everyday ?? null;
+  const pick = (from: T[]): T | null => {
+    const tagged = from.find((p) => Array.isArray(p.day_group) && p.day_group.includes(wd));
+    if (tagged) return tagged;
+    return from.find((p) => p.day_group == null || (Array.isArray(p.day_group) && p.day_group.length === 0)) ?? null;
+  };
+
+  // A LIVE plan always wins for a date it is in force on. Superseded versions
+  // are only consulted for dates BEFORE the current plan started — which is the
+  // whole point of keeping them: last Tuesday was governed by last Tuesday's
+  // menu, not by the one that replaced it on Thursday.
+  //
+  // Doing it in this order rather than by effective_date alone also makes a
+  // CANCELLED future plan harmless. An archived row dated next month would
+  // otherwise out-sort the live one and start governing in September. Status is
+  // the only thing that distinguishes "superseded" from "abandoned", and it
+  // cannot tell them apart — so the live plan is never overruled.
+  //
+  // A candidate with no status is treated as live: that is every caller that
+  // predates this, and the existing behaviour must not shift under them.
+  const live = list.filter((p) => p.status == null || p.status === "live");
+  return pick(live) ?? pick(list);
 }
 
 /**
@@ -113,6 +132,38 @@ export function shiftDate(dateStr: string, days: number): string {
 //
 // pickPlanForDate does the effective_date comparison against the viewed date,
 // so a plan that has not started cannot leak into an earlier day.
+//
+// ── AND IT REACHES BACKWARD TOO, WHICH IS NEWER AND HARDER-WON ─────────────
+//
+// Claudine, 13 Aug: "Omfg i replaced one of the meals for a recipe i made and
+// the clanker changed ALL the meals not only for today but days before... i had
+// to manually change amounts to 0 and the clanker put all the amounts back."
+//
+// She was right on every count, and none of it was the AI. Editing a
+// trainer-authored meal CLONES the plan (/api/nutrition/plan-edit) and archives
+// the original — correct, so Dustin's prescription is never mutated. But this
+// query asked for status = 'live', so the moment the old version was archived
+// it vanished from the candidate set, and every past day fell through to
+// today's plan. Two things followed:
+//
+//   · last week's menu was redrawn as this week's, retroactively;
+//   · every "I didn't eat that" zero came back. Those live in
+//     meal_adherence_logs.item_overrides keyed by meal_item ID, and the clone
+//     minted brand-new item rows — so on a past day the keys matched nothing
+//     and the item rendered at its full planned amount. Her removals silently
+//     un-removed themselves, and the day's calories moved with them.
+//
+// A version's reign is [its effective_date, the next version's). 'live' vs
+// 'archived' says which one is CURRENT — it does not say which one governed
+// last Tuesday. So superseded versions stay in the set and pickPlanForDate,
+// which already picks the newest effective_date on or before the viewed date,
+// gets the right answer for history without changing at all.
+//
+// Capped, because a client who edits a meal a day accumulates versions and each
+// one carries its whole meal/item tree. Twenty covers far more history than the
+// screen can page to.
+const MAX_PLAN_VERSIONS = 20;
+
 export async function fetchLivePlans(
   supabase: SupabaseClient,
   clientId: string,
@@ -125,9 +176,10 @@ export async function fetchLivePlans(
     .from("meal_plans")
     .select(sel)
     .eq("client_id", clientId)
-    .eq("status", "live")
+    .in("status", ["live", "archived"])
     .order("effective_date", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(MAX_PLAN_VERSIONS);
   return (data as unknown as DayGroupPlan[]) || [];
 }
 

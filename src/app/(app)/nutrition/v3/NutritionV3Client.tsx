@@ -183,11 +183,26 @@ export default function NutritionV3Client(props: Props) {
   // client-side, TZ-safe via pickPlanForDate). Fall back to the server-resolved
   // `mealPlan` (today's) when no set is provided. For a client with a single
   // null-day_group plan this always yields that plan → zero behavior change.
+  //
+  // THE FALLBACK IS FOR TODAY AND FORWARD ONLY.
+  //
+  // `?? mealPlan` used to apply to every date, and mealPlan is the CURRENT
+  // plan — so any past day the resolver could not place fell through to
+  // today's menu and was redrawn as if it had always been that. That is the
+  // second half of what Claudine hit on 13 Aug: her plan was cloned, the old
+  // version was archived out of the candidate set, and a week of history was
+  // retroactively rewritten to match today, zeros and all. The resolver now
+  // keeps superseded versions, so it can place those days properly.
+  //
+  // For a date in the past with genuinely no plan on file, the honest answer is
+  // no plan — the screen falls into open mode and logs what was actually eaten.
+  // Showing today's menu over a day it did not govern is not a graceful
+  // degradation; it is a wrong number that looks like a right one.
   const activePlan = useMemo<MealPlanShape | null>(() => {
     const set = livePlans && livePlans.length ? livePlans : (mealPlan ? [mealPlan] : []);
-    if (!set.length) return mealPlan ?? null;
-    return pickPlanForDate(set, selectedDate) ?? mealPlan ?? null;
-  }, [livePlans, mealPlan, selectedDate]);
+    if (!set.length) return selectedDate >= today ? (mealPlan ?? null) : null;
+    return pickPlanForDate(set, selectedDate) ?? (selectedDate >= today ? mealPlan ?? null : null);
+  }, [livePlans, mealPlan, selectedDate, today]);
 
   // Dustin, 2026-08-05: "If we set up a meal plan that changes, it needs to be
   // scheduled ahead of time. And I need to be able to see it days ahead of
