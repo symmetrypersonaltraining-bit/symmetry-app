@@ -8,6 +8,13 @@
 //                        1 cup rice") becomes structured rows with macros.
 //   mode 'estimate'    — an ingredient list that already exists but has zeros
 //                        in it gets the missing macros filled in.
+//   mode 'create'      — WHAT MEGAN ASKED FOR, 14 Aug: "would be cool to put in
+//                        ingredients and have it make the recipe to fit macros.
+//                        Im using chatgpt to do it now." You give it what is in
+//                        your kitchen and the macros you have left; it chooses
+//                        the QUANTITIES so the totals land, and writes the
+//                        method. The other two modes read a recipe you already
+//                        have. This one writes one.
 //
 // EVERY NUMBER IT RETURNS IS A GUESS, and the app says so: rows come back
 // marked source 'ai' and the builder shows them differently from a catalog
@@ -38,7 +45,17 @@ interface AiIngredient {
   fats: number;
   note?: string | null;
 }
-interface Reply { ingredients: AiIngredient[]; servings?: number | null; notes?: string | null }
+interface Reply {
+  ingredients: AiIngredient[];
+  servings?: number | null;
+  notes?: string | null;
+  /** 'create' only — the recipe it wrote. */
+  title?: string | null;
+  description?: string | null;
+  instructions?: string[];
+  prep_minutes?: number | null;
+  cook_minutes?: number | null;
+}
 
 const SYSTEM = `You estimate the nutrition of recipe ingredients for a personal-training app.
 
@@ -56,6 +73,28 @@ Rules:
 - If the text is not food at all, return {"ingredients":[]}.
 
 Be conservative and specific. "Chicken breast" at 8 oz raw is about 53 g protein and 6 g fat, not 40 and 20.`;
+
+// The create-mode prompt is separate rather than a paragraph bolted onto the
+// one above, because the job is genuinely different: that one READS a recipe,
+// this one WRITES one and has to land on a number while doing it.
+const CREATE_SYSTEM = `You write recipes for clients of a personal-training studio, from the food they already have, hitting a macro target.
+
+Return ONLY valid JSON, no markdown, no fences:
+{"title":string,"description":string,"servings":number,"prep_minutes":number,"cook_minutes":number,"ingredients":[{"food":string,"amount":number,"unit":string,"protein":number,"carbs":number,"fats":number,"note":string|null}],"instructions":[string],"notes":string|null}
+
+THE TARGET IS THE JOB. You are choosing QUANTITIES so the per-serving totals land on the macros you are given. Getting within about 5 g on each of protein, carbs and fat is the whole point — a recipe that tastes plausible and misses the numbers is a failure here.
+
+Rules:
+- Use the ingredients you are given. You may add ordinary storecupboard items — oil, salt, pepper, herbs, spices, vinegar, stock, garlic, lemon — and you should say so in notes. Do NOT invent a main ingredient they did not mention.
+- If the target cannot be hit with what they have, get as close as you can and say plainly in notes what is short and what one item would fix it.
+- Macros are GRAMS, for the WHOLE quantity of that ingredient in the recipe — not per 100 g, not per serving.
+- Do NOT return calories. They are computed from the macros.
+- Cooked vs raw changes the numbers a lot. Say which you priced in that ingredient's note.
+- Oil and butter are fat and matter. Never round them away to make a target work.
+- instructions: 3–8 steps, each one plain and short, the way you would say it out loud. No numbering — the app numbers them.
+- title: what a person would call it, not a description. "Chipotle Beef Rice Bowl", not "High Protein Beef And Rice Dish With Vegetables".
+- description: one sentence, under 140 characters.
+- Real cooking. Ordinary equipment, ordinary technique, nothing that needs a scale for every step.`;
 
 function validate(raw: unknown): Reply | null {
   if (!raw || typeof raw !== "object") return null;
@@ -84,10 +123,27 @@ function validate(raw: unknown): Reply | null {
     if (ingredients.length >= 40) break;
   }
   const sv = Number(o.servings);
+  const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) || null : null);
+  const mins = (v: unknown) => {
+    const x = Number(v);
+    return Number.isFinite(x) && x >= 0 ? Math.min(600, Math.round(x)) : null;
+  };
   return {
     ingredients,
     servings: Number.isFinite(sv) && sv > 0 ? Math.round(sv) : null,
-    notes: typeof o.notes === "string" ? o.notes.trim().slice(0, 300) || null : null,
+    notes: str(o.notes, 300),
+    title: str(o.title, 120),
+    description: str(o.description, 200),
+    // Steps are the part a person actually follows, so an empty or non-string
+    // entry is dropped rather than rendered as a blank numbered line.
+    instructions: Array.isArray(o.instructions)
+      ? o.instructions
+          .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+          .map((x) => x.trim().slice(0, 400))
+          .slice(0, 20)
+      : [],
+    prep_minutes: mins(o.prep_minutes),
+    cook_minutes: mins(o.cook_minutes),
   };
 }
 
@@ -100,14 +156,58 @@ export async function POST(req: NextRequest) {
   const paused = await enforceMeter(null, "recipe_ai");
   if (paused) return paused;
 
-  let body: { mode?: string; text?: string; ingredients?: { food: string; amount?: number | null; unit?: string | null }[]; title?: string };
+  let body: {
+    mode?: string;
+    text?: string;
+    ingredients?: { food: string; amount?: number | null; unit?: string | null }[];
+    title?: string;
+    /** create mode */
+    have?: string;
+    target?: { protein?: number; carbs?: number; fats?: number };
+    servings?: number;
+    constraints?: string;
+  };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "AI isn't configured" }, { status: 503 });
 
   let prompt: string;
-  if (body.mode === "estimate" && Array.isArray(body.ingredients) && body.ingredients.length) {
+  let system = SYSTEM;
+  let maxTokens = 1600;
+
+  if (body.mode === "create") {
+    const have = (body.have || "").trim();
+    if (!have) return NextResponse.json({ error: "Tell me what you've got in the kitchen." }, { status: 400 });
+
+    const t = body.target || {};
+    const p = Number(t.protein), c = Number(t.carbs), f = Number(t.fats);
+    const hasTarget = [p, c, f].some((x) => Number.isFinite(x) && x > 0);
+    if (!hasTarget) {
+      return NextResponse.json({ error: "Give me a macro target to aim at." }, { status: 400 });
+    }
+    const servings = Number.isFinite(Number(body.servings)) && Number(body.servings) > 0
+      ? Math.min(12, Math.round(Number(body.servings))) : 1;
+
+    // The target is stated PER SERVING and the servings count is stated
+    // separately, because "make it hit 40g protein" means per plate to a person
+    // and there is no way to guess which they meant.
+    const targetLine = [
+      Number.isFinite(p) && p > 0 ? `protein ${Math.round(p)} g` : null,
+      Number.isFinite(c) && c > 0 ? `carbs ${Math.round(c)} g` : null,
+      Number.isFinite(f) && f > 0 ? `fat ${Math.round(f)} g` : null,
+    ].filter(Boolean).join(", ");
+
+    prompt =
+      `They have: ${have.slice(0, 1500)}\n\n` +
+      `Target PER SERVING: ${targetLine}\n` +
+      `Servings: ${servings}\n` +
+      (body.constraints ? `Must respect: ${body.constraints.slice(0, 400)}\n` : "") +
+      `\nWrite one recipe. Choose the quantities so each serving lands on that target. ` +
+      `Ingredient macros you return are for the WHOLE recipe, not per serving.`;
+    system = CREATE_SYSTEM;
+    maxTokens = 2200;
+  } else if (body.mode === "estimate" && Array.isArray(body.ingredients) && body.ingredients.length) {
     prompt =
       `Recipe: ${body.title || "(untitled)"}\n\nWork out the macros for each of these ingredients, keeping the food names and quantities exactly as given:\n` +
       body.ingredients.map((i) => `- ${[i.amount, i.unit, i.food].filter(Boolean).join(" ")}`).join("\n");
@@ -123,8 +223,8 @@ export async function POST(req: NextRequest) {
     meter: { clientId: scoped.scope.clientId ?? null, feature: "recipe_ai" },
     apiKey,
     model: HAIKU_MODEL,
-    system: SYSTEM,
-    maxTokens: 1600,
+    system,
+    maxTokens,
     messages: [{ role: "user", content: prompt }],
     validate,
   });
@@ -139,6 +239,38 @@ export async function POST(req: NextRequest) {
     source: "ai" as const,
     kcal: kcalOf(i.protein, i.carbs, i.fats),
   }));
+
+  if (body.mode === "create") {
+    // Totals are computed HERE from the ingredient rows, never taken from the
+    // model. It is the only way to tell the person honestly how close it landed
+    // — and a model asked to hit a target will sometimes report the target back
+    // rather than what it actually wrote.
+    const sv = value.servings && value.servings > 0 ? value.servings : 1;
+    const tot = ingredients.reduce(
+      (a, i) => ({ p: a.p + i.protein, c: a.c + i.carbs, f: a.f + i.fats }),
+      { p: 0, c: 0, f: 0 },
+    );
+    const per = {
+      protein: Math.round((tot.p / sv) * 10) / 10,
+      carbs: Math.round((tot.c / sv) * 10) / 10,
+      fats: Math.round((tot.f / sv) * 10) / 10,
+      kcal: kcalOf(tot.p / sv, tot.c / sv, tot.f / sv),
+    };
+    return NextResponse.json({
+      ok: true,
+      recipe: {
+        title: value.title || "Untitled recipe",
+        description: value.description,
+        servings: sv,
+        prep_minutes: value.prep_minutes,
+        cook_minutes: value.cook_minutes,
+        instructions: value.instructions || [],
+      },
+      ingredients,
+      perServing: per,
+      notes: value.notes,
+    });
+  }
 
   return NextResponse.json({ ok: true, ingredients, servings: value.servings, notes: value.notes });
 }
