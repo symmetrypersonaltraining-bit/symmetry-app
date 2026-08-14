@@ -110,8 +110,19 @@ test("a page we could not read is retried, not recorded as a verdict", () => {
   );
 });
 
-test("the ceiling is Dustin's thirty seconds", () => {
-  assert.equal(MAX_SECONDS, 30);
+test("the ceiling is Dustin's sixty seconds", () => {
+  /**
+   * Was 30. He raised it to 60 on 14 Aug after the numbers showed the "119
+   * exercises still need a video" problem was not a search problem at all:
+   * 112 of the 119 already HAD a video found, parked in `too_long` because the
+   * shortest clip that existed for them ran 31 seconds against a 30-second
+   * ceiling.
+   *
+   * Pinned as a value he owns, not a number to tune. Anyone lowering it is
+   * taking videos off 67 exercises; anyone raising it is putting something
+   * longer than a minute in front of someone mid-set. Either is his call.
+   */
+  assert.equal(MAX_SECONDS, 60);
 });
 
 test("every URL shape the agents recorded still parses", () => {

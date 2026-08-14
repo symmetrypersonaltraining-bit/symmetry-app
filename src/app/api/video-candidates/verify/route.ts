@@ -52,8 +52,34 @@ export const maxDuration = 60;
 const BATCH = 30;
 const CONCURRENCY = 6;
 
-/** Dustin's ceiling. Anything longer is not a demo, it is a video. */
-export const MAX_SECONDS = 30;
+/**
+ * Dustin's ceiling. Anything longer is not a demo, it is a video.
+ *
+ * Raised 30 → 60 on 14 Aug, by him, on numbers rather than taste.
+ *
+ * 119 exercises had no video and it read like a search problem — it was not.
+ * Only FOUR of the 119 had never been searched. The other 112 already had a
+ * video found and sitting in `too_long`, because the shortest clip anyone could
+ * find for them was 31 seconds and the ceiling was 30. One second.
+ *
+ * What the whole pile looked like, by the shortest candidate per exercise:
+ *
+ *     ceiling   exercises that gain a video   still without
+ *        30s              0                        119
+ *        45s             33                         86
+ *        60s             67                         52     ← chosen
+ *        90s             83                         36
+ *       180s            106                         13
+ *
+ * 60 is where the curve bends: 30→60 buys 67 exercises, 60→90 buys 16 more for
+ * triple the length. A minute is still short enough to watch between sets,
+ * which is the only thing the ceiling is really protecting.
+ *
+ * IDEAL_SECONDS is untouched at 20 — the queue still sorts toward short, so a
+ * better clip surfacing later still wins. This raises what is ACCEPTABLE, not
+ * what is preferred.
+ */
+export const MAX_SECONDS = 60;
 /** What he actually wants. Used for sorting the review queue, not for rejecting. */
 export const IDEAL_SECONDS = 20;
 
