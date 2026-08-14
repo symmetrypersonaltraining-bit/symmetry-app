@@ -2996,6 +2996,7 @@ function OffPlanFlow({
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const libRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [listening, setListening] = useState(false);
   const micRef = useRef<{ stop?: () => void } | null>(null);
@@ -3111,12 +3112,22 @@ function OffPlanFlow({
       {mode === "pick" && (
         <>
           {rowBtn("📷", "Snap a photo", "Restaurant & receipt aware — detects chains for official data", () => fileRef.current?.click())}
+          {rowBtn("🖼", "Pick a photo you already took", "From your camera roll — same AI estimate", () => libRef.current?.click())}
           {rowBtn("⌨", "Type foods with amounts", '"8 oz chicken, 1 cup rice" → AI parses each item', () => setMode("typed"))}
           {rowBtn("✏️", "Describe it loosely", '"chipotle bowl, double chicken, no rice"', () => setMode("typed"))}
           {rowBtn("🎤", "Say it out loud", "Voice logging → transcript → estimate", startMic)}
         </>
       )}
+      {/* TWO inputs, and the difference is the whole point.
+          `capture="environment"` opens the camera directly — great when you are
+          standing over the plate, useless when the photo is already on your
+          phone, because Android hides the gallery entirely when capture is set.
+          Megan Gautreaux, 14 Aug: "Need a way to add a picture from my phone
+          instead of just take a Pic with camera to log food."
+          ProgressPhotos has had both since it shipped and even documents this
+          exact trap; food logging never got it. */}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+      <input ref={libRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
 
       {mode === "typed" && !est && (
         <>

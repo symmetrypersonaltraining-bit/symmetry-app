@@ -399,7 +399,12 @@ function QuickLog({ clientId, selectedDate, logs, setLogs }: { clientId: string;
           <button onClick={() => photoRef.current?.click()} disabled={photoBusy} className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ border: "1px dashed var(--brand-border)", background: "var(--brand-surface)", color: "var(--brand-text-secondary)" }} aria-label="Photo (AI)">
             <i className={photoBusy ? "ti ti-loader-2 animate-spin" : "ti ti-camera"} />
           </button>
-          <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleQuickPhoto} />
+          {/* No `capture`. With it, Android opens the camera and hides the
+              gallery, so a photo you already took is unreachable — Megan's
+              report, 14 Aug. Without it the OS offers Camera AND Photos, with
+              Camera first, so taking one costs one extra tap and using an
+              existing one becomes possible at all. */}
+          <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handleQuickPhoto} />
         </div>
         {results.length > 0 && !picked && (
           <div className="mt-2">
@@ -1169,8 +1174,9 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
         <button onClick={() => setTab("quick")} className="flex-1 py-2.5 rounded-full text-sm font-bold transition-all relative z-10" style={tab === "quick" ? { color: "var(--brand-text)" } : { color: "var(--brand-text-secondary)" }}>Quick log</button>
       </div>
 
-      {/* Hidden camera input */}
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment"
+      {/* Hidden photo input — camera OR camera roll. `capture` deliberately
+          absent; see the note on photoRef above. */}
+      <input ref={cameraRef} type="file" accept="image/*"
         className="hidden" onChange={handlePhotoCapture} />
 
       {/* Off-Plan Modal */}
