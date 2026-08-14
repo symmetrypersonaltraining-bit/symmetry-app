@@ -120,7 +120,13 @@ export default function GoalCard({
         {statusText}
       </span>
 
-      <div style={{ position: "relative", touchAction: "none", marginTop: 12 }}>
+      {/* CAP THE CHART'S WIDTH.
+          The viewBox is 340 wide and every font-size inside it is in viewBox
+          units, so `width: 100%` on a 1,250px trainer-desktop column scaled the
+          axis labels to about 40px — caught on the live screen a minute after
+          shipping, not in review, because at phone width it looks perfect.
+          A chart does not get more readable past ~480px; it just gets louder. */}
+      <div style={{ position: "relative", touchAction: "none", marginTop: 12, maxWidth: 480 }}>
         <svg
           ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", width: "100%", height: "auto", overflow: "visible" }}
           role="img"
