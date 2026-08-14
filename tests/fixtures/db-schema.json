@@ -286,6 +286,24 @@
     "compensation_confidence",
     "movement_assessment_id"
   ],
+  "client_goals": [
+    "id",
+    "client_id",
+    "metric",
+    "target_value",
+    "target_date",
+    "start_value",
+    "start_date",
+    "set_by",
+    "status",
+    "rolled_from_id",
+    "rolled_to_id",
+    "note",
+    "accepted_at",
+    "achieved_at",
+    "created_at",
+    "updated_at"
+  ],
   "client_notifications": [
     "id",
     "client_id",

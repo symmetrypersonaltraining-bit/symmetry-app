@@ -67,10 +67,15 @@ test("GoalsSection renders nothing rather than breaking the screen", () => {
   // bad trade for a feature not every client has yet.
   const src = readFileSync(join(ROOT, "src/components/GoalsSection.tsx"), "utf8");
   assert.match(src, /catch \{\s*\n?\s*return null;/, "GoalsSection no longer swallows its own errors");
+  // A brand-new client — no goal, no proposal, no weigh-in history — sees the
+  // Progress screen exactly as it was before this feature existed. The set of
+  // things worth rendering has grown since the first cut (proposals and the
+  // "set a goal" invitation joined the list); what must not change is that an
+  // empty client still gets nothing rather than an empty box.
   assert.match(
     src,
-    /if \(!active\.length && !showNudge\) return null;/,
-    "GoalsSection renders something for a client with no goal and no stale weigh-in",
+    /const anything = [^;]+;\s*\n\s*if \(!anything\) return null;/,
+    "GoalsSection renders something for a client with nothing on file at all",
   );
 });
 

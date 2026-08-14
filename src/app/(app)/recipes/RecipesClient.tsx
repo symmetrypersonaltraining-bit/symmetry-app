@@ -264,6 +264,8 @@ function RecipeView({ rec, planMeals, onClose }: { rec: RecipeRow; planMeals: { 
   // {COACH_FIRST_NAME}'s original is archived and restorable, never overwritten.
   const [slot, setSlot] = useState("");
   const [planning, setPlanning] = useState(false);
+  // The permanent change asks once. See the confirm block below for why.
+  const [confirming, setConfirming] = useState(false);
 
   async function addToPlan() {
     if (!slot || planning || !ings) return;
@@ -287,8 +289,8 @@ function RecipeView({ rec, planMeals, onClose }: { rec: RecipeRow; planMeals: { 
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) { setLogged((json && json.error) || "Couldn't add that to your plan."); return; }
       setLogged(json.cloned
-        ? `Added to your plan 📌 — this is your version now, ${COACH_FIRST_NAME}'s is in your history`
-        : "Added to your plan 📌");
+        ? `Swapped into your plan from today on 📌 — ${COACH_FIRST_NAME}'s version is saved under Plan versions if you want it back`
+        : "Swapped into your plan from today on 📌 — the old version is under Plan versions if you want it back");
     } catch {
       setLogged("Network error — check your connection.");
     } finally { setPlanning(false); }
@@ -386,17 +388,59 @@ function RecipeView({ rec, planMeals, onClose }: { rec: RecipeRow; planMeals: { 
             {logging ? "Logging…" : "🍽️ Log this to today"}
           </button>
         </div>
+        {/* THE PERMANENT ONE, AND IT HAS TO LOOK IT.
+            Claudine, 13 Aug: "Omfg i replaced one of the meals for a recipe i
+            made and the clanker changed ALL the meals not only for today but
+            days before." She was not trying to change her plan. She was trying
+            to eat this tonight.
+            The control she used said "Put it in my plan as…" and "📌 Add" — two
+            phrases that describe adding something to a list. What it actually
+            did was REPLACE that meal's contents in her plan, from that day
+            forward, every day. Nothing on it said replace, nothing said every
+            day, and there was no confirm step.
+            So: the word is now REPLACE, it names the meal and says how long
+            before it will fire, and it asks once. "Log this to today" above is
+            the thing most people actually want, and stays the easy one. */}
         {planMeals.length > 0 && (
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-            <select value={slot} onChange={(e) => setSlot(e.target.value)}
-              style={{ flex: 1, minWidth: 0, padding: "10px 8px", borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-card)", color: "var(--brand-text)", fontSize: 12.5 }}>
-              <option value="">Put it in my plan as…</option>
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--brand-border)" }}>
+            <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--brand-text-secondary)", margin: "0 0 6px" }}>
+              Or make it part of your plan
+            </p>
+            <select
+              value={slot}
+              onChange={(e) => { setSlot(e.target.value); setConfirming(false); }}
+              style={{ width: "100%", padding: "10px 8px", borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-card)", color: "var(--brand-text)", fontSize: 12.5 }}
+            >
+              <option value="">Choose the meal it replaces…</option>
               {planMeals.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
-            <button onClick={addToPlan} disabled={!slot || planning}
-              style={{ flex: "0 0 auto", padding: "11px 14px", borderRadius: 12, border: "1px solid var(--brand-primary)", background: "transparent", color: "var(--brand-primary)", fontWeight: 800, fontSize: 12.5, cursor: !slot || planning ? "default" : "pointer", opacity: !slot || planning ? 0.5 : 1 }}>
-              {planning ? "Adding…" : "📌 Add"}
-            </button>
+            {slot && !confirming && (
+              <button
+                onClick={() => setConfirming(true)}
+                style={{ width: "100%", marginTop: 8, padding: "11px 14px", borderRadius: 12, border: "1px solid var(--brand-primary)", background: "transparent", color: "var(--brand-primary)", fontWeight: 800, fontSize: 12.5, cursor: "pointer" }}
+              >
+                📌 Replace it in my plan — every day
+              </button>
+            )}
+            {slot && confirming && (
+              <div style={{ marginTop: 8, padding: 11, borderRadius: 12, background: "var(--brand-card)", border: "1px solid var(--brand-primary)" }}>
+                <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "var(--brand-text)" }}>
+                  This swaps <b>{planMeals.find((m) => m.id === slot)?.name}</b> for <b>{rec.title}</b> in your
+                  plan from today on — not just today. Days you&rsquo;ve already logged stay exactly as they were,
+                  and your old plan is kept under <b>Plan versions</b> if you want it back.
+                </p>
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button onClick={() => setConfirming(false)}
+                    style={{ flex: 1, padding: "10px 8px", borderRadius: 11, border: "1px solid var(--brand-border)", background: "transparent", color: "var(--brand-text-secondary)", fontWeight: 800, fontSize: 12.5, cursor: "pointer" }}>
+                    Never mind
+                  </button>
+                  <button onClick={() => { setConfirming(false); addToPlan(); }} disabled={planning}
+                    style={{ flex: 1, padding: "10px 8px", borderRadius: 11, border: "none", background: "var(--brand-primary)", color: "#fff", fontWeight: 800, fontSize: 12.5, cursor: planning ? "default" : "pointer", opacity: planning ? 0.6 : 1 }}>
+                    {planning ? "Saving…" : "Yes, replace it"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {logged && <p style={{ fontSize: 12.5, fontWeight: 700, color: "var(--brand-primary)", textAlign: "center", marginTop: 8 }}>{logged}</p>}

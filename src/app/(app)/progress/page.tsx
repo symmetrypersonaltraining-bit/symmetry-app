@@ -85,7 +85,7 @@ export default async function ProgressPage({
                 no goal and no stale weigh-in, and swallows its own errors — a
                 Progress screen that broke because an optional new card failed
                 would be a bad trade. */}
-            <GoalsSection clientId={clientId} />
+            <GoalsSection clientId={clientId} viewerIsThisClient={!isTrainer} />
             <MetricCards clientId={clientId} />
             <ConsistencyCalendar clientId={clientId} />
             <AchievementCard clientId={clientId} name={clientName} />

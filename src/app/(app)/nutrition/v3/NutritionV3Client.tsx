@@ -1090,6 +1090,8 @@ export default function NutritionV3Client(props: Props) {
   }, [coachOn, coachDismissed, coachApi, dailyTarget, totals, openMode]);
 
   // ---- versions -----------------------------------------------------------
+  const [restoring, setRestoring] = useState<string | null>(null);
+
   async function openVersions() {
     openSheet({ kind: "versions" });
     const { data } = await supabase
@@ -2436,6 +2438,39 @@ export default function NutritionV3Client(props: Props) {
               <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>
                 Effective {v.effective_date || "—"}{v.change_reason ? ` · ${v.change_reason}` : ""}
               </p>
+              {/* THE BUTTON THAT MAKES THE PROMISE TRUE.
+                  This sheet has said "restorable anytime" since it was built and
+                  there was no way to do it. Claudine found that gap the hard way
+                  on 13 Aug: one tap replaced a meal in her plan for good and
+                  there was no route back to the version she had five seconds
+                  earlier. Restoring archives what it displaces, so this is
+                  itself undoable — the plan you just left is the archived row
+                  directly above. */}
+              {!isLive && !pending && (
+                <button
+                  onClick={async () => {
+                    if (restoring) return;
+                    setRestoring(v.id);
+                    try {
+                      const res = await fetch("/api/nutrition/plan-restore", {
+                        method: "POST", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ planId: v.id }),
+                      });
+                      const j = await res.json().catch(() => null);
+                      if (!res.ok || !j?.ok) { toast.error((j && j.error) || "Couldn't restore that version"); return; }
+                      toast.success("Restored — the version you were on is saved here too", { duration: 4000 });
+                      setTimeout(() => { try { window.location.reload(); } catch { /* noop */ } }, 1200);
+                    } catch {
+                      toast.error("Network error — check your connection");
+                    } finally { setRestoring(null); }
+                  }}
+                  disabled={!!restoring}
+                  className="w-full mt-2.5 py-2.5 rounded-xl text-xs font-bold"
+                  style={{ border: "1px solid var(--brand-primary)", color: "var(--brand-primary)", background: "transparent", opacity: restoring ? 0.5 : 1 }}
+                >
+                  {restoring === v.id ? "Restoring…" : "↩ Make this my plan again"}
+                </button>
+              )}
             </div>
           );
         })}

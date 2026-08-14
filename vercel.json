@@ -15,6 +15,10 @@
     {
       "path": "/api/ai-nudges",
       "schedule": "0 15 * * 1"
+    },
+    {
+      "path": "/api/cron/goals",
+      "schedule": "0 12 * * *"
     }
   ]
 }

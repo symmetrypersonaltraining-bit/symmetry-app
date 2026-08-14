@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import GoalCard from "@/components/GoalCard";
+import GoalsPanel from "@/components/GoalsPanel";
 import WeighInNudge from "@/components/WeighInNudge";
 import { WEIGH_IN_NUDGE_DAYS, type Goal, type GoalMetric, type Reading } from "@/lib/goals";
 
@@ -30,7 +30,19 @@ const COLUMN: Record<GoalMetric, string> = {
   lean_mass: "lean_mass",
 };
 
-export default async function GoalsSection({ clientId }: { clientId: string }) {
+export default async function GoalsSection({
+  clientId,
+  viewerIsThisClient = true,
+}: {
+  clientId: string;
+  /**
+   * False when the trainer is looking at somebody else's Progress screen.
+   *
+   * He can still PROPOSE a goal from there — that is half the point of the
+   * proposed state. He cannot answer one on their behalf, here or in the API.
+   */
+  viewerIsThisClient?: boolean;
+}) {
   const supabase = await createClient();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
@@ -83,16 +95,30 @@ export default async function GoalsSection({ clientId }: { clientId: string }) {
   const active = goals.filter((g) => g.status === "active" && readingsFor(g.metric).length > 0);
   const showNudge = daysSince == null || daysSince > WEIGH_IN_NUDGE_DAYS;
 
-  if (!active.length && !showNudge) return null;
+  // Ordered the way the metrics are ordered everywhere else, so the cards do
+  // not shuffle between renders.
+  const ordered = METRICS.flatMap((m) => goals.filter((g) => g.metric === m));
+  const readingsByMetric: Record<string, Reading[]> = {};
+  for (const m of METRICS) readingsByMetric[m] = readingsFor(m);
+
+  // Something to show if there is a goal, a proposal, a stale weigh-in, or any
+  // history at all to hang a first goal on. Only a brand-new client with
+  // nothing on file renders nothing — and for them the Progress screen is
+  // exactly as it was before this feature existed.
+  const anything = ordered.length > 0 || showNudge || readingsByMetric.weight.length > 0;
+  if (!anything) return null;
 
   return (
     <div className="space-y-5">
       {showNudge && <WeighInNudge daysSince={daysSince} hasGoal={active.length > 0} />}
-      {METRICS.flatMap((metric) => {
-        const g = active.find((x) => x.metric === metric);
-        if (!g) return [];
-        return [<GoalCard key={g.id} goal={g} readings={readingsFor(metric)} today={today} />];
-      })}
+      <GoalsPanel
+        clientId={clientId}
+        goals={ordered}
+        readingsByMetric={readingsByMetric}
+        today={today}
+        canSet
+        canAnswer={viewerIsThisClient}
+      />
     </div>
   );
 }
