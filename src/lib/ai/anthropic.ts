@@ -93,8 +93,27 @@ export type AiTier = "standard" | "advanced";
  * moves a job UP, and today it moves exactly one: extraction, from Haiku to
  * Sonnet, for clients who talk to the app instead of navigating it.
  */
-export function modelFor(kind: "extract" | "coach", tier: AiTier = "standard"): string {
+export function modelFor(kind: "extract" | "coach" | "chat", tier: AiTier = "standard"): string {
   if (kind === "extract") return tier === "advanced" ? SONNET_MODEL : HAIKU_MODEL;
+  // CHAT — the ✦ drawer, the free-text box on every screen.
+  //
+  // This one is metered by VOLUME rather than by importance, which is why it
+  // does not simply return Sonnet like "coach" does. "Coach" fires a handful of
+  // times a day per client, on a schedule; chat is thirty-five people typing
+  // whenever they feel like it, and it was the one surface in the app with no
+  // cap and no kill switch until 12 Aug. Putting all of them on Sonnet is a
+  // straight multiple on the biggest call volume there is.
+  //
+  // But it is also the surface Gerard and Sharon USE AS THE APP. Everyone else
+  // types into it occasionally and navigates with their thumbs; those two ask
+  // it to do the navigating. A misread there is not a slightly flat answer, it
+  // is the app doing the wrong thing for someone with no fallback UI to go and
+  // undo it with.
+  //
+  // So: Haiku for the roster, Sonnet for the two who talk to the app. Same
+  // shape as extraction, same reasoning, and the cost lands on two people
+  // rather than thirty-five.
+  if (kind === "chat") return tier === "advanced" ? SONNET_MODEL : HAIKU_MODEL;
   return SONNET_MODEL;
 }
 
