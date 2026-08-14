@@ -20,6 +20,10 @@ const ROOT = process.cwd();
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const SRC = strip(readFileSync(join(ROOT, "src/lib/ai/clientActions.ts"), "utf8"));
 const ROUTE = strip(readFileSync(join(ROOT, "src/app/api/ai-assistant/route.ts"), "utf8"));
+// The loop moved into a shared module on 14 Aug so the ✦ Coach — the AI clients
+// can actually open — runs the SAME code. These properties did not change; the
+// file they live in did, so they are asserted where they now are.
+const RUNNER = strip(readFileSync(join(ROOT, "src/lib/ai/clientAssistantRun.ts"), "utf8"));
 
 test("no client tool takes a client_id", () => {
   // The one that matters most. The id is resolved from the session and passed
@@ -89,15 +93,22 @@ test("nothing here deletes anything", () => {
 });
 
 test("tools are offered only to a resolved client, never the trainer", () => {
+  // Still gated on the route: a trainer goes to /api/agent and its larger
+  // toolset, and never gets CLIENT_TOOLS here.
   assert.match(ROUTE, /const canAct = !isTrainer && !!scoped\.scope\.clientId;/);
-  assert.match(ROUTE, /\.\.\.\(canAct \? \{ tools: CLIENT_TOOLS \} : \{\}\)/);
+  assert.match(ROUTE, /if \(canAct\) \{/, "the route no longer gates the tool loop on canAct");
+  // And the runner is only ever entered with a resolved client id, which is
+  // what it hands to every tool.
+  assert.match(RUNNER, /clientId: string;/, "the shared runner no longer requires a client id");
+  assert.match(RUNNER, /opts\.clientId,/, "the runner stopped passing the resolved id to runClientTool");
 });
 
 test("the tool loop is bounded and bills what it actually used", () => {
-  assert.match(ROUTE, /round < 4/, "the tool loop is unbounded");
+  assert.match(RUNNER, /opts\.maxRounds \?\? 4/, "the tool loop lost its default bound");
+  assert.match(RUNNER, /round < rounds/, "the tool loop is unbounded");
+  assert.match(RUNNER, /tokensIn \+= response\.usage/, "rounds are no longer individually billed");
+  assert.match(RUNNER, /tokensOut \+= response\.usage/, "rounds are no longer individually billed");
   // Every round's tokens are counted, not just the last call's — otherwise a
   // four-round conversation logs as one and the $95 cap stops meaning anything.
-  assert.match(ROUTE, /totalIn \+= response\.usage/);
-  assert.match(ROUTE, /totalOut \+= response\.usage/);
   assert.match(ROUTE, /logUsage\(scoped\.scope\.clientId \?\? null, "client_assistant", totalIn, totalOut, model\)/);
 });

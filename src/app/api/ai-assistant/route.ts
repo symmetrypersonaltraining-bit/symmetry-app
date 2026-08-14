@@ -9,7 +9,7 @@ import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 import { modelFor } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { assistantContext } from "@/lib/ai/assistantContext";
-import { CLIENT_TOOLS, runClientTool } from "@/lib/ai/clientActions";
+import { runClientAssistant } from "@/lib/ai/clientAssistantRun";
 import { CT_TODAY } from "@/lib/ai/coach-context";
 
 const SYSTEM_PROMPT = SYMMETRY_SYSTEM_PROMPT;
@@ -92,41 +92,45 @@ export async function POST(req: NextRequest) {
     // outcome is the text it has rather than a bill.
     const canAct = !isTrainer && !!scoped.scope.clientId;
     const today = CT_TODAY();
-    const convo: Anthropic.MessageParam[] = messages.slice(-20).map((m) => ({ role: m.role, content: m.content }));
 
+    // The loop itself now lives in lib/ai/clientAssistantRun so the ✦ Coach can
+    // run the SAME code rather than a second copy that drifts. See that file for
+    // why: these tools were unreachable by anyone for a week because this route
+    // grants them only to clients while both buttons that open it render only
+    // for trainers.
+    let text = "";
     let totalIn = 0;
     let totalOut = 0;
-    let text = "";
 
-    for (let round = 0; round < 4; round++) {
-      const response: Anthropic.Message = await anthropic.messages.create({
+    if (canAct) {
+      const run = await runClientAssistant({
+        apiKey,
+        model,
+        systemPrompt,
+        supabase,
+        clientId: scoped.scope.clientId as string,
+        today,
+        messages,
+      });
+      text = run.text;
+      totalIn = run.tokensIn;
+      totalOut = run.tokensOut;
+    } else {
+      // A trainer here gets plain chat; /api/agent has their much larger toolset.
+      const anthropic = new Anthropic({ apiKey });
+      const response = await anthropic.messages.create({
         model,
         max_tokens: 1024,
         system: systemPrompt,
-        messages: convo,
-        ...(canAct ? { tools: CLIENT_TOOLS } : {}),
+        messages: messages.slice(-20).map((m) => ({ role: m.role, content: m.content })),
       });
-      totalIn += response.usage?.input_tokens ?? 0;
-      totalOut += response.usage?.output_tokens ?? 0;
-
-      text = response.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.TextBlock).text).join("\n").trim() || text;
-
-      const calls = response.content.filter((b) => b.type === "tool_use") as Anthropic.ToolUseBlock[];
-      if (!calls.length) break;
-
-      convo.push({ role: "assistant", content: response.content });
-      const results: Anthropic.ToolResultBlockParam[] = [];
-      for (const c of calls) {
-        const out = await runClientTool(
-          supabase,
-          scoped.scope.clientId as string,
-          c.name,
-          (c.input || {}) as Record<string, unknown>,
-          today,
-        );
-        results.push({ type: "tool_result", tool_use_id: c.id, content: out });
-      }
-      convo.push({ role: "user", content: results });
+      totalIn = response.usage?.input_tokens ?? 0;
+      totalOut = response.usage?.output_tokens ?? 0;
+      text = response.content
+        .filter((b) => b.type === "text")
+        .map((b) => (b as Anthropic.TextBlock).text)
+        .join("\n")
+        .trim();
     }
 
     await logUsage(scoped.scope.clientId ?? null, "client_assistant", totalIn, totalOut, model);

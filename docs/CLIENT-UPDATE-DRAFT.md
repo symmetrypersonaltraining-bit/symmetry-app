@@ -1,5 +1,31 @@
 # Client update — group message draft
 
+> # ⛔ ON HOLD — DO NOT SEND, 14 Aug 2026
+>
+> **Dustin: "I don't wanna send that message out to the group until the AI is
+> working the way that we're saying that it's working."**
+>
+> He is right, and the reason is in item 1 of this very message. It tells 35
+> people the coach "knows *your* stuff" and invites them to ask it real
+> questions. Then he asked it, from the client app, to adapt his session to a
+> hotel gym — the exact use case the conversational layer was built for — and it
+> told him to message his trainer. He *is* the trainer.
+>
+> The cause is not the prompt. **The five client action tools shipped in
+> `0636890` are unreachable by anyone**: `/api/ai-assistant` grants them only
+> when `!isTrainer`, while both buttons that open it
+> (`HeaderAssist.tsx:116`, `FloatingDock.tsx:111`) render only when
+> `isTrainer && !clientMode`. Clients cannot open it; trainers who can are given
+> no tools. The ✦ Coach that IS reachable has `canAct={false}` and no workout
+> tools at all.
+>
+> **Sending this message now would advertise a capability nobody can reach.**
+> That is worse than saying nothing: it invites 35 people to try the one thing
+> that is guaranteed to disappoint them, on the day we drew attention to it.
+>
+> **Unblock:** make the tool-capable AI reachable from the client app, verify a
+> real swap end to end, then send. Tracked as task #19.
+
 **Status:** DRAFT, not sent. Copy the block below the line into the group chat.
 Add to it as tonight's items land; the "Still coming" section is the parking
 spot for anything not shipped yet.

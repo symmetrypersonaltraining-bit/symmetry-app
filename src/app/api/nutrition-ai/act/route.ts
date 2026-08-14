@@ -25,6 +25,10 @@ import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
+import { SYMMETRY_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
+import { assistantContext } from "@/lib/ai/assistantContext";
+import { runClientAssistant } from "@/lib/ai/clientAssistantRun";
+
 import {
   loadMemory, loadRecentTurns, memoryBlock, recordTurns,
   countUnfolded, shouldFold, foldMemory,
@@ -189,6 +193,78 @@ export async function POST(req: NextRequest) {
     // Clarifying question (ambiguous/missing reference) — return it directly.
     if (act.params.clarify && act.reply) {
       return NextResponse.json({ intent: "none", message: act.reply });
+    }
+
+    // ---- ONE AI: the workout tools, offered before the nutrition answer -----
+    //
+    // Dustin, 12 Aug: "one AI that does all of it." Until now there were two,
+    // and only the one nobody could open could do anything.
+    //
+    // The five client action tools shipped in `0636890` were UNREACHABLE BY
+    // ANYONE: /api/ai-assistant grants them only when `!isTrainer`, while both
+    // buttons that open it render only when `isTrainer && !clientMode`. So a
+    // client could never open the drawer, and a trainer who could was given no
+    // tools. Everything built on top — the contraindication gate, the cleared
+    // pool, the write-time re-check for Gerard and Sharon — sat behind a door
+    // with no handle.
+    //
+    // He found it by asking this very chat, from the client app, to adapt his
+    // session to a hotel gym. It told him to message his trainer. He is the
+    // trainer.
+    //
+    // WHY THIS SHAPE, AND NOT A NEW INTENT. Adding `workout_help` to the pass-1
+    // schema would mean touching ACT_INTENTS, the ActReply type, the switch and
+    // the client's handling of every intent — a change that ripples through the
+    // nutrition path that 35 people use to log food every day, to add something
+    // that path does not care about.
+    //
+    // Instead the tool loop runs FIRST and its answer is used ONLY IF A TOOL
+    // ACTUALLY RAN. Ask about macros and the model reaches for no workout tool,
+    // `toolsUsed` comes back 0, the result is discarded, and the existing coach
+    // path below runs exactly as it did before — same context, same memory,
+    // same suggestion chips, bit for bit. Ask to move Friday's session and a
+    // tool runs and answers. The nutrition contract is untouched by
+    // construction rather than by careful editing.
+    //
+    // Cost is one extra call on question turns. Thirty days of every AI call in
+    // this app came to $2.84 against a $95 cap, so this is affordable; it is
+    // metered as its own feature so it stays visible if that ever stops being
+    // true.
+    if (clientId && apiKey) {
+      try {
+        const assistantSystem =
+          SYMMETRY_SYSTEM_PROMPT +
+          `\n\nCurrent user: Client` +
+          (await assistantContext(supabase, clientId)) +
+          `\n\nTODAY IS ${logDate}. Only reach for a tool when the client is asking about their ` +
+          `TRAINING — their schedule, moving or swapping a session, what to do today, or logging a ` +
+          `weigh-in. If they are asking about food, meals, macros or their plan, answer nothing here ` +
+          `and call no tool: a different part of the coach handles nutrition and will answer them properly.`;
+
+        // Hoisted rather than inlined into logUsage below: the aiFeatures guard
+        // test scans metering calls for the retired catch-all labels, and
+        // `modelFor("chat", …)` sitting inside one reads as the old "chat"
+        // feature name. Computing it once is better anyway.
+        const toolModel = modelFor("chat", tier);
+
+        const run = await runClientAssistant({
+          apiKey,
+          model: toolModel,
+          systemPrompt: assistantSystem,
+          supabase,
+          clientId,
+          today: logDate,
+          messages: [...history, { role: "user", content: message }],
+        });
+
+        if (run.toolsUsed > 0 && run.text) {
+          await logUsage(clientId, "coach_workout_tools", run.tokensIn, run.tokensOut, toolModel);
+          return NextResponse.json({ intent: "none", message: run.text });
+        }
+      } catch {
+        // A failure here must never cost someone their nutrition answer. Fall
+        // through to the coach exactly as if the tools had not been offered.
+      }
     }
 
     // ---- intent 'none' = a question → the existing coach behavior ----------

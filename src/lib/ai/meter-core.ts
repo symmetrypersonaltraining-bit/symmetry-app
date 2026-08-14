@@ -55,6 +55,10 @@ export const AI_FEATURES = {
   coach_card:      { label: "Coach card",              surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
   coach_read:      { label: "Coach's read",            surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
   client_assistant:{ label: "Client assistant",        surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  // The workout tool loop the ✦ Coach runs before answering a question. Its own
+  // feature so the cost of giving that coach tools stays visible rather than
+  // hiding inside coach_action.
+  coach_workout_tools:{ label: "Coach chat (workout tools)", surface: "client", limitColumn: "ai_daily_chat_limit", defaultLimit: 15 },
   celebration:     { label: "Session celebration",     surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
   food_parse:      { label: "Food parse",              surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 15 },
   food_photo:      { label: "Meal photo",              surface: "client",    limitColumn: "ai_daily_photo_limit",      defaultLimit: 20 },
