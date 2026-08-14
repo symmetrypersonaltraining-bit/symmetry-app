@@ -1,5 +1,61 @@
 # Backlog — the single work queue
 
+> ## 14 Aug, evening — #44 micronutrients: running, and the honest ceiling
+>
+> **`food_catalog.micros` was NULL on all 1.26M rows.** Not sparse — empty. That
+> is why `planMealNutrients()` returned nothing for every planned meal: there
+> was no source data anywhere to read. The docs called #44 a data gap in
+> `meal_items`; the gap was the whole library.
+>
+> **The data was already arriving and being thrown away.** `import_off_bulk`
+> builds `nm` = every nutriment name → per-100g value, read eight keys out of
+> it, and dropped the other twenty-nine. Two functions now fix that:
+>
+> - `off_nut(nm, key, scale, max_plausible)` — one nutrient, scaled and bounded
+> - `off_micros(nm)` — the whole map, keyed to `lib/nutrition/nutrients.ts`
+>
+> Wired into the importer (new foods) and into `backfill_off_micros()` on cron
+> every minute at :30 (the 1.26M already imported). Both verified live.
+>
+> **Three things were caught by looking at real output, and all three would have
+> silently shipped garbage to 35 people:**
+>
+> 1. **Units.** OFF reports every nutriment in GRAMS per 100g. The registry
+>    wants g / mg / mcg per key. Getting this backwards is a factor of a million
+>    on a million rows. Verified against live rows (calcium 0.0247 = 24.7mg,
+>    selenium 0.000005 = 5mcg), not reasoned about.
+> 2. **Ceilings were too loose.** The first cut passed breadcrumbs with 2,581mg
+>    of cholesterol. Ceilings are now set from what food actually contains
+>    (~2–3× the richest known source), and an over-value is dropped to NULL
+>    rather than clamped — a clamped number is a wrong number wearing a
+>    plausible face.
+> 3. **All-zero maps are not measurements.** "High Protein Semolina Pudding"
+>    arrived with twenty nutrients all exactly 0.0000. Semolina has iron and
+>    magnesium. That is a contributor filling a form, or a "0% DV" column
+>    transcribed as "0 g". A single zero among real values is kept — "no
+>    cholesterol" is a useful fact — but an all-zero map now becomes NULL.
+>
+> **⚠️ THE CEILING, AND IT MATTERS FOR WHAT DUSTIN WAS PROMISED.** He asked for
+> "everything in library to have all nutrient info". That is **not achievable
+> from Open Food Facts**, because OFF simply does not hold micros for most
+> products. Measured hit rates: **~13%** of newly imported foods, **~46%** on
+> the earlier (better-curated) offsets. Expect roughly 20–30% overall, averaging
+> ~10 nutrients per food that has any. Do not write "the library has full
+> nutrient data" anywhere — it will not be true, and this file has a history of
+> confident documentation that was wrong.
+>
+> **The higher-value next step is USDA FoodData Central.** Dustin's plan meals
+> are generic whole foods — "White rice (cooked)", "Almonds", "Salmon
+> (cooked)", "Mixed berries" — which is exactly what USDA covers superbly and
+> where OFF is weakest (OFF is branded/barcode products). FDC publishes full
+> nutrient data as a free bulk download. That, not more OFF, is what gets the
+> PLAN meals to full micros.
+>
+> Neither pipeline costs a cent of AI budget, and neither should ever be made
+> to: 1.26M foods through a model would be roughly a $10,000 idea.
+
+---
+
 > ## 14 Aug, afternoon — where things actually stand
 >
 > **Exercise videos: 788 of 839 (93.9%)**, up from 720 this morning. It was
