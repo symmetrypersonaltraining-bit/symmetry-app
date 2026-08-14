@@ -1,5 +1,35 @@
 # Backlog — the single work queue
 
+> ## 14 Aug, afternoon — where things actually stand
+>
+> **Exercise videos: 788 of 839 (93.9%)**, up from 720 this morning. It was
+> never a search problem. 112 of the 119 empty exercises already HAD a video
+> found, parked in `too_long`, because the shortest clip that exists for them
+> runs 31 seconds against a 30-second ceiling. Dustin raised the ceiling to 60
+> (`62fcea7`) and 68 exercises filled in one deploy.
+>
+> **The same thing is now true one notch up.** Of the 51 still empty, 45 have a
+> candidate and the shortest is **61 seconds**. Do NOT just raise the ceiling
+> again — that reflex is what put the number at 30 and left it there. 90s would
+> clear 16 more, 120s would clear 24. The honest next step is searching for
+> genuinely shorter alternatives for those 45; the ceiling is his call and he
+> has already made it once today. 6 have no usable candidate at all.
+>
+> **Writes: swept, clean.** RLS was tested by IMPERSONATING A REAL CLIENT — set
+> the role and `request.jwt.claims` and Postgres evaluates the real policies.
+> Every client-facing write passed as Bobbie Page; every cross-client write was
+> correctly blocked (42501). Verify the mechanism before trusting a result: as
+> her, `select count(*) from clients` must return 1, not 35, or the "OK"s mean
+> nothing. NOT NULL swept too, nothing found.
+>
+> **All mics are now MicButton**, including the workout logger's three (one of
+> which was broken three ways) and the program page. No exemptions left in
+> `everyAiInputHasAMic.test.ts`.
+>
+> **Food catalog: 1.15M+ and climbing.**
+
+---
+
 > ## ⛔⛔ READ THIS FIRST — 14 Aug, midday
 >
 > **Six writes in this app had never once succeeded.** Not "worked sometimes",
