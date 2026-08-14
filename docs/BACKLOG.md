@@ -1,6 +1,34 @@
 # Backlog — the single work queue
 
-> ## ⛔ START HERE — FIRST WORK OF THE NEXT SESSION
+> ## ⛔ START HERE — 14 Aug (night 2)
+>
+> **Read `docs/OVERNIGHT-8-14-NIGHT2.md` first.** Three things in it change what
+> you would otherwise do:
+>
+> 1. **The exercise videos are DONE.** 703 of 839 have one (was 595), avg 18.6s.
+>    The block below about WebSearch budget is **historical** — 94 were found
+>    with 93 calls, and durations no longer come from search at all.
+> 2. **YouTube removed `lengthSeconds` from the watch page.** The scrape in
+>    `/api/video-candidates/verify` is obsolete, not blocked. Measuring now runs
+>    in Postgres on the YouTube Data API (`measure_video_durations()`), on cron.
+>    Do not try to "fix" the scrape by moving it somewhere with a better IP.
+> 3. **#44 is a DATA gap, not a display gap.** Every previous handoff says the
+>    opposite. `meal_items` has 1,528 rows and **0** with micros, so
+>    `planMealNutrients()` correctly returns nothing for every planned meal.
+>    Building display renders 1,528 blanks. Details in the night-2 handoff.
+>
+> **Also: CI had been red on every push since 13 Aug** (`4df0802`), sending
+> Dustin a failure email per commit. Fixed in `7a2d3b2`, verified green as run
+> #680. If you see failure mail from before that SHA, it is the old noise.
+>
+> **Running unattended right now:** `off-bulk-import` (every minute, food
+> catalog → ~4M) and `video-duration-measure` (every 10 min). Both are
+> rate-limited by the upstream service, not by cost. **30 pages/min is the
+> fastest CLEAN rate — 45 and 55 both earn 429s and 55 is measurably slower.**
+
+---
+
+> ## Historical — the video budget problem, now resolved
 >
 > **Finish the exercise library videos.** Dustin, 13 Aug: *"make sure next
 > session we start from here picks up on continuing the exercise library."*

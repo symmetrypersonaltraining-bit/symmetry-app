@@ -4,8 +4,13 @@
 Add to it as tonight's items land; the "Still coming" section is the parking
 spot for anything not shipped yet.
 
-**Last updated:** 13 Aug 2026 — everything below is live. Every numbered item
-in the message is shipped; nothing in it is aspirational.
+**Last updated:** 14 Aug 2026 (overnight) — everything below is live. Every
+numbered item in the message is shipped; nothing in it is aspirational.
+
+**Two items added overnight:** the demo videos (which the 13 Aug note below
+correctly predicted would earn a line once the queue was worked — it has been)
+and the food database. Both are genuinely client-visible, which is the bar for
+being in this message at all.
 
 ---
 
@@ -202,6 +207,35 @@ once, and "not now" costs you nothing — it'll ask again in a month.
 
 ---
 
+**Demo videos on a lot more exercises**
+
+If you've ever tapped an exercise name expecting to see how it's done and got
+nothing, that's mostly fixed. A hundred-odd exercises that had no demo now have
+one, and they're short on purpose — about eighteen seconds on average, none over
+thirty. You want to see the movement mid-set, not watch someone talk.
+
+There are still some without one. If you hit an exercise where the video is
+missing — or, worse, where it's the *wrong* movement — tell me which one. A
+wrong demo is worse than none and I'd rather pull it than leave it up.
+
+---
+
+**The food database is now enormous, and getting bigger every minute**
+
+Searching for food should stop coming up empty. It's gone from about 180,000
+foods to several hundred thousand, with brand names and barcodes, and it's still
+importing — it'll be into the millions in a day or so.
+
+That means: scan a barcode, get the actual product. Search a brand name, find
+it. Full nutrition on each one, and you can set your own serving size instead of
+being stuck with whatever it assumes.
+
+**Test it:** search for the most obscure thing in your cupboard. If it's not in
+there, screenshot it and send it to me — that's exactly the gap I want to know
+about.
+
+---
+
 **What I need from you**
 
 Use it normally for a couple of days and tell me:
@@ -230,11 +264,29 @@ Reply here or message me directly. — Dustin
    covered by item 1's "it's on every screen", so no separate item needed.
 ~~6. The go-quiet check-in~~ DONE and live — now item 9 above.
 
-**Not for the client message, but worth Dustin knowing before he sends it:**
-exercise demo videos. 252 of 847 exercises have no video; 151 now have a
-candidate waiting for review at **Library → Exercise Videos**. Press "Check
-lengths" once, then work the queue — it takes about a second a decision. Once
-that queue is worked, item 11's list can gain a line about demo videos.
+~~**Not for the client message:** exercise demo videos, 252 of 847 missing~~
+**DONE overnight 14 Aug** — and it earned its own section above, as predicted.
+
+Final state: **703 of 839 exercises have a video**, up from 595. 108 applied
+automatically, averaging **18.6 seconds**, none over 30.
+
+**Two things Dustin should do before sending, both quick:**
+
+1. **129 candidates came back over 30 seconds** and were deliberately NOT
+   applied. They sit at **Library → Exercise Videos** under "Found, but not
+   used". Some will be the only decent demo of that movement — take those. The
+   rest can stay unused.
+2. **136 exercises still have no video and no candidate left.** Four of those
+   are ones I binned on purpose because the search result was the wrong
+   movement, and one of those matters clinically: *Lunge to Balance Sagittal
+   Plane* had been matched to a **transverse** lunge. Wrong plane. The others
+   were Sandbag Step up, Lateral Bound to Toe Touch, and Medicine Ball Slam
+   with Squat (a toss, not a slam). They are recoverable from
+   `bak_video_candidates_dropped_20260814` if you disagree.
+
+The message above asks clients to report a wrong video. Worth meaning it: the
+108 that went in were matched by search on name alone and nobody has watched
+them.
 
 ## DELIBERATELY EXCLUDED (trainer-only, not client-facing)
 
