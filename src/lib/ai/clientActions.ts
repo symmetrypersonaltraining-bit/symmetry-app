@@ -90,7 +90,9 @@ export const CLIENT_TOOLS = [
   {
     name: "add_my_workout",
     description:
-      "Put an ADDITIONAL session on one of this client's days, keeping whatever is already there. Use for 'add a second walk today' or 'give me an extra session on Saturday'. Use my_workout_options for the session to add. Do NOT use this to replace something — that is swap_my_workout.",
+      "Put an ADDITIONAL session on one of this client's days, keeping whatever is already there. Use for 'add a second walk today' or 'give me an extra session on Saturday'. " +
+      "The day_id may come from EITHER my_workout_options OR the [day_id ...] of a session already on their schedule from my_schedule — repeating a session they are already doing is always allowed, and most prescribed days are not in the swappable options list, so do not refuse on those grounds. " +
+      "If the client has clearly asked for it, CALL THIS TOOL rather than asking them to confirm which session they mean when there is only one sensible match. Do NOT use this to replace something — that is swap_my_workout.",
     input_schema: {
       type: "object" as const,
       properties: {
