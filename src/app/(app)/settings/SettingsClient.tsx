@@ -7,6 +7,7 @@ import { useTheme, THEMES, DEPTH_LEVELS } from "@/components/ThemeProvider";
 import { AvatarSelf } from "@/components/Avatar";
 import PaymentsSettingsCard from "@/components/PaymentsSettingsCard";
 import ExperienceSettings from "@/components/ExperienceSettings";
+import NotificationSettings from "@/components/NotificationSettings";
 import HelpCenter from "@/components/HelpCenter";
 
 interface Props {
@@ -107,6 +108,10 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
       <section>
         <p className="section-header">Experience</p>
         <ExperienceSettings isTrainer={isTrainer && !isInClientMode} />
+
+      {/* Per-event push preferences. Sits directly under Experience because
+          both answer "how does this app behave for me". */}
+      <NotificationSettings isTrainer={isTrainer && !isInClientMode} />
       </section>
 
       <section>

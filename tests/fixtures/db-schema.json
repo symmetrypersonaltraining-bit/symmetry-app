@@ -820,6 +820,12 @@
     "created_at",
     "updated_at"
   ],
+  "notification_preferences": [
+    "user_id",
+    "event_key",
+    "enabled",
+    "updated_at"
+  ],
   "offplan_workout_logs": [
     "id",
     "client_id",
