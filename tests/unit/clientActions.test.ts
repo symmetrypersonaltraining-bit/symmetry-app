@@ -112,3 +112,37 @@ test("the tool loop is bounded and bills what it actually used", () => {
   // four-round conversation logs as one and the $95 cap stops meaning anything.
   assert.match(ROUTE, /logUsage\(scoped\.scope\.clientId \?\? null, "client_assistant", totalIn, totalOut, model\)/);
 });
+
+test("a session can be put on a day twice, deliberately", () => {
+  /**
+   * Dustin asked the coach for a second walk today and it refused: "Can't stack
+   * two cardio sessions on the same day — the system doesn't allow duplicates."
+   * True at the time, and wrong: two walks in a day is normal programming, and
+   * the app was forbidding it. "Fix this restraint. It puts whatever we tell it
+   * to put in there period."
+   *
+   * The old key was (client_id, day_id, scheduled_date), which cannot tell an
+   * ACCIDENT from an INTENTION — a double-submit and a deliberately repeated
+   * session are byte-identical rows. `position` is the discriminator, and it
+   * was already in the table meaning exactly this. So the tools must claim a
+   * free slot rather than colliding, or the refusal comes straight back wearing
+   * a Postgres error message.
+   */
+  assert.match(
+    SRC,
+    /async function nextFreePosition\(/,
+    "nextFreePosition is gone — move/swap will collide on the unique key and the coach " +
+      "goes back to telling people the system does not allow duplicates",
+  );
+  assert.match(
+    SRC,
+    /position: movePos/,
+    "move_my_workout no longer claims a free slot on the destination date",
+  );
+  assert.match(
+    SRC,
+    /position: swapPos/,
+    "swap_my_workout no longer claims a free slot, so swapping in a session the day " +
+      "already has will fail",
+  );
+});

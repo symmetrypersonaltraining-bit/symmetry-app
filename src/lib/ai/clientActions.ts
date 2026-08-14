@@ -123,6 +123,42 @@ function shift(iso: string, days: number): string {
  * because the model needs to be able to explain the refusal to the person
  * rather than the request simply dying.
  */
+/**
+ * The next free slot for a session on a given day.
+ *
+ * `scheduled_workouts` is unique on (client_id, day_id, scheduled_date,
+ * position). That key is what lets a coach deliberately put the same session on
+ * a day twice — two walks, a morning and an evening — while still refusing an
+ * accidental double-submit, which would land on the identical position.
+ *
+ * Dustin, 14 Aug, after the coach told him it could not stack two cardio
+ * sessions: "fix this restraint. it puts whatever we tell it to put in there
+ * period." So the tools no longer refuse; they find the next slot and use it.
+ *
+ * Returns 1 when nothing is there, otherwise one past the highest in use.
+ */
+async function nextFreePosition(
+  db: Db,
+  clientId: string,
+  dayId: string,
+  date: string,
+  excludeId?: string,
+): Promise<number> {
+  let q = db
+    .from("scheduled_workouts")
+    .select("position")
+    .eq("client_id", clientId)
+    .eq("day_id", dayId)
+    .eq("scheduled_date", date)
+    .is("deleted_at", null);
+  if (excludeId) q = q.neq("id", excludeId);
+  const { data } = await q;
+  const used = ((data as { position: number | null }[] | null) || [])
+    .map((r) => r.position ?? 1);
+  if (!used.length) return 1;
+  return Math.max(...used) + 1;
+}
+
 export async function runClientTool(
   db: Db,
   clientId: string,
@@ -202,20 +238,28 @@ export async function runClientTool(
       // Ownership re-checked HERE, not at the read. The id came from the model.
       const { data: sw } = await db
         .from("scheduled_workouts")
-        .select("id, client_id, status, scheduled_date, deleted_at")
+        .select("id, client_id, status, scheduled_date, deleted_at, day_id")
         .eq("id", swId)
         .maybeSingle();
-      const row = sw as { id: string; client_id: string; status: string | null; scheduled_date: string; deleted_at: string | null } | null;
+      const row = sw as { id: string; client_id: string; status: string | null; scheduled_date: string; deleted_at: string | null; day_id: string | null } | null;
       if (!row || row.client_id !== clientId || row.deleted_at) return "That workout isn't on this client's schedule.";
       if (row.status === "completed") return "That one is already logged as done, so it can't be moved. Say so rather than moving a different one.";
 
+      // The destination may already hold this same session. That is allowed —
+      // it just needs its own slot, or the unique key refuses the write and the
+      // client is told "the system doesn't allow duplicates", which is the
+      // exact refusal this stopped being.
+      const movePos = await nextFreePosition(db, clientId, row.day_id ?? "", to, swId);
+
       const { error } = await db
         .from("scheduled_workouts")
-        .update({ scheduled_date: to, moved_from_date: row.scheduled_date, updated_at: new Date().toISOString() })
+        .update({ scheduled_date: to, moved_from_date: row.scheduled_date, position: movePos, updated_at: new Date().toISOString() })
         .eq("id", swId)
         .eq("client_id", clientId);
       if (error) return `Couldn't move it: ${error.message}`;
-      return `Moved from ${row.scheduled_date} to ${to}.`;
+      return movePos > 1
+        ? `Moved from ${row.scheduled_date} to ${to} — that day now has ${movePos} sessions.`
+        : `Moved from ${row.scheduled_date} to ${to}.`;
     }
 
     if (name === "swap_my_workout") {
@@ -250,9 +294,13 @@ export async function runClientTool(
         if (!d) return "That session isn't one of this client's options.";
       }
 
+      // Same reason as the move: swapping IN a session the day already has is
+      // legitimate, it just needs its own slot.
+      const swapPos = await nextFreePosition(db, clientId, dayId, row.scheduled_date, swId);
+
       const { error } = await db
         .from("scheduled_workouts")
-        .update({ day_id: dayId, updated_at: new Date().toISOString() })
+        .update({ day_id: dayId, position: swapPos, updated_at: new Date().toISOString() })
         .eq("id", swId)
         .eq("client_id", clientId);
       if (error) return `Couldn't swap it: ${error.message}`;
