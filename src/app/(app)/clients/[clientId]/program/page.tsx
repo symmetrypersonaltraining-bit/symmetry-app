@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { startDictation } from "@/lib/dictation";
+import MicButton from "@/components/MicButton";
 import { dedupeInsertRows, type ExistingSlot } from "@/lib/scheduleDedupe";
 import { scheduleWriteError } from "@/lib/scheduleConflict";
 import Link from "next/link";
@@ -188,7 +188,6 @@ function WorkoutEditor({
     exercises: [{ name: "", sets: "3", reps: "10", weight: "", rest: "60s" }]
   }]);
 
-  const micRef = useRef<any>(null);
 
   useEffect(() => {
     if (tab !== "program") return;
@@ -399,20 +398,12 @@ function WorkoutEditor({
     }).eq("id", id);
   }
 
-  function startMic() {
-    // Unified dictation: native app (Capacitor) + browser.
-    micRef.current = startDictation({
-      onStart: () => setMicActive(true),
-      onEnd: () => setMicActive(false),
-      onResult: (t) => { setWorkoutName(t); setMicActive(false); },
-      onUnavailable: () => setMicActive(false),
-    });
-  }
-
-  function stopMic() {
-    micRef.current?.stop();
-    setMicActive(false);
-  }
+  // Dictation is MicButton's job now, so this field animates while recording
+  // like every other mic. Two things changed in the swap, both fixes:
+  //   · it APPENDS instead of replacing, so typing "Upper Body" then saying "A"
+  //     gives "Upper Body A" rather than "A"
+  //   · onUnavailable used to just clear the flag — a denied microphone looked
+  //     exactly like a button that does nothing. MicButton says which no it is.
 
   function addSection() {
     setNewSections(s => [...s, {
@@ -503,17 +494,17 @@ function WorkoutEditor({
                   className="flex-1 rounded-lg px-3 py-2 text-sm border outline-none"
                   style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)", color: "var(--brand-text)" }}
                 />
-                <button
-                  onClick={micActive ? stopMic : startMic}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+                <MicButton
+                  size={36}
+                  onText={(t) => setWorkoutName((p) => (p ? p + " " + t : t))}
+                  onListeningChange={setMicActive}
                   style={{
-                    background: micActive ? "#7c3aed" : "var(--brand-surface)",
-                    border: `1px solid ${micActive ? "#7c3aed" : "var(--brand-border)"}`,
+                    borderRadius: 8,
+                    background: micActive ? "#ef4444" : "var(--brand-surface)",
+                    color: micActive ? "#fff" : "var(--brand-text-secondary)",
+                    border: `1px solid ${micActive ? "#ef4444" : "var(--brand-border)"}`,
                   }}
-                  title="Voice input">
-                  <i className="ti ti-microphone text-base"
-                    style={{ color: micActive ? "white" : "var(--brand-text-secondary)" }} />
-                </button>
+                />
               </div>
             </div>
 

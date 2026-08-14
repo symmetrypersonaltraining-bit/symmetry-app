@@ -89,3 +89,26 @@ export function startDictation(cb: Callbacks): DictationHandle {
     return { stop: () => { /* noop */ } };
   }
 }
+
+/**
+ * Turn a dictation failure reason into something the person can ACT on.
+ *
+ * Promoted here from WorkoutLogger, which had by far the best version of this
+ * in the app and was the only surface using it. The distinction is the whole
+ * point: "not-allowed" is a permission the person can grant in thirty seconds,
+ * "no-engine" is a device limit they cannot do anything about, and "network"
+ * is neither. One generic sentence for all three is how a fixable permission
+ * prompt gets reported as "the mic doesn't work".
+ *
+ * MicButton calls this, so every mic in the app now says it instead of one.
+ */
+export function dictationMessage(why: string): string {
+  const w = String(why || "");
+  if (w === "no-engine") return "This device has no dictation engine — type it instead.";
+  if (w.includes("not-allowed") || w.includes("permission") || w.includes("denied")) {
+    return "Microphone permission is off for the app — turn it on in your phone's settings, then try again.";
+  }
+  if (w.includes("network")) return "Dictation needs a connection and couldn't reach the service.";
+  if (w.startsWith("native-")) return "Dictation didn't start (" + w.replace("native-error: ", "") + "). Type it instead.";
+  return "Dictation isn't available right now — type it instead.";
+}

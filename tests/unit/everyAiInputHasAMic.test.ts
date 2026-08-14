@@ -191,50 +191,89 @@ test("a recording mic MOVES", () => {
   );
 });
 
-/**
- * Still rendering their own mic, ON PURPOSE, pending Dustin's per-item say-so.
- *
- * Both work — they call startDictation, so they dictate correctly on a phone.
- * What they do NOT get is the recording animation, because that lives in
- * MicButton. They are listed rather than converted because the workout logger
- * is off limits without asking per item, and the program page is the trainer's
- * programming surface. Ask before touching either.
- */
-const OWN_MIC_PENDING_APPROVAL = [
-  "src/app/(app)/workout/[dayId]/WorkoutLogger.tsx",
-  "src/app/(app)/clients/[clientId]/program/page.tsx",
-];
-
-test("only MicButton renders a mic — apart from the two awaiting sign-off", () => {
-  // The first version of this test looked for aria-label="Dictate", which four
-  // hand-rolled buttons did not use, so it passed while four copies existed.
-  // The icon is the honest signal: if a file draws a microphone, it owns a mic.
+test("MicButton is the ONLY thing in the app that draws a microphone", () => {
+  /**
+   * No exclusions. Dustin signed off on the last two — the workout logger and
+   * the client program page — on 14 Aug, and converting them turned up three
+   * more mics that had never worked properly:
+   *
+   *   · the logger's FEEDBACK mic had no onStart/onEnd, so it never changed
+   *     appearance; it threw away the handle, so it could not be stopped and a
+   *     second tap orphaned a recogniser (Android allows one); and it called
+   *     alert(), which this very file's comments say wedges a WebView.
+   *   · the SECOND mount of the AI-programming-note mic referenced no listening
+   *     state at all, so it sat dead still while recording.
+   *   · the session-note mic handler had no button anywhere in the JSX. Dead
+   *     code that read like a working feature.
+   *
+   * Three mics, one file, none of them right, and every test green throughout.
+   * That is the argument for this test having no exemptions.
+   *
+   * The first version looked for aria-label="Dictate", which most hand-rolled
+   * buttons did not set — so it passed while five copies existed. The icon is
+   * the honest signal: if a file draws a microphone, it owns a mic.
+   */
   const files = execFiles().filter((f) => !f.endsWith("src/components/MicButton.tsx"));
   const offenders = files
     .filter((f) => /ti-microphone/.test(readFileSync(f, "utf8")))
     .map((f) => f.replace(ROOT + "/", ""))
-    .filter((f) => !OWN_MIC_PENDING_APPROVAL.includes(f))
     .sort();
 
   assert.deepEqual(
     offenders,
     [],
     `these files draw their own microphone instead of using MicButton:\n  ${offenders.join("\n  ")}\n` +
-      `One mic, one place — otherwise the next change to how a mic looks or behaves ` +
-      `reaches only some of them, which is exactly how the ✦ Coach ended up as the ` +
-      `single surface with no mic at all. If a file must keep its own, add it to ` +
-      `OWN_MIC_PENDING_APPROVAL with the reason.`,
+      `One mic, one place. Otherwise the next change to how a mic looks or behaves ` +
+      `reaches only some of them — which is exactly how the ✦ Coach ended up the ` +
+      `single AI surface in the app with no mic at all.`,
   );
 });
 
+test("dictation failure copy lives in ONE place", () => {
+  // voiceMessage was WorkoutLogger's, and it was the best in the app: it tells a
+  // permission the person can grant apart from a device limit they cannot apart
+  // from a network blip. Every other surface had a single generic sentence for
+  // all three, which is how a thirty-second settings fix got reported as "the
+  // mic doesn't work".
+  const dict = read("src/lib/dictation.ts");
+  assert.match(dict, /export function dictationMessage/, "dictationMessage is gone from lib/dictation");
+  for (const needle of ["no-engine", "not-allowed", "network"]) {
+    assert.ok(dict.includes(needle), `dictationMessage no longer distinguishes "${needle}"`);
+  }
+  assert.match(
+    read("src/components/MicButton.tsx"),
+    /dictationMessage\(/,
+    "MicButton stopped using dictationMessage, so every mic is back to one generic sentence",
+  );
+
+  // Comments stripped: MicButton's header legitimately QUOTES the reason codes
+  // while explaining them. Reading raw source flagged it, which is a false
+  // positive of exactly the kind that gets a test deleted rather than fixed.
+  const copies = execFiles()
+    .filter((f) => !f.endsWith("src/lib/dictation.ts"))
+    .filter((f) => /function voiceMessage|"no-engine"/.test(codeOnly(readFileSync(f, "utf8"))))
+    .map((f) => f.replace(ROOT + "/", ""));
+  assert.deepEqual(copies, [], `these files re-implement the failure copy: ${copies.join(", ")}`);
+});
+
 test("an unavailable mic says WHICH no it is", () => {
+  // The distinguishing moved into dictationMessage (see the test above), so this
+  // now checks that MicButton still ROUTES failures through it rather than
+  // quietly swallowing them or printing one sentence for every cause.
   const mic = read("src/components/MicButton.tsx");
   assert.match(
     mic,
-    /not-allowed|permission/i,
-    "MicButton no longer distinguishes a denied microphone permission from a missing " +
-      "engine. They need opposite things from the person holding the phone, and one " +
-      "generic message is how a fixable permission prompt reads as a broken feature.",
+    /onUnavailable[\s\S]{0,300}dictationMessage\(/,
+    "MicButton's onUnavailable no longer runs the reason through dictationMessage. " +
+      "A denied permission and a missing engine need opposite things from the person " +
+      "holding the phone, and one generic message is how a thirty-second settings fix " +
+      "reads as a broken feature.",
+  );
+  assert.match(
+    mic,
+    /onNotice\s*\?|if \(onNotice\)/,
+    "MicButton stopped preferring the caller's inline notice over alert(). A modal " +
+      "from inside a WebView overlay is ignored at best and wedges the page at worst.",
   );
 });
 

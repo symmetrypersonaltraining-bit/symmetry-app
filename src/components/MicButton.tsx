@@ -30,7 +30,7 @@
 // that is exactly how the logger's stayed broken.
 
 import { useEffect, useRef, useState } from "react";
-import { startDictation } from "@/lib/dictation";
+import { startDictation, dictationMessage } from "@/lib/dictation";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 export default function MicButton({
@@ -87,15 +87,16 @@ export default function MicButton({
       onEnd: () => setListening(false),
       onUnavailable: (reason: string) => {
         setListening(false);
-        // Wording lifted from FeedbackButton, which had the best version of this
-        // in the app: it names the app so the person can find the right settings
-        // screen, and it says what to do next instead of just what went wrong.
-        // Promoting it here means every mic gets it rather than one.
-        const msg = /not-allowed|denied|permission/i.test(reason)
-          ? "Microphone permission is off for Symmetry. Turn it on in your phone's app settings, then tap the mic again — or just type it instead."
-          : `Voice input couldn't start — ${reason || "unknown"}.\n\nYou can type it instead. If it keeps happening, send ${COACH_FIRST_NAME} this message.`;
+        // dictationMessage lives in lib/dictation and separates a permission the
+        // person can grant from a device limit they cannot from a network blip.
+        // It came from WorkoutLogger, which was the only surface that made the
+        // distinction; every mic makes it now.
+        const msg = dictationMessage(reason);
         if (onNotice) onNotice(msg);
-        else alert(msg);
+        // A modal from inside a WebView overlay is ignored at best and wedges
+        // the page at worst — so alert() is the LAST resort, only where the
+        // caller gave us nowhere better to put it.
+        else alert(`${msg}\n\nIf it keeps happening, send ${COACH_FIRST_NAME} this message.`);
       },
     }) as { stop?: () => void } | null;
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { startDictation } from "@/lib/dictation";
+import MicButton from "@/components/MicButton";
 import { createClient } from "@/lib/supabase/client";
 // Aliased: this file already has a local submitFeedback() handler, and the
 // import silently shadowed it — the call below was recursing into itself.
@@ -625,7 +625,6 @@ export default function WorkoutLogger({
   const [fieldCfg, setFieldCfg] = useState<Record<string, string[]>>({});
   const [historyExercise, setHistoryExercise] = useState<{ id: string; exId?: string | null; name: string } | null>(null);
   const [sessionNote, setSessionNote] = useState("");
-  const [listening, setListening] = useState(false);
   // ─── PER-SET TIMER ────────────────────────────────────────────────────────
   // Dustin, 12 Aug: "movements that track time you set timer or stop watch
   // right there where you log it, hit start, when time is up it logs as
@@ -681,7 +680,6 @@ export default function WorkoutLogger({
   const [showAiNote, setShowAiNote] = useState(false);
   const [trainerListening, setTrainerListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  const trainerVoiceRef = useRef<{ stop?: () => void } | null>(null);
   const [showCue, setShowCue] = useState(false);
   // Notes are typed in a sheet, not in the card — see the note at the card.
   const [noteSheetOpen, setNoteSheetOpen] = useState(false);
@@ -867,7 +865,6 @@ export default function WorkoutLogger({
       } catch { /* noop */ }
     };
   }, [sessionMode]);
-  const recognitionRef = useRef<any>(null);
 
   const allFlat = localSections.flatMap(s => s.prescribed_exercises);
   const totalSets = Object.values(sets).reduce((a, arr) => a + arr.length, 0);
@@ -1775,22 +1772,10 @@ export default function WorkoutLogger({
     } finally { setSaving(false); }
   }
 
-  // NOTE: nothing calls this. The session-note mic button was never mounted in
-  // the JSX, so `listening` and recognitionRef are only reachable from here.
-  // Left in place (and corrected alongside the AI-note mic) rather than deleted,
-  // because the session note itself is live and saved with the log — but if you
-  // are looking for "the mic in the logger", it is startTrainerVoice, not this.
-  function startVoiceNote() {
-    if (listening) { try { (recognitionRef.current as { stop?: () => void } | null)?.stop?.(); } catch { /* noop */ } setListening(false); return; }
-    recognitionRef.current = startDictation({
-      onResult: (t) => setSessionNote(prev => prev ? prev + " " + t : t),
-      onStart: () => setListening(true),
-      onEnd: () => setListening(false),
-      // No alert(). A modal dialog from inside a WebView overlay is ignored at
-      // best and wedges the page at worst; the message goes on screen instead.
-      onUnavailable: (why) => { setListening(false); setVoiceError(voiceMessage(why)); },
-    }) as unknown as typeof recognitionRef.current;
-  }
+  // `startVoiceNote` used to sit here — a mic handler for the session note
+  // whose button was never mounted in the JSX, so nothing could ever call it.
+  // Deleted rather than carried: dead code that LOOKS like a working feature is
+  // how "the logger already has a mic for that" stays believable for a week.
 
   async function saveTrainerNote() {
     if (!trainerNoteText.trim()) return;
@@ -1850,59 +1835,12 @@ export default function WorkoutLogger({
     setTimeout(() => { setFbSent(false); setShowFeedback(false); }, 2200);
   }
 
-  function startFeedbackVoice() {
-    startDictation({
-      onResult: (t) => setFbText(prev => prev ? prev + " " + t : t),
-      onUnavailable: () => alert("Voice dictation isn't available here yet. You can type instead."),
-    });
-  }
-
-  // One place that turns a dictation failure reason into something {COACH_FIRST_NAME} can
-  // act on. "not-allowed" is a permission he can grant; "no-engine" is a device
-  // limit he cannot. Telling him the difference is the whole point.
-  function voiceMessage(why: string): string {
-    const w = String(why || "");
-    if (w === "no-engine") return "This device has no dictation engine — type it instead.";
-    if (w.includes("not-allowed") || w.includes("permission") || w.includes("denied")) {
-      return "Microphone permission is off for the app — turn it on in your phone's settings, then try again.";
-    }
-    if (w.includes("network")) return "Dictation needs a connection and couldn't reach the service.";
-    if (w.startsWith("native-")) return "Dictation didn't start (" + w.replace("native-error: ", "") + "). Type it instead.";
-    return "Dictation isn't available right now — type it instead.";
-  }
-
-  // The mic on the AI programming note.
-  //
-  // It looked dead because it gave no feedback of any kind. startDictation was
-  // called without onStart or onEnd, so the button never changed; the handle it
-  // returns was thrown away, so there was no way to stop it and a second tap
-  // just started a second recognizer (Android allows one at a time, so the
-  // second one fails and the first is orphaned). On Android native dictation we
-  // pass popup:false, so there is no system UI either — tap the mic, nothing
-  // happens on screen, and it reads as broken whether or not it is.
-  //
-  // And when it genuinely failed it called alert(), which in a WebView inside a
-  // fixed overlay is at best ignored and at worst freezes the extension bridge.
-  // The reason string is now shown inline instead, so "not working" is
-  // diagnosable — "no-engine" and "native-error: permission denied" are very
-  // different problems.
-  function startTrainerVoice() {
-    if (trainerListening) {
-      try { trainerVoiceRef.current?.stop?.(); } catch { /* noop */ }
-      setTrainerListening(false);
-      return;
-    }
-    setVoiceError(null);
-    trainerVoiceRef.current = startDictation({
-      onResult: (t) => setTrainerNoteText(prev => prev ? prev + " " + t : t),
-      onStart: () => setTrainerListening(true),
-      onEnd: () => setTrainerListening(false),
-      onUnavailable: (why) => {
-        setTrainerListening(false);
-        setVoiceError(voiceMessage(why));
-      },
-    });
-  }
+  // startFeedbackVoice, voiceMessage and startTrainerVoice used to fill this
+  // space. Dictation is MicButton's job now, and `voiceMessage` — the best
+  // failure copy in the app, and the only one that told a permission the person
+  // can GRANT apart from a device limit they cannot — was promoted into
+  // lib/dictation as `dictationMessage`. Every mic says it now, not just this
+  // screen.
 
   // \u2500\u2500\u2500 WORKOUT COMPLETE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   async function handleSwap(newExercise: Exercise) {
@@ -2079,10 +2017,17 @@ export default function WorkoutLogger({
                       placeholder={"What went wrong or what you'd change…"}
                       className="flex-1 text-sm px-3 py-2.5 rounded-xl outline-none"
                       style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid var(--brand-border)" }} />
-                    <button onClick={startFeedbackVoice} className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.35)" }}>
-                      <i className="ti ti-microphone text-sm" style={{ color: "#f59e0b" }} />
-                    </button>
+                    {/* This button was broken three ways and looked fine: no
+                        onStart/onEnd so it never changed, the handle thrown away
+                        so a second tap orphaned a recogniser, and alert() on
+                        failure — which this file's own comment says wedges a
+                        WebView. MicButton fixes all three and animates. */}
+                    <MicButton
+                      size={40}
+                      onText={(t) => setFbText((prev) => (prev ? prev + " " + t : t))}
+                      onNotice={setVoiceError}
+                      style={{ borderRadius: 12, background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.35)", color: "#f59e0b" }}
+                    />
                     <button onClick={submitFeedback} disabled={fbSending || !fbText.trim()}
                       className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#f59e0b" }}>
                       <i className="ti ti-send text-sm text-white" />
@@ -2113,16 +2058,18 @@ export default function WorkoutLogger({
                   placeholder={"e.g. bump to 140 next week, elbows flaring…"}
                   className="flex-1 text-sm px-3 py-2.5 rounded-xl outline-none"
                   style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid rgba(139,92,246,0.3)" }} />
-                <button onClick={startTrainerVoice} aria-label={trainerListening ? "Stop dictation" : "Dictate note"}
-                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                <MicButton
+                  size={40}
+                  onText={(t) => setTrainerNoteText((prev) => (prev ? prev + " " + t : t))}
+                  onListeningChange={setTrainerListening}
+                  onNotice={setVoiceError}
                   style={{
+                    borderRadius: 12,
                     background: trainerListening ? "#ef4444" : "rgba(139,92,246,0.2)",
                     border: "1px solid " + (trainerListening ? "#ef4444" : "rgba(139,92,246,0.3)"),
-                    animation: trainerListening ? "cw-pulse 1.2s ease-in-out infinite" : "none",
-                  }}>
-                  <i className={`ti ${trainerListening ? "ti-player-stop" : "ti-microphone"} text-sm`}
-                    style={{ color: trainerListening ? "#fff" : "#8b5cf6" }} />
-                </button>
+                    color: trainerListening ? "#fff" : "#8b5cf6",
+                  }}
+                />
                 <button onClick={saveTrainerNote} disabled={savingNote || !trainerNoteText.trim()}
                   className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ background: noteSaved ? "#22c55e" : "#8b5cf6" }}>
@@ -2894,11 +2841,21 @@ export default function WorkoutLogger({
                 placeholder={'Record a note for AI program adjustments\u2026'}
                 className="flex-1 text-sm px-3 py-2.5 rounded-xl outline-none"
                 style={{ background: "var(--brand-bg)", color: "var(--brand-text)", border: "1px solid rgba(139,92,246,0.3)" }} />
-              <button onClick={startTrainerVoice}
-                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)" }}>
-                <i className="ti ti-microphone text-sm" style={{ color: "#8b5cf6" }} />
-              </button>
+              {/* Second mount of the same note field. Its icon referenced no
+                  listening state at all, so this mic sat dead still while
+                  recording even before the animation existed. */}
+              <MicButton
+                size={40}
+                onText={(t) => setTrainerNoteText((prev) => (prev ? prev + " " + t : t))}
+                onListeningChange={setTrainerListening}
+                onNotice={setVoiceError}
+                style={{
+                  borderRadius: 12,
+                  background: trainerListening ? "#ef4444" : "rgba(139,92,246,0.1)",
+                  border: "1px solid " + (trainerListening ? "#ef4444" : "rgba(139,92,246,0.3)"),
+                  color: trainerListening ? "#fff" : "#8b5cf6",
+                }}
+              />
               <button onClick={saveTrainerNote} disabled={savingNote || !trainerNoteText.trim()}
                 className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{ background: noteSaved ? "#22c55e" : "#8b5cf6" }}>
