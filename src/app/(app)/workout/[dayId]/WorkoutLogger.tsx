@@ -1812,10 +1812,24 @@ export default function WorkoutLogger({
       };
       const { data } = await supabase.from("exercise_notes").insert(row).select("id, note, author, created_at");
       if (data && data[0]) setExNotePrior(prev => [data[0] as unknown as { id: string; note: string; author: string; created_at: string }, ...prev]);
-      // Client-authored notes also land in the trainer's messaging inbox, tagged with the movement, so {COACH_FIRST_NAME} can answer.
+      // A note on a movement is a NOTE, not a question.
+      //
+      // Dustin, 14 Aug: "the notes on movements in workout logger is sending to
+      // me as a 'question' — that should go in as notes to the ai to see when
+      // we program and should be labeled accordingly."
+      //
+      // "[Question · Lat Pulldown]" framed every one of these as something
+      // awaiting his reply, so a client writing "went up to 110, felt easy" —
+      // which is programming information, not a question — landed in his inbox
+      // looking like an unanswered message. It also set the client's
+      // expectation that a reply was coming.
+      //
+      // The row itself already goes to exercise_notes, which is what the
+      // programming AI reads. This copy exists only so he SEES it happen
+      // without opening the logger, so it is labelled for what it is.
       if (!isTrainerSession) {
         const exName = currentExercise.exercises?.name ?? "Exercise";
-        try { await sendClientMessage(`[Question · ${exName}]\n${row.note}`); } catch (e) { console.error(e); }
+        try { await sendClientMessage(`[Training note · ${exName}]\n${row.note}`); } catch (e) { console.error(e); }
       }
       setExNoteText(""); setExNoteSaved(true);
       setTimeout(() => setExNoteSaved(false), 2500);

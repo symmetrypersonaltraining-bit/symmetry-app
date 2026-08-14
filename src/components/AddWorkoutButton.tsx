@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { FunLoader } from "@/components/FunMoments";
 import ManualWorkoutBuilder from "@/components/ManualWorkoutBuilder";
 import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 type LibDay = { id: string; label: string };
 
@@ -26,6 +27,9 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
   const [custom, setCustom] = useState(false);
   const [build, setBuild] = useState(false);
   const [text, setText] = useState("");
+  // What was just logged, so the sheet can SAY it landed instead of
+  // reloading into an identical-looking screen. See addCustom().
+  const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pickedDate, setPickedDate] = useState<string>(dateStr || ctToday());
   const [markDone, setMarkDone] = useState(false);
@@ -143,7 +147,18 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
       if (!cid) { window.alert("Could not find your client profile."); return; }
       const ins = await (supabase as any).from("offplan_workout_logs").insert({ client_id: cid, log_date: pickedDate, description: text.trim().slice(0, 80), details: text.trim(), status: "pending" });
       if (ins.error) { window.alert(scheduleWriteError(ins.error, "add")); return; }
-      window.location.reload();
+
+      // SAY SO. This used to insert and then reload the page, and nothing on
+      // Home renders offplan_workout_logs — so the screen came back looking
+      // byte-for-byte identical to before. Todd Prine, 14 Aug, two minutes
+      // after his run saved perfectly: "Tried to just type my run in for a
+      // workout and I don't think it saved."
+      //
+      // It had saved. The row was there the whole time. A write nobody
+      // confirms is a write the person assumes failed — and the next thing
+      // they do is either give up or log it twice.
+      setSaved(text.trim().slice(0, 60));
+      setText("");
     } finally { setBusy(false); }
   }
 
@@ -197,9 +212,34 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
               </>
             ) : (
               <>
-                <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="What did you do? e.g. 30 min incline walk, 3x12 goblet squats" rows={4} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", marginBottom: 10, resize: "vertical" }} />
-                <button disabled={busy || !text.trim()} onClick={addCustom} style={{ width: "100%", padding: "12px", borderRadius: 12, border: "none", background: "var(--brand-primary, #7c9cf5)", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700, opacity: busy || !text.trim() ? 0.5 : 1 }}>Add workout</button>
-                <button onClick={() => setCustom(false)} style={{ marginTop: 8, width: "100%", padding: "10px", borderRadius: 12, border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: "inherit", opacity: 0.7 }}>Back to library</button>
+                {saved ? (
+                  <div style={{ padding: "18px 14px", textAlign: "center" }}>
+                    <div style={{ fontSize: 34, lineHeight: 1 }}>✅</div>
+                    <div style={{ fontWeight: 800, fontSize: 15, marginTop: 8 }}>Logged</div>
+                    <div style={{ fontSize: 13, opacity: 0.75, marginTop: 6, lineHeight: 1.45 }}>
+                      &ldquo;{saved}&rdquo;
+                    </div>
+                    <div style={{ fontSize: 12.5, opacity: 0.7, marginTop: 10, lineHeight: 1.45 }}>
+                      Saved for {pickedDate === ctToday() ? "today" : pickedDate}. {COACH_FIRST_NAME} can see it.
+                    </div>
+                    <button
+                      onClick={() => { setSaved(null); setCustom(false); setOpen(false); window.location.reload(); }}
+                      style={{ marginTop: 16, width: "100%", padding: "12px", borderRadius: 12, border: "none", background: "var(--brand-primary, #7c9cf5)", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>
+                      Done
+                    </button>
+                    <button
+                      onClick={() => setSaved(null)}
+                      style={{ marginTop: 8, width: "100%", padding: "10px", borderRadius: 12, border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: "inherit", opacity: 0.7 }}>
+                      Log another
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="What did you do? e.g. 30 min incline walk, 3x12 goblet squats" rows={4} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", marginBottom: 10, resize: "vertical" }} />
+                    <button disabled={busy || !text.trim()} onClick={addCustom} style={{ width: "100%", padding: "12px", borderRadius: 12, border: "none", background: "var(--brand-primary, #7c9cf5)", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700, opacity: busy || !text.trim() ? 0.5 : 1 }}>Add workout</button>
+                    <button onClick={() => setCustom(false)} style={{ marginTop: 8, width: "100%", padding: "10px", borderRadius: 12, border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: "inherit", opacity: 0.7 }}>Back to library</button>
+                  </>
+                )}
               </>
             )}
           </div>
