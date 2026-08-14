@@ -334,6 +334,22 @@ the session drops a git bundle plus a `SHIP-NOW` trigger in `outbox\`, and the
 watcher fast-forwards `origin/main`. It refuses any non-fast-forward, so it
 cannot clobber `main`. Full detail in `START-HERE-SESSION-SETUP.md`.
 
+> ### ⚠️ Run `git fetch origin main` after EVERY ship. Two seconds, saves an argument.
+>
+> The laptop does the pushing, so this sandbox's `origin/main` ref stays frozen
+> at whatever it last fetched — even though the commit is on GitHub. Anything
+> comparing local to `origin/main` (the stop hook, `git status`, your own eyes)
+> then reports phantom unpushed commits.
+>
+> On 14 Aug this fired three separate times, each one after a `SHIP-RESULT.txt`
+> that said `OK pushed`, and each one cost a round trip to disprove. **When the
+> ship result says OK, that is the truth and the local ref is stale.** The fetch
+> is what makes the two agree, and the correct place for it is immediately after
+> reading a successful SHIP-RESULT — not after something looks wrong.
+>
+> Concretely, the ship sequence is: bundle → deliver → `SHIP-NOW` → read
+> `SHIP-RESULT.txt` → **`git fetch origin main`**.
+
 ---
 
 ## Shipped 2026-08-07 — do not redo
