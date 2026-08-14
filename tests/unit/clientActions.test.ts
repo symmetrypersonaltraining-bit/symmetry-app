@@ -43,7 +43,13 @@ test("the trainer's tools are not reachable from here", () => {
   const forbidden = ["send_message", "set_macro_targets", "assign_program", "update_client", "query_table", "advance_phase", "book_session", "cancel_session"];
   const names = CLIENT_TOOLS.map((t) => t.name);
   for (const f of forbidden) assert.ok(!names.includes(f), `${f} is exposed to clients`);
-  assert.equal(names.length, 5, `the client toolset grew to ${names.length}: ${names.join(", ")}`);
+  // Raised 5 -> 6 on 14 Aug for add_my_workout, deliberately. This number is a
+  // tripwire, not a fact to keep in sync: every tool added here widens what a
+  // free-text box reachable by 35 people can do to their own data, so the count
+  // is pinned specifically to force that thought. If you are changing it,
+  // confirm the new tool carries the same two barriers as swap_my_workout —
+  // the cleared-pool filter AND the write-time re-check — before you do.
+  assert.equal(names.length, 6, `the client toolset grew to ${names.length}: ${names.join(", ")}`);
 });
 
 test("every write re-checks ownership at the moment of writing", () => {
@@ -145,4 +151,32 @@ test("a session can be put on a day twice, deliberately", () => {
     "swap_my_workout no longer claims a free slot, so swapping in a session the day " +
       "already has will fail",
   );
+});
+
+test("adding a session is gated exactly as hard as swapping one", () => {
+  /**
+   * add_my_workout was the missing capability behind "it puts whatever we tell
+   * it to put in there period". Without it the coach could move and swap but
+   * not ADD, so "give me a second walk today" ended at "I'll need to create a
+   * new session on your schedule" — which it could not do.
+   *
+   * Adding is exactly as capable of putting a movement in front of somebody as
+   * swapping is. Gerard has ~1.5 inches of tibia missing and Sharon cannot take
+   * unstable-surface work; an ADD that skipped the pool check would be the same
+   * injury as a SWAP that skipped it. So it carries both barriers, and this
+   * test fails if either goes missing.
+   */
+  const idx = SRC.indexOf('if (name === "add_my_workout")');
+  assert.ok(idx > -1, "add_my_workout is gone — the coach can no longer add a session");
+  const fn = SRC.slice(idx, SRC.indexOf('if (name === "log_my_weight")'));
+
+  assert.match(fn, /clearedPoolFor\(db, clientId\)/, "add_my_workout no longer reads the cleared pool");
+  assert.match(fn, /isDayInPool\(db, clientId, dayId\)/, "add_my_workout no longer re-checks the pool at write time");
+  assert.match(fn, /Do NOT add it/, "the refusal instruction to the model is gone");
+  assert.match(
+    fn,
+    /client_owner_id.*clientId|eq\("client_owner_id", clientId\)/s,
+    "an ungated client could be given another client's day, or a master library row",
+  );
+  assert.match(fn, /nextFreePosition\(/, "add_my_workout does not claim a free slot, so a second copy collides");
 });

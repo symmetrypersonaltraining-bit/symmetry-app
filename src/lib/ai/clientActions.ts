@@ -88,6 +88,19 @@ export const CLIENT_TOOLS = [
     },
   },
   {
+    name: "add_my_workout",
+    description:
+      "Put an ADDITIONAL session on one of this client's days, keeping whatever is already there. Use for 'add a second walk today' or 'give me an extra session on Saturday'. Use my_workout_options for the session to add. Do NOT use this to replace something — that is swap_my_workout.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        day_id: { type: "string", description: "From my_workout_options." },
+        date: { type: "string", description: "YYYY-MM-DD." },
+      },
+      required: ["day_id", "date"],
+    },
+  },
+  {
     name: "log_my_weight",
     description:
       "Record a weigh-in for this client. Only ever call this with a number the client has actually told you in this conversation — never a guess, never one carried over from their history.",
@@ -305,6 +318,51 @@ export async function runClientTool(
         .eq("client_id", clientId);
       if (error) return `Couldn't swap it: ${error.message}`;
       return `Swapped the session on ${row.scheduled_date}.`;
+    }
+
+    if (name === "add_my_workout") {
+      const dayId = str("day_id");
+      const date = str("date");
+      if (!dayId || !ISO.test(date)) return "Error: need the day_id and a date as YYYY-MM-DD.";
+
+      const away = Math.abs((Date.parse(`${date}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / DAY);
+      if (!Number.isFinite(away) || away > MAX_MOVE_DAYS) {
+        return `That date is more than ${MAX_MOVE_DAYS} days away. Check it with them — if it is right, their coach can make the change.`;
+      }
+
+      // THE SAME TWO BARRIERS AS A SWAP. Adding a session is exactly as capable
+      // of putting a movement in front of somebody as swapping one is, so it is
+      // gated identically. A gated client's options were filtered before the
+      // model ever saw them; this checks the id again at the moment of writing.
+      const pool = await clearedPoolFor(db, clientId);
+      if (pool.gated) {
+        const allowed = await isDayInPool(db, clientId, dayId);
+        if (!allowed) {
+          return "That session isn't one of this client's cleared options. Do NOT add it. Tell them which sessions they can have and offer to pass the request to their coach.";
+        }
+      } else {
+        const { data: d } = await db
+          .from("days").select("id").eq("id", dayId).eq("client_owner_id", clientId).eq("swappable", true).maybeSingle();
+        if (!d) return "That session isn't one of this client's options.";
+      }
+
+      // Its own slot, so putting the same session on twice is a second row
+      // rather than a unique-key refusal. This is the whole point: Dustin,
+      // 14 Aug — "it puts whatever we tell it to put in there period."
+      const pos = await nextFreePosition(db, clientId, dayId, date);
+
+      const { error } = await db.from("scheduled_workouts").insert({
+        client_id: clientId,
+        day_id: dayId,
+        scheduled_date: date,
+        position: pos,
+        status: "scheduled",
+        source: "client",
+      });
+      if (error) return `Couldn't add it: ${error.message}`;
+      return pos > 1
+        ? `Added — ${date} now has ${pos} sessions.`
+        : `Added to ${date}.`;
     }
 
     if (name === "log_my_weight") {
