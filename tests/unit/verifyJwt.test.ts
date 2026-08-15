@@ -63,7 +63,14 @@ async function sign(
   return `${h}.${p}.${b64url(sig)}`;
 }
 
-const NOW = 1_786_770_000_000; // fixed; Date.now() would make these flaky
+// Token expiry is judged against this FIXED instant, so the tests do not drift.
+//
+// The JWKS cache, though, is primed at REAL time on purpose — `getKeys` checks
+// its freshness against the actual clock, and priming it at NOW meant the cache
+// silently expired once real time passed NOW + JWKS_TTL_MS. These tests passed
+// alone and failed in the full suite an hour later, which is exactly the shape
+// of a test that would have started failing for somebody else next week.
+const NOW = 1_786_770_000_000;
 const goodClaims = (over: Record<string, unknown> = {}) => ({
   iss: ISSUER,
   sub: "aaec8ad5-9d01-4110-84f7-a32fa08e8192",
@@ -88,7 +95,7 @@ const notFetched: typeof fetch = async () => {
 
 test("verifyAccessToken: a genuine token verifies, with its claims", async () => {
   const pair = await makeKeypair();
-  __setJwksCacheForTests([await publicJwk(pair)], NOW);
+  __setJwksCacheForTests([await publicJwk(pair)]);
   const got = await verify(await sign(pair, goodClaims()));
   assert.ok(got, "a genuine token must verify");
   assert.equal(got.sub, "aaec8ad5-9d01-4110-84f7-a32fa08e8192");
@@ -100,14 +107,14 @@ test("verifyAccessToken: a genuine token verifies, with its claims", async () =>
 test("verifyAccessToken: a token signed by the WRONG key is refused", async () => {
   const real = await makeKeypair();
   const attacker = await makeKeypair();
-  __setJwksCacheForTests([await publicJwk(real)], NOW);
+  __setJwksCacheForTests([await publicJwk(real)]);
   // Correct claims, correct kid, correct everything — except who signed it.
   assert.equal(await verify(await sign(attacker, goodClaims())), null);
 });
 
 test("verifyAccessToken: a tampered payload is refused", async () => {
   const pair = await makeKeypair();
-  __setJwksCacheForTests([await publicJwk(pair)], NOW);
+  __setJwksCacheForTests([await publicJwk(pair)]);
   const token = await sign(pair, goodClaims());
   const [h, , s] = token.split(".");
   const swapped = b64url(JSON.stringify(goodClaims({ email: "someone.else@example.com" })));
@@ -117,7 +124,7 @@ test("verifyAccessToken: a tampered payload is refused", async () => {
 test("verifyAccessToken: alg is PINNED to ES256, not read from the token", async () => {
   // The classic JWT confusion bug is letting the token choose its own algorithm.
   const pair = await makeKeypair();
-  __setJwksCacheForTests([await publicJwk(pair)], NOW);
+  __setJwksCacheForTests([await publicJwk(pair)]);
   for (const alg of ["none", "HS256", "RS256", "ES384"]) {
     const token = await sign(pair, goodClaims(), { alg, typ: "JWT", kid: KID });
     assert.equal(await verify(token), null, `alg "${alg}" must be refused`);
@@ -126,27 +133,27 @@ test("verifyAccessToken: alg is PINNED to ES256, not read from the token", async
 
 test("verifyAccessToken: a token from another project is refused", async () => {
   const pair = await makeKeypair();
-  __setJwksCacheForTests([await publicJwk(pair)], NOW);
+  __setJwksCacheForTests([await publicJwk(pair)]);
   const token = await sign(pair, goodClaims({ iss: "https://someone-else.supabase.co/auth/v1" }));
   assert.equal(await verify(token), null);
 });
 
 test("verifyAccessToken: an expired token is refused", async () => {
   const pair = await makeKeypair();
-  __setJwksCacheForTests([await publicJwk(pair)], NOW);
+  __setJwksCacheForTests([await publicJwk(pair)]);
   const token = await sign(pair, goodClaims({ exp: Math.floor(NOW / 1000) - 1 }));
   assert.equal(await verify(token), null);
 });
 
 test("verifyAccessToken: a token with no subject is refused", async () => {
   const pair = await makeKeypair();
-  __setJwksCacheForTests([await publicJwk(pair)], NOW);
+  __setJwksCacheForTests([await publicJwk(pair)]);
   assert.equal(await verify(await sign(pair, goodClaims({ sub: undefined }))), null);
 });
 
 test("verifyAccessToken: rubbish in is null out, never a throw", async () => {
   const pair = await makeKeypair();
-  __setJwksCacheForTests([await publicJwk(pair)], NOW);
+  __setJwksCacheForTests([await publicJwk(pair)]);
   for (const junk of ["", "a", "a.b", "a.b.c", "....", "not-a-jwt-at-all"]) {
     assert.equal(await verify(junk), null, `"${junk}" must be null, not a throw`);
   }
@@ -159,7 +166,7 @@ test("verifyAccessToken: a token near expiry is refused so it gets REFRESHED", a
   // token dies would swap an outage for a quieter bug: sessions that stop
   // refreshing and dump people at /login.
   const pair = await makeKeypair();
-  __setJwksCacheForTests([await publicJwk(pair)], NOW);
+  __setJwksCacheForTests([await publicJwk(pair)]);
   const nearly = await sign(pair, goodClaims({ exp: Math.floor(NOW / 1000) + REFRESH_MARGIN_SECONDS - 10 }));
   assert.equal(await verify(nearly), null, "inside the refresh margin it must defer to getUser()");
 
@@ -172,16 +179,13 @@ test("verifyAccessToken: a token near expiry is refused so it gets REFRESHED", a
 test("verifyAccessToken: the key is chosen by kid, not by being first", async () => {
   const wrong = await makeKeypair();
   const right = await makeKeypair();
-  __setJwksCacheForTests(
-    [await publicJwk(wrong, "other-key"), await publicJwk(right, KID)],
-    NOW
-  );
+  __setJwksCacheForTests([await publicJwk(wrong, "other-key"), await publicJwk(right, KID)]);
   assert.ok(await verify(await sign(right, goodClaims())), "must pick the key matching kid");
 });
 
 test("verifyAccessToken: an unknown kid is refused rather than guessed at", async () => {
   const pair = await makeKeypair();
-  __setJwksCacheForTests([await publicJwk(pair, "some-other-kid")], NOW);
+  __setJwksCacheForTests([await publicJwk(pair, "some-other-kid")]);
   assert.equal(await verify(await sign(pair, goodClaims())), null);
 });
 

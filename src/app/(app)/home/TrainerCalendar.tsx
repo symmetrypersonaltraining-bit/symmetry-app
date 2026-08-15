@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { setGCalEventColor } from "@/app/(app)/schedule/scheduleActions";
+import { centralIso } from "@/lib/central-time";
 
 // ---- Types ----
 type ViewMode = "week" | "month" | "day" | "agenda";
@@ -248,10 +249,27 @@ function AddSessionModal({ date, timeStr, clients, onClose, onSaved }: {
     const supabase = createClient();
     const dateStr = dayStr(date);
 
+    // A NAIVE TIMESTAMP IS A UTC TIMESTAMP HERE.
+    //
+    // scheduled_at and ends_at are timestamptz, and this database's connection
+    // timezone is UTC (verified: `show timezone` → UTC). So "2026-08-15T09:00:00"
+    // with no offset is stored as 09:00 UTC, which is 04:00 Central — a 9am
+    // session booked for four in the morning.
+    //
+    // NOT a live corruption, and worth being exact about: every one of the 4,628
+    // appointments in the table came from the Google Calendar sync, which sends
+    // proper offsets. Nothing has ever been booked through this modal, so nothing
+    // is currently wrong. It is a trap sitting under the button, not a mess to
+    // clean up — and the early-morning appointments in the data are real, because
+    // Dustin genuinely starts at four.
+    //
+    // centralIso exists for exactly this and was already being used correctly by
+    // the reschedule flow in ScheduleClient. This modal predates the 31 Jul
+    // timezone audit and was missed by it.
     const buildRow = (ds: string) => ({
       client_id: clientId,
-      scheduled_at: `${ds}T${startTime}:00`,
-      ends_at: `${ds}T${endTime}:00`,
+      scheduled_at: centralIso(ds, startTime),
+      ends_at: centralIso(ds, endTime),
       title,
       status: "scheduled",
     });
@@ -267,8 +285,15 @@ function AddSessionModal({ date, timeStr, clients, onClose, onSaved }: {
       }
     }
 
-    for (const row of rows) {
-      await supabase.from("appointments").insert(row);
+    // One insert, not a loop of unchecked ones. A recurring series used to be
+    // inserted week by week with no error read, so a single failure part-way
+    // through — a conflict, an RLS refusal — still closed the sheet as if the
+    // whole series had been booked.
+    const { error: insErr } = await supabase.from("appointments").insert(rows);
+    if (insErr) {
+      setSaving(false);
+      alert(`Couldn't book that session: ${insErr.message}`);
+      return;
     }
     setSaving(false);
     onSaved();
@@ -364,7 +389,39 @@ function SessionDetailPopup({ ev, clients, workoutMap, onClose, onSaved }: {
   async function updateStatus(status: string) {
     setUpdating(true);
     const supabase = createClient();
-    await supabase.from("appointments").update({ status }).eq("id", ev.id);
+    // THE SAME BUG THE BULK CANCEL HAD, in the button right next to it, unfixed.
+    //
+    // `appointments_status_check` accepts scheduled / completed /
+    // cancelled_client / cancelled_trainer / no_show. It does NOT accept
+    // 'cancelled'. Re-confirmed against the live database on 15 Aug by running
+    // the update inside a rolled-back DO block — 23514, every time — and
+    // `select count(*) from appointments where status='cancelled'` returns 0.
+    // This button has never once worked, since the day it shipped.
+    //
+    // And it never LOOKED broken. The error was not read, so the lines below
+    // recoloured the Google Calendar event orange and the sheet closed. Dustin
+    // cancelled a session, watched it go orange in Google Calendar, and the
+    // appointment stayed `scheduled` — still counted, still reminding, still in
+    // today's sessions.
+    //
+    // Why the guard test missed it, which is the transferable part: the scanner
+    // in dbCheckConstraintValues.test.ts follows a bare identifier back to its
+    // `const`. Here `status` is a FUNCTION PARAMETER and the offending literal
+    // lives at the call site, so it is invisible — structurally the same hole
+    // that hid the sixth of the original six dead writes.
+    const outgoing = status === "cancelled" ? "cancelled_client" : status;
+    const { error: statusErr } = await supabase
+      .from("appointments")
+      .update({ status: outgoing })
+      .eq("id", ev.id);
+    if (statusErr) {
+      // Never again recolour the calendar and close the sheet over a write that
+      // did not happen. A silent success is as bad as a silent failure; this was
+      // both at once.
+      setUpdating(false);
+      alert(`Couldn't update that session: ${statusErr.message}`);
+      return;
+    }
     // A half-price credit used to be written to billing_adjustments here, priced
     // off a THIRD rate formula (current_fees / (training_frequency * 4)) that
     // disagreed with both clients.session_rate and the reminder calculation.

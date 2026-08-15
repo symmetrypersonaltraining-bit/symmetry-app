@@ -485,7 +485,24 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
       if (!clientId) return "Error: client_id required.";
       const programId = str("program_id");
       if (!programId) return "Error: program_id required.";
-      const { data: prev } = await db.from("program_assignments").select("id, program_id, current_phase_id, active").eq("client_id", clientId).eq("active", true).maybeSingle();
+      // NOT maybeSingle(). More than one ACTIVE assignment is the normal state
+      // here — measured 15 Aug, 26 of 35 clients have two or more: their real
+      // block plus the auto-created "Personal Workouts" sidecar, and five carry
+      // several real programmes at once because that is how a corrective track
+      // plus a training layer plus cardio is expressed.
+      //
+      // maybeSingle() raises PGRST116 on more than one row, and only `data` was
+      // destructured — so the error was dropped and `prev` came back null
+      // exactly as if the client had NO active programme. The undo record for
+      // this action has therefore been silently empty for most of the roster.
+      // Same fault, worse consequence, in advance_phase below.
+      const { data: prevRows } = await db
+        .from("program_assignments")
+        .select("id, program_id, current_phase_id, active")
+        .eq("client_id", clientId)
+        .eq("active", true);
+      // All of them, so the undo can put back everything this deactivates.
+      const prev = (prevRows as unknown[] | null) || [];
       await db.from("program_assignments").update({ active: false }).eq("client_id", clientId).eq("active", true);
       const phaseId = str("phase_id") || null;
       const { data: created, error } = await db.from("program_assignments")
@@ -500,9 +517,55 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
 
     if (name === "advance_phase") {
       if (!clientId) return "Error: client_id required.";
-      const { data: asg } = await db.from("program_assignments").select("id, program_id, current_phase_id").eq("client_id", clientId).eq("active", true).maybeSingle();
-      const a = asg as { id: string; program_id: string; current_phase_id: string | null } | null;
+      // See assign_program above for why maybeSingle() is wrong here. The
+      // consequence in THIS tool is the visible one: ask the assistant to
+      // advance Claudine a phase and it answered "that client has no active
+      // program" — because she has TWO, PGRST116 was raised, the error was
+      // dropped, and no rows and too many rows produced the same null.
+      //
+      // Ordering is the real fix, not just the row count. A manual workout in
+      // the personal sidecar must never be what gets phase-advanced, so a real
+      // programme wins, then the most recently assigned. Same preference as
+      // src/lib/pickProgramPhase.ts, which exists for the same reason.
+      const { data: asgRows } = await db
+        .from("program_assignments")
+        .select("id, program_id, assigned_at, programs(personal_for_client_id)")
+        .eq("client_id", clientId)
+        .eq("active", true);
+      const candidates = (asgRows as {
+        id: string;
+        program_id: string;
+        assigned_at: string | null;
+        current_phase_id?: string | null;
+        programs?: { personal_for_client_id?: string | null } | null;
+      }[] | null) || [];
+      const ranked = candidates.slice().sort((x, y) => {
+        const xp = x.programs?.personal_for_client_id ? 1 : 0;
+        const yp = y.programs?.personal_for_client_id ? 1 : 0;
+        if (xp !== yp) return xp - yp;
+        const xt = x.assigned_at ? Date.parse(x.assigned_at) : NaN;
+        const yt = y.assigned_at ? Date.parse(y.assigned_at) : NaN;
+        const xr = Number.isFinite(xt) ? -xt : Number.POSITIVE_INFINITY;
+        const yr = Number.isFinite(yt) ? -yt : Number.POSITIVE_INFINITY;
+        if (xr !== yr) return xr < yr ? -1 : 1;
+        return x.id < y.id ? -1 : x.id > y.id ? 1 : 0;
+      });
+      const chosen = ranked[0];
+      if (!chosen) return "That client has no active program.";
+      // current_phase_id is not in the select above (the join changed the shape),
+      // so read it back for the one row we actually chose.
+      const { data: chosenRow } = await db
+        .from("program_assignments")
+        .select("id, program_id, current_phase_id")
+        .eq("id", chosen.id)
+        .maybeSingle();
+      const a = chosenRow as { id: string; program_id: string; current_phase_id: string | null } | null;
       if (!a) return "That client has no active program.";
+      if (candidates.length > 1) {
+        // Say so rather than picking quietly. The trainer is the one who knows
+        // whether advancing the chosen block is what he meant.
+        console.warn(`advance_phase: ${candidates.length} active assignments for ${clientId}; chose ${a.program_id}`);
+      }
       let target = str("phase_id");
       if (!target) {
         const { data: phases } = await db.from("phases").select("id, label, position").eq("program_id", a.program_id).order("position");
