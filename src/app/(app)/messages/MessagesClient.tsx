@@ -39,6 +39,8 @@ interface Props {
   currentUserId: string;
   unreadByClient: Record<string, number>;
   senderNames?: Record<string, string>;
+  /** Group thread only: the face beside each name, keyed by auth user id. */
+  senderAvatars?: Record<string, { url: string | null; initials: string }>;
   lastByClient?: Record<string, { body: string; from_id: string; created_at: string }>;
 }
 
@@ -82,7 +84,7 @@ async function compressImage(file: File, max = 1280): Promise<Blob> {
   }
 }
 
-export default function MessagesClient({ isTrainer, clients, selectedClientId, thread, currentUserId, unreadByClient, senderNames = {}, lastByClient = {} }: Props) {
+export default function MessagesClient({ isTrainer, clients, selectedClientId, thread, currentUserId, unreadByClient, senderNames = {}, senderAvatars = {}, lastByClient = {} }: Props) {
   const router = useRouter();
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -298,7 +300,42 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                             <img src={faceSrc("messages")} alt="" width={18} height={18} style={{ borderRadius: "50%", objectFit: "cover" }} />
                             Coach Bot
                           </>
-                        ) : nameForFrom(m)}
+                        ) : (
+                          <>
+                            {/* Dustin, 15 Aug: "in group chat, our profile icons
+                                shoukd show on msges". Same 18px slot Coach Bot
+                                has always used, so the bot no longer looks like
+                                the only one with a face.
+
+                                Group thread only — in a one-to-one thread there
+                                are two people and the bubble side already says
+                                which is which, so a face there is decoration.
+
+                                Photo when there is one, initials when there is
+                                not, which today is 25 of 29 people. The initials
+                                circle is drawn here rather than through
+                                <Avatar> because it has to sit legibly on BOTH
+                                bubble colours — on your own message the bubble
+                                is already --brand-primary, and an --brand-primary
+                                circle on it would vanish. */}
+                            {isGroup && (senderAvatars[m.from_id]?.url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={senderAvatars[m.from_id]!.url as string} alt="" width={18} height={18}
+                                style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                            ) : (
+                              <span aria-hidden style={{
+                                width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                fontSize: 8.5, fontWeight: 800, letterSpacing: 0.2, lineHeight: 1,
+                                background: isMe ? "rgba(255,255,255,0.22)" : "color-mix(in srgb, var(--brand-primary) 18%, transparent)",
+                                color: isMe ? "#fff" : "var(--brand-primary)",
+                              }}>
+                                {senderAvatars[m.from_id]?.initials || "?"}
+                              </span>
+                            ))}
+                            {nameForFrom(m)}
+                          </>
+                        )}
                         {m.is_broadcast ? <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: 0.4, padding: "1px 5px", borderRadius: 4, background: isMe ? "rgba(255,255,255,0.2)" : "color-mix(in srgb, var(--brand-primary) 16%, transparent)", color: isMe ? "#fff" : "var(--brand-primary)" }}>ANNOUNCEMENT</span> : null}
                         {m.__recipients ? <span style={{ fontSize: 9, fontWeight: 600, opacity: 0.8 }}>· {m.__recipients} recipient{m.__recipients === 1 ? "" : "s"}</span> : null}
                       </p>

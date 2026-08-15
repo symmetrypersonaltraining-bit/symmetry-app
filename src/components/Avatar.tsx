@@ -10,16 +10,11 @@ import { fetchOwnClientRow } from "@/lib/ownClient";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const supabase = createClient() as any;
-export function initialsOf(name: string): string {
-  return (
-    (name || "")
-      .split(" ")
-      .map((n) => n[0] || "")
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "?"
-  );
-}
+// Moved to lib/initials.ts — a pure function should not sit behind this
+// file's module-scope createClient(). Re-exported so existing imports of
+// `initialsOf` from "@/components/Avatar" keep working unchanged.
+export { initialsOf } from "@/lib/initials";
+import { initialsOf } from "@/lib/initials";
 
 interface AvatarProps {
   name: string;

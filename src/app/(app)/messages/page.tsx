@@ -4,6 +4,7 @@ import { getServerUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
 import MessagesClient from "./MessagesClient";
 import { isTrainerEmail } from "@/lib/trainer";
+import { initialsOf } from "@/lib/initials";
 // Never serve a cached/prefetched variant of this route — the trainer-vs-client
 // branch must be decided per request from the cookie + ?as marker.
 export const dynamic = "force-dynamic";
@@ -35,7 +36,19 @@ export default async function MessagesPage(props: {
     await supabase.rpc("mark_group_read");
     const { data: allClients } = await supabase.from("clients").select("*").not("auth_user_id", "is", null).is("archived_at", null).order("name");
     const senderNames: Record<string, string> = {};
-    for (const cc of (allClients || []) as any[]) { if (cc.auth_user_id) senderNames[cc.auth_user_id] = String(cc.name || "").trim().split(" ")[0]; }
+    // Faces for the group thread. `initials` is computed from the FULL name
+    // here, not from senderNames — that holds the first name only, so falling
+    // back to it would put a single letter in every circle and make the four
+    // Gautreauxs and the two Sharons indistinguishable. Only 4 of 29 have
+    // uploaded a photo (Settings → Add photo), so the initials are the common
+    // case, not the edge one.
+    const senderAvatars: Record<string, { url: string | null; initials: string }> = {};
+    for (const cc of (allClients || []) as any[]) {
+      if (!cc.auth_user_id) continue;
+      const full = String(cc.name || "").trim();
+      senderNames[cc.auth_user_id] = full.split(" ")[0];
+      senderAvatars[cc.auth_user_id] = { url: cc.avatar_url || null, initials: initialsOf(full) };
+    }
     return (
       <MessagesClient
         isTrainer={isTrainer}
@@ -45,6 +58,7 @@ export default async function MessagesPage(props: {
         currentUserId={user.id}
         unreadByClient={{}}
         senderNames={senderNames}
+        senderAvatars={senderAvatars}
       />
     );
   }
