@@ -213,6 +213,14 @@
 > runs 31 seconds against a 30-second ceiling. Dustin raised the ceiling to 60
 > (`62fcea7`) and 68 exercises filled in one deploy.
 >
+> ⚠️ **CORRECTED 15 Aug — the sentence below is WRONG.** Measured against the
+> live table: only SEVEN of the 51 are near the ceiling (61–67s). Sixteen sit
+> at 61–90s, eight at 91–120s, fifteen at 121–180s, six over 180s — the worst is
+> **1,098 seconds** — and six have no usable candidate at all. So "raise it a
+> notch" clears almost nothing, and the exact number barely matters.
+> `docs/EXERCISE-VIDEOS-THE-REAL-NUMBERS.md` has the full distribution and the
+> three rows that should not be counted at all.
+>
 > **The same thing is now true one notch up.** Of the 51 still empty, 45 have a
 > candidate and the shortest is **61 seconds**. Do NOT just raise the ceiling
 > again — that reflex is what put the number at 30 and left it there. 90s would
