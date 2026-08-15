@@ -12,6 +12,7 @@ import { NotificationProvider } from "@/lib/useNotificationFeed";
 import RefreshHandle from "@/components/RefreshHandle";
 import GlobalCoach from "@/components/GlobalCoach";
 import { isTrainerEmail } from "@/lib/trainer";
+import { getServerUser } from "@/lib/auth/serverUser";
 
 export default async function AppLayout({
   children,
@@ -19,9 +20,13 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
+  // Verifies the session token locally when it can, so a slow or unreachable
+  // Supabase Auth cannot stop this layout — and therefore the whole app — from
+  // rendering. Falls back to asking Supabase, capped, when it cannot.
+  // src/lib/auth/verifyJwt.ts has the incident and the trade-off.
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getServerUser(supabase);
 
   if (!user) redirect("/login");
 

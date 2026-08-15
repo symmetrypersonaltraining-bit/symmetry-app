@@ -61,11 +61,47 @@ test("every redirect target is still covered", () => {
   }
 });
 
-test("getUser is called before any redirect decision", () => {
-  // The refresh is a side effect of this call. Deciding to redirect before it
-  // runs means the session never gets refreshed at all on those requests.
-  const getUserAt = CODE.indexOf("supabase.auth.getUser()");
+test("auth is resolved before any redirect decision", () => {
+  // The refresh is a side effect of resolving auth. Deciding to redirect before
+  // that runs means the session never gets its chance to refresh on those
+  // requests.
+  //
+  // UPDATED 15 Aug 2026. This used to look for `supabase.auth.getUser()`
+  // literally. The middleware now calls getUserFast, which verifies the token
+  // locally when it can and only calls getUser when it cannot — so the literal
+  // is no longer on the hot path and the test failed against correct code.
+  // The property it was protecting is unchanged, so it is the SEARCH that
+  // moved, not the rule.
+  const authAt = CODE.indexOf("getUserFast(");
   const firstRedirect = CODE.indexOf("redirectKeepingSession(new URL");
-  assert.ok(getUserAt > -1 && firstRedirect > -1);
-  assert.ok(getUserAt < firstRedirect, "a redirect is decided before the token gets its chance to refresh");
+  assert.ok(authAt > -1, "middleware no longer resolves auth through getUserFast");
+  assert.ok(firstRedirect > -1);
+  assert.ok(authAt < firstRedirect, "a redirect is decided before the token gets its chance to refresh");
+});
+
+test("the fast path still leaves a window in which the token gets refreshed", () => {
+  // THE HAZARD THIS FILE EXISTS FOR, in its new form.
+  //
+  // Local verification skips the network call, and the refresh is a side effect
+  // of that call. So a token verified locally right up to the moment it expires
+  // would never be refreshed, and the person would be signed out — the exact
+  // symptom Dustin reported on 13 Aug, reintroduced by the fix for a different
+  // problem.
+  //
+  // REFRESH_MARGIN_SECONDS is what prevents it: inside that window,
+  // verification deliberately declines and the request falls through to
+  // getUser(), which refreshes and rotates the cookie. If that margin is ever
+  // removed or set to zero, sessions stop refreshing.
+  const VERIFY = fs.readFileSync(path.join(process.cwd(), "src/lib/auth/verifyJwt.ts"), "utf8");
+  const m = VERIFY.match(/REFRESH_MARGIN_SECONDS\s*=\s*(\d+)/);
+  assert.ok(m, "REFRESH_MARGIN_SECONDS is gone — nothing forces a refresh any more");
+  assert.ok(
+    Number(m[1]) >= 60,
+    `refresh margin is ${m[1]}s; too small a window and a token can expire before anything refreshes it`
+  );
+  assert.match(
+    VERIFY,
+    /claims\.exp - REFRESH_MARGIN_SECONDS <= now/,
+    "the refresh margin is declared but no longer applied to the expiry check"
+  );
 });

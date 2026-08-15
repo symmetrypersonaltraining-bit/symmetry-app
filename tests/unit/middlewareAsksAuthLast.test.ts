@@ -30,10 +30,10 @@ test("middleware: the public-path allowlist is checked BEFORE auth is asked", ()
   const allowlistAt = SRC.indexOf('pathname === "/manifest.webmanifest"');
   // The CALL, not the several comments that mention it by name — matching the
   // prose here is how this test passed against the broken order on first run.
-  const getUserAt = SRC.search(/withAuthTimeout\(\s*supabase\.auth\.getUser\(\)\s*\)/);
+  const getUserAt = SRC.search(/await getUserFast\(/);
 
   assert.ok(allowlistAt > -1, "could not find the public-path allowlist");
-  assert.ok(getUserAt > -1, "could not find the capped auth.getUser() call");
+  assert.ok(getUserAt > -1, "could not find the getUserFast call");
   assert.ok(
     allowlistAt < getUserAt,
     "auth.getUser() runs before the allowlist, so every /api/, /sw.js and /icons/ " +
@@ -50,11 +50,35 @@ test("middleware: /api/ is on the allowlist", () => {
 test("middleware: the auth call is capped, not awaited indefinitely", () => {
   // A bare `await supabase.auth.getUser()` is what turned a slow dependency
   // into MIDDLEWARE_INVOCATION_TIMEOUT and a white screen for every client.
-  assert.match(SRC, /withAuthTimeout\(\s*supabase\.auth\.getUser\(\)\s*\)/);
+  //
+  // The cap now lives inside getUserFast, which tries local verification first
+  // and falls back to a capped getUser. What must never come back is a direct,
+  // uncapped call in this file.
+  assert.match(SRC, /await getUserFast\(/, "middleware must resolve auth through getUserFast");
   assert.ok(
-    !/[^d]await supabase\.auth\.getUser\(\)/.test(SRC),
-    "found an uncapped await on auth.getUser()"
+    !/await supabase\.auth\.getUser\(\)/.test(SRC),
+    "found a direct, uncapped await on supabase.auth.getUser() in the middleware"
   );
+});
+
+test("getUserFast: local verification is tried first, and its failure falls back", () => {
+  // The safety property the whole design rests on: local verification can
+  // REFUSE but never wrongly admit, and a refusal costs one network call —
+  // which is what every request paid before it existed. If the fallback is
+  // ever removed, a bug in the verifier becomes a locked door.
+  //
+  // Strip comments before searching. This is the THIRD source-order test
+  // tonight to be fooled by prose that names the very call it is looking for —
+  // here the file's own opening line, "Drop-in for `await
+  // supabase.auth.getUser()`", sits above everything and matched first.
+  const FAST = readFileSync(join(process.cwd(), "src/lib/auth/getUserFast.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  const localAt = FAST.indexOf("verifyAccessToken(");
+  const remoteAt = FAST.indexOf("supabase.auth.getUser()");
+  assert.ok(localAt > -1, "local verification is gone");
+  assert.ok(remoteAt > -1, "THE FALLBACK IS GONE — a verifier bug would now lock everyone out");
+  assert.ok(localAt < remoteAt, "the network call must be the fallback, not the first move");
 });
 
 test("middleware: a degraded auth result passes through, it does not redirect", () => {

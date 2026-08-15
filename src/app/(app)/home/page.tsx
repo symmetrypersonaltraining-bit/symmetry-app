@@ -8,6 +8,7 @@ import PwaInstallBanner from "@/components/PwaInstallBanner";
 import PendingRemindersPanel from "@/components/PendingRemindersPanel";
 import SlackerGate from "@/components/SlackerScreen";
 import { TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
+import { getServerUser } from "@/lib/auth/serverUser";
 
 async function isClientMode(asMarker?: string): Promise<boolean> {
   // Explicit ?as=client marker OR the cookie. The marker guarantees the client
@@ -24,7 +25,8 @@ export default async function HomePage(props: {
 }) {
   const searchParams = (await props.searchParams) ?? {};
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Local token verification first; see src/lib/auth/verifyJwt.ts.
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
   const isTrainer = isTrainerEmail((user?.email ?? ""));

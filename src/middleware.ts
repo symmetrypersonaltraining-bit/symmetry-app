@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isTrainerEmail } from "@/lib/trainer";
 import { withAuthTimeout } from "@/lib/authTimeout";
+import { getUserFast } from "@/lib/auth/getUserFast";
 
 /**
  * Redirect WITHOUT throwing away a freshly-rotated session.
@@ -99,12 +100,16 @@ export async function middleware(request: NextRequest) {
   // service that is already struggling was being asked several times as many
   // questions as it needed to answer.
   //
-  // The cap is because Supabase Auth being slow must not mean the app is DOWN.
-  // See src/lib/authTimeout.ts for the incident and for why passing through is
-  // safe: the layout and every page re-check the user, and RLS is the real
-  // boundary. This middleware is a convenience, not a gate.
-  const auth = await withAuthTimeout(supabase.auth.getUser());
-  const user = auth.value?.data?.user ?? null;
+  // getUserFast verifies the session token LOCALLY when it can — no network
+  // call — and only falls back to asking Supabase (capped at 4s) when it
+  // cannot. See src/lib/auth/verifyJwt.ts for why, and for the trade-off
+  // Dustin accepted during the 15 Aug outage.
+  //
+  // See src/lib/authTimeout.ts for why passing through on a non-answer is safe:
+  // the layout and every page re-check the user, and RLS is the real boundary.
+  // This middleware is a convenience, not a gate.
+  const auth = await getUserFast(supabase, request.cookies.getAll());
+  const user = auth.data.user;
 
   // Auth did not answer. Hand the request to the page rather than guessing.
   //
