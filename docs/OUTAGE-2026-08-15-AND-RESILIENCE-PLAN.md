@@ -115,6 +115,39 @@ the single most important sentence in this document.
 > be enough. If they are at zero and staying there, the instance is undersized
 > and Part 3 item 4's "bigger instance" is the honest answer. I can infer from
 > behaviour; I cannot read the gauge, and Dustin can.
+>
+> ### FOURTH AND FIFTH READINGS — it is ERRATIC, which is its own answer
+>
+> Kept probing, reading the clock each time this time:
+>
+> ```
+> 06:33Z  3,000,000 in  1.15s  =  0.38 µs/row   ← best of the night
+> 07:29Z    500,000 in  5.04s  = 10.1  µs/row
+> 07:49Z    500,000 in  2.29s  =  4.57 µs/row   ← improving?
+> 07:59Z    500,000 in 10.86s  = 21.7  µs/row   ← worst of the night
+> ```
+>
+> **A 57× spread inside ninety minutes, on a database with nothing running on
+> it.** That is not a smooth refill and it is not a stable floor. It is erratic.
+>
+> For a production app that is arguably worse than being uniformly slow, because
+> it means performance depends on luck rather than on load — you cannot plan
+> around it, and you cannot tell a bad deploy from a bad minute.
+>
+> It also means neither of my earlier stories was right. Not "recovering
+> steadily", not "at its floor". Whatever governs this instance's CPU is
+> handing it out in a way that a single number cannot describe, and the
+> dashboard is still where the answer is.
+>
+> ### ── AND THE THING WORTH TAKING FROM ALL OF IT ──
+>
+> Measured at **07:59Z, in the same minute as that 21.7 µs/row reading**, the
+> app served six consecutive page loads at **304 / 111 / 98 / 88 / 102 / 103 ms**.
+>
+> The database was at its worst of the entire night and **the app did not
+> notice**, because after `82d33d0` it no longer asks the database who you are on
+> every page load. That is the whole value of the change Dustin approved at
+> 05:15, demonstrated under the exact conditions that produced the outage.
 
 ### The cause (as understood at 05:00Z — superseded by the box above)
 
