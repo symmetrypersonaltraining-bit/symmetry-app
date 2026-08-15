@@ -125,6 +125,20 @@ function balancedObject(src: string, open: number, limit = 4000): string | null 
  * the goal is zero false failures, not total coverage. Every real instance of
  * this bug so far has been an inline literal.
  */
+/** The text inside a balanced (...) starting at `open`. Null if unbalanced. */
+function balancedParen(src: string, open: number): string | null {
+  if (src[open] !== "(") return null;
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === "(") depth++;
+    else if (src[i] === ")") {
+      depth--;
+      if (depth === 0) return src.slice(open + 1, i);
+    }
+  }
+  return null;
+}
+
 function scan(): Finding[] {
   const findings: Finding[] = [];
   for (const file of walk(SRC)) {
@@ -159,6 +173,37 @@ function scan(): Finding[] {
           const at = src.indexOf("{", decl.index);
           obj = balancedObject(src, at);
           objStart = at - m.index;
+        } else {
+          // ── A ROW ARRAY BUILT BY .map(), WHICH IS HOW THE SEVENTH ONE GOT IN ──
+          //
+          // `const ing = r.ingredients.map((i, idx) => { … return { … } })`
+          // then `.insert(ing)`. The declaration is not `= {`, so the branch
+          // above walks straight past it, exactly as the first scanner walked
+          // past the `const patch = {}` shape.
+          //
+          // Cost: the meal-recipe library seeded 20 recipes and ZERO
+          // ingredients on its first real run — `source: "library"` against a
+          // constraint allowing only manual/database/ai. Caught by the route
+          // checking its own writes, not by this test, which is the wrong way
+          // round.
+          //
+          // Take the LAST object literal in the map callback: that is the
+          // returned row, whether written as `=> ({…})` or `=> { … return {…} }`.
+          const mapDecl = new RegExp(
+            `\\b(?:const|let|var)\\s+${byRef[1]}\\b[^=]*=\\s*[^;]*?\\.map\\(`
+          ).exec(src);
+          if (mapDecl) {
+            const open = src.indexOf("(", mapDecl.index + mapDecl[0].length - 1);
+            const body = balancedParen(src, open);
+            if (body) {
+              const ret = body.lastIndexOf("return {");
+              const at = ret !== -1 ? body.indexOf("{", ret) : body.indexOf("({") + 1;
+              if (at > 0) {
+                obj = balancedObject(body, at);
+                objStart = 0;
+              }
+            }
+          }
         }
       } else {
         objStart = span.indexOf("{", w);

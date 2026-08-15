@@ -143,7 +143,10 @@ export async function GET(req: NextRequest) {
           protein: i.p,
           carbs: i.c,
           fats: i.f,
-          source: "library",
+          // MUST be one of manual / database / ai — recipe_ingredients_source_check.
+          // "library" was rejected by the constraint on the first real run; these
+          // values are hand-authored from reference data, so "manual" is honest.
+          source: "manual",
         };
       });
       const { error: ingErr, count } = await db

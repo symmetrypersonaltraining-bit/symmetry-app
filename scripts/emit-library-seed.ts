@@ -68,7 +68,7 @@ for (const r of RECIPE_LIBRARY) {
           const m = i.a.match(/^([\d.]+)\s*(.*)$/);
           const amount = m ? m[1] : "null";
           const unit = m ? m[2] : i.a;
-          return `((select id from r), ${idx + 1}, ${q(i.n)}, ${amount}, ${q(unit)}, ${i.p}, ${i.c}, ${i.f}, 'library')`;
+          return `((select id from r), ${idx + 1}, ${q(i.n)}, ${amount}, ${q(unit)}, ${i.p}, ${i.c}, ${i.f}, 'manual')`;
         })
         .join(",\n  ") +
       ";"
