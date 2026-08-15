@@ -70,6 +70,73 @@ async function targetsLine(db: Db, clientId: string, today: string): Promise<str
 }
 
 /**
+ * Their most recent weigh-in, as one line.
+ *
+ * ADDED 15 Aug 2026, and the reason matters. Section 6 of the system prompt
+ * carried a HARDCODED weight and body-fat figure for eighteen clients, written
+ * into the prompt months ago. Checked against `metrics` on 15 Aug, every one of
+ * them was wrong:
+ *
+ *   Tyler Dorsett      prompt 236 lb / 12.7%   actual 250.8 / 7.7%   (6 Aug)
+ *   Lauren Standefer   prompt 155 / 29%        actual 146.2 / 28.7%  (5 Aug)
+ *   Cheyenne Martin    prompt 205 / 35.9%      actual 197.1 / 37.8%  (14 Aug)
+ *   Claudine Ocon      prompt 110 / 25.2%      actual 116.7 / 24.2%  (4 Aug)
+ *   Todd Prine         prompt 236              actual 242.4          (27 Jul)
+ *   Brooke Reynolds, Tania Millan, Laurie Kane, Troy Schnitzler
+ *                      carried figures in the prompt and have NO metrics row
+ *
+ * A number in the prompt beats no number, so the model answered confidently and
+ * wrongly — telling a client in contest prep he was fifteen pounds lighter and
+ * five points fatter than he is. The numbers are gone from the prompt. This is
+ * where they come from now.
+ *
+ * NULL WHEN THERE IS NO WEIGH-IN, deliberately. Four of those clients have
+ * never been weighed in this system, and absence has to reach the model AS
+ * absence — the prompt already tells it to say it does not know rather than
+ * guess, and that instruction only works if nothing is inventing a figure.
+ */
+async function metricsLine(db: Db, clientId: string): Promise<string | null> {
+  try {
+    const { data } = await db
+      .from("metrics")
+      .select("metric_date, weight, body_fat_pct, lean_mass")
+      .eq("client_id", clientId)
+      .order("metric_date", { ascending: false })
+      .limit(6);
+    const rows =
+      (data as {
+        metric_date: string;
+        weight: number | null;
+        body_fat_pct: number | null;
+        lean_mass: number | null;
+      }[] | null) || [];
+    const latest = rows.find((r) => r.weight != null || r.body_fat_pct != null);
+    if (!latest) return null;
+
+    const bits: string[] = [];
+    if (latest.weight != null) bits.push(`${latest.weight} lb`);
+    if (latest.body_fat_pct != null) bits.push(`${latest.body_fat_pct}% body fat`);
+    if (latest.lean_mass != null) bits.push(`${latest.lean_mass} lb lean`);
+
+    // The DATE is not decoration. A ten-week-old weigh-in read back as "you're
+    // at 133" is a different claim from "you were 133 in June", and several of
+    // these clients go months between readings.
+    let line = `LATEST WEIGH-IN (${latest.metric_date}): ${bits.join(", ")}.`;
+
+    const weighed = rows.filter((r) => r.weight != null);
+    if (weighed.length >= 2) {
+      const delta = Number(weighed[0].weight) - Number(weighed[1].weight);
+      if (Math.abs(delta) >= 0.1) {
+        line += ` Change since ${weighed[1].metric_date}: ${delta > 0 ? "+" : ""}${delta.toFixed(1)} lb.`;
+      }
+    }
+    return line;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The context block for one client's ✦ drawer.
  *
  * Never throws, and returns "" rather than null when there is nothing to say,
@@ -80,11 +147,12 @@ export async function assistantContext(db: Db, clientId: string | null): Promise
   const today = CT_TODAY();
 
   try {
-    const [profile, goals, todays, targets, pool] = await Promise.all([
+    const [profile, goals, todays, targets, metrics, pool] = await Promise.all([
       fetchClientProfile(db, clientId).catch(() => null),
       goalContextBlock(db, clientId, today).catch(() => null),
       todayLine(db, clientId, today),
       targetsLine(db, clientId, today),
+      metricsLine(db, clientId),
       clearedPoolFor(db, clientId).catch(() => null),
     ]);
 
@@ -92,6 +160,9 @@ export async function assistantContext(db: Db, clientId: string | null): Promise
     if (profile?.line) lines.push(profile.line);
     if (todays) lines.push(todays);
     if (targets) lines.push(targets);
+    // Before the goal block, because the goal block reads as commentary on
+    // these numbers and it only appears when a goal exists at all.
+    if (metrics) lines.push(metrics);
     if (goals) lines.push(goals);
 
     // ── THE GATE ────────────────────────────────────────────────────────────

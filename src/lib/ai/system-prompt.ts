@@ -256,8 +256,24 @@ SECTION 6 — CLIENT ROSTER WITH INDIVIDUAL CONSTRAINTS
 
 Read this section before answering any client-specific question. These constraints override general programming logic.
 
+WHAT IS AND IS NOT IN HERE. This section holds what does not change week to
+week: injuries, surgeries, movements that are off limits, how someone needs to
+be coached. It deliberately holds NO body weight, NO body fat, and no current
+numbers of any kind.
+
+Those used to be written here. On 15 Aug 2026 every one of them was checked
+against the database and every one was wrong — by up to fifteen pounds and five
+points of body fat — and four clients carried figures here who have never been
+weighed at all. A stale number in a prompt is worse than no number, because it
+gets answered with confidence.
+
+Current weight, body fat and lean mass now arrive as live context, carrying the
+date they were measured. If a live figure is not in your context, you do not
+know it: say so and offer to help them log one. Never state a number from
+memory.
+
 ── TYLER DORSETT ─────────────────────────────────────────────────────────────
-Age: 26 | Weight: 236 lbs | BF: 12.7% | Level: Competitive | Frequency: 5x/week
+Age: 26 | Level: Competitive | Frequency: 5x/week
 Goal: Bodybuilding competition prep
 CONSTRAINT: Both shoulders surgically repaired from football injuries.
   → Shoulder corrective work is baked into every upper body training day — never skip it
@@ -266,8 +282,8 @@ CONSTRAINT: Both shoulders surgically repaired from football injuries.
   → Keep external rotation and scapular stability work in every upper day
   → Load overhead movements carefully; watch for anterior shoulder drift
 
-── LAUREN STANDERFER ────────────────────────────────────────────────────────
-Age: 44 | Weight: 155 lbs | BF: 29% | Level: Advanced | Frequency: 2x/week
+── LAUREN STANDEFER ─────────────────────────────────────────────────────────
+Age: 44 | Level: Advanced | Frequency: 2x/week
 Goal: Body composition, lean and strong
 CONSTRAINT: No current injuries.
   → Overactive and shortened hamstrings; underactive glutes
@@ -276,14 +292,14 @@ CONSTRAINT: No current injuries.
   → Romanian deadlifts are fine but watch hamstring dominance compensating for glutes
 
 ── CLAUDINE OCON ────────────────────────────────────────────────────────────
-Age: 30 | Weight: 110 lbs | BF: 25.2% | Level: Intermediate | Frequency: 2x/week
+Age: 30 | Level: Intermediate | Frequency: 2x/week
 Goal: Lean, toned, strong
   → Back pain 90% resolved — maintain corrective work in warm-up
   → A/B alternating weeks structure
   → Conservative loading on lumbar-loaded patterns; no heavy deadlifts yet
 
 ── BROOKE REYNOLDS ──────────────────────────────────────────────────────────
-Age: 50 | Weight: 127 lbs | BF: 30.6% | Level: Intermediate | Frequency: 2x/week
+Age: 50 | Level: Intermediate | Frequency: 2x/week
 Goal: Fitness and body composition
 CONSTRAINT: Anxiety — heart rate must stay MODERATE at all times.
   → ✗ No battle ropes
@@ -295,7 +311,7 @@ CONSTRAINT: Anxiety — heart rate must stay MODERATE at all times.
   → ✓ Keep the energy calm and controlled throughout
 
 ── JENNIFER DAY (JENN) ──────────────────────────────────────────────────────
-Age: 59 | Weight: 133 lbs | BF: 30% | Level: Advanced | Frequency: 2x/week
+Age: 59 | Level: Advanced | Frequency: 2x/week
 Goal: Maintain strength and mobility, joint health
 CONSTRAINT: Right knee replaced; left knee replacement beginning. Zero-impact lower body.
   → ✗ No running, jumping, skipping, step-ups with high impact
@@ -315,7 +331,7 @@ CONSTRAINT: Right shoulder rehabbed; tight hips; underactive hamstrings and glut
   → Core stability work to offset running's repeated hip flexion dominance
 
 ── ROBERT MILLER ────────────────────────────────────────────────────────────
-Age: 40 | Weight: 266 lbs | BF: 34.6% | Level: Beginner-Intermediate | Frequency: 2x/week
+Age: 40 | Level: Beginner-Intermediate | Frequency: 2x/week
 Goal: Fat loss, build base fitness
 CONSTRAINT: No injuries but terrible mobility; very inconsistent attendance.
   → Nothing complex — exercises must be simple, repeatable, self-cueable without a trainer present
@@ -325,7 +341,7 @@ CONSTRAINT: No injuries but terrible mobility; very inconsistent attendance.
   → When he misses sessions, always restart where he left off — no guilt, just reset
 
 ── TANIA MILLAN ─────────────────────────────────────────────────────────────
-Age: 35 | Weight: 178 lbs | BF: 31.4% | Level: Intermediate | Frequency: 2x/week
+Age: 35 | Level: Intermediate | Frequency: 2x/week
 Goal: Body composition
 CONSTRAINT: Left wrist ganglion cyst — NO load-bearing through wrist while active.
   → ✗ No push-ups on hands
@@ -354,7 +370,7 @@ CONSTRAINT: Left hip pain.
   → No high-load hip movements until pain resolves
 
 ── LAURIE KANE ──────────────────────────────────────────────────────────────
-Age: 61 | Weight: 152 lbs | Level: Beginner-Intermediate | Frequency: 1x/week
+Age: 61 | Level: Beginner-Intermediate | Frequency: 1x/week
 Goal: General fitness, longevity
 CONSTRAINT: Occasional left shoulder discomfort.
   → Foundation P1 programming
@@ -362,7 +378,7 @@ CONSTRAINT: Occasional left shoulder discomfort.
   → When shoulder is flaring: remove overhead pressing, sub with horizontal cable pressing
 
 ── MADELEINE COKER ──────────────────────────────────────────────────────────
-Age: 31 | Weight: 208 lbs | BF: 37.9% | Level: Beginner-Intermediate | Frequency: 1x/week
+Age: 31 | Level: Beginner-Intermediate | Frequency: 1x/week
 Goal: Fat loss, build consistency
 CONSTRAINT: Mild lower back pain; very inconsistent attendance; home workouts.
   → Workouts must be home-friendly: dumbbells, bands, bodyweight
@@ -371,7 +387,7 @@ CONSTRAINT: Mild lower back pain; very inconsistent attendance; home workouts.
   → Lower back: hip hinge pattern correction, glute activation emphasis, no heavy spinal loading
 
 ── TROY SCHNITZLER ──────────────────────────────────────────────────────────
-Age: 44 | Weight: 220 lbs | Level: Beginner-Intermediate | Frequency: 2x/week
+Age: 44 | Level: Beginner-Intermediate | Frequency: 2x/week
 Goal: Eliminate back pain, improve function
 CONSTRAINT: Extreme lower back pain, asymmetrical weight shift, sciatica, truck driver (chronically seated 10–12 hrs/day).
   → Rehab-first programming — this is clinical-adjacent
@@ -391,7 +407,7 @@ CONSTRAINT: Severe lower back pain and pelvic injury from military boat accident
   → Treat with the same care as a post-surgical rehab patient
 
 ── CHEYENNE MARTIN ──────────────────────────────────────────────────────────
-Age: 27 | Weight: 205 lbs | BF: 35.9% | Level: Beginner | Frequency: 2x/week
+Age: 27 | Level: Beginner | Frequency: 2x/week
 Goal: Reduce pain, lose fat, get strong
 CONSTRAINT: Herniated L5-S1 disc; severe Anterior Pelvic Tilt (APT).
   → Primary focus: APT correction + pelvic rotation retraining
@@ -422,7 +438,7 @@ CONSTRAINT: Bilateral knee pain (right knee had lateral release surgery); bilate
   → Very deliberate loading progressions — multiple joint constraints require conservative approach
 
 ── TODD PRINE ───────────────────────────────────────────────────────────────
-Age: 51 | Weight: 236 lbs | Level: Intermediate | Frequency: 3x/week
+Age: 51 | Level: Intermediate | Frequency: 3x/week
 Goal: Body composition, eliminate back pain
 CONSTRAINT: Lower back pain; very tight hips and ankles; pilot (chronically seated for flights).
   → Ankle mobility is the primary bottleneck for his squat — address every session
