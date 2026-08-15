@@ -411,6 +411,17 @@ re-proposed · a stalled client's roll-forward does not extrapolate from zero.
 
 ### Open, from this session
 
+- **Read `docs/SATURDAY-NIGHT-2026-08-15.md` first.** Everything from the night
+  of 15 Aug: what shipped, the four things that need Dustin, and why the v2
+  Phase 0 build stalled (it needs his hands, not more knowledge).
+- **Jerry Bourgeois has never had a workout scheduled.** Active client, logging
+  meals, zero rows in scheduled_workouts ever. Needs a programme decision.
+- **The v2 push route.** The ship bridge hardcodes the live repo. Extending it
+  to take the target repo from SHIP-NOW is ~20 minutes and removes this blocker
+  permanently — recommended over a one-off manual push.
+- **Images for meals/recipes.** Schema has recipes.image_url. Blocked on a
+  source, not on build work: this sandbox cannot generate or fetch images.
+
 - **Turn the uptime monitor on.** `/api/health` shipped (`8238cd8`) and is live;
   pointing Better Stack at it needs Dustin's sign-in. Ten minutes, steps in
   `docs/MONITORING-SETUP.md`. Until this is done the app still has no monitoring
