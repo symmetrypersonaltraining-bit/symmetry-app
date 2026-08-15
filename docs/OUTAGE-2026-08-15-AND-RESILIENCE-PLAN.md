@@ -427,29 +427,76 @@ That one makes most of it not happen.
 
 ---
 
-## PART 5 — IF IT IS STILL BROKEN IN THE MORNING
+## PART 5 — SEND THIS. It is no longer conditional.
 
-**Read the root-cause box at the top first.** If the CPU measurement has
-recovered (`select count(*) from generate_series(1, 3000000)` back under a
-second) and the app is fast, there is nothing to raise with Supabase — the
-instance was throttled because we exhausted it, and it recovered because we
-stopped. The ticket below is only worth sending if the CPU measurement is still
-several seconds with the imports off and the database idle, which would mean
-something is consuming the instance that we have not found.
+**Updated 08:31Z. The condition below has been met, and then some: it is not
+recovering, it is getting steadily WORSE.**
+
+```
+06:33Z  3,000,000 rows in  1.15s  =  0.38 µs/row   ← best of the night
+07:29Z    500,000 rows in  5.04s  = 10.1  µs/row
+07:49Z    500,000 rows in  2.29s  =  4.57 µs/row
+07:59Z    500,000 rows in 10.86s  = 21.7  µs/row
+08:29Z    500,000 rows in 14.51s  = 29.0  µs/row
+08:31Z     50,000 rows in  1.82s  = 36.4  µs/row   ← worst, on the SMALLEST job
+```
+
+Monotonic since 07:49. **96× worse than this same instance managed four hours
+earlier.** The imports have been off for hours, `pg_stat_activity` shows nothing
+running, and the last reading is on a workload of fifty thousand integers.
+
+**One alternative was considered and ruled out:** that the slowness is in the
+connection path rather than the database. It is not. `EXPLAIN ANALYZE` reports
+`actual time` measured *inside* the Postgres backend, and a slow connection
+cannot inflate that. 14.3 seconds of backend wall-clock to count 500,000
+integers is the Postgres process not getting CPU.
+
+**Why the app is still fast anyway, and why that will not last:** serving a page
+now costs almost no Postgres CPU — auth is verified locally since `82d33d0`, and
+`/login` reads nothing. A starved database and a fast app are perfectly
+consistent right now. They stop being consistent the moment anything reads real
+data, which is to say the moment a client opens their workout.
+
+So: **send the ticket, and check the dashboard while you are there.**
 
 Supabase support ticket. Project `mkfiginpiesospsnktea`, region us-east-1.
 
-> Auth service `GET /user` is returning 504 `context deadline exceeded` for
-> roughly half of all requests, with durations of 10–65 seconds, since at least
-> 2026-08-15 03:32 UTC. A healthy call on the same project takes 2–200ms.
+> Since 2026-08-15 ~03:30 UTC this project has had almost no CPU, and it is
+> getting worse rather than recovering.
 >
-> The database is idle (1 active connection, no IO waits), all cron jobs are
-> disabled, `auth.users` has 33 rows and `auth.refresh_tokens` 1,449. Requests
-> from a residential IP succeed in 2ms while requests from Vercel's IPs time out
-> in the same minute. The project reports ACTIVE_HEALTHY throughout.
+> Measured with pure-CPU queries on a completely idle database — no cron jobs
+> running (all disabled), `pg_stat_activity` showing nothing but the probe
+> itself, no application traffic of consequence:
 >
-> Example request ids: `01a003b6-fbd7-7025-a2f5-b671687ac6bc`,
+> ```
+> 06:33Z  3,000,000 rows in  1.15s  =  0.38 us/row
+> 07:29Z    500,000 rows in  5.04s  = 10.1  us/row
+> 07:49Z    500,000 rows in  2.29s  =  4.57 us/row
+> 07:59Z    500,000 rows in 10.86s  = 21.7  us/row
+> 08:29Z    500,000 rows in 14.51s  = 29.0  us/row
+> 08:31Z     50,000 rows in  1.82s  = 36.4  us/row
+> ```
+>
+> That is 96x degradation over four hours on an idle instance. The timings are
+> `EXPLAIN ANALYZE`'s own `actual time`, measured inside the backend, so this is
+> not a connection or pooler artefact. Planning a trivial index scan took 844ms
+> at one point.
+>
+> Knock-on effects seen during the same window: auth `GET /user` returning 504
+> `context deadline exceeded` at 10-65s for roughly half of all requests (a
+> healthy call on this project is 2-200ms), PostgREST queries timing out, and a
+> 13.6s `realtime.apply_rls`. The project reports ACTIVE_HEALTHY throughout.
+>
+> Context that may be the cause: two per-minute cron jobs bulk-imported ~1.5M
+> rows into an 853MB table for several hours before this began. They were
+> disabled at ~05:55 UTC and performance has continued to degrade since.
+>
+> Questions: is this instance out of CPU credits, and if so why is it not
+> recovering with the load removed? Is there anything running on the platform
+> side that we cannot see in `pg_stat_activity`?
+>
+> Example auth request ids: `01a003b6-fbd7-7025-a2f5-b671687ac6bc`,
 > `01a003b6-77e0-7e64-89d5-1db6f730028b`,
 > `01a003b6-74f0-7d74-9008-ea5fa654b768`.
 
-The timing table in Part 1 is the attachment.
+The timing tables in Part 1 and above are the attachment.
