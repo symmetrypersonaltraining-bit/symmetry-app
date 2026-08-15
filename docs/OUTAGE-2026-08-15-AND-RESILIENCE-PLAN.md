@@ -26,7 +26,59 @@ code on it. No branding, no explanation, nothing a client could act on.
 **Dustin found it, not the monitoring, because there is no monitoring.** That is
 the single most important sentence in this document.
 
-### The cause
+> ## ⚠️ ROOT CAUSE, FOUND AT 06:47Z — READ THIS BEFORE THE REST
+>
+> **The database instance has almost no CPU, and the imports are what took it.**
+> Everything below this box was written before that was known and reasons from
+> the symptom outward. It is kept because the ruling-out is worth having, but
+> where it says "this is Supabase's problem, not ours", it is **wrong**.
+>
+> The measurement that settles it — pure CPU, no IO, no tables, no concurrency,
+> on an idle database:
+>
+> ```
+> select count(*) from generate_series(1, 3000000)   →  4.26s, then 6.58s
+> ```
+>
+> A healthy small Postgres does that in 0.4–0.7s. This is **8–13× slower**.
+>
+> And a real query — 46 rows, correct index, 31 buffers — took **4,631 ms**, of
+> which **844 ms was planning**. Thirty-one pages cannot take 4.6 seconds. The
+> queries are fine. There is nothing left to run them with.
+>
+> **Why.** The instance is burstable: it earns CPU credits while idle and spends
+> them under load. `off-bulk-import` and `off-micros-backfill` pushed 1.5M rows
+> through an 853 MB table every 60 seconds for hours. That drains the credits,
+> and once they are gone the instance is throttled to a fraction of one vCPU.
+> Everything on it degrades at once — and Supabase still reports
+> `ACTIVE_HEALTHY`, because the instance is up. It is just slow.
+>
+> That single fact explains every symptom independently observed tonight:
+> auth at 10–65s, PostgREST timing out on half of all queries, a 13.6s Realtime
+> `apply_rls`, and 844ms to plan a trivial index scan.
+>
+> **Consequences for what to do:**
+>
+> - Leaving the imports **off is the treatment**, not a precaution. Credits
+>   refill while the instance is quiet, over hours.
+> - **Do not re-enable them** before deciding between a larger instance and a
+>   maintenance window. Item 4 below is no longer a "live risk" — it is the
+>   cause, and it is now the first thing to fix.
+> - Local JWT verification (`82d33d0`) is why the app serves in 150ms while the
+>   database is still this slow. It is a real fix on its own merits and it also
+>   bought the headroom to diagnose this calmly.
+> - AI features stay slow until the CPU returns: they read a lot per request,
+>   and reading is what is expensive.
+>
+> **Two corrections I owe the record.** My first answer tonight — the imports
+> are saturating the connection pool — was the right culprit for the wrong
+> reason. My second — this is Supabase's fault, nothing on our side makes it
+> slow — was wrong, and I said it confidently after the pool cleared and the
+> timeouts continued. What I had actually shown was that stopping the imports
+> does not *immediately* fix it, which is a different claim, and CPU credits are
+> exactly the mechanism that makes those two things differ.
+
+### The cause (as understood at 05:00Z — superseded by the box above)
 
 Supabase's **auth service** (GoTrue), not the app and not the database.
 
@@ -209,13 +261,12 @@ fault in this codebase and the ship rule about idempotency exists for a reason.
 tests. Half-built offline sync is worse than none: it produces confident wrong
 data instead of an honest error.
 
-### 4. Stop the importer and the app sharing one database — a decision, not a build
+### 4. Stop the importer and the app sharing one database — ★ THIS IS THE CAUSE ★
 
-**The problem:** a job that scans a million rows sits on the same Postgres
-instance your clients' logins depend on. Tonight that was not the cause. It very
-nearly was, and at 45 seconds per run on a 60-second schedule it was already
-exhausting the connection pool — which is why every diagnostic query this
-session ran timed out about half the time.
+**Updated 06:47Z.** This was written as a precaution and is now the top item. A
+job that scans a million rows sits on the same Postgres instance your clients'
+logins depend on, and on 15 Aug it drained the instance's CPU credits and took
+the app down for most of a night. It is not a theoretical interaction.
 
 **Three options, cheapest first:**
 
@@ -229,9 +280,17 @@ session ran timed out about half the time.
   project. Cleanest, most work, and it is the one that stops this class of
   problem permanently.
 
-**Recommendation: the maintenance window tonight, and a real look at
-separating the catalog when the AI audit is done.** The instance size question
-answers itself once there is a monitor producing numbers.
+**Recommendation, revised now that this is the known cause: pick the instance
+size FIRST, then the window.** A maintenance window alone still spends the same
+credits, just at 3am — which is fine until the day an import overruns or a
+client trains early. The honest question is whether this app should be running
+its production database on a burstable instance at all now that it holds 1.6M
+rows and 35 people's training.
+
+Cheapest correct answer is probably: **window the imports now** (free, one line,
+stops the bleeding), **and move the food catalog off this project** when there
+is time — it is 853 MB of the 917 MB database, it is read-only reference data,
+and it shares nothing with client records.
 
 ---
 
@@ -298,6 +357,14 @@ That one makes most of it not happen.
 ---
 
 ## PART 5 — IF IT IS STILL BROKEN IN THE MORNING
+
+**Read the root-cause box at the top first.** If the CPU measurement has
+recovered (`select count(*) from generate_series(1, 3000000)` back under a
+second) and the app is fast, there is nothing to raise with Supabase — the
+instance was throttled because we exhausted it, and it recovered because we
+stopped. The ticket below is only worth sending if the CPU measurement is still
+several seconds with the imports off and the database idle, which would mean
+something is consuming the instance that we have not found.
 
 Supabase support ticket. Project `mkfiginpiesospsnktea`, region us-east-1.
 
