@@ -11,6 +11,7 @@ import { assertNotPaused, capBody, checkAndLog, pausedBody } from "@/lib/ai/mete
 // keep working. The single source of truth is @/lib/trainer.
 export { TRAINER_EMAIL, TRAINER_EMAILS, isTrainerEmail, isTrainerUser } from "@/lib/trainer";
 import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
+import { getServerUser } from "@/lib/auth/serverUser";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Db = SupabaseClient<any, any, any>;
 
@@ -34,9 +35,26 @@ export type ScopeResult = { ok: true; scope: AiScope } | { ok: false; response: 
  */
 export async function resolveAiScope(requestedClientId?: string | null): Promise<ScopeResult> {
   const supabase = await createClient();
+
+  // THIS IS THE GATE FOR EVERY AI ROUTE IN THE APP, and until 15 Aug it awaited
+  // Supabase Auth with no time limit. During that morning's outage the auth
+  // service was taking 10–65 seconds, so every AI feature — the coach, food
+  // parsing, photo analysis, the workout builder, the trainer agent — simply
+  // hung. Confirmed live: a /api/nutrition-ai/coach call was still waiting at
+  // 28 seconds while the app's own pages were serving in 150ms, because the
+  // page path had already been fixed and this had not.
+  //
+  // getServerUser verifies the session token locally when it can and falls back
+  // to a capped getUser when it cannot. See src/lib/auth/verifyJwt.ts.
+  //
+  // IT FAILS CLOSED, and that is the difference between here and the
+  // middleware. When auth cannot be resolved at all, `user` is null and the
+  // line below returns 401 — an API route has nothing downstream to defer to,
+  // so 'I could not establish who you are' must mean no. Only the middleware
+  // passes through, and only because the page re-checks.
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getServerUser(supabase);
   if (!user) {
     return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
