@@ -1,17 +1,95 @@
 # Backlog — the single work queue
 
-> ## 👉 START AT `docs/HANDOFF-2026-08-14.md`
+> ## 👉 START AT `docs/MORNING-2026-08-15.md`
 >
-> Written 14 Aug after a full day on live data. It carries the three rules this
-> session learned the hard way (updates go to the GROUP CHAT as ONE message,
-> verify by running statements not reading code, a silent success is as bad as a
-> silent failure), the seven writes that had never once succeeded, and the
-> Claudine incident — whose ROOT CAUSE IS STILL OPEN.
+> Written overnight 14/15 Aug. Twenty-two commits, an outage, and its root
+> cause. Two lists: done, and needs-Dustin. Read it before this file.
 >
-> **The single most urgent open item:** Claudine had two active program
-> assignments and 10 sessions she was never programmed. The extras are removed
-> and backed up, but nobody has checked whether other clients are in the same
-> state. The query is in the handoff.
+> **The one thing that must not be undone:** the food and micronutrient import
+> crons are **OFF**, and off is the treatment, not a precaution. They drained
+> the database instance's CPU credits and took the whole app down for most of a
+> night — auth at 10–65s, half of all page loads returning
+> `504 MIDDLEWARE_INVOCATION_TIMEOUT`. Do not re-enable them before choosing
+> between a larger instance and a maintenance window.
+> `docs/OUTAGE-2026-08-15-AND-RESILIENCE-PLAN.md` has the evidence and the
+> options.
+>
+> **Claudine's root cause: FOUND, and it was not what either handoff assumed.**
+> Two active assignments is the NORMAL state — 26 of 35 clients have two or
+> more, because everyone who has ever used a manual workout carries a "Personal
+> Workouts" sidecar and five people run several real programmes at once. Her
+> rogue sessions came from a chat-scheduling pass on 16 Jul, not from a code
+> path that runs on its own. The actual defect was `ensurePhaseId` asking
+> Postgres for one active assignment with **no ordering**, so the same client
+> adding the same workout twice could land it in two different programmes
+> (`505fcc5`).
+>
+> **Bug A and Bug B below are BOTH ALREADY FIXED** — the entries further down
+> this file are stale. Bug B's repair shipped 13 Aug in
+> `20260813_swap_relabels.sql`; Bug A's `EDIT_WINDOW_MIN` de-duplication is live
+> in `workout-ai/route.ts`. Re-verified against live data 15 Aug: no
+> triples-seconds-apart since 30 Jul, and the five remaining "stale labels" are
+> false positives or Dustin's deliberate naming.
+
+---
+
+> ## 15 Aug — three writes that had never once succeeded, or could not fail
+>
+> Same family as the six found on 14 Aug, and one of them is in the file that
+> was fixed for exactly this.
+>
+> - **The single-session Cancel button on the trainer calendar wrote
+>   `'cancelled'`**, which `appointments_status_check` refuses. Verified: 23514
+>   every time, and 0 rows in the table have ever carried that status. The error
+>   was not read, so the code recoloured the Google Calendar event orange and
+>   closed the sheet — Dustin cancelled a session, watched Google agree, and the
+>   appointment stayed `scheduled`. The BULK cancel sixty lines below had this
+>   exact bug and was fixed on 14 Aug. **Why the scanner missed it:**
+>   `dbCheckConstraintValues.test.ts` follows a bare identifier back to its
+>   `const`, and here `status` is a function PARAMETER. Same hole that hid the
+>   sixth of the original six. (`8fb61b0`)
+> - **`deleteMessage` / `deleteThread` could not fail.** They never read their
+>   error and returned void, so `MessagesClient`'s `catch {}` was unreachable —
+>   a confirmed "delete the entire conversation" refused by RLS still navigated
+>   away as if it had worked. (`e798d18`)
+> - **Two unchecked `payment_reminders` writes.** The second, in the SEND path,
+>   is the worse one: it sets the amount immediately before POSTing to
+>   `/api/reminders/send`, which reads the row back — so a failed update sent the
+>   email with the OLD amount under a screen showing the new one. (`e798d18`)
+>
+> Also latent, fixed before it bit: `AddSessionModal` wrote naive timestamps into
+> `timestamptz` on a UTC connection, i.e. every booked session 5–6 hours early.
+> Never exercised — all 4,628 appointments came from the Google Calendar sync —
+> so nothing to clean up.
+
+---
+
+> ## 15 Aug — the AI audit
+>
+> - **The system prompt carried hardcoded body weights for eighteen clients and
+>   every one was wrong.** Tyler by 15 lb and 5 points of body fat while in
+>   contest prep; four clients had figures that exist nowhere in the database.
+>   Now live from `metrics`, with the measurement date. (`3baefae`)
+> - **Every AI feature was hanging.** `resolveAiScope`, the authorisation gate
+>   for every AI route, awaited auth with no cap — measured at 28s and never
+>   answering while the app's own pages served in 150ms. (`36e6919`)
+> - **The AI could not see a single logged set.** 8,406 of them, 5,524 in the
+>   last 30 days, across 29 clients — so "what did I press last time?" could not
+>   be answered by the app that recorded the answer. Both client-facing contexts
+>   now carry recent sessions and the last logged set per movement. (`e8db78a`)
+> - **Still not wired, and these need Dustin's call:** movement assessment
+>   findings are unreachable by ANY AI surface including his own assistant; his
+>   trainer notes are not in the trainer agent's readable list; the nutrition
+>   coach sees only 14 days.
+> - **13 of 25 AI features have never produced a usage row** since per-feature
+>   tracking began 13 Aug — including `client_assistant` (the ✦ on every client
+>   screen) and `trainer_agent` (Dustin's own). Some are explained
+>   (`verify_food` is dormant, `outbox_draft` was never built, the Monday and
+>   Saturday sweeps have not come round, and `birthday_post` correctly did
+>   nothing because nobody has a birthday this week). The two big assistants
+>   having zero usage is worth a conversation.
+> - Only **20 of 35 clients have a date of birth**, so the birthday bot can only
+>   ever reach twenty of them.
 
 
 > ## 14 Aug, late — USDA is in. What it can and cannot do.
