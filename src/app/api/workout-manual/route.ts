@@ -33,6 +33,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAiScope } from "@/lib/ai/scope";
 import { findExerciseIdByName } from "@/lib/exerciseLookup";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { pickPhases, type ActiveAssignment } from "@/lib/pickProgramPhase";
 
 export const dynamic = "force-dynamic";
 
@@ -115,16 +116,31 @@ async function resolveExerciseId(db: Db, clientId: string, rawName: string): Pro
  */
 async function ensurePhaseId(db: Db, clientId: string): Promise<string | null> {
   // 1 · their active program, if they have one
-  const { data: ap } = await db
+  //
+  // MORE THAN ONE IS NORMAL, so this must not pick arbitrarily. 26 of 35
+  // clients carry two or more active assignments: their real block plus the
+  // "Personal Workouts" fallback this function creates, and five carry several
+  // real programs at once because that is how a corrective track plus a
+  // training layer plus cardio is expressed.
+  //
+  // This used to be `.limit(1).maybeSingle()` with no ORDER BY, so Postgres
+  // returned whichever row it felt like. The same client adding the same
+  // workout twice could land it in their real block one time and in their
+  // personal sidecar the next — and a hand-built session appearing inside a
+  // prescribed programme is exactly the shape Claudine reported.
+  //
+  // Deterministic order, most-preferred first:
+  //   1. a REAL program over the personal sidecar — a manual workout should sit
+  //      beside actual programming, which is what the sidecar exists to avoid
+  //      being needed for
+  //   2. the most recently assigned, because that is the block they are on now
+  //   3. id, so a tie can never come out two different ways
+  const { data: aps } = await db
     .from("program_assignments")
-    .select("programs(phases(id, position))")
+    .select("id, assigned_at, programs(id, personal_for_client_id, phases(id, position))")
     .eq("client_id", clientId)
-    .eq("active", true)
-    .limit(1)
-    .maybeSingle();
-  const phases = (((ap as { programs?: { phases?: { id: string; position: number }[] } } | null)?.programs?.phases) || [])
-    .slice()
-    .sort((a, b) => a.position - b.position);
+    .eq("active", true);
+  const phases = pickPhases((aps as ActiveAssignment[] | null) || []);
   if (phases[0]) return phases[0].id;
 
   // 2 · an existing personal program
