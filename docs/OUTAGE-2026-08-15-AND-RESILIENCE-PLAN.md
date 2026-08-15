@@ -77,6 +77,38 @@ the single most important sentence in this document.
 > timeouts continued. What I had actually shown was that stopping the imports
 > does not *immediately* fix it, which is a different claim, and CPU credits are
 > exactly the mechanism that makes those two things differ.
+>
+> ### ⚠️ THIRD READING, 10:52Z — and it changes the recommendation
+>
+> **It is not recovering, and that is the most useful thing measured all night.**
+>
+> Four hours after the imports were disabled, with `pg_stat_activity` showing
+> **nothing running at all**, a pure-CPU probe of 500,000 rows took **5.04
+> seconds**. Per row that is:
+>
+> ```
+> 08:16Z   3,000,000 rows in 1.15s  =  0.38 µs/row
+> 10:52Z     500,000 rows in 5.04s  = 10.1  µs/row     ← 26× worse
+> ```
+>
+> An idle database cannot be 26× slower than itself two hours earlier because it
+> is busy. There is nothing to be busy with. **This is the instance's floor** —
+> what it runs at with no burst credit — and the brief 1.15s reading at 08:16
+> was a small accrual that my own repeated probes then spent.
+>
+> **What that changes.** If this is the floor, the imports were never a workload
+> this instance could carry, and a maintenance window only moves the collapse to
+> 3am. It also means the app was one busy morning away from this with no imports
+> involved at all.
+>
+> Read Part 3 item 4 with that in mind: **the instance size stops being the
+> expensive option and becomes the honest one.** Windowing the imports is still
+> worth doing, but as housekeeping, not as the fix.
+>
+> One caveat I cannot resolve from here: I cannot see the instance's tier or its
+> credit balance through the tools I have, so "burstable, out of credit" is an
+> inference from behaviour — a very well-supported one, but Dustin can confirm
+> it in the Supabase dashboard in ten seconds, and should before spending money.
 
 ### The cause (as understood at 05:00Z — superseded by the box above)
 
