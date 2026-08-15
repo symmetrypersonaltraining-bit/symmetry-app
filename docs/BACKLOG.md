@@ -455,6 +455,32 @@ cannot clobber `main`. Full detail in `START-HERE-SESSION-SETUP.md`.
 > Concretely, the ship sequence is: bundle → deliver → `SHIP-NOW` → read
 > `SHIP-RESULT.txt` → **`git fetch origin main`**.
 
+> ### ⚠️ And the sandbox cannot `curl` the app either. A `000` is NOT an outage.
+>
+> Same proxy, second surprise, found 15 Aug at 11:03Z and confirmed again at
+> 11:24Z. From the sandbox shell:
+>
+> | target | result |
+> |---|---|
+> | `api.github.com`, `registry.npmjs.org` | **200** — git and `npm ci` work fine |
+> | `symmetry-app-omega.vercel.app` | `curl: (56) CONNECT tunnel failed, response 403` |
+> | `<project>.supabase.co` | same |
+>
+> So `curl -o /dev/null -w "%{http_code}"` against the live app returns `000`
+> with a sub-300ms time, which looks exactly like the site being down and is
+> not. It says nothing whatsoever about the app.
+>
+> **What actually works, and what to use instead:**
+>
+> - the app → the **WebFetch tool** (it egresses elsewhere). `/api/health` and
+>   `/api/version` are the two worth hitting. WebFetch caches 15 minutes per
+>   URL, so add a throwaway `?probe=N` to force a fresh reading.
+> - the database → the **Supabase MCP tool** (`execute_sql`). Unaffected.
+>
+> This is written down because a session that greets a `000` by announcing an
+> outage will burn an hour on a problem that does not exist — which is the exact
+> failure mode that cost most of the night of 14/15 Aug.
+
 ---
 
 ## Shipped 2026-08-07 — do not redo
