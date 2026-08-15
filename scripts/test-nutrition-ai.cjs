@@ -92,9 +92,12 @@ console.log("\nmeter-core: daily limits");
 // Feature labels were split one-per-route on 2026-08-13 (see AI_FEATURES in
 // meter-core). The CAPS are unchanged — these assert the same ceilings under
 // the new names, so a regression in the rename shows up here too.
-test("defaults are 15/15/20/1 (+20 verify)", () => {
-  assert.strictEqual(core.resolveDailyLimit(null, "coach_action"), 15);
-  assert.strictEqual(core.resolveDailyLimit(undefined, "food_parse"), 15);
+// Raised 15 -> 60 on the conversational surfaces, 15 Aug, at Dustin's
+// instruction after 15 cut Jennifer off mid-workout. food_photo, plan_build and
+// verify_food are deliberately unchanged — see tests/unit/aiFeatures.test.ts.
+test("defaults are 60/60/20/1 (+20 verify)", () => {
+  assert.strictEqual(core.resolveDailyLimit(null, "coach_action"), 60);
+  assert.strictEqual(core.resolveDailyLimit(undefined, "food_parse"), 60);
   assert.strictEqual(core.resolveDailyLimit({}, "food_photo"), 20);
   assert.strictEqual(core.resolveDailyLimit({}, "plan_build"), 1);
   assert.strictEqual(core.resolveDailyLimit({}, "verify_food"), 20);
@@ -105,9 +108,9 @@ test("client_app_settings columns override defaults", () => {
   assert.strictEqual(core.resolveDailyLimit({ ai_daily_photo_limit: "25" }, "food_photo"), 25);
 });
 test("garbage settings values fall back to defaults", () => {
-  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: "lots" }, "coach_action"), 15);
-  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: -2 }, "coach_action"), 15);
-  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: null }, "coach_action"), 15);
+  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: "lots" }, "coach_action"), 60);
+  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: -2 }, "coach_action"), 60);
+  assert.strictEqual(core.resolveDailyLimit({ ai_daily_chat_limit: null }, "coach_action"), 60);
 });
 test("assertUnderCap: under → ok, at/over → CapExceeded with details", () => {
   core.assertUnderCap("coach_action", 14, 15); // no throw

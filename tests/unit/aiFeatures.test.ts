@@ -192,16 +192,27 @@ test("every registry entry is complete and internally consistent", () => {
   }
 });
 
-test("the caps that applied before the rename still apply", () => {
-  // The rename must not have changed a single client's ceiling. These are the
-  // exact values the old labels carried.
-  assert.equal(DEFAULT_LIMITS.coach_action, 15);
-  assert.equal(DEFAULT_LIMITS.food_parse, 15);
+test("the caps are the ones Dustin set, and nothing drifted with them", () => {
+  // Was "the caps that applied before the rename still apply" and pinned the
+  // conversational surfaces at 15. Raised to 60 on 15 Aug at Dustin's
+  // instruction, after 15 cut Jennifer off mid-workout on a day the entire app
+  // spent $0.51. The test still exists to catch DRIFT — the numbers below are
+  // deliberate, and changing one should be a decision, not a side effect.
+  assert.equal(DEFAULT_LIMITS.coach_action, 60);
+  assert.equal(DEFAULT_LIMITS.food_parse, 60);
   assert.equal(DEFAULT_LIMITS.food_photo, 20);
   assert.equal(DEFAULT_LIMITS.plan_build, 1);
   assert.equal(DEFAULT_LIMITS.verify_food, 20);
   assert.equal(DEFAULT_LIMITS.workout_build, 8);
   assert.equal(DEFAULT_LIMITS.feedback_image, 30);
+
+  // Deliberately NOT raised, each for its own reason:
+  //   food_photo    20 — a photo is the most expensive client call there is
+  //   plan_build     1 — rebuilding a meal plan is not a thing to do twice a day
+  //   workout_build  8 — writes real rows; a loop here does damage, not spend
+  //   feedback_image 30 — a side effect of reporting a bug, not a choice
+  assert.equal(DEFAULT_LIMITS.food_photo, 20);
+  assert.equal(DEFAULT_LIMITS.workout_build, 8);
 
   assert.equal(LIMIT_COLUMNS.coach_action, "ai_daily_chat_limit");
   assert.equal(LIMIT_COLUMNS.food_parse, "ai_daily_parse_limit");

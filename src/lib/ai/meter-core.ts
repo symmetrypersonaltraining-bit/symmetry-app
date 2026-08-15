@@ -49,18 +49,42 @@ export interface AiFeatureSpec {
   dormant?: true;
 }
 
+/**
+ * ── 15 Aug: the daily limits, and what they are actually for ───────────────
+ *
+ * Raised from 15 to 60 on the client-facing conversational surfaces.
+ *
+ * Dustin: "raise cap but save usage where we can without losing anytgijgbwe
+ * built."
+ *
+ * WHAT 15 WAS COSTING. Jennifer hit it at 12:52 on 15 Aug, mid-workout, on her
+ * 15th coach_action of the day. She stopped asking the coach and started typing
+ * notes by hand instead. Her entire day of AI — 20 calls across three surfaces
+ * — cost $0.17.
+ *
+ * WHAT THE REAL CEILING IS. Whole-app spend over the fortnight to 15 Aug ran
+ * $0.09–$0.94 a day, roughly $14 a month against the $95 kill switch. There was
+ * never a cost problem. The per-day cap was rationing something that is not
+ * scarce, and the kill switch is what actually protects the bill.
+ *
+ * IMPORTANT, AND EASY TO GET WRONG: these caps are counted PER FEATURE, not
+ * pooled by limitColumn — checkAndLog filters `.eq("feature", feature)`. Two
+ * features sharing `ai_daily_chat_limit` each get their own 60; they do not
+ * share one. (Read this the other way round once and reported it to Dustin as
+ * fact. It is written here so the next person does not.)
+ */
 export const AI_FEATURES = {
   // ── Client app ───────────────────────────────────────────────────────────
-  coach_action:    { label: "Coach chat (action)",     surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
-  coach_card:      { label: "Coach card",              surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
-  coach_read:      { label: "Coach's read",            surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
-  client_assistant:{ label: "Client assistant",        surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  coach_action:    { label: "Coach chat (action)",     surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
+  coach_card:      { label: "Coach card",              surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
+  coach_read:      { label: "Coach's read",            surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
+  client_assistant:{ label: "Client assistant",        surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
   // The workout tool loop the ✦ Coach runs before answering a question. Its own
   // feature so the cost of giving that coach tools stays visible rather than
   // hiding inside coach_action.
-  coach_workout_tools:{ label: "Coach chat (workout tools)", surface: "client", limitColumn: "ai_daily_chat_limit", defaultLimit: 15 },
-  celebration:     { label: "Session celebration",     surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
-  food_parse:      { label: "Food parse",              surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 15 },
+  coach_workout_tools:{ label: "Coach chat (workout tools)", surface: "client", limitColumn: "ai_daily_chat_limit", defaultLimit: 60 },
+  celebration:     { label: "Session celebration",     surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
+  food_parse:      { label: "Food parse",              surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 60 },
   food_photo:      { label: "Meal photo",              surface: "client",    limitColumn: "ai_daily_photo_limit",      defaultLimit: 20 },
   plan_build:      { label: "Meal plan builder",       surface: "client",    limitColumn: "ai_daily_plan_build_limit", defaultLimit: 1  },
   // Audited 2026-08-13: the route works and is metered, but NOTHING calls it —
@@ -68,8 +92,8 @@ export const AI_FEATURES = {
   // because the food catalog still wants an auditor; wire it and drop the flag.
   verify_food:     { label: "Food catalog auditor",    surface: "client",    limitColumn: "ai_daily_verify_limit",     defaultLimit: 20, dormant: true },
   workout_build:   { label: "Create / replace workout",surface: "client",    limitColumn: "workout_build_daily_limit", defaultLimit: 8  },
-  recipe_ai:       { label: "Recipe builder",          surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 15 },
-  movement_explain:{ label: "Movement explanation",    surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  recipe_ai:       { label: "Recipe builder",          surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 60 },
+  movement_explain:{ label: "Movement explanation",    surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
   // Redrawing what the coach remembers about a client. Its own label because
   // it is the surface most likely to break silently — nothing on screen changes
   // when a fold fails, the coach just quietly stops learning. No per-client cap:
@@ -78,12 +102,14 @@ export const AI_FEATURES = {
   memory_fold:     { label: "Client memory",           surface: "client",    limitColumn: "", defaultLimit: null },
 
   // ── Trainer app ──────────────────────────────────────────────────────────
+  // Also 15 until 15 Aug, which meant Dustin could be rate-limited out of his
+  // own tools in the middle of a programming session. Same reasoning as above.
   trainer_agent:   { label: "Trainer assistant",       surface: "trainer",   limitColumn: "", defaultLimit: null },
-  workout_assist:  { label: "Workout assist",          surface: "trainer",   limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
-  session_brief:   { label: "Session brief",           surface: "trainer",   limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
-  focus_suggest:   { label: "Focus suggestions",       surface: "trainer",   limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
-  assessment_rec:  { label: "Assessment recommendation",surface: "trainer",  limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
-  outbox_draft:    { label: "Outbox drafts",           surface: "trainer",   limitColumn: "ai_daily_chat_limit",       defaultLimit: 15 },
+  workout_assist:  { label: "Workout assist",          surface: "trainer",   limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
+  session_brief:   { label: "Session brief",           surface: "trainer",   limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
+  focus_suggest:   { label: "Focus suggestions",       surface: "trainer",   limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
+  assessment_rec:  { label: "Assessment recommendation",surface: "trainer",  limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
+  outbox_draft:    { label: "Outbox drafts",           surface: "trainer",   limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
   // Not a feature a client chooses to spend — a side effect of reporting a bug.
   // Generous, so nobody rations bug reports, but finite so a retry loop on the
   // feedback form cannot quietly spend the month's budget.

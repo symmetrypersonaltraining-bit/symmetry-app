@@ -29,6 +29,7 @@ import { claimCoachSlot } from "@/lib/ai/coachMount";
 import { kcalOf } from "@/lib/nutrition/dailyTotals";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import Sheet from "./Sheet";
+import AiLimitTakeover, { shouldShowTakeover } from "@/components/AiLimitTakeover";
 
 export interface CoachSuggestion {
   label: string;
@@ -345,6 +346,12 @@ export default function CoachChatSheet({
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [capped, setCapped] = useState(false);
+  // The full-screen explanation, shown once a day the first time they hit it.
+  // Dustin, 15 Aug: "send a screen take over to make them aware of limit and
+  // give tips on how to save it". The inline CAP_MESSAGE stays for every
+  // subsequent hit that day — by then they have read the long version.
+  const [showLimitTakeover, setShowLimitTakeover] = useState(false);
+  const [cappedLimit, setCappedLimit] = useState<number | null>(null);
   const [applied, setApplied] = useState<Set<string>>(new Set()); // "msgIdx:sugIdx"
   const [applying, setApplying] = useState<string | null>(null);
   const [acting, setActing] = useState<number | null>(null); // msg index of the executing action
@@ -461,6 +468,12 @@ export default function CoachChatSheet({
       if (res.status === 429 || json?.capExceeded) {
         setCapped(true);
         setMsgs((m) => [...m, { role: "coach", text: CAP_MESSAGE }]);
+        // Read the limit off the SERVER's reply rather than hard-coding it, so
+        // the number on screen can never disagree with the one enforced — and
+        // stays right for a client whose limit Dustin has raised individually.
+        const lim = (json as { limit?: number } | null)?.limit;
+        setCappedLimit(typeof lim === "number" ? lim : null);
+        if (shouldShowTakeover()) setShowLimitTakeover(true);
         return;
       }
       if (json?.paused) {
@@ -643,6 +656,11 @@ export default function CoachChatSheet({
 
   return (
     <>
+      <AiLimitTakeover
+        open={showLimitTakeover}
+        limit={cappedLimit}
+        onClose={() => setShowLimitTakeover(false)}
+      />
       {/* The shared button — placement, z-order and the hide-under-the-keyboard
           rule live in CoachFab so every mount of the coach behaves the same. */}
       {!open && !startOpen && <CoachFab onClick={openChat} mood={fabMood} liftPx={fabLiftPx} />}
