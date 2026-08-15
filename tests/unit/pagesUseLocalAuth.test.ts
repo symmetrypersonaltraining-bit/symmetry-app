@@ -38,13 +38,15 @@ const EXEMPT = new Set([
   // Off limits without Dustin's per-item say-so.
   "workout/page.tsx",
   "workout/[dayId]/page.tsx",
-  // Read-only preview that redirects to the trainer's own session — arguably
-  // not a "logger" at all, and converting it would be safe. Left anyway: the
-  // standing rule says anything to do with the workout loggers needs Dustin's
-  // per-item permission, an 11-commit batch was once reverted for testing that
-  // boundary, and 3am with him asleep is the wrong time to decide my reading of
-  // the rule is the right one. Costs one network call on one page.
-  "client-preview/workout/page.tsx",
+  // (client-preview/workout/page.tsx sat here overnight, unconverted for want
+  // of permission. Dustin gave it on 15 Aug, with the condition that it must
+  // not "change the way the app recognizes me as trainer/client mode" — which
+  // is the thing that actually mattered, because that page redirects on
+  // isTrainerEmail(user.email) and a missing email claim would have bounced him
+  // out of his own preview into the client logger. It carries the claim, and
+  // twenty pages including the three sibling client-preview screens had been
+  // gating on it that way for a day. Converted; it falls under the sweep now.)
+  //
   // Builds its Supabase client differently; left rather than half-converted.
   "movement/page.tsx",
   "movement/testers/page.tsx",

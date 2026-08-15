@@ -1,11 +1,15 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import { isTrainerEmail } from "@/lib/trainer";
 import { fetchOwnClientRow } from "@/lib/ownClient";
 
 export default async function ClientPreviewWorkoutPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Carries the same `email` claim, so the trainer gate on the next line but
+  // one behaves identically. Twenty pages — including the three sibling
+  // client-preview screens — have gated on it this way since 15 Aug.
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
   if (!isTrainerEmail(user.email)) redirect("/workout");
 
