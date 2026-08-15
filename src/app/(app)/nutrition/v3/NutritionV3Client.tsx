@@ -306,13 +306,36 @@ export default function NutritionV3Client(props: Props) {
 
   const loadMyMeals = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from("my_meals").select("*").eq("client_id", clientId).order("created_at", { ascending: false }).limit(50);
+      // The client's OWN saved meals plus the SHARED LIBRARY (client_id null).
+      //
+      // Dustin, 15 Aug: "these should be accessable to clients to custom build
+      // and the ai to use if they want to have ai build it."
+      //
+      // One list, one composer, one add-to-plan path — the library is just more
+      // rows. RLS lets everybody read the null-client rows and still refuses
+      // them a write, so a client can copy a library meal into their own and
+      // edit that, and cannot touch the shared one.
+      const { data, error } = await supabase
+        .from("my_meals")
+        .select("*")
+        .or(`client_id.eq.${clientId},client_id.is.null`)
+        .order("created_at", { ascending: false })
+        .limit(200);
       if (error) throw error;
-      setMyMeals(((data as Record<string, unknown>[]) || []).map((m) => ({
-        id: String(m.id),
-        name: String(m.name ?? "My meal"),
-        items: (Array.isArray(m.items) ? (m.items as CustomItem[]) : []),
-      })));
+      setMyMeals(((data as Record<string, unknown>[]) || []).map((m) => {
+        const t = (m.totals || {}) as { slot?: string; tags?: string[] };
+        return {
+          id: String(m.id),
+          name: String(m.name ?? "My meal"),
+          items: (Array.isArray(m.items) ? (m.items as CustomItem[]) : []),
+          // A library meal has no owner. The picker needs to know, because
+          // "delete" must not be offered on a row this client cannot delete —
+          // RLS would refuse and the row would reappear on refresh.
+          library: m.client_id == null,
+          slot: t.slot ?? null,
+          tags: Array.isArray(t.tags) ? t.tags : [],
+        };
+      }));
       setMyMealsOk(true);
     } catch { setMyMealsOk(false); }
   }, [supabase, clientId]);
