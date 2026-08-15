@@ -429,8 +429,36 @@ That one makes most of it not happen.
 
 ## PART 5 — SEND THIS. It is no longer conditional.
 
-**Updated 08:31Z. The condition below has been met, and then some: it is not
-recovering, it is getting steadily WORSE.**
+> ### ⛔ FINAL CHARACTERISATION, 08:40Z — read this instead of the trend below
+>
+> **Four identical queries, three minutes, idle database:**
+>
+> ```
+> 500,000 rows in  0.145s  =  0.29 µs/row   ← BEST of the entire night
+> 500,000 rows in 11.92s   = 23.8  µs/row
+> 500,000 rows in  4.73s   =  9.5  µs/row
+> 500,000 rows in  1.12s   =  2.24 µs/row
+> ```
+>
+> **An 82× swing across four back-to-back runs of the same query.** The instance
+> is not degrading and it is not recovering. It is **violently unstable minute
+> to minute** — full speed one moment, ~100× slower the next, with no pattern
+> visible from here.
+>
+> **I called this wrong four times tonight** — "recovering", then "at its floor",
+> then "erratic", then "getting steadily worse" — each time from the two or three
+> readings I happened to have in front of me. The readings were fine. Drawing a
+> line through them was the mistake, repeatedly, and the same mistake each time:
+> narrating the latest data point as a direction.
+>
+> **The distribution is the finding. There was never a direction to find.**
+>
+> The ticket below still stands — an 82× swing on an idle instance across three
+> minutes is abnormal and is Supabase's to explain — but send it describing
+> INSTABILITY, not decline. The numbers in it are accurate; the word "degrading"
+> is not.
+
+**Original framing, 08:31Z — superseded by the box above:**
 
 ```
 06:33Z  3,000,000 rows in  1.15s  =  0.38 µs/row   ← best of the night
@@ -461,23 +489,33 @@ So: **send the ticket, and check the dashboard while you are there.**
 
 Supabase support ticket. Project `mkfiginpiesospsnktea`, region us-east-1.
 
-> Since 2026-08-15 ~03:30 UTC this project has had almost no CPU, and it is
-> getting worse rather than recovering.
+> Since 2026-08-15 ~03:30 UTC this project's CPU performance has been violently
+> unstable — swinging by up to two orders of magnitude between identical
+> queries, minutes apart, on an idle database.
 >
 > Measured with pure-CPU queries on a completely idle database — no cron jobs
 > running (all disabled), `pg_stat_activity` showing nothing but the probe
 > itself, no application traffic of consequence:
 >
 > ```
-> 06:33Z  3,000,000 rows in  1.15s  =  0.38 us/row
-> 07:29Z    500,000 rows in  5.04s  = 10.1  us/row
-> 07:49Z    500,000 rows in  2.29s  =  4.57 us/row
-> 07:59Z    500,000 rows in 10.86s  = 21.7  us/row
-> 08:29Z    500,000 rows in 14.51s  = 29.0  us/row
-> 08:31Z     50,000 rows in  1.82s  = 36.4  us/row
+> 06:33Z  3,000,000 rows in  1.15s   =  0.38 us/row
+> 07:29Z    500,000 rows in  5.04s   = 10.1  us/row
+> 07:49Z    500,000 rows in  2.29s   =  4.57 us/row
+> 07:59Z    500,000 rows in 10.86s   = 21.7  us/row
+> 08:29Z    500,000 rows in 14.51s   = 29.0  us/row
+> 08:31Z     50,000 rows in  1.82s   = 36.4  us/row
+>
+> and then, four identical queries within three minutes:
+> 08:37Z    500,000 rows in  0.145s  =  0.29 us/row
+> 08:38Z    500,000 rows in 11.92s   = 23.8  us/row
+> 08:39Z    500,000 rows in  4.73s   =  9.5  us/row
+> 08:40Z    500,000 rows in  1.12s   =  2.24 us/row
 > ```
 >
-> That is 96x degradation over four hours on an idle instance. The timings are
+> That last group is an 82x swing across four back-to-back runs of the same
+> query, and the fastest of them is the fastest reading we have ever recorded on
+> this project. So this is not a steady degradation - it is extreme
+> instability. The timings are
 > `EXPLAIN ANALYZE`'s own `actual time`, measured inside the backend, so this is
 > not a connection or pooler artefact. Planning a trivial index scan took 844ms
 > at one point.
@@ -491,9 +529,11 @@ Supabase support ticket. Project `mkfiginpiesospsnktea`, region us-east-1.
 > rows into an 853MB table for several hours before this began. They were
 > disabled at ~05:55 UTC and performance has continued to degrade since.
 >
-> Questions: is this instance out of CPU credits, and if so why is it not
-> recovering with the load removed? Is there anything running on the platform
-> side that we cannot see in `pg_stat_activity`?
+> Questions: what would cause CPU availability on an idle instance to vary by
+> ~80x between identical queries minutes apart? Is this instance exhausting and
+> re-earning burst credits on that timescale, is there noisy-neighbour
+> contention, or is something running on the platform side that we cannot see in
+> `pg_stat_activity`?
 >
 > Example auth request ids: `01a003b6-fbd7-7025-a2f5-b671687ac6bc`,
 > `01a003b6-77e0-7e64-89d5-1db6f730028b`,
