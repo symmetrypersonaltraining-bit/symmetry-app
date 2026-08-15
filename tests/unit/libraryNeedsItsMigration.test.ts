@@ -59,6 +59,37 @@ test("it drops before it creates, so re-running a migration is safe", () => {
   assert.ok(dropAt < createAt, "the drop has to come first");
 });
 
+test("the RECIPE library is readable too, and the publish trigger is untouched", () => {
+  // The recipes went in as `private` — enforce_recipe_publish() downgrades a
+  // public insert unless is_trainer(), and the service role is not a trainer.
+  // All twenty were invisible to every client while the sync route reported
+  // {"ok":true,"recipes":20}, which was TRUE: the inserts succeeded. A trigger
+  // rewrote a column on the way in and no error was ever produced.
+  const sql = allMigrationSql();
+  assert.match(sql, /create policy recipes_library_read/i, "library recipes must be readable");
+  assert.match(
+    sql,
+    /create policy recipe_ing_library_read/i,
+    "a visible recipe listing no ingredients is worse than not showing it"
+  );
+  // The fix must NOT have been to weaken the trigger or is_trainer(). That
+  // trigger is what stops a client publishing a recipe to everybody else.
+  assert.doesNotMatch(sql, /drop trigger[^;]*trg_recipe_publish/i);
+  assert.doesNotMatch(sql, /create or replace function[^;]*enforce_recipe_publish/i);
+  assert.doesNotMatch(sql, /create or replace function[^;]*is_trainer/i);
+});
+
+test("the library read policies are SELECT-only, both tables", () => {
+  const sql = allMigrationSql();
+  for (const name of ["recipes_library_read", "recipe_ing_library_read", "my_meals_library_read"]) {
+    const i = sql.toLowerCase().indexOf(`create policy ${name}`);
+    assert.ok(i >= 0, `${name} missing`);
+    const stmt = sql.slice(i, sql.indexOf(";", i));
+    assert.match(stmt, /for select/i, `${name} must be SELECT-only`);
+    assert.doesNotMatch(stmt, /for (all|insert|update|delete)/i);
+  }
+});
+
 test("the sync route is the only writer of library rows, and it is key-gated", () => {
   // It writes with the service role. Reachable without a key, it would let
   // anybody wipe and replace the library for every client at once.
