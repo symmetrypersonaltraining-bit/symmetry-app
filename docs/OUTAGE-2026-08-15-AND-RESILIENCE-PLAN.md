@@ -453,6 +453,17 @@ That one makes most of it not happen.
 >
 > **The distribution is the finding. There was never a direction to find.**
 >
+> Eleven readings by 08:43Z, µs/row, sorted — no trend line, because there is no
+> trend:
+>
+> ```
+> 0.29  0.38  2.24  4.57  9.50  10.1  21.7  23.8  29.0  36.4  50.6
+> n = 11    min 0.29    median 10.1    max 50.6    max/min = 174×
+> ```
+>
+> **A 174× spread on one idle database in four hours.** The app was measured
+> repeatedly across the whole of that range and never left **86–334 ms**.
+>
 > The ticket below still stands — an 82× swing on an idle instance across three
 > minutes is abnormal and is Supabase's to explain — but send it describing
 > INSTABILITY, not decline. The numbers in it are accurate; the word "degrading"
