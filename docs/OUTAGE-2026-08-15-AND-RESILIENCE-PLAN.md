@@ -78,37 +78,43 @@ the single most important sentence in this document.
 > does not *immediately* fix it, which is a different claim, and CPU credits are
 > exactly the mechanism that makes those two things differ.
 >
-> ### ⚠️ THIRD READING, 10:52Z — and it changes the recommendation
+> ### ⚠️ THIRD READING, ~07:29Z — the measurement, and a correction to my own
 >
-> **It is not recovering, and that is the most useful thing measured all night.**
->
-> Four hours after the imports were disabled, with `pg_stat_activity` showing
-> **nothing running at all**, a pure-CPU probe of 500,000 rows took **5.04
-> seconds**. Per row that is:
+> **It is not recovering the way it should be, and the database was idle when
+> measured.**
 >
 > ```
-> 08:16Z   3,000,000 rows in 1.15s  =  0.38 µs/row
-> 10:52Z     500,000 rows in 5.04s  = 10.1  µs/row     ← 26× worse
+> ~06:33Z   3,000,000 rows in 1.15s  =  0.38 µs/row
+> ~07:29Z     500,000 rows in 5.04s  = 10.1  µs/row     ← 26× worse per row
 > ```
 >
-> An idle database cannot be 26× slower than itself two hours earlier because it
-> is busy. There is nothing to be busy with. **This is the instance's floor** —
-> what it runs at with no burst credit — and the brief 1.15s reading at 08:16
-> was a small accrual that my own repeated probes then spent.
+> `pg_stat_activity` at the time showed **nothing running but the probe itself**.
+> An idle database cannot be 26× slower than itself an hour earlier because it
+> is busy — there is nothing to be busy with.
 >
-> **What that changes.** If this is the floor, the imports were never a workload
-> this instance could carry, and a maintenance window only moves the collapse to
-> 3am. It also means the app was one busy morning away from this with no imports
-> involved at all.
+> **A CORRECTION I OWE, and it matters because Dustin may spend money on this.**
+> The first version of this box said "four hours after the imports were
+> disabled" and dated the readings 08:16Z and 10:52Z. **All three numbers were
+> wrong.** I wrote the timestamps by hand from a drifting sense of the clock
+> instead of reading it. Anchored against the ship-bridge result files, which
+> are real: the imports were paused ~04:41Z and fully disabled ~05:55Z, and that
+> last probe was ~07:29Z. So the elapsed time is **1h34m, not four hours.**
 >
-> Read Part 3 item 4 with that in mind: **the instance size stops being the
-> expensive option and becomes the honest one.** Windowing the imports is still
-> worth doing, but as housekeeping, not as the fix.
+> That weakens the conclusion and I would rather say so than let a tidy story
+> stand. **1h34m is not long enough to declare a burstable instance recovered**,
+> so "this is its floor" is no longer supported by the elapsed time.
 >
-> One caveat I cannot resolve from here: I cannot see the instance's tier or its
-> credit balance through the tools I have, so "burstable, out of credit" is an
-> inference from behaviour — a very well-supported one, but Dustin can confirm
-> it in the Supabase dashboard in ten seconds, and should before spending money.
+> What survives the correction: the instance was **idle** and still 26× slower
+> than itself an hour before. That is not explained by load, and it says this
+> instance cannot hold its performance. Whether that is a credit floor or a slow
+> refill is exactly the thing I cannot tell from here.
+>
+> **So the recommendation is: look at the dashboard before deciding.** The tier
+> and the CPU credit balance are both there and take ten seconds. If credits are
+> at zero and climbing, this is a slow refill and a maintenance window may well
+> be enough. If they are at zero and staying there, the instance is undersized
+> and Part 3 item 4's "bigger instance" is the honest answer. I can infer from
+> behaviour; I cannot read the gauge, and Dustin can.
 
 ### The cause (as understood at 05:00Z — superseded by the box above)
 
