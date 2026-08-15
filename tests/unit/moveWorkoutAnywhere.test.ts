@@ -135,3 +135,48 @@ test("swap is deliberately NOT included, and that is a different operation", () 
   const swap = handler(code(CLIENT_ACTIONS), "swap_my_workout");
   assert.match(swap, /status === "completed"/, "swap keeps its guard until Dustin says otherwise");
 });
+
+// ── The MANUAL path ────────────────────────────────────────────────────────
+//
+// Bobbie said two things and only one of them was about the AI: "Tried manually
+// and it won't work. Tried ai and i got frustrated." The drag-and-drop on the
+// trainer calendar carried the same completed-status restriction the AI did,
+// and its write was unchecked, so a refused move looked identical to a
+// successful one — the card snapped back on refresh with no explanation.
+
+const CALENDAR = readFileSync(join(process.cwd(), "src/app/(app)/home/TrainerCalendar.tsx"), "utf8");
+
+test("a completed workout can be DRAGGED, not just moved by the AI", () => {
+  const src = code(CALENDAR);
+  assert.doesNotMatch(
+    src,
+    /draggable=\{workout\.status !== "completed"\}/,
+    "the drag handle must not be withheld from a finished session"
+  );
+  assert.doesNotMatch(
+    src,
+    /cursor: workout\.status !== "completed"/,
+    "and it must not still LOOK undraggable"
+  );
+  assert.match(src, /<a\s+draggable\s/, "the card is unconditionally draggable");
+});
+
+test("a drag that fails says so instead of silently snapping back", () => {
+  // The write was `await supabase...update(...)` with no error check. Same
+  // silent-write fault fixed across messages and payments on 15 Aug, and worse
+  // here because the person is watching the card move as they do it.
+  const src = code(CALENDAR);
+  const fn = src.slice(src.indexOf("async function handleRescheduleWorkout"));
+  const body = fn.slice(0, fn.indexOf("async function handleRescheduleAppt"));
+  assert.match(body, /const \{ error \} = await supabase/, "the update must be checked");
+  assert.match(body, /if \(error\)/);
+  assert.match(body, /window\.alert\("Couldn't move that workout: "/);
+  assert.match(body, /return;/, "and must not pretend it worked");
+});
+
+test("a dragged move records where it came from, like every other move path", () => {
+  const src = code(CALENDAR);
+  const fn = src.slice(src.indexOf("async function handleRescheduleWorkout"));
+  const body = fn.slice(0, fn.indexOf("async function handleRescheduleAppt"));
+  assert.match(body, /moved_from_date: from/, "otherwise a drag is the one unauditable move");
+});

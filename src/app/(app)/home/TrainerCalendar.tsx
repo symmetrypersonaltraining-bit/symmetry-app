@@ -1027,14 +1027,20 @@ function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, cl
                     transition: "background 0.15s, border-color 0.15s",
                   }}>
                   {workout ? (
+                    // Draggable whatever its status. Dustin, 15 Aug: "we can
+                    // all move workouts from anywhere to anywhere period. I
+                    // don't care if its scheduled, past, future, logged, not
+                    // logged, mid session." This was `status !== "completed"`,
+                    // which meant a session somebody had actually DONE was the
+                    // one thing you could not drag onto the right day.
                     <a
-                      draggable={workout.status !== "completed"}
-                      onDragStart={workout.status !== "completed" ? e => {
+                      draggable
+                      onDragStart={e => {
                         e.dataTransfer.effectAllowed = "move";
                         e.dataTransfer.setData("workoutId", workout.id);
                         e.dataTransfer.setData("workoutDate", ds);
                         setDragId(workout.id);
-                      } : undefined}
+                      }}
                       onDragEnd={() => { setDragId(null); setDropTarget(null); }}
                       href={workout.dayId
                         ? `/clients/${clientId}/day/${workout.dayId}`
@@ -1045,7 +1051,7 @@ function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, cl
                         border: `1.5px solid ${statusColor}40`,
                         textDecoration: "none",
                         opacity: dragId === workout.id ? 0.35 : 1,
-                        cursor: workout.status !== "completed" ? "grab" : "pointer",
+                        cursor: "grab",
                         userSelect: "none",
                       }}>
                       {/* Status dot + label */}
@@ -1280,7 +1286,23 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
 
   async function handleRescheduleWorkout(workoutId: string, newDate: string) {
     const supabase = createClient();
-    await supabase.from("scheduled_workouts").update({ scheduled_date: newDate }).eq("id", workoutId);
+    // Record where it came from, like every other move path does, so a drag is
+    // as auditable and as reversible as an AI move.
+    const { data: before } = await supabase
+      .from("scheduled_workouts").select("scheduled_date").eq("id", workoutId).maybeSingle();
+    const from = (before as { scheduled_date?: string } | null)?.scheduled_date ?? null;
+    // The write used to be unchecked, so a refused move looked exactly like a
+    // successful one: the card snapped back on refresh and nobody was told why.
+    // That is the same silent-write fault fixed across messages and payments on
+    // 15 Aug, and it is worse here because the person is watching it happen.
+    const { error } = await supabase
+      .from("scheduled_workouts")
+      .update({ scheduled_date: newDate, moved_from_date: from, updated_at: new Date().toISOString() })
+      .eq("id", workoutId);
+    if (error) {
+      window.alert("Couldn't move that workout: " + error.message);
+      return;
+    }
     setWeekAnchor(a => new Date(a));
   }
 
