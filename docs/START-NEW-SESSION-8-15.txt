@@ -1,0 +1,20 @@
+Symmetry Trainer App. Read these two first, in this order, before doing anything:
+
+  docs/HANDOFF-2026-08-14.md
+  docs/HANDOFF-2026-08-15-SESSION2.md
+
+They carry every rule, the ship bridge, and what is still broken. Do not skip them.
+
+Then:
+1. Confirm the bridge is up (outbox/watcher-alive.txt mtime is recent).
+2. Clone the repo, npm ci, run the tests. 1,014 should pass.
+3. Pull the remaining app feedback items (docs/BACKLOG.md + FEEDBACK-LIST-8-6.md
+   in the Trainer App folder + the open items list in the SESSION2 handoff).
+4. Build me a task list.
+5. Ask me EVERY question you have RIGHT NOW, all in one batch, so I can go to bed.
+6. Then work the list overnight.
+
+Start with the Claudine root cause - it is the one thing still unfixed.
+
+I'll be reporting bugs from my phone all week. The laptop stays on. You cannot
+push to GitHub directly - ship every commit through the bridge.
