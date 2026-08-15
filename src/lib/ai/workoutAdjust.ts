@@ -129,7 +129,13 @@ export async function applyProposal(db: Db, clientId: string, proposal: Proposal
       }
     }
     // Repoint the in-scope sessions at the client-owned copy.
-    await db.from("scheduled_workouts").update({ day_id: targetDayId }).in("id", targetSwIds);
+    const { error: repointErr } = await db.from("scheduled_workouts").update({ day_id: targetDayId }).in("id", targetSwIds);
+    if (repointErr) {
+      // The clone exists but nothing points at it. Saying "applied" here would
+      // be a lie about the client's programme, so stop rather than continue
+      // editing rows no session is reading.
+      return { ok: false, message: `Couldn't point the sessions at the new copy: ${repointErr.message}`, undo: null };
+    }
     steps.push({ op: "repoint", ids: targetSwIds, day_id: orig.id });
     steps.push({ op: "delete", table: "days", id: targetDayId });
   } else {
@@ -139,7 +145,20 @@ export async function applyProposal(db: Db, clientId: string, proposal: Proposal
   }
 
   // Apply each change against the target (cloned or in-place) rows.
+  //
+  // ── EVERY WRITE IS CHECKED, AND ONLY A WRITE THAT LANDED IS COUNTED ──────
+  //
+  // `applied++` used to run immediately after each write with the result
+  // discarded. An RLS refusal, a constraint violation or a vanished row all
+  // produced the same thing: a confident "Applied 3 changes" and a workout that
+  // had not changed at all. Dustin would have believed it, and the client would
+  // have trained the old session.
+  //
+  // Found 15 Aug by sweeping every write path in the app for exactly this
+  // shape, after the same fault turned up in messages, payments and the
+  // calendar drag inside two days.
   let applied = 0;
+  const failures: string[] = [];
   for (const ch of proposal.changes) {
     try {
       if (ch.op === "remove" && ch.pe_id) {
@@ -149,7 +168,9 @@ export async function applyProposal(db: Db, clientId: string, proposal: Proposal
           const { data: before } = await db.from("prescribed_exercises").select("*").eq("id", id).maybeSingle();
           if (before) steps.push({ op: "reinsert", table: "prescribed_exercises", values: before as Record<string, unknown> });
         }
-        await db.from("prescribed_exercises").delete().eq("id", id); applied++;
+        const { error } = await db.from("prescribed_exercises").delete().eq("id", id);
+        if (error) { failures.push(`remove: ${error.message}`); continue; }
+        applied++;
       } else if (ch.op === "modify" && ch.pe_id) {
         const id = peMap.get(ch.pe_id); if (!id) continue;
         const upd: Record<string, unknown> = {};
@@ -162,7 +183,9 @@ export async function applyProposal(db: Db, clientId: string, proposal: Proposal
             const { data: before } = await db.from("prescribed_exercises").select(PE_MUTABLE.join(",")).eq("id", id).maybeSingle();
             if (before) steps.push({ op: "restore", table: "prescribed_exercises", id, values: before as unknown as Record<string, unknown> });
           }
-          await db.from("prescribed_exercises").update(upd).eq("id", id); applied++;
+          const { error } = await db.from("prescribed_exercises").update(upd).eq("id", id);
+          if (error) { failures.push(`modify: ${error.message}`); continue; }
+          applied++;
         }
       } else if (ch.op === "swap" && ch.pe_id && ch.to_exercise) {
         const id = peMap.get(ch.pe_id); if (!id) continue;
@@ -175,27 +198,43 @@ export async function applyProposal(db: Db, clientId: string, proposal: Proposal
           const { data: before } = await db.from("prescribed_exercises").select(PE_MUTABLE.join(",")).eq("id", id).maybeSingle();
           if (before) steps.push({ op: "restore", table: "prescribed_exercises", id, values: before as unknown as Record<string, unknown> });
         }
-        await db.from("prescribed_exercises").update(upd).eq("id", id); applied++;
+        const { error } = await db.from("prescribed_exercises").update(upd).eq("id", id);
+        if (error) { failures.push(`swap: ${error.message}`); continue; }
+        applied++;
       } else if (ch.op === "add" && ch.section_id && ch.exercise) {
         const secId = secMap.get(ch.section_id); if (!secId) continue;
         const exId = await resolveExerciseId(db, clientId, ch.exercise); if (!exId) continue;
         const { data: posRow } = await db.from("prescribed_exercises").select("position").eq("section_id", secId).order("position", { ascending: false }).limit(1);
         const nextPos = ((posRow && posRow[0] ? (posRow[0] as { position: number }).position : 0) || 0) + 1;
         const t = trackingFor(ch.type, ch.reps ?? null, ch.duration ?? null);
-        const { data: addedRow } = await db.from("prescribed_exercises")
+        const { data: addedRow, error } = await db.from("prescribed_exercises")
           .insert({ section_id: secId, exercise_id: exId, position: nextPos, sets: ch.sets ?? 3, volume_type: t.volume_type, volume_value: t.volume_value, tracked_fields: t.tracked, cue: ch.note })
           .select("id").single();
-        if (!mustClone && addedRow) steps.push({ op: "delete", table: "prescribed_exercises", id: (addedRow as { id: string }).id });
+        // applied++ used to run unconditionally here — an insert that returned
+        // nothing still counted as a change that had been made.
+        if (error || !addedRow) { failures.push(`add: ${error?.message || "no row returned"}`); continue; }
+        if (!mustClone) steps.push({ op: "delete", table: "prescribed_exercises", id: (addedRow as { id: string }).id });
         applied++;
       }
     } catch (e) { console.error("workout-assist apply change error", e); }
   }
-  if (!applied) return { ok: false, message: "No changes could be applied — the workout may have changed. Try again.", undo: null };
+  if (!applied) {
+    const why = failures.length ? ` (${failures.slice(0, 3).join("; ")})` : "";
+    return { ok: false, message: `No changes could be applied — the workout may have changed. Try again.${why}`, undo: null };
+  }
   const nSessions = targetSwIds.length;
   const where = scope === "series" && nSessions > 1 ? ` across all ${nSessions} upcoming sessions of this workout` : " for this session";
+  // A PARTIAL failure is still a failure, and it has to be said out loud.
+  // Reporting only the successes reads as "all done" — Dustin would move on and
+  // the client would train a session with two of three changes in it.
+  const partial = failures.length
+    ? ` ${failures.length} change${failures.length === 1 ? "" : "s"} did NOT apply: ${failures.slice(0, 3).join("; ")}.`
+    : "";
   return {
     ok: true,
-    message: (proposal.summary ? proposal.summary + " —" : `Applied ${applied} change${applied === 1 ? "" : "s"}`) + ` done${where}. The library is untouched.`,
+    message:
+      (proposal.summary ? proposal.summary + " —" : `Applied ${applied} change${applied === 1 ? "" : "s"}`) +
+      ` done${where}. The library is untouched.` + partial,
     undo: steps.length ? { kind: "workout_adjust", steps } : null,
   };
 }
