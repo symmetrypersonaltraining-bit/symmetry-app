@@ -4,11 +4,28 @@ The endpoint is built and live. What's left needs a sign-in, which I can't do.
 
 **The URL:** `https://symmetry-app-omega.vercel.app/api/health`
 
-Open it now on your phone. You should get something like:
+Open it now on your phone. Here is a real reading, taken live at 11:20 UTC:
 
 ```json
-{"ok":true,"sha":"8238cd8","checks":{"auth":{"ok":true,"ms":74},"db":{"ok":true,"ms":61}},"ts":"…"}
+{"ok":true,"sha":"d86fb5a","checks":{"auth":{"ok":true,"ms":19},"db":{"ok":true,"ms":53}},"ts":"2026-08-15T11:20:25Z"}
 ```
+
+**One thing to expect, so it doesn't alarm you.** The first call after a quiet
+spell is slow — the serverless function is cold and the connection is new. Four
+calls in a row, twenty seconds apart, measured just now:
+
+| call | auth | db |
+|---|---|---|
+| 1st, cold | 706 ms | **1179 ms** |
+| 2nd | 387 ms | 506 ms |
+| 3rd | 187 ms | 180 ms |
+| 4th | 19 ms | 53 ms |
+
+That is warming up, not the database being ill — it drops cleanly and settles.
+But 1179 ms is close to the 1500 ms amber line, so **if you check once every
+fifteen minutes every check is a cold one and you'll sit near amber forever.**
+Checking every minute keeps it warm and the numbers stay in the tens. This is
+the actual reason for the 1-minute frequency below; it isn't just impatience.
 
 ---
 
