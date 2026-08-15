@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isTrainerEmail } from "@/lib/trainer";
+import { withAuthTimeout } from "@/lib/authTimeout";
 
 /**
  * Redirect WITHOUT throwing away a freshly-rotated session.
@@ -49,8 +50,22 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // Capped, because Supabase Auth being slow must not mean the app is DOWN.
+  // See src/lib/authTimeout.ts for the incident behind this and for why passing
+  // through is safe: the layout and every page re-check the user, and RLS is
+  // the real boundary. This middleware is a convenience, not a gate.
+  const auth = await withAuthTimeout(supabase.auth.getUser());
+  const user = auth.value?.data?.user ?? null;
   const { pathname } = request.nextUrl;
+
+  // Auth did not answer. Hand the request to the page rather than guessing.
+  //
+  // A guess in either direction is worse than passing through: redirecting to
+  // /login signs out somebody who IS signed in, and letting a redirect to
+  // /home stand shows an app shell to somebody who is not. The page can find
+  // out for itself. If it cannot either, it fails somewhere a person can see
+  // and act on, which a Vercel 504 never is.
+  if (auth.degraded) return supabaseResponse;
 
   // Always allow static assets, auth callback, and the public anatomy preview.
   //
@@ -117,11 +132,20 @@ export async function middleware(request: NextRequest) {
   // One query, not two — middleware runs on every navigation and this already
   // cost a round trip.
   if (pathname.startsWith("/")) {
-    const { data: clientRow } = await supabase
-      .from("clients")
-      .select("onboarding_complete, client_app_settings(first_login_completed)")
-      .eq("email", user.email!)
-      .maybeSingle();
+    // Capped for the same reason as the auth call above. This one is a
+    // convenience — it routes a first-run client to /welcome — and a client who
+    // reaches /home instead sees their app. A client who reaches a 504 sees
+    // nothing at all, so waiting indefinitely for it trades a small wrong
+    // destination for a total failure.
+    const clientLookup = await withAuthTimeout(
+      supabase
+        .from("clients")
+        .select("onboarding_complete, client_app_settings(first_login_completed)")
+        .eq("email", user.email!)
+        .maybeSingle()
+    );
+    if (clientLookup.degraded) return supabaseResponse;
+    const clientRow = clientLookup.value?.data ?? null;
 
     if (clientRow) {
       // /welcome is where the one-tap invite link lands. But links expire, and
