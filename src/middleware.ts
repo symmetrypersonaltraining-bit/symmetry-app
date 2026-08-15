@@ -50,22 +50,7 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Capped, because Supabase Auth being slow must not mean the app is DOWN.
-  // See src/lib/authTimeout.ts for the incident behind this and for why passing
-  // through is safe: the layout and every page re-check the user, and RLS is
-  // the real boundary. This middleware is a convenience, not a gate.
-  const auth = await withAuthTimeout(supabase.auth.getUser());
-  const user = auth.value?.data?.user ?? null;
   const { pathname } = request.nextUrl;
-
-  // Auth did not answer. Hand the request to the page rather than guessing.
-  //
-  // A guess in either direction is worse than passing through: redirecting to
-  // /login signs out somebody who IS signed in, and letting a redirect to
-  // /home stand shows an app shell to somebody who is not. The page can find
-  // out for itself. If it cannot either, it fails somewhere a person can see
-  // and act on, which a Vercel 504 never is.
-  if (auth.degraded) return supabaseResponse;
 
   // Always allow static assets, auth callback, and the public anatomy preview.
   //
@@ -99,6 +84,36 @@ export async function middleware(request: NextRequest) {
   ) {
     return supabaseResponse;
   }
+
+  // ── ONLY NOW ask who this is ───────────────────────────────────────────────
+  //
+  // This check used to sit ABOVE the allowlist, so every request the allowlist
+  // was about to wave through paid a network round trip to Supabase Auth first
+  // and then threw the answer away. That is not a micro-optimisation: `/api/`
+  // is in the list and is not excluded by the matcher, so EVERY API call the
+  // app made — every meal logged, every set saved, every poll — spent an extra
+  // GoTrue request in middleware before its route handler did its own auth
+  // properly. Same for /sw.js, /manifest.webmanifest and every icon fetch.
+  //
+  // Found while diagnosing the 15 Aug auth outage. It is not the cause, but a
+  // service that is already struggling was being asked several times as many
+  // questions as it needed to answer.
+  //
+  // The cap is because Supabase Auth being slow must not mean the app is DOWN.
+  // See src/lib/authTimeout.ts for the incident and for why passing through is
+  // safe: the layout and every page re-check the user, and RLS is the real
+  // boundary. This middleware is a convenience, not a gate.
+  const auth = await withAuthTimeout(supabase.auth.getUser());
+  const user = auth.value?.data?.user ?? null;
+
+  // Auth did not answer. Hand the request to the page rather than guessing.
+  //
+  // A guess in either direction is worse than passing through: redirecting to
+  // /login signs out somebody who IS signed in, and letting them through to
+  // /home shows an app shell to somebody who is not. The page can find out for
+  // itself. If it cannot either, it fails somewhere a person can see and act
+  // on, which a Vercel 504 never is.
+  if (auth.degraded) return supabaseResponse;
 
   // Login page
   if (pathname === "/login") {
