@@ -78,8 +78,29 @@ test("an ungated client still cannot be given another client's day", () => {
   assert.match(SRC, /\.eq\("client_owner_id", clientId\)\.eq\("swappable", true\)/);
 });
 
-test("a completed workout cannot be moved or swapped", () => {
-  assert.equal((SRC.match(/row\.status === "completed"/g) || []).length, 2);
+test("a completed workout can be MOVED, and still cannot be SWAPPED", () => {
+  // This test used to assert TWO completed-guards — one on move, one on swap.
+  // Dustin removed the move one on 15 Aug, in these words:
+  //
+  //   "last time im saying this.. we can all move workouts from anywhere to
+  //    anywhere period. I don't care if its scheduled, past, future, logged,
+  //    not logged, mid session. no reason to have any restraint here."
+  //
+  // Moving changes WHEN a session sits. It is recorded in moved_from_date and
+  // it is reversible, so there was never much to protect.
+  //
+  // Swapping changes WHICH session it was, and doing that to a completed one
+  // rewrites what somebody actually did — that is not a move and he did not ask
+  // for it. So the count is now exactly ONE, and this test fails in both
+  // directions: if the move guard comes back, and if the swap guard goes.
+  const guards = (SRC.match(/row\.status === "completed"/g) || []).length;
+  assert.equal(guards, 1, "expected the swap guard only");
+  const swapStart = SRC.indexOf('if (name === "swap_my_workout")');
+  assert.ok(swapStart > 0);
+  assert.ok(
+    SRC.indexOf('row.status === "completed"', swapStart) > swapStart,
+    "the one remaining guard must be the SWAP one"
+  );
 });
 
 test("a misheard weight cannot land in the metrics table", () => {

@@ -46,7 +46,11 @@ export const CLIENT_TOOLS = [
   {
     name: "my_schedule",
     description:
-      "This client's own scheduled workouts in a date range. Returns the workout id needed to move or swap one. Always call this before moving or swapping anything — never guess an id.",
+      "This client's own workouts in a date range — PAST sessions included, not just upcoming. " +
+      "Defaults to the last 14 days through the next 21. Returns the workout id needed to move or swap one. " +
+      "Always call this before moving or swapping anything — never guess an id. If the client refers to a " +
+      "session you cannot see, widen the range with `from` before concluding anything about it, and if it is " +
+      "still not there say so plainly rather than explaining why it might be missing.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -64,7 +68,11 @@ export const CLIENT_TOOLS = [
   {
     name: "move_my_workout",
     description:
-      "Move one of this client's scheduled workouts to a different date. Use my_schedule first to get the id. Cannot move a workout that is already completed.",
+      "Move one of this client's workouts to a different date. Use my_schedule first to get the id. " +
+      "ANY workout can be moved to ANY date — past or future, scheduled or already completed, logged or not, " +
+      "even one they are part-way through. There are no restrictions and you must never invent one or tell " +
+      "them to ask their coach instead. If you cannot find the workout, say that; do not guess at a reason it " +
+      "cannot be moved.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -124,7 +132,6 @@ const DAY = 86_400_000;
 const WEIGHT_RANGE: [number, number] = [60, 600];
 const BF_RANGE: [number, number] = [3, 60];
 /** How far a workout may be moved in one go, in either direction. */
-const MAX_MOVE_DAYS = 60;
 
 function shift(iso: string, days: number): string {
   return new Date(Date.parse(`${iso}T12:00:00Z`) + days * DAY).toISOString().slice(0, 10);
@@ -186,7 +193,23 @@ export async function runClientTool(
 
   try {
     if (name === "my_schedule") {
-      const from = ISO.test(str("from")) ? str("from") : today;
+      // ── THE DEFAULT WINDOW LOOKS BACKWARDS TOO, AND THAT IS THE FIX ────
+      //
+      // `from` defaulted to TODAY. So when Bobbie asked on 15 Aug to move her
+      // Friday cardio to today, the model called my_schedule, got today
+      // forward, and Friday's session was simply not in the list. It could not
+      // find the thing she was pointing at.
+      //
+      // What it did next is the part that matters: instead of saying "I can't
+      // see it", it produced a confident story — "you logged the treadmill
+      // session on Friday, but the app recorded it as a separate log entry" —
+      // which the database flatly contradicts. She has no workout log on 14 Aug
+      // at all. A wrong answer delivered warmly, about her own training.
+      //
+      // Fourteen days back covers "yesterday", "last week", and the backfilling
+      // people actually do, and it costs nothing: the same single query, the
+      // same 60-row limit.
+      const from = ISO.test(str("from")) ? str("from") : shift(today, -14);
       const to = ISO.test(str("to")) ? str("to") : shift(today, 21);
       const { data } = await db
         .from("scheduled_workouts")
@@ -250,10 +273,26 @@ export async function runClientTool(
       const swId = str("scheduled_workout_id");
       const to = str("to_date");
       if (!swId || !ISO.test(to)) return "Error: need the workout id and a date as YYYY-MM-DD.";
-      const days = Math.abs((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / DAY);
-      if (!Number.isFinite(days) || days > MAX_MOVE_DAYS) {
-        return `That date is more than ${MAX_MOVE_DAYS} days away. Check it with them — if it is right, their coach can make the change.`;
-      }
+      // ── NO WINDOW, NO STATUS CHECK. This is deliberate. ───────────────
+      //
+      // Dustin, 15 Aug: "last time im saying this.. we can all move workouts
+      // from anywhere to anywhere period. I don't care if its scheduled, past,
+      // future, logged, not logged, mid session. no reason to have any
+      // restraint here."
+      //
+      // Two guards used to live here and both are gone:
+      //   · a 60-day window, which refused a date the client meant
+      //   · `status === "completed"` → refuse, which meant a session you had
+      //     actually done was the one thing you could not put on the right day
+      //
+      // Bobbie Page, 14 Aug, is what that cost: "It won't let me move my cardio
+      // from yesterday (friday) to today. Tried manually and it won't work.
+      // Tried ai and i got frustrated because it wasnt working and stopped
+      // trying." Moving a session is not a destructive act — moved_from_date
+      // records where it came from, so it stays auditable and reversible.
+      //
+      // Ownership is still checked, because that is not a restraint on Dustin,
+      // it is the wall between two clients' data.
 
       // Ownership re-checked HERE, not at the read. The id came from the model.
       const { data: sw } = await db
@@ -263,7 +302,6 @@ export async function runClientTool(
         .maybeSingle();
       const row = sw as { id: string; client_id: string; status: string | null; scheduled_date: string; deleted_at: string | null; day_id: string | null } | null;
       if (!row || row.client_id !== clientId || row.deleted_at) return "That workout isn't on this client's schedule.";
-      if (row.status === "completed") return "That one is already logged as done, so it can't be moved. Say so rather than moving a different one.";
 
       // The destination may already hold this same session. That is allowed —
       // it just needs its own slot, or the unique key refuses the write and the
@@ -332,10 +370,9 @@ export async function runClientTool(
       const date = str("date");
       if (!dayId || !ISO.test(date)) return "Error: need the day_id and a date as YYYY-MM-DD.";
 
-      const away = Math.abs((Date.parse(`${date}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / DAY);
-      if (!Number.isFinite(away) || away > MAX_MOVE_DAYS) {
-        return `That date is more than ${MAX_MOVE_DAYS} days away. Check it with them — if it is right, their coach can make the change.`;
-      }
+      // No date window here either — same instruction as move_my_workout above.
+      // A client backfilling last month's sessions or planning a block ahead is
+      // doing normal work, not something to be talked out of.
 
       // THE SAME TWO BARRIERS AS A SWAP. Adding a session is exactly as capable
       // of putting a movement in front of somebody as swapping one is, so it is

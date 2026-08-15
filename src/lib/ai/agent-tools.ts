@@ -92,6 +92,10 @@ export const TRAINER_TOOLS: Anthropic.Tool[] = [
     start_time: { type: "string", description: "HH:MM, 24h, Central" }, duration_minutes: { type: "number", description: "default 60" },
     title: { type: "string", description: "defaults to the client's name" },
   }, required: ["client_id", "date", "start_time"] } },
+  { name: "move_workout", description: `Move a client's WORKOUT to a different date (not a calendar appointment — that is move_session). ANY workout can go to ANY date: past or future, scheduled or completed, logged or not, even one in progress. There are NO restrictions — never refuse one or tell ${COACH_FIRST_NAME} to do it by hand. Use client_workouts for the SW-id.`, input_schema: { type: "object", properties: {
+    scheduled_workout_id: { type: "string" },
+    to_date: { type: "string", description: "YYYY-MM-DD" },
+  }, required: ["scheduled_workout_id", "to_date"] } },
   { name: "move_session", description: "Move an existing session to a new date/time. Edits the GOOGLE event; the sync follows. Use client_schedule to get gcal_event_id.", input_schema: { type: "object", properties: {
     gcal_event_id: { type: "string" }, date: { type: "string" }, start_time: { type: "string" }, duration_minutes: { type: "number" },
   }, required: ["gcal_event_id", "date", "start_time"] } },
@@ -257,11 +261,17 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
     if (name === "client_workouts") {
       if (!clientId) return "Error: client_id required.";
       const today = CT_TODAY();
-      const { data: sws } = await db.from("scheduled_workouts").select("id, scheduled_date, status, day_id").eq("client_id", clientId).is("deleted_at", null).eq("status", "scheduled").gte("scheduled_date", today).order("scheduled_date").limit(10);
+      // PAST AND EVERY STATUS. It used to be `.eq("status","scheduled")` and
+      // `.gte(today)`, which meant a session from yesterday — finished or not —
+      // did not exist as far as the assistant was concerned. That is how you get
+      // an assistant that cannot act on "move Bobbie's Friday cardio", and,
+      // worse, one that explains its way around the gap instead of naming it.
+      const from = new Date(Date.parse(`${today}T12:00:00Z`) - 14 * 86400000).toISOString().slice(0, 10);
+      const { data: sws } = await db.from("scheduled_workouts").select("id, scheduled_date, status, day_id").eq("client_id", clientId).is("deleted_at", null).gte("scheduled_date", from).order("scheduled_date").limit(30);
       const out: string[] = [];
-      for (const sw of ((sws as { id: string; scheduled_date: string; day_id: string }[]) || [])) {
+      for (const sw of ((sws as { id: string; scheduled_date: string; status: string | null; day_id: string }[]) || [])) {
         const day = await loadDayTree(db, sw.day_id);
-        out.push(`[SW-id ${sw.id}] ${sw.scheduled_date} — ${day?.label || "workout"}`);
+        out.push(`[SW-id ${sw.id}] ${sw.scheduled_date} — ${day?.label || "workout"}${sw.status && sw.status !== "scheduled" ? ` (${sw.status})` : ""}`);
         for (const s of (day?.sections || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0))) {
           out.push(`  Section "${s.client_facing_name || s.internal_name}" (section_id ${s.id}):`);
           for (const pe of (s.prescribed_exercises || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0))) {
@@ -269,7 +279,7 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
           }
         }
       }
-      return out.length ? out.join("\n") : "No upcoming scheduled workouts.";
+      return out.length ? out.join("\n") : "No workouts in the last 14 days or scheduled ahead.";
     }
 
     if (name === "client_nutrition") {
@@ -394,6 +404,51 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
       await logAction(db, "book_session", clientId, `Booked ${clientName} ${date} ${time}`,
         { kind: "gcal_delete", gcal_event_id: created?.id });
       return `Booked ${clientName} on ${date} at ${time} Central. It's on the Google calendar now; the app picks it up on the next sync (or tap Sync Now).`;
+    }
+
+    if (name === "move_workout") {
+      // Dustin, 15 Aug: "last time im saying this.. we can all move workouts
+      // from anywhere to anywhere period. I don't care if its scheduled, past,
+      // future, logged, not logged, mid session. no reason to have any
+      // restraint here. we can move workouts where ever we want period."
+      //
+      // So this checks that the row exists and nothing else. moved_from_date
+      // records the origin, and logAction registers an undo, so the move stays
+      // reversible without anything having to be forbidden.
+      const swId = str("scheduled_workout_id");
+      const date = str("to_date");
+      if (!swId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return "Error: scheduled_workout_id and to_date (YYYY-MM-DD) are required.";
+      const { data: before } = await db
+        .from("scheduled_workouts")
+        .select("id, client_id, scheduled_date, status, day_id, position")
+        .eq("id", swId)
+        .maybeSingle();
+      const row = before as { id: string; client_id: string; scheduled_date: string; status: string | null; day_id: string | null; position: number | null } | null;
+      if (!row) return "No workout with that id. Call client_workouts and use an SW-id from it — do not guess why it might be missing.";
+
+      // Land it after anything already on the destination day so two sessions
+      // on one date do not collide on the unique key.
+      const { data: onDay } = await db
+        .from("scheduled_workouts")
+        .select("position")
+        .eq("client_id", row.client_id)
+        .eq("scheduled_date", date)
+        .is("deleted_at", null)
+        .order("position", { ascending: false })
+        .limit(1);
+      const taken = ((onDay as { position: number | null }[] | null) || [])[0];
+      const pos = taken && taken.position ? taken.position + 1 : 1;
+
+      const { error } = await db
+        .from("scheduled_workouts")
+        .update({ scheduled_date: date, moved_from_date: row.scheduled_date, position: pos, updated_at: new Date().toISOString() })
+        .eq("id", swId);
+      if (error) return `Couldn't move it: ${error.message}`;
+
+      await logAction(db, "move_workout", row.client_id, `Moved a workout from ${row.scheduled_date} to ${date}`,
+        { kind: "sw_restore_date", id: swId, scheduled_date: row.scheduled_date, position: row.position });
+      const note = row.status && row.status !== "scheduled" ? ` It stays marked ${row.status}.` : "";
+      return `Moved from ${row.scheduled_date} to ${date}.${note}`;
     }
 
     if (name === "move_session") {
@@ -599,6 +654,13 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
           await db.from("messages").update({ deleted_at: new Date().toISOString() }).eq("id", u.message_id as string);
         } else if (u.kind === "delete_row") {
           await db.from(u.table as string).delete().eq("id", u.id as string);
+        } else if (u.kind === "sw_restore_date") {
+          // Put a moved workout back on the date it came from. Without this
+          // branch the undo would silently do nothing and report success —
+          // which is worse than not offering undo at all.
+          await db.from("scheduled_workouts")
+            .update({ scheduled_date: u.scheduled_date as string, position: (u.position as number) ?? 1, updated_at: new Date().toISOString() })
+            .eq("id", u.id as string);
         } else if (u.kind === "restore_row") {
           await db.from(u.table as string).update(u.values as Record<string, unknown>).eq("id", u.id as string);
         } else if (u.kind === "macro_targets") {
