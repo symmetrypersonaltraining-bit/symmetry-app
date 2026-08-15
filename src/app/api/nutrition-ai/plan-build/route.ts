@@ -9,6 +9,7 @@
 // Auth-checked, client-scoped, metered (feature 'plan_build', default 1/day).
 
 import { NextRequest, NextResponse } from "next/server";
+import { libraryPromptBlock } from "@/lib/nutrition/libraryForAi";
 import { CT_TODAY } from "@/lib/ai/coach-context";
 import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
@@ -31,7 +32,9 @@ Rules:
 - When a CONSULT is given (client answers + metrics/goal): first decide appropriate daily targets (protein ~0.8-1.2g per lb bodyweight, sensible deficit/surplus for the goal), put a concise 2-4 sentence explanation in "reasoning", then build the meals to hit them.
 - This is a DRAFT for the coach/client to review — do not mention databases or saving.
 
-${nutrientPromptSpec()}`;
+${nutrientPromptSpec()}
+
+${libraryPromptBlock()}`;
 
 interface Targets {
   kcal: number;
