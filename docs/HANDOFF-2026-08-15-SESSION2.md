@@ -53,7 +53,12 @@ The sandbox commits locally, then hands a bundle to the laptop, which pushes.
    refs/heads/main" on the laptop side.
 3. `SendUserFile` the bundle.
 4. `device_commit_files` it to
-   `C:\Users\dusti\Claude\Projects\Trainer App\outbox\origin-main.bundle`.
+   `C:\Users\dusti\Claude\Projects\Trainer App\outbox\ship.bundle`.
+   — **`ship.bundle`. That exact name.** `ship-watcher.sh` line 73 tests
+   `[ ! -s "$OUTBOX/ship.bundle" ]`. There is a stale `origin-main.bundle`
+   sitting in that folder from an older flow; write to it and the watcher logs
+   *"bundle missing or empty; waiting for it to finish landing"* forever while
+   looking perfectly healthy. I lost a cycle to this on 15 Aug.
 5. Write the new SHA into `outbox\SHIP-NOW` — **no file extension.**
    `ship-watcher.sh` polls for `$OUTBOX/SHIP-NOW`. `SHIP-NOW.txt` does nothing
    and I have lost time to exactly that.
