@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 // Aliased: this file already has a local submitFeedback() handler, and the
 // import silently shadowed it — the call below was recursing into itself.
 import { submitFeedback as fileFeedback } from "@/lib/feedback";
+import { routeTrainingNote } from "@/lib/trainingNoteRouting";
 import { sendClientMessage } from "@/app/(app)/home/messageActions";
 import Link from "next/link";
 import OffPlanBanner from "@/components/OffPlanBanner";
@@ -1827,7 +1828,22 @@ export default function WorkoutLogger({
       // The row itself already goes to exercise_notes, which is what the
       // programming AI reads. This copy exists only so he SEES it happen
       // without opening the logger, so it is labelled for what it is.
-      if (!isTrainerSession) {
+      //
+      // ── 15 Aug: and now only when it is worth seeing ────────────────────
+      //
+      // Relabelling fixed the wording and nothing else. Every note still fired
+      // a push, an email and an unread badge, exactly like a real message —
+      // four of them from Jennifer inside ninety minutes, all of them loads.
+      //
+      // Dustin: "filter the ai stuff. if I need to deal w it send to me, if
+      // not, send to ai feedback."
+      //
+      // routeTrainingNote decides. Symptoms, questions, app problems and
+      // anything it does not recognise are DELIVERED; recognisable load and
+      // equipment bookkeeping is not. Either way the exercise_notes row above
+      // is already written, so the AI sees every note regardless and nothing
+      // here can lose one — the only thing being decided is his phone.
+      if (!isTrainerSession && routeTrainingNote(row.note) === "deliver") {
         const exName = currentExercise.exercises?.name ?? "Exercise";
         try { await sendClientMessage(`[Training note · ${exName}]\n${row.note}`); } catch (e) { console.error(e); }
       }
