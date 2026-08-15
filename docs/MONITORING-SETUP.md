@@ -10,22 +10,34 @@ Open it now on your phone. Here is a real reading, taken live at 11:20 UTC:
 {"ok":true,"sha":"d86fb5a","checks":{"auth":{"ok":true,"ms":19},"db":{"ok":true,"ms":53}},"ts":"2026-08-15T11:20:25Z"}
 ```
 
-**One thing to expect, so it doesn't alarm you.** The first call after a quiet
-spell is slow — the serverless function is cold and the connection is new. Four
-calls in a row, twenty seconds apart, measured just now:
+**What the numbers actually look like**, measured over 45 minutes this morning
+rather than guessed:
 
-| call | auth | db |
+| when | auth | db |
 |---|---|---|
-| 1st, cold | 706 ms | **1179 ms** |
-| 2nd | 387 ms | 506 ms |
-| 3rd | 187 ms | 180 ms |
-| 4th | 19 ms | 53 ms |
+| first call after a deploy — genuinely cold container | 706 ms | **1179 ms** |
+| 8 seconds later | 387 ms | 506 ms |
+| 6 seconds later | 187 ms | 180 ms |
+| 3 seconds later | 19 ms | 53 ms |
+| after 2 minutes idle | 265 ms | 360 ms |
+| after 9 minutes idle | 255 ms | 547 ms |
+| after 19 minutes idle | 252 ms | 425 ms |
 
-That is warming up, not the database being ill — it drops cleanly and settles.
-But 1179 ms is close to the 1500 ms amber line, so **if you check once every
-fifteen minutes every check is a cold one and you'll sit near amber forever.**
-Checking every minute keeps it warm and the numbers stay in the tens. This is
-the actual reason for the 1-minute frequency below; it isn't just impatience.
+Warm is tens of milliseconds. Any gap of a few minutes costs a few hundred, and
+**it stops there** — a nineteen-minute gap was no worse than a two-minute one.
+Everything above is comfortably inside the 1500 ms amber line.
+
+The one case that can legitimately trip amber is the very first call after a
+deploy, when the container is cold for real. If you see a single amber right
+after something ships, that's what it is.
+
+> **Correcting myself.** I first wrote that a fifteen-minute check interval
+> would "sit near amber forever". Then I measured a nineteen-minute gap and it
+> came back at 425 ms. That claim was wrong — extrapolated from one cold reading
+> before the evidence was in, which is a habit I spent last night regretting.
+> The 1-minute frequency below is still right, but for a plainer reason: it's
+> how fast you find out. At fifteen minutes an outage gets a fifteen-minute head
+> start on you.
 
 ---
 
@@ -38,7 +50,7 @@ the actual reason for the 1-minute frequency below; it isn't just impatience.
 
    | Setting | Value | Why |
    |---|---|---|
-   | Check frequency | **1 minute** | last night ran hours before anyone noticed |
+   | Check frequency | **1 minute** | how fast you find out; last night ran hours before anyone noticed |
    | Request timeout | **10 seconds** | ours is 5s, so we fail first and tell you *which* half broke |
    | Confirm before alerting | **2 failures** | one blip at 3am is not worth waking you |
    | Alert via | **phone push** | email you'd read in the morning, which is the current situation |
