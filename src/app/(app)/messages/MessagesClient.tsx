@@ -9,6 +9,7 @@ import MessageReactions from "@/components/MessageReactions";
 import GroupChallenge from "@/components/GroupChallenge";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { faceSrc } from "@/lib/ai/faces";
+import toast from "react-hot-toast";
 
 interface Message {
   id: string;
@@ -140,19 +141,40 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
 
   const handleDeleteMessage = useCallback(async (id: string) => {
     setDeletingId(id);
-    try { await deleteMessage(id); router.refresh(); } catch { setDeletingId(null); }
+    try {
+      await deleteMessage(id);
+      router.refresh();
+    } catch (e) {
+      setDeletingId(null);
+      toast.error(e instanceof Error ? e.message : "Couldn't delete that message");
+    }
   }, [router]);
 
+  // The empty catch used to be unreachable: deleteThread could not throw, so a
+  // failed delete still navigated away and refreshed as if it had worked. It
+  // throws now, so say something instead of swallowing it — a confirmed delete
+  // that quietly does nothing is worse than one that fails out loud.
   const handleDeleteThread = useCallback(async () => {
     if (!selectedClientId || selectedClientId === "group" || selectedClientId === "broadcast") return;
     if (!confirmDelThread) { setConfirmDelThread(true); setTimeout(() => setConfirmDelThread(false), 3500); return; }
     setConfirmDelThread(false);
-    try { await deleteThread(selectedClientId); router.push("/messages"); router.refresh(); } catch {}
+    try {
+      await deleteThread(selectedClientId);
+      router.push("/messages");
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't delete that conversation");
+    }
   }, [confirmDelThread, selectedClientId, router]);
 
   const handleDeleteThreadFor = useCallback(async (clientId: string, name: string) => {
     if (typeof window !== "undefined" && !window.confirm(`Delete the entire conversation with ${name}?`)) return;
-    try { await deleteThread(clientId); router.refresh(); } catch {}
+    try {
+      await deleteThread(clientId);
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't delete that conversation");
+    }
   }, [router]);
 
   const handleSend = useCallback(async () => {

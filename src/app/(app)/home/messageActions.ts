@@ -169,11 +169,28 @@ export async function sendGroupMessage(body: string, imageUrl?: string | null, s
 
 // Soft-delete: sets deleted_at so a message/thread disappears from every view
 // but the row is preserved (reversible by clearing deleted_at). Never a hard delete.
+//
+// BOTH OF THESE NOW THROW ON FAILURE, and the reason is the caller.
+//
+// MessagesClient wraps them in
+//   try { await deleteThread(...); router.push(...); router.refresh(); } catch {}
+// which LOOKS like error handling and was not, because neither function could
+// throw. So the success path ran unconditionally: the view navigated away, the
+// list refreshed, and if the write had failed — RLS, a bad id, a transient
+// error — the thread was still there and nothing was said.
+//
+// A confirmed "Delete the entire conversation with X" that silently does
+// nothing is the same class of fault as the six writes that had never once
+// succeeded. Throwing gives that catch block something real to catch.
 export async function deleteMessage(id: string): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from("messages").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+  const { error } = await supabase
+    .from("messages")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(`Couldn't delete that message: ${error.message}`);
   revalidatePath("/messages");
 }
 
@@ -181,11 +198,12 @@ export async function deleteThread(clientId: string): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || !clientId) return;
-  await supabase
+  const { error } = await supabase
     .from("messages")
     .update({ deleted_at: new Date().toISOString() })
     .eq("client_id", clientId)
     .is("deleted_at", null);
+  if (error) throw new Error(`Couldn't delete that conversation: ${error.message}`);
   revalidatePath("/messages");
 }
 

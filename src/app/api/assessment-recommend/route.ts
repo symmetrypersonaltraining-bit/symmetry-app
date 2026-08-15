@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { resolveAiScope, enforceMeter } from '@/lib/ai/scope';
 import { logUsage } from '@/lib/ai/meter';
 import { COACH_NAME } from "@/lib/trainer";
+import { HAIKU_MODEL } from "@/lib/ai/anthropic";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -53,12 +54,15 @@ Respond with JSON only:
 }`;
 
   const message = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    // Was pinned to a DATED snapshot ('claude-haiku-4-5-20251001'), which is
+    // worse than a plain literal: it survives a model rotation by continuing to
+    // call a version everything else has left behind.
+    model: HAIKU_MODEL,
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
   });
 
-  await logUsage(null, "assessment_rec", message.usage?.input_tokens ?? 0, message.usage?.output_tokens ?? 0, 'claude-haiku-4-5-20251001');
+  await logUsage(null, "assessment_rec", message.usage?.input_tokens ?? 0, message.usage?.output_tokens ?? 0, HAIKU_MODEL);
 
   const text = message.content[0].type === 'text' ? message.content[0].text : '';
   const jsonMatch = text.match(/\{[\s\S]*\}/);

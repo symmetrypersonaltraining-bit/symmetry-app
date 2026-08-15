@@ -130,11 +130,22 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
           return;
         }
       } else {
-        await supabase.from("payment_reminders").update({
+        // Checked, because the SEND that follows reads the reminder back from
+        // the database. If this update fails, the trainer's edited amount and
+        // note are silently discarded and the email goes out with whatever was
+        // there before — under a screen showing the new figure. Found while
+        // fixing the same fault in saveEdit below; this one is worse, because
+        // it reaches a client.
+        const { error: apprErr } = await supabase.from("payment_reminders").update({
           amount_due: parseFloat(amount) || client.amountDue,
           notes: notes || null,
           approved_at: new Date().toISOString(),
         }).eq("id", client.reminderId);
+        if (apprErr) {
+          setError(`Couldn't save the amount before sending: ${apprErr.message}`);
+          setSending(false);
+          return;
+        }
 
         const res = await fetch("/api/reminders/send", {
           method: "POST",
@@ -661,11 +672,20 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
         ));
       }
     } else {
-      await supabase.from("payment_reminders").update({
+      // Check before the optimistic update, not after. Without this a failed
+      // write left the list showing the amount just typed while the database
+      // kept the old one — and the reminder email that goes out later reads
+      // from the database, so the trainer and the client would have seen two
+      // different numbers with nothing to suggest a problem.
+      const { error: updErr } = await supabase.from("payment_reminders").update({
         amount_due: parseFloat(editAmount) || c.amountDue,
         due_date: editDueDate,
         notes: editNotes || null,
       }).eq("id", c.reminderId);
+      if (updErr) {
+        alert(`Couldn't save that change: ${updErr.message}`);
+        return;
+      }
       setLocalClients(prev => prev.map(p =>
         p.clientId === c.clientId
           ? { ...p, amountDue: parseFloat(editAmount) || c.amountDue, dueDate: editDueDate, notes: editNotes || null }

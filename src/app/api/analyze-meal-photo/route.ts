@@ -5,9 +5,13 @@ import { extractJson } from '@/lib/ai/nutrition-json';
 import { logUsage, pausedBody, assertNotPaused, checkAndLog, AiPaused, CapExceeded, capBody } from '@/lib/ai/meter';
 import { nutrientPromptSpec, sanitizeNutrients, roundNutrients, LEGACY_NUTRIENT_KEYS } from "@/lib/nutrition/nutrients";
 import { isTrainerEmail } from "@/lib/trainer";
+import { SONNET_MODEL } from "@/lib/ai/anthropic";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = 'claude-sonnet-4-6';
+// Imported, not spelled out. A literal here means this route silently keeps
+// using the old model on the day every other route moves, and nothing fails —
+// it just quietly costs and reasons differently from its siblings.
+const MODEL = SONNET_MODEL;
 // POST /api/analyze-meal-photo
 // Body: { imageBase64, mimeType?, text?, logId?, clientId? }
 // - text: optional client-typed description analyzed alongside the photo.
