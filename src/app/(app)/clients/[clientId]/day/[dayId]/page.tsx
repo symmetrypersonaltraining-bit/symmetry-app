@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import Link from "next/link";
 import WorkoutDayEditor from "./WorkoutDayEditor";
 import ClientProfileNav from "@/components/ClientProfileNav";
@@ -12,7 +13,7 @@ export default async function WorkoutDayEditPage({
 }) {
   const { clientId, dayId } = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
   if (!isTrainerEmail(user.email)) redirect("/home");
 

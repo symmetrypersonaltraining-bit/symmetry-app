@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import { cookies } from "next/headers";
 import MealPlanClient from "./MealPlanClient";
 import NutritionV3Client from "./v3/NutritionV3Client";
@@ -23,7 +24,7 @@ export default async function NutritionPage({
   searchParams: Promise<{ clientId?: string; as?: string }>;
 }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
   const isTrainer = isTrainerEmail(user.email);

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import ProposalsClient from "./ProposalsClient";
 import { isTrainerEmail } from "@/lib/trainer";
 
@@ -14,7 +15,7 @@ import { isTrainerEmail } from "@/lib/trainer";
 // trainer-only rows in front of clients.
 export default async function ScheduleProposalsPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
   if (!isTrainerEmail(user.email)) redirect("/home");
 

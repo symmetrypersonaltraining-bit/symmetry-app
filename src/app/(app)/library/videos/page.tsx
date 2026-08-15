@@ -13,6 +13,7 @@
 // version of it that actually happens.
 
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
 import { isTrainerUser } from "@/lib/trainer";
 import VideoQueueClient, { type Candidate } from "./VideoQueueClient";
@@ -21,9 +22,7 @@ export const dynamic = "force-dynamic";
 
 export default async function VideoQueuePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
   if (!isTrainerUser(user)) redirect("/home");
 

@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
 import ExerciseLibraryClient from "./ExerciseLibraryClient";
 
 export default async function ExerciseLibraryPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
   const { data: exercises } = await supabase

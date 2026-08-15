@@ -1,14 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import ClientsListClient from "./ClientsListClient";
 import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function ClientsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
   if (!isTrainerEmail(user.email)) redirect("/home");
 

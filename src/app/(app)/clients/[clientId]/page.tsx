@@ -1,5 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import Link from "next/link";
 import ClientProfileTabs from "./ClientProfileTabs";
 import PlateauSpotter from "@/components/PlateauSpotter";
@@ -16,7 +17,7 @@ export default async function ClientProfilePage({
 }) {
   const { clientId } = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
   if (!isTrainerEmail(user.email)) redirect("/home");
 

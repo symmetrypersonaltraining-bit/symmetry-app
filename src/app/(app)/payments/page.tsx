@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import PaymentsClient from "./PaymentsClient";
 import ReminderEditor from "@/components/ReminderEditor";
 import { isTrainerEmail } from "@/lib/trainer";
 
 export default async function PaymentsPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
   if (!isTrainerEmail(user.email)) redirect("/home");
 

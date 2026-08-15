@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import ScheduleClient from "./ScheduleClient";
@@ -22,7 +23,7 @@ function getCentralNow() {
 
 export default async function SchedulePage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
   const isTrainer = isTrainerEmail(user.email);

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
 import MessagesClient from "./MessagesClient";
 import { isTrainerEmail } from "@/lib/trainer";
@@ -12,9 +13,7 @@ export default async function MessagesPage(props: {
 }) {
   const searchParams = await props.searchParams;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
   const __cookieStore = await cookies();

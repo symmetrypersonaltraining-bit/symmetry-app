@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import MetricCards from "@/components/MetricCards";
 import GoalsSection from "@/components/GoalsSection";
 import ClientSelector from "@/components/ClientSelector";
@@ -16,7 +17,7 @@ export default async function ProgressPage({
   searchParams: Promise<{ clientId?: string }>;
 }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
   const isTrainer = isTrainerEmail(user.email);

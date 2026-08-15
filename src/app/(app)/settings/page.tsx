@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import SettingsClient from "./SettingsClient";
 import { isTrainerEmail, COACH_NAME } from "@/lib/trainer";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ gcal?: string; as?: string }> }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
   const { data: profile } = await supabase.from("clients").select("name").eq("auth_user_id", user.id).maybeSingle();

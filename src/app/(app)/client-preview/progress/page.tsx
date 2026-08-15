@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import MetricCards from "@/components/MetricCards";
 import ConsistencyCalendar from "@/components/ConsistencyCalendar";
 import AchievementCard from "@/components/AchievementCard";
@@ -10,7 +11,7 @@ import { TRAINER_EMAIL, isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 
 export default async function ClientPreviewProgressPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
   if (!isTrainerEmail(user.email)) redirect("/progress");
 

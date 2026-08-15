@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import LogClient from "./LogClient";
 import { isClientMode } from "@/lib/client-mode";
 import { isTrainerEmail } from "@/lib/trainer";
@@ -7,7 +8,7 @@ import { fetchOwnClientRow } from "@/lib/ownClient";
 
 export default async function LogPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
   const isTrainer = isTrainerEmail(user.email);

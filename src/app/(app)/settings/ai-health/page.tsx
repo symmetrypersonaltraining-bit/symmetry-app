@@ -23,6 +23,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isTrainerEmail } from "@/lib/trainer";
 import { AI_FEATURES, AI_FEATURE_KEYS, MONTHLY_COST_CAP_USD, type AiFeature } from "@/lib/ai/meter-core";
@@ -42,7 +43,7 @@ interface LogRow {
 
 export default async function AiHealthPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
   if (!isTrainerEmail(user.email)) redirect("/home");
 

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import MealPlanClient from "../../nutrition/MealPlanClient";
 import NutritionV3Client from "../../nutrition/v3/NutritionV3Client";
 import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
@@ -8,7 +9,7 @@ import { fetchOwnClientRow } from "@/lib/ownClient";
 
 export default async function ClientPreviewNutritionPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
   if (!isTrainerEmail(user.email)) redirect("/nutrition");
 

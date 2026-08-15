@@ -10,6 +10,7 @@
 // arrives populated instead of flashing empty.
 
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
 import RecipesClient from "./RecipesClient";
 import { isTrainerEmail } from "@/lib/trainer";
@@ -17,7 +18,7 @@ import { isTrainerEmail } from "@/lib/trainer";
 export const dynamic = "force-dynamic";
 export default async function RecipesPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
   const isTrainer = isTrainerEmail(user.email);
