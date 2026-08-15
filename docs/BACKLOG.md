@@ -411,6 +411,11 @@ re-proposed · a stalled client's roll-forward does not extrapolate from zero.
 
 ### Open, from this session
 
+- **Turn the uptime monitor on.** `/api/health` shipped (`8238cd8`) and is live;
+  pointing Better Stack at it needs Dustin's sign-in. Ten minutes, steps in
+  `docs/MONITORING-SETUP.md`. Until this is done the app still has no monitoring
+  in the sense that matters — the endpoint answers, but nobody is asking.
+
 - **Claudine's 13 Aug totals** were computed while her zeroed items were back.
   Today's row is keyed to the current plan's item ids so it should be right —
   have her reload and confirm before reading anything into the number.

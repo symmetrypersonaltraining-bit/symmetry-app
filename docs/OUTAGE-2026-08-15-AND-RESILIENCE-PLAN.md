@@ -288,7 +288,17 @@ like from "the app is broken" to "the app is having a bad minute". It does not
 reduce downtime by one second, and that is fine — most of the damage an outage
 does to a coaching business is not the downtime.
 
-### 2. A monitor that tells Dustin before a client does — half a day
+### 2. A monitor that tells Dustin before a client does — ✅ ENDPOINT SHIPPED (`8238cd8`)
+
+> **Status, 15 Aug morning.** The code half is done: `/api/health` is live, and
+> it fails on SLOW rather than only on broken — which is what makes it useful,
+> since nothing errored on the night. 12 tests, all 10 mutations bite.
+>
+> What is left is signing up for the external monitor and pointing it at the
+> URL. That needs a sign-in, so it is Dustin's step, not mine. Ten minutes,
+> written out in `docs/MONITORING-SETUP.md`.
+>
+> The original plan below is unchanged and still correct.
 
 **The problem:** this outage ran from at least 03:32 UTC. It was found at 23:00
 CT by Dustin opening the app. Nothing else would have found it. If it had
