@@ -30,6 +30,7 @@ import type { Db } from "@/lib/ai/scope";
 import { CT_TODAY, fetchClientProfile } from "@/lib/ai/coach-context";
 import { goalContextBlock } from "@/lib/ai/goalContext";
 import { clearedPoolFor } from "@/lib/ai/workoutPool";
+import { trainingHistoryBlock } from "@/lib/ai/trainingHistory";
 
 /** Today's scheduled session, as one line. */
 async function todayLine(db: Db, clientId: string, today: string): Promise<string | null> {
@@ -147,12 +148,16 @@ export async function assistantContext(db: Db, clientId: string | null): Promise
   const today = CT_TODAY();
 
   try {
-    const [profile, goals, todays, targets, metrics, pool] = await Promise.all([
+    const [profile, goals, todays, targets, metrics, history, pool] = await Promise.all([
       fetchClientProfile(db, clientId).catch(() => null),
       goalContextBlock(db, clientId, today).catch(() => null),
       todayLine(db, clientId, today),
       targetsLine(db, clientId, today),
       metricsLine(db, clientId),
+      // What they actually lifted. Until 15 Aug no client-facing surface could
+      // see a single logged set, so "what did I press last time?" - the most
+      // ordinary question in a gym - had to be answered by Dustin.
+      trainingHistoryBlock(db, clientId).catch(() => ""),
       clearedPoolFor(db, clientId).catch(() => null),
     ]);
 
@@ -164,6 +169,7 @@ export async function assistantContext(db: Db, clientId: string | null): Promise
     // these numbers and it only appears when a goal exists at all.
     if (metrics) lines.push(metrics);
     if (goals) lines.push(goals);
+    if (history) lines.push(history);
 
     // ── THE GATE ────────────────────────────────────────────────────────────
     //

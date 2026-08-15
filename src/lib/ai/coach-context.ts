@@ -13,6 +13,7 @@ import { Db } from "@/lib/ai/scope";
 import { computeDayTotals, kcalOf, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
 import { weeklyNumbersBlockSafe } from "@/lib/ai/weekly-context";
 import { goalContextBlock } from "@/lib/ai/goalContext";
+import { trainingHistoryBlock } from "@/lib/ai/trainingHistory";
 
 // Every date the AI sees must be America/Chicago. log_date is written in Central time, so a
 // UTC "today" is already tomorrow from ~7pm CDT — the exact hours clients log their food.
@@ -499,7 +500,7 @@ async function fetchTodayMealProgress(
 
 export async function assembleCoachContext(db: Db, clientId: string): Promise<string> {
   const today = CT_TODAY();
-  const [dailyTotals, targetRes, metricsRes, planSummary, profile, weekBlock, goalBlock, mealProgress] = await Promise.all([
+  const [dailyTotals, targetRes, metricsRes, planSummary, profile, weekBlock, goalBlock, mealProgress, trainingHistory] = await Promise.all([
     fetchDailyTotals(db, clientId, 14),
     db
       .from("macro_targets")
@@ -528,6 +529,12 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
     // third of it — which is how "only 914 kcal across 2 meals" became a verdict
     // instead of a progress note.
     fetchTodayMealProgress(db, clientId, today),
+    // What they actually lifted. This context is shared by the ✦ Coach and the
+    // /act surface, and until 15 Aug neither could see a single logged set —
+    // so a client asking "what did I press last time?" got a deflection while
+    // the answer sat in the database. Never throws; empty string when they have
+    // logged nothing.
+    trainingHistoryBlock(db, clientId).catch(() => ""),
   ]);
 
   const target = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
@@ -575,5 +582,9 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
   // answers "how are they doing"; this answers "how did LAST week go and what
   // should this week be about" — which is what the weekly copy is written from.
   if (weekBlock) lines.push(weekBlock);
+  // Last, because it is reference rather than narrative: the model reaches for
+  // it when asked a specific question about a lift, not when forming its
+  // general read of how someone is doing.
+  if (trainingHistory) lines.push(trainingHistory);
   return lines.join("\n");
 }
