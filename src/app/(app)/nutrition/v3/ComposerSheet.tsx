@@ -19,6 +19,7 @@ export default function ComposerSheet({
   initialName,
   compare,
   saveLabel,
+  keepOption,
   onSave,
   onClose,
   onBack,
@@ -30,7 +31,21 @@ export default function ComposerSheet({
   initialName?: string;
   compare?: { label: string; macros: Macros } | null;
   saveLabel: string;
-  onSave: (items: CustomItem[], name: string) => void | Promise<void>;
+  /**
+   * Show the "keep this in My Meals" tick above the save button, and pass its
+   * state to onSave.
+   *
+   * Robert Burns, 14 Aug: he typed what he ate, logged it, and went looking for
+   * a way to keep it. There wasn't one on this screen. The save DOES exist —
+   * "⭐ Save to My Meals" — but only in a meal's ⋯ menu, and only AFTER the meal
+   * is on the plan, which is not where anyone finishes typing. He also looked
+   * for "My Foods", which is what he'd have called it.
+   *
+   * A tick here rather than a second button: the moment he wants is "log this
+   * AND keep it", and two buttons would make him pick one.
+   */
+  keepOption?: boolean;
+  onSave: (items: CustomItem[], name: string, keep: boolean) => void | Promise<void>;
   onClose: () => void;
   onBack?: () => void;
 }) {
@@ -40,6 +55,11 @@ export default function ComposerSheet({
   const [parsing, setParsing] = useState(false);
   const [parseFailed, setParseFailed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Defaults OFF. Most typed meals are a one-off ("chicken and rice at Mum's"),
+  // and a library that fills itself with those is worse than one you have to
+  // opt into — the whole complaint was about FINDING the save, not about it
+  // being one tap too many.
+  const [keep, setKeep] = useState(false);
 
   const totals = customMealMacros({ name, items });
   const r = Math.round;
@@ -148,8 +168,36 @@ export default function ComposerSheet({
               </div>
             </div>
           )}
+          {keepOption && (
+            <button
+              type="button"
+              onClick={() => setKeep((k) => !k)}
+              aria-pressed={keep}
+              className="w-full mt-1 mb-1 flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left"
+              style={{ background: "var(--brand-bg)", border: `1px solid ${keep ? "#22c55e" : "var(--brand-border)"}` }}
+            >
+              <span
+                aria-hidden
+                className="flex items-center justify-center rounded-md"
+                style={{
+                  width: 20, height: 20, fontSize: 13, fontWeight: 800, lineHeight: 1,
+                  background: keep ? "#22c55e" : "transparent",
+                  border: keep ? "1px solid #22c55e" : "1px solid var(--brand-border)",
+                  color: "#fff",
+                }}
+              >
+                {keep ? "✓" : ""}
+              </span>
+              <span className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>
+                ⭐ Keep this in My Meals
+                <span className="block text-xs font-normal" style={{ color: "var(--brand-text-secondary)" }}>
+                  So you can log it again in one tap
+                </span>
+              </span>
+            </button>
+          )}
           <button
-            onClick={async () => { setSaving(true); try { await onSave(items, name.trim() || "Custom meal"); } finally { setSaving(false); } }}
+            onClick={async () => { setSaving(true); try { await onSave(items, name.trim() || "Custom meal", keep); } finally { setSaving(false); } }}
             disabled={saving}
             className="w-full mt-1 py-3 rounded-2xl text-sm font-bold text-white"
             style={{ background: "var(--brand-primary)" }}

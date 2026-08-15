@@ -1927,9 +1927,14 @@ export default function NutritionV3Client(props: Props) {
           : s.mode === "insert" ? (s.logNow ? "Log it ✓" : "Add meal (saves to My Meals)")
           : "Log it — totals update ✓"
         }
+        // The tick only appears where the meal is NOT already being kept.
+        // "Swap it in" and "Add meal" already save to My Meals unconditionally
+        // and say so on their own button, so a tick there would be an option
+        // that does nothing.
+        keepOption={s.mode === "slot" || s.mode === "extra" || (s.mode === "insert" && !!s.logNow)}
         onClose={closeAllSheets}
         onBack={backSheet}
-        onSave={async (items, name) => {
+        onSave={async (items, name, keep) => {
           if (s.mode === "swap" && row) {
             const meta: CustomMeta = { name, time: rowTime(row), items, kind: "swap", sourceMealId: row.chosen?.id ?? null, unlogged: true };
             await upsertLog(row.position, {
@@ -1942,19 +1947,30 @@ export default function NutritionV3Client(props: Props) {
             toast.success(`Swapped for “${name}” — saved to My Meals ✓`);
           } else if (s.mode === "insert") {
             await insertCustomMeal(s.at ?? rows.length, { name, items, kind: "insert" }, !!s.logNow);
-            if (!s.logNow) await saveMyMeal(name, items);
+            // Unlogged inserts always went to My Meals. A LOGGED one — "type
+            // what you ate" — never did, and that is the gap Robert fell into.
+            const kept = !s.logNow || keep;
+            if (kept) await saveMyMeal(name, items);
             closeAllSheets();
-            toast.success(s.logNow ? "Logged ✓ — totals updated" : `“${name}” added ✓`);
+            toast.success(
+              s.logNow
+                ? (kept ? "Logged ✓ — and kept in My Meals" : "Logged ✓ — totals updated")
+                : `“${name}” added ✓`
+            );
           } else if (s.mode === "slot" && row) {
             const meta: CustomMeta = row.meta
               ? { ...row.meta, items: [...row.meta.items, ...items], unlogged: false }
               : { name: OPEN_SLOTS.find((x) => x.position === row.position)?.name || name, items, kind: "slot" };
             await patchCustom(row, { ...meta, unlogged: false });
+            if (keep) await saveMyMeal(rowName(row) || name || meta.name, items);
             closeAllSheets();
-            toast.success("Logged ✓ — totals updated");
+            toast.success(keep ? "Logged ✓ — and kept in My Meals" : "Logged ✓ — totals updated");
           } else {
-            await addExtra(items, name || items.map((i2) => i2.n).join(" + "));
+            const extraName = name || items.map((i2) => i2.n).join(" + ");
+            await addExtra(items, extraName);
+            if (keep) await saveMyMeal(extraName, items);
             closeAllSheets();
+            if (keep) toast.success("Logged ✓ — and kept in My Meals");
           }
         }}
       />
