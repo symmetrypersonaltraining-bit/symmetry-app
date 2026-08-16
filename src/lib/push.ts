@@ -132,8 +132,19 @@ export async function sendPushDiagnostics(
           // error, so a bug can't nuke a good token).
           const dead = r.status === 404 || r.status === 410 ||
             /UNREGISTERED|registration-token-not-registered|NOT_FOUND/i.test(txt);
-          if (dead) { try { await admin.from("device_tokens").delete().eq("token", token); } catch { /* noop */ } }
-          out.results.push({ token: masked, status: r.status, error: (errCode || txt).slice(0, 200), pruned: dead });
+          // `pruned` reports what HAPPENED, not what was attempted. The delete
+          // returns its error rather than throwing, so the catch here never
+          // fired and this said pruned:true for a token still sitting in the
+          // table — /api/push-test then reads as "cleaned up" while the same
+          // dead token fails again on every send, forever.
+          let pruned = false;
+          let pruneErr = "";
+          if (dead) {
+            const { error: delErr } = await admin.from("device_tokens").delete().eq("token", token);
+            pruned = !delErr;
+            if (delErr) pruneErr = ` [prune failed: ${delErr.message}]`;
+          }
+          out.results.push({ token: masked, status: r.status, error: ((errCode || txt).slice(0, 200) + pruneErr) || undefined, pruned });
         }
       } catch (e) {
         out.results.push({ token: masked, status: 0, error: String(e).slice(0, 160) });

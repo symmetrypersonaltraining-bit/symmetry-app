@@ -54,7 +54,7 @@ export interface WebPushResult {
   sent: number;
   failed: number;
   /** Set when nothing was attempted, so a caller can say why. */
-  skipped?: "no_vapid_keys" | "no_subscriptions";
+  skipped?: "no_vapid_keys" | "no_subscriptions" | "lookup_failed";
 }
 
 let configuredOnce = false;
@@ -105,7 +105,18 @@ export async function sendWebPush(userId: string, payload: WebPushPayload): Prom
       .eq("user_id", userId)
       .is("failed_at", null);
 
-    if (error || !subs || subs.length === 0) {
+    // A refused READ is not an empty list, and collapsing the two is the exact
+    // failure this file was written to end. "no_subscriptions" is what the
+    // settings screen turns into "you haven't turned push on" — a sentence that
+    // is simply false when the query was rejected, and one that sends the
+    // person to fix something that is not broken while the real fault stays
+    // invisible. PostgREST returns its error rather than throwing, so the catch
+    // at the bottom would never have seen this either.
+    if (error) {
+      console.error("sendWebPush: could not read push_subscriptions —", error.message);
+      return { sent: 0, failed: 0, skipped: "lookup_failed" };
+    }
+    if (!subs || subs.length === 0) {
       return { sent: 0, failed: 0, skipped: "no_subscriptions" };
     }
 
@@ -134,17 +145,27 @@ export async function sendWebPush(userId: string, payload: WebPushPayload): Prom
           failed += 1;
           const status = (e as { statusCode?: number })?.statusCode;
           if (status === 404 || status === 410) {
-            await admin
+            // Unchecked, a refused mark-dead meant this endpoint was retried on
+            // every send forever, `failed` climbed on every message, and the
+            // one column that would explain why stayed empty. The write returns
+            // its error rather than throwing, so nothing anywhere noticed.
+            const { error: markErr } = await admin
               .from("push_subscriptions")
               .update({ failed_at: new Date().toISOString(), last_error: `gone (${status})` })
               .eq("id", s.id);
+            if (markErr) {
+              console.error(`sendWebPush: subscription ${s.id} is gone (${status}) but could not be marked —`, markErr.message);
+            }
           } else {
             // Transient. Recorded but NOT marked dead — marking a subscription
             // dead on a timeout is how somebody silently stops being reachable.
-            await admin
+            const { error: noteErr } = await admin
               .from("push_subscriptions")
               .update({ last_error: String((e as Error)?.message || e).slice(0, 300) })
               .eq("id", s.id);
+            if (noteErr) {
+              console.error(`sendWebPush: could not record the failure on subscription ${s.id} —`, noteErr.message);
+            }
           }
         }
       }),
