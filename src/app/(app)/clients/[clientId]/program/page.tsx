@@ -328,22 +328,38 @@ function WorkoutEditor({
 
       if (!phaseId) { setSaving(false); return; }
 
-      const { data: newDay } = await supabase
+      // Every bare `return` and `continue` below used to be exactly that:
+      // silent. The trainer builds a whole workout, presses save, and either
+      // the modal sits there saying nothing or the workout is created with a
+      // section — or an exercise — quietly missing from it. The comment on
+      // assignDay above names this: "a rejection would look like the button
+      // doing nothing at all — the single worst way for a constraint to
+      // surface." It was true three more times in this one function.
+      const { data: newDay, error: dayErr } = await supabase
         .from("days")
         .insert({ phase_id: phaseId, label: workoutName, position: Date.now() })
         .select("id")
         .single();
 
-      if (!newDay) { setSaving(false); return; }
+      if (dayErr || !newDay) {
+        window.alert("Couldn't create the workout" + (dayErr ? ` — ${dayErr.message}` : "."));
+        return;
+      }
 
       for (let si = 0; si < newSections.length; si++) {
         const sec = newSections[si];
-        const { data: newSec } = await supabase
+        const { data: newSec, error: secErr } = await supabase
           .from("sections")
           .insert({ day_id: (newDay as any).id, internal_name: sec.label, client_facing_name: sec.label, position: si })
           .select("id")
           .single();
-        if (!newSec) continue;
+        // Stop rather than skip. A workout saved with one section missing looks
+        // finished, and the trainer has no way to tell which one went.
+        if (secErr || !newSec) {
+          window.alert(`Couldn't save the "${sec.label}" section, so the workout is incomplete` +
+            (secErr ? ` — ${secErr.message}` : "."));
+          return;
+        }
 
         for (let ei = 0; ei < sec.exercises.length; ei++) {
           const ex = sec.exercises[ei];
@@ -354,15 +370,19 @@ function WorkoutEditor({
             .ilike("name", ex.name.trim())
             .maybeSingle();
           if (!exRow) {
-            const { data: newEx } = await supabase
+            const { data: newEx, error: exErr } = await supabase
               .from("exercises")
               .insert({ name: ex.name.trim() })
               .select("id")
               .single();
+            if (exErr || !newEx) {
+              window.alert(`Couldn't add "${ex.name.trim()}" to the exercise library, so it is not in the workout` +
+                (exErr ? ` — ${exErr.message}` : "."));
+              return;
+            }
             exRow = newEx;
           }
-          if (!exRow) continue;
-          await supabase.from("prescribed_exercises").insert({
+          const { error: peErr } = await supabase.from("prescribed_exercises").insert({
             section_id: (newSec as any).id,
             exercise_id: (exRow as any).id,
             position: ei,
@@ -372,6 +392,10 @@ function WorkoutEditor({
             load_descriptor: ex.weight || null,
             rest: ex.rest || null,
           });
+          if (peErr) {
+            window.alert(`Couldn't save "${ex.name.trim()}" into the workout — ${peErr.message}`);
+            return;
+          }
         }
       }
 
@@ -391,11 +415,15 @@ function WorkoutEditor({
   }
 
   async function saveExercise(id: string, sets: string, volume: string, load: string) {
-    await supabase.from("prescribed_exercises").update({
+    // Sets, reps and load on a client's programme. Unchecked, a refused update
+    // left the typed numbers on screen and the old ones in the database, and
+    // the trainer walked away believing the change was made.
+    const { error } = await supabase.from("prescribed_exercises").update({
       sets: sets ? parseInt(sets) : null,
       volume_value: volume || null,
       load_descriptor: load || null,
     }).eq("id", id);
+    if (error) window.alert("That didn't save — the workout still has the old numbers. " + error.message);
   }
 
   // Dictation is MicButton's job now, so this field animates while recording
@@ -1038,7 +1066,11 @@ export default function ProgramPage() {
   }, []);
 
   async function deleteWorkout(id: string) {
-    await supabase.from("scheduled_workouts").delete().eq("id", id);
+    // loadWorkouts() would put it straight back, which is honest but mute — a
+    // Delete that visibly does nothing reads as a broken button rather than a
+    // refusal, and the client still has the session on their calendar.
+    const { error } = await supabase.from("scheduled_workouts").delete().eq("id", id);
+    if (error) window.alert("That didn't delete — it is still on the client's calendar. " + error.message);
     loadWorkouts();
   }
 

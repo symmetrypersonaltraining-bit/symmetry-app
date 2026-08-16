@@ -557,6 +557,12 @@ and the onboarding routes were done earlier in the night. Then, in `804d0d2`,
 | `agent-tools.ts` assign | Deactivating the current programme was unchecked, so the insert ran anyway and left the client on TWO — the exact state `advance_phase` records breaking on. |
 | `ReminderEditor.tsx` | A refused approval still emailed the client, under a notice reading "Reminder approved and the in-app banner is showing". `confirmPaid` thanked the client and rolled the cycle forward without knowing the payment was recorded. |
 | `/api/video-candidates/decide` | That file promises "Approving is REVERSIBLE and the route makes sure of it" — and the promise lived entirely in one unchecked write. Failed, it left the new clip live in front of clients, the candidate un-undoable, and the previous URL existing nowhere. |
+| `/api/workout-ai` | The writes that BUILD the workout were unchecked while the response describes it back verbatim. A failed section clear leaves the old sections AND the new ones — a doubled workout, reported as created. |
+| `WorkoutDayEditor.tsx` | Sets, reps, duration, cue and delete, on a client's programme. Every one repainted first and wrote without looking. Delete took the row off the screen while the exercise stayed in the workout. |
+| `/api/workout-manual` | The assignment insert — the thing that "makes the program visible to the client at all" — was unchecked, so a workout could be saved into a programme the client cannot see. And the rollback couldn't report leaving a half-created day behind. |
+| `/api/nutrition/plan-edit` | Four unchecked writes inside the clone, each of which silently corrupts a live meal plan. The sharpest: on the in-place path a failed delete plus a successful insert leaves every food in the meal twice and the day's macros doubled. |
+| `clients/[clientId]/program` | Building a workout had three silent exits and one unchecked write. A failed section `continue`d — a workout that looks finished with a section missing and no way to tell which. |
+| `TrainerWeekDigest.tsx` | Setting a focus removes the client from Week Ahead, and that removal IS the record of dealing with them. Unchecked, the focus was never saved AND they never came back round to be noticed. |
 
 **The recurring shape, worth naming once:** a `try/catch` wrapped around a
 PostgREST call. It reads as careful and is the opposite — the call RETURNS its

@@ -194,7 +194,15 @@ export default function TrainerWeekDigest() {
       // Week Ahead until the next Sunday, then they pop back in for the weekly
       // reset. Clearing a focus (empty) leaves them in the list.
       if (val) update.digest_snoozed_until = nextSunday(todayCT());
-      await supabase.from("clients").update(update).eq("id", id);
+      // Checked. Removing the client from the Week Ahead list IS the record of
+      // having dealt with them for the week. Unchecked, a refused write took
+      // them off the list anyway — the focus was never saved AND they never
+      // came back round to be noticed, until the next Sunday reset.
+      const { error } = await supabase.from("clients").update(update).eq("id", id);
+      if (error) {
+        window.alert("That focus didn't save — " + error.message);
+        return;
+      }
       if (val) setRows((rs) => (rs ? rs.filter((r) => r.id !== id) : rs));
       else setRows((rs) => (rs ? rs.map((r) => (r.id === id ? { ...r, focus: null } : r)) : rs));
       setEditing(null); setDraft("");
@@ -231,7 +239,11 @@ export default function TrainerWeekDigest() {
     if (editing === id) { setEditing(null); setDraft(""); }
     try {
       const supabase: any = createClient();
-      await supabase.from("clients").update({ digest_snoozed_until: until }).eq("id", id);
+      // The row is already off the screen by this point, so a failure cannot be
+      // hidden by putting it back — it will simply reappear on the next load,
+      // which is confusing rather than wrong. Say so instead of nothing.
+      const { error } = await supabase.from("clients").update({ digest_snoozed_until: until }).eq("id", id);
+      if (error) window.alert("Couldn't dismiss that one — it will be back next time you open this. " + error.message);
     } catch { /* ignore */ }
   }
   function dismissPop() {

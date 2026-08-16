@@ -130,16 +130,28 @@ export async function POST(req: NextRequest) {
       const src = (allMeals as { id: string; name: string; timing: string | null; position: number; swaps: string | null; rotation: unknown }[]) || [];
 
       for (const m of src) {
-        const { data: copy } = await admin.from("meals").insert({
+        // A failed copy used to `continue`: the loop moved on, the archive
+        // below then retired the ORIGINAL, and the client was left holding a
+        // plan missing a meal they had that morning. Every failure in this
+        // clone must abandon the whole thing instead — the catch at the bottom
+        // already answers 500, and nothing has been archived at this point, so
+        // the old plan simply stays in force.
+        const { data: copy, error: copyErr } = await admin.from("meals").insert({
           meal_plan_id: targetPlanId,
           name: m.name, timing: m.timing, position: m.position, swaps: m.swaps, rotation: m.rotation,
         }).select("id").single();
+        if (copyErr) throw new Error(`Could not copy the meal "${m.name}": ${copyErr.message}`);
         const copyId = (copy as { id: string } | null)?.id;
-        if (!copyId) continue;
+        if (!copyId) throw new Error(`Could not copy the meal "${m.name}".`);
         if (m.id === meal.id) targetMealId = copyId;
 
         if (m.id === meal.id) {
-          await admin.from("meal_items").insert(edited.map((it, i) => ({ meal_id: copyId, ...it, position: i + 1 })));
+          // The edit itself. Unchecked, the response still reported
+          // `items: edited.length` while the meal the client opens is empty.
+          const { error: editErr } = await admin
+            .from("meal_items")
+            .insert(edited.map((it, i) => ({ meal_id: copyId, ...it, position: i + 1 })));
+          if (editErr) throw new Error(`Could not save the edited meal: ${editErr.message}`);
         } else {
           const { data: its } = await admin
             // kcal + micros MUST be in this list. It is an explicit column list, so a
@@ -148,7 +160,16 @@ export async function POST(req: NextRequest) {
             .from("meal_items").select("food, amount, unit, basis, protein, carbs, fats, is_unlimited, position, kcal, micros")
             .eq("meal_id", m.id).order("position");
           const rows = (its as Record<string, unknown>[]) || [];
-          if (rows.length) await admin.from("meal_items").insert(rows.map((r) => ({ ...r, meal_id: copyId })));
+          if (rows.length) {
+            // Same reasoning as the column list above: a silently empty meal in
+            // the clone is indistinguishable from a meal the trainer meant to
+            // leave empty, and the archive below would then retire the version
+            // that still had its food in it.
+            const { error: itemsErr } = await admin
+              .from("meal_items")
+              .insert(rows.map((r) => ({ ...r, meal_id: copyId })));
+            if (itemsErr) throw new Error(`Could not copy the items in "${m.name}": ${itemsErr.message}`);
+          }
         }
       }
 
@@ -179,7 +200,18 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // ── Already their plan: replace this meal's items in place ───────────
-      await admin.from("meal_items").delete().eq("meal_id", targetMealId);
+      //
+      // The delete is the "replace" half of replace-in-place. Unchecked, a
+      // refused delete followed by a successful insert leaves the OLD items and
+      // the new ones in the same meal — the client opens it to find every food
+      // twice and the day's macros doubled, while the response says ok.
+      const { error: clearErr } = await admin.from("meal_items").delete().eq("meal_id", targetMealId);
+      if (clearErr) {
+        return NextResponse.json(
+          { error: `Could not clear the old items, so nothing was changed: ${clearErr.message}` },
+          { status: 500 },
+        );
+      }
       const { error: insErr } = await admin
         .from("meal_items").insert(edited.map((it, i) => ({ meal_id: targetMealId, ...it, position: i + 1 })));
       if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
