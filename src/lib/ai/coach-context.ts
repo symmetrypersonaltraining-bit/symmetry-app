@@ -396,8 +396,19 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
   const win30 = ctShiftDays(today, -29);
   const win7 = ctShiftDays(today, -6);
   const win14 = ctShiftDays(today, -13);
+  // The streak needs its OWN window. It used to be counted off the 30-day
+  // adherence fetch, which silently capped it at 30: a client on a 31-day run
+  // would be told 30, and told 30 again the next day, and the next — the number
+  // freezing while they kept training, with nothing on screen to say why.
+  //
+  // Not theoretical. Claudine's run of 25 Jul – 13 Aug is TWENTY days, two
+  // thirds of the way to the ceiling, and she is one of 29.
+  //
+  // A separate query rather than widening win30, because `done30/total30` on
+  // the next line must stay a 30-day number.
+  const winStreak = ctShiftDays(today, -399);
 
-  const [profile, swRes, metricsRes, adherenceRes, weekBlock, goalBlock] = await Promise.all([
+  const [profile, swRes, streakRes, metricsRes, adherenceRes, weekBlock, goalBlock] = await Promise.all([
     fetchClientProfile(db, clientId),
     db
       .from("scheduled_workouts")
@@ -405,6 +416,15 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
       .eq("client_id", clientId)
       .is("deleted_at", null)
       .gte("scheduled_date", win30)
+      .lte("scheduled_date", today)
+      .order("scheduled_date", { ascending: true }),
+    db
+      .from("scheduled_workouts")
+      .select("scheduled_date")
+      .eq("client_id", clientId)
+      .is("deleted_at", null)
+      .eq("status", "completed")
+      .gte("scheduled_date", winStreak)
       .lte("scheduled_date", today)
       .order("scheduled_date", { ascending: true }),
     db
@@ -431,7 +451,9 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
   const total7 = in7.length;
   const done7 = in7.filter((w) => done(w.status || "")).length;
 
-  const completedDates = Array.from(new Set(sw.filter((w) => done(w.status || "")).map((w) => w.scheduled_date))).sort();
+  // From the wide fetch, not `sw` — see winStreak above. Counting off the
+  // 30-day array is what capped this at 30.
+  const completedDates = ((streakRes.data as { scheduled_date: string }[]) || []).map((w) => w.scheduled_date);
   let streak = 0;
   if (completedDates.length) {
     let cursor = today;

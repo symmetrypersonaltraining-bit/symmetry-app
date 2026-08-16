@@ -251,6 +251,39 @@ be able to record a session as Modified or Partial at all? The database has said
 yes for two years and the app has never offered it. If the answer is no, the
 column is a constant and should stop pretending otherwise.
 
+### And the streak the AI quotes was capped at 30 without saying so
+
+Coach's Read tells a client "Current completed-session streak: N days". N was
+counted off the same 30-day array as the adherence numbers, so it could never
+exceed 30 — a client on a 31-day run is told 30, and told 30 again tomorrow, and
+the next day, the number frozen while they keep training.
+
+Measured before touching it, because "could happen" is not a reason:
+
+    with sw as (select distinct client_id, scheduled_date d from scheduled_workouts
+                where status='completed' and deleted_at is null),
+         g  as (select client_id, d, d - (row_number() over
+                (partition by client_id order by d))::int grp from sw)
+    select name, count(*) from g join clients ... group by name, grp
+    order by count(*) desc;
+    → Claudine Ocon, TWENTY consecutive days, 25 Jul – 13 Aug.
+
+Two thirds of the way to the ceiling, by one of 29. The streak now has its own
+wide query; `last 30 days X/Y` still reads the 30-day fetch, because those have
+to stay 30-day numbers.
+
+**The other half, deliberately NOT changed.** There are three streak
+calculations in the app and they use two sources. The Progress and Home screens
+count `workout_logs.completed` — everything the client did. The AI counts
+`scheduled_workouts.status='completed'` — only what was on the plan. Over 90
+days those disagree on **92 client-days across 21 of 29 clients**.
+
+But I checked what that actually produces, and **no client's streak differs
+today**. Nobody is being shown two different numbers right now. Unifying them
+changes what the AI says to every client on the strength of a latent
+inconsistency, and picking which definition wins is a coaching decision, not a
+4am one. Left for you — it is on the list below.
+
 ### NEEDS YOU — ordered by what it buys you
 
 **Do these two and the app is meaningfully better by lunchtime.**
@@ -279,7 +312,12 @@ column is a constant and should stop pretending otherwise.
    I fixed in two other places last night, one door along. That file is on your
    off-limits list so I left it. Ten lines, one function, no change to either
    logger's behaviour, and the guard already exists next to it.
-5. **What should a client be told when only half a workout write lands?**
+5. **Which streak is the real one?** Three calculations, two sources: the
+   screens count everything a client did (`workout_logs`), the AI counts only
+   what was on the plan (`scheduled_workouts`). They disagree on 92 client-days
+   in 90 days across 21 clients, though by luck nobody sees a different number
+   today. Say which definition you want and I will make all three use it.
+6. **What should a client be told when only half a workout write lands?**
    `/api/workout-ai` logs the session, then writes the matching
    `scheduled_workouts` row. If the second half fails the two counts drift —
    that file's own comments record what that cost last time ("165 minutes across
@@ -289,30 +327,30 @@ column is a constant and should stop pretending otherwise.
 
 **Worth twenty minutes when you have them.**
 
-6. **Review nine videos.** Not 175 — nine. They are the auto-published ones on
+7. **Review nine videos.** Not 175 — nine. They are the auto-published ones on
    exercises anybody is actually programmed, 9 to 26 seconds each. Library →
    Videos, top of the list, "Use this" or undo. Everything else in that queue is
    on library entries nobody has ever prescribed and can wait for ever.
-7. **Glance at the Saturday review screen this afternoon.** Today's 6am run is
+8. **Glance at the Saturday review screen this afternoon.** Today's 6am run is
    the first since the publisher crashed on 9 Aug and was fixed on the 13th. If
    ~33 drafts are waiting, it works. If it is empty, the generator is what to
    look at, not the publisher.
 
 **Background, no rush.**
 
-8. **`ANTHROPIC_API_KEY` on the symmetry-app-v2 Vercel project.** Must be named
+9. **`ANTHROPIC_API_KEY` on the symmetry-app-v2 Vercel project.** Must be named
    exactly that — `ANTHROPIC_API_KEY_2` is never read (34 call sites). One from
    3 Aug may already be there and working. Env vars only apply on a NEW
    deployment.
-9. **Invite the tester to the Symmetry Dev Supabase org** —
+10. **Invite the tester to the Symmetry Dev Supabase org** —
    `https://supabase.com/dashboard/org/qmfsauherdswigrbhklh/team`, that org only,
    never the live one. Send me the address and the trainer-identity change is
    five minutes.
-10. **17 clients run out of programming on 31 Aug.** Your call, not a build task.
-11. **Supabase Pro** only if you ever want the other 4M foods and full micros.
+11. **17 clients run out of programming on 31 Aug.** Your call, not a build task.
+12. **Supabase Pro** only if you ever want the other 4M foods and full micros.
     Not urgent — the catalog stops growing and the barcode scanner backfills
     anything a client actually scans.
-12. **Your 24 Aug plan** stays archived unless you say otherwise. Correctly
+13. **Your 24 Aug plan** stays archived unless you say otherwise. Correctly
     archived as far as I can tell. Nothing to do.
 
 `UPSTREAM_SYNC_TOKEN` and `VERCEL_DEPLOY_HOOK` came OFF this list: the sync uses
