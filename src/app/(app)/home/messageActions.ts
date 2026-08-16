@@ -37,53 +37,68 @@ export async function markMessageRead(id: string): Promise<void> {
     .eq('id', id);
 }
 
-export async function sendMessage(clientId: string, body: string, imageUrl?: string | null): Promise<void> {
+// ── These return an error STRING now. The push is why ────────────────────────
+//
+// The insert was unchecked and the push fired regardless, so a refused write
+// notified the recipient "New message from your coach" about a message that did
+// not exist. They open the app, find nothing, and the sender has been told
+// nothing at all — MessagesClient clears the input box and refreshes on the
+// success path, so the typed text is gone too.
+//
+// deleteMessage and deleteThread in this same file were given exactly this
+// treatment on 15 Aug, for exactly this reason. The send paths were missed.
+export async function sendMessage(clientId: string, body: string, imageUrl?: string | null): Promise<string | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) return 'You are signed out — sign in and try again.';
   const { data: clientRow } = await supabase
     .from('clients')
     .select('auth_user_id')
     .eq('id', clientId)
     .maybeSingle();
-  if (!clientRow?.auth_user_id) return;
-  await supabase.from('messages').insert({
+  if (!clientRow?.auth_user_id) return 'That client has no login yet, so they cannot receive messages.';
+  const { error } = await supabase.from('messages').insert({
     from_id: user.id,
     to_id: clientRow.auth_user_id,
     client_id: clientId,
     body,
     image_url: imageUrl || null,
   });
+  // Return BEFORE the push. Notifying someone about a message that was not
+  // written is worse than the failure itself.
+  if (error) return `Message not sent: ${error.message}`;
   revalidatePath('/messages');
 
   // Push the client (deep-links to their trainer thread). Guarded — never blocks.
   try {
     await sendPushToUser(clientRow.auth_user_id as string, NOTIFICATION_EVENTS.MESSAGE_FROM_COACH, 'New message from your coach', (body || '📷 Photo').slice(0, 140), { url: '/messages' });
   } catch (e) { console.error('client push failed', e); }
+  return null;
 }
 
-export async function sendClientMessage(body: string, imageUrl?: string | null): Promise<void> {
+export async function sendClientMessage(body: string, imageUrl?: string | null): Promise<string | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) return 'You are signed out — sign in and try again.';
 
   const { data: clientRecord } = await supabase
     .from('clients')
     .select('id, name')
     .eq('auth_user_id', user.id)
     .maybeSingle();
-  if (!clientRecord) return;
+  if (!clientRecord) return 'We could not find your client record.';
 
   const { data: trainerId } = await supabase.rpc("trainer_user_id");
-  if (!trainerId) return;
+  if (!trainerId) return 'No trainer is configured to receive this.';
 
-  await supabase.from('messages').insert({
+  const { error } = await supabase.from('messages').insert({
     from_id: user.id,
     to_id: (trainerId as string),
     client_id: clientRecord.id,
     body,
     image_url: imageUrl || null,
   });
+  if (error) return `Message not sent: ${error.message}`;
   revalidatePath('/messages');
 
   // Notify the trainer. Push is unreliable (single Android token), so we ALSO
@@ -94,6 +109,7 @@ export async function sendClientMessage(body: string, imageUrl?: string | null):
     await sendPushToUser(trainerId as string, NOTIFICATION_EVENTS.MESSAGE_FROM_CLIENT, `New message from ${who}`, (body || '📷 Photo').slice(0, 140), { url: `/messages?client=${clientRecord.id}` });
   } catch (e) { console.error('trainer push failed', e); }
   await emailTrainerNewMessage(who, body || '', !!imageUrl);
+  return null;
 }
 
 export async function sendBroadcastMessage(body: string, imageUrl?: string | null): Promise<number> {
@@ -109,12 +125,21 @@ export async function sendBroadcastMessage(body: string, imageUrl?: string | nul
   const rows = (clients || [])
     .filter((c: any) => c.auth_user_id && c.auth_user_id !== user.id)
     .map((c: any) => ({ from_id: user.id, to_id: c.auth_user_id, client_id: c.id, body, image_url: imageUrl || null, is_broadcast: true }));
+  // The returned count is what the trainer is SHOWN ("sent to 22"). It used to
+  // be rows.length — the number this function intended to send, reported
+  // identically whether the insert landed or was refused outright. A broadcast
+  // that reached nobody said 22.
+  let sent = 0;
   if (rows.length) {
-    await supabase.from('messages').insert(rows);
+    const { data: inserted, error } = await supabase.from('messages').insert(rows).select('id');
+    if (error) return 0;
+    sent = (inserted as { id: string }[] | null)?.length ?? 0;
   }
   revalidatePath('/messages');
-  if (rows.length) {
-    // Self-copy (client_id null) so the trainer can confirm the broadcast went out.
+  if (sent > 0) {
+    // Self-copy (client_id null) so the trainer can confirm the broadcast went
+    // out. Only written if something actually did — a self-copy of a broadcast
+    // that reached nobody is a receipt for a thing that did not happen.
     await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, image_url: imageUrl || null, is_broadcast: true });
   }
 
@@ -126,7 +151,7 @@ export async function sendBroadcastMessage(body: string, imageUrl?: string | nul
     ));
   } catch (e) { console.error('broadcast push failed', e); }
 
-  return rows.length;
+  return sent;
 }
 
 /**
@@ -140,14 +165,17 @@ export async function sendBroadcastMessage(body: string, imageUrl?: string | nul
  * unread in the app, and still turns up in the notification centre; it just
  * does not ring.
  */
-export async function sendGroupMessage(body: string, imageUrl?: string | null, silent = false): Promise<void> {
+export async function sendGroupMessage(body: string, imageUrl?: string | null, silent = false): Promise<string | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, image_url: imageUrl || null, is_group: true });
+  if (!user) return 'You are signed out — sign in and try again.';
+  const { error } = await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, image_url: imageUrl || null, is_group: true });
+  // Before the fan-out: buzzing thirty-five phones about a message that was
+  // never written is the loudest possible way to be wrong.
+  if (error) return `Message not posted to the group: ${error.message}`;
   revalidatePath("/messages");
 
-  if (silent) return;
+  if (silent) return null;
 
   // Push all OTHER group members (every client + the trainer) except the sender.
   // Uses the admin client so the recipient list isn't limited by the sender's RLS.
@@ -165,6 +193,7 @@ export async function sendGroupMessage(body: string, imageUrl?: string | null, s
       sendPushToUser(uid, NOTIFICATION_EVENTS.GROUP_MESSAGE, 'New group message', (body || '📷 Photo').slice(0, 140), { url: '/messages?client=group' }).catch(() => {})
     ));
   } catch (e) { console.error('group push failed', e); }
+  return null;
 }
 
 // Soft-delete: sets deleted_at so a message/thread disappears from every view

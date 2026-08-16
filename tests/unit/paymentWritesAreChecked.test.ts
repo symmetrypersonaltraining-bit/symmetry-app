@@ -129,3 +129,62 @@ for (const fn of ["logCardioSession", "logStrengthSession"]) {
     assert.match(after, /window\.alert\(/, `${fn} fails silently`);
   });
 }
+
+// ── Messages: the push is the reason this one matters ──────────────────────
+//
+// The inserts in sendMessage / sendClientMessage / sendGroupMessage were
+// unchecked and the push fired regardless. A refused write therefore notified
+// the recipient "New message from your coach" about a message that did not
+// exist — they open the app and find nothing — while MessagesClient cleared the
+// input box on the success path, so the sender's typed text was gone too and
+// nothing said why.
+//
+// sendBroadcastMessage returned rows.length: the number it INTENDED to send,
+// reported identically whether the insert landed or was refused outright. A
+// broadcast that reached nobody said "sent to 22".
+//
+// deleteMessage and deleteThread in the same file were given this treatment on
+// 15 Aug for exactly this reason. The send paths were missed.
+
+const MSG_ACTIONS = strip(readFileSync(join(process.cwd(), "src/app/(app)/home/messageActions.ts"), "utf8"));
+const MSG_CLIENT = strip(readFileSync(join(process.cwd(), "src/app/(app)/messages/MessagesClient.tsx"), "utf8"));
+
+for (const fn of ["sendMessage", "sendClientMessage", "sendGroupMessage"]) {
+  test(`${fn} can report failure`, () => {
+    const i = MSG_ACTIONS.indexOf(`export async function ${fn}(`);
+    assert.ok(i > 0, `${fn} not found`);
+    const sig = MSG_ACTIONS.slice(i, MSG_ACTIONS.indexOf("{", i));
+    assert.match(sig, /Promise<string \| null>/, `${fn} still returns void`);
+  });
+
+  test(`${fn} does not notify anyone about a message it failed to write`, () => {
+    const i = MSG_ACTIONS.indexOf(`export async function ${fn}(`);
+    const body = MSG_ACTIONS.slice(i, i + 2600);
+    const guard = body.search(/if \(error\) return `Message not (sent|posted)/);
+    const push = body.indexOf("sendPushToUser");
+    assert.ok(guard > 0, `${fn} has no failure return`);
+    assert.ok(push === -1 || guard < push, `${fn} pushes before it knows the write landed`);
+  });
+}
+
+test("a broadcast reports what LANDED, not what it attempted", () => {
+  const i = MSG_ACTIONS.indexOf("export async function sendBroadcastMessage");
+  const body = MSG_ACTIONS.slice(i, i + 2600);
+  assert.doesNotMatch(body, /return rows\.length;/, "rows.length is the intended count, not the sent count");
+  assert.match(body, /\.insert\(rows\)\.select\('id'\)/, "the count must come from what the database returned");
+  assert.match(body, /return sent;/);
+});
+
+test("a failed send leaves the person's typed message where it was", () => {
+  // Clearing the box is a success signal. Losing what they wrote, with no
+  // explanation, is the part that made this expensive rather than annoying.
+  const i = MSG_CLIENT.indexOf("let sendErr: string | null = null;");
+  assert.ok(i > 0, "the send path no longer captures an error");
+  const after = MSG_CLIENT.slice(i, i + 1400);
+  const guard = after.indexOf("if (sendErr)");
+  const clear = after.indexOf('setBody("")');
+  assert.ok(guard > 0, "no failure branch");
+  assert.ok(clear === -1 || guard < clear, "the input is cleared before the error is checked");
+  assert.match(after.slice(guard, guard + 220), /alert\(sendErr\)/);
+  assert.match(after.slice(guard, guard + 220), /return;/);
+});

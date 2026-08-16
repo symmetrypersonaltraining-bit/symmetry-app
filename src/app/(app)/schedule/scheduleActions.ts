@@ -36,7 +36,18 @@ export async function updateGCalEvent(params: {
     if (params.endIso) updates.ends_at = params.endIso;
 
     if (Object.keys(updates).length > 0) {
-      await supabase.from('appointments').update(updates).eq('id', params.appointmentId);
+      // Checked, because Google has ALREADY been patched by the time we get
+      // here. Unchecked, a refused write left the calendar showing the new time
+      // and the app showing the old one, while this function returned
+      // success — two systems disagreeing about when a client is training, and
+      // nothing anywhere saying so.
+      const { error } = await supabase.from('appointments').update(updates).eq('id', params.appointmentId);
+      if (error) {
+        return {
+          success: false,
+          error: `Google Calendar was updated but the app was not: ${error.message}. They now disagree — refresh and try again.`,
+        };
+      }
     }
 
     return { success: true };
@@ -90,14 +101,20 @@ export async function deleteGCalEvent(params: {
       method: 'DELETE',
     });
 
-    if (params.deleteSeries) {
-      const baseId = params.gcalEventId.split('_')[0];
-      await supabase
-        .from('appointments')
-        .delete()
-        .like('gcal_event_id', `${baseId}%`);
-    } else {
-      await supabase.from('appointments').delete().eq('id', params.appointmentId);
+    // Same again, and worse on this path: the Google event is already gone, so
+    // an unchecked failure here leaves a ghost appointment in the app that no
+    // longer exists on the calendar — and says it was deleted.
+    const { error } = params.deleteSeries
+      ? await supabase
+          .from('appointments')
+          .delete()
+          .like('gcal_event_id', `${params.gcalEventId.split('_')[0]}%`)
+      : await supabase.from('appointments').delete().eq('id', params.appointmentId);
+    if (error) {
+      return {
+        success: false,
+        error: `The calendar event was deleted but the app session was not: ${error.message}. It will still show until this is retried.`,
+      };
     }
 
     return { success: true };

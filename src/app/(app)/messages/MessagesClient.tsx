@@ -202,15 +202,28 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
           return;
         }
       }
+      // Every send path reports failure now, and the reason this matters is the
+      // three lines below: on success this clears the input box. Unchecked, a
+      // refused send wiped what the person had typed and told them nothing —
+      // they had to notice the message was missing and write it again from
+      // memory.
+      let sendErr: string | null = null;
       if (selectedClientId === "group") {
-        await sendGroupMessage(trimmed, imageUrl);
+        sendErr = await sendGroupMessage(trimmed, imageUrl);
       } else if (isTrainer && selectedClientId === "broadcast") {
         const n = await sendBroadcastMessage(trimmed, imageUrl);
-        setBroadcastSent(n);
+        // n is what actually landed, not what was attempted.
+        if (n === 0) sendErr = "That broadcast reached nobody — nothing was sent.";
+        else setBroadcastSent(n);
       } else if (isTrainer && selectedClientId) {
-        await sendMessage(selectedClientId, trimmed, imageUrl);
+        sendErr = await sendMessage(selectedClientId, trimmed, imageUrl);
       } else {
-        await sendClientMessage(trimmed, imageUrl);
+        sendErr = await sendClientMessage(trimmed, imageUrl);
+      }
+      if (sendErr) {
+        // Leave the text and the attachment exactly where they are.
+        alert(sendErr);
+        return;
       }
       setBody("");
       clearAttach();

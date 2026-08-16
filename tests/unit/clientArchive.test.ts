@@ -27,7 +27,13 @@ function src(rel: string): string {
 /** Each entry: file, and a snippet that must carry the archived filter. */
 const ROSTER_QUERIES: { file: string; near: string }[] = [
   { file: "app/(app)/home/messageActions.ts", near: "sendBroadcastMessage" },
-  { file: "app/(app)/home/messageActions.ts", near: "sendGroupMessage" },
+  // Anchored on the roster query itself, not the function name. It was
+  // "sendGroupMessage" until 16 Aug, when that function grew an error check and
+  // the query slid out of the +900 window — a passing guard turned failing
+  // because of a change three lines above it, which teaches people to widen the
+  // window. Widening is the wrong repair: the point of a narrow window is that
+  // the filter sits in the SAME query expression. A tighter anchor keeps that.
+  { file: "app/(app)/home/messageActions.ts", near: "admin.from('clients')" },
   { file: "app/(app)/messages/page.tsx", near: "allClients" },
   { file: "app/api/attention/route.ts", near: "primary_goal, created_at" },
   { file: "app/api/ai-nudges/route.ts", near: "primary_goal, auth_user_id" },

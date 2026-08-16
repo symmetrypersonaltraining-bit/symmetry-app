@@ -50,6 +50,25 @@ and say so.
   result was not, which is the half that let it run wrong. Callers now catch and
   say what failed. Four assertions, mutation-tested.
 
+- **`schedule/scheduleActions.ts` — fixed.** Both functions already returned
+  `{success, error}`, and both patched or deleted the Google Calendar event
+  BEFORE the unchecked Supabase write. So a refused write left Google showing the
+  new time and the app the old one, or the calendar event gone and a ghost
+  session still in the app — and returned `success: true` either way. The errors
+  now say which side landed, because "it half worked" is the only useful thing
+  to tell someone staring at two calendars that disagree.
+
+- **`home/messageActions.ts` + `MessagesClient.tsx` — fixed.** The inserts were
+  unchecked and the push fired regardless: a refused write notified the
+  recipient "New message from your coach" about a message that did not exist,
+  while the sender's input box was cleared on the success path — so their typed
+  text was gone and nothing said why. `sendBroadcastMessage` returned
+  `rows.length`, the number it INTENDED to send, so a broadcast that reached
+  nobody reported "sent to 22"; it now returns what the database gave back.
+  Every send returns before pushing. Nine assertions, mutation-tested.
+  `markMessageRead` is left alone deliberately — a read receipt that fails
+  misleads no one.
+
 ## Not to be touched without Dustin's per-item permission
 
 `WorkoutLogger.tsx`, `NutritionV3Client.tsx`, `MealPlanClient.tsx` — 11 sites.
@@ -68,13 +87,11 @@ error has nowhere useful to go.
 
 ## Next, in priority order — by who gets lied to
 
-1. **`schedule/scheduleActions.ts`** (3) — appointment update/delete from server
-   actions. `schedule/actions.ts` is done; this is the other half.
-2. **`home/messageActions.ts`** (6) — a message that appears sent and was not.
-3. **`api/invite-client`, `api/create-client`, `api/create-client-from-assessment`,
-   `api/complete-onboarding`, `set-password`** (7) — onboarding, where a half-written
-   client is worse than a failed one.
-4. **`api/challenge`, `api/program-feedback`, `api/focus-drafts`,
+1. **`api/invite-client`, `api/create-client`,
+   `api/create-client-from-assessment`, `api/complete-onboarding`,
+   `set-password`** (7) — onboarding, where a half-written client is worse than a
+   failed one.
+2. **`api/challenge`, `api/program-feedback`, `api/focus-drafts`,
    `api/video-candidates/*`** — trainer-facing, lower stakes.
 5. **`api/cron/*`, `api/weekly-ai`, `api/coach/focus`** — no human waiting, but a
    silent failure here is invisible for weeks. Logging is enough; alerts are not.
