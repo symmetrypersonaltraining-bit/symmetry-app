@@ -74,6 +74,13 @@ claim about your plan was not.
 5. **Supabase Pro** if you ever want the other 4M foods and the full micros. Not
    urgent — the catalog stops growing now and the barcode scanner backfills any
    product a client actually scans.
+6. **Exercise video ceiling: 30 seconds or 60?** They currently disagree —
+   `verify/route.ts` says `MAX_SECONDS = 60`, the database job that actually runs
+   says 30. Found by watching it reject clips at 48s, 49s and 53s tonight, all
+   inside the documented ceiling. Aligning to 60 gains one or two exercises, so
+   the number matters less than the fact that one rule has two homes and the
+   analysis in `EXERCISE-VIDEOS-THE-REAL-NUMBERS.md` was written against the one
+   the system does not enforce. Addendum added to that document.
 
 `UPSTREAM_SYNC_TOKEN` and `VERCEL_DEPLOY_HOOK` came OFF this list during the
 night: the sync now uses GitHub's built-in token, and v2's Vercel is already

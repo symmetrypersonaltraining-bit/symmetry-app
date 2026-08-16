@@ -102,3 +102,52 @@ queries, which is the worst possible condition for a job that is mostly writes.
 Everything above it on the night's list was finished. This was left, deliberately
 and with the numbers corrected, rather than half-done against a database that
 could not take it.
+
+---
+
+# ADDENDUM, 16 Aug — the ceiling is 30 seconds, not 60
+
+**Everything above is measured against a 60-second ceiling. The automation does
+not use 60.**
+
+Two places define the same rule and they disagree:
+
+| Where | Ceiling |
+|---|---|
+| `src/app/api/video-candidates/verify/route.ts` | `MAX_SECONDS = 60` |
+| `public.measure_video_durations()` in the database | **30** |
+
+The database function marks anything over **30** seconds `too_long`
+(`status = case when v_secs <= 30 then 'pending' else 'too_long' end`) and only
+auto-applies candidates at `duration_sec <= 30`. So a 45-second clip is
+acceptable to the route and rejected by the job that actually runs.
+
+Found by watching it happen. Ten candidates were seeded on 16 Aug for the five
+exercises that had no candidate at all; the job measured them within minutes and
+auto-approved four. Three were marked `too_long` at **48s, 49s and 53s** — all
+comfortably inside the documented ceiling.
+
+## What it is worth in practice
+
+Measured against the live table, for exercises with no video and at least one
+measured candidate (46 of them):
+
+| shortest candidate | exercises |
+|---|---|
+| ≤ 30s (auto-approves today) | 0 |
+| **31–60s (rejected today, would pass at 60)** | **1** |
+| 61–90s | 16 |
+| over 90s | 29 |
+
+So aligning the database to 60 gains roughly **one or two exercises**, not
+sixteen. The argument in the body of this document still holds: the fix is
+finding shorter clips, not moving the line.
+
+**The disagreement is the bug, regardless of the number.** Two sources of truth
+for one rule means the analysis above was written against a ceiling the system
+does not enforce — and anyone reasoning about "the 60-second rule" has been
+reasoning about the wrong thing.
+
+**Needs Dustin: 30 or 60?** 30 is a demonstration; 60 is what the code says and
+what the reasoning in `verify/route.ts` argues for. Whichever he picks, it should
+live in ONE place and the other should read it.
