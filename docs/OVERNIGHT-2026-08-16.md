@@ -27,6 +27,8 @@ the final version.
 | `21660f5` | Plan builder actually uses the meal library — and a correction |
 | `30106f7` | Payments screen stops showing changes that never landed |
 | `76765d9` | Coach's Read orphan deleted |
+| `59c0806` | Payments screen + video queue stop reporting writes that failed |
+| `779a787` | **The duration job stops publishing videos nobody has looked at** |
 | `3c59a08` | A meal you TYPE keeps its nutrients — three layers were dropping them |
 
 ### Added mid-session, and it turned out to be the big one
@@ -46,6 +48,50 @@ thread (`047c801`).
 **A separate "messages from Dustin, not the AI" preference was NOT built,
 because it already exists** — `MESSAGE_FROM_COACH` in `notificationEvents.ts`.
 It was never the problem. Nothing had a delivery route.
+
+### The one to read first
+
+**No video in this app has ever been approved by a person.**
+
+    select count(*) filter (where status='approved' and applied_at is not null),
+           count(*) filter (where status='approved' and applied_at is null)
+    from exercise_video_candidates;
+    → 179 auto-applied, 0 reviewed by hand
+
+792 exercises have a video. 617 came from the original library and are not in
+question. The other **175 were found by an agent web search and published to
+clients by a cron job**, unreviewed, every ten minutes.
+
+`/api/video-candidates/decide/route.ts` opens with the rule in its own words:
+*"The candidates came out of a web search run by an agent, which is a perfectly
+good way to find a demo of a Romanian deadlift and a perfectly good way to find
+a fourteen-minute critique of one. Nothing found that way goes in front of a
+client without a human looking at it first."* The staging table, the review
+screen, the approve/reject/undo route and the previous-URL stash all exist to
+enforce that sentence. `measure_video_durations()` reached straight past every
+one of them.
+
+The queue was not being skipped — it was being run AFTER publication. Its
+"live" list is videos already in front of clients, sorted longest-first, with an
+undo. Review after the fact is a different product from review before it.
+
+**What I did:** removed the apply loop, left the measuring half alone (it holds
+the YouTube key and nothing else can do that job), and **left all 175 live
+videos exactly where they are** — pulling demos off clients' screens overnight
+on nobody's say-so is worse than leaving them up, and every one is reviewable
+with a working undo from the queue screen. Reversible: the old definition is
+stored verbatim in `bak_measure_video_durations_20260816`.
+
+**What I did NOT do:** touch the 30-vs-60-second ceiling. Both are running and
+the table proves it — ten candidates between 35 and 60 seconds sit `pending`
+(measured by `verify/route.ts`, ceiling 60) while three at 48, 49 and 53 sit
+`too_long` (measured by the DB function, ceiling 30), all created within the
+same hour. That is your question to answer, not mine to guess.
+
+**One thing worth knowing before you review them:** the 46 exercises still
+without a video mostly DO have a candidate — rejected for length, and only one
+of them is under 60 seconds. Raising the ceiling to 60 buys you one exercise.
+The rest genuinely need shorter clips.
 
 ### The four that matter most
 
@@ -493,8 +539,17 @@ One judgement worth recording: the exercise is *Lunge to Balance **Sagittal
 Plane***. Clips titled "Frontal" and "Transverse" came back in the same search
 and were deliberately not used — a demo of the wrong plane is worse than no demo.
 
-**Still open:** the 47 rejected-for-length exercises. That is a real search job
-and wants a session with fresh WebSearch budget.
+**Still open:** the rejected-for-length exercises — 46 now, re-counted against
+the live table. Worth knowing before anyone spends a session on it: **only ONE
+of them has a candidate under 60 seconds** (Medicine Ball Slam with Squat, 48s).
+Raising the ceiling buys a single exercise. The other 45 shortest candidates run
+61 seconds to eighteen minutes, so this is genuinely a search job, not a
+threshold argument.
+
+**And the thing that made this item worth opening at all:** re-measuring it
+turned up that `measure_video_durations()` was PUBLISHING candidates, not just
+measuring them — see "The one to read first" at the top. That is now stopped
+(`779a787`), reversibly, with the live videos left alone.
 
 
 ### [x] H. `coach_read` orphan — DELETED
