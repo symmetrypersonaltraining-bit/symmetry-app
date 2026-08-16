@@ -4,14 +4,20 @@
 things that genuinely need Dustin. Scheduled sessions read this, take the top
 unfinished item, ship it, tick it off here, and stop.
 
-Last updated by the 15 Aug evening session at **23:55 CT**.
+Last updated **02:40 CT, Sunday 16 Aug**, mid-session.
 
 ---
 
 ## MORNING SUMMARY — read this, then stop reading
 
-Written at **00:20 CT**. Later runs update it; if the timestamp says 05:xx it is
-the final version.
+Written at **02:40 CT**. Later runs update it; if the timestamp says 05:xx it
+is the final version.
+
+**If you read three things:** the video pipeline was publishing to clients on
+its own and no video in the app had ever been approved by a person (stopped);
+your Saturday review queue has been empty because the publisher crashed on 9 Aug
+and has not had a Sunday since (fixed already, fires tomorrow); and push still
+needs two keys from you before any client can be notified about anything.
 
 ### Shipped to live, each gated and verified
 
@@ -27,10 +33,14 @@ the final version.
 | `21660f5` | Plan builder actually uses the meal library — and a correction |
 | `30106f7` | Payments screen stops showing changes that never landed |
 | `76765d9` | Coach's Read orphan deleted |
-| `59c0806` | Payments screen + video queue stop reporting writes that failed |
-| `779a787` | **The duration job stops publishing videos nobody has looked at** |
-| `a14a5a9` | The second auto-publisher removed; video item closed on the numbers |
 | `3c59a08` | A meal you TYPE keeps its nutrients — three layers were dropping them |
+| `804d0d2` | Three routes stop reporting writes that never landed |
+| `88af90b` | **The AI agent stops saying "Undone" when nothing was undone** |
+| `59c0806` | Payments screen + video queue stop reporting writes that failed |
+| `2535e31` | **The duration job stops publishing videos nobody has looked at** |
+| `4736142` | Why the Saturday review queue has always been empty |
+| `493842a` | The second auto-publisher removed; video item closed on the numbers |
+| `cf61e52` | The AI workout builder stops handing over a workout it failed to write |
 
 ### Added mid-session, and it turned out to be the big one
 
@@ -290,15 +300,16 @@ users — so the schema catch-up can be done from here without Dustin.
 
 ---
 
-## STATE RIGHT NOW — 23:55 CT
+## STATE RIGHT NOW — 02:40 CT
 
 | | |
 |---|---|
-| `origin/main` (live) | `f2598da`, shipped and verified |
-| Unit tests | **1,190 passed, 0 failed**; `tsc` 0 errors in `src/` |
-| Ship bridge | **v2, repo-aware, up** — proved itself on three real pushes tonight |
+| `origin/main` (live) | `cf61e52`, shipped and verified against `origin/main` |
+| Unit tests | **1,355 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
+| Ship bridge | **v2, repo-aware, up** — eight real pushes tonight, no failures |
 | Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
-| `symmetry-app-v2` repo | **seeded** — main is live main byte for byte (`f2598da`) |
+| Video pipeline | **no longer publishes on its own**, from either place. 175 live videos untouched, all reviewable |
+| `symmetry-app-v2` repo | **seeded** — main is live main byte for byte |
 | `symmetry-app-v2.vercel.app` | serving, but an OLDER build — `/api/health` 404s. Confirm this. |
 | Dev Supabase `giiovjfpbuzmrvpdglhv` | **caught up** — 88 tables, 1,169 columns, 166 policies |
 
@@ -306,12 +317,11 @@ Both food import cron jobs are **stopped** (`off-bulk-import` job 36,
 `off-micros-backfill` job 39). Do not restart them without Dustin: the catalog
 cannot grow further on the free tier. `trim-off-catalog` has been unscheduled.
 
----|---|
-| `origin/main` (live) | `1e5c8ad` — pending ship |
-| Unit tests | green |
-| Ship bridge | **v2, repo-aware, up** (`alive … v=2 repos=symmetry-app,symmetry-app-v2`) |
-| Live Supabase | trim in progress, see below |
-| Dev Supabase `giiovjfpbuzmrvpdglhv` | ACTIVE_HEALTHY, own org, schema from 3 Aug |
+Every pg_cron job's run history was swept tonight. Apart from the focus
+publisher (documented above) the only real failure in 21 days was
+`detect_schedule_changes_12h` hitting `uq_scp_open` once on 31 Jul; it has
+succeeded every run since. Everything else marked failed is `job startup
+timeout` on 15 Aug — a Supabase-side blip that cleared on the next run.
 
 ---
 
@@ -540,7 +550,7 @@ and the onboarding routes were done earlier in the night. Then, in `804d0d2`,
 
 | Surface | What was being said that was not true |
 |---|---|
-| `/api/focus-drafts` | Every write unchecked, every answer `{ ok: true }`. A failed APPROVAL published nothing, returned 200 and cleared the queue off his screen — and Sunday's 6am fallback then published all 35 drafts unreviewed. That is the outcome the review screen exists to prevent. |
+| `/api/focus-drafts` | Every write unchecked, every answer `{ ok: true }`. A failed APPROVAL published nothing, returned 200 and cleared the queue off his screen — and Sunday's 6am fallback is then supposed to publish all 35 unreviewed. That is the outcome the review screen exists to prevent. (In fact the fallback has been crashing since 9 Aug — see above — so nothing published at all, which is a different failure of the same feature.) |
 | `/api/program-feedback` | The write that IS the answer was unchecked; `delivered` meant "was it substantive", not "did it arrive". Both best-effort writes were wrapped in try/catch, which cannot work. |
 | `/api/challenge` | `join` swallowed every error to forgive a duplicate. `start` ends the running challenge before inserting the new one, unchecked — causing the one thing that write prevents: two live at once. |
 | `agent-tools.ts` undo | **The worst of them.** The whole undo block is a try/catch over PostgREST calls, which never throw — so every failed reversal answered "Undone: …" in prose. The file's own comment says it: "the undo would silently do nothing and report success — which is worse than not offering undo at all." |
