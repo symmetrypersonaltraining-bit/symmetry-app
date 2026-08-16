@@ -28,6 +28,24 @@ the final version.
 | `30106f7` | Payments screen stops showing changes that never landed |
 | `76765d9` | Coach's Read orphan deleted |
 
+### Added mid-session, and it turned out to be the big one
+
+**Dustin: "Noone is chatting in the group chat. confirm they are getting
+notification."** They were not. **29 active clients, 2 device tokens.** Not
+switched off — unreachable. `PushRegister` only ever worked inside the Android
+APK, and the service worker had no push handling at all. A hundred group
+messages in a fortnight; 27 people were never told about one of them.
+
+Web Push built and shipped (`48814b1`): service worker handlers, subscriptions
+table, a sender that is inert until keys exist, both delivery routes fired
+independently, and the permission ask behind a button rather than a page-load
+prompt. The bell and message tab now flash properly and both land on the group
+thread (`047c801`).
+
+**A separate "messages from Dustin, not the AI" preference was NOT built,
+because it already exists** — `MESSAGE_FROM_COACH` in `notificationEvents.ts`.
+It was never the problem. Nothing had a delivery route.
+
 ### The four that matter most
 
 1. **Your live database was headed off a cliff.** `food_catalog` was 891 MB of a
@@ -74,7 +92,15 @@ claim about your plan was not.
 5. **Supabase Pro** if you ever want the other 4M foods and the full micros. Not
    urgent — the catalog stops growing now and the barcode scanner backfills any
    product a client actually scans.
-6. **Exercise video ceiling: 30 seconds or 60?** They currently disagree —
+6. **VAPID keys, so push actually works.** Two env vars plus a redeploy —
+   `docs/PUSH-SETUP-FOR-DUSTIN.md` has the exact steps. **Until these exist, no
+   client can be notified about anything**, which is why the group chat is
+   silent. This is the highest-value thing on your list.
+7. **Read and send the group message** —
+   `docs/GROUP-MESSAGE-DRAFT-2026-08-16.md`. Drafted, deliberately NOT sent:
+   asking people to turn notifications on before push works, at 1am, is the
+   fastest way to get the group muted. Send it in the morning, after the keys.
+8. **Exercise video ceiling: 30 seconds or 60?** They currently disagree —
    `verify/route.ts` says `MAX_SECONDS = 60`, the database job that actually runs
    says 30. Found by watching it reject clips at 48s, 49s and 53s tonight, all
    inside the documented ceiling. Aligning to 60 gains one or two exercises, so
