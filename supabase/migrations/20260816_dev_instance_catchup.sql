@@ -717,44 +717,79 @@ begin
   end loop;
 end $$;
 
--- ── dev_catchup_06_functions_and_triggers  (applied to dev as 20260816035434) ─────────
+-- ── dev_catchup_06_functions_and_triggers  (applied to dev as REPLACED) ─────
 
-create or replace function public.touch_movement_assessments()
-returns trigger language plpgsql as $function$
-begin new.updated_at = now(); return new; end $function$;
+-- INSTALL ONLY IF ABSENT. This section creates the two trigger functions and
+-- their triggers, and it will not overwrite either one if it is already there.
+--
+-- The first attempt used the replace-and-recreate idiom, and
+-- libraryNeedsItsMigration.test.ts refused it. The test was right to. The
+-- recipe publish gate is what stops one client publishing a recipe to
+-- everybody else, and when the twenty library recipes came back invisible on
+-- 15 Aug, loosening that gate was the tempting fix. (The real cause: the
+-- service role is not a trainer, so the gate quietly rewrote `public` to
+-- `private` on the way in while the route answered {"ok":true,"recipes":20} —
+-- which was true, the inserts had succeeded. The fix was a read policy for
+-- library rows, not a looser gate.)
+--
+-- On dev this is a first install, which is legitimate. But a migration that
+-- CAN overwrite that definition is one that WILL, the day somebody points it
+-- at the wrong database. Creating only when absent is strictly safer than the
+-- idiom the guard objected to, so the guard stays exactly as it is.
 
--- The recipe publish gate. Worth stating plainly because it caused a real
--- incident on live: the service role is NOT a trainer, so a bulk insert of
--- public library recipes is silently downgraded to private by this trigger and
--- the route still returns 200 with correct-looking counts. The fix there was a
--- read policy for library rows (client_id is null), NOT weakening this.
-create or replace function public.enforce_recipe_publish()
-returns trigger language plpgsql security definer set search_path to 'public' as $function$
+do $$
 begin
-  if tg_op = 'INSERT' then
-    if new.visibility = 'public' and not is_trainer() then
-      new.visibility := 'private';
-    end if;
-    return new;
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'touch_movement_assessments'
+  ) then
+    execute $fn$
+      create function public.touch_movement_assessments()
+      returns trigger language plpgsql as $body$
+      begin new.updated_at = now(); return new; end $body$;
+    $fn$;
   end if;
-  if new.visibility is distinct from old.visibility
-     and (new.visibility = 'public' or old.visibility = 'public')
-     and not is_trainer() then
-    new.visibility := old.visibility;
+
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'enforce_recipe_publish'
+  ) then
+    execute $fn$
+      create function public.enforce_recipe_publish()
+      returns trigger language plpgsql security definer set search_path to 'public' as $body$
+      begin
+        if tg_op = 'INSERT' then
+          if new.visibility = 'public' and not is_trainer() then
+            new.visibility := 'private';
+          end if;
+          return new;
+        end if;
+        if new.visibility is distinct from old.visibility
+           and (new.visibility = 'public' or old.visibility = 'public')
+           and not is_trainer() then
+          new.visibility := old.visibility;
+        end if;
+        new.updated_at := now();
+        return new;
+      end $body$;
+    $fn$;
   end if;
-  new.updated_at := now();
-  return new;
-end $function$;
 
-drop trigger if exists trg_touch_movement_assessments on public.movement_assessments;
-create trigger trg_touch_movement_assessments
-  before update on public.movement_assessments
-  for each row execute function touch_movement_assessments();
+  if not exists (
+    select 1 from pg_trigger t join pg_class c on c.oid = t.tgrelid
+    where c.relname = 'movement_assessments' and t.tgname = 'trg_touch_movement_assessments'
+      and not t.tgisinternal
+  ) then
+    execute 'create trigger trg_touch_movement_assessments before update on public.movement_assessments for each row execute function touch_movement_assessments()';
+  end if;
 
-drop trigger if exists trg_recipe_publish on public.recipes;
-create trigger trg_recipe_publish
-  before insert or update on public.recipes
-  for each row execute function enforce_recipe_publish();
+  if not exists (
+    select 1 from pg_trigger t join pg_class c on c.oid = t.tgrelid
+    where c.relname = 'recipes' and t.tgname = 'trg_recipe_publish' and not t.tgisinternal
+  ) then
+    execute 'create trigger trg_recipe_publish before insert or update on public.recipes for each row execute function enforce_recipe_publish()';
+  end if;
+end $$;
 
 -- ── dev_catchup_07_missing_columns  (applied to dev as 20260816035639) ────────────────
 
