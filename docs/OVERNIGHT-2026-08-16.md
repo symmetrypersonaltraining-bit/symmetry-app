@@ -4,14 +4,13 @@
 things that genuinely need Dustin. Scheduled sessions read this, take the top
 unfinished item, ship it, tick it off here, and stop.
 
-Last updated **03:50 CT, Sunday 16 Aug**, mid-session.
+Last updated **04:10 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
 
 ---
 
 ## MORNING SUMMARY — read this, then stop reading
 
-Written at **03:50 CT**. Later runs update it; if the timestamp says 05:xx it
-is the final version.
+Written at **04:10 CT**, after the last queue item shipped.
 
 **If you read three things:** the video pipeline was publishing to clients on
 its own, from two places, and no video in this app had ever been approved by a
@@ -59,6 +58,9 @@ of it threw an error, because none of it ever asked.
 | `c58ff31` | Live app verified healthy on tonight's code |
 | `47d1b99` | NEEDS YOU list reordered by value |
 | `ceef51f` | **The streak counted sessions nobody finished** |
+| `db3b2fa` | Final state refresh |
+| `42d24e9` | **The streak the AI quotes was capped at 30 without saying so** |
+| `3074d88` | Unchecked-writes inventory brought in line with reality |
 
 ### Added mid-session, and it turned out to be the big one
 
@@ -357,15 +359,40 @@ inconsistency, and picking which definition wins is a coaching decision, not a
 GitHub's built-in token now, and v2's Vercel is connected to git and deployed
 the seed by itself.
 
-### Left deliberately undone
+### Left undone, and why — the honest list
+
+Nothing on this list is forgotten. Each one is here because doing it would have
+been worse than not doing it.
 
 - **Photos for the meal library.** Wikimedia Commons is cache-only for this
-  environment's fetch tool, so the image URL, licence and author cannot be
-  retrieved — and hotlinking without a licence is a copyright problem, not a
-  formatting one. Written up in item E with what would work instead.
-- **The other 47 exercises without videos**, which need a real search pass.
-- **The remaining unchecked writes** — inventoried with the question that
-  decides each one, rather than blanket-fixed on a weak signal.
+  environment's fetch tool: web SEARCH returns Commons results fine, but the
+  direct image URL, the licence and the attribution line cannot be retrieved.
+  Hotlinking without a licence is a copyright problem, not a formatting one, so
+  it was stopped rather than bodged. Item E has what would work instead.
+- **Shorter clips for the 48 exercises with no video.** Not deferred — **closed
+  on the numbers.** Not one of them is programmed for anybody, and all 616
+  exercises that ARE programmed already have a video. It was work with no user
+  on the other end.
+- **The 30-vs-60-second video ceiling.** Two homes, one rule, both running.
+  Picking a number is yours; the evidence is in the doc and the number turns out
+  to matter far less than it looks.
+- **`aiItemsToCustom` in `NutritionV3Client.tsx`.** Four of 33 nutrients, ten
+  lines, guard already written — and an off-limits file. Waiting on one word.
+- **Unifying the three streak calculations.** Two sources, disagreeing on 92
+  client-days across 21 clients — but **no client sees a different number
+  today**, so changing what the AI tells everyone on a latent inconsistency was
+  not a 4am call. The cap that WAS actively wrong got fixed; the definition
+  split did not.
+- **What to tell a client when only half a workout write lands.** Made to report
+  rather than fail, because by that point the session IS logged and saying
+  "not logged" is its own lie. The remaining choice is a product decision.
+- **Whether a session should be recordable as Modified or Partial at all.** The
+  database has allowed it for two years; the app has never offered it, and all
+  977 rows say the same thing. That is a question about coaching, not a bug.
+- **The remaining 67 unchecked writes.** 12 in off-limits files, 22 on
+  fire-and-forget tables, the rest singles with nowhere useful for an error to
+  go. Every one was read against the same question rather than assumed — which
+  is how three that were NOT harmless got caught on the way past.
 
 ---
 
@@ -408,13 +435,13 @@ users — so the schema catch-up can be done from here without Dustin.
 
 ---
 
-## STATE RIGHT NOW — 03:50 CT
+## STATE RIGHT NOW — 04:10 CT
 
 | | |
 |---|---|
-| `origin/main` (live) | `ceef51f`, shipped and verified against `origin/main` |
-| Unit tests | **1,397 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
-| Ship bridge | **v2, repo-aware, up** — nineteen real pushes tonight, no failures |
+| `origin/main` (live) | `3074d88`, shipped and verified against `origin/main` |
+| Unit tests | **1,402 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
+| Ship bridge | **v2, repo-aware, up** — twenty-two real pushes tonight, no failures |
 | Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
 | Video pipeline | **no longer publishes on its own**, from either place. 175 live videos untouched, all reviewable |
 | Live app | **verified healthy at 03:18 CT** — `/api/health` on `6dc889a`, auth 208 ms, db 344 ms, `ok: true`. Vercel is deploying tonight's commits. |
