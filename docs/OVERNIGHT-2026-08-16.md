@@ -8,6 +8,89 @@ Last updated by the 15 Aug evening session at **23:55 CT**.
 
 ---
 
+## MORNING SUMMARY — read this, then stop reading
+
+Written at **00:20 CT**. Later runs update it; if the timestamp says 05:xx it is
+the final version.
+
+### Shipped to live, each gated and verified
+
+| SHA | What |
+|---|---|
+| `aa6f61c` | Ship bridge made repo-aware and put in the repo |
+| `1e5c8ad` | A dev instance can no longer redeploy the LIVE app; nightly dev sync added |
+| `9b68265` | Overnight queue + the dev-is-a-month-behind finding |
+| `f2598da` | Recipe publish gate installs only when absent |
+| `b3aa4c1` | Dev sync needs no hand-created secret |
+| `d445002` | Food logger stopped throwing away 29 of a food's 33 nutrients |
+| `86727f7` | **Meal plans can be scheduled ahead and seen ahead** |
+| `21660f5` | Plan builder actually uses the meal library — and a correction |
+| `30106f7` | Payments screen stops showing changes that never landed |
+| `76765d9` | Coach's Read orphan deleted |
+
+### The four that matter most
+
+1. **Your live database was headed off a cliff.** `food_catalog` was 891 MB of a
+   956 MB database and only 38% imported; finished it would have been ~3.5 GB
+   against a 0.5 GB free-tier allowance, and the import was taking CPU from real
+   clients' requests. Trimmed to the US catalog on your call: **956 MB → 363 MB**,
+   574,605 foods, under the limit with 137 MB spare. Both import jobs stopped.
+2. **Dylan's instance was a month behind in the DATABASE**, not a few days, and
+   nobody was looking there. 35 missing tables including `recipes`. Now caught
+   up: 53 → 88 tables, 1,169 columns, zero missing against live.
+3. **symmetry-app-v2 is seeded with your live code** — stuck since 20 July,
+   because the ship bridge could only ever push to one repo. It can now push to
+   both, and live can never be force-pushed from it.
+4. **Meal plans can be scheduled ahead.** Two database guards refused any future
+   date; scheduled plans were invisible until the morning they started; three
+   code paths archived future plans on the way past; and the AI coach was
+   reading tomorrow's plan as today's.
+
+### What I got wrong, so you do not have to find it
+
+I reported that your **v3 plan dated 24 Aug had been destroyed** by the archive
+bug. It had not. You questioned it and you were right — that row's own
+`change_reason` ends "SUPERSEDED by BULK v2 on Aug 16, 2026 — never activated".
+It was replaced deliberately by a plan starting the 17th. I matched an archived
+future-dated plan to a bug I had just found and asserted the cause without
+reading the evidence that was already in the row. The bug is real and fixed; the
+claim about your plan was not.
+
+### NEEDS YOU — the whole list
+
+1. **`ANTHROPIC_API_KEY` on the symmetry-app-v2 Vercel project.** The variable
+   must be named exactly that — you created `ANTHROPIC_API_KEY_2`, which the app
+   never reads (34 call sites, all `ANTHROPIC_API_KEY`). There is also one from
+   3 Aug already sitting there; if that one still works you need nothing.
+   **Env vars only apply on a NEW deployment** — nothing you set takes effect
+   until something redeploys.
+2. **Invite the tester to the Symmetry Dev Supabase org** —
+   `https://supabase.com/dashboard/org/qmfsauherdswigrbhklh/team`, that org only,
+   never the live one. Send me the email address when you know it and the
+   trainer-identity change is five minutes: one env var and one migration.
+3. **Your 24 Aug plan** stays archived unless you say otherwise. Correctly
+   archived as far as I can tell — nothing to do.
+4. **17 clients run out of programming on 31 Aug.** Your call, not a build task.
+5. **Supabase Pro** if you ever want the other 4M foods and the full micros. Not
+   urgent — the catalog stops growing now and the barcode scanner backfills any
+   product a client actually scans.
+
+`UPSTREAM_SYNC_TOKEN` and `VERCEL_DEPLOY_HOOK` came OFF this list during the
+night: the sync now uses GitHub's built-in token, and v2's Vercel is already
+connected to git and deployed the seed by itself.
+
+### Left deliberately undone
+
+- **Photos for the meal library.** Wikimedia Commons is cache-only for this
+  environment's fetch tool, so the image URL, licence and author cannot be
+  retrieved — and hotlinking without a licence is a copyright problem, not a
+  formatting one. Written up in item E with what would work instead.
+- **The other 47 exercises without videos**, which need a real search pass.
+- **The remaining unchecked writes** — inventoried with the question that
+  decides each one, rather than blanket-fixed on a weak signal.
+
+---
+
 ## THE BIG FINDING OF THE NIGHT — Dylan's instance is a MONTH behind, in the database
 
 Dustin asked whether v2 gets "all the updates we added in the last few days".
@@ -295,47 +378,62 @@ Next, by who gets lied to: schedule actions (6), message actions (6), the
 onboarding routes (7), then trainer-facing, then cron. The three logger files
 (11 sites) are OFF LIMITS and listed only so they are not forgotten.
 
-### [ ] E. Photographs for the meal library, by URL
+### [ ] E. Photographs for the meal library — BLOCKED HERE, and here is why
 
-Dustin asked for images. Nothing here can generate or download them — but they
-do not need downloading. Open Food Facts publishes an image URL for most catalog
-products, and Wikimedia Commons has permissively-licensed food photography for
-the 50 meals and 20 recipes. Store the URL and the attribution; costs nothing in
-storage. Add a column, wire it through the meal and recipe cards, leave it null
-where nothing decent exists rather than shipping a wrong photo.
+Attempted and stopped rather than bodged. **Wikimedia Commons is cache-only for
+this environment's fetch tool** — both the MediaWiki API and individual `File:`
+pages return "This domain is cache-only and cannot be fetched". Web SEARCH
+returns Commons results fine, so the photographs are findable; what cannot be
+retrieved is the **direct image URL, the licence and the attribution line**.
 
-### [x] F. Micronutrients below the day level — DONE (`d445002`)
+Hotlinking a Commons image without its licence and author is a copyright
+problem, not a formatting one, so guessing the URL pattern from the filename was
+not an option. Working around the fetch restriction with curl or a script is
+explicitly out of bounds.
 
-The day total already had it and must not be rebuilt — a previous session
-grepped for the panel's call site with `grep -v dailyTotals.ts`, the one file
-that calls it, concluded "called from nowhere", and shipped a duplicate.
+**What would work, for whoever picks this up:**
 
-What was actually missing turned out to be worse than a missing panel.
-`FoodSearchSheet` carried fiber/sugar/sodium/satFat on its type, scaled them
-correctly, and took real care that "0.4 of an unknown sodium is still unknown" —
-but never read `food_catalog.micros`, the jsonb holding the other 29. And
-`CustomItem.mi` already existed for exactly that bag, written by the AI path and
-read by the registry. Only this sheet never filled it.
+- Open Food Facts publishes an image URL per product in the same JSON
+  `/api/nutrition-ai/barcode-lookup` already fetches server-side. Adding
+  `image_url` to `food_catalog` on that path costs one column and gets photos on
+  the foods clients actually scan — better value than 70 stock photos of
+  prepared meals. Storage cost is a URL, roughly 46 MB across the catalog, which
+  needs weighing against the 137 MB of headroom the trim just bought.
+- For the 50 meals and 20 recipes, a session whose fetch tool can reach Commons
+  (or Openverse) can collect URL + licence + author properly.
 
-So a food with a complete lab-measured panel — every USDA whole food, which is
-what every meal plan is written from — became a four-nutrient food the instant a
-client logged it, and the day total understated itself with nothing on screen to
-say so. No error, no warning, numbers that look entirely reasonable.
+**Plumbing not yet built either** — neither `LibraryMeal` nor the recipe type has
+an image field, and `recipes.image_url` exists but is unused. Worth doing in the
+same pass as the content, not before it: shipping empty plumbing just moves the
+question.
 
-Fixed at the source (`mapRow` reads micros, `pickItem` passes the scaled map),
-and the picker now shows them for the portion about to be logged: grouped,
-percent of a general daily reference and labelled as such, and an honest "no
-nutrient detail published for this food" instead of a grid of dashes. Everything
-renders through the registry; no formatter written locally.
 
-**`ComposerSheet` still has no nutrient handling** and is the remaining gap at
-this level.
+### [~] G. Exercise videos — the five true gaps now have candidates
 
-### [ ] G. Exercise videos — 101 unsearched
+Re-measured against the live table rather than trusting the note: **52 of 840
+exercises have no video**, but only **five** had no candidate at all. The other
+47 have candidates that were rejected for length — a different problem with a
+different answer, and `docs/EXERCISE-VIDEOS-THE-REAL-NUMBERS.md` already argues
+it: the fix is shorter clips, not a higher ceiling. A 90-second clip is a lesson;
+the ceiling exists for a client glancing at their phone mid-set.
 
-Needs a fresh WebSearch budget, which a new session has. See
-`docs/EXERCISE-VIDEOS-THE-REAL-NUMBERS.md`. Six have no candidate at all; the
-worst is 1,098 seconds.
+Ten candidates inserted for those five, two each, **status `pending` — nothing
+approved, nothing pointed at a client**. YouTube Shorts preferred on purpose:
+the format caps at 60 seconds, which is the same ceiling the library enforces.
+
+Durations left NULL deliberately — `measure_video_durations()` fills them
+server-side and nothing here guessed a length. **pg_cron job 34
+(`video-duration-measure`) re-enabled** to do that; it was dormant because there
+was nothing to measure. It runs every 10 minutes only while unmeasured pending
+candidates exist.
+
+One judgement worth recording: the exercise is *Lunge to Balance **Sagittal
+Plane***. Clips titled "Frontal" and "Transverse" came back in the same search
+and were deliberately not used — a demo of the wrong plane is worse than no demo.
+
+**Still open:** the 47 rejected-for-length exercises. That is a real search job
+and wants a session with fresh WebSearch budget.
+
 
 ### [x] H. `coach_read` orphan — DELETED
 
