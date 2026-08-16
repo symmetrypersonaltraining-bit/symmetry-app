@@ -57,10 +57,20 @@ reverted immediately on finding the original. **That is precisely the
 second-source-of-truth drift this codebase keeps being bitten by, and I wrote
 three tests against that exact pattern earlier the same night.**
 
-**What may still be open** — not verified, do not assume either way: whether
-per-MEAL or per-ITEM nutrients appear in the composer / meal detail sheet. The
-DAY level is definitely covered. Dustin's wording was "everywhere in food
-logger", so check the meal sheet before deciding the feedback item is closed.
+**What IS still open — verified by reading the renders, not by grepping names:**
+
+| Level | Nutrients shown? |
+|---|---|
+| Day total (nutrition screen) | **YES** — "ALL NUTRIENTS", full registry, grouped |
+| Picking a food (`FoodSearchSheet`) | **NO** — it carries fiber/sugar/sodium/satFat on its type, scales them correctly, and takes real care that "0.4 of an unknown sodium is still unknown"… then renders none of them |
+| Building a meal (`ComposerSheet`) | **NO** — no nutrient handling at all |
+
+So Dustin's "everywhere in food logger" is satisfied at the day level and not
+below it. The smallest honest fix is showing the four legacy nutrients on a food
+row in the search sheet, where the data is already in hand and already scaled.
+
+**Use `groupedNutrients` and `pctOfDaily` from `@/lib/nutrition/nutrients`.**
+Do not write new formatters — that is exactly what produced the duplicate above.
 
 ### [ ] 2. Prove the AI plan builder actually uses the library
 
@@ -126,9 +136,9 @@ tests green and nothing else in flight.
 
 ---
 
-## STATE AS OF 15 Aug 20:05 CT
+## STATE AS OF 15 Aug 20:35 CT
 
-- `origin/main` = `ea6c4f1`, tree clean, **1,177 tests / 0 failures**
+- `origin/main` = `cfb9ac8`, tree clean, **1,177 tests / 0 failures**
 - App healthy — `/api/health` green, auth ~200ms, db ~530ms
 - Meal library LIVE and verified as a real client: 50 meals, 20 recipes, 116
   ingredients readable; 0 rows writable
