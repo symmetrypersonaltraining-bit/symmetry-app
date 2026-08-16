@@ -4,23 +4,30 @@
 things that genuinely need Dustin. Scheduled sessions read this, take the top
 unfinished item, ship it, tick it off here, and stop.
 
-Last updated **06:05 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
+Last updated **06:20 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
 
 ---
 
 ## MORNING SUMMARY — read this, then stop reading
 
-Written at **04:10 CT**, after the last queue item shipped.
+Written at 04:10 CT, opener rewritten at **06:20** once the publisher result was in.
 
-**If you read three things:** the video pipeline was publishing to clients on
-its own, from two places, and no video in this app had ever been approved by a
-person (stopped, reversibly, nothing pulled); your Saturday review queue has
-been empty because the publisher crashed on 9 Aug and has not had a Sunday since
-(the publisher fix is now **CONFIRMED WORKING** — it ran clean at 06:00 this
-morning, its first success since 2 Aug — but yesterday's generator produced
-nothing, so there was nothing to publish; the generator is the remaining
-problem, see below); and push still needs two keys from you before any client
-can be notified about anything.
+**If you read three things:**
+
+1. **No video in this app had ever been approved by a person.** 175 were found
+   by an agent web search and published straight to clients by automation, from
+   two different places. Both are stopped, reversibly, and nothing was pulled.
+   Nine of them are on exercises anyone actually trains — that is your review
+   list, not 175.
+2. **Your Saturday review queue: half fixed this morning, half still broken.**
+   The publisher crashed on 9 Aug; the fix went in on the 13th and **ran clean
+   at 06:00 today — confirmed, its first success since 2 Aug.** But the
+   generator produced nothing yesterday, so there was nothing to publish. The
+   generator is now the whole problem and it needs one thing only you can get:
+   the Vercel cron log for `/api/cron/weekly-ai?draft=1` on Sat 15 Aug.
+3. **Push still needs two keys from you.** Until they exist no client can be
+   notified about anything, which is why the group chat is silent. Everything
+   built for notifications last night is inert without them.
 
 **The thread running through the night**, if you want one sentence for it: the
 app was repeatedly telling somebody a thing had happened when it had not. A
@@ -546,11 +553,11 @@ users — so the schema catch-up can be done from here without Dustin.
 
 ---
 
-## STATE RIGHT NOW — 06:05 CT
+## STATE RIGHT NOW — 06:20 CT
 
 | | |
 |---|---|
-| `origin/main` (live) | `296bc60`, shipped and verified against `origin/main` |
+| `origin/main` (live) | `a9f73b3`, shipped and verified against `origin/main`. Re-verified at 06:20: gates green, `/api/health` on `a9f73b3`, sweeps 60/21, no cron failures in 3 h. |
 | Unit tests | **1,407 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
 | Ship bridge | **v2, repo-aware, up** — twenty-eight real pushes tonight, no failures |
 | Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
