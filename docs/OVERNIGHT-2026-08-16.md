@@ -575,11 +575,21 @@ completely unguarded while looking guarded. Four of the seven above were this,
 including every "best-effort, just log it" block, whose console lines had
 therefore never once fired.
 
-**Still open: 73 sites, and they are a different kind of thing.** The sweep that
-found 139 now reports 73, and what is left is genuine fire-and-forget —
-telemetry, seen-markers, chat memory — plus a tail of singles. Nothing left in
-the list has a person being told a change landed when it did not, which was the
-whole test.
+**Still open: 70 sites, and they are a different kind of thing.** The sweep that
+found 139 now reports 70, and what is left is genuine fire-and-forget —
+telemetry, seen-markers, chat memory — plus a tail of singles.
+
+I wrote that sentence first and then went and checked it, which is the only
+reason it is true: **three of the "harmless" remainder were not harmless.**
+`ClientTakeovers.joinAndGo` told a client they had joined a challenge whose
+board will never show them (same fault, same table, as the GroupChallenge one).
+And both delete buttons on the log screen removed a client's own weigh-in or
+cardio entry from the screen without checking — a lie about their own data,
+which is the least forgivable place for one. All three fixed.
+
+`MessageReactions` was checked and deliberately left alone: it re-reads the
+truth in a `finally` and undoes its own optimistic change, which is a real
+answer and needs no error branch.
 
 The two logger files, **`WorkoutLogger.tsx` (8) and `MealPlanClient.tsx` (3),
 are OFF LIMITS** and are listed only so they are not forgotten. They are the

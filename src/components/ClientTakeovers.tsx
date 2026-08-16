@@ -686,7 +686,20 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
     setBusy(true);
     try {
       if (!pick.joined && meId) {
-        await supabase.from("challenge_participants").insert({ challenge_id: pick.challenge.id, client_id: meId });
+        // A duplicate genuinely means they were already in, and that is
+        // success. Anything else is not — and the catch below could never see
+        // one, because a PostgREST call returns its error rather than throwing.
+        // So every failure still ran fx("complete") and the client was told
+        // they had joined a challenge whose board will never show them. Same
+        // fault, same table, as the one in GroupChallenge that produced
+        // "twenty-three people had joined and six were showing".
+        const { error } = await supabase
+          .from("challenge_participants")
+          .insert({ challenge_id: pick.challenge.id, client_id: meId });
+        if (error && error.code !== "23505") {
+          window.alert("Couldn't join that one — you can try again from the group chat.");
+          return;
+        }
       }
       fx("complete");
     } catch {

@@ -314,3 +314,59 @@ test("a digest that never arrived is not reported as a successful run", () => {
   const ok = NUDGES.indexOf('mode: "digest_only"', guard);
   assert.ok(guard > 0 && ok > guard, "the success response is returned before the digest is known to have landed");
 });
+
+// ── The last three where a person was still being told something ──────────
+//
+// Found while checking a claim rather than asserting it. The sweep's remaining
+// sites are meant to be genuine fire-and-forget, and three of them were not:
+//
+//   `ClientTakeovers.joinAndGo` — the full-screen "join the challenge" prompt.
+//   Unchecked insert, `fx("complete")` regardless, straight to the group chat.
+//   The client is told they joined a board that will never show them. Same
+//   fault, same table, as the one in GroupChallenge that produced "twenty-three
+//   people had joined and six were showing".
+//
+//   The two delete buttons in the log screen. A client deletes their own
+//   weigh-in or cardio entry, watches the row vanish, and it is still there on
+//   the next load — a lie about their own data, which is the one place it is
+//   least forgivable.
+//
+// `MessageReactions` was checked and left alone on purpose: it re-reads the
+// truth in a `finally` and undoes the optimistic change, which is a legitimate
+// way to solve this and needs no error branch.
+
+const TAKEOVERS = read("src/components/ClientTakeovers.tsx");
+const LOGCLIENT = read("src/app/(app)/log/LogClient.tsx");
+
+test("the takeover join forgives a duplicate and nothing else", () => {
+  const i = TAKEOVERS.indexOf("async function joinAndGo");
+  const body = TAKEOVERS.slice(i, i + 900);
+  assert.match(body, /const \{ error \} = await supabase/, "the insert is unchecked again");
+  assert.match(body, /error\.code !== "23505"/, "it swallows every error again");
+  const guard = body.indexOf("if (error");
+  const done = body.indexOf('fx("complete")');
+  assert.ok(guard > 0 && guard < done, "the client is congratulated before the join is known to have landed");
+});
+
+for (const [what, table] of [
+  ["a weigh-in", "metrics"],
+  ["a cardio entry", "cardio_logs"],
+] as const) {
+  test(`deleting ${what} that did not delete leaves it on screen`, () => {
+    const i = LOGCLIENT.indexOf(`from("${table}").delete()`);
+    assert.ok(i > 0, `${table} delete not found`);
+    const around = LOGCLIENT.slice(Math.max(0, i - 120), i + 400);
+    assert.match(around, /const \{ error \} = await supabase/, `the ${table} delete is unchecked again`);
+    const guard = around.indexOf("if (error)");
+    const remove = around.indexOf("prev.filter");
+    assert.ok(guard > 0 && guard < remove, "the row leaves the screen before the delete is known to have landed");
+    assert.match(around.slice(guard, guard + 220), /window\.alert\(/);
+  });
+}
+
+test("MessageReactions is left alone, because reconciling is a real answer", () => {
+  // Its optimistic change is undone by re-reading in a finally. An error branch
+  // on top would be a second mechanism for the same guarantee.
+  const react = read("src/components/MessageReactions.tsx");
+  assert.match(react, /await loadAll\(true\);/);
+});

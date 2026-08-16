@@ -182,7 +182,7 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
                       {m.weight && <span className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>{m.weight} lb</span>}
                       {m.body_fat_pct && <span className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{m.body_fat_pct}% BF</span>}
                     </div>
-                  <button onClick={async (e) => { e.stopPropagation(); if (!confirm("Delete this entry?")) return; await supabase.from("metrics").delete().eq("id", m.id); setMetrics((prev: any[]) => prev.filter((x) => x.id !== m.id)); }} aria-label="Delete entry" style={{ marginLeft: "auto", padding: "4px 9px", background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "15px", fontWeight: 700, lineHeight: 1 }}>✕</button></div>
+                  <button onClick={async (e) => { e.stopPropagation(); if (!confirm("Delete this entry?")) return; const { error } = await supabase.from("metrics").delete().eq("id", m.id); if (error) { window.alert("That didn't delete — it's still there. " + error.message); return; } setMetrics((prev: any[]) => prev.filter((x) => x.id !== m.id)); }} aria-label="Delete entry" style={{ marginLeft: "auto", padding: "4px 9px", background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "15px", fontWeight: 700, lineHeight: 1 }}>✕</button></div>
                 ))}
               </div>
             )}
@@ -261,7 +261,7 @@ export default function LogClient({ clientId, today, recentMetrics, recentCardio
                       {c.duration_minutes && <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>{c.duration_minutes} min</p>}
                       {c.distance && <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{c.distance} mi</p>}
                     </div>
-                  <button onClick={async (e) => { e.stopPropagation(); if (!confirm("Delete this entry?")) return; await supabase.from("cardio_logs").delete().eq("id", c.id); setCardioLogs((prev: any[]) => prev.filter((x) => x.id !== c.id)); }} aria-label="Delete entry" style={{ marginLeft: "auto", padding: "4px 9px", background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "15px", fontWeight: 700, lineHeight: 1 }}>✕</button></div>
+                  <button onClick={async (e) => { e.stopPropagation(); if (!confirm("Delete this entry?")) return; const { error } = await supabase.from("cardio_logs").delete().eq("id", c.id); if (error) { window.alert("That didn't delete — it's still there. " + error.message); return; } setCardioLogs((prev: any[]) => prev.filter((x) => x.id !== c.id)); }} aria-label="Delete entry" style={{ marginLeft: "auto", padding: "4px 9px", background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "15px", fontWeight: 700, lineHeight: 1 }}>✕</button></div>
                 ))}
               </div>
             )}
