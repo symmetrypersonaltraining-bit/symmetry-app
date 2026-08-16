@@ -24,7 +24,17 @@ export const dynamic = "force-dynamic";
 function makeDb(admin: ReturnType<typeof createAdminClient>): AdoptDb {
   return {
     async archiveLivePlans(clientId) {
-      const { error } = await admin.from("meal_plans").update({ status: "archived" }).eq("client_id", clientId).eq("status", "live");
+      // Only plans already IN FORCE. A client adopting a plan today does not
+      // cancel one their trainer scheduled to start next Monday — that plan has
+      // not begun, so there is nothing here for it to supersede. Without the
+      // date bound, a single tap on "switch to my AI plan" quietly retired
+      // every future plan booked for them, and the trainer would find out weeks
+      // later when the menu never changed.
+      const ctToday = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+      const { error } = await admin.from("meal_plans").update({ status: "archived" })
+        .eq("client_id", clientId)
+        .in("status", ["live", "pending"])
+        .lte("effective_date", ctToday);
       if (error) throw new Error(error.message);
     },
     async maxVersion(clientId) {

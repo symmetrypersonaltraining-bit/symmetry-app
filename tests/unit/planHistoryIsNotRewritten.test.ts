@@ -82,7 +82,16 @@ test("the query fetches superseded versions and selects the status it sorts on",
   const src = readFileSync(join(ROOT, "src/lib/nutrition/resolvePlan.ts"), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "");
-  assert.match(src, /\.in\("status", \["live", "archived"\]\)/, "the resolver is back to live-only — history will be rewritten again");
+  // This asserted the literal ["live", "archived"] until 16 Aug, when "pending"
+  // joined the list so plans scheduled ahead become visible before they start.
+  // Pinning the exact array made a correct change look like a regression, so it
+  // now asserts what the test is actually FOR: archived versions must be in the
+  // set, or a past day falls through to today's menu and Claudine's week gets
+  // redrawn again. Which statuses accompany archived is not this test's business.
+  const statusIn = src.match(/\.in\("status", \[([^\]]*)\]\)/);
+  assert.ok(statusIn, "fetchLivePlans must still filter on a status list");
+  assert.match(statusIn![1], /"archived"/, "superseded versions must be fetched — history will be rewritten again without them");
+  assert.match(statusIn![1], /"live"/, "the current plan must obviously still be fetched");
   assert.match(PLAN_SELECT, /\bstatus\b/, "status dropped out of PLAN_SELECT; every plan then reads as live");
 });
 

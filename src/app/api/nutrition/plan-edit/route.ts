@@ -154,8 +154,29 @@ export async function POST(req: NextRequest) {
 
       // Only once the copy is whole. An archive that ran first and then failed
       // would leave the client with no live plan at all.
-      await admin.from("meal_plans").update({ status: "archived" })
-        .eq("client_id", clientId).eq("status", "live").neq("id", targetPlanId);
+      //
+      // And it archives only what this edit actually SUPERSEDES — plans already
+      // in force. A plan scheduled to start next week is not superseded by
+      // someone swapping a meal today; it has not begun.
+      //
+      // This is not theoretical. Dustin's v3 plan dated 24 Aug is sitting in
+      // the table with status 'archived' and nobody cancelled it: an edit made
+      // on an earlier day archived it on the way past, because the filter was
+      // status='live' with no date bound. The scheduled plan simply disappeared,
+      // silently, and the next edit would have taken the one after it.
+      const { error: archErr } = await admin.from("meal_plans").update({ status: "archived" })
+        .eq("client_id", clientId)
+        .in("status", ["live", "pending"])
+        .lte("effective_date", CT_TODAY())
+        .neq("id", targetPlanId);
+      // Reported, not swallowed. A failed archive leaves two plans in force for
+      // the same day and the client sees whichever sorts first.
+      if (archErr) {
+        return NextResponse.json(
+          { error: `Saved your edit, but could not retire the previous version: ${archErr.message}` },
+          { status: 500 },
+        );
+      }
     } else {
       // ── Already their plan: replace this meal's items in place ───────────
       await admin.from("meal_items").delete().eq("meal_id", targetMealId);

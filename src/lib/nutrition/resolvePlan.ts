@@ -88,8 +88,22 @@ export function pickPlanForDate<T extends { day_group?: number[] | null; effecti
   //
   // A candidate with no status is treated as live: that is every caller that
   // predates this, and the existing behaviour must not shift under them.
-  const live = list.filter((p) => p.status == null || p.status === "live");
-  return pick(live) ?? pick(list);
+  //
+  // `pending` counts as current too, and that is the whole of Dustin's 16 Aug
+  // complaint. A plan scheduled to start next Monday was written as `pending`
+  // and only promoted to `live` by a nightly job on the morning it began — so
+  // until that job ran it was not in this set at all. Paging forward to Monday
+  // showed the CURRENT menu for a day it would not actually govern. The plan
+  // existed, the date was right, and the screen showed the wrong food.
+  //
+  // Nothing here needs to know whether the promotion job has run: `list` is
+  // already filtered to effective_date <= the date being VIEWED, so a pending
+  // plan can only win on days it is genuinely in force. That filter is what
+  // protects today, not the status.
+  const current = list.filter(
+    (p) => p.status == null || p.status === "live" || p.status === "pending",
+  );
+  return pick(current) ?? pick(list);
 }
 
 /**
@@ -160,9 +174,21 @@ export function shiftDate(dateStr: string, days: number): string {
 // gets the right answer for history without changing at all.
 //
 // Capped, because a client who edits a meal a day accumulates versions and each
-// one carries its whole meal/item tree. Twenty covers far more history than the
-// screen can page to.
-const MAX_PLAN_VERSIONS = 20;
+// one carries its whole meal/item tree.
+//
+// It was twenty, and twenty stopped being enough the moment scheduled plans
+// joined the set. Gerard and Jerry each have eleven plans booked out to
+// October. Ordered effective_date DESC and cut at twenty, those eleven future
+// rows are taken FIRST and only nine slots remain for history — so paging back
+// a fortnight would have started falling through to the current menu, which is
+// precisely the Claudine bug (13 Aug: last week's menu redrawn as this week's,
+// and every "I didn't eat that" zero reappearing because the item IDs no longer
+// matched). Fixing forward visibility by breaking backward visibility would
+// have been a poor trade, and a silent one.
+//
+// Sixty is comfortably more than any client has ever accumulated in total
+// (the busiest is sixteen), so in practice nothing is truncated at all.
+const MAX_PLAN_VERSIONS = 60;
 
 export async function fetchLivePlans(
   supabase: SupabaseClient,
@@ -176,7 +202,11 @@ export async function fetchLivePlans(
     .from("meal_plans")
     .select(sel)
     .eq("client_id", clientId)
-    .in("status", ["live", "archived"])
+    // `pending` is here for the same reason it is in pickPlanForDate: a plan
+    // scheduled ahead is written pending and promoted by a nightly job, so
+    // without it the row a trainer just scheduled is invisible on the very
+    // screen meant to show it. `archived` stays for history.
+    .in("status", ["live", "pending", "archived"])
     .order("effective_date", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(MAX_PLAN_VERSIONS);

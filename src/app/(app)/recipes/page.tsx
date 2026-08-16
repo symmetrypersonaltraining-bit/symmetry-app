@@ -14,6 +14,7 @@ import { getServerUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
 import RecipesClient from "./RecipesClient";
 import { isTrainerEmail } from "@/lib/trainer";
+import { CT_TODAY } from "@/lib/ai/coach-context";
 
 export const dynamic = "force-dynamic";
 export default async function RecipesPage() {
@@ -49,8 +50,15 @@ export default async function RecipesPage() {
   // /api/nutrition/plan-edit) — nothing here mutates Dustin's original.
   let planMeals: { id: string; name: string; position: number }[] = [];
   if (clientId) {
+    // TODAY's plan, not merely the newest row flagged live. Without the date
+    // bound this took whichever live plan had the latest effective_date — so
+    // the moment a plan could be scheduled ahead, next Monday's menu started
+    // offering its meal slots today. Not hypothetical: on 16 Aug the table
+    // already held a live plan dated the 17th.
     const { data: live } = await supabase
-      .from("meal_plans").select("id").eq("client_id", clientId).eq("status", "live")
+      .from("meal_plans").select("id").eq("client_id", clientId)
+      .in("status", ["live", "pending"])
+      .lte("effective_date", CT_TODAY())
       .order("effective_date", { ascending: false }).limit(1);
     const planId = ((live as { id: string }[]) || [])[0]?.id;
     if (planId) {

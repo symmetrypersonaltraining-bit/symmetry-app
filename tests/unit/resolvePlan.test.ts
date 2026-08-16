@@ -175,3 +175,132 @@ describe("(f) the call sites", () => {
     assert.match(src, /`scheduled — \$\{planLabel\(activePlan as never\)\}`/);
   });
 });
+
+// ============================================================================
+// SCHEDULING AHEAD — Dustin, 16 Aug:
+//
+//   "i do not want that project telling me it cant make a meal plan live in the
+//    future and i cant look at it live in the future again. i like the flag
+//    telling me when the new meal plan starts but there is zero logic behind me
+//    not being able to plan ahead, schedule a meal plan and look at it ahead of
+//    time."
+//
+// Two things stood between him and that, and the code was only half of it.
+//
+// In the DATABASE, two triggers — trg_no_future_live_plan and
+// trg_no_future_macro_target — raised an exception on any row dated past
+// Central today. Both dropped (definitions preserved in
+// bak_dropped_plan_guards_20260816).
+//
+// In the CODE, a plan scheduled ahead is written status='pending' and promoted
+// by a nightly job. Neither the fetch nor the resolver considered pending, so
+// the scheduled plan was invisible until the morning it started — paging
+// forward showed the CURRENT menu for a day it would not govern. Which is
+// exactly the flip-it-live-on-the-morning workflow he asked to stop doing.
+// ============================================================================
+
+describe("plans scheduled ahead", () => {
+  const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+
+  it("a pending plan governs its own dates, once they arrive", () => {
+    const cands = [
+      { id: "next", effective_date: "2026-08-17", status: "pending" },
+      { id: "now", effective_date: "2026-08-10", status: "live" },
+    ];
+    assert.equal(pickPlanForDate(cands, "2026-08-17")?.id, "next", "its first day");
+    assert.equal(pickPlanForDate(cands, "2026-08-20")?.id, "next", "and after");
+  });
+
+  it("...and CANNOT leak into a day before it starts", () => {
+    // The whole safety of dropping the guards rests on this one assertion.
+    const cands = [
+      { id: "next", effective_date: "2026-08-17", status: "pending" },
+      { id: "now", effective_date: "2026-08-10", status: "live" },
+    ];
+    assert.equal(pickPlanForDate(cands, "2026-08-16")?.id, "now", "the day before");
+    assert.equal(pickPlanForDate(cands, "2026-08-11")?.id, "now");
+  });
+
+  it("a future LIVE plan cannot govern today either", () => {
+    // Dustin's own v4 is status='live' dated 17 Aug. On the 16th the correct
+    // answer is still the older plan, and it is the date that decides — not
+    // whether some job has flipped a flag yet.
+    const cands = [
+      { id: "v4", effective_date: "2026-08-17", status: "live" },
+      { id: "v3", effective_date: "2026-08-03", status: "live" },
+    ];
+    assert.equal(pickPlanForDate(cands, "2026-08-16")?.id, "v3");
+    assert.equal(pickPlanForDate(cands, "2026-08-17")?.id, "v4");
+  });
+
+  it("history still resolves to the version that actually governed", () => {
+    // Claudine, 13 Aug — last week's menu must not be redrawn as this week's.
+    const cands = [
+      { id: "sched", effective_date: "2026-08-17", status: "pending" },
+      { id: "curr", effective_date: "2026-08-10", status: "live" },
+      { id: "old", effective_date: "2026-08-03", status: "archived" },
+    ];
+    assert.equal(pickPlanForDate(cands, "2026-08-05")?.id, "old");
+    assert.equal(pickPlanForDate(cands, "2026-08-12")?.id, "curr");
+  });
+
+  it("an archived future plan is still inert — cancelling one means cancelling it", () => {
+    const cands = [
+      { id: "cancelled", effective_date: "2026-09-01", status: "archived" },
+      { id: "live", effective_date: "2026-08-10", status: "live" },
+    ];
+    assert.equal(pickPlanForDate(cands, "2026-09-05")?.id, "live");
+  });
+
+  it("the fetch asks for pending plans, or nothing above is reachable", () => {
+    const src = read("src/lib/nutrition/resolvePlan.ts");
+    assert.match(src, /\.in\("status", \["live", "pending", "archived"\]\)/);
+  });
+
+  it("the version cap leaves room for history as well as the future", () => {
+    // Gerard and Jerry each have eleven plans booked to October. Ordered
+    // effective_date DESC and cut at twenty, those future rows are taken FIRST
+    // and only nine slots remain for history — so paging back a fortnight would
+    // start falling through to the current menu. That is the Claudine bug
+    // reintroduced through the back door, by a fix aimed at the future.
+    const src = read("src/lib/nutrition/resolvePlan.ts");
+    const m = src.match(/const MAX_PLAN_VERSIONS = (\d+)/);
+    assert.ok(m, "MAX_PLAN_VERSIONS must exist");
+    assert.ok(Number(m![1]) >= 40, `cap is ${m![1]} — too low once scheduled plans join the set`);
+  });
+
+  it("nothing archives a plan that has not started yet", () => {
+    // Dustin's v3 dated 24 Aug is sitting archived and nobody cancelled it: an
+    // edit made on an earlier day retired it on the way past, because the
+    // filter was status='live' with no date bound. Both write paths now bound
+    // the archive to plans already in force.
+    for (const p of [
+      "src/app/api/nutrition/plan-edit/route.ts",
+      "src/app/api/nutrition/adopt-plan/route.ts",
+    ]) {
+      const src = read(p);
+      const i = src.indexOf('update({ status: "archived" })');
+      assert.ok(i > 0, `${p}: no archive call found`);
+      const stmt = src.slice(i, i + 400);
+      assert.match(stmt, /\.lte\("effective_date"/, `${p}: archive must be bounded to today`);
+      assert.doesNotMatch(
+        stmt,
+        /\.eq\("status", "live"\)\s*;/,
+        `${p}: archiving by status alone takes future plans with it`,
+      );
+    }
+  });
+
+  it("'today's plan' queries are bounded to today", () => {
+    // Both of these took the newest live row with no date filter, so a plan
+    // dated next Monday became today's answer. The coach one matters most: it
+    // tells a client what to eat, in detail, out of a plan that has not started.
+    for (const p of ["src/app/(app)/recipes/page.tsx", "src/lib/ai/coach-context.ts"]) {
+      const src = read(p);
+      const i = src.indexOf('.from("meal_plans")');
+      assert.ok(i > 0, `${p}: no meal_plans query`);
+      const stmt = src.slice(i, i + 400);
+      assert.match(stmt, /\.lte\("effective_date", CT_TODAY\(\)\)/, `${p} must bound to today`);
+    }
+  });
+});

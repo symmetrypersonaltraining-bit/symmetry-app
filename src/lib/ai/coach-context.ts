@@ -208,9 +208,15 @@ async function fetchDailyTotals(db: Db, clientId: string, days: number): Promise
 // on the plan when asked "what's my meal plan / what should I eat for M3". Without
 // this the model only sees macro totals and can't reference real meals.
 export async function fetchMealPlanSummary(db: Db, clientId: string): Promise<string | null> {
+  // Bounded to today. Unbounded, the coach answers "what should I eat for M3"
+  // out of a plan that does not start until next week — confidently, in detail,
+  // and wrong. Same shape as Bobbie Page's schedule on 14 Aug: the model was
+  // not inventing anything, it was handed the wrong rows.
   const { data: plan } = await db
     .from("meal_plans").select("id")
-    .eq("client_id", clientId).eq("status", "live")
+    .eq("client_id", clientId)
+    .in("status", ["live", "pending"])
+    .lte("effective_date", CT_TODAY())
     .order("effective_date", { ascending: false }).limit(1).maybeSingle();
   const planId = (plan as { id: string } | null)?.id;
   if (!planId) return null;
