@@ -1,5 +1,64 @@
 # Backlog — the single work queue
 
+> ## 16 Aug — the calendar detector, and why no move could ever apply
+>
+> Dustin's spec, in his words: *"My programmed schedule is the default and it
+> persists. The ABSENCE of an appointment is not a signal and must never flag or
+> move anything. An appointment is a POSITIVE signal that can move a workout.
+> Nothing else."*
+>
+> **Fixed and verified live. Three faults, and the second two were not in the
+> spec — they were found while checking the first.**
+>
+> 1. **`reason='orphaned'` reported the default state as an error.** A
+>    supervised session sitting exactly where it was programmed, with no Google
+>    appointment on that date, raised a proposal. 10 pending, 8 of them Todd
+>    Prine's, all false — his recurring series had lapsed while his programming
+>    was right. Gone. Orphans are still *computed*, because pairing needs them,
+>    but an orphan nothing can absorb now emits nothing.
+> 2. **Approving a move could never move anything.** The occupancy guard in
+>    `resolve_schedule_proposal()` had no `supervised` filter, so a client's own
+>    unsupervised homework on the target date read as "occupied". Simulated
+>    against all six pending moves: *supervised* rows on the target date were
+>    **0 for every one of them**. Six proposals, six guaranteed no-ops. The
+>    feature had never applied a single one.
+> 3. **A move that did fire would have moved the whole day.** The update matched
+>    `client_id + scheduled_date`, not the proposal's own
+>    `scheduled_workout_id` — 2 rows for Greg Lennon, 3 for Sariah Duncan. It
+>    now targets that one session, with `from_date` kept only as a staleness
+>    guard.
+>
+> Also found live: **two contradictory pending moves for one session.** Sariah
+> Duncan's 19 Aug session had a move to the 18th *and* a move to the 20th, from
+> two different nightly runs; the open-proposal unique index keys on `to_date`,
+> so nothing stopped it. Each run now retires a pending move it no longer agrees
+> with, and pairing picks the **nearest** date rather than sort order.
+>
+> **Verified against the database, not a success response:** zero pending
+> `orphaned`; zero proposals for clients with no future appointments; zero
+> sessions with more than one pending move; the function run twice by hand
+> returns 82 both times (idempotent); `scheduled_workouts` unchanged — 4,421
+> rows, 0 deleted, and the 3 rows updated in 24h are two client logs and one of
+> Dustin's own edits at 15:21 UTC, before any of this ran.
+>
+> **Nothing was deleted.** 11 pending proposals were *superseded*, with every id
+> and its previous status recorded in `bak_scp_superseded_20260816`. Both
+> function definitions are captured verbatim in
+> `bak_detect_schedule_changes_20260816` and
+> `bak_resolve_schedule_proposal_20260816` — rollback is `select def` and run it.
+>
+> Approval stays manual. Nothing auto-applies, and the detector is still on.
+>
+> Guards: `tests/unit/detectorAbsenceIsNotASignal.test.ts` (20 assertions),
+> mutation-tested by `tests/mutate-detector.sh` — **28 mutations, 28 caught**.
+> Two holes were found and closed that way: renaming `_scd_orphan` satisfied a
+> prefix match, and four mutations that were silently no-ops.
+>
+> **Still open, and it is Dustin's call, not a build task:**
+> `google_channel_id` and `google_sync_token` are both NULL, so the calendar
+> only resyncs at 4am. Registering a Google watch channel would give same-day
+> pickup. The sync itself is healthy — it does not need fixing.
+
 > ## 👉 START AT `docs/MORNING-2026-08-15.md`
 >
 > Written overnight 14/15 Aug. Twenty-two commits, an outage, and its root
