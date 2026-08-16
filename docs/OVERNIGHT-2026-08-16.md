@@ -4,7 +4,7 @@
 things that genuinely need Dustin. Scheduled sessions read this, take the top
 unfinished item, ship it, tick it off here, and stop.
 
-Last updated **04:25 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
+Last updated **04:45 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
 
 ---
 
@@ -62,7 +62,7 @@ of it threw an error, because none of it ever asked.
 | `42d24e9` | **The streak the AI quotes was capped at 30 without saying so** |
 | `3074d88` | Unchecked-writes inventory brought in line with reality |
 | `7606fd4` | Final summary, and an honest list of what was not done |
-| `0709ecb` | The rotation cloner keeps kcal and micros — a trap set for next week |
+| `0a5c670` | The rotation cloner keeps kcal and micros — a trap set for next week |
 
 ### Added mid-session, and it turned out to be the big one
 
@@ -325,6 +325,41 @@ nutrient source, so this is a floor, not the day's total." Plan meals contribute
 no nutrients today, and the screen says so rather than implying a complete
 total.
 
+### Every headline number checked — two were wrong, the rest hold up
+
+The question that found both real bugs tonight was not "does this read well" but
+**"what would prove that number is real?"** Applied to every number a client or
+trainer is shown. Recorded here so nobody repeats the review.
+
+**Wrong, and fixed:**
+
+| Number | What was actually behind it | SHA |
+|---|---|---|
+| Training-day count / streak on Progress | `w.completed \|\| w.status` — a truthiness test on a column set on every row, so sessions started and abandoned counted as training days | `ceef51f` |
+| "Current completed-session streak" in Coach's Read | Counted off the 30-day adherence array, so it could never exceed 30 — Claudine reached 20 | `42d24e9` |
+
+**Checked and sound — leave these alone:**
+
+- **Nutrition adherence.** `consistency × accuracy`, and the module's own comment
+  explains why it replaced the meal-status average: Claudine tags everything
+  Off-plan, which scored 0.75, so her adherence read exactly 75% every day
+  forever — "a number that could never move, and therefore never coach anyone".
+  The in-progress day is removed from BOTH sides of consistency. Where there is
+  no macro target it falls back to the old measure and **says so** —
+  `adherenceBasis` is rendered on both client screens and spelled out to the AI
+  as "meal-status average only… treat it as a rough read".
+- **Weekly done-counts.** Numerator and denominator both from
+  `scheduled_workouts`, deleted sessions excluded, and the whole card hides when
+  a client has no activity rather than showing a demoralising 0/0.
+- **The day's nutrient panel.** Says "From X of Y logged meals — the rest have
+  no nutrient source, so this is a floor, not the day's total." Plan meals carry
+  no nutrients today (0 of 1,566 meal items have any), and the screen discloses
+  that instead of implying a complete total.
+
+The pattern in the two that were wrong: both read a field that could not say
+what the label claimed — a status column with one possible value, and an array
+with a 30-day bound. Neither threw. Neither looked wrong.
+
 ### NEEDS YOU — ordered by what it buys you
 
 **Do these two and the app is meaningfully better by lunchtime.**
@@ -478,7 +513,7 @@ users — so the schema catch-up can be done from here without Dustin.
 
 | | |
 |---|---|
-| `origin/main` (live) | `7606fd4`, shipped and verified against `origin/main` |
+| `origin/main` (live) | `0a5c670`, shipped and verified against `origin/main` |
 | Unit tests | **1,407 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
 | Ship bridge | **v2, repo-aware, up** — twenty-four real pushes tonight, no failures |
 | Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
