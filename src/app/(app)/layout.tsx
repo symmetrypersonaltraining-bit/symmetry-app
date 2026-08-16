@@ -7,6 +7,11 @@ import SessionDock from "@/components/SessionDock";
 import HeaderAssist from "@/components/HeaderAssist";
 import RealtimeScheduleSync from "@/components/RealtimeScheduleSync";
 import PushRegister from "@/components/PushRegister";
+// Web Push reaches the installed web app; PushRegister only ever reached the
+// Android APK, which on 16 Aug was 2 of 29 clients. Both are mounted: a person
+// with the APK and a browser subscription is reached twice, which is a far
+// better problem than the one being fixed.
+import WebPushRegister from "@/components/WebPushRegister";
 import MessageNotifier from "@/components/MessageNotifier";
 import { NotificationProvider } from "@/lib/useNotificationFeed";
 import RefreshHandle from "@/components/RefreshHandle";
@@ -41,6 +46,7 @@ export default async function AppLayout({
       <NotificationProvider>
         <RealtimeScheduleSync />
         <PushRegister />
+        <WebPushRegister />
         <MessageNotifier />
           <TrainerLayoutWrapper>{children}</TrainerLayoutWrapper>
       </NotificationProvider>
@@ -53,6 +59,7 @@ export default async function AppLayout({
       <RealtimeScheduleSync />
       {/* Clients register for push AND get the in-app new-message banner too. */}
       <PushRegister />
+      <WebPushRegister />
       <MessageNotifier />
       {/* Docked feedback strip: reserves its own row in the page flow, so the
           button can NEVER cover content (fixed overlays float over scrolled content). */}

@@ -26,6 +26,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { createClient } from "@/lib/supabase/client";
 import {
   NOTIFICATION_EVENTS,
@@ -155,6 +156,7 @@ export default function NotificationSettings({ isTrainer }: { isTrainer: boolean
 
   return (
     <div className="metric-card">
+      <EnablePushOnThisDevice />
       <p
         className="text-xs font-semibold uppercase tracking-widest mb-1"
         style={{ color: "var(--brand-text-secondary)" }}
@@ -180,4 +182,165 @@ export default function NotificationSettings({ isTrainer }: { isTrainer: boolean
       ))}
     </div>
   );
+}
+
+/**
+ * The button that turns push on for THIS device.
+ *
+ * ── Why every toggle above it was decorative until now ──────────────────────
+ *
+ * Dustin, 16 Aug: "Noone is chatting in the group chat. confirm they are
+ * getting notification." They were not. 29 active clients, TWO device tokens in
+ * the database. The list of switches above has always worked — it just governed
+ * a delivery route that reached almost nobody, because the only registration
+ * path in the app required the Android APK.
+ *
+ * A settings screen full of notification preferences, on an account that cannot
+ * receive a notification, is worse than no settings screen: it is a promise.
+ *
+ * ── Why the ask lives HERE and not on page load ─────────────────────────────
+ *
+ * A permission prompt fired the moment somebody opens the app is the fastest
+ * possible way to get "Block" pressed — and a blocked origin cannot be asked
+ * again from inside the app. The client would have to dig it out of browser
+ * settings, which means never. So the prompt sits behind a button they chose to
+ * press, on a screen that has just told them what the notifications are for.
+ */
+function EnablePushOnThisDevice() {
+  const [state, setState] = useState<"checking" | "unsupported" | "unconfigured" | "on" | "off" | "blocked" | "working">("checking");
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (typeof window === "undefined") return;
+        if (!("serviceWorker" in navigator) || !("PushManager" in window) || typeof Notification === "undefined") {
+          setState("unsupported");
+          return;
+        }
+        const cfg = await fetch("/api/push/subscribe").then((r) => r.json()).catch(() => null);
+        if (!cfg?.configured) { setState("unconfigured"); return; }
+        if (Notification.permission === "denied") { setState("blocked"); return; }
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        setState(sub && Notification.permission === "granted" ? "on" : "off");
+      } catch {
+        setState("unsupported");
+      }
+    })();
+  }, []);
+
+  async function enable() {
+    setErr(null);
+    setState("working");
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") {
+        setState(perm === "denied" ? "blocked" : "off");
+        return;
+      }
+      const cfg = await fetch("/api/push/subscribe").then((r) => r.json());
+      if (!cfg?.publicKey) { setState("unconfigured"); return; }
+
+      const reg = await navigator.serviceWorker.ready;
+      const sub =
+        (await reg.pushManager.getSubscription()) ||
+        (await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64(cfg.publicKey),
+        }));
+
+      const res = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      });
+      // Checked. "It said it worked and I still get nothing" is the exact
+      // complaint this whole change exists to answer; a silent failure here
+      // would recreate it inside the fix.
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setErr(j?.error || "Could not save this device. Try again.");
+        setState("off");
+        return;
+      }
+      setState("on");
+    } catch (e) {
+      setErr((e as Error)?.message || "Could not turn notifications on.");
+      setState("off");
+    }
+  }
+
+  if (state === "checking" || state === "unsupported") return null;
+
+  const box = {
+    border: "1px solid var(--brand-border)",
+    borderRadius: 14,
+    padding: "12px 14px",
+    marginBottom: 12,
+  } as const;
+
+  if (state === "unconfigured") {
+    return (
+      <div style={box}>
+        <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>Push notifications aren&rsquo;t set up yet</p>
+        <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>
+          Your coach is still finishing this off. The switches below will work once it&rsquo;s live.
+        </p>
+      </div>
+    );
+  }
+
+  if (state === "blocked") {
+    return (
+      <div style={box}>
+        <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>Notifications are blocked</p>
+        <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>
+          Your browser is blocking them for this app, so nothing below can reach you.
+          Open your browser&rsquo;s site settings for Symmetry and set Notifications to Allow,
+          then come back here.
+        </p>
+      </div>
+    );
+  }
+
+  if (state === "on") {
+    return (
+      <div style={box}>
+        <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>✓ Notifications are on for this device</p>
+        <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>
+          If you use the app on another phone or a laptop, turn them on there too — this is per device.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={box}>
+      <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>Turn on notifications</p>
+      <p className="text-xs mt-1 mb-2" style={{ color: "var(--brand-text-secondary)", lineHeight: 1.5 }}>
+        Without this you won&rsquo;t hear about messages from {COACH_FIRST_NAME}, group chat, or your
+        payment reminders — the switches below have nothing to reach you with.
+      </p>
+      {err && <p className="text-xs mb-2" style={{ color: "#DC2626" }}>{err}</p>}
+      <button
+        onClick={() => void enable()}
+        disabled={state === "working"}
+        className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
+        style={{ background: "var(--brand-primary)", opacity: state === "working" ? 0.6 : 1 }}
+      >
+        {state === "working" ? "Turning on…" : "Turn on notifications"}
+      </button>
+    </div>
+  );
+}
+
+/** base64url VAPID key → the bytes PushManager wants. */
+function urlB64(base64String: string): ArrayBuffer {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; ++i) out[i] = raw.charCodeAt(i);
+  return out.buffer;
 }

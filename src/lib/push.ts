@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { NotificationEvent } from "@/lib/notificationEvents";
+import { sendWebPush } from "@/lib/webPush";
 
 // Firebase Cloud Messaging (HTTP v1) sender — dependency-free.
 // INERT until the env var FCM_SERVICE_ACCOUNT_JSON is set (the full Firebase
@@ -192,6 +193,28 @@ export async function sendPushToUser(
 ): Promise<void> {
   try {
     if (await isMuted(userId, event)) return;
-    await sendPushDiagnostics(userId, title, body, data);
+    // BOTH routes, deliberately, and Web Push first.
+    //
+    // FCM only ever reached the Android APK, and on 16 Aug that was TWO people
+    // out of 29 — every other client got nothing, ever, because PushRegister
+    // returns immediately off-native. Web Push reaches the installed web app on
+    // Android and an iPhone with the app on its home screen, which is where
+    // everybody else actually is.
+    //
+    // Neither is allowed to prevent the other: a person with the APK and a
+    // browser subscription is reached twice, which is a far better problem than
+    // the one being fixed here. Both are individually inert without their own
+    // configuration, so this line changes nothing until VAPID keys exist.
+    await Promise.all([
+      sendWebPush(userId, {
+        title,
+        body,
+        url: data?.url,
+        // Collapse repeats per thread. Three group messages arriving as one
+        // notification is the difference between a busy app and a muted one.
+        tag: data?.url ? `sym:${data.url}` : undefined,
+      }).catch(() => undefined),
+      sendPushDiagnostics(userId, title, body, data).catch(() => undefined),
+    ]);
   } catch { /* push must never break the caller */ }
 }
