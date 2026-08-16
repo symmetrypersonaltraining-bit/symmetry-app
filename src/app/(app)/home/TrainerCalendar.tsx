@@ -1289,15 +1289,48 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
     // Record where it came from, like every other move path does, so a drag is
     // as auditable and as reversible as an AI move.
     const { data: before } = await supabase
-      .from("scheduled_workouts").select("scheduled_date").eq("id", workoutId).maybeSingle();
-    const from = (before as { scheduled_date?: string } | null)?.scheduled_date ?? null;
+      .from("scheduled_workouts")
+      .select("scheduled_date, client_id, day_id, position")
+      .eq("id", workoutId)
+      .maybeSingle();
+    const row = before as
+      | { scheduled_date?: string; client_id?: string; day_id?: string | null; position?: number | null }
+      | null;
+    const from = row?.scheduled_date ?? null;
+
+    // ── LAND IT IN A FREE SLOT, OR THE UNIQUE KEY REFUSES THE MOVE ──────────
+    //
+    // uq_scheduled_workout_one_per_slot is (client_id, day_id, scheduled_date,
+    // position). Dragging a session onto a date that already holds the SAME day
+    // at the same position raises 23505 and the move is rejected — on a
+    // "move anywhere to anywhere" instruction, that is the app saying no to
+    // something Dustin explicitly said yes to.
+    //
+    // Both AI move paths already compute a free position. This one did not: it
+    // set only the date. Since tonight it at least reports the failure instead
+    // of snapping the card back in silence, but reporting a refusal is not the
+    // same as not refusing.
+    let position = row?.position ?? 1;
+    if (row?.client_id) {
+      const { data: onDay } = await supabase
+        .from("scheduled_workouts")
+        .select("position")
+        .eq("client_id", row.client_id)
+        .eq("scheduled_date", newDate)
+        .is("deleted_at", null)
+        .neq("id", workoutId)
+        .order("position", { ascending: false })
+        .limit(1);
+      const taken = ((onDay as { position: number | null }[] | null) || [])[0];
+      if (taken && taken.position != null) position = taken.position + 1;
+    }
     // The write used to be unchecked, so a refused move looked exactly like a
     // successful one: the card snapped back on refresh and nobody was told why.
     // That is the same silent-write fault fixed across messages and payments on
     // 15 Aug, and it is worse here because the person is watching it happen.
     const { error } = await supabase
       .from("scheduled_workouts")
-      .update({ scheduled_date: newDate, moved_from_date: from, updated_at: new Date().toISOString() })
+      .update({ scheduled_date: newDate, moved_from_date: from, position, updated_at: new Date().toISOString() })
       .eq("id", workoutId);
     if (error) {
       window.alert("Couldn't move that workout: " + error.message);

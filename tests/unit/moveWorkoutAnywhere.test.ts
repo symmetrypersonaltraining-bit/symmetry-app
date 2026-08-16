@@ -180,3 +180,31 @@ test("a dragged move records where it came from, like every other move path", ()
   const body = fn.slice(0, fn.indexOf("async function handleRescheduleAppt"));
   assert.match(body, /moved_from_date: from/, "otherwise a drag is the one unauditable move");
 });
+
+test("a drag lands in a FREE slot — the unique key refuses anything else", () => {
+  // uq_scheduled_workout_one_per_slot is (client_id, day_id, scheduled_date,
+  // position). Dropping a session onto a date that already holds the same day
+  // at the same position raises 23505, and the move is refused — which on a
+  // "move anywhere to anywhere" instruction is the app saying no to something
+  // Dustin explicitly said yes to.
+  //
+  // Both AI paths already computed a free position. The drag set only the date.
+  // Found by trying to move a real completed workout inside a rolled-back
+  // transaction and watching the constraint fire.
+  const src = code(CALENDAR);
+  const fn = src.slice(src.indexOf("async function handleRescheduleWorkout"));
+  const body = fn.slice(0, fn.indexOf("async function handleRescheduleAppt"));
+  assert.match(body, /\.eq\("scheduled_date", newDate\)/, "it must look at the DESTINATION date");
+  assert.match(body, /\.neq\("id", workoutId\)/, "…and not count the row being moved");
+  assert.match(body, /position = taken\.position \+ 1/, "…and land after what is already there");
+  assert.match(body, /moved_from_date: from, position,/, "the position must be written with the move");
+});
+
+test("all three move paths compute a destination position", () => {
+  // Client AI, trainer AI and the drag. If one of them forgets, that path alone
+  // fails on exactly the days a client is most likely to be rearranging.
+  assert.match(code(CLIENT_ACTIONS), /nextFreePosition\(db, clientId/, "client AI");
+  const trainer = handler(code(AGENT_TOOLS), "move_workout");
+  assert.match(trainer, /\.eq\("scheduled_date", date\)/, "trainer AI reads the destination day");
+  assert.match(trainer, /position: pos/, "trainer AI writes a position");
+});
