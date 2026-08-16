@@ -4,7 +4,7 @@
 things that genuinely need Dustin. Scheduled sessions read this, take the top
 unfinished item, ship it, tick it off here, and stop.
 
-Last updated **05:00 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
+Last updated **05:25 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
 
 ---
 
@@ -193,6 +193,21 @@ the two, and they have completely different fixes.
 
 Worth doing: it is the difference between 29 clients getting a written weekly
 focus and 29 clients getting nothing, every week, silently.
+
+**What the publisher will do at 06:00 CT today, so you can read it correctly.**
+It should run and report **0 published**, and that is the SUCCESS case — there
+are no drafts to publish, because the generator produced none yesterday. Job 27
+last ran on 9 Aug and failed, so this is its first run since the 13 Aug fix.
+
+    select status, return_message, start_time
+    from cron.job_run_details where jobid = 27
+    order by start_time desc limit 1;
+
+- `succeeded` → the publisher fix works. The remaining problem is entirely the
+  generator, and the Vercel log above is the next step.
+- `failed` → that is NEW, it is not the `text = date` bug (I verified the live
+  definition casts `p_week::text` in both places), and it wants looking at
+  properly rather than patching.
 
 ### The four that matter most
 
@@ -526,16 +541,16 @@ users — so the schema catch-up can be done from here without Dustin.
 
 ---
 
-## STATE RIGHT NOW — 05:00 CT
+## STATE RIGHT NOW — 05:25 CT
 
 | | |
 |---|---|
-| `origin/main` (live) | `2ad32d5`, shipped and verified against `origin/main` |
+| `origin/main` (live) | `3a53cd4`, shipped and verified against `origin/main` |
 | Unit tests | **1,407 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
-| Ship bridge | **v2, repo-aware, up** — twenty-six real pushes tonight, no failures |
+| Ship bridge | **v2, repo-aware, up** — twenty-seven real pushes tonight, no failures |
 | Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
 | Video pipeline | **no longer publishes on its own**, from either place. 175 live videos untouched, all reviewable |
-| Live app | **verified healthy at 04:51 CT** — `/api/health` on `2ad32d5` (the newest commit), auth 140 ms, db 141 ms, `ok: true`. Vercel is fully caught up. |
+| Live app | **verified healthy at 05:22 CT** — `/api/health` on `3a53cd4` (the newest commit), auth 177 ms, db 160 ms, `ok: true`. Vercel is fully caught up. |
 | `symmetry-app-v2` repo | **seeded** — main is live main byte for byte |
 | `symmetry-app-v2.vercel.app` | **CONFIRMED HEALTHY at 04:52 CT** — it does NOT 404. 200, `ok:true`, sha `f2598da` (the seed), auth 641 ms, db 932 ms. It is 43 commits behind live, which is expected for a seeded mirror. |
 | Dev Supabase `giiovjfpbuzmrvpdglhv` | **caught up** — 88 tables, 1,169 columns, 166 policies |
