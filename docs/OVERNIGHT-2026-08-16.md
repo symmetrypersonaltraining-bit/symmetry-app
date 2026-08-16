@@ -27,6 +27,7 @@ the final version.
 | `21660f5` | Plan builder actually uses the meal library — and a correction |
 | `30106f7` | Payments screen stops showing changes that never landed |
 | `76765d9` | Coach's Read orphan deleted |
+| `3c59a08` | A meal you TYPE keeps its nutrients — three layers were dropping them |
 
 ### Added mid-session, and it turned out to be the big one
 
@@ -107,6 +108,13 @@ claim about your plan was not.
    the number matters less than the fact that one rule has two homes and the
    analysis in `EXERCISE-VIDEOS-THE-REAL-NUMBERS.md` was written against the one
    the system does not enforce. Addendum added to that document.
+
+9. **One yes/no: may I touch `aiItemsToCustom` in `NutritionV3Client.tsx`?**
+   A meal logged through the AI coach still keeps **four of its 33 nutrients** —
+   the same fault I fixed in two other places tonight, one door along. That file
+   is on your off-limits list so I left it. Ten lines, one function, no change to
+   either logger's behaviour, and the guard for it already exists. Say yes and it
+   goes out in the next session.
 
 `UPSTREAM_SYNC_TOKEN` and `VERCEL_DEPLOY_HOOK` came OFF this list during the
 night: the sync now uses GitHub's built-in token, and v2's Vercel is already
@@ -485,6 +493,56 @@ the rule being relaxed.
 The `coach_read` entry in `AI_FEATURES` **stays**, marked dormant. `ai_usage_log`
 holds real rows keyed `coach_read` from before the retirement, and dropping the
 key would leave the health page unable to name its own history.
+
+### [x] I. A meal typed into the composer kept none of its nutrients (`3c59a08`)
+
+The third layer of this same path found dropping them, after `CoachActionItem`
+(14 Aug) and `FoodSearchSheet` (15 Aug). Always a mapping layer in the middle;
+never the model, never the database.
+
+`parseClient.mapItem` — the client-side mapper every composer parse goes
+through — returned **no nutrient fields at all**. The route asks the model for
+all 33, `validateParseResult` sanitises and returns them per item, `CustomItem`
+has `mi` for exactly that bag, and the day total reads it. The mapper in the
+middle discarded the lot, so a meal you typed reached the database with macros
+and nothing else while the identical meal picked from search carried its full
+panel.
+
+Two more faults sat behind it, and fixing only the mapper would have left the
+numbers still wrong on screen:
+
+- **`customMealNutrients` read the four short keys and ignored the bag.** Every
+  AI-parsed item is exactly that case. `NutritionV3Client.upsertLog` derives the
+  stored `est_fiber` / `est_sugar` / `est_sodium` / `est_sat_fat` **columns**
+  from this function, so the row disagreed with the meal it was written from.
+  Now a projection of `customMealNutrientMap`, the same relationship
+  `planMealNutrients` already had to `planMealNutrientMap`.
+- **Those four columns then SHADOWED the 33 on the items** in
+  `logConsumedNutrientMap` — and they are derived from those items, so a meal
+  that knew thirty-three logged as four. Silently, because four real numbers
+  look like a working panel. Merged now, columns winning per key, which is the
+  precedence `readNutrients` already uses for flat-vs-jsonb.
+
+The sheet shows the panel through `customMealNutrientMap` — the same call the
+day total makes on it a second later, not a second addition written in the
+sheet. Registry helpers only, per the standing note about the duplicate panel.
+
+Also fixed alongside: `FoodSearchSheet` printed `pctOfDaily` raw, so 0.9 mg of
+thiamin rendered as `75.83333333333334%` on a client's phone. The day panel has
+always rounded; that render site was copied without it.
+
+18 guards in `tests/unit/composerNutrients.test.ts`, each mutation-tested —
+dropping the bag, reverting the projection, restoring the shadow, removing the
+empty-meal fallthrough guard, counting an unlogged meal, writing unknown as
+zero, blanking the panel and un-rounding the percentage all fail it.
+
+**Left for Dustin, permission needed:** `aiItemsToCustom` in
+`NutritionV3Client.tsx` still maps a coach-parsed item down to four of 33 — the
+identical fault, one door along. That file is on the off-limits list, so it was
+not touched. Ten lines, and `coachItemsCarryNutrients.test.ts` is already sitting
+next to it.
+
+---
 
 ---
 

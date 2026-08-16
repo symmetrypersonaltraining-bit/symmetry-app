@@ -62,12 +62,19 @@ three tests against that exact pattern earlier the same night.**
 | Level | Nutrients shown? |
 |---|---|
 | Day total (nutrition screen) | **YES** — "ALL NUTRIENTS", full registry, grouped |
-| Picking a food (`FoodSearchSheet`) | **NO** — it carries fiber/sugar/sodium/satFat on its type, scales them correctly, and takes real care that "0.4 of an unknown sodium is still unknown"… then renders none of them |
-| Building a meal (`ComposerSheet`) | **NO** — no nutrient handling at all |
+| Picking a food (`FoodSearchSheet`) | **YES** as of `d445002` — it was also reading only 4 of the catalog's 33 |
+| Building a meal (`ComposerSheet`) | **YES** as of `3c59a08` — and the parse mapper was throwing all 33 away before the sheet ever saw them |
 
-So Dustin's "everywhere in food logger" is satisfied at the day level and not
-below it. The smallest honest fix is showing the four legacy nutrients on a food
-row in the search sheet, where the data is already in hand and already scaled.
+**CLOSED, 16 Aug.** "Everywhere in food logger" is satisfied at every level now
+(`d445002`, `3c59a08`). Both sheets show the full registry panel, and the two
+mapping layers that were silently discarding nutrients before either sheet could
+render them are fixed.
+
+**One gap remains and it needs Dustin's permission**, not a decision:
+`aiItemsToCustom` in `NutritionV3Client.tsx` maps a coach-parsed item's nutrient
+bag down to **four of the 33** — the same fault, one door along. That file is on
+the off-limits list, so it is left alone; it is roughly a ten-line change and a
+guard already exists next to it (`coachItemsCarryNutrients.test.ts`).
 
 **Use `groupedNutrients` and `pctOfDaily` from `@/lib/nutrition/nutrients`.**
 Do not write new formatters — that is exactly what produced the duplicate above.
