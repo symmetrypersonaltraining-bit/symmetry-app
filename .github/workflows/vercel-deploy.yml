@@ -1,3 +1,28 @@
+# Kicks Vercel after a push to main.
+#
+# ── Why this file is gated by repository name ────────────────────────────────
+#
+# The deploy hook below belongs to the LIVE Vercel project. symmetry-app-v2 is
+# meant to be this repository byte for byte — that is the entire point of it,
+# so that Dylan tests the app Dustin's clients are actually running rather than
+# a fork that drifted. But copied verbatim, this file meant every push to the
+# DEV repo fired the LIVE project's deploy hook: dev work redeploying
+# symmetry-app-omega, which serves 27 real clients.
+#
+# So the live hook only fires on the live repository, by name. On any other
+# repository the job looks for a VERCEL_DEPLOY_HOOK secret and uses that
+# instead, which keeps the file identical everywhere and moves the difference
+# into configuration where it belongs. A dev repo with no secret set simply
+# does not deploy from CI, which is a safe default rather than a broken one.
+#
+# ── And why -fsS ─────────────────────────────────────────────────────────────
+#
+# This was a bare `curl -X POST`. curl exits 0 on an HTTP 404, so a deleted or
+# rotated hook would report a green tick on every push while nothing deployed —
+# and you would find out from a client, days later, that a fix never landed.
+# -f makes an HTTP error an exit code; -sS keeps it quiet but still prints the
+# error when there is one.
+
 name: Deploy to Vercel
 
 on:
@@ -9,5 +34,19 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Vercel deploy
-        run: curl -X POST https://api.vercel.com/v1/integrations/deploy/prj_tvOt9zO3LMPE2khGKlZsWJmcRRVA/gun0ydyAB0
+      - name: Trigger LIVE Vercel deploy
+        if: github.repository == 'symmetrypersonaltraining-bit/symmetry-app'
+        run: curl -fsS -X POST https://api.vercel.com/v1/integrations/deploy/prj_tvOt9zO3LMPE2khGKlZsWJmcRRVA/gun0ydyAB0
+
+      - name: Trigger this instance's Vercel deploy
+        if: github.repository != 'symmetrypersonaltraining-bit/symmetry-app'
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "No VERCEL_DEPLOY_HOOK secret on ${{ github.repository }} — nothing to deploy."
+            echo "This is not a failure. Set the secret to a Vercel deploy hook for THIS"
+            echo "instance's project if you want CI to deploy it."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK"

@@ -1,0 +1,89 @@
+# Nightly one-way mirror: LIVE main -> this repository's main.
+#
+# ── What this is for ─────────────────────────────────────────────────────────
+#
+# symmetry-app-v2 exists so Dylan can use the app as a trainer and find bugs.
+# That is only worth anything if he is testing what Dustin's clients are
+# actually running. The moment dev stops tracking live, "Dylan tested it" stops
+# meaning "it works" — he finds bugs that were fixed a week ago and misses the
+# ones that shipped yesterday.
+#
+# src/lib/trainer.ts records what the alternative cost: the dev instance used to
+# be a FORK, with sixty-odd lines edited to make Dylan the trainer, so every fix
+# either never reached him or arrived as a merge conflicting on exactly those
+# lines. The fix was to move trainer identity into environment variables, which
+# means dev and live can now be the SAME CODE. This workflow is what keeps them
+# that way without anyone remembering to do it.
+#
+# ── Why it force-pushes, and why that is safe here ───────────────────────────
+#
+# Dev is a mirror, not a branch: it holds no commits of its own by design, so
+# "fast-forward if you can, otherwise stop" would simply stall forever the
+# first time someone committed on dev directly. It replaces main outright and
+# says so in the run summary when it discarded something, rather than failing
+# quietly. If you ever DO want to develop on v2, do it on a branch — branches
+# are untouched by this.
+#
+# ── Why it can never run on live ─────────────────────────────────────────────
+#
+# The job-level `if` refuses to run on the live repository at all. Even so, the
+# push targets `origin`, which is always the repository the workflow is running
+# in — so there is no configuration of secrets that could point this at live.
+# Both facts are deliberate; either one alone would be enough.
+
+name: Sync from live
+
+on:
+  schedule:
+    # 08:00 UTC = 03:00 America/Chicago. Central, never UTC.
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    if: github.repository != 'symmetrypersonaltraining-bit/symmetry-app'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.UPSTREAM_SYNC_TOKEN }}
+
+      - name: Mirror live main
+        env:
+          LIVE: https://github.com/symmetrypersonaltraining-bit/symmetry-app.git
+        run: |
+          set -euo pipefail
+          git remote add live "$LIVE" 2>/dev/null || git remote set-url live "$LIVE"
+          git fetch --no-tags live main
+
+          before="$(git rev-parse origin/main)"
+          after="$(git rev-parse live/main)"
+
+          if [ "$before" = "$after" ]; then
+            echo "Already identical to live at ${after}. Nothing to do." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Did this repository hold commits that live does not? Say so — a
+          # silent discard is how somebody loses an afternoon's work and never
+          # finds out where it went.
+          if git merge-base --is-ancestor "$before" "$after"; then
+            echo "Fast-forward: ${before:0:7} -> ${after:0:7}" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### Discarded dev-only commits"
+              echo ""
+              echo "\`main\` on this repository held commits that live does not."
+              echo "They have been replaced by live's history. Recover them from"
+              echo "the reflog or from \`${before}\` if you need them:"
+              echo ""
+              echo '```'
+              git log --oneline "$after..$before" || true
+              echo '```'
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+          git push --force origin "${after}:refs/heads/main"
+          echo "main is now ${after}" | tee -a "$GITHUB_STEP_SUMMARY"
