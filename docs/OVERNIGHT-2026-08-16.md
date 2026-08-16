@@ -141,26 +141,40 @@ live-only resource must sit behind a repository check. Reverting
 
 ## THE QUEUE — take the top unfinished item
 
-### [ ] A. Bring the dev database up to live's schema
+### [x] A. Bring the dev database up to live's schema — DONE, 23:40 CT
 
-**The one that unblocks Dylan.** ~35 tables, plus whatever functions, triggers,
-policies and constraints came with them. Both databases are reachable from a
-cloud session via the Supabase tools — `mkfiginpiesospsnktea` (live, READ ONLY,
-never write) and `giiovjfpbuzmrvpdglhv` (dev, safe to change).
+Shipped as `supabase/migrations/20260816_dev_instance_catchup.sql`, applied to
+dev in seven named migrations (`dev_catchup_01`…`_07`). Verified by querying the
+database afterwards, not by trusting a success response:
 
-Rules for this task:
+| | before | after |
+|---|---|---|
+| Tables | 53 | **88** |
+| Columns | 1,087 | **1,169** — 0 still missing versus live |
+| Policies | — | **166**, RLS on all 88 tables |
+| Foreign keys | — | **108** |
+| Hardcoded-email policies | — | **0** (live still has 14) |
 
-1. **Never write to live.** Read its schema; change only dev.
-2. **Copy no client data.** Structure only. The everfit_* archives, every
-   `*_bak_*`, `*_backup_*`, `dedupe_*`, `fork_*`, `demo_seed_*` and `_sql_load`
-   are scratch — they do not belong on dev either.
-3. Ship each chunk as a real file in `supabase/migrations/`, because that is the
-   only channel dev schema is supposed to arrive through, and the repo is the
-   record of what dev is.
-4. `is_trainer()` on dev stays **Dustin + Dylan**. Live's stays Dustin only.
-   Do not overwrite dev's with live's.
-5. Verify against the database, not against a success response. Count the tables
-   afterwards.
+**How the diff was found, and why the obvious method would have missed it.** Dev
+was built from a schema *dump*, so its migration names bear no relation to the
+repo's — a filename diff shows nothing useful. The two catalogs were compared
+directly instead: 35 missing tables and 82 missing columns.
+
+**The thing worth remembering.** Seven of live's policies name
+`symmetrypersonaltraining@gmail.com` literally instead of calling
+`is_trainer()`. Copied to dev verbatim they compile perfectly and show Dylan
+**empty tables** on those screens — no error, nothing to notice, he would simply
+report working features as broken and we would chase ghosts. They call
+`is_trainer()` on dev, which there means Dustin + Dylan. Each rewrite is marked
+in the migration.
+
+**Still open on dev, for a later run:** seed data for the new tables
+(`challenge_templates` is empty and the challenges UI reads it;
+`usda_nutrient_map` likewise), and the storage buckets for `progress_photos` /
+`movement_assessments` keyframes. Neither blocks a login.
+
+**Live is untouched.** Every statement above ran against `giiovjfpbuzmrvpdglhv`
+only, and every one is idempotent, so the migration file is a no-op on live.
 
 ### [ ] B. Seed `symmetry-app-v2` from current live main
 
