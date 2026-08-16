@@ -4,7 +4,7 @@
 things that genuinely need Dustin. Scheduled sessions read this, take the top
 unfinished item, ship it, tick it off here, and stop.
 
-Last updated by the 15 Aug evening session at **22:45 CT**.
+Last updated by the 15 Aug evening session at **23:55 CT**.
 
 ---
 
@@ -47,10 +47,23 @@ users — so the schema catch-up can be done from here without Dustin.
 
 ---
 
-## STATE RIGHT NOW
+## STATE RIGHT NOW — 23:55 CT
 
 | | |
 |---|---|
+| `origin/main` (live) | `f2598da`, shipped and verified |
+| Unit tests | **1,190 passed, 0 failed**; `tsc` 0 errors in `src/` |
+| Ship bridge | **v2, repo-aware, up** — proved itself on three real pushes tonight |
+| Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
+| `symmetry-app-v2` repo | **seeded** — main is live main byte for byte (`f2598da`) |
+| `symmetry-app-v2.vercel.app` | serving, but an OLDER build — `/api/health` 404s. Confirm this. |
+| Dev Supabase `giiovjfpbuzmrvpdglhv` | **caught up** — 88 tables, 1,169 columns, 166 policies |
+
+Both food import cron jobs are **stopped** (`off-bulk-import` job 36,
+`off-micros-backfill` job 39). Do not restart them without Dustin: the catalog
+cannot grow further on the free tier. `trim-off-catalog` has been unscheduled.
+
+---|---|
 | `origin/main` (live) | `1e5c8ad` — pending ship |
 | Unit tests | green |
 | Ship bridge | **v2, repo-aware, up** (`alive … v=2 repos=symmetry-app,symmetry-app-v2`) |
@@ -176,25 +189,30 @@ in the migration.
 **Live is untouched.** Every statement above ran against `giiovjfpbuzmrvpdglhv`
 only, and every one is idempotent, so the migration file is a no-op on live.
 
-### [ ] B. Seed `symmetry-app-v2` from current live main
+### [x] B. Seed `symmetry-app-v2` from current live main — DONE, 23:48 CT
 
-Not a rebuild of the Jul-20 fork — that work is superseded. The
-hardcoded-email sweep landed on live on 11 Aug (`src/lib/trainer.ts`,
+```
+OK pushed [symmetry-app-v2]. main c5cd628 -> f2598da (FORCED - history replaced)
+```
+
+The July placeholder commit is gone. **v2's main is live main byte for byte** —
+not a fork, not a rebuild from the Jul-20 spec, which was superseded anyway when
+the hardcoded-email sweep landed on live on 11 Aug (`src/lib/trainer.ts`,
 `NEXT_PUBLIC_TRAINER_EMAILS` / `NEXT_PUBLIC_COACH_NAME` /
-`NEXT_PUBLIC_BUSINESS_NAME`), so **v2 is live main byte for byte**, differing
-only by environment variables. That is the whole point: a configuration, not a
-fork.
+`NEXT_PUBLIC_BUSINESS_NAME`). v2 differs from live by environment variables and
+nothing else. That is the whole point: a configuration, not a fork.
 
-Do this **after A**, or Dylan opens the app to errors.
+The bridge did it unattended — cloned v2 on Dustin's laptop by itself, refused
+the plain push because a fresh dev repo cannot be a fast-forward, accepted the
+force only because the request named v2 explicitly, and pushed with
+`--force-with-lease`.
 
-Ship it through the bridge: bundle, `SHIP-REPO` = `symmetry-app-v2`,
-`SHIP-FORCE` = `symmetry-app-v2` (v2 holds one unrelated July commit, so the
-seed cannot be a fast-forward). Subsequent ships need no force.
-
-Known trap from the July attempt: a commit author email Vercel cannot match to
-a GitHub account. Sandbox commits are authored `Claude <noreply@anthropic.com>`.
-Live deploys via the hook rather than Vercel's git integration, so it has never
-mattered there — but check how v2's Vercel project is wired before assuming.
+`https://symmetry-app-v2.vercel.app` serves a login page. As of 23:50 it is
+still an OLDER build — `/api/health` 404s and that route has been on live since
+15 Aug — so Vercel is either mid-build or waiting on the `VERCEL_DEPLOY_HOOK`
+secret. **A later run must confirm the deploy actually went green rather than
+assuming the push implied it.** If `/api/health` still 404s, the deploy did not
+happen and that is a finding, not a delay.
 
 ### [ ] C. Prove the AI plan builder actually uses the meal library
 
