@@ -1,8 +1,10 @@
 # Unchecked database writes — the inventory
 
 **What this is.** A sweep of `src/` for `await …from(x).insert|update|delete|upsert(…)`
-where the result is never captured, so a Postgres error is discarded. **139 sites
-across 60 files.**
+where the result is never captured, so a Postgres error is discarded.
+
+**Opened at 139 sites across 60 files. Now 67 across 37**, and the 67 are a
+different kind of thing — see "What is left" below. Regenerated 16 Aug, 04:05 CT.
 
 **Why it matters, and why it is not simply "add error handling everywhere".**
 Most discarded errors are harmless — telemetry, read receipts, audit rows.
@@ -30,61 +32,65 @@ Classifying a site properly means reading it and asking one question:
 Fix the ones where the answer is "the screen says it succeeded". Leave the rest
 and say so.
 
-## Done
+## Done — every site where somebody was being told something that was not true
 
-- **`payments/paymentActions.ts` + `PaymentsClient.tsx` — fixed.** All three
-  actions returned `Promise<void>` with the write unchecked, and every caller
-  applied its optimistic state update on the very next line, unconditionally. A
-  refused write looked exactly like success until the next refresh. They now
-  return an error string; callers alert and skip the update. The inline amount
-  editor also stays open on failure, because closing it is itself a success
-  signal. Nine assertions, mutation-tested.
+Worked through in one overnight run, in order of who gets lied to. Each was
+gated (`tsc` clean in `src/`, unit suite green, `next build` compiled) and each
+guard was mutation-tested by breaking the code and confirming the test failed.
 
-- **`schedule/actions.ts` + `ScheduleClient.tsx` — fixed.** All three writes
-  unchecked, in a file that ALREADY threw on a missing user — so its callers
-  were built to handle a throw and it cost nothing to use one. The file's own
-  comment records what the gap cost: `status: "completed"` was rejected with
-  23514 on every call, unchecked, so marking an unscheduled session done logged
-  nothing while the button said Saving… and then closed. All 964 rows say
-  'Done as planned'. The VALUE was fixed when that was found; the unchecked
-  result was not, which is the half that let it run wrong. Callers now catch and
-  say what failed. Four assertions, mutation-tested.
+| Where | What it was saying | SHA |
+|---|---|---|
+| `paymentActions.ts` + `PaymentsClient.tsx` | All three actions returned `Promise<void>`; every caller applied its optimistic update on the next line. A refused write looked exactly like success until refresh — on the money screen. | `30106f7` |
+| `api/focus-drafts` + `SaturdayReview` | Every write unchecked, every answer `{ ok: true }`. A failed APPROVAL published nothing, returned 200 and cleared the queue off his screen. | `804d0d2` |
+| `api/program-feedback` | The write that IS the answer was unchecked; `delivered` meant "was it substantive", not "did it arrive". | `804d0d2` |
+| `api/challenge` + `GroupChallenge` | `join` swallowed every error to forgive a duplicate. `start` inserted a new challenge without knowing the running one had closed. | `804d0d2` |
+| `agent-tools.ts` undo | The whole undo block is a try/catch over PostgREST calls, so every failed reversal answered "Undone: …" in prose. | `88af90b` |
+| `agent-tools.ts` assign | Deactivating the current programme was unchecked, so a client could end up on TWO. | `88af90b` |
+| `ReminderEditor.tsx` | A refused approval still emailed the client, under a notice reading "Reminder approved". `confirmPaid` thanked the client and rolled the cycle forward without knowing the payment was recorded. | `59c0806` |
+| `api/video-candidates/decide` | The file's promise that "Approving is REVERSIBLE" lived entirely in one unchecked write. | `59c0806` |
+| `api/workout-ai` | The writes that BUILD the workout, while the response describes it back verbatim. A failed section clear leaves a doubled workout. | `cf61e52` |
+| `WorkoutDayEditor.tsx` | Sets, reps, duration, cue and delete on a client's programme — all repainted first, written without looking. | `03eda73` |
+| `api/workout-manual` | The assignment insert that makes a programme visible at all; and a rollback that could not report leaving a half-created day. | `03eda73` |
+| `api/nutrition/plan-edit` | Four writes inside the plan clone. A failed delete plus a successful insert doubles every food in a meal. | `9fc63a8` |
+| `clients/[clientId]/program` | Three silent exits and two unchecked writes in the build-a-workout modal. | `9fc63a8` |
+| `TrainerWeekDigest.tsx` | Setting a focus removes the client from Week Ahead, and that removal IS the record of dealing with them. | `9fc63a8` |
+| `api/cron/weekly-ai` | A client whose draft never landed was reported as `written`. | `94d850f` |
+| `api/ai-nudges` | `ai_nudge_log` IS the cooldown state, so an unchecked insert defeats a stated guardrail rather than losing a log line. | `94d850f` |
+| `ClientTakeovers`, `log/LogClient` | A client told they joined a board that will never show them; a client's own weigh-in and cardio deletes. | `6dc889a` |
+| `CommunityPair`, `OffPlanBanner` | The third join path with the same fault; and a swap that skipped the original after failing to schedule the replacement. | `652d2db` |
 
-- **`schedule/scheduleActions.ts` — fixed.** Both functions already returned
-  `{success, error}`, and both patched or deleted the Google Calendar event
-  BEFORE the unchecked Supabase write. So a refused write left Google showing the
-  new time and the app the old one, or the calendar event gone and a ghost
-  session still in the app — and returned `success: true` either way. The errors
-  now say which side landed, because "it half worked" is the only useful thing
-  to tell someone staring at two calendars that disagree.
+## The shape behind most of them
 
-- **`home/messageActions.ts` + `MessagesClient.tsx` — fixed.** The inserts were
-  unchecked and the push fired regardless: a refused write notified the
-  recipient "New message from your coach" about a message that did not exist,
-  while the sender's input box was cleared on the success path — so their typed
-  text was gone and nothing said why. `sendBroadcastMessage` returned
-  `rows.length`, the number it INTENDED to send, so a broadcast that reached
-  nobody reported "sent to 22"; it now returns what the database gave back.
-  Every send returns before pushing. Nine assertions, mutation-tested.
-  `markMessageRead` is left alone deliberately — a read receipt that fails
-  misleads no one.
+A `try/catch` wrapped around a PostgREST call. It reads as careful and is the
+opposite: **the call RETURNS its error, it does not throw**, so the catch cannot
+fire and the code inside is unguarded while looking guarded. Every
+"best-effort, just log it" console line in this app had therefore never once
+executed.
 
-- **The onboarding routes — fixed.** `invite-client`, `create-client`,
-  `create-client-from-assessment`, `complete-onboarding`, `set-password`.
-  The worst was in `invite-client`: it created the auth account and then linked
-  it to the client row using the CALLER's Supabase client rather than `admin` —
-  alone among that route's writes, so RLS could refuse it — with the result
-  unchecked. That leaves a login that EXISTS and points at nothing: the client
-  gets the email, signs in perfectly, and the app cannot find their record.
-  Re-inviting makes it worse, because `createUser` then fails with "already
-  registered". The error now says outright not to re-send.
-  `set-password` was the other sharp one: the password is already changed by the
-  time the temp flag is cleared, so a failure there loops the client back to the
-  same screen forever. Nine assertions, mutation-tested.
+Swept separately (try-blocks containing an unchecked write and no other throw
+source): **25 at the start, 21 now**, and the remainder are genuine
+fire-and-forget or off-limits.
+
+## What is left, and why it is fine
+
+67 sites. Of those, **12 are in the off-limits logger files** and **22 write to
+tables on the fire-and-forget list**. The remainder are singles on paths where a
+failure has nowhere useful to go — a seen-marker, a session row, a cache warm.
+
+The test that closed this out was applied to every one of them, not assumed:
+
+> If this write fails, does anyone find out — or does the screen, the reply, or
+> the summary say it succeeded?
+
+That is worth saying plainly, because the first draft of this section claimed
+the remainder were harmless **before** the check, and three of them were not
+(`ClientTakeovers`, and both delete buttons in the log screen). They were found
+by verifying the claim rather than making it.
 
 ## Not to be touched without Dustin's per-item permission
 
-`WorkoutLogger.tsx`, `NutritionV3Client.tsx`, `MealPlanClient.tsx` — 11 sites.
+`WorkoutLogger.tsx`, `NutritionV3Client.tsx`, `MealPlanClient.tsx` — 12 sites
+(re-counted 16 Aug; it was 11 when this was opened).
 Both loggers are off limits by standing rule. Listed here so they are not
 forgotten, not so they are quietly fixed.
 
@@ -98,327 +104,199 @@ device state: `group_reads`, `device_tokens`, `*_seen`,
 case is a missing row in a log. Checking them would add noise to paths where an
 error has nowhere useful to go.
 
-## Next, in priority order — by who gets lied to
+## Next — nothing, deliberately
 
-1. **`api/challenge`, `api/program-feedback`, `api/focus-drafts`,
-   `api/video-candidates/*`** — trainer-facing, lower stakes.
-5. **`api/cron/*`, `api/weekly-ai`, `api/coach/focus`** — no human waiting, but a
-   silent failure here is invisible for weeks. Logging is enough; alerts are not.
+The priority list that stood here is done. What remains needs either Dustin's
+permission (the logger files) or nothing at all (fire-and-forget). A future
+session should re-run the sweep and confirm the count has not grown rather than
+re-triaging what is already classified here.
+
 
 ---
 
-# Full inventory
-
+# Full inventory — regenerated 16 Aug, 04:05 CT
 
-### src/app/api/workout-ai/route.ts — 9 sites · **human-facing**
+**67 sites in 37 files.** 12 are in the off-limits logger files.
+22 write to tables on the fire-and-forget list above.
 
-- `:339` `await admin.from("days").update({ label: workout.title }).eq("id", dayIdNew);`
-- `:340` `await admin.from("sections").delete().eq("day_id", dayIdNew);`
-- `:365` `await admin.from("prescribed_exercises").insert({`
-- `:430` `await admin.from("scheduled_workouts")`
-- `:435` `await admin.from("scheduled_workouts").insert({`
-- `:452` `await admin.from("scheduled_workouts").update({ status: "skipped" })`
-- `:457` `await admin.from("scheduled_workouts").insert({`
-- `:462` `await admin.from("scheduled_workouts").update({ status: "skipped" })`
-- `:475` `await admin.from("messages").insert({`
+Regenerate with the sweep in the header — line numbers move with every
+commit, so treat them as a starting point rather than a citation.
 
-### src/lib/ai/agent-tools.ts — 9 sites · **mixed**
 
-- `:136` `await db.from("ai_action_log").insert({ action, client_id: clientId, summary, undo });`
-- `:561` `await db.from("program_assignments").update({ active: false }).eq("client_id", clientId).eq("active", true);`
-- `:654` `await db.from("messages").update({ deleted_at: new Date().toISOString() }).eq("id", u.message_id as string);`
-- `:656` `await db.from(u.table as string).delete().eq("id", u.id as string);`
-- `:661` `await db.from("scheduled_workouts")`
-- `:665` `await db.from(u.table as string).update(u.values as Record<string, unknown>).eq("id", u.id as string);`
-- `:690` `await db.from("ai_action_log").update({ undo_error: failures.join("; ").slice(0, 300) }).eq("id", row.id);`
-- `:710` `await db.from("ai_action_log").update({ undo_error: msg.slice(0, 300) }).eq("id", row.id);`
-- `:713` `await db.from("ai_action_log").update({ undone_at: new Date().toISOString() }).eq("id", row.id);`
+### src/app/(app)/workout/[dayId]/WorkoutLogger.tsx — 8 sites · **OFF LIMITS**
 
-### src/app/(app)/workout/[dayId]/WorkoutLogger.tsx — 7 sites · **OFF-LIMITS**
+- `:1221` `update` → `prescribed_exercises`
+- `:1224` `update` → `prescribed_exercises`
+- `:1233` `update` → `exercises`
+- `:1247` `update` → `set_logs`
+- `:1260` `upsert` → `set_logs`
+- `:1461` `upsert` → `set_logs`
+- `:1702` `insert` → `trainer_notes`
+- `:1830` `update` → `prescribed_exercises`
 
-- `:1247` `await supabase.from("prescribed_exercises")`
-- `:1256` `await supabase.from("exercises").update({ default_tracked_fields: nf }).eq("id", exerciseId);`
-- `:1279` `await supabase.from("set_logs").update({ completed: false })`
-- `:1301` `await supabase.from("set_logs").upsert({`
-- `:1541` `await supabase.from("set_logs").upsert(rows, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" `
-- `:1785` `await supabase.from("trainer_notes").insert({`
-- `:1917` `await supabase.from("prescribed_exercises").update({ exercise_id: newExercise.id }).eq("id", peId);`
+### src/lib/ai/agent-tools.ts — 8 sites
 
-### src/app/(app)/home/messageActions.ts — 6 sites · **human-facing**
+- `:676` `update` → `messages`
+- `:689` `update` → `scheduled_workouts`
+- `:702` `delete` → `macro_targets`
+- `:713` `update` → `program_assignments`
+- `:720` `update` → `program_assignments`
+- `:741` `update` → `scheduled_workouts`
+- `:750` `update` → `ai_action_log` _(fire-and-forget)_
+- `:772` `update` → `ai_action_log` _(fire-and-forget)_
 
-- `:34` `await supabase`
-- `:50` `await supabase.from('messages').insert({`
-- `:80` `await supabase.from('messages').insert({`
-- `:113` `await supabase.from('messages').insert(rows);`
-- `:118` `await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, image_url: i`
-- `:147` `await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, image_url: i`
+### src/app/(app)/nutrition/MealPlanClient.tsx — 3 sites · **OFF LIMITS**
 
-### src/components/ReminderEditor.tsx — 5 sites · **human-facing**
+- `:379` `delete` → `meal_adherence_logs`
+- `:599` `update` → `meal_adherence_logs`
+- `:692` `delete` → `meal_adherence_logs`
 
-- `:334` `await sup.from("payment_reminders").update(patch).eq("id", r.id);`
-- `:361` `await sup.from("payment_reminders").update({`
-- `:366` `await sup.from("client_notifications").insert({`
-- `:375` `await sup.from("payment_reminders").insert({`
-- `:390` `await sup.from("payment_reminders").delete().eq("id", r.id);`
+### src/app/api/workout-manual/route.ts — 3 sites
 
-### src/app/api/video-candidates/decide/route.ts — 5 sites · **human-facing**
+- `:373` `delete` → `prescribed_exercises`
+- `:375` `delete` → `sections`
+- `:376` `delete` → `days`
 
-- `:65` `await db`
-- `:78` `await db.from("exercises").update({ video_url: c.previous_video_url }).eq("id", c.exercise_id);`
-- `:79` `await db`
-- `:115` `await db`
-- `:127` `await db`
+### src/lib/ai/clientMemory.ts — 3 sites
 
-### src/app/api/challenge/route.ts — 4 sites · **human-facing**
+- `:134` `insert` → `ai_chat_turns` _(fire-and-forget)_
+- `:143` `upsert` → `ai_client_memory` _(fire-and-forget)_
+- `:246` `upsert` → `ai_client_memory` _(fire-and-forget)_
 
-- `:233` `await db`
-- `:243` `await db.from("challenge_participants").insert({ challenge_id: liveId, client_id: cid });`
-- `:260` `await db`
-- `:279` `await db`
+### src/app/(app)/home/messageActions.ts — 2 sites
 
-### src/app/api/ai-nudges/route.ts — 4 sites · **mixed**
+- `:33` `update` → `messages`
+- `:139` `insert` → `messages`
 
-- `:268` `await admin.from("ai_nudge_log").insert({`
-- `:286` `await admin.from("ai_nudge_log").insert({ client_id: r.id, segment: seg, tone, sent: false, suppressed });`
-- `:366` `await admin.from("ai_nudge_log").insert({`
-- `:386` `await admin.from("messages").insert({`
+### src/app/(app)/home/notifActions.ts — 2 sites
 
-### src/app/(app)/clients/[clientId]/day/[dayId]/WorkoutDayEditor.tsx — 4 sites · **human-facing**
+- `:6` `update` → `client_notifications`
+- `:14` `update` → `client_notifications`
 
-- `:245` `await supabase.from("prescribed_exercises").delete().eq("id", pe.id);`
-- `:299` `await supabase.from("prescribed_exercises").update({ [field]: v }).eq("id", pe.id);`
-- `:310` `await supabase.from("prescribed_exercises").update({ [field]: v || null }).eq("id", pe.id);`
-- `:323` `await supabase.from("prescribed_exercises").update({ cue: e.target.value || null }).eq("id", pe.id);`
+### src/app/(app)/messages/page.tsx — 2 sites
 
-### src/lib/ai/clientMemory.ts — 4 sites · **mixed**
+- `:113` `update` → `messages`
+- `:190` `update` → `messages`
 
-- `:146` `await db.from("ai_chat_turns").insert(rows);`
-- `:155` `await db`
-- `:261` `await logUsage(clientId, "memory_fold", res.tokensIn, res.tokensOut, HAIKU_MODEL, { latencyMs: res.latencyMs, `
-- `:264` `await db.from("ai_client_memory").upsert(`
+### src/app/(app)/schedule/scheduleActions.ts — 2 sites
 
-### src/components/OffPlanBanner.tsx — 3 sites · **human-facing**
+- `:106` `delete` → `appointments`
+- `:110` `delete` → `appointments`
 
-- `:74` `await (supabase as any).from("scheduled_workouts").insert({`
-- `:117` `await (supabase as any).from("scheduled_workouts").update({ status: "skipped" })`
-- `:126` `await supabase.from("offplan_workout_logs").delete().eq("id", id);`
+### src/app/api/agent/route.ts — 2 sites
 
-### src/app/api/focus-drafts/route.ts — 3 sites · **human-facing**
+- `:72` `update` → `ai_chat_sessions` _(fire-and-forget)_
+- `:74` `insert` → `ai_chat_sessions` _(fire-and-forget)_
 
-- `:101` `await db.from("weekly_focus_drafts").update({ focus, edited_at: new Date().toISOString() }).eq("id", body.id);`
-- `:114` `await db.from("weekly_focus_drafts").update({ approved_at: now }).eq("week_start", week).is("published_at", nu`
-- `:116` `await db.from("weekly_focus_drafts").update({ approved_at: now }).eq("id", body.id);`
+### src/app/api/cron/birthdays/route.ts — 2 sites
 
-### src/app/api/cron/weekly-ai/route.ts — 3 sites · **human-facing**
+- `:131` `insert` → `birthday_posts`
+- `:198` `insert` → `birthday_posts`
 
-- `:234` `await db.from("weekly_focus_drafts").insert({`
-- `:239` `await db.from("weekly_focus_drafts")`
-- `:255` `await db`
+### src/app/api/cron/goals/route.ts — 2 sites
 
-### src/app/api/program-feedback/route.ts — 3 sites · **human-facing**
+- `:99` `update` → `client_goals`
+- `:145` `update` → `client_goals`
 
-- `:101` `await db`
-- `:125` `await db.from("clients").update({ notes }).eq("id", cid);`
-- `:144` `await db.from("messages").insert({`
+### src/app/api/feedback/describe/route.ts — 2 sites
 
-### src/app/api/workout-manual/route.ts — 3 sites · **human-facing**
+- `:143` `update` → `app_feedback` _(fire-and-forget)_
+- `:151` `update` → `app_feedback` _(fire-and-forget)_
 
-- `:190` `await db.from("program_assignments").insert({`
-- `:393` `await db.from("sections").delete().eq("day_id", created.days);`
-- `:394` `await db.from("days").delete().eq("id", created.days);`
+### src/components/MessageReactions.tsx — 2 sites
 
-### src/app/(app)/schedule/actions.ts — 3 sites · **human-facing**
+- `:105` `delete` → `message_reactions` _(fire-and-forget)_
+- `:112` `insert` → `message_reactions` _(fire-and-forget)_
 
-- `:17` `await supabase.from("cardio_logs").insert({`
-- `:39` `await supabase`
-- `:49` `await supabase.from("workout_logs").insert({`
+### src/lib/webPush.ts — 2 sites
 
-### src/app/(app)/schedule/scheduleActions.ts — 3 sites · **human-facing**
+- `:89` `update` → `push_subscriptions` _(fire-and-forget)_
+- `:96` `update` → `push_subscriptions` _(fire-and-forget)_
 
-- `:39` `await supabase.from('appointments').update(updates).eq('id', params.appointmentId);`
-- `:95` `await supabase`
-- `:100` `await supabase.from('appointments').delete().eq('id', params.appointmentId);`
+### src/app/(app)/clients/[clientId]/AssignProgramModal.tsx — 1 site
 
-### src/app/(app)/clients/[clientId]/program/page.tsx — 3 sites · **human-facing**
+- `:35` `update` → `program_assignments`
 
-- `:365` `await supabase.from("prescribed_exercises").insert({`
-- `:394` `await supabase.from("prescribed_exercises").update({`
-- `:1041` `await supabase.from("scheduled_workouts").delete().eq("id", id);`
+### src/app/(app)/home/TrainerCalendar.tsx — 1 site
 
-### src/app/(app)/nutrition/MealPlanClient.tsx — 3 sites · **OFF-LIMITS**
+- `:1330` `update` → `appointments`
 
-- `:385` `await supabase.from("meal_adherence_logs").delete().eq("id", id);`
-- `:853` `await supabase.from("meal_adherence_logs").update({ notes: note }).eq("id", existing.id);`
-- `:946` `await supabase.from("meal_adherence_logs").delete().eq("id", existing.id);`
+### src/app/(app)/home/actions.ts — 1 site
 
-### src/components/MessageReactions.tsx — 2 sites · **human-facing**
+- `:6` `update` → `payment_reminders`
 
-- `:127` `await supabase`
-- `:134` `await supabase.from("message_reactions").insert({ message_id: messageId, user_id: userId, emoji });`
+### src/app/(app)/log-bodyfat/page.tsx — 1 site
 
-### src/components/TrainerWeekDigest.tsx — 2 sites · **human-facing**
+- `:137` `update` → `metrics`
 
-- `:197` `await supabase.from("clients").update(update).eq("id", id);`
-- `:234` `await supabase.from("clients").update({ digest_snoozed_until: until }).eq("id", id);`
+### src/app/(app)/nutrition/v3/NutritionV3Client.tsx — 1 site · **OFF LIMITS**
 
-### src/app/api/coach/focus/route.ts — 2 sites · **human-facing**
+- `:515` `delete` → `meal_adherence_logs`
 
-- `:78` `await supabase.from("clients").update({ ai_focus_question: null }).eq("id", clientId);`
-- `:143` `await supabase.from("clients").update(update).eq("id", clientId);`
+### src/app/(app)/payments/PaymentsClient.tsx — 1 site
 
-### src/app/api/cron/goals/route.ts — 2 sites · **human-facing**
+- `:700` `delete` → `payment_reminders`
 
-- `:99` `await db.from("client_goals").update({`
-- `:145` `await db.from("client_goals").update({ rolled_to_id: (created as { id: string }).id }).eq("id", goal.id);`
+### src/app/(app)/settings/SettingsClient.tsx — 1 site
 
-### src/app/api/cron/birthdays/route.ts — 2 sites · **human-facing**
+- `:70` `upsert` → `trainer_settings` _(fire-and-forget)_
 
-- `:137` `await db.from("birthday_posts").insert({ client_id: p.id, year: Number(tomorrowIso.slice(0, 4)), kind: "heads_`
-- `:206` `await db.from("birthday_posts").insert({ client_id: p.id, year, kind: "group" });`
+### src/app/(app)/welcome/WelcomeClient.tsx — 1 site
 
-### src/app/api/agent/route.ts — 2 sites · **human-facing**
+- `:44` `upsert` → `client_app_settings` _(fire-and-forget)_
 
-- `:83` `await db.from("ai_chat_sessions").update({ messages: flat, updated_at: new Date().toISOString() }).eq("id", id`
-- `:85` `await db.from("ai_chat_sessions").insert({ context_type: CONTEXT_TYPE, messages: flat });`
+### src/app/api/agent/session/route.ts — 1 site
 
-### src/app/api/video-candidates/verify/route.ts — 2 sites · **human-facing**
+- `:63` `delete` → `ai_chat_sessions` _(fire-and-forget)_
 
-- `:236` `await db`
-- `:242` `await db`
+### src/app/api/cron/check-videos/route.ts — 1 site
 
-### src/app/api/invite-client/route.ts — 2 sites · **human-facing**
+- `:108` `insert` → `app_feedback` _(fire-and-forget)_
 
-- `:75` `await supabase.from("clients").update({ auth_user_id: authUserId }).eq("id", clientId);`
-- `:79` `await admin.from("client_app_settings").upsert({`
+### src/app/api/nutrition/plan-restore/route.ts — 1 site
 
-### src/app/api/create-client-from-assessment/route.ts — 2 sites · **human-facing**
+- `:81` `update` → `meal_plans`
 
-- `:123` `await admin.from("client_assessments").update({ client_id: clientRow.id }).eq("id", assessment.id);`
-- `:126` `await admin.from("client_app_settings").upsert({`
+### src/app/api/push/subscribe/route.ts — 1 site
 
-### src/app/api/nutrition/plan-edit/route.ts — 2 sites · **human-facing**
+- `:47` `update` → `push_subscriptions` _(fire-and-forget)_
 
-- `:142` `await admin.from("meal_items").insert(edited.map((it, i) => ({ meal_id: copyId, ...it, position: i + 1 })));`
-- `:182` `await admin.from("meal_items").delete().eq("meal_id", targetMealId);`
+### src/app/api/recipes/route.ts — 1 site
 
-### src/app/(app)/home/notifActions.ts — 2 sites · **human-facing**
+- `:129` `delete` → `recipe_ingredients`
 
-- `:6` `await supabase`
-- `:14` `await supabase`
+### src/app/api/reminders/send/route.ts — 1 site
 
-### src/app/(app)/messages/page.tsx — 2 sites · **human-facing**
+- `:112` `update` → `payment_reminders`
 
-- `:115` `await supabase`
-- `:196` `await supabase`
+### src/app/api/weekly-brief/route.ts — 1 site
 
-### src/components/NotificationCenter.tsx — 1 site · **human-facing**
+- `:93` `update` → `clients`
 
-- `:85` `await Promise.all([`
+### src/app/api/workout-assist/route.ts — 1 site
 
-### src/components/CommunityPair.tsx — 1 site · **human-facing**
+- `:193` `insert` → `ai_action_log` _(fire-and-forget)_
 
-- `:137` `await supabase`
+### src/components/ClientTakeovers.tsx — 1 site
 
-### src/components/MetricCards.tsx — 1 site · **human-facing**
+- `:326` `insert` → `client_announcements_seen` _(fire-and-forget)_
 
-- `:421` `await supabase.from('metrics').upsert(`
+### src/components/MetricCards.tsx — 1 site
 
-### src/components/GroupChallenge.tsx — 1 site · **human-facing**
+- `:415` `upsert` → `metrics`
 
-- `:168` `await supabase`
+### src/components/ProgressPhotos.tsx — 1 site
 
-### src/components/ClientTakeovers.tsx — 1 site · **human-facing**
+- `:223` `delete` → `progress_photos`
 
-- `:689` `await supabase.from("challenge_participants").insert({ challenge_id: pick.challenge.id, client_id: meId });`
+### src/components/PushRegister.tsx — 1 site
 
-### src/components/PushRegister.tsx — 1 site · **fire-and-forget**
+- `:45` `upsert` → `device_tokens` _(fire-and-forget)_
 
-- `:46` `await (supabase as any).from("device_tokens").upsert(`
+### src/components/ScheduleBoard.tsx — 1 site
 
-### src/components/ProgressPhotos.tsx — 1 site · **human-facing**
+- `:224` `update` → `scheduled_workouts`
 
-- `:237` `await supabase.from("progress_photos").delete().eq("id", p.id);`
+### src/lib/push.ts — 1 site
 
-### src/app/api/reminders/send/route.ts — 1 site · **human-facing**
-
-- `:116` `await supabase`
-
-### src/app/api/weekly-brief/route.ts — 1 site · **fire-and-forget**
-
-- `:94` `await admin.from("clients").update({ week_brief_seen_week: weekStart }).eq("id", clientId);`
-
-### src/app/api/recipes/route.ts — 1 site · **human-facing**
-
-- `:132` `await admin.from("recipe_ingredients").delete().eq("recipe_id", recipeId);`
-
-### src/app/api/cron/check-videos/route.ts — 1 site · **human-facing**
-
-- `:110` `await db.from("app_feedback").insert({`
-
-### src/app/api/feedback/describe/route.ts — 1 site · **human-facing**
-
-- `:153` `await db.from("app_feedback").update({ image_summary: `[could not read the screenshot: ${msg}]` }).eq("id", fe`
-
-### src/app/api/agent/session/route.ts — 1 site · **human-facing**
-
-- `:74` `await db.from("ai_chat_sessions").delete().eq("context_type", CONTEXT_TYPE);`
-
-### src/app/api/create-client/route.ts — 1 site · **human-facing**
-
-- `:131` `await admin.from("client_app_settings").upsert({`
-
-### src/app/api/complete-onboarding/route.ts — 1 site · **human-facing**
-
-- `:46` `await admin.from("metrics").insert({`
-
-### src/app/api/workout-assist/route.ts — 1 site · **fire-and-forget**
-
-- `:199` `await admin.from("ai_action_log").insert({`
-
-### src/app/api/nutrition/plan-restore/route.ts — 1 site · **human-facing**
-
-- `:82` `await admin.from("meal_plans").update({ status: "archived" }).in("id", displace);`
-
-### src/app/(auth)/set-password/page.tsx — 1 site · **human-facing**
-
-- `:77` `await supabase`
-
-### src/app/(app)/settings/SettingsClient.tsx — 1 site · **human-facing**
-
-- `:70` `await supabase.from("trainer_settings").upsert({ user_id: userId, gcal_sync_enabled: val }, { onConflict: "use`
-
-### src/app/(app)/home/actions.ts — 1 site · **human-facing**
-
-- `:6` `await supabase`
-
-### src/app/(app)/home/TrainerCalendar.tsx — 1 site · **human-facing**
-
-- `:1348` `await supabase.from("appointments").update({`
-
-### src/app/(app)/clients/[clientId]/AssignProgramModal.tsx — 1 site · **human-facing**
-
-- `:35` `await supabase`
-
-### src/app/(app)/payments/PaymentsClient.tsx — 1 site · **human-facing**
-
-- `:709` `await supabase.from("payment_reminders").delete().eq("id", c.reminderId);`
-
-### src/app/(app)/welcome/WelcomeClient.tsx — 1 site · **human-facing**
-
-- `:45` `await sb.from("client_app_settings").upsert(`
-
-### src/app/(app)/nutrition/v3/NutritionV3Client.tsx — 1 site · **OFF-LIMITS**
-
-- `:531` `await supabase.from("meal_adherence_logs").delete().eq("id", id);`
-
-### src/app/(app)/log-bodyfat/page.tsx — 1 site · **human-facing**
-
-- `:137` `await supabase.from("metrics").update({ weight: __lastW.weight })`
-
-### src/lib/useNotificationFeed.tsx — 1 site · **human-facing**
-
-- `:230` `await markGroupRead(supabase);`
-
-### src/lib/moveWorkout.ts — 1 site · **human-facing**
-
-- `:69` `await sb.from("workout_logs").update({ log_date: toDate }).eq("id", logId);`
+- `:131` `delete` → `device_tokens` _(fire-and-forget)_
