@@ -71,11 +71,28 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
         .select("id, position").eq("client_id", clientId).eq("day_id", dayId)
         .eq("scheduled_date", today).eq("status", "scheduled").order("id");
       const orig = origRows && origRows[0] ? origRows[0] : null;
-      await (supabase as any).from("scheduled_workouts").insert({
+      // Order matters and both halves matter. Unchecked, a refused insert was
+      // followed by skipping the ORIGINAL and then navigating to the
+      // replacement anyway — so the client ended the swap with no workout
+      // scheduled at all, standing on the page for one. uq_scheduled_workout_
+      // one_per_day can reject this insert outright when the target session is
+      // already on today, which makes it a live possibility rather than a
+      // theoretical one.
+      const { error: addErr } = await (supabase as any).from("scheduled_workouts").insert({
         client_id: clientId, day_id: target.id, scheduled_date: today,
         status: "scheduled", source: "client_self_assign", position: orig ? orig.position : 0,
       });
-      if (orig) await (supabase as any).from("scheduled_workouts").update({ status: "skipped" }).eq("id", orig.id);
+      if (addErr) {
+        window.alert("Couldn't swap that in — your original workout is still there. " + addErr.message);
+        return;
+      }
+      if (orig) {
+        const { error: skipErr } = await (supabase as any).from("scheduled_workouts")
+          .update({ status: "skipped" }).eq("id", orig.id);
+        // The new one IS scheduled by now, so this cannot undo the swap — but
+        // both sitting there is a confusing day and worth saying.
+        if (skipErr) window.alert("Swapped in, but your original workout is still on today as well.");
+      }
       window.location.href = "/workout/" + target.id + window.location.search;
     } finally { setBusy(false); }
   }
@@ -114,8 +131,13 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
       // tolerated if it fails: what they DID is now safely recorded, and losing
       // that would be the worse outcome.
       try {
-        await (supabase as any).from("scheduled_workouts").update({ status: "skipped" })
+        // Still tolerated if it fails — what they DID is safely recorded and
+        // losing that would be worse. But it has to be able to SAY so: this
+        // call returns its error rather than throwing, so the catch below has
+        // never once seen a failure here.
+        const { error: skipErr } = await (supabase as any).from("scheduled_workouts").update({ status: "skipped" })
           .eq("client_id", clientId).eq("day_id", dayId).eq("scheduled_date", today).eq("status", "scheduled");
+        if (skipErr) console.error("OffPlanBanner: session logged but the planned one was not skipped —", skipErr.message);
       } catch { /* the session is logged; this is bookkeeping */ }
       setTyped(""); setDetails(""); setMode("closed");
       window.location.reload();
@@ -123,7 +145,14 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
   }
 
   async function deleteRow(id: string) {
-    await supabase.from("offplan_workout_logs").delete().eq("id", id);
+    // Removing it from the list is the only confirmation the client gets, so
+    // doing that on a refused delete tells them their entry is gone when it is
+    // still there on the next load.
+    const { error } = await supabase.from("offplan_workout_logs").delete().eq("id", id);
+    if (error) {
+      window.alert("That didn't delete — it is still there. " + error.message);
+      return;
+    }
     setPendingRows((prev) => prev.filter((r) => r.id !== id));
   }
 

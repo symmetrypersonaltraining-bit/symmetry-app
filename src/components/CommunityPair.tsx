@@ -134,9 +134,20 @@ export default function CommunityPair({ basePath = "" }: { basePath?: string }) 
     try {
       const { data: me } = await supabase.rpc("my_client_id");
       if (me) {
-        await supabase
+        // The third join path in the app, and the third with this fault. A
+        // duplicate genuinely means they were already in; anything else means
+        // they are NOT on the board while the button says they are. The catch
+        // below could never tell the difference, because a PostgREST call
+        // returns its error rather than throwing — so every failure landed on
+        // `setJoined(true)`. This is where "twenty-three people had joined and
+        // six were showing" comes from.
+        const { error } = await supabase
           .from("challenge_participants")
           .insert({ challenge_id: challenge.id, client_id: me as string });
+        if (error && error.code !== "23505") {
+          window.alert("Couldn't join — try again in a moment.");
+          return;
+        }
         setJoined(true);
         setChallenge((c) =>
           c ? { ...c, participant_count: (c.participant_count ?? 0) + 1 } : c

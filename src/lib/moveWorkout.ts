@@ -66,7 +66,12 @@ export async function moveScheduledWorkout(
   }
   if (logId) {
     try {
-      await sb.from("workout_logs").update({ log_date: toDate }).eq("id", logId);
+      // Still never fatal — the reasoning above holds, the schedule is
+      // authoritative and a stale log_date is the smaller problem. But this
+      // call returns its error rather than throwing, so the catch below has
+      // never seen one and a log left on the old date was completely silent.
+      const { error: logErr } = await sb.from("workout_logs").update({ log_date: toDate }).eq("id", logId);
+      if (logErr) console.error("moveScheduledWorkout: schedule moved, log left on the old date —", logErr.message);
     } catch { /* schedule is authoritative for where the session sits */ }
   }
   return null;

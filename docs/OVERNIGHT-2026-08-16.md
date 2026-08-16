@@ -4,13 +4,13 @@
 things that genuinely need Dustin. Scheduled sessions read this, take the top
 unfinished item, ship it, tick it off here, and stop.
 
-Last updated **03:15 CT, Sunday 16 Aug**, mid-session.
+Last updated **03:30 CT, Sunday 16 Aug**, mid-session.
 
 ---
 
 ## MORNING SUMMARY — read this, then stop reading
 
-Written at **03:15 CT**. Later runs update it; if the timestamp says 05:xx it
+Written at **03:30 CT**. Later runs update it; if the timestamp says 05:xx it
 is the final version.
 
 **If you read three things:** the video pipeline was publishing to clients on
@@ -47,6 +47,8 @@ needs two keys from you before any client can be notified about anything.
 | `94d850f` | The two cron writers can say when they failed |
 | `f36698d` | Unchecked-write sweep marked done, summary refreshed |
 | `6dc889a` | Three of the "harmless" remainder were not harmless |
+| `4a3922c` | Bot-message audit recorded — clean |
+| _this_ | The catches that could never fire, swept and closed |
 
 ### Added mid-session, and it turned out to be the big one
 
@@ -306,13 +308,13 @@ users — so the schema catch-up can be done from here without Dustin.
 
 ---
 
-## STATE RIGHT NOW — 03:15 CT
+## STATE RIGHT NOW — 03:30 CT
 
 | | |
 |---|---|
-| `origin/main` (live) | `6dc889a`, shipped and verified against `origin/main` |
-| Unit tests | **1,386 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
-| Ship bridge | **v2, repo-aware, up** — fourteen real pushes tonight, no failures |
+| `origin/main` (live) | `4a3922c`, shipped and verified against `origin/main` |
+| Unit tests | **1,393 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
+| Ship bridge | **v2, repo-aware, up** — sixteen real pushes tonight, no failures |
 | Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
 | Video pipeline | **no longer publishes on its own**, from either place. 175 live videos untouched, all reviewable |
 | `symmetry-app-v2` repo | **seeded** — main is live main byte for byte |
@@ -608,11 +610,26 @@ largest single concentration left.
 **The recurring shape, worth naming once and remembering:** a `try/catch`
 wrapped around a PostgREST call. It reads as careful and is the opposite — the
 call RETURNS its error rather than throwing, so the catch cannot fire and the
-code inside is completely unguarded while looking guarded. It turned up in the
-agent's undo, in program-feedback, in workout-manual's rollback, in the
-programming question, in the trainer notification, and in every "best-effort,
-just log it" block in the app. **Not one of those console lines had ever
-fired.**
+code inside is completely unguarded while looking guarded. **Not one "best-effort,
+just log it" console line in this app had ever executed.**
+
+Rather than keep meeting it, I swept for it: try-blocks containing an unchecked
+write and no other throw source. **25 of them.** Six are in the off-limits logger
+files (listed, untouched). Most of the rest are genuinely fire-and-forget —
+device tokens, seen-markers, chat memory. Three were not, and one of those is
+the same bug for the third time:
+
+| Where | What it did |
+|---|---|
+| `CommunityPair.join` | The THIRD challenge-join path with this fault, after GroupChallenge and ClientTakeovers. Every failure landed on `setJoined(true)`. All three now agree on 23505-only, and a test holds them together. |
+| `OffPlanBanner.doSwap` | A refused insert was followed by skipping the ORIGINAL and navigating to the replacement anyway — the client finished the swap with **no workout scheduled at all**, standing on the page for one. `uq_scheduled_workout_one_per_day` can reject that insert, so it is live, not theoretical. |
+| `OffPlanBanner.deleteRow` | Removing the row from the list is the only confirmation the client gets. |
+
+Two more were left best-effort **on purpose** and only made capable of
+reporting: the skip in `saveOffPlan` (what they DID is already recorded, and
+losing that is worse) and the `log_date` move in `moveScheduledWorkout` (the
+schedule is authoritative; a stale date is the smaller problem). A test asserts
+those two did NOT become fatal, because that would be the wrong fix.
 
 ### [ ] E. Photographs for the meal library — BLOCKED HERE, and here is why
 
