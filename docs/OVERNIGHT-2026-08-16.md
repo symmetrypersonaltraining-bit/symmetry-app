@@ -250,22 +250,50 @@ Claudine bug through the back door.
 **Left undone deliberately:** Dustin's 24 Aug plan is still `archived`. Restoring
 it changes a real plan row and needs his word.
 
-### [ ] C. Prove the AI plan builder actually uses the meal library
+### [x] C. Prove the AI plan builder actually uses the meal library — DONE (`21660f5`)
 
-Shipped `6887ce7` — 50 meals and 20 recipes are in the plan-builder system
-prompt. **Never executed against the real model.** Call
-`/api/nutrition-ai/plan-build` with real targets and check whether library meal
-names come back verbatim. A name that is NOT in the library verbatim is the
-worse finding — nothing downstream would resolve it.
+The task was to call the model and see whether it used the library. Reading what
+happens to the reply answers a better question first: **nothing used it.**
+`validatePlanDraft` took the meal name as text and the macros as whatever the
+model wrote. So a plan naming a library meal was no more accurate than one
+inventing a meal — it merely looked more trustworthy, which is worse. The
+prompt's own promise, "the numbers are known to be right", had no implementation
+anywhere in the code.
 
-### [ ] D. The 92 unchecked writes — triage the rest
+An exact name match now substitutes the library's verified items and measured
+portions and sets `fromLibrary`. Matching is exact and nothing looser: a fuzzy
+match would serve a client a different meal that happened to share a word.
+Invented meals are untouched, because the prompt deliberately allows inventing
+when nothing fits.
 
-`c7d06c6` fixed the workout adjuster, which was reporting failed writes as
-completed actions. A sweep found 92 candidate sites; most are legitimately
-fire-and-forget (push, telemetry). Classify them. Fix any where a discarded
-error is reported to a human as a completed action, and say which are genuinely
-fire-and-forget. Regenerate the list by walking `src/` for
-`await …from(x).insert|update|delete` whose result is not destructured.
+Still worth doing when someone has an authenticated session: run the builder
+against real targets and see how OFTEN it reaches for the library. That is a
+prompt-quality question, and it is now separable from the accuracy one.
+
+### [~] D. Unchecked writes — inventoried, payments fixed, the rest queued
+
+Swept: **139 sites across 60 files**, written up in
+`docs/UNCHECKED-WRITES-INVENTORY.md` along with the scan that produced it.
+
+**Fixed: the payments screen.** All three actions in `paymentActions.ts` returned
+`Promise<void>` with the write unchecked, and every caller applied its optimistic
+update on the very next line, unconditionally — so a refused write looked exactly
+like success until refresh, on the one screen where being wrong costs money.
+There is precedent in that file's own history: `markClientPaid` once inserted
+with a column that did not exist, unchecked, immediately after deleting the
+current reminder, and quietly wiped a client's billing schedule.
+
+**Deliberately NOT auto-fixed.** The per-file classification in that document
+comes from a regex over table names, which is a weak signal — a cron route
+writing `payment_reminders` looks identical to a button doing it, and only one
+of them has somebody watching. Blanket-fixing 139 sites on that basis would add
+noise everywhere and still miss the ones that matter. The document says so, and
+gives the single question that decides each site: **if this write fails, does
+anyone find out?**
+
+Next, by who gets lied to: schedule actions (6), message actions (6), the
+onboarding routes (7), then trainer-facing, then cron. The three logger files
+(11 sites) are OFF LIMITS and listed only so they are not forgotten.
 
 ### [ ] E. Photographs for the meal library, by URL
 
@@ -276,19 +304,32 @@ the 50 meals and 20 recipes. Store the URL and the attribution; costs nothing in
 storage. Add a column, wire it through the meal and recipe cards, leave it null
 where nothing decent exists rather than shipping a wrong photo.
 
-### [ ] F. Micronutrients below the day level
+### [x] F. Micronutrients below the day level — DONE (`d445002`)
 
-The day total already has it — the nutrition screen's "ALL NUTRIENTS" panel,
-full registry, grouped, hiding unknowns rather than showing dashes. **Do not
-rebuild that; it exists.** A previous session grepped for its call site with
-`grep -v dailyTotals.ts` — the one file that calls it — concluded "called from
-nowhere", and shipped a duplicate.
+The day total already had it and must not be rebuilt — a previous session
+grepped for the panel's call site with `grep -v dailyTotals.ts`, the one file
+that calls it, concluded "called from nowhere", and shipped a duplicate.
 
-Still missing: `FoodSearchSheet` carries fiber/sugar/sodium/satFat on its type
-and scales them correctly, then renders none of them. `ComposerSheet` has no
-nutrient handling at all. Use `groupedNutrients` and `pctOfDaily` from
-`@/lib/nutrition/nutrients`. Write no new formatters — that is exactly what
-produced the duplicate.
+What was actually missing turned out to be worse than a missing panel.
+`FoodSearchSheet` carried fiber/sugar/sodium/satFat on its type, scaled them
+correctly, and took real care that "0.4 of an unknown sodium is still unknown" —
+but never read `food_catalog.micros`, the jsonb holding the other 29. And
+`CustomItem.mi` already existed for exactly that bag, written by the AI path and
+read by the registry. Only this sheet never filled it.
+
+So a food with a complete lab-measured panel — every USDA whole food, which is
+what every meal plan is written from — became a four-nutrient food the instant a
+client logged it, and the day total understated itself with nothing on screen to
+say so. No error, no warning, numbers that look entirely reasonable.
+
+Fixed at the source (`mapRow` reads micros, `pickItem` passes the scaled map),
+and the picker now shows them for the portion about to be logged: grouped,
+percent of a general daily reference and labelled as such, and an honest "no
+nutrient detail published for this food" instead of a grid of dashes. Everything
+renders through the registry; no formatter written locally.
+
+**`ComposerSheet` still has no nutrient handling** and is the remaining gap at
+this level.
 
 ### [ ] G. Exercise videos — 101 unsearched
 

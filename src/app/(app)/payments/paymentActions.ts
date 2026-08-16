@@ -1,14 +1,27 @@
 'use server';
 import { createClient } from '@/lib/supabase/server';
 
-export async function markClientPaid(reminderId: string): Promise<void> {
+// ── These return an error STRING instead of void, and that is the whole point ─
+//
+// Every one of them was `Promise<void>` with the write unchecked, and every
+// caller in PaymentsClient.tsx applies its optimistic state update on the very
+// next line, unconditionally. So an RLS refusal, a dropped connection or a
+// column that does not exist produced exactly the same thing on screen as
+// success: the row moved, the amount changed, the reminder vanished — until the
+// next refresh put it all back. On a money screen that is the worst possible
+// failure, because the trainer has already moved on believing it took.
+//
+// null means it worked. A string is the reason it did not, and the caller shows
+// it and skips the optimistic update.
+
+export async function markClientPaid(reminderId: string): Promise<string | null> {
   const supabase = await createClient();
   const { data: reminder } = await supabase
     .from('payment_reminders')
     .select('*')
     .eq('id', reminderId)
     .single();
-  if (!reminder) return;
+  if (!reminder) return 'That reminder no longer exists — refresh the page.';
 
   // Next month's due date, clamped to that month's last day. Date.setMonth(+1)
   // overflows — a 31st due date rolled to Mar 3 instead of Feb 28.
@@ -36,27 +49,36 @@ export async function markClientPaid(reminderId: string): Promise<void> {
   });
   if (insErr) {
     console.error('markClientPaid: could not roll the reminder forward', insErr.message);
-    return; // leave the current reminder in place rather than lose the schedule
+    // Leave the current reminder in place rather than lose the schedule.
+    return `Could not create next cycle's reminder: ${insErr.message}`;
   }
 
-  await supabase.from('payment_reminders').delete().eq('id', reminderId);
+  // Checked too. An unchecked delete here leaves the client with BOTH the old
+  // reminder and the new one, and the screen says paid.
+  const { error: delErr } = await supabase.from('payment_reminders').delete().eq('id', reminderId);
+  if (delErr) {
+    return `Next cycle was created, but the paid reminder is still showing: ${delErr.message}`;
+  }
+  return null;
 }
 
 export async function setPaymentStatus(
   reminderId: string,
   status: 'pending' | 'paused' | 'disabled'
-): Promise<void> {
+): Promise<string | null> {
   const supabase = await createClient();
-  await supabase
+  const { error } = await supabase
     .from('payment_reminders')
     .update({ notification_status: status })
     .eq('id', reminderId);
+  return error ? `Could not change that reminder to ${status}: ${error.message}` : null;
 }
 
-export async function updateAmountDue(reminderId: string, amount: number): Promise<void> {
+export async function updateAmountDue(reminderId: string, amount: number): Promise<string | null> {
   const supabase = await createClient();
-  await supabase
+  const { error } = await supabase
     .from('payment_reminders')
     .update({ amount_due: amount })
     .eq('id', reminderId);
+  return error ? `Could not save that amount: ${error.message}` : null;
 }

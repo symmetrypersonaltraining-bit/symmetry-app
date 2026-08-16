@@ -590,7 +590,10 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
     if (!c.reminderId) return;
     setUpdating(c.clientId);
     // Use server action: delete current + create next month
-    await markClientPaid(c.reminderId);
+    // The optimistic update below is only honest if the write actually landed.
+    // Unchecked, a refused write left the row showing as paid until refresh.
+    const err = await markClientPaid(c.reminderId);
+    if (err) { setUpdating(null); window.alert(err); return; }
     // Optimistic update: remove reminder from local state (page refresh will reload fresh data)
     setLocalClients(prev => prev.map(p =>
       p.clientId === c.clientId
@@ -605,7 +608,8 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
     if (!c.reminderId) return;
     const next = c.notificationStatus === "paused" ? "pending" : "paused";
     setUpdating(c.clientId);
-    await setPaymentStatus(c.reminderId, next);
+    const err = await setPaymentStatus(c.reminderId, next);
+    if (err) { setUpdating(null); window.alert(err); return; }
     setLocalClients(prev => prev.map(p =>
       p.clientId === c.clientId ? { ...p, notificationStatus: next } : p
     ));
@@ -616,7 +620,8 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
     if (!c.reminderId) return;
     const next = c.notificationStatus === "disabled" ? "pending" : "disabled";
     setUpdating(c.clientId);
-    await setPaymentStatus(c.reminderId, next as 'pending' | 'paused' | 'disabled');
+    const err = await setPaymentStatus(c.reminderId, next as 'pending' | 'paused' | 'disabled');
+    if (err) { setUpdating(null); window.alert(err); return; }
     setLocalClients(prev => prev.map(p =>
       p.clientId === c.clientId ? { ...p, notificationStatus: next } : p
     ));
@@ -724,7 +729,9 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
       return;
     }
     if (c.reminderId) {
-      await updateAmountDue(c.reminderId, newAmt);
+      const err = await updateAmountDue(c.reminderId, newAmt);
+      // Leave the editor open on failure — closing it would look like a save.
+      if (err) { window.alert(err); return; }
     }
     setLocalClients(prev => prev.map(p =>
       p.clientId === c.clientId ? { ...p, amountDue: newAmt } : p
