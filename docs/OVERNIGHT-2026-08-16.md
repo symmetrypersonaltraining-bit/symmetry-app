@@ -4,7 +4,7 @@
 things that genuinely need Dustin. Scheduled sessions read this, take the top
 unfinished item, ship it, tick it off here, and stop.
 
-Last updated **04:45 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
+Last updated **04:55 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
 
 ---
 
@@ -16,8 +16,9 @@ Written at **04:10 CT**, after the last queue item shipped.
 its own, from two places, and no video in this app had ever been approved by a
 person (stopped, reversibly, nothing pulled); your Saturday review queue has
 been empty because the publisher crashed on 9 Aug and has not had a Sunday since
-(already fixed on the 13th — this morning is its first real run); and push still
-needs two keys from you before any client can be notified about anything.
+(already fixed on the 13th, but yesterday's generator produced nothing, so
+there is still nothing to publish — see below); and push still needs two keys
+from you before any client can be notified about anything.
 
 **The thread running through the night**, if you want one sentence for it: the
 app was repeatedly telling somebody a thing had happened when it had not. A
@@ -144,11 +145,11 @@ longest-first, which is where a wrong one is most likely to be.
 The other 166 are on library entries nobody has ever prescribed. They can wait
 indefinitely and cost nothing while they do.
 
-### Second thing to read — the Saturday review fires tomorrow, for the first time since it broke
+### Second thing to read — the focus pipeline is still not producing, and it is not the bug I fixed
 
-I hardened that screen tonight (`804d0d2`), then went to check how often the
-Sunday fallback had been publishing unreviewed copy. The answer is that the
-whole pipeline has run twice, ever:
+I hardened the review screen (`804d0d2`), then went to check how often the
+Sunday fallback had been publishing unreviewed copy. The publisher has run
+twice, ever:
 
     select jobid, status, return_message, start_time
     from cron.job_run_details where jobid = 27 order by start_time desc;
@@ -156,26 +157,42 @@ whole pipeline has run twice, ever:
     2026-08-09 11:00  FAILED   operator does not exist: text = date
     2026-08-02 11:00  succeeded  1 row
 
-The 9 Aug failure is the exact bug the current function's own comment says it
-was written to fix — `weekly_focus_week` is TEXT and was being compared to a
-DATE. **It was fixed on 13 Aug and has not fired since**, because job 27 only
-runs on Sundays and there has not been one.
+The 9 Aug failure is the exact bug that function's own comment says it was
+written to fix — `weekly_focus_week` is TEXT and was compared to a DATE. **That
+was fixed on 13 Aug** and I verified the live definition casts `p_week::text` in
+both places. Nothing more to do on the publisher.
 
-What that cost: 33 drafts were generated correctly on Sat 8 Aug (the Vercel cron
-works — `weekly-ai?draft=1` at 11:00 UTC ran at 11:44 and wrote all 33 with AI
-text). None were approved, none published, and on 13 Aug they were archived to
-`bak_focus_drafts_20260813`. That week's coaching copy never reached anybody.
+**But re-checking at 04:40 CT found the other half is not working either.**
+Yesterday was Saturday; the generator (`weekly-ai?draft=1`, Vercel cron, 06:00
+CT) was due and:
 
-**So tomorrow morning is the first real test of the fix.** Today's Saturday
-generator run at 6am CT should put ~33 drafts in front of you on the trainer
-home screen; the Sunday 6am job publishes whatever you have not got to. If the
-screen is empty this afternoon, the generator is what to look at, not the
-publisher.
+    select count(*) from weekly_focus_drafts;                    → 0
+    select count(*) from ai_usage_log where feature='weekly_sweep'; → 0
 
-Nothing to do tonight — the fix is already deployed and correct (I checked the
-live definition casts `p_week::text` in both places). This is here so you know
-to glance at it, and so that if it works nobody spends another session
-wondering why the queue is always empty.
+**No drafts, and not one model call ever logged for that route.** So the
+publisher will run at 06:00 CT this morning and correctly publish nothing,
+because there is nothing there. Fixing the publisher was necessary and is not
+sufficient.
+
+I could not finish the diagnosis from here — it needs the Vercel cron logs,
+which I cannot read. What I DID rule out, so nobody repeats it:
+
+| Ruled out | How |
+|---|---|
+| The 405 trap that killed `/api/ai-nudges` | This route **does** export `GET` (line 297), so a Vercel cron GET is not rejected |
+| The AI kill switch | Month-to-date spend is **$4.30** against a $95 cap — nowhere near tripped |
+| A rejected `feature` value | `ai_usage_log` has no enum on `feature`, only a length check |
+| `logUsage` failing silently | It captures its error and logs it — checked, not the unchecked-write pattern |
+| The 8 Aug batch proving it once worked | Metering was only added on **13 Aug** (`ab13c36`), so the absence of usage rows for 8 Aug means nothing either way |
+
+What is left is: the Vercel cron did not fire on 15 Aug, or it fired and every
+client was skipped before the model call ("no activity in either week" is a real
+skip path in that route). **Check the Vercel cron log for
+`/api/cron/weekly-ai?draft=1` on Sat 15 Aug** — that single log line separates
+the two, and they have completely different fixes.
+
+Worth doing: it is the difference between 29 clients getting a written weekly
+focus and 29 clients getting nothing, every week, silently.
 
 ### The four that matter most
 
@@ -513,12 +530,12 @@ users — so the schema catch-up can be done from here without Dustin.
 
 | | |
 |---|---|
-| `origin/main` (live) | `0a5c670`, shipped and verified against `origin/main` |
+| `origin/main` (live) | `b732e27`, shipped and verified against `origin/main` |
 | Unit tests | **1,407 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
 | Ship bridge | **v2, repo-aware, up** — twenty-four real pushes tonight, no failures |
 | Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
 | Video pipeline | **no longer publishes on its own**, from either place. 175 live videos untouched, all reviewable |
-| Live app | **verified healthy at 03:18 CT** — `/api/health` on `6dc889a`, auth 208 ms, db 344 ms, `ok: true`. Vercel is deploying tonight's commits. |
+| Live app | **verified healthy at 04:39 CT** — `/api/health` on `b732e27` (the newest commit), auth 159 ms, db 157 ms, `ok: true`. Vercel is fully caught up. |
 | `symmetry-app-v2` repo | **seeded** — main is live main byte for byte |
 | `symmetry-app-v2.vercel.app` | serving, but an OLDER build — `/api/health` 404s. Confirm this. |
 | Dev Supabase `giiovjfpbuzmrvpdglhv` | **caught up** — 88 tables, 1,169 columns, 166 policies |
@@ -968,8 +985,11 @@ next to it.
    `device_list_dir`. If it is stale, do NOT start — leave a note and stop. A
    commit that never ships dies with the container.
 2. **Gates before every ship:** `npx tsc --noEmit` (0 errors in `src/`),
-   `npm run test:unit` (0 failed), `npx next build`. The `/login` prerender error
-   about Supabase env vars is expected in the sandbox — ignore it.
+   `npm run test:unit` (0 failed), `npx next build`. The prerender error about
+   Supabase env vars is expected in the sandbox — ignore it. **The page it names
+   varies** (`/login` or `/set-password`, whichever the parallel export reaches
+   first), so a different page name is not a new failure. The line that matters
+   is `✓ Compiled successfully` above it.
 3. **Mutation-test every guard you write.** Break the code on purpose, watch the
    test fail, restore. This caught a real hole tonight and two on 15 Aug.
 4. **Verify against the database, not against a success response.** On 15 Aug a
