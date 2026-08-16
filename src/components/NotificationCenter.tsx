@@ -102,16 +102,18 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
     background: solid ? "var(--brand-primary)" : "rgba(255,255,255,0.12)",
     boxShadow: solid ? "0 4px 14px rgba(20,30,55,.3)" : "none",
     color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-    // The single app-wide bell BLINKS whenever there are unread notifications.
-    animation: total > 0 ? "cw-pulse 1.2s ease-in-out infinite" : "none",
+    // The single app-wide bell ALERTS whenever there are unread notifications.
+    // cw-alert rather than cw-pulse: a 5% scale change on a 34px button is easy
+    // to look straight past, and being missed is the entire problem here.
+    animation: total > 0 ? "cw-alert 1.35s ease-in-out infinite" : "none",
   };
 
   return (
     <>
       <button aria-label={`Notifications${total ? ` (${total} unread)` : ""}` } style={hBtn} onClick={() => setOpen((o) => !o)}>
-        <i className="ti ti-bell" style={{ fontSize: 16, animation: total > 0 ? "cw-bell-swing 1.4s ease-in-out infinite" : "none" }} />
+        <i className="ti ti-bell" style={{ fontSize: 16, animation: total > 0 ? "cw-bell-swing 0.9s ease-in-out infinite" : "none" }} />
         {total > 0 && (
-          <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999, background: "#ef4444", color: "#fff", fontSize: 9.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 0 2px var(--brand-bg)", animation: "cw-pulse 1.3s ease-in-out infinite" }}>
+          <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999, background: "#ef4444", color: "#fff", fontSize: 9.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 0 2px var(--brand-bg)", animation: "cw-alert-badge 1.35s ease-in-out infinite" }}>
             {total > 9 ? "9+" : total}
           </span>
         )}

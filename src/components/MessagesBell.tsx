@@ -48,7 +48,7 @@ export default function MessagesBell({ variant = "icon" }: { variant?: "icon" | 
           borderRadius: 16,
           padding: "12px 16px",
           boxShadow: "0 6px 20px rgba(124,156,245,0.5)",
-          animation: "cw-pulse 1.4s ease-in-out infinite",
+          animation: "cw-alert-badge 1.2s ease-in-out infinite",
         }}
       >
         <span style={{ position: "relative", display: "inline-flex" }}>
@@ -87,7 +87,7 @@ export default function MessagesBell({ variant = "icon" }: { variant?: "icon" | 
         height: 38,
         borderRadius: 12,
         textDecoration: "none",
-        animation: count > 0 ? "cw-pulse 1.4s ease-in-out infinite" : "none",
+        animation: count > 0 ? "cw-alert 1.35s ease-in-out infinite" : "none",
       }}
     >
       <i

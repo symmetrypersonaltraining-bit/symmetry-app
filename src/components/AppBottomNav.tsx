@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUnreadCount } from "@/lib/useUnreadCount";
+import { useUnreadCount, useUnreadTarget } from "@/lib/useUnreadCount";
 
 export interface NavItem {
   href: string;
@@ -21,6 +21,9 @@ export interface NavItem {
 export default function AppBottomNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
   const unread = useUnreadCount();
+  // Where the badge is pointing. A tab lit by group activity should open the
+  // group, not the thread list with the group one tap further away.
+  const { href: unreadHref } = useUnreadTarget();
 
   function isActive(item: NavItem) {
     const base = item.activeMatch || item.href;
@@ -40,11 +43,18 @@ export default function AppBottomNav({ items }: { items: NavItem[] }) {
       {items.map((item) => {
         const active = isActive(item);
         const showBadge = item.badge === "messages" && unread > 0;
+        // Only ever redirects the MESSAGES tab, only while something is unread,
+        // and only within the same section — the client-preview nav has its own
+        // /client-preview/messages route and must not be thrown onto /messages.
+        const href =
+          showBadge && unreadHref && item.href.endsWith("/messages")
+            ? item.href.replace(/\/messages$/, "") + unreadHref
+            : item.href;
         const blink = showBadge; // Messages tab blinks (icon + label) on unread — a 2nd, unmissable notification
         return (
           <Link
             key={item.href}
-            href={item.href}
+            href={href}
             prefetch={false}
             className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors relative"
           >
@@ -56,7 +66,9 @@ export default function AppBottomNav({ items }: { items: NavItem[] }) {
                 className={`ti ${item.icon} text-xl transition-transform duration-300 ${active ? "scale-110 -translate-y-0.5" : ""}`}
                 style={{
                   color: blink ? "#ef4444" : active ? "var(--brand-primary)" : "var(--brand-text-secondary)",
-                  animation: blink ? "cw-blink 1s ease-in-out infinite" : undefined,
+                  // Was cw-blink (opacity only). Unread messages now move as
+                  // well as fade — Dustin, 16 Aug: "flash message tab".
+                  animation: blink ? "cw-alert-badge 0.9s ease-in-out infinite, cw-blink 0.9s ease-in-out infinite" : undefined,
                 }}
               />
               {showBadge && (
@@ -66,7 +78,7 @@ export default function AppBottomNav({ items }: { items: NavItem[] }) {
                     position: "absolute", top: -5, right: -8, minWidth: 15, height: 15, padding: "0 4px",
                     borderRadius: 999, background: "#ef4444", color: "#fff", fontSize: 9, fontWeight: 800,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    boxShadow: "0 0 0 2px var(--brand-surface)", animation: "cw-pulse 1.3s ease-in-out infinite",
+                    boxShadow: "0 0 0 2px var(--brand-surface)", animation: "cw-alert-badge 1.1s ease-in-out infinite",
                   }}
                 >
                   {unread > 9 ? "9+" : unread}
