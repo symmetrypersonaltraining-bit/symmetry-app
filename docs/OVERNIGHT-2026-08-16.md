@@ -564,6 +564,7 @@ users — so the schema catch-up can be done from here without Dustin.
 | Video pipeline | **no longer publishes on its own**, from either place. 175 live videos untouched, all reviewable |
 | Live app | **verified healthy at 05:22 CT** — `/api/health` on `3a53cd4`, auth 177 ms, db 160 ms, `ok: true`. Vercel is fully caught up. |
 | Focus publisher | **PROVEN — ran clean at 06:00 CT**, first success since 2 Aug. Published 0, correctly: there are no drafts. |
+| Video auto-publish | **PROVEN STOPPED — behaviourally, not just in code.** The DB job runs every 10 min; in the 3½ h since the fix it has had ~21 chances to publish and taken none. Last auto-apply was 00:10 CT, before the fix. `exercises_with_video` still 792. |
 | `symmetry-app-v2` repo | **seeded** — main is live main byte for byte |
 | `symmetry-app-v2.vercel.app` | **CONFIRMED HEALTHY at 04:52 CT** — it does NOT 404. 200, `ok:true`, sha `f2598da` (the seed), auth 641 ms, db 932 ms. It is 43 commits behind live, which is expected for a seeded mirror. |
 | Dev Supabase `giiovjfpbuzmrvpdglhv` | **caught up** — 88 tables, 1,169 columns, 166 policies |
