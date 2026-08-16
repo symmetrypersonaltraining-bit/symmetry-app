@@ -414,7 +414,7 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
                 </div>
                 <div className="flex gap-2 pt-1">
                   <button onClick={() => setLogStep("choose")} className="flex-1 py-3 rounded-xl text-sm font-medium" style={{background:"var(--brand-bg)",color:"var(--brand-text-secondary)"}}>Back</button>
-                  <button disabled={!durationMin || saving} onClick={async () => { if (!clientId || !durationMin) return; setSaving(true); try { await logCardioSession({clientId,logDate:selectedDate,cardioType,durationMinutes:Number(durationMin),distance:distanceMi?Number(distanceMi):undefined}); setSelectedDate(null); setDurationMin(""); setDistanceMi(""); } finally { setSaving(false); } }} className="flex-1 py-3 rounded-xl text-sm font-semibold" style={{background:durationMin&&!saving?"var(--brand-primary)":"var(--brand-border)",color:"white"}}>{saving?"Saving...":"Save"}</button>
+                  <button disabled={!durationMin || saving} onClick={async () => { if (!clientId || !durationMin) return; setSaving(true); try { await logCardioSession({clientId,logDate:selectedDate,cardioType,durationMinutes:Number(durationMin),distance:distanceMi?Number(distanceMi):undefined}); setSelectedDate(null); setDurationMin(""); setDistanceMi(""); } catch (e) { window.alert((e as Error)?.message || "Could not save that cardio session."); } finally { setSaving(false); } }} className="flex-1 py-3 rounded-xl text-sm font-semibold" style={{background:durationMin&&!saving?"var(--brand-primary)":"var(--brand-border)",color:"white"}}>{saving?"Saving...":"Save"}</button>
                 </div>
               </div>
             )}
@@ -432,7 +432,7 @@ function MonthView({ year, month, daysInMonth, firstDay, today, workoutDates, up
                   )}
                   <div className="flex gap-2">
                     <button onClick={() => setLogStep("choose")} className="flex-1 py-3 rounded-xl text-sm font-medium" style={{background:"var(--brand-bg)",color:"var(--brand-text-secondary)"}}>Back</button>
-                    <button disabled={saving} onClick={async () => { if (!clientId) return; setSaving(true); try { await logStrengthSession({clientId,logDate:selectedDate,scheduledWorkoutId:sw?.id}); setSelectedDate(null); } finally { setSaving(false); } }} className="flex-1 py-3 rounded-xl text-sm font-semibold" style={{background:saving?"var(--brand-border)":"var(--brand-primary)",color:"white"}}>{saving?"Saving...":"Mark Complete"}</button>
+                    <button disabled={saving} onClick={async () => { if (!clientId) return; setSaving(true); try { await logStrengthSession({clientId,logDate:selectedDate,scheduledWorkoutId:sw?.id}); setSelectedDate(null); } catch (e) { window.alert((e as Error)?.message || "Could not mark that session complete."); } finally { setSaving(false); } }} className="flex-1 py-3 rounded-xl text-sm font-semibold" style={{background:saving?"var(--brand-border)":"var(--brand-primary)",color:"white"}}>{saving?"Saving...":"Mark Complete"}</button>
                   </div>
                 </div>
               );

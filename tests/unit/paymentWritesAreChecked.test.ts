@@ -89,3 +89,43 @@ test("a failed save does not close the inline amount editor", () => {
   const close = after.indexOf("setEditingAmountId(null)");
   assert.ok(guard > 0 && (close === -1 || guard < close));
 });
+
+// ── The same fault, on the schedule ────────────────────────────────────────
+//
+// schedule/actions.ts already threw on a missing user, so its callers were
+// built to handle a throw — but its three writes were unchecked. The file's own
+// comment records what that cost: `status: "completed"` was rejected with 23514
+// on every single call, unchecked, so marking an unscheduled session done
+// logged nothing at all while the button said Saving… and then closed. All 964
+// rows in the table say 'Done as planned'.
+//
+// The VALUE was fixed when that was found. The unchecked result was not, which
+// is the half that let it run wrong for so long — checking it is what would
+// have surfaced the constraint violation the first time anyone pressed it.
+
+const SCHED_ACTIONS = strip(readFileSync(join(process.cwd(), "src/app/(app)/schedule/actions.ts"), "utf8"));
+const SCHED_CLIENT = strip(readFileSync(join(process.cwd(), "src/app/(app)/schedule/ScheduleClient.tsx"), "utf8"));
+
+test("every write in the schedule actions is checked", () => {
+  const writes = (SCHED_ACTIONS.match(/\.(insert|update|delete|upsert)\(/g) || []).length;
+  const checked = (SCHED_ACTIONS.match(/const \{ error(?::\s*\w+)? \} = await/g) || []).length;
+  assert.ok(writes > 0);
+  assert.equal(checked, writes, `${writes} writes, ${checked} checked`);
+});
+
+test("a failed schedule write throws rather than returning quietly", () => {
+  const throws = (SCHED_ACTIONS.match(/if \(error\) throw new Error\(/g) || []).length;
+  assert.ok(throws >= 3, `only ${throws} throw sites — a write can still fail in silence`);
+});
+
+for (const fn of ["logCardioSession", "logStrengthSession"]) {
+  test(`the ${fn} button tells the person when it failed`, () => {
+    // Without a catch the rejection is unhandled: the sheet stays open, which
+    // is an honest-ish signal, but nothing says why and nothing says it failed.
+    const i = SCHED_CLIENT.indexOf(`await ${fn}(`);
+    assert.ok(i > 0, `${fn} caller not found`);
+    const after = SCHED_CLIENT.slice(i, i + 400);
+    assert.match(after, /catch \(e\)/, `${fn} has no catch`);
+    assert.match(after, /window\.alert\(/, `${fn} fails silently`);
+  });
+}

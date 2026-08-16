@@ -40,6 +40,16 @@ and say so.
   editor also stays open on failure, because closing it is itself a success
   signal. Nine assertions, mutation-tested.
 
+- **`schedule/actions.ts` + `ScheduleClient.tsx` — fixed.** All three writes
+  unchecked, in a file that ALREADY threw on a missing user — so its callers
+  were built to handle a throw and it cost nothing to use one. The file's own
+  comment records what the gap cost: `status: "completed"` was rejected with
+  23514 on every call, unchecked, so marking an unscheduled session done logged
+  nothing while the button said Saving… and then closed. All 964 rows say
+  'Done as planned'. The VALUE was fixed when that was found; the unchecked
+  result was not, which is the half that let it run wrong. Callers now catch and
+  say what failed. Four assertions, mutation-tested.
+
 ## Not to be touched without Dustin's per-item permission
 
 `WorkoutLogger.tsx`, `NutritionV3Client.tsx`, `MealPlanClient.tsx` — 11 sites.
@@ -58,9 +68,8 @@ error has nowhere useful to go.
 
 ## Next, in priority order — by who gets lied to
 
-1. **`schedule/actions.ts`, `schedule/scheduleActions.ts`** (6) — appointments
-   and cardio/workout logs written from server actions with optimistic UI.
-   Same shape as payments, same blast radius for a trainer's day.
+1. **`schedule/scheduleActions.ts`** (3) — appointment update/delete from server
+   actions. `schedule/actions.ts` is done; this is the other half.
 2. **`home/messageActions.ts`** (6) — a message that appears sent and was not.
 3. **`api/invite-client`, `api/create-client`, `api/create-client-from-assessment`,
    `api/complete-onboarding`, `set-password`** (7) — onboarding, where a half-written
