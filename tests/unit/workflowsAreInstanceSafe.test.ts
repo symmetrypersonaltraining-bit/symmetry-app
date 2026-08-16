@@ -111,6 +111,38 @@ test("the live deploy hook fires only on live, and a dev instance has its own pa
   );
 });
 
+test("the sync needs no secret anyone has to remember to create", () => {
+  // The reason this is a test and not a preference. symmetry-app-v2 ALREADY had
+  // a sync-from-live mechanism. It ran on schedule for twelve consecutive
+  // nights — 12 green runs, Aug 5 through Aug 16 — and dev's main never moved
+  // off its 20 July commit the entire time, because each run opened a
+  // `sync/live-YYYYMMDD-HHMM` branch marked "needs review" and no human ever
+  // reviewed one. Twelve successful runs, one month of drift, no failure
+  // anywhere to notice.
+  //
+  // So: no review step, and no secret that has to be created by hand either.
+  // The built-in GITHUB_TOKEN can push to the repository it runs in.
+  const raw = readFileSync(join(DIR, "sync-from-live.yml"), "utf8");
+  const doc = yaml.load(raw) as Workflow;
+  const job = doc?.jobs?.sync;
+  assert.ok(job, "the sync job must exist");
+  assert.match(
+    String((job.steps || [])[0]?.with?.token ?? ""),
+    /secrets\.GITHUB_TOKEN/,
+    "the checkout must fall back to the built-in token, or the sync silently depends on setup"
+  );
+  assert.equal(
+    (job as unknown as { permissions?: Record<string, string> }).permissions?.contents,
+    "write",
+    "GITHUB_TOKEN cannot push without contents: write"
+  );
+  assert.doesNotMatch(
+    raw.replace(/^\s*#.*$/gm, ""),
+    /pull_request|gh pr create|needs review/i,
+    "no review step — that is precisely what stalled the previous mechanism"
+  );
+});
+
 test("a deploy that fails is not reported as a success", () => {
   // This was a bare `curl -X POST`. curl exits 0 on an HTTP 404, so a rotated
   // or deleted hook shows a green tick on every push while nothing deploys —

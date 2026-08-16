@@ -43,12 +43,23 @@ jobs:
   sync:
     if: github.repository != 'symmetrypersonaltraining-bit/symmetry-app'
     runs-on: ubuntu-latest
+    # The built-in GITHUB_TOKEN can push to the repository the workflow runs
+    # in, so this needs NO secret to be set up by hand. That matters more than
+    # it sounds: the previous sync mechanism worked perfectly for twelve
+    # consecutive nights, opened a `sync/live-…` branch each time, and dev's
+    # main never moved — because the last step was a human review nobody did.
+    # A sync with a manual step is a sync that stops. UPSTREAM_SYNC_TOKEN is
+    # still honoured if it exists, for the case where the push must trigger
+    # other workflows (GITHUB_TOKEN pushes deliberately do not), but nothing
+    # here requires it.
+    permissions:
+      contents: write
     steps:
       - name: Check out this repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.UPSTREAM_SYNC_TOKEN }}
+          token: ${{ secrets.UPSTREAM_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Mirror live main
         env:
