@@ -97,7 +97,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       // a HEAD count is why it could never route to the sender's thread.
       const { data: rows } = await supabase
         .from("messages")
-        .select("id, from_id, to_id, client_id, body, created_at, read_at, deleted_at, is_group, is_broadcast, image_url")
+        // sender_kind: a message Dustin typed and a nightly AI nudge are not
+        // the same event, and the banner needs to know which it is.
+        .select("id, from_id, to_id, client_id, body, created_at, read_at, deleted_at, is_group, is_broadcast, image_url, sender_kind")
         .eq("to_id", user.id)
         .is("read_at", null)
         .is("deleted_at", null)
@@ -142,6 +144,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               snippet: group.snippet ?? "New messages in the group",
               count: group.count,
               time: group.latest?.created_at ?? new Date().toISOString(),
+              fromPerson: group.fromPerson === true,
               href:
                 "/messages?client=group" +
                 (clientMode ? "&as=client" : "") +

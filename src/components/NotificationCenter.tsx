@@ -64,7 +64,11 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
         const here = new URLSearchParams(window.location.search);
         const samePath = window.location.pathname === want;
         const sameClient = here.get("client") === params.get("client");
-        if (!samePath || !sameClient) window.location.assign(href);
+        // m too. Two announcements in the same thread differ only by m, and
+        // arriving at the thread without scrolling to the one you were told
+        // about is the failure this anchor exists to prevent.
+        const sameMsg = (here.get("m") || "") === (params.get("m") || "");
+        if (!samePath || !sameClient || !sameMsg) window.location.assign(href);
       } catch {
         /* noop */
       }

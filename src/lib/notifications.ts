@@ -14,9 +14,28 @@ export interface RawUnread {
   is_group?: boolean | null;
   is_broadcast?: boolean | null;
   image_url?: string | null;
+  /**
+   * 'coachbot' when the app wrote it; null when a person did.
+   *
+   * Dustin, 16 Aug: "Just the ones personally from me in group or to them need
+   * to get their attention." This column is how that question is answered, and
+   * it has been on the table since the CoachBot work — it simply was not read
+   * here, so a nightly AI nudge and a message he typed himself were treated as
+   * the same event.
+   */
+  sender_kind?: string | null;
 }
 
 export interface NotifRow {
+  /**
+   * A HUMAN sent this, not the app. Drives how loudly it is announced.
+   *
+   * Only ever true when every unread message in the row was written by a
+   * person: one coachbot nudge landing in the same group thread must not
+   * downgrade an announcement Dustin typed, and equally a nudge on its own must
+   * not borrow the emphasis meant for him.
+   */
+  fromPerson?: boolean;
   key: string;
   kind: "client" | "trainer" | "group";
   clientId?: string;
@@ -86,15 +105,22 @@ export function aggregateNotifications(
     const anchor = announcement || oldestUnread;
     const m = anchor?.id ? "&m=" + anchor.id : "";
 
+    // Written by a person, not by the app. `some`, not `every`: a row is worth
+    // shouting about the moment it contains one message a human typed. Using
+    // `every` would let a single overnight nudge landing in the same thread
+    // quietly demote an announcement Dustin wrote — and the nudge is exactly
+    // the thing he does not want stealing that emphasis.
+    const fromPerson = g.rows.some((r) => (r.sender_kind ?? null) === null);
+
     if (key === "group") {
-      out.push({ key, kind: "group", title: "Group Chat", snippet, count: g.rows.length, time: g.latest, href: "/messages?client=group" + asMarker + m });
+      out.push({ key, kind: "group", title: "Group Chat", snippet, count: g.rows.length, time: g.latest, fromPerson, href: "/messages?client=group" + asMarker + m });
     } else if (opts.isTrainer) {
       const clientId = key.slice("client:".length);
       const title = (opts.clientNames && opts.clientNames[clientId]) || "Client";
-      out.push({ key, kind: "client", clientId, title, snippet, count: g.rows.length, time: g.latest, href: "/messages?client=" + clientId + m });
+      out.push({ key, kind: "client", clientId, title, snippet, count: g.rows.length, time: g.latest, fromPerson, href: "/messages?client=" + clientId + m });
     } else {
       const base = opts.clientMode ? "/messages?as=client" : "/messages";
-      out.push({ key, kind: "trainer", title: "Trainer", snippet, count: g.rows.length, time: g.latest, href: base + (m ? (base.includes("?") ? m : "?" + m.slice(1)) : "") });
+      out.push({ key, kind: "trainer", title: "Trainer", snippet, count: g.rows.length, time: g.latest, fromPerson, href: base + (m ? (base.includes("?") ? m : "?" + m.slice(1)) : "") });
     }
   }
 

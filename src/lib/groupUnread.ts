@@ -16,6 +16,8 @@ export interface GroupUnread {
    *  it outranks whatever arrived after it. */
   anchorId: string | null;
   snippet: string | null;
+  /** At least one unread group message was typed by a person, not the app. */
+  fromPerson?: boolean;
 }
 
 // Pure predicate (unit-tested): a group message counts as unread for `userId`
@@ -55,13 +57,15 @@ export async function fetchGroupUnread(supabase: SupabaseClient, userId: string,
     const lastReadAt = (gr as { last_read_at?: string } | null)?.last_read_at || "1970-01-01T00:00:00Z";
     let q = supabase
       .from("messages")
-      .select("id, body, created_at, image_url, from_id, is_broadcast")
+      // sender_kind: the group thread carries both Dustin's own posts and the
+      // CoachBot nudges, and only one of them earns a loud banner.
+      .select("id, body, created_at, image_url, from_id, is_broadcast, sender_kind")
       .eq("is_group", true)
       .is("deleted_at", null)
       .gt("created_at", lastReadAt);
     if (!includeOwn) q = q.neq("from_id", userId);
     const { data: msgs } = await q.order("created_at", { ascending: false }).limit(200);
-    const rows = (msgs as { id: string; body: string; created_at: string; image_url: string | null; from_id: string; is_broadcast?: boolean | null }[]) || [];
+    const rows = (msgs as { id: string; body: string; created_at: string; image_url: string | null; from_id: string; is_broadcast?: boolean | null; sender_kind?: string | null }[]) || [];
     const latest = rows[0] ? { body: rows[0].body, created_at: rows[0].created_at, image_url: rows[0].image_url } : null;
     // rows are newest-first. The announcement wins if there is one, otherwise
     // start reading at the oldest thing they have not seen.
@@ -77,9 +81,13 @@ export async function fetchGroupUnread(supabase: SupabaseClient, userId: string,
       ids: rows.map((r) => r.id),
       anchorId: anchor ? anchor.id : null,
       snippet,
+      // True the moment ONE unread group message was typed by a person. `some`
+      // rather than `every` on purpose: an overnight CoachBot nudge landing in
+      // the same thread must not quietly demote an announcement Dustin wrote.
+      fromPerson: rows.some((r) => (r.sender_kind ?? null) === null),
     };
   } catch {
-    return { count: 0, latest: null, ids: [], anchorId: null, snippet: null };
+    return { count: 0, latest: null, ids: [], anchorId: null, snippet: null, fromPerson: false };
   }
 }
 

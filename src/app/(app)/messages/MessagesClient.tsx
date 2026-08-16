@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { sendMessage, sendClientMessage, sendGroupMessage, sendBroadcastMessage, deleteMessage, deleteThread } from "../home/messageActions";
 import { createClient } from "@/lib/supabase/client";
@@ -119,9 +119,18 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
   // read is off screen and they see chatter instead. ?m=<id> scrolls to that
   // message and flashes it, so the tap lands on the message rather than near it.
   const [flashId, setFlashId] = useState<string | null>(null);
+  // Read REACTIVELY, not once per thread change.
+  //
+  // This used to depend on [thread] alone and read window.location inside the
+  // effect. Tapping a notification for a message in the thread you are ALREADY
+  // looking at changes only ?m= — the thread array is identical, so the effect
+  // never re-ran and nothing scrolled. You were told to read a specific message
+  // and landed wherever you happened to be, which is exactly the "it routed
+  // wrong" that keeps coming back. useSearchParams re-renders on the query.
+  const searchParams = useSearchParams();
+  const targetParam = searchParams.get("m");
   useEffect(() => {
-    let target: string | null = null;
-    try { target = new URLSearchParams(window.location.search).get("m"); } catch { target = null; }
+    const target: string | null = targetParam;
 
     if (target && thread.some((m) => m.id === target)) {
       // Wait a frame so the thread has laid out, otherwise scrollIntoView
@@ -139,7 +148,7 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
       return;
     }
     bottomRef.current?.scrollIntoView({ behavior: "instant" });
-  }, [thread]);
+  }, [thread, targetParam]);
 
   const handleDeleteMessage = useCallback(async (id: string) => {
     setDeletingId(id);

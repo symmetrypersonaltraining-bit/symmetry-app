@@ -14,7 +14,25 @@
 // The rule now: group and direct are DIFFERENT THREADS, so one can never stand
 // in for the other. Every thread that gained messages gets its own banner.
 
-export type Banner = { text: string; href: string };
+export type Banner = {
+  text: string;
+  href: string;
+  /**
+   * A person wrote it, so announce it loudly.
+   *
+   * Dustin, 16 Aug: "the in app notifications for messages I personally send I
+   * want more aggressive and obvious so they dont miss those when they do get
+   * on the app. Just the ones personally from me in group or to them need to
+   * get their attention."
+   *
+   * The distinction is `messages.sender_kind`: 'coachbot' when the app wrote it,
+   * null when a human did. Both land in the same threads, and until now both
+   * raised exactly the same 6-second banner — so a nightly automated nudge was
+   * given the same weight as something he sat down and typed. Spending the loud
+   * treatment on the nudges is precisely how the loud treatment stops working.
+   */
+  fromPerson?: boolean;
+};
 
 export function bannersForDelta(opts: {
   groupDelta: number;

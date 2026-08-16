@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useNotificationFeed } from "@/lib/useNotificationFeed";
 import { type Banner } from "@/lib/messageBanners";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 export default function MessageNotifier() {
   const router = useRouter();
@@ -30,11 +31,30 @@ export default function MessageNotifier() {
     if (next) setBanner(next);
   }, [banner, tick]);
 
-  // Each banner gets its own 6s on screen.
+  // Each banner gets its own time on screen — longer when a person sent it.
+  //
+  // Six seconds is enough to notice something moved and not enough to decide to
+  // act on it if you are mid-set with a phone on a bench. Twelve for a message
+  // Dustin actually typed; the automated nudges keep the shorter one, because
+  // giving everything the long treatment is how the long treatment stops
+  // meaning anything.
   useEffect(() => {
     if (!banner) return;
-    const t = setTimeout(() => setBanner(null), 6000);
+    const t = setTimeout(() => setBanner(null), banner.fromPerson ? 12000 : 6000);
     return () => clearTimeout(t);
+  }, [banner]);
+
+  // A short buzz for a person's message, where the device allows it. Deliberately
+  // not for automated ones: a phone that vibrates every night at 9pm for a nudge
+  // gets its notifications turned off entirely, and that takes the payment
+  // reminders with it.
+  useEffect(() => {
+    if (!banner?.fromPerson) return;
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+        navigator.vibrate([60, 45, 60]);
+      }
+    } catch { /* not supported, and not important enough to care */ }
   }, [banner]);
 
   // Driven by the shared feed, and by message IDENTITY rather than a count.
@@ -61,8 +81,17 @@ export default function MessageNotifier() {
     // One banner per SOURCE, not per message: three group posts is one "Group
     // Chat" banner, not three. Sources are already grouped by the feed.
     const queued: Banner[] = items.slice(0, 2).map((i) => ({
-      text: i.count > 1 ? `${i.count} new in ${i.title}` : `New message — ${i.title}`,
+      // A person's message says so. "New message — Group Chat" reads like
+      // system chatter; naming the coach is what makes somebody stop.
+      text: i.fromPerson
+        ? i.count > 1
+          ? `${i.count} new from ${COACH_FIRST_NAME} in ${i.title}`
+          : `${COACH_FIRST_NAME} messaged you — ${i.title}`
+        : i.count > 1
+          ? `${i.count} new in ${i.title}`
+          : `New message — ${i.title}`,
       href: i.href,
+      fromPerson: i.fromPerson === true,
     }));
     if (queued.length) {
       // Cap the backlog. If the app sat in the background through several polls
@@ -85,22 +114,47 @@ export default function MessageNotifier() {
         router.push(to);
         window.setTimeout(() => {
           try {
+            // The QUERY, not just the path.
+            //
+            // This compared pathname alone, so tapping a banner while already
+            // on /messages could never trigger the fallback — same path, so it
+            // concluded the navigation had worked. If the client-side push had
+            // not actually moved the thread, you stayed exactly where you were
+            // and the banner was gone. That is the "it routed wrong" Dustin has
+            // hit more than once, and it only ever showed up when you were
+            // already in Messages, which is why it was hard to pin down.
+            //
+            // client AND m both matter: a second announcement in a thread you
+            // are already reading differs only by m, and landing on the thread
+            // without scrolling to the message is the same failure in miniature.
             const want = to.split("?")[0];
-            if (window.location.pathname !== want) window.location.assign(to);
+            const target = new URLSearchParams(to.split("?")[1] || "");
+            const here = new URLSearchParams(window.location.search);
+            const samePath = window.location.pathname === want;
+            const sameClient = (here.get("client") || "") === (target.get("client") || "");
+            const sameMsg = (here.get("m") || "") === (target.get("m") || "");
+            if (!samePath || !sameClient || !sameMsg) window.location.assign(to);
           } catch { /* noop */ }
         }, 700);
       }}
       style={{
         position: "fixed", top: "calc(env(safe-area-inset-top) + 8px)", left: 12, right: 12, zIndex: 3000,
         display: "flex", alignItems: "center", gap: 12, textAlign: "left",
-        background: "var(--brand-primary)", color: "#fff", border: "none",
-        borderRadius: 14, padding: "12px 16px", cursor: "pointer",
-        boxShadow: "0 8px 28px rgba(0,0,0,0.28)", animation: "cw-slide-down 0.25s ease",
+        background: banner.fromPerson ? "#E53935" : "var(--brand-primary)", color: "#fff", border: "none",
+        borderRadius: 14, padding: banner.fromPerson ? "15px 16px" : "12px 16px", cursor: "pointer",
+        // A person's message gets the red treatment, a heavier shadow and a
+        // slow pulse that keeps going the whole time it is up. The brand blue
+        // banner is what every automated nudge already looks like, and after a
+        // fortnight of those it reads as furniture.
+        boxShadow: banner.fromPerson ? "0 10px 34px rgba(229,57,53,0.45)" : "0 8px 28px rgba(0,0,0,0.28)",
+        animation: banner.fromPerson
+          ? "cw-slide-down 0.25s ease, cw-alert 1.6s ease-in-out 0.25s infinite"
+          : "cw-slide-down 0.25s ease",
         maxWidth: 560, margin: "0 auto",
       }}
     >
-      <i className="ti ti-bell" style={{ fontSize: 20 }} />
-      <span style={{ flex: 1, fontWeight: 800, fontSize: 14 }}>{banner.text} — tap to read</span>
+      <i className={`ti ${banner.fromPerson ? "ti-message-circle-2-filled" : "ti-bell"}`} style={{ fontSize: banner.fromPerson ? 23 : 20 }} />
+      <span style={{ flex: 1, fontWeight: 800, fontSize: banner.fromPerson ? 15 : 14 }}>{banner.text} — tap to read</span>
       <i className="ti ti-chevron-right" style={{ fontSize: 18 }} />
     </button>
   );
