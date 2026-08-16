@@ -37,48 +37,30 @@ top unfinished item, ships it through the bridge, ticks it off here, and stops.
 
 ## THE QUEUE — in order. Take the top unfinished item.
 
-### [~] 1. Micronutrients have no UI at all — PANEL BUILT, NOT YET MOUNTED
+### [x] 1. Micronutrients — ALREADY BUILT. I was wrong, twice, and shipped a duplicate.
 
-**Done 15 Aug, 20:15 CT:** `src/components/NutrientPanel.tsx` exists, with 10
-tests and all 6 mutations biting. It renders the 33-nutrient registry grouped,
-with units and reference percentages, and — the load-bearing part — shows a DASH
-for unknown, never a zero.
+**Do not build this. It exists.** The nutrition screen has an "ALL NUTRIENTS"
+collapsible under the macro card: the full registry, grouped, with
+`pctOfDaily`, rows hidden when unknown rather than shown as dashes, and a
+coverage footnote that says outright when a total is "a floor, not the day's
+total". It is better than what I built to replace it.
 
-**Confirmed while building it:** `planMealNutrientMap` and
-`logConsumedNutrientMap` in `lib/nutrition/dailyTotals.ts` compute the whole
-panel for a meal and for a log row, are tested, and are **called from nowhere**.
-That is the entire reason "full nutrients" was missing — the data side was
-finished and no screen ever asked for it.
+**How I got it wrong.** I grepped for `logConsumedNutrientMap` across the repo
+with `grep -v dailyTotals.ts` — and it is called from `computeDayTotals`, at
+line 552 of `dailyTotals.ts`, the one file I excluded. I concluded "called from
+nowhere" and built `NutrientPanel.tsx` as the missing end of the pipeline.
 
-**WHAT IS LEFT — mount it:**
-- nutrition screen: a day-total panel, summing `logConsumedNutrientMap` over the
-  day's logs with `sumNutrients`
-- the food/meal detail sheet: per-meal, from `planMealNutrientMap`
-- put it behind a collapsed row ("Nutrients") rather than always-open — 33 lines
-  under the macros would bury the numbers people actually check daily
+It was a duplicate: a second `formatNutrient`, a second percent-of-reference, a
+second grouped renderer, all shadowing `groupedNutrients` and `pctOfDaily` which
+the registry already exports and the UI already uses. Shipped as `eb8c7ce` and
+reverted immediately on finding the original. **That is precisely the
+second-source-of-truth drift this codebase keeps being bitten by, and I wrote
+three tests against that exact pattern earlier the same night.**
 
-Read `NutrientPanel.tsx`'s header before wiring; the null-is-not-zero rule is
-the thing to preserve.
-
-### [ ] 1b. (was 1) Mount the panel
-
-**Feedback (Dustin, 4 Aug): "Need to track full nutrients on everywhere in food
-logger."** Still open, and narrower than it reads.
-
-Micros are already captured, carried through the AI, and stored on `meal_items`
-and inside `item_overrides.__custom`. The pipeline is complete. **Nothing in the
-app renders a single micronutrient to a client.**
-
-Build the display:
-- per-item micros in the food detail / composer sheet
-- a daily totals panel on the nutrition screen alongside the macro row
-- units follow `food_catalog` exactly — sodium in mg, the rest in g
-- **null means "the source did not publish it", NOT zero.** Rendering a missing
-  value as 0 tells a client they ate no sodium. Show a dash.
-
-Do NOT block on the micros backfill — it is at ~9% and 180 hours from done. The
-display should degrade honestly when a food has no micros, which is most of
-them today.
+**What may still be open** — not verified, do not assume either way: whether
+per-MEAL or per-ITEM nutrients appear in the composer / meal detail sheet. The
+DAY level is definitely covered. Dustin's wording was "everywhere in food
+logger", so check the meal sheet before deciding the feedback item is closed.
 
 ### [ ] 2. Prove the AI plan builder actually uses the library
 
