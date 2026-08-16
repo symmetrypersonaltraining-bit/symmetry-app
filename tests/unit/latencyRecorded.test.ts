@@ -38,7 +38,6 @@ test("the timing comes from inside the helper, not re-measured around it", () =>
   const files = [
     "src/app/api/nutrition-ai/act/route.ts",
     "src/app/api/nutrition-ai/coach/route.ts",
-    "src/app/api/coach/focus/route.ts",
   ];
   for (const rel of files) {
     const src = fs.readFileSync(path.join(ROOT, rel), "utf8");
@@ -58,7 +57,6 @@ test("the surfaces a client waits on all record their time", () => {
     ["src/app/api/nutrition-ai/act/route.ts", 2],
     ["src/app/api/nutrition-ai/coach/route.ts", 1],
     ["src/app/api/nutrition-ai/parse/route.ts", 1],
-    ["src/app/api/coach/focus/route.ts", 1],
   ] as const;
   for (const [rel, atLeast] of shouldTime) {
     const src = fs.readFileSync(path.join(ROOT, rel), "utf8");

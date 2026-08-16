@@ -337,11 +337,23 @@ Needs a fresh WebSearch budget, which a new session has. See
 `docs/EXERCISE-VIDEOS-THE-REAL-NUMBERS.md`. Six have no candidate at all; the
 worst is 1,098 seconds.
 
-### [ ] H. `coach_read` is orphaned
+### [x] H. `coach_read` orphan — DELETED
 
-`CoachFocusCard` is mounted nowhere; `/api/coach/focus` is called by nothing.
-Deleting both is the tidy-up — safe, but only worth doing with tests green and
-nothing else in flight.
+`CoachFocusCard.tsx` and `/api/coach/focus` are gone. Verified before removing
+anything: the component was referenced only by itself, the route was called only
+by that component, and `ClientDashboard.tsx` carries a comment saying the card
+was unmounted on 1 Aug because it restated the Focus line `ClientWeekSummary`
+already showed — clients were reading the same coaching twice in two voices.
+`/api/coach/focus-suggestions` is a DIFFERENT route, is used by
+`TrainerWeekDigest`, and is untouched.
+
+Four guards enumerated the deleted files by name and failed, which is them doing
+their job. Each list had the entry removed with a note saying why, rather than
+the rule being relaxed.
+
+The `coach_read` entry in `AI_FEATURES` **stays**, marked dormant. `ai_usage_log`
+holds real rows keyed `coach_read` from before the retirement, and dropping the
+key would leave the health page unable to name its own history.
 
 ---
 

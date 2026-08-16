@@ -79,13 +79,20 @@ export const AI_FEATURES = {
   coach_card:      { label: "Coach card",              surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
   // Retired 2026-08-01, not broken. CoachFocusCard was removed from
   // ClientDashboard because it restated the Focus line ClientWeekSummary
-  // already showed, so clients read the same coaching twice in two voices. The
-  // route and the component still exist; nothing mounts them.
+  // already showed, so clients read the same coaching twice in two voices.
   //
-  // Marked dormant on 15 Aug during the AI audit, which is what this flag is
-  // for: "the health page shouts NEVER USED at a surface that is never-used ON
-  // PURPOSE, forever. One permanent false alarm is all it takes for the page to
-  // stop being read." Zero calls in 30 days is the CORRECT reading here.
+  // The component and /api/coach/focus were DELETED on 16 Aug — they had been
+  // sitting there unmounted and uncalled for a fortnight, and dead code that
+  // still compiles is the kind that gets accidentally revived or, worse,
+  // maintained.
+  //
+  // This entry STAYS, and dormant is why. ai_usage_log holds real rows keyed
+  // 'coach_read' from before the retirement; dropping the key would leave the
+  // health page unable to name its own history. Marked dormant on 15 Aug for
+  // the reason that flag exists: "the health page shouts NEVER USED at a
+  // surface that is never-used ON PURPOSE, forever. One permanent false alarm
+  // is all it takes for the page to stop being read." Zero calls is the CORRECT
+  // reading here, now permanently so.
   coach_read:      { label: "Coach's read",            surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 60, dormant: true },
   client_assistant:{ label: "Client assistant",        surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
   // The workout tool loop the ✦ Coach runs before answering a question. Its own

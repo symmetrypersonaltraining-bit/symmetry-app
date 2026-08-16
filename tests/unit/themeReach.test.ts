@@ -258,7 +258,10 @@ test("the focus panel is derived, not a literal lavender", () => {
     ".focus-panel's background must derive from --brand-surface so it is dark " +
       "on dark themes and tinted toward whichever scheme is active.",
   );
-  for (const file of ["src/components/ClientWeekSummary.tsx", "src/components/CoachFocusCard.tsx"]) {
+  // CoachFocusCard.tsx was in this list until 16 Aug, when it was deleted —
+  // unmounted since 1 Aug, uncalled, and dead code that still compiles is the
+  // kind that gets revived by accident.
+  for (const file of ["src/components/ClientWeekSummary.tsx"]) {
     assert.ok(
       !/#eef2ff/i.test(code(read(file))),
       `${file} still carries the literal #eef2ff focus panel. Use className="focus-panel".`,

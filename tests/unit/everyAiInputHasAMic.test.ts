@@ -63,7 +63,7 @@ const AI_TEXT_SURFACES = [
   // "Type foods with amounts" / "Describe it loosely" → the same parser.
   "src/app/(app)/nutrition/v3/NutritionV3Client.tsx",
   // The client's answer to the AI's daily question, routed to Dustin's inbox.
-  "src/components/CoachFocusCard.tsx",
+  // CoachFocusCard.tsx deleted 16 Aug — unmounted since 1 Aug and uncalled.
   // Trainer-side: the AI drafts the weekly focus, Dustin edits it.
   "src/components/TrainerWeekDigest.tsx",
   // The trainer agent drawer.

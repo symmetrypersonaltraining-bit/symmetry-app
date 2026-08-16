@@ -19,7 +19,11 @@ const API = path.join(ROOT, "src/app/api");
 /** Routes whose output a client or trainer reads as coaching. */
 const COACHING = [
   "nutrition-ai/coach/route.ts",   // the food-logger coach card
-  "coach/focus/route.ts",          // the weekly focus / Coach's Read
+  // "coach/focus/route.ts" was here. Deleted 16 Aug along with CoachFocusCard —
+  // the card was unmounted on 1 Aug because it restated the Focus line
+  // ClientWeekSummary already showed, and the route sat uncalled for a
+  // fortnight afterwards. The rule it was asserted against is unchanged and
+  // still covers every surface that survives.
   "cron/weekly-ai/route.ts",       // the Sunday sweep that writes both
   "weekly-brief/route.ts",         // the pre-session brief
   "ai-nudges/route.ts",            // the Monday nudge, sent to a real person
