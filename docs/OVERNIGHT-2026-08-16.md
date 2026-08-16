@@ -49,6 +49,8 @@ needs two keys from you before any client can be notified about anything.
 | `6dc889a` | Three of the "harmless" remainder were not harmless |
 | `4a3922c` | Bot-message audit recorded — clean |
 | `652d2db` | The catches that could never fire, swept and closed |
+| `c58ff31` | Live app verified healthy on tonight's code |
+| `47d1b99` | NEEDS YOU list reordered by value |
 
 ### Added mid-session, and it turned out to be the big one
 
@@ -211,6 +213,35 @@ workout surface, and your rule says those are yours. Two lines of work once you
 say which way. Everything that BUILDS the workout — the section clear, the day
 rename, every exercise insert — is now checked and fails cleanly, because a
 doubled or short workout in front of a client has no such trade-off.
+
+### One more, found by pulling a thread — your streak counts sessions nobody finished
+
+`workout_logs.status` has a CHECK allowing five values: `Done as planned`,
+`Modified`, `Partial`, `Skipped`, `Rest day`. **977 rows across two years and 29
+clients, and every single one says 'Done as planned'.** Not a data problem —
+every write site in the app hardcodes that string, and there is no screen
+anywhere for recording a modified or partial session. The other four have never
+been used.
+
+Which would be harmless, except three places read the column, and all three
+tested it against `"completed"` — a value from `scheduled_workouts`, not this
+table. Two were merely dead. `MetricCards` was not:
+
+    .filter((w) => w.completed || w.status)
+
+That is a truthiness test on a column that is set on every row, so it counted
+**every log as a training day, including `completed = false` ones** — sessions
+started and walked away from — and fed that into the streak and the training-day
+count. One such row exists today; it only grows.
+
+All three now read the `completed` boolean, which is the field that answers the
+question. A guard walks every source file, so a new reader making the same
+mistake fails the build.
+
+**Not fixed, and it is a product question rather than a bug:** should a client
+be able to record a session as Modified or Partial at all? The database has said
+yes for two years and the app has never offered it. If the answer is no, the
+column is a constant and should stop pretending otherwise.
 
 ### NEEDS YOU — ordered by what it buys you
 

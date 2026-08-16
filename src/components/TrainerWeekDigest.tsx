@@ -122,7 +122,12 @@ export default function TrainerWeekDigest() {
 
         for (const w of (swThis.data || [])) { thisTotal[w.client_id] = (thisTotal[w.client_id] || 0) + 1; }
         for (const l of (wlogs.data || [])) {
-          if (l.completed || l.status === "completed") {
+          // workout_logs.status can never be "completed" — its CHECK allows only
+        // 'Done as planned' | 'Modified' | 'Partial' | 'Skipped' | 'Rest day'.
+        // "completed" belongs to scheduled_workouts, and the two vocabularies
+        // were conflated here. `completed` is the boolean that actually says
+        // whether the session finished.
+          if (l.completed) {
             const c = lastLog[l.client_id];
             if (!c || l.log_date > c) lastLog[l.client_id] = l.log_date;
             if (l.log_date >= thisWk && l.log_date <= today) (weekDone[l.client_id] = weekDone[l.client_id] || new Set<string>()).add(l.log_date);

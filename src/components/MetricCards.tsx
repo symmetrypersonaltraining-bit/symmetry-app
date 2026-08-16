@@ -602,7 +602,18 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
 
     if (wDates && wDates.length > 0) {
       const uniqueDates = [
-        ...new Set((wDates as any[]).filter((w: any) => w.completed || w.status).map((w: any) => w.log_date).filter(Boolean)),
+        // THE BUG, not just a dead clause: `|| w.status` is a truthiness test,
+        // and workout_logs.status is set on every row that has one — always the
+        // single value 'Done as planned', because no code path in this app has
+        // ever written any of the other four the CHECK allows. So this counted
+        // every log row as a training day INCLUDING `completed = false` ones,
+        // inflating the streak and the training-day count with sessions the
+        // client started and abandoned.
+        //
+        // "completed" was never a workout_logs status anyway — that vocabulary
+        // belongs to scheduled_workouts. The boolean is the field that answers
+        // the question being asked.
+        ...new Set((wDates as any[]).filter((w: any) => w.completed).map((w: any) => w.log_date).filter(Boolean)),
       ].sort().reverse() as string[];
       // Anchor on today if they've already trained today, otherwise on
       // yesterday. Without this, a real run reads as 0 every morning until the

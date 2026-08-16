@@ -132,7 +132,15 @@ export default function ClientWeekSummary() {
         let weightDelta: number | null = null;
         if (mts.length >= 2) weightDelta = +(Number(mts[mts.length - 1].weight) - Number(mts[0].weight)).toFixed(1);
 
-        const doneDates = new Set((wlogs.data || []).filter((w: any) => w.completed || w.status === "completed").map((w: any) => w.log_date));
+        // workout_logs.status can never be "completed" — its CHECK allows only
+        // 'Done as planned' | 'Modified' | 'Partial' | 'Skipped' | 'Rest day'.
+        // "completed" belongs to scheduled_workouts, and the two vocabularies
+        // were conflated here. `completed` is the boolean that actually says
+        // whether the session finished.
+        // Dead rather than wrong here — the boolean already carried it — but a
+        // dead clause with a false premise is how the MetricCards version of
+        // this line ended up counting unfinished sessions.
+        const doneDates = new Set((wlogs.data || []).filter((w: any) => w.completed).map((w: any) => w.log_date));
         let streak = 0;
         let cursor = doneDates.has(today) ? today : addDays(today, -1);
         if (doneDates.has(cursor)) { while (doneDates.has(cursor)) { streak++; cursor = addDays(cursor, -1); } }
