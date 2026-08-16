@@ -4,7 +4,7 @@
 things that genuinely need Dustin. Scheduled sessions read this, take the top
 unfinished item, ship it, tick it off here, and stop.
 
-Last updated **05:25 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
+Last updated **06:05 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
 
 ---
 
@@ -16,9 +16,11 @@ Written at **04:10 CT**, after the last queue item shipped.
 its own, from two places, and no video in this app had ever been approved by a
 person (stopped, reversibly, nothing pulled); your Saturday review queue has
 been empty because the publisher crashed on 9 Aug and has not had a Sunday since
-(already fixed on the 13th, but yesterday's generator produced nothing, so
-there is still nothing to publish — see below); and push still needs two keys
-from you before any client can be notified about anything.
+(the publisher fix is now **CONFIRMED WORKING** — it ran clean at 06:00 this
+morning, its first success since 2 Aug — but yesterday's generator produced
+nothing, so there was nothing to publish; the generator is the remaining
+problem, see below); and push still needs two keys from you before any client
+can be notified about anything.
 
 **The thread running through the night**, if you want one sentence for it: the
 app was repeatedly telling somebody a thing had happened when it had not. A
@@ -145,7 +147,7 @@ longest-first, which is where a wrong one is most likely to be.
 The other 166 are on library entries nobody has ever prescribed. They can wait
 indefinitely and cost nothing while they do.
 
-### Second thing to read — the focus pipeline is still not producing, and it is not the bug I fixed
+### Second thing to read — the publisher is FIXED and proven; the generator is not
 
 I hardened the review screen (`804d0d2`), then went to check how often the
 Sunday fallback had been publishing unreviewed copy. The publisher has run
@@ -194,20 +196,23 @@ the two, and they have completely different fixes.
 Worth doing: it is the difference between 29 clients getting a written weekly
 focus and 29 clients getting nothing, every week, silently.
 
-**What the publisher will do at 06:00 CT today, so you can read it correctly.**
-It should run and report **0 published**, and that is the SUCCESS case — there
-are no drafts to publish, because the generator produced none yesterday. Job 27
-last ran on 9 Aug and failed, so this is its first run since the 13 Aug fix.
+**IT RAN AT 06:00 CT AND IT SUCCEEDED.** Checked at 06:01, one minute after:
 
-    select status, return_message, start_time
-    from cron.job_run_details where jobid = 27
-    order by start_time desc limit 1;
+    select status, return_message, start_time from cron.job_run_details
+    where jobid = 27 order by start_time desc limit 3;
 
-- `succeeded` → the publisher fix works. The remaining problem is entirely the
-  generator, and the Vercel log above is the next step.
-- `failed` → that is NEW, it is not the `text = date` bug (I verified the live
-  definition casts `p_week::text` in both places), and it wants looking at
-  properly rather than patching.
+    2026-08-16 11:00  succeeded  1 row     ← today, the fix working
+    2026-08-09 11:00  FAILED     operator does not exist: text = date
+    2026-08-02 11:00  succeeded  1 row
+
+**The 13 Aug fix is confirmed in production, not just in the definition I read.**
+That is the publisher's first clean run since 2 Aug, and the `text = date` bug is
+dead. Nothing further to do on that half.
+
+It published 0, which is correct — there were no drafts. `weekly_focus_drafts`
+is still empty and `ai_usage_log` still has zero `weekly_sweep` rows, so **the
+generator is now the whole of the problem**, and the Vercel cron log above is
+the one thing that will tell you which half of it failed.
 
 ### The four that matter most
 
@@ -541,16 +546,17 @@ users — so the schema catch-up can be done from here without Dustin.
 
 ---
 
-## STATE RIGHT NOW — 05:25 CT
+## STATE RIGHT NOW — 06:05 CT
 
 | | |
 |---|---|
-| `origin/main` (live) | `3a53cd4`, shipped and verified against `origin/main` |
+| `origin/main` (live) | `296bc60`, shipped and verified against `origin/main` |
 | Unit tests | **1,407 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
-| Ship bridge | **v2, repo-aware, up** — twenty-seven real pushes tonight, no failures |
+| Ship bridge | **v2, repo-aware, up** — twenty-eight real pushes tonight, no failures |
 | Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
 | Video pipeline | **no longer publishes on its own**, from either place. 175 live videos untouched, all reviewable |
-| Live app | **verified healthy at 05:22 CT** — `/api/health` on `3a53cd4` (the newest commit), auth 177 ms, db 160 ms, `ok: true`. Vercel is fully caught up. |
+| Live app | **verified healthy at 05:22 CT** — `/api/health` on `3a53cd4`, auth 177 ms, db 160 ms, `ok: true`. Vercel is fully caught up. |
+| Focus publisher | **PROVEN — ran clean at 06:00 CT**, first success since 2 Aug. Published 0, correctly: there are no drafts. |
 | `symmetry-app-v2` repo | **seeded** — main is live main byte for byte |
 | `symmetry-app-v2.vercel.app` | **CONFIRMED HEALTHY at 04:52 CT** — it does NOT 404. 200, `ok:true`, sha `f2598da` (the seed), auth 641 ms, db 932 ms. It is 43 commits behind live, which is expected for a seeded mirror. |
 | Dev Supabase `giiovjfpbuzmrvpdglhv` | **caught up** — 88 tables, 1,169 columns, 166 policies |
