@@ -156,14 +156,36 @@ deciding whether that job should run at all.
 
 ## 5 · ⏸️ NEEDS YOU — decisions, ordered
 
-### 1. Jerry Bourgeois has never had a workout scheduled
+### 1. Jerry Bourgeois — the fuller picture, and I overstated it earlier
 
-Active client since 17 Jul, has a login, logging meals 5 of 7 days as of 11 Aug.
-**Zero rows in `scheduled_workouts`, ever.** Every other active client has
-programming through at least 31 Aug.
+I first flagged this as if something were broken. Having actually looked, it may
+be entirely intentional and you are the only one who knows.
 
-I have not assigned him anything — your standing rule is that programmes are
-your call. Tell me what he should be on and I will build it.
+| | |
+|---|---|
+| Joined | 17 Jul |
+| Goal on file | "Lose 30 lbs fat only" |
+| Meal plans | **16** |
+| Meal logs | **115** |
+| Program assignments | **0** |
+| Workouts ever scheduled | **0** |
+| experience_level / training_frequency / injuries | all **blank** |
+
+So he is not a neglected client — he is a heavily-coached NUTRITION client. He
+is also the **only** one of your 29 active clients with no workouts at all;
+every other one has programming.
+
+**Either reading is plausible** and I am not going to guess: he is nutrition-
+only by arrangement, or his training was never set up. Tell me which and I will
+either leave it alone or build the programme.
+
+**One thing worth knowing either way.** Jerry is `ai_pool_only = false`, so he
+is UNGATED — the coach may offer him any workout in the library and
+`add_my_workout` will let him take it. For most clients that is fine, because a
+programme and an assessment sit behind it. Jerry has neither, and no recorded
+injuries or experience level, so nothing at all constrains what the AI would
+hand him. The gate exists and you already use it selectively (Gerard and Sharon
+have server-side contraindications). This is a decision, not a bug.
 
 ### 2. Megan is not in the system
 
@@ -244,7 +266,28 @@ category of blocker is gone for good.
 
 ---
 
-## 7 · What I checked and found clean
+## 7 · Verified since, as an actual client rather than as the service role
+
+The library RLS changes were the risky part of the night, so I tested them the
+way a client would hit them — inside a transaction, as `authenticated`, with a
+real client's JWT claims, rolled back afterwards.
+
+| As Jennifer Day | Result |
+|---|---|
+| Library meals she can READ | **50** ✓ |
+| Library recipes she can READ | **20** ✓ |
+| Library ingredients she can READ | **116** ✓ |
+| Library meals she can EDIT | **0** ✓ |
+| Library meals she can DELETE | **0** ✓ |
+| Library recipes she can DELETE | **0** ✓ |
+| Library ingredients she can DELETE | **0** ✓ |
+
+Readable by everyone, writable by nobody but you. That is what it was supposed
+to be, and now it is checked rather than assumed.
+
+---
+
+## 8 · What I checked and found clean
 
 - **Every other commit today touches no schema.** The library policy was the
   only one, and it now has its migration.
