@@ -3,6 +3,7 @@
 // can fall back to "save as pending — macros tonight" like the current logger.
 
 import { CustomItem, kcalOf } from "./dailyTotals";
+import { sanitizeNutrients } from "./nutrients";
 
 interface ParseResult {
   items: CustomItem[];
@@ -24,6 +25,23 @@ function mapItem(raw: Record<string, unknown>): CustomItem | null {
   const amount = (raw.amount ?? raw.serving ?? raw.a ?? raw.quantity ?? null) as string | number | null;
   const unit = (raw.unit ?? "") as string;
   const a = amount != null ? String(amount) + (unit ? " " + unit : "") : null;
+
+  // The nutrients the model was asked for, kept.
+  //
+  // /api/nutrition-ai/parse has asked for all 33 since da30c87 and
+  // validateParseResult sanitises and returns them per item — and this mapper
+  // dropped every one of them on the floor. So a meal typed into the composer
+  // reached the database with macros and NOTHING else, while the identical meal
+  // picked from food search carried its full panel. That is the third time the
+  // same shape of bug has been found on this path (CoachActionItem had no
+  // field for them; FoodSearchSheet never read food_catalog.micros) and it is
+  // always a mapping layer, never the model and never the database.
+  //
+  // sanitizeNutrients, not a local loop: unknown keys are the model's, and a
+  // hallucinated "vitamin_q" must not reach a log row. An empty bag is stored
+  // as null so "unknown" stays distinguishable from "contains none".
+  const mi = sanitizeNutrients(raw.micros ?? raw.nutrients);
+
   return {
     n: String(name),
     a,
@@ -31,6 +49,7 @@ function mapItem(raw: Record<string, unknown>): CustomItem | null {
     free: !!(raw.free ?? raw.unlimited ?? raw.is_unlimited),
     est: true,
     fac: 1,
+    mi: Object.keys(mi).length ? mi : null,
   };
 }
 

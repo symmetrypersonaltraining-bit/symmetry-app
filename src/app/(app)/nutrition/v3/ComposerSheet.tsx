@@ -5,7 +5,8 @@
 // save. Side-by-side compare vs the plan meal it replaces (swap mode).
 
 import { useState } from "react";
-import { CustomItem, Macros, customMealMacros } from "@/lib/nutrition/dailyTotals";
+import { CustomItem, Macros, customMealMacros, customMealNutrientMap } from "@/lib/nutrition/dailyTotals";
+import { countKnownNutrients, formatNutrient, groupedNutrients, pctOfDaily } from "@/lib/nutrition/nutrients";
 import { parseFoodText, lastParseFailure, parseFailureMessage } from "@/lib/nutrition/parseClient";
 import Sheet from "./Sheet";
 import AiBadge from "@/components/AiBadge";
@@ -60,8 +61,15 @@ export default function ComposerSheet({
   // opt into — the whole complaint was about FINDING the save, not about it
   // being one tap too many.
   const [keep, setKeep] = useState(false);
+  // Collapsed by default. The macros are why anyone opened this sheet; the
+  // nutrients are why they might change their mind about it.
+  const [showNutrients, setShowNutrients] = useState(false);
 
   const totals = customMealMacros({ name, items });
+  // The same function the day total will call on this meal once it is logged,
+  // not a second addition written here — see customMealNutrientMap.
+  const nutrients = customMealNutrientMap({ name, items });
+  const knownNutrients = countKnownNutrients(nutrients);
   const r = Math.round;
 
   async function runParse() {
@@ -149,6 +157,74 @@ export default function ComposerSheet({
             <span style={{ color: "var(--brand-text-secondary)", fontWeight: 500 }}>Total</span>
             <span>{r(totals.kcal)} cal · {r(totals.protein)}P / {r(totals.carbs)}C / {r(totals.fats)}F</span>
           </div>
+
+          {/*
+            The nutrients this meal is about to log.
+
+            The parse route asks the model for all 33 and the day total reads
+            them — but below the day level this sheet showed four macros and
+            stopped, so nobody could see what a typed meal was actually worth
+            until after it was logged and they went looking for the day panel.
+
+            Registry helpers only — groupedNutrients, formatNutrient,
+            pctOfDaily. A local formatter here is exactly what produced the
+            duplicate nutrient panel that had to be reverted on 15 Aug.
+          */}
+          {knownNutrients === 0 ? (
+            // Said out loud. "We don't know" and "it contains none" are
+            // different facts, and the estimate is only as good as what the
+            // model returned.
+            <p className="text-xs pb-1" style={{ color: "var(--brand-text-secondary)" }}>
+              No nutrient detail for these items — macros only.
+            </p>
+          ) : (
+            <div className="mb-2">
+              <button
+                type="button"
+                onClick={() => setShowNutrients((v) => !v)}
+                aria-expanded={showNutrients}
+                className="w-full py-2 rounded-xl text-xs font-bold uppercase tracking-widest"
+                style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)", background: "transparent" }}
+              >
+                {showNutrients ? "Hide" : "Show"} nutrients ({knownNutrients})
+              </button>
+              {showNutrients && (
+                <div className="mt-2">
+                  {groupedNutrients(nutrients)
+                    .map((g) => ({ ...g, rows: g.rows.filter((row) => row.value != null) }))
+                    .filter((g) => g.rows.length > 0)
+                    .map((g) => (
+                      <div key={g.group} className="mb-2">
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "var(--brand-text-secondary)" }}>
+                          {g.label}
+                        </p>
+                        {g.rows.map((row) => {
+                          const pct = pctOfDaily(row.def.key, row.value);
+                          return (
+                            <div key={row.def.key} className="flex items-baseline justify-between text-xs py-0.5">
+                              <span style={{ color: "var(--brand-text)" }}>{row.def.label}</span>
+                              <span style={{ color: "var(--brand-text-secondary)" }}>
+                                {formatNutrient(row.def.key, row.value)}
+                                {/* Rounded, like the day panel's nutrientRow.
+                                    pctOfDaily returns full precision on
+                                    purpose, so every render site has to do
+                                    this — printing it raw gives
+                                    "12.345678901234568%". */}
+                                {pct != null && <span className="ml-2 opacity-70">{Math.round(pct)}%</span>}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  <p className="text-[10px] mt-1" style={{ color: "var(--brand-text-secondary)" }}>
+                    Estimated. Percentages are of a general daily reference, not your targets.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {compare && (
             <div className="grid grid-cols-2 gap-2 my-2">
               <div className="rounded-xl p-2.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>

@@ -276,30 +276,6 @@ function numOrNull(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-// Scale a nutrient by a factor, preserving null. 0.75 of an unknown is still
-// unknown, not 0.
-function scaleN(n: Nutrients, pct: number): Nutrients {
-  return {
-    fiber: n.fiber == null ? null : n.fiber * pct,
-    sugar: n.sugar == null ? null : n.sugar * pct,
-    sodium: n.sodium == null ? null : n.sodium * pct,
-    satFat: n.satFat == null ? null : n.satFat * pct,
-  };
-}
-
-// Sum across items. A field stays null only if EVERY contributing item was null;
-// once one item knows its sodium, the sum is a real (if partial) number.
-function addN(a: Nutrients, b: Nutrients): Nutrients {
-  const add = (x: number | null, y: number | null) =>
-    x == null && y == null ? null : (x ?? 0) + (y ?? 0);
-  return {
-    fiber: add(a.fiber, b.fiber),
-    sugar: add(a.sugar, b.sugar),
-    sodium: add(a.sodium, b.sodium),
-    satFat: add(a.satFat, b.satFat),
-  };
-}
-
 function estNutrients(log: LogRow): Nutrients {
   return {
     fiber: numOrNull(log.est_fiber),
@@ -309,18 +285,23 @@ function estNutrients(log: LogRow): Nutrients {
   };
 }
 
+// The four legacy nutrients for a custom (itemised) meal.
+//
+// A PROJECTION of customMealNutrientMap, not a second calculation — the same
+// relationship planMealNutrients has to planMealNutrientMap, for the same
+// reason. This used to read `it.fi/su/so/sf` directly and ignore `it.mi`, which
+// meant an item whose fibre arrived in the full bag rather than the four short
+// keys reported no fibre HERE while the full panel reported it correctly. That
+// is not cosmetic: NutritionV3Client.upsertLog derives the est_fiber /
+// est_sugar / est_sodium / est_sat_fat columns from this function, so the
+// stored row disagreed with the meal it was stored from.
+//
+// Every AI-parsed item is exactly that case — the parse route returns a
+// `micros` bag, never the short keys.
 export function customMealNutrients(meta: CustomMeta): Nutrients {
-  let out = { ...NUTRIENTS_UNKNOWN };
-  for (const it of meta.items || []) {
-    const fac = it.fac ?? 1;
-    out = addN(out, scaleN({
-      fiber: numOrNull(it.fi),
-      sugar: numOrNull(it.su),
-      sodium: numOrNull(it.so),
-      satFat: numOrNull(it.sf),
-    }, fac));
-  }
-  return out;
+  const m = customMealNutrientMap(meta);
+  const pick = (k: string) => (m[k] == null ? null : Number(m[k]));
+  return { fiber: pick("fiber"), sugar: pick("sugar"), sodium: pick("sodium"), satFat: pick("sat_fat") };
 }
 
 // The full nutrient panel for a plan meal, honouring per-day item overrides and
@@ -363,7 +344,13 @@ export function planMealNutrients(meal: PlanMeal, overrides?: ItemOverrides | nu
 // whole registry, and the four are a projection of this, never a second
 // calculation. If the two ever disagree it is a bug in the projection.
 
-function customMealNutrientMap(meta: CustomMeta): NutrientMap {
+/**
+ * Exported so the composer can show the panel it is ABOUT to log, using the
+ * identical calculation the day total will use on it a second later. A sheet
+ * that adds up its own nutrients is how a screen and a total end up disagreeing
+ * about the same meal.
+ */
+export function customMealNutrientMap(meta: CustomMeta): NutrientMap {
   let out: NutrientMap = {};
   for (const it of meta.items || []) {
     const fac = it.fac ?? 1;
@@ -394,19 +381,29 @@ export function logConsumedNutrientMap(
     fiber: log.est_fiber, sugar: log.est_sugar,
     sodium: log.est_sodium, sat_fat: log.est_sat_fat,
   });
-  if (Object.keys(fromCols).length > 0) {
-    if (log.adherence === "Off-plan" || !log.adherence) return fromCols;
+
+  // A custom meal's ITEMS know up to 33 nutrients; est_fiber/sugar/sodium/
+  // sat_fat are only ever four columns DERIVED from those same items. So the
+  // columns must not shadow the items — that turned a meal that knew thirty-
+  // three nutrients into a four-nutrient meal the moment it was logged, and
+  // did it silently, because four real numbers look like a working panel.
+  //
+  // Merged rather than picked, with the columns winning per key: that is the
+  // precedence readNutrients already uses for flat-vs-jsonb, and it keeps a
+  // hand-corrected column authoritative over the item it came from.
+  const fromCustom = ov?.__custom ? customMealNutrientMap(ov.__custom) : {};
+  const merged = Object.keys(fromCustom).length > 0 ? { ...fromCustom, ...fromCols } : fromCols;
+
+  if (Object.keys(merged).length > 0) {
+    if (log.adherence === "Off-plan" || !log.adherence) return merged;
     const pct = adherencePct(log.adherence);
-    return pct == null ? fromCols : scaleNutrients(fromCols, pct);
+    return pct == null ? merged : scaleNutrients(merged, pct);
   }
 
-  if (ov?.__custom) {
-    const n = customMealNutrientMap(ov.__custom);
-    if (Object.keys(n).length === 0) return {};
-    if (log.adherence === "Off-plan" || !log.adherence) return n;
-    const pct = adherencePct(log.adherence);
-    return pct == null ? n : scaleNutrients(n, pct);
-  }
+  // A custom meal that knows nothing contributes nothing. It must NOT fall
+  // through to the plan-meal lookup below — the meal in that slot is not what
+  // was eaten, and crediting its nutrients would invent a panel out of nowhere.
+  if (ov?.__custom) return {};
 
   const meal =
     (log.meal_id && mealById?.get(log.meal_id)) ||

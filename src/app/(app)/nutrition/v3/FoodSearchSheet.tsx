@@ -531,7 +531,13 @@ export default function FoodSearchSheet({
                               <span style={{ color: "var(--brand-text)" }}>{r.def.label}</span>
                               <span style={{ color: "var(--brand-text-secondary)" }}>
                                 {formatNutrient(r.def.key, r.value)}
-                                {pct != null && <span className="ml-2 opacity-70">{pct}%</span>}
+                                {/* Rounded. pctOfDaily returns full precision
+                                    and this printed it raw, so a food with
+                                    0.9 mg of thiamin read "75.83333333333334%"
+                                    on the client's phone. The day panel's
+                                    nutrientRow has always rounded; this site
+                                    was copied without it. */}
+                                {pct != null && <span className="ml-2 opacity-70">{Math.round(pct)}%</span>}
                               </span>
                             </div>
                           );
