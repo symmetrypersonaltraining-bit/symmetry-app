@@ -8,7 +8,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-SYNC=supabase/migrations/20260816_homework_never_blocks_a_move.sql
+SYNC=supabase/migrations/20260816_sync_can_move_the_same_session_twice.sql
 BAK=supabase/migrations/20260816_bak_sync_supervised_workouts.sql
 RES=supabase/migrations/20260816_resolve_moves_the_one_session.sql
 TEST=tests/unit/homeworkNeverBlocksAMove.test.ts
@@ -58,7 +58,7 @@ echo
 echo "the rules that must survive being unblocked:"
 mutate "drags homework around"        "$SYNC" 're.sub(r"\n *and sw\.supervised\b[^\n]*", "", s)'
 mutate "moves a logged session"       "$SYNC" 're.sub(r"\n *and sw\.workout_log_id is null[^\n]*", "", s)'
-mutate "overrides a manual move"      "$SYNC" 're.sub(r"\n *and sw\.moved_from_date is null[^\n]*", "", s)'
+mutate "overrides a manual move"      "$SYNC" 're.sub(r"\n *and \(sw\.moved_from_date is null or sw\.moved_by = .calendar_sync.\)", "", s)'
 mutate "follows a cancelled appt"     "$SYNC" "s.replace(\"and a.status = 'scheduled'\", \"and a.status is not null\")"
 mutate "touches archived clients"     "$SYNC" 're.sub(r"\n *and c\.archived_at is null[^\n]*", "", s)'
 mutate "unlinked from the appointment" "$SYNC" "s.replace('join appointments a on a.id = sw.appointment_id', 'join appointments a on a.client_id = sw.client_id')"
@@ -71,6 +71,14 @@ echo
 echo "the backup, and the sibling copy of the same bug:"
 mutate "backup captures nothing"      "$BAK"  "s.replace('pg_get_functiondef(p.oid)', chr(39) + 'stub' + chr(39))"
 mutate "sibling regresses"            "$RES"  're.sub(r"\n *and x\.supervised[^\n]*", "", s)'
+
+echo
+echo "the self-block:"
+mutate "frozen after one move"        "$SYNC" 's.replace("and (sw.moved_from_date is null or sw.moved_by = " + chr(39) + "calendar_sync" + chr(39) + ")", "and sw.moved_from_date is null")'
+mutate "stops marking its own moves"  "$SYNC" 're.sub(r"\n *moved_by *= *.calendar_sync.,", "", s)'
+mutate "unmarked moves are fair game" "$SYNC" 's.replace("and (sw.moved_from_date is null or sw.moved_by = " + chr(39) + "calendar_sync" + chr(39) + ")", "and sw.moved_by is distinct from " + chr(39) + "trainer" + chr(39))'
+mutate "null moved_by means eligible" "$SYNC" 's.replace("and (sw.moved_from_date is null or sw.moved_by = " + chr(39) + "calendar_sync" + chr(39) + ")", "and (sw.moved_by is null or sw.moved_by = " + chr(39) + "calendar_sync" + chr(39) + ")")'
+mutate "column never ships"           "$SYNC" 's.replace("add column if not exists moved_by", "add column if not exists moved_by_unused")'
 
 echo
 echo "caught $pass, missed $fail"
