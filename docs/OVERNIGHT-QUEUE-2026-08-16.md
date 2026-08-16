@@ -136,11 +136,11 @@ tests green and nothing else in flight.
 
 ---
 
-## STATE AS OF 15 Aug 20:35 CT
+## STATE AS OF 15 Aug 20:45 CT — the handover point
 
-- `origin/main` = `cfb9ac8`, tree clean, **1,177 tests / 0 failures**
+- `origin/main` = `106e1c3`, tree clean, **1,177 tests / 0 failures**
 - App healthy — `/api/health` green, auth ~200ms, db ~530ms
 - Meal library LIVE and verified as a real client: 50 meals, 20 recipes, 116
   ingredients readable; 0 rows writable
-- Imports running clean: catalog **44.5%**, micros **9.1%**, no errors
+- Imports running clean: catalog **45.3%**, micros **9.7%**, no errors
 - `app_feedback`: 100 resolved, 2 open (micros UI, Garmin import)
