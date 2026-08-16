@@ -4,7 +4,7 @@
 things that genuinely need Dustin. Scheduled sessions read this, take the top
 unfinished item, ship it, tick it off here, and stop.
 
-Last updated **04:10 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
+Last updated **04:25 CT, Sunday 16 Aug**. The queue is finished; later runs re-verify rather than add.
 
 ---
 
@@ -61,6 +61,8 @@ of it threw an error, because none of it ever asked.
 | `db3b2fa` | Final state refresh |
 | `42d24e9` | **The streak the AI quotes was capped at 30 without saying so** |
 | `3074d88` | Unchecked-writes inventory brought in line with reality |
+| `7606fd4` | Final summary, and an honest list of what was not done |
+| `0709ecb` | The rotation cloner keeps kcal and micros — a trap set for next week |
 
 ### Added mid-session, and it turned out to be the big one
 
@@ -286,6 +288,43 @@ changes what the AI says to every client on the strength of a latent
 inconsistency, and picking which definition wins is a coaching decision, not a
 4am one. Left for you — it is on the list below.
 
+### A trap set for next week, disarmed — the rotation cloner drops kcal and micros
+
+`plan-edit/route.ts` carries this above its own clone, in its own words:
+
+> "kcal + micros MUST be in this list. It is an explicit column list, so a
+> column missing from it is silently dropped when the plan is cloned."
+
+Fixed there. `generate_rotation_plans()` — the same clone, from the database, on
+pg_cron job 14 at 06:20 CT every morning, building **ten weeks of plans ahead**
+— had the identical explicit column list and was missing both columns.
+
+**Checked before touching it:** `select count(*) filter (where kcal is not null)
+from meal_items` → **0 of 1,566.** Nothing anywhere in the database has ever
+carried a kcal or a micros value, so nothing was being lost. The clone was
+faithful by accident.
+
+Fixed anyway, and now rather than later, because the app has just started
+producing that data — the food sheet carries the full nutrient bag (`d445002`),
+the AI parse path carries it (`3c59a08`), plan-edit already copies both. The
+first plan built with real nutrient data would have been stripped for every
+rotation client — 24 plans, 724 items, out to 19 October — and it would have
+surfaced weeks later as "the nutrients are missing on future plans", which is a
+miserable thing to work out backwards.
+
+Reversible: previous definition verbatim in
+`bak_generate_rotation_plans_20260816`. A test reads the migrations in order and
+checks the last definition, so a later short column list fails the build — and
+it pins the horizon, the already-exists skip, the version numbering and
+`status='pending'`, because a "fix" that quietly changed one of those would be
+far worse than the bug.
+
+**Verified clean while I was in there:** the day panel's nutrient coverage line
+is honest about this. It says "From X of Y logged meals — the rest have no
+nutrient source, so this is a floor, not the day's total." Plan meals contribute
+no nutrients today, and the screen says so rather than implying a complete
+total.
+
 ### NEEDS YOU — ordered by what it buys you
 
 **Do these two and the app is meaningfully better by lunchtime.**
@@ -439,9 +478,9 @@ users — so the schema catch-up can be done from here without Dustin.
 
 | | |
 |---|---|
-| `origin/main` (live) | `3074d88`, shipped and verified against `origin/main` |
-| Unit tests | **1,402 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
-| Ship bridge | **v2, repo-aware, up** — twenty-two real pushes tonight, no failures |
+| `origin/main` (live) | `7606fd4`, shipped and verified against `origin/main` |
+| Unit tests | **1,407 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
+| Ship bridge | **v2, repo-aware, up** — twenty-four real pushes tonight, no failures |
 | Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
 | Video pipeline | **no longer publishes on its own**, from either place. 175 live videos untouched, all reviewable |
 | Live app | **verified healthy at 03:18 CT** — `/api/health` on `6dc889a`, auth 208 ms, db 344 ms, `ok: true`. Vercel is deploying tonight's commits. |
