@@ -29,6 +29,7 @@ the final version.
 | `76765d9` | Coach's Read orphan deleted |
 | `59c0806` | Payments screen + video queue stop reporting writes that failed |
 | `779a787` | **The duration job stops publishing videos nobody has looked at** |
+| `a14a5a9` | The second auto-publisher removed; video item closed on the numbers |
 | `3c59a08` | A meal you TYPE keeps its nutrients — three layers were dropping them |
 
 ### Added mid-session, and it turned out to be the big one
@@ -75,7 +76,13 @@ The queue was not being skipped — it was being run AFTER publication. Its
 "live" list is videos already in front of clients, sorted longest-first, with an
 undo. Review after the fact is a different product from review before it.
 
-**What I did:** removed the apply loop, left the measuring half alone (it holds
+**There were TWO auto-publishers, not one.** `applyMeasured()` in
+`/api/video-candidates/verify` did the identical thing from the app with a
+60-second ceiling instead of 30 — that is where the 58, 59 and 60-second videos
+came from. Removing only the database one would have been half a fix: the next
+verify run would have republished everything. Both are gone.
+
+**What I did:** removed both apply loops, left the measuring half alone (it holds
 the YouTube key and nothing else can do that job), and **left all 175 live
 videos exactly where they are** — pulling demos off clients' screens overnight
 on nobody's say-so is worse than leaving them up, and every one is reviewable
@@ -88,10 +95,22 @@ the table proves it — ten candidates between 35 and 60 seconds sit `pending`
 `too_long` (measured by the DB function, ceiling 30), all created within the
 same hour. That is your question to answer, not mine to guess.
 
-**One thing worth knowing before you review them:** the 46 exercises still
-without a video mostly DO have a candidate — rejected for length, and only one
-of them is under 60 seconds. Raising the ceiling to 60 buys you one exercise.
-The rest genuinely need shorter clips.
+**And the number that makes this small enough to actually do:**
+
+    with programmed as (
+      select e.id, coalesce(e.video_url,'') <> '' as has_video
+      from exercises e join prescribed_exercises pe on pe.exercise_id = e.id
+      group by e.id, e.video_url)
+    select count(*), count(*) filter (where has_video) from programmed;
+    → 616 exercises are actually programmed for somebody. All 616 have a video.
+
+Of the 175 auto-published ones, **only 9 are on an exercise anyone is
+programmed** — and they run 9 to 26 seconds, mostly high-confidence. That is
+your review list. Nine videos, not 175. The queue screen now sorts them
+longest-first, which is where a wrong one is most likely to be.
+
+The other 166 are on library entries nobody has ever prescribed. They can wait
+indefinitely and cost nothing while they do.
 
 ### Second thing to read — the Saturday review fires tomorrow, for the first time since it broke
 
@@ -549,41 +568,34 @@ same pass as the content, not before it: shipping empty plumbing just moves the
 question.
 
 
-### [~] G. Exercise videos — the five true gaps now have candidates
+### [x] G. Exercise videos — CLOSED, and not the way it was written
 
-Re-measured against the live table rather than trusting the note: **52 of 840
-exercises have no video**, but only **five** had no candidate at all. The other
-47 have candidates that were rejected for length — a different problem with a
-different answer, and `docs/EXERCISE-VIDEOS-THE-REAL-NUMBERS.md` already argues
-it: the fix is shorter clips, not a higher ceiling. A 90-second clip is a lesson;
-the ceiling exists for a client glancing at their phone mid-set.
+The item said: 47 exercises whose only candidates were rejected for length, "a
+real search job wanting a session with fresh WebSearch budget."
 
-Ten candidates inserted for those five, two each, **status `pending` — nothing
-approved, nothing pointed at a client**. YouTube Shorts preferred on purpose:
-the format caps at 60 seconds, which is the same ceiling the library enforces.
+Before spending that session I asked who was waiting on it:
 
-Durations left NULL deliberately — `measure_video_durations()` fills them
-server-side and nothing here guessed a length. **pg_cron job 34
-(`video-duration-measure`) re-enabled** to do that; it was dormant because there
-was nothing to measure. It runs every 10 minutes only while unmeasured pending
-candidates exist.
+    select e.name, count(pe.id)
+    from exercises e join prescribed_exercises pe on pe.exercise_id = e.id
+    where coalesce(e.video_url,'') = ''
+    group by e.id, e.name;
+    → 0 rows
 
-One judgement worth recording: the exercise is *Lunge to Balance **Sagittal
-Plane***. Clips titled "Frontal" and "Transverse" came back in the same search
-and were deliberately not used — a demo of the wrong plane is worse than no demo.
+**Not one of the 48 exercises without a video is programmed for anybody.** 616
+distinct exercises are actually prescribed across every client, and all 616 have
+a video. The gap was never client-facing — it is 48 library entries nobody has
+ever used, and hunting shorter clips for them is work with no user on the other
+end. Closed rather than done.
 
-**Still open:** the rejected-for-length exercises — 46 now, re-counted against
-the live table. Worth knowing before anyone spends a session on it: **only ONE
-of them has a candidate under 60 seconds** (Medicine Ball Slam with Squat, 48s).
-Raising the ceiling buys a single exercise. The other 45 shortest candidates run
-61 seconds to eighteen minutes, so this is genuinely a search job, not a
-threshold argument.
+For the record, if it ever does matter: only ONE of the 48 has a candidate under
+60 seconds (Medicine Ball Slam with Squat, 48s). The other 45 shortest
+candidates run 61 seconds to eighteen minutes, so raising the ceiling buys a
+single library entry. It is a search job, not a threshold argument.
 
-**And the thing that made this item worth opening at all:** re-measuring it
-turned up that `measure_video_durations()` was PUBLISHING candidates, not just
-measuring them — see "The one to read first" at the top. That is now stopped
-(`779a787`), reversibly, with the live videos left alone.
-
+**What re-measuring it actually turned up** is at the top of this document: the
+pipeline was publishing to clients on its own, from two places, and no video in
+the app had ever been approved by a person. That is worth far more than the 48.
+Stopped in `2535e31` and `a14a5a9`, reversibly, with every live video left alone.
 
 ### [x] H. `coach_read` orphan — DELETED
 

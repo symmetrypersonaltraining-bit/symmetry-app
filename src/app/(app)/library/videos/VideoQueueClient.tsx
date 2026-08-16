@@ -78,6 +78,30 @@ export default function VideoQueueClient({
     [live],
   );
 
+  // Best first among what is waiting: highest confidence, then shortest.
+  //
+  // This ranking used to live in `applyMeasured()` in the verify route, where it
+  // chose which candidate to PUBLISH to a client with nobody looking. That
+  // auto-publisher was removed on 16 Aug — 179 videos had gone live that way and
+  // not one had been approved by a person — so the ranking moved here, to the
+  // screen where a person presses the button. Same judgement, applied to the
+  // order of a list instead of to a client's phone.
+  //
+  // Shortest as the tie-break because the stated preference is "preferably under
+  // twenty seconds": between two equally good matches the shorter one is the
+  // better demo every time. The page loads this list ordered by exercise name,
+  // which is right for finding one specific exercise and useless for working
+  // down the queue, which is now the only way anything reaches a client.
+  const restSorted = useMemo(() => {
+    const rank: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    return [...rest].sort((a, b) => {
+      const ra = rank[a.confidence ?? ""] ?? 3;
+      const rb = rank[b.confidence ?? ""] ?? 3;
+      if (ra !== rb) return ra - rb;
+      return (a.duration_sec ?? 9999) - (b.duration_sec ?? 9999);
+    });
+  }, [rest]);
+
   async function undo(id: string) {
     setBusy(id);
     try {
@@ -355,14 +379,23 @@ export default function VideoQueueClient({
       {rest.length > 0 && (
         <>
           <h2 style={{ fontSize: 13, fontWeight: 800, color: "var(--brand-text)", margin: "4px 0 4px" }}>
-            Found, but not used
+            Waiting for you
           </h2>
+          {/*
+            This used to read "Found, but not used — either the exercise already
+            had a video, or this one is over 30 seconds", which described a world
+            where anything SHORT enough went live on its own. That was true, and
+            it was the bug: 179 videos reached clients that way and none had been
+            looked at. Nothing publishes itself now, so this list is simply
+            everything found, best match first, and the copy has to say so.
+          */}
           <p style={{ fontSize: 12, color: "var(--brand-text-secondary)", marginBottom: 10, lineHeight: 1.5 }}>
-            Either the exercise already had a video, or this one is over 30 seconds. Both are
-            yours to override.
+            Nothing goes in front of a client until you press Use this. Best match first —
+            strongest match, then shortest clip. Some are over the length you asked for, or
+            for an exercise that already has a video; both are yours to override.
           </p>
           <div style={{ display: "grid", gap: 12 }}>
-            {rest.map((c) => (
+            {restSorted.map((c) => (
               <Row key={c.id} c={c} action="use" />
             ))}
           </div>

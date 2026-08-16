@@ -55,34 +55,49 @@ test("approving stashes the URL it overwrote, so it can be undone", () => {
   assert.match(code, /action === "undo"[\s\S]{0,400}video_url: c\.previous_video_url/, "undo must restore it");
 });
 
-test("the automatic fill only ever writes a MEASURED, in-ceiling candidate", () => {
+// ── The automatic fill is GONE, 16 Aug ─────────────────────────────────────
+//
+// Three tests stood here guarding how carefully `applyMeasured()` chose what to
+// publish: measured-and-in-ceiling only, never overwrite an existing video, best
+// candidate per exercise with runners-up superseded. Every one of those
+// properties was true and well-tested, and none of them was the problem.
+//
+//   select count(*) filter (where status='approved' and applied_at is not null),
+//          count(*) filter (where status='approved' and applied_at is null)
+//   from exercise_video_candidates;
+//   → 179 applied by automation, 0 by a person.
+//
+// `applied_at` is set only by `applyMeasured()` here and by the identical loop
+// in the database's `measure_video_durations()`. The human path, decide/route.ts,
+// does not set it. So there was no such thing in that database as a video a
+// person had approved — while decide/route.ts's own header states the rule the
+// whole pipeline exists for: "Nothing found that way goes in front of a client
+// without a human looking at it first."
+//
+// It was careful code doing a thing it should not have been doing at all. These
+// three are therefore REPLACED rather than relaxed: the property to defend is no
+// longer "the fill chooses well", it is "there is no fill".
+//
+// The choosing itself was not thrown away — the confidence-then-shortest ranking
+// moved to VideoQueueClient, which now orders the review queue by it.
+// tests/unit/videoJobDoesNotPublish.test.ts holds all of that.
+
+test("there is no automatic fill in the verify route any more", () => {
   const code = strip(VERIFY);
-  // The query that feeds the writer. Both filters are load-bearing: without
-  // `not null` an unmeasured row is eligible, without `lte` a two-hour video is.
-  assert.match(
+  assert.doesNotMatch(
     code,
-    /\.eq\("status", "pending"\)\s*\.not\("duration_sec", "is", null\)\s*\.lte\("duration_sec", MAX_SECONDS\)/,
-    "the auto-fill no longer restricts itself to measured candidates under the ceiling — " +
-      "one run would fill the library with unmeasured videos",
+    /\.from\("exercises"\)\s*\n?\s*\.update\(\{\s*video_url/,
+    "the auto-publisher is back — 179 videos reached clients this way, none reviewed",
   );
+  assert.doesNotMatch(code, /status: "approved"/, "verify approves candidates again, with nobody looking");
 });
 
-test("the automatic fill never replaces a video that is already there", () => {
+test("the ceiling still classifies, even with nothing publishing", () => {
+  // MAX_SECONDS was load-bearing in two ways and only one of them was the
+  // problem. Losing the ok/too_long boundary would leave every measured
+  // candidate unclassified and the queue unsortable.
   const code = strip(VERIFY);
-  // Overwriting a demo Dustin chose, or one that has worked for months, with a
-  // search result is a regression nobody notices until a client does.
-  assert.match(code, /\.filter\(\(e\) => !e\.video_url\)/, "the empty-only filter is gone");
-  assert.match(code, /if \(!empty\.has\(c\.exercise_id\)\) continue/, "candidates are no longer screened against it");
-});
-
-test("the fill picks the best candidate per exercise, not an arbitrary one", () => {
-  const code = strip(VERIFY);
-  assert.match(code, /CONF_RANK/, "confidence is no longer part of the choice");
-  // Shortest wins ties: his stated preference is "preferably under twenty".
-  assert.match(code, /a\[0\] < b\[0\] \|\| \(a\[0\] === b\[0\] && a\[1\] < b\[1\]\)/);
-  // And the runners-up must be closed out, or the next run flips the video back
-  // and forth between two candidates forever.
-  assert.match(code, /status: "superseded"/, "losing candidates stay pending and will re-apply");
+  assert.match(code, /seconds <= MAX_SECONDS \? "ok" : "too_long"/);
 });
 
 test("the length parser reads a real watch-page payload", () => {

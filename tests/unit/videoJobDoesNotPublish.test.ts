@@ -121,3 +121,64 @@ test("approving in the app still stashes what it replaced", () => {
   const route = readFileSync(join(process.cwd(), "src/app/api/video-candidates/decide/route.ts"), "utf8");
   assert.match(route, /previous_video_url: previous/);
 });
+
+// ── The other auto-publisher ───────────────────────────────────────────────
+//
+// Removing the loop from the DB function was half a fix. `applyMeasured()` in
+// /api/video-candidates/verify did the identical thing from the app, with a
+// 60-second ceiling instead of 30 — which is where the 58, 59 and 60-second
+// videos in the live set came from — so the next verify run would simply
+// republish everything.
+//
+// `applied_at` is only ever set by these two. The human path
+// (/api/video-candidates/decide) does not set it, which is what makes
+// "179 applied, 0 by hand" a complete answer rather than a suggestive one.
+
+const VERIFY = readFileSync(join(process.cwd(), "src/app/api/video-candidates/verify/route.ts"), "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
+
+test("the verify route does not publish either", () => {
+  assert.doesNotMatch(
+    VERIFY,
+    /\.from\("exercises"\)\s*\n?\s*\.update\(\{\s*video_url/,
+    "verify still writes exercises.video_url — the DB-side fix is half a fix",
+  );
+  assert.doesNotMatch(
+    VERIFY,
+    /status:\s*"approved"/,
+    "verify still approves a candidate without anyone reviewing it",
+  );
+});
+
+test("verify still reports `applied`, at zero", () => {
+  assert.match(VERIFY, /applied: 0/);
+});
+
+test("verify still classifies by length — only the publishing went", () => {
+  // MAX_SECONDS remains the ok/too_long boundary. Losing it would leave every
+  // measured candidate unclassified.
+  assert.match(VERIFY, /MAX_SECONDS/);
+  assert.match(VERIFY, /seconds <= MAX_SECONDS \? "ok" : "too_long"/);
+});
+
+test("the ranking survived the removal, on the review screen", () => {
+  // It used to decide what got published. It now decides what a person is shown
+  // first. Deleting it outright would have thrown away a real judgement:
+  // highest confidence, then shortest.
+  const q = readFileSync(join(process.cwd(), "src/app/(app)/library/videos/VideoQueueClient.tsx"), "utf8");
+  assert.match(q, /high: 0, medium: 1, low: 2/);
+  assert.match(q, /restSorted/);
+  assert.match(q, /\{restSorted\.map/, "the sorted list must be the one actually rendered");
+});
+
+test("the queue no longer tells the trainer that short clips go live on their own", () => {
+  // Comments stripped: the file explains the old copy in a comment, and the
+  // explanation must not satisfy a test about what is on screen.
+  const q = readFileSync(join(process.cwd(), "src/app/(app)/library/videos/VideoQueueClient.tsx"), "utf8")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  assert.doesNotMatch(q, /Found, but not used/);
+  assert.match(q, /Nothing goes in front of a client until you press/);
+});

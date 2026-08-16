@@ -168,86 +168,58 @@ async function verifyOne(url: string): Promise<Verdict> {
   }
 }
 
-/** high beats medium beats low. Anything unlabelled sorts last. */
-const CONF_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
-
-type Cand = {
-  id: string;
-  exercise_id: string;
-  url: string;
-  duration_sec: number | null;
-  confidence: string | null;
-};
+// CONF_RANK and the Cand type used to live here, feeding applyMeasured()'s
+// choice of which candidate to publish. They moved with the ranking into
+// VideoQueueClient, which now sorts the review queue by the same rule — highest
+// confidence, then shortest — so the judgement survives and a person makes the
+// call. Left as a note rather than deleted silently: the next person to read
+// this file will wonder where the ranking went.
 
 /**
- * Fill in every exercise that now has a measured candidate under the ceiling.
+ * REMOVED, 16 Aug: this used to fill in every exercise that had a measured
+ * candidate under the ceiling. It published to clients without anyone looking.
  *
- * Only touches exercises with NO video — an exercise that already has one is
- * left completely alone, because replacing a demo Dustin chose (or that has
- * been working for months) with a search result is not an improvement, it is a
- * regression nobody would notice until a client did.
+ * ── What was measured ──────────────────────────────────────────────────────
  *
- * Best candidate per exercise = highest confidence, then shortest. Shortest
- * because his actual preference is "preferably under twenty seconds", and among
- * two equally-good matches the shorter one is the better demo every time.
+ *   select count(*) filter (where status='approved' and applied_at is not null),
+ *          count(*) filter (where status='approved' and applied_at is null)
+ *   from exercise_video_candidates;
+ *   → 179 applied by automation, 0 by a person.
+ *
+ * `applied_at` is only ever set by automation — this function and the database's
+ * `measure_video_durations()`, which had the identical loop with a 30-second
+ * ceiling instead of 60. The human path, `/api/video-candidates/decide`, does
+ * not set it. So that query is the whole answer: **there was no such thing in
+ * this database as a video a person had approved.**
+ *
+ * ── Why it had to go ───────────────────────────────────────────────────────
+ *
+ * `decide/route.ts` states the rule this pipeline is built around: "The
+ * candidates came out of a web search run by an agent, which is a perfectly
+ * good way to find a demo of a Romanian deadlift and a perfectly good way to
+ * find a fourteen-minute critique of one. Nothing found that way goes in front
+ * of a client without a human looking at it first."
+ *
+ * The staging table, the review screen, the approve/reject/undo route and the
+ * previous_video_url stash all exist to enforce that sentence, and both
+ * auto-appliers reached straight past them. Removing only the database one
+ * would have been half a fix: the next verify run would republish.
+ *
+ * The care taken here was real and is worth recording, because none of it was
+ * the problem — an exercise that already had a video was never touched, the
+ * best candidate was highest-confidence-then-shortest, and runners-up were
+ * superseded so the video could not flip back and forth. It was good code doing
+ * a thing it should not have been doing at all. That ranking now lives where it
+ * belongs: the review screen sorts by it, and a person presses the button.
+ *
+ * `applied` stays in the response shape reporting 0, so the queue screen and
+ * anything else reading this endpoint keep working and can see it has stopped.
+ *
+ * MAX_SECONDS is still exported and still used to CLASSIFY (ok vs too_long).
+ * Only the publishing is gone.
  */
-async function applyMeasured(db: ReturnType<typeof createAdminClient>) {
-  const { data } = await db
-    .from("exercise_video_candidates")
-    .select("id, exercise_id, url, duration_sec, confidence")
-    .eq("status", "pending")
-    .not("duration_sec", "is", null)
-    .lte("duration_sec", MAX_SECONDS);
-
-  const cands = (data as Cand[] | null) || [];
-  if (!cands.length) return { applied: 0, skippedHadVideo: 0 };
-
-  // Which of those exercises are actually empty right now.
-  const ids = [...new Set(cands.map((c) => c.exercise_id))];
-  const { data: exRows } = await db
-    .from("exercises")
-    .select("id, video_url")
-    .in("id", ids);
-  const empty = new Set(
-    ((exRows as { id: string; video_url: string | null }[] | null) || [])
-      .filter((e) => !e.video_url)
-      .map((e) => e.id),
-  );
-
-  const best = new Map<string, Cand>();
-  for (const c of cands) {
-    if (!empty.has(c.exercise_id)) continue;
-    const cur = best.get(c.exercise_id);
-    if (!cur) { best.set(c.exercise_id, c); continue; }
-    const a = [CONF_RANK[c.confidence ?? ""] ?? 3, c.duration_sec ?? 9999];
-    const b = [CONF_RANK[cur.confidence ?? ""] ?? 3, cur.duration_sec ?? 9999];
-    if (a[0] < b[0] || (a[0] === b[0] && a[1] < b[1])) best.set(c.exercise_id, c);
-  }
-
-  const now = new Date().toISOString();
-  let applied = 0;
-  for (const c of best.values()) {
-    const { error } = await db
-      .from("exercises")
-      .update({ video_url: c.url, video_status: "ok", video_checked_at: now })
-      .eq("id", c.exercise_id);
-    if (error) continue;
-    applied += 1;
-    await db
-      .from("exercise_video_candidates")
-      .update({ status: "approved", applied_at: now, reviewed_at: now, previous_video_url: null })
-      .eq("id", c.id);
-    // The runners-up for that exercise are moot now. Left pending they would
-    // re-apply on the next run and quietly flip the video back and forth.
-    await db
-      .from("exercise_video_candidates")
-      .update({ status: "superseded", reviewed_at: now })
-      .eq("exercise_id", c.exercise_id)
-      .neq("id", c.id)
-      .in("status", ["pending", "too_long"]);
-  }
-
-  return { applied, skippedHadVideo: ids.length - empty.size };
+async function applyMeasured(_db: ReturnType<typeof createAdminClient>) {
+  return { applied: 0, skippedHadVideo: 0 };
 }
 
 export async function POST(req: NextRequest) {
