@@ -187,12 +187,21 @@ async function ensurePhaseId(db: Db, clientId: string): Promise<string | null> {
   // Matches the 25 that already exist: the assignment is active, which is what
   // makes the program visible to the client at all. It does not displace real
   // programming — this branch only runs when there is none to displace.
-  await db.from("program_assignments").insert({
+  //
+  // Checked, because the comment above says exactly why it matters: the
+  // assignment is what makes the programme visible to the client AT ALL.
+  // Unchecked, this helper returned the phase id as success while the client
+  // could not see the programme, and the workout saved into it looked to them
+  // like a workout that simply never appeared. Returning null puts the caller
+  // on its existing failure path, which says "Could not set up a place to save
+  // this" — true, and better than a silent success.
+  const { error: asgErr } = await db.from("program_assignments").insert({
     client_id: clientId,
     program_id: programId,
     current_phase_id: (phase as { id: string }).id,
     active: true,
   });
+  if (asgErr) return null;
 
   return (phase as { id: string }).id;
 }
@@ -389,9 +398,24 @@ export async function POST(req: Request) {
       try {
         const { data: secs } = await db.from("sections").select("id").eq("day_id", created.days);
         const ids = ((secs as { id: string }[] | null) || []).map((s) => s.id);
-        if (ids.length) await db.from("prescribed_exercises").delete().in("section_id", ids);
-        await db.from("sections").delete().eq("day_id", created.days);
-        await db.from("days").delete().eq("id", created.days);
+        // Each step checked, and a failure ABANDONS the rest rather than
+        // pressing on: deleting a day whose sections are still there is how you
+        // get orphans, and PostgREST returns its error rather than throwing, so
+        // the catch below has never seen one of these. The comment above says a
+        // half-created day is worse than a reported failure — that was true and
+        // the cleanup could not tell anyone when it left one.
+        const step1 = ids.length
+          ? await db.from("prescribed_exercises").delete().in("section_id", ids)
+          : { error: null };
+        const step2 = step1.error ? { error: step1.error } : await db.from("sections").delete().eq("day_id", created.days);
+        const step3 = step2.error ? { error: step2.error } : await db.from("days").delete().eq("id", created.days);
+        const cleanupErr = step1.error || step2.error || step3.error;
+        if (cleanupErr) {
+          console.error(
+            `workout-manual: rollback incomplete, day ${created.days} may be half-created —`,
+            cleanupErr.message,
+          );
+        }
       } catch { /* the original error is the one worth reporting */ }
     }
     // uq_scheduled_workout_one_per_day is not a server fault and must not read

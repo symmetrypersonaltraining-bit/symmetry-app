@@ -242,8 +242,46 @@ function ExerciseRow({
 
   async function handleDelete() {
     setDeleting(true);
-    await supabase.from("prescribed_exercises").delete().eq("id", pe.id);
+    // onDelete() takes the row off the screen. Unchecked, a refused delete did
+    // that anyway and the exercise was still in the client's workout — the
+    // trainer removes something they have decided not to programme, watches it
+    // go, and the client trains it that afternoon.
+    const { error } = await supabase.from("prescribed_exercises").delete().eq("id", pe.id);
+    if (error) {
+      setDeleting(false);
+      window.alert("That didn't delete — it is still in the workout. " + error.message);
+      return;
+    }
     onDelete();
+  }
+
+  /**
+   * Save one field, and put the screen back if it did not save.
+   *
+   * Every editor on this row called `onUpdate()` — which repaints immediately —
+   * and then fired the write without looking at the result. So a refused update
+   * showed the trainer their new number, on a client's programme, while the
+   * database kept the old one. Nothing said otherwise until the next load, and
+   * by then the change had been made in their head.
+   *
+   * Reverting rather than only warning: these inputs are uncontrolled, so
+   * leaving the typed value on screen after an alert would keep showing a
+   * number that is not in the database.
+   */
+  async function saveField(
+    field: string,
+    value: string | number | null,
+    previous: string | number,
+    revert: () => void,
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("prescribed_exercises")
+      .update({ [field]: value })
+      .eq("id", pe.id);
+    if (!error) return;
+    onUpdate(field, previous);
+    revert();
+    window.alert(`That didn't save — ${field} is still ${previous === "" ? "empty" : previous}. ${error.message}`);
   }
 
   const label = pe.exercises?.name || "Exercise";
@@ -295,8 +333,10 @@ function ExerciseRow({
                 <select defaultValue={String(value)}
                   onChange={async e => {
                     const v = e.target.value;
+                    const prev = String(value);
+                    const el = e.target;
                     onUpdate(field, v);
-                    await supabase.from("prescribed_exercises").update({ [field]: v }).eq("id", pe.id);
+                    await saveField(field, v, prev, () => { el.value = prev; });
                   }}
                   className="w-full px-3 py-2 rounded-lg text-sm border"
                   style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)", color: "var(--brand-text)" }}>
@@ -306,8 +346,10 @@ function ExerciseRow({
                 <input type={type} defaultValue={String(value)}
                   onBlur={async e => {
                     const v = type === "number" ? Number(e.target.value) : e.target.value;
+                    const prev = value;
+                    const el = e.target;
                     onUpdate(field, v);
-                    await supabase.from("prescribed_exercises").update({ [field]: v || null }).eq("id", pe.id);
+                    await saveField(field, v || null, prev, () => { el.value = String(prev); });
                   }}
                   className="w-full px-3 py-2 rounded-lg text-sm border"
                   style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)", color: "var(--brand-text)" }} />
@@ -320,7 +362,9 @@ function ExerciseRow({
                 style={{ color: "var(--brand-text-secondary)" }}>Cue</label>
               <input type="text" defaultValue={pe.cue ?? ""}
                 onBlur={async e => {
-                  await supabase.from("prescribed_exercises").update({ cue: e.target.value || null }).eq("id", pe.id);
+                  const prev = pe.cue ?? "";
+                  const el = e.target;
+                  await saveField("cue", e.target.value || null, prev, () => { el.value = prev; });
                 }}
                 className="w-full px-3 py-2 rounded-lg text-sm border"
                 style={{ background: "var(--brand-surface)", borderColor: "var(--brand-border)", color: "var(--brand-text)" }} />
