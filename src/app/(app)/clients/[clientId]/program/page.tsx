@@ -1093,7 +1093,13 @@ export default function ProgramPage() {
   }
 
   async function moveWorkout(workout: ScheduledWorkout, newDate: string) {
-    const { error } = await supabase.from("scheduled_workouts").update({ scheduled_date: newDate }).eq("id", workout.id);
+    // moved_from_date is not only provenance: pg_cron jobid 18
+    // (sync_supervised_workouts_to_appointments) leaves a row alone only while
+    // it is set. Without it a supervised session moved here can be dragged back
+    // onto its appointment's date within hours, silently.
+    const { error } = await supabase.from("scheduled_workouts")
+      .update({ scheduled_date: newDate, moved_from_date: workout.scheduled_date })
+      .eq("id", workout.id);
     if (error) { window.alert(scheduleWriteError(error, "move")); return; }
     loadWorkouts();
   }

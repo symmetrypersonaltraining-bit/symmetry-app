@@ -236,9 +236,22 @@ export default function ScheduleBoard({
     setWorkouts((prev) => prev.map((x) => (x.id === a.id ? { ...x, date: bDate } : x.id === b.id ? { ...x, date: aDate } : x)));
     try {
       const supabase: any = createClient();
-      const r1 = await supabase.from("scheduled_workouts").update({ scheduled_date: bDate }).eq("id", a.id);
+      // Both halves of a swap are moves, so both record where they came from.
+      // moved_from_date is not only provenance: pg_cron jobid 18
+      // (sync_supervised_workouts_to_appointments) leaves a row alone only
+      // while it is set, so a swap that did not set it could be half-undone by
+      // the job within hours — one session dragged back onto its appointment's
+      // date and the other left where the swap put it.
+      const r1 = await supabase.from("scheduled_workouts")
+        .update({ scheduled_date: bDate, moved_from_date: aDate }).eq("id", a.id);
       if (r1.error) throw r1.error;
-      const r2 = await supabase.from("scheduled_workouts").update({ scheduled_date: aDate }).eq("id", b.id);
+      const r2 = await supabase.from("scheduled_workouts")
+        .update({ scheduled_date: aDate, moved_from_date: bDate }).eq("id", b.id);
+      // Compensating rollback, deliberately NOT setting moved_from_date: this
+      // puts `a` back where it started, and stamping a move onto a swap that
+      // did not happen would be a lie. The marker r1 already wrote is left in
+      // place rather than blanked - it makes jobid 18 skip the row, which is
+      // the safe direction to be wrong in.
       if (r2.error) { await supabase.from("scheduled_workouts").update({ scheduled_date: aDate }).eq("id", a.id); throw r2.error; }
       flash("Swapped ✓");
       router.refresh();

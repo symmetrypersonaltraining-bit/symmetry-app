@@ -45,9 +45,37 @@ export async function moveScheduledWorkout(
   w: MovableWorkout,
   toDate: string,
 ): Promise<string | null> {
+  // Read BEFORE the update, because the date we are about to overwrite is the
+  // thing worth keeping. Seven code paths in this app move a scheduled workout;
+  // the other six all set moved_from_date and this one did not, which had two
+  // consequences.
+  //
+  // The small one: a move made from the schedule board or the day sheet left no
+  // trace it had ever been moved.
+  //
+  // The one that matters: `sync_supervised_workouts_to_appointments()` runs on
+  // cron three times a day and pulls a supervised session onto its linked
+  // appointment's date. Its guard against undoing somebody's deliberate move is
+  // `moved_from_date is null` — a guard this path never armed. Move a supervised
+  // session off its appointment date from the schedule board, and the job was
+  // free to drag it straight back within hours, silently.
+  //
+  // Latent rather than observed: all 29 rows carrying a moved_from_date today
+  // came from the six paths that set it, and no case of the job reversing a
+  // board move has been found in the data. The guard simply was not connected.
+  const { data: before } = await sb
+    .from("scheduled_workouts")
+    .select("scheduled_date, workout_log_id")
+    .eq("id", w.id)
+    .maybeSingle();
+  const fromDate = (before as { scheduled_date?: string } | null)?.scheduled_date ?? null;
+
   const { error } = await sb
     .from("scheduled_workouts")
-    .update({ scheduled_date: toDate })
+    // Same shape as the other six paths: moved_from_date records the date this
+    // move left, not the original programmed date. Omitted entirely when the
+    // row could not be read, so a failed lookup cannot blank a real one.
+    .update(fromDate ? { scheduled_date: toDate, moved_from_date: fromDate } : { scheduled_date: toDate })
     .eq("id", w.id);
   // A move can now collide with uq_scheduled_workout_one_per_day: the target
   // day may already hold this exact session. "Try again" would be bad advice —
@@ -59,10 +87,8 @@ export async function moveScheduledWorkout(
   // did not.
   let logId = w.workoutLogId ?? null;
   if (w.workoutLogId === undefined) {
-    try {
-      const { data } = await sb.from("scheduled_workouts").select("workout_log_id").eq("id", w.id).maybeSingle();
-      logId = (data as { workout_log_id: string | null } | null)?.workout_log_id ?? null;
-    } catch { /* no log to move, or not readable — the move itself stands */ }
+    // Already fetched above, in the same round trip that got the old date.
+    logId = (before as { workout_log_id?: string | null } | null)?.workout_log_id ?? null;
   }
   if (logId) {
     try {
