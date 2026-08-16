@@ -16,6 +16,12 @@
 // clean and then dies at runtime with "Cannot find module". Relative paths
 // survive both the Next build and that standalone compile.
 import { kcalOf } from "../nutrition/dailyTotals";
+// Relative, like every other import here — see the note above. mealLibrary is a
+// pure leaf (its only import is kcalOf from dailyTotals, already required), so
+// it survives the standalone CommonJS compile. An "@/" path would compile clean
+// and then die at runtime with "Cannot find module", which is exactly the trap
+// that note exists to prevent.
+import { MEAL_LIBRARY, mealTotals } from "../nutrition/mealLibrary";
 import { sanitizeNutrients, addNutrients, roundNutrients, type NutrientMap } from "../nutrition/nutrients";
 
 /** Pull the first JSON object out of a model reply (tolerates ``` fences / stray prose). */
@@ -177,6 +183,22 @@ export interface PlanMeal {
   timing: string | null;
   items: PlanMealItem[];
   subtotal: { kcal: number; p: number; c: number; f: number };
+  /**
+   * This meal's items came from the shared library, not from the model.
+   *
+   * The library was added to the plan-builder's prompt on 15 Aug so the model
+   * would PREFER meals whose portions and macros have been checked. Reading
+   * what happened to the reply afterwards: nothing did. The name came back as
+   * text, the macros came back as whatever the model remembered, and the items
+   * were taken as given. So a plan naming a library meal was no more accurate
+   * than one inventing a meal — it merely looked more trustworthy, which is
+   * worse. The stated benefit, "the numbers are known to be right", did not
+   * exist anywhere in the code.
+   *
+   * Now an exact name match replaces the model's items with the library's, and
+   * this flag records that it happened.
+   */
+  fromLibrary?: boolean;
 }
 
 export interface PlanDraft {
@@ -184,6 +206,48 @@ export interface PlanDraft {
   reasoning: string | null;
   meals: PlanMeal[];
   totals: { kcal: number; p: number; c: number; f: number };
+}
+
+/**
+ * If the model named a library meal, use the LIBRARY'S items rather than the
+ * model's recollection of them.
+ *
+ * The prompt tells it to give a library meal's name "EXACTLY as written", so an
+ * exact match is a deliberate signal, not a coincidence — and the library's
+ * portions have been checked against their macros by mealLibrary.test.ts, which
+ * the model's have not. Left as-is, "1 cup Greek yogurt, 17 g protein" is wrong
+ * by a third and reads exactly as reasonable as the line above it.
+ *
+ * Matching is exact on the trimmed, case-folded name and nothing looser. A
+ * fuzzy match would silently swap a client's meal for a different one that
+ * happened to share a word, which is far worse than leaving the model's version
+ * alone — so anything short of an exact name keeps what the model wrote.
+ *
+ * The recomputed subtotal may now miss the target the model was aiming at. That
+ * is the honest outcome: it means the meal it chose does not fit, and a total
+ * that visibly misses is worth more than one that hits using invented numbers.
+ */
+function libraryMeal(name: string, timing: string | null): PlanMeal | null {
+  const key = name.trim().toLowerCase();
+  const found = MEAL_LIBRARY.find((m) => m.name.trim().toLowerCase() === key);
+  if (!found) return null;
+  const items: PlanMealItem[] = found.items.map((i) => ({
+    food: i.n,
+    amount: null,
+    unit: i.a,
+    p: round1(i.p),
+    c: round1(i.c),
+    f: round1(i.f),
+    kcal: kcalFromMacros(i.p, i.c, i.f),
+  }));
+  const t = mealTotals(found.items);
+  return {
+    name: found.name,
+    timing,
+    items,
+    subtotal: { kcal: t.kcal, p: round1(t.protein), c: round1(t.carbs), f: round1(t.fats) },
+    fromLibrary: true,
+  };
 }
 
 /** Validate + normalize a plan-build reply; subtotals/totals recomputed from items. */
@@ -235,12 +299,14 @@ export function validatePlanDraft(raw: unknown): PlanDraft | null {
       (s, it) => ({ kcal: s.kcal + it.kcal, p: s.p + it.p, c: s.c + it.c, f: s.f + it.f }),
       { kcal: 0, p: 0, c: 0, f: 0 }
     );
-    meals.push({
-      name,
-      timing: typeof m.timing === "string" && m.timing.trim() ? m.timing.trim() : null,
-      items,
-      subtotal: { kcal: Math.round(subtotal.kcal), p: round1(subtotal.p), c: round1(subtotal.c), f: round1(subtotal.f) },
-    });
+    meals.push(
+      libraryMeal(name, typeof m.timing === "string" && m.timing.trim() ? m.timing.trim() : null) ?? {
+        name,
+        timing: typeof m.timing === "string" && m.timing.trim() ? m.timing.trim() : null,
+        items,
+        subtotal: { kcal: Math.round(subtotal.kcal), p: round1(subtotal.p), c: round1(subtotal.c), f: round1(subtotal.f) },
+      },
+    );
   }
 
   const totals = meals.reduce(

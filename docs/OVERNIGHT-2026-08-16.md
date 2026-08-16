@@ -214,6 +214,42 @@ secret. **A later run must confirm the deploy actually went green rather than
 assuming the push implied it.** If `/api/health` still 404s, the deploy did not
 happen and that is a finding, not a delay.
 
+### [x] NEW — Meal plans can be scheduled ahead and seen ahead (`86727f7`), 00:55 CT
+
+Dustin, mid-session: "there is zero logic behind me not being able to plan
+ahead, schedule a meal plan and look at it ahead of time." Four causes, only one
+of which had been noticed:
+
+1. `trg_no_future_live_plan` / `trg_no_future_macro_target` raised on any future
+   date. Dropped; definitions preserved in `bak_dropped_plan_guards_20260816`.
+2. A plan booked ahead is written `pending` and promoted overnight, and neither
+   the fetch nor `pickPlanForDate` considered `pending` — so it was invisible
+   until the morning it started.
+3. plan-edit, adopt-plan and `flip_due_meal_plans` all archived by status
+   alone, with no date bound — so any of them could retire a plan booked for
+   later. Gerard and Jerry have eleven plans booked to October; the next flip
+   would have taken ten. All three now bound the archive to plans in force.
+
+   **CORRECTION, and it was mine.** I first reported this as having already
+   destroyed Dustin's v3 plan dated 24 Aug, because I found it archived with a
+   future date and matched it to the bug I had just found. He questioned it and
+   he was right: that row's own `change_reason` ends "SUPERSEDED by BULK v2 on
+   Aug 16, 2026 — never activated". It was replaced deliberately by a plan
+   starting the 17th instead of the 24th, and the reason was written down in the
+   row I was looking at. I asserted a cause from a matching shape without
+   reading the evidence that was already in hand — the same failure as taking a
+   route's `200` for proof the feature worked. The BUG is real and the fix
+   stands; it simply had not bitten yet.
+4. The recipes page and the **AI coach** asked for "the newest live plan" with
+   no date bound — which today is a plan dated tomorrow.
+
+`MAX_PLAN_VERSIONS` 20 → 60: cut at twenty with eleven future rows sorting
+first, only nine slots remain for history, which would have reintroduced the
+Claudine bug through the back door.
+
+**Left undone deliberately:** Dustin's 24 Aug plan is still `archived`. Restoring
+it changes a real plan row and needs his word.
+
 ### [ ] C. Prove the AI plan builder actually uses the meal library
 
 Shipped `6887ce7` — 50 meals and 20 recipes are in the plan-builder system

@@ -93,3 +93,80 @@ test("recipes are labelled PER SERVING, because meals are not", () => {
   // ends up counting a 4-serving tray as one meal.
   assert.match(libraryPromptBlock(), /macros are PER SERVING/);
 });
+
+// ── AND THE HALF THAT WAS MISSING ──────────────────────────────────────────
+//
+// Everything above proves the library reaches the MODEL. Reading what happened
+// to the reply afterwards: nothing did. validatePlanDraft took the meal name as
+// text and the macros as whatever the model wrote, so a plan naming a library
+// meal was no more accurate than one inventing a meal — it merely looked more
+// trustworthy, which is worse than looking invented.
+//
+// The prompt's own promise ("a client can then log it in one tap, and the
+// numbers are known to be right") had no implementation. These are the tests
+// for the half that makes it true.
+
+import { validatePlanDraft } from "../../src/lib/ai/nutrition-json";
+
+const draftWith = (name: string, items: { food: string; p: number; c: number; f: number }[]) => ({
+  targets: { kcal: 2000, p: 150, c: 200, f: 60 },
+  meals: [{ name, items }],
+});
+
+test("a meal named exactly from the library gets the LIBRARY's items", () => {
+  const lib = MEAL_LIBRARY[0];
+  // The model returns the right name and badly wrong macros — the realistic
+  // failure, because a wrong number looks exactly as reasonable as a right one.
+  const d = validatePlanDraft(draftWith(lib.name, [{ food: "whatever it remembered", p: 1, c: 1, f: 1 }]));
+  assert.ok(d, "draft must validate");
+  const m = d!.meals[0];
+  assert.equal(m.fromLibrary, true, "the substitution must be recorded, not silent");
+  assert.equal(m.items.length, lib.items.length);
+  const t = mealTotals(lib.items);
+  assert.deepEqual(m.subtotal, { kcal: t.kcal, p: t.protein, c: t.carbs, f: t.fats });
+});
+
+test("the substituted items carry the library's measured portions", () => {
+  // A portion is half the fact. "Chicken breast, 52 g protein" means nothing
+  // without "6 oz cooked" beside it.
+  const lib = MEAL_LIBRARY[0];
+  const d = validatePlanDraft(draftWith(lib.name, [{ food: "x", p: 1, c: 1, f: 1 }]));
+  for (const [i, it] of d!.meals[0].items.entries()) {
+    assert.equal(it.food, lib.items[i].n);
+    assert.equal(it.unit, lib.items[i].a, "the measured portion must survive");
+  }
+});
+
+test("matching is EXACT — a near miss keeps what the model wrote", () => {
+  // A fuzzy match would silently serve a client a different meal that happened
+  // to share a word. Leaving the model's version alone is much the lesser evil,
+  // so anything short of an exact name is left alone.
+  const near = MEAL_LIBRARY[0].name + " with extra chicken";
+  const d = validatePlanDraft(draftWith(near, [{ food: "chicken", p: 40, c: 0, f: 5 }]));
+  assert.equal(d!.meals[0].fromLibrary, undefined, "a near miss must NOT be substituted");
+  assert.equal(d!.meals[0].items[0].food, "chicken");
+});
+
+test("case and surrounding whitespace do not defeat the match", () => {
+  const d = validatePlanDraft(draftWith("  " + MEAL_LIBRARY[0].name.toUpperCase() + "  ", [{ food: "x", p: 1, c: 1, f: 1 }]));
+  assert.equal(d!.meals[0].fromLibrary, true);
+});
+
+test("an invented meal is left completely alone", () => {
+  // The prompt explicitly allows inventing when nothing fits — allergies, an
+  // empty fridge, macros no library item gives. That path must be untouched.
+  const d = validatePlanDraft(draftWith("Something Nobody Wrote Down", [{ food: "eggs", p: 12, c: 1, f: 10 }]));
+  const m = d!.meals[0];
+  assert.equal(m.fromLibrary, undefined);
+  assert.equal(m.items[0].p, 12);
+  assert.equal(m.subtotal.p, 12);
+});
+
+test("the day totals are recomputed from whatever ended up in the meals", () => {
+  // If substitution moved the numbers, the total has to move with them. A total
+  // that still reflects the model's invented macros would be the worst of both.
+  const lib = MEAL_LIBRARY[0];
+  const d = validatePlanDraft(draftWith(lib.name, [{ food: "x", p: 999, c: 999, f: 999 }]));
+  assert.equal(d!.totals.p, d!.meals[0].subtotal.p);
+  assert.notEqual(d!.totals.p, 999);
+});
