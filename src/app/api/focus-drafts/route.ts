@@ -98,7 +98,19 @@ export async function PATCH(req: NextRequest) {
   // focus_ai is left alone on purpose — it is the record of what the model
   // wrote, and it is the only way to answer "is the AI getting these right"
   // from data rather than memory.
-  await db.from("weekly_focus_drafts").update({ focus, edited_at: new Date().toISOString() }).eq("id", body.id);
+  //
+  // Checked, because `{ ok: true }` on an unchecked write is a lie the caller
+  // cannot see through. SaturdayReview closes the editor and repaints the row
+  // with the new text on the very next line, so a refused update looked exactly
+  // like a saved one until the next load put the model's original back — on
+  // coaching copy about to be published to 35 people.
+  const { error } = await db
+    .from("weekly_focus_drafts")
+    .update({ focus, edited_at: new Date().toISOString() })
+    .eq("id", body.id);
+  if (error) {
+    return NextResponse.json({ error: `Edit not saved — ${error.message}` }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }
 
@@ -110,17 +122,40 @@ export async function POST(req: NextRequest) {
   const week = targetWeek(CT_TODAY());
   const now = new Date().toISOString();
 
+  // A failed approval must NOT fall through to publishing. publish_focus_drafts
+  // takes only approved rows, so an unchecked failure here publishes nothing and
+  // returns 200 — the screen clears the queue, and on Sunday at 6am the fallback
+  // publishes every one of those drafts unreviewed. That is the exact outcome
+  // this whole review screen exists to prevent.
+  let approveErr: string | null = null;
   if (body.all) {
-    await db.from("weekly_focus_drafts").update({ approved_at: now }).eq("week_start", week).is("published_at", null);
+    const { error } = await db
+      .from("weekly_focus_drafts")
+      .update({ approved_at: now })
+      .eq("week_start", week)
+      .is("published_at", null);
+    approveErr = error?.message ?? null;
   } else if (body.id) {
-    await db.from("weekly_focus_drafts").update({ approved_at: now }).eq("id", body.id);
+    const { error } = await db.from("weekly_focus_drafts").update({ approved_at: now }).eq("id", body.id);
+    approveErr = error?.message ?? null;
   } else {
     return NextResponse.json({ error: "Bad request" }, { status: 400 });
+  }
+  if (approveErr) {
+    return NextResponse.json({ error: `Not approved — ${approveErr}` }, { status: 500 });
   }
 
   // Publishing writes weekly_focus with week_start = the COMING Sunday, and
   // the client's week card only shows a focus belonging to the current week.
   // So approving on Saturday is safe: nothing appears until the week it is for.
-  const { data: n } = await db.rpc("publish_focus_drafts", { p_week: week, p_only_approved: true });
+  const { data: n, error: pubErr } = await db.rpc("publish_focus_drafts", { p_week: week, p_only_approved: true });
+  if (pubErr) {
+    // Approved but not published. Say which, because the two have different
+    // fixes and "published: 0" with a 200 reads as "there was nothing to do".
+    return NextResponse.json(
+      { error: `Approved, but publishing failed — ${pubErr.message}`, approved: true },
+      { status: 500 },
+    );
+  }
   return NextResponse.json({ ok: true, published: n ?? 0 });
 }

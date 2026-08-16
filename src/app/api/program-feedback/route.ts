@@ -98,7 +98,10 @@ export async function POST(req: NextRequest) {
 
   const substantive = isSubstantive(answer);
 
-  await db
+  // Checked. This is the write that IS the answer; everything below it is a
+  // copy. Unchecked, a refused update returned `{ ok: true }` and the client
+  // watched their answer disappear from the screen, having gone nowhere.
+  const { error: saveErr } = await db
     .from("client_program_feedback")
     .update({
       answer,
@@ -106,6 +109,12 @@ export async function POST(req: NextRequest) {
       delivered_at: substantive ? new Date().toISOString() : null,
     })
     .eq("id", row.id);
+  if (saveErr) {
+    return NextResponse.json(
+      { error: "That didn't send — give it another go in a moment." },
+      { status: 500 },
+    );
+  }
 
   // ── The record ───────────────────────────────────────────────────────────
   // Every answer, substantive or not, appended to the client's notes with the
@@ -122,12 +131,24 @@ export async function POST(req: NextRequest) {
     });
     const entry = `[${stamp}] Programming check-in\nQ: ${row.question}\nA: ${answer}`;
     const notes = client?.notes ? `${client.notes}\n\n${entry}` : entry;
-    await db.from("clients").update({ notes }).eq("id", cid);
+    // Captured, not just wrapped. A PostgREST failure RETURNS an error, it does
+    // not throw — so the catch around this block never saw a failed note append
+    // and the console line it was written to produce could not fire. The answer
+    // itself is already saved, so this stays best-effort; it just has to be
+    // capable of saying it went wrong.
+    const { error: noteErr } = await db.from("clients").update({ notes }).eq("id", cid);
+    if (noteErr) console.error("program-feedback: note append failed", noteErr.message);
   } catch (e) {
-    console.error("program-feedback: note append failed", e);
+    console.error("program-feedback: note append threw", e);
   }
 
   // ── The inbox ────────────────────────────────────────────────────────────
+  //
+  // `delivered` is what the client is TOLD. It must mean the message landed in
+  // Dustin's inbox, not that we intended to put it there — the insert was
+  // unchecked and the response said `delivered: true` regardless, so a client
+  // could be told their coach had their answer when nothing had been written.
+  let delivered = false;
   if (substantive) {
     try {
       const [{ data: ts }, { data: c }] = await Promise.all([
@@ -141,7 +162,7 @@ export async function POST(req: NextRequest) {
       const from = (c as { auth_user_id: string | null } | null)?.auth_user_id ?? null;
 
       if (trainerUid && from) {
-        await db.from("messages").insert({
+        const { error: msgErr } = await db.from("messages").insert({
           from_id: from,
           to_id: trainerUid,
           client_id: cid,
@@ -149,13 +170,19 @@ export async function POST(req: NextRequest) {
           is_group: false,
           is_broadcast: false,
         });
+        if (msgErr) console.error("program-feedback: inbox delivery failed", msgErr.message);
+        else delivered = true;
+      } else {
+        console.error("program-feedback: no trainer or client auth user — nothing delivered");
       }
     } catch (e) {
-      console.error("program-feedback: inbox delivery failed", e);
+      console.error("program-feedback: inbox delivery threw", e);
     }
   }
 
-  return NextResponse.json({ ok: true, delivered: substantive });
+  // The answer is saved either way — `ok` says so. `delivered` says only
+  // whether it also reached the inbox.
+  return NextResponse.json({ ok: true, delivered });
 }
 
 function data_first<T>(rows: T[] | null | undefined): T | null {

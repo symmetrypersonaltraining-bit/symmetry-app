@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import ShareToGroup from "@/components/ShareToGroup";
 import { createClient } from "@/lib/supabase/client";
 import { fx } from "@/lib/fx";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 /**
  * GroupChallenge — the slim pinned bar at the top of the group chat that opens
@@ -126,13 +127,19 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: title.trim(), metric, days }),
       });
-      if (res.ok) {
-        fx("complete");
-        setCreating(false);
-        await load();
+      if (!res.ok) {
+        // The form staying open was the whole signal, which reads as a dead
+        // button. The route can now say WHY — including the one that matters:
+        // the running challenge could not be closed, so nothing was started.
+        const j = await res.json().catch(() => null);
+        window.alert(j?.error || "Couldn't start that challenge — try again.");
+        return;
       }
+      fx("complete");
+      setCreating(false);
+      await load();
     } catch {
-      /* form stays open to retry */
+      window.alert("Couldn't start that challenge — you may be offline.");
     } finally {
       setBusy(false);
     }
@@ -143,14 +150,21 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
     if (!window.confirm("End this challenge now? The board stops updating.")) return;
     setBusy(true);
     try {
-      await fetch("/api/challenge", {
+      const res = await fetch("/api/challenge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "end", id: ch.id }),
       });
+      // The reload alone would put the challenge back on screen, which is at
+      // least honest — but with nothing said, pressing End and watching it
+      // stay reads as the button not working rather than the write failing.
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        window.alert(j?.error || "Couldn't end it — it is still running.");
+      }
       await load();
     } catch {
-      /* ignore */
+      window.alert("Couldn't end it — you may be offline. It is still running.");
     } finally {
       setBusy(false);
     }
@@ -164,18 +178,30 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
       // writes. The old version set client_app_settings.leaderboard_opt_in,
       // which is a different flag for a different board.
       const { data: me } = await supabase.rpc("my_client_id");
-      if (me) {
-        await supabase
-          .from("challenge_participants")
-          .insert({ challenge_id: ch.id, client_id: me as string });
+      if (!me) {
+        // Previously this fell through to setJoined(true) having written
+        // nothing at all — the button said You're in and the board never
+        // showed them.
+        window.alert(`Couldn't find your profile — tell ${COACH_FIRST_NAME} and they'll add you.`);
+        return;
+      }
+      const { error } = await supabase
+        .from("challenge_participants")
+        .insert({ challenge_id: ch.id, client_id: me as string });
+      // A duplicate genuinely means they were already in, and that is success.
+      // Anything else is not: an RLS refusal returns an error rather than
+      // THROWING, so the catch below never saw one and every failure landed on
+      // the success path. This is the neighbourhood of the bug where
+      // twenty-three people had joined and six were showing.
+      if (error && error.code !== "23505") {
+        window.alert("Couldn't join — try again.");
+        return;
       }
       fx("complete");
       setJoined(true);
       await load();
     } catch {
-      // The unique constraint is the source of truth — a duplicate means they
-      // were already in.
-      setJoined(true);
+      window.alert("Couldn't join — you may be offline.");
     } finally {
       setJoining(false);
     }
@@ -189,15 +215,20 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
       // It deletes from challenge_participants — the SAME table join writes.
       // If these two ever point at different places we are back to the bug
       // where twenty-three people had joined and six were showing.
-      await fetch("/api/challenge", {
+      const res = await fetch("/api/challenge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "leave" }),
       });
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        window.alert(j?.error || "Couldn't leave — you are still on the board.");
+        return;
+      }
       setJoined(false);
       await load();
     } catch {
-      /* leave the state alone and let the next load settle it */
+      window.alert("Couldn't leave — you may be offline. You are still on the board.");
     } finally {
       setJoining(false);
     }

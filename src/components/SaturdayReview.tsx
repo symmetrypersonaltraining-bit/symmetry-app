@@ -105,11 +105,22 @@ export default function SaturdayReview() {
     }
     setBusy(d.id);
     try {
-      await fetch("/api/focus-drafts", {
+      // Checked. A non-ok response is NOT a throw, so the old code walked
+      // straight into the success path on a 500: the editor closed, the row
+      // repainted with his text, and the model's original was still in the
+      // database — visible only on the next load, by which point he had moved
+      // on believing it saved.
+      const res = await fetch("/api/focus-drafts", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: d.id, focus: text }),
       });
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        // Editor stays open with his text still in it. That IS the signal.
+        window.alert(j?.error || "That edit did not save. Try again.");
+        return;
+      }
       setDrafts((prev) => prev.map((x) => (x.id === d.id ? { ...x, focus: text, edited_at: new Date().toISOString() } : x)));
       setEditing((e) => {
         const n = { ...e };
@@ -117,7 +128,7 @@ export default function SaturdayReview() {
         return n;
       });
     } catch {
-      /* keep the edit on screen */
+      window.alert("That edit did not save — you may be offline. Your text is still here.");
     } finally {
       setBusy(null);
     }
@@ -131,16 +142,22 @@ export default function SaturdayReview() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(id ? { id } : { all: true }),
       });
-      if (res.ok) {
-        fx("complete");
-        if (id) setDrafts((prev) => prev.filter((d) => d.id !== id));
-        else {
-          setDrafts([]);
-          setOpen(false);
-        }
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        // Clearing the queue is the success signal, and clearing it wrongly is
+        // the expensive failure: Sunday's 6am fallback then publishes the whole
+        // batch unreviewed, which is what this screen exists to prevent.
+        window.alert(j?.error || "Not approved — nothing was published. Try again.");
+        return;
+      }
+      fx("complete");
+      if (id) setDrafts((prev) => prev.filter((d) => d.id !== id));
+      else {
+        setDrafts([]);
+        setOpen(false);
       }
     } catch {
-      /* noop */
+      window.alert("Not approved — you may be offline. Nothing was published.");
     } finally {
       setBusy(null);
     }

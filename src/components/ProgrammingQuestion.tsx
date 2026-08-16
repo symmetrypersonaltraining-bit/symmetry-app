@@ -56,12 +56,18 @@ export default function ProgrammingQuestion() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: q.id, answer: answer.trim() }),
       });
-      if (res.ok) {
-        fx("complete");
-        setDone(true);
+      if (!res.ok) {
+        // Keeping their text but saying nothing means the button just does not
+        // work as far as they can tell, and they stop answering. The text stays
+        // either way — that part was right.
+        const j = await res.json().catch(() => null);
+        window.alert(j?.error || "That didn't send — give it another go in a moment.");
+        return;
       }
+      fx("complete");
+      setDone(true);
     } catch {
-      /* leave the text on screen so nothing they typed is lost */
+      window.alert("That didn't send — you may be offline. Your answer is still here.");
     } finally {
       setBusy(false);
     }

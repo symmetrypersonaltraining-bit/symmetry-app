@@ -227,20 +227,29 @@ export async function POST(req: NextRequest) {
     if (!liveId) return NextResponse.json({ error: "No challenge running" }, { status: 400 });
 
     if (body.action === "leave") {
-      // Idempotent: leaving twice reads as success. Deleting a row that is
-      // not there is not an error, and surfacing one would make the button
-      // look broken to someone double-tapping it.
-      await db
+      // Still idempotent: deleting a row that is not there is not an error in
+      // PostgREST, so leaving twice reads as success without any help from us.
+      // What was NOT wanted is a real refusal being reported as "you have left"
+      // — the button says done, and the next load puts them back on the board.
+      const { error } = await db
         .from("challenge_participants")
         .delete()
         .eq("challenge_id", liveId)
         .eq("client_id", cid);
+      if (error) return NextResponse.json({ error: "Couldn't leave — try again." }, { status: 500 });
       return NextResponse.json({ ok: true, joined: false });
     }
 
-    // Ignore a duplicate: the unique constraint is the source of truth and
-    // "join twice" should read as success, not as an error.
-    await db.from("challenge_participants").insert({ challenge_id: liveId, client_id: cid });
+    // A duplicate is still success — the unique constraint is the source of
+    // truth and "join twice" is not a mistake worth a red message. But it was
+    // being used to swallow EVERY error, so a client told "you're in" could be
+    // missing from the leaderboard with nothing to explain it. 23505 only.
+    const { error } = await db
+      .from("challenge_participants")
+      .insert({ challenge_id: liveId, client_id: cid });
+    if (error && error.code !== "23505") {
+      return NextResponse.json({ error: "Couldn't join — try again." }, { status: 500 });
+    }
     return NextResponse.json({ ok: true, joined: true });
   }
 
@@ -257,10 +266,13 @@ export async function POST(req: NextRequest) {
     // an "ended" challenge still showing as live everywhere else.
     if (body.action === "end") {
       if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-      await db
+      const { error } = await db
         .from("group_challenges")
         .update({ ended_at: new Date().toISOString(), status: "complete" })
         .eq("id", body.id);
+      if (error) {
+        return NextResponse.json({ error: `Not ended — ${error.message}` }, { status: 500 });
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -276,11 +288,21 @@ export async function POST(req: NextRequest) {
 
     // Only one challenge runs at a time — end whatever is live before starting.
     // Two overlapping boards would make "who's winning" ambiguous.
-    await db
+    //
+    // So a failure here must STOP the create rather than fall through it.
+    // Unchecked, the one thing this write exists to prevent was exactly what
+    // happened next: the new challenge was inserted anyway and both ran.
+    const { error: endErr } = await db
       .from("group_challenges")
       .update({ ended_at: new Date().toISOString(), status: "complete" })
       .is("ended_at", null)
       .gte("ends_on", today);
+    if (endErr) {
+      return NextResponse.json(
+        { error: `Couldn't close the running challenge, so nothing was started — ${endErr.message}` },
+        { status: 500 },
+      );
+    }
 
     const { data, error } = await db
       .from("group_challenges")
