@@ -7,6 +7,16 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CustomItem, kcalOf } from "@/lib/nutrition/dailyTotals";
+import {
+  NutrientMap,
+  countKnownNutrients,
+  formatNutrient,
+  groupedNutrients,
+  hasAnyNutrient,
+  pctOfDaily,
+  readNutrients,
+  scaleNutrients,
+} from "@/lib/nutrition/nutrients";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 import Sheet from "./Sheet";
 import BarcodeScanner from "./BarcodeScanner";
@@ -30,6 +40,20 @@ export interface CatalogFood {
   sugar?: number | null;
   sodium?: number | null;
   sat_fat?: number | null;
+  /**
+   * The full registry — all 33 nutrients, from food_catalog.micros.
+   *
+   * This sheet already carried the four legacy columns above and took real care
+   * scaling them ("0.4 of an unknown sodium is still unknown"). It never read
+   * `micros`, so the other 29 were dropped on the floor at the moment of
+   * logging: a food with a complete lab-measured panel in the catalog became a
+   * food with four nutrients the instant a client added it, and the day total
+   * understated itself with nothing on screen to say so.
+   *
+   * The item shape already had somewhere to put them — CustomItem.mi, written
+   * by the AI path and read by the registry. Only this sheet never filled it.
+   */
+  micros?: NutrientMap | null;
 }
 
 function n(v: unknown): number { const x = Number(v); return isFinite(x) ? x : 0; }
@@ -61,6 +85,10 @@ function mapRow(raw: Record<string, unknown>, fromCatalog: boolean): CatalogFood
     sugar: nOrNull(raw.sugar),
     sodium: nOrNull(raw.sodium),
     sat_fat: nOrNull(raw.sat_fat),
+    // readNutrients merges the jsonb bag with the four legacy columns, so a row
+    // that has only the legacy four still produces a valid four-entry map and a
+    // row with a full panel produces all of it. One reader, one shape.
+    micros: readNutrients(raw.micros, raw as Record<string, unknown>),
   };
 }
 
@@ -84,6 +112,9 @@ export default function FoodSearchSheet({
   const [tab, setTab] = useState<"all" | "mine">("all");
   const [results, setResults] = useState<CatalogFood[]>([]);
   const [picked, setPicked] = useState<CatalogFood | null>(null);
+  // Collapsed by default. The four headline nutrients are on screen either way;
+  // this opens the rest. Resets whenever a different food is picked.
+  const [showNutrients, setShowNutrients] = useState(false);
   // Feedback b534996d / f949f793: the serving picker used to be a ±0.25 stepper
   // over WHOLE servings, so a food stored as "25 g" (chili crisp oil) couldn't
   // be logged at 5 g. Now you TYPE the amount and pick the UNIT — grams, oz,
@@ -144,6 +175,7 @@ export default function FoodSearchSheet({
   function openPicked(f: CatalogFood) {
     const ps = parseServing(f.serving);
     setPicked(f);
+    setShowNutrients(false);
     setAmt(String(ps.amount));
     setUnit(ps.unit);
   }
@@ -199,6 +231,11 @@ export default function FoodSearchSheet({
       su: scale(f.sugar),
       so: f.sodium == null ? null : Math.round(f.sodium * m),
       sf: scale(f.sat_fat),
+      // The other 29, scaled by the same multiplier. scaleNutrients keeps null
+      // as null for exactly the reason above. Without this line a food with a
+      // full lab-measured panel in the catalog became a four-nutrient food the
+      // moment it was logged, and the day total quietly understated itself.
+      mi: f.micros && hasAnyNutrient(f.micros) ? scaleNutrients(f.micros, m) : null,
     });
   }
 
@@ -442,6 +479,74 @@ export default function FoodSearchSheet({
           <p className="text-center text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
             {amtNum > 0 ? `${amtNum} ${unit}` : "—"} · P{Math.round(n(picked.protein) * mult)} C{Math.round(n(picked.carbs) * mult)} F{Math.round(n(picked.fats) * mult)} · {picked.kcal != null ? Math.round(n(picked.kcal) * mult) : kcalOf(n(picked.protein) * mult, n(picked.carbs) * mult, n(picked.fats) * mult)} cal
           </p>
+          {/*
+            Nutrients for THIS portion, before you commit to it.
+            Dustin's feedback, 4 Aug: micronutrients everywhere in the food
+            logger. The day total already had them; below the day level there
+            was nothing, even though this sheet was already carrying and
+            correctly scaling the data.
+            Everything here comes from the shared registry — groupedNutrients,
+            formatNutrient, pctOfDaily. No formatter is written locally, because
+            a second copy of that logic is exactly what produced a duplicate
+            nutrient panel on 15 Aug that had to be reverted.
+          */}
+          {(() => {
+            const scaled = picked.micros ? scaleNutrients(picked.micros, mult) : null;
+            const known = countKnownNutrients(scaled);
+            if (!scaled || known === 0) {
+              // Said out loud rather than shown as a row of dashes. "We don't
+              // know" and "it contains none" are different facts, and a client
+              // deciding between two foods deserves to be told which this is.
+              return (
+                <p className="text-center text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
+                  No nutrient detail published for this food.
+                </p>
+              );
+            }
+            const groups = groupedNutrients(scaled).map((g) => ({
+              ...g,
+              rows: g.rows.filter((r) => r.value != null),
+            })).filter((g) => g.rows.length > 0);
+            return (
+              <div className="mb-3">
+                <button
+                  onClick={() => setShowNutrients((v) => !v)}
+                  aria-expanded={showNutrients}
+                  className="w-full py-2 rounded-xl text-xs font-bold uppercase tracking-widest"
+                  style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)", background: "transparent" }}
+                >
+                  {showNutrients ? "Hide" : "Show"} nutrients ({known})
+                </button>
+                {showNutrients && (
+                  <div className="mt-2">
+                    {groups.map((g) => (
+                      <div key={g.group} className="mb-2">
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "var(--brand-text-secondary)" }}>
+                          {g.label}
+                        </p>
+                        {g.rows.map((r) => {
+                          const pct = pctOfDaily(r.def.key, r.value);
+                          return (
+                            <div key={r.def.key} className="flex items-baseline justify-between text-xs py-0.5">
+                              <span style={{ color: "var(--brand-text)" }}>{r.def.label}</span>
+                              <span style={{ color: "var(--brand-text-secondary)" }}>
+                                {formatNutrient(r.def.key, r.value)}
+                                {pct != null && <span className="ml-2 opacity-70">{pct}%</span>}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                    <p className="text-[10px] mt-1" style={{ color: "var(--brand-text-secondary)" }}>
+                      Percentages are of a general daily reference, not your targets.
+                      Only nutrients this food publishes are listed.
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           <button onClick={() => pickItem(picked, mult)} disabled={amtNum <= 0} className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)", opacity: amtNum > 0 ? 1 : 0.5 }}>
             Add it ✓
           </button>
