@@ -93,6 +93,39 @@ without a video mostly DO have a candidate — rejected for length, and only one
 of them is under 60 seconds. Raising the ceiling to 60 buys you one exercise.
 The rest genuinely need shorter clips.
 
+### Second thing to read — the Saturday review fires tomorrow, for the first time since it broke
+
+I hardened that screen tonight (`804d0d2`), then went to check how often the
+Sunday fallback had been publishing unreviewed copy. The answer is that the
+whole pipeline has run twice, ever:
+
+    select jobid, status, return_message, start_time
+    from cron.job_run_details where jobid = 27 order by start_time desc;
+
+    2026-08-09 11:00  FAILED   operator does not exist: text = date
+    2026-08-02 11:00  succeeded  1 row
+
+The 9 Aug failure is the exact bug the current function's own comment says it
+was written to fix — `weekly_focus_week` is TEXT and was being compared to a
+DATE. **It was fixed on 13 Aug and has not fired since**, because job 27 only
+runs on Sundays and there has not been one.
+
+What that cost: 33 drafts were generated correctly on Sat 8 Aug (the Vercel cron
+works — `weekly-ai?draft=1` at 11:00 UTC ran at 11:44 and wrote all 33 with AI
+text). None were approved, none published, and on 13 Aug they were archived to
+`bak_focus_drafts_20260813`. That week's coaching copy never reached anybody.
+
+**So tomorrow morning is the first real test of the fix.** Today's Saturday
+generator run at 6am CT should put ~33 drafts in front of you on the trainer
+home screen; the Sunday 6am job publishes whatever you have not got to. If the
+screen is empty this afternoon, the generator is what to look at, not the
+publisher.
+
+Nothing to do tonight — the fix is already deployed and correct (I checked the
+live definition casts `p_week::text` in both places). This is here so you know
+to glance at it, and so that if it works nobody spends another session
+wondering why the queue is always empty.
+
 ### The four that matter most
 
 1. **Your live database was headed off a cliff.** `food_catalog` was 891 MB of a
