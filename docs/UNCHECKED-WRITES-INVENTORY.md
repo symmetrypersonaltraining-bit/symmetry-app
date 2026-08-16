@@ -69,6 +69,19 @@ and say so.
   `markMessageRead` is left alone deliberately — a read receipt that fails
   misleads no one.
 
+- **The onboarding routes — fixed.** `invite-client`, `create-client`,
+  `create-client-from-assessment`, `complete-onboarding`, `set-password`.
+  The worst was in `invite-client`: it created the auth account and then linked
+  it to the client row using the CALLER's Supabase client rather than `admin` —
+  alone among that route's writes, so RLS could refuse it — with the result
+  unchecked. That leaves a login that EXISTS and points at nothing: the client
+  gets the email, signs in perfectly, and the app cannot find their record.
+  Re-inviting makes it worse, because `createUser` then fails with "already
+  registered". The error now says outright not to re-send.
+  `set-password` was the other sharp one: the password is already changed by the
+  time the temp flag is cleared, so a failure there loops the client back to the
+  same screen forever. Nine assertions, mutation-tested.
+
 ## Not to be touched without Dustin's per-item permission
 
 `WorkoutLogger.tsx`, `NutritionV3Client.tsx`, `MealPlanClient.tsx` — 11 sites.
@@ -87,11 +100,7 @@ error has nowhere useful to go.
 
 ## Next, in priority order — by who gets lied to
 
-1. **`api/invite-client`, `api/create-client`,
-   `api/create-client-from-assessment`, `api/complete-onboarding`,
-   `set-password`** (7) — onboarding, where a half-written client is worse than a
-   failed one.
-2. **`api/challenge`, `api/program-feedback`, `api/focus-drafts`,
+1. **`api/challenge`, `api/program-feedback`, `api/focus-drafts`,
    `api/video-candidates/*`** — trainer-facing, lower stakes.
 5. **`api/cron/*`, `api/weekly-ai`, `api/coach/focus`** — no human waiting, but a
    silent failure here is invisible for weeks. Logging is enough; alerts are not.

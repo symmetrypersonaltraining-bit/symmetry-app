@@ -128,11 +128,19 @@ export async function POST(req: NextRequest) {
 
   // If invited: create client_app_settings so login redirect works, then send email
   if (send_invite && authUserId && clientRow?.id) {
-    await admin.from("client_app_settings").upsert({
+    // Checked: without this row the first-login redirect never fires and the
+    // client keeps the temporary password forever, having been told to expect a
+    // prompt that never comes.
+    const { error: casErr } = await admin.from("client_app_settings").upsert({
       client_id: clientRow.id,
       password_is_temporary: true,
       first_login_completed: false,
     }, { onConflict: "client_id" });
+    if (casErr) {
+      return NextResponse.json({
+        error: `${name} was created and a login exists, but the first-login password reset could not be set up: ${casErr.message}. Do not send the invite yet.`,
+      }, { status: 500 });
+    }
 
     const resendKey = process.env.RESEND_API_KEY;
     if (resendKey) {

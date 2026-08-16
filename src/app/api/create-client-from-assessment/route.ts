@@ -119,13 +119,27 @@ export async function POST(req: NextRequest) {
   }).select("id, name").single();
   if (cErr) return NextResponse.json({ error: cErr.message }, { status: 500 });
 
-  // 4) Two-way link so the assessment shows on the client profile
-  await admin.from("client_assessments").update({ client_id: clientRow.id }).eq("id", assessment.id);
+  // 4) Two-way link so the assessment shows on the client profile.
+  // Unchecked, the assessment they filled in stays orphaned: the client exists,
+  // their screen findings do not appear on the profile, and the only clue is
+  // that the corrective track looks unexplained.
+  const { error: linkErr } = await admin
+    .from("client_assessments").update({ client_id: clientRow.id }).eq("id", assessment.id);
+  if (linkErr) {
+    return NextResponse.json({
+      error: `${clientRow.name} was created, but their assessment could not be linked to the profile: ${linkErr.message}.`,
+    }, { status: 500 });
+  }
 
   // 5) Flag temp password -> first-login reset routing
-  await admin.from("client_app_settings").upsert({
+  const { error: casErr } = await admin.from("client_app_settings").upsert({
     client_id: clientRow.id, password_is_temporary: true, first_login_completed: false,
   }, { onConflict: "client_id" });
+  if (casErr) {
+    return NextResponse.json({
+      error: `${clientRow.name} was created, but the first-login password reset could not be set up: ${casErr.message}. Do not send the invite yet.`,
+    }, { status: 500 });
+  }
 
   // 5b) Create the first payment reminder IMMEDIATELY so it exists the moment the client is created.
   // Editable afterward on the Payments page (amount, due date, credits, approve & notify, confirm paid).

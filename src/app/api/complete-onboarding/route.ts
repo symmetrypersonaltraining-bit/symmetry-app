@@ -43,11 +43,20 @@ export async function POST(req: Request) {
       const lean = (w && bf) ? +(w * (1 - bf / 100)).toFixed(1) : null;
       const fat = (w && bf) ? +(w * (bf / 100)).toFixed(1) : null;
       const admin = createAdminClient();
-      await admin.from("metrics").insert({
+      // Checked: this is the client's FIRST data point. Lost silently, their
+      // progress chart starts from whenever they next weighed in and every
+      // "since you started" number is measured from the wrong place — with
+      // nothing on screen ever suggesting a reading is missing.
+      const { error: metricErr } = await admin.from("metrics").insert({
         client_id: clientRec.id,
         metric_date: new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }), // Central, not UTC: after 7pm Central the UTC date is already tomorrow
         weight: w, body_fat_pct: bf, lean_mass: lean, fat_mass: fat,
       });
+      if (metricErr) {
+        return NextResponse.json({
+          error: `Your details were saved, but your starting weight was not: ${metricErr.message}. Add it from the Progress screen so your charts start in the right place.`,
+        }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ ok: true });

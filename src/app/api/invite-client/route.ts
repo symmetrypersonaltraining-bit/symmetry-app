@@ -71,16 +71,42 @@ export async function POST(req: NextRequest) {
     if (createErr) return NextResponse.json({ error: createErr.message }, { status: 500 });
     authUserId = newUser.user.id;
 
-    // Link auth user to client record
-    await supabase.from("clients").update({ auth_user_id: authUserId }).eq("id", clientId);
+    // Link auth user to client record.
+    //
+    // Two things were wrong here and the second hid the first. It used the
+    // CALLER's client rather than `admin` — alone among the writes in this
+    // route — so RLS could refuse it; and the result was unchecked, so when it
+    // did the invite reported success anyway.
+    //
+    // The state that leaves is the worst kind: the auth account EXISTS but is
+    // linked to nothing. The client receives the email, signs in perfectly, and
+    // the app cannot find their record. Re-inviting does not help either —
+    // createUser now fails with "already registered". Somebody has to go into
+    // the database to unpick it.
+    const { error: linkErr } = await admin
+      .from("clients").update({ auth_user_id: authUserId }).eq("id", clientId);
+    if (linkErr) {
+      return NextResponse.json({
+        error: `Login was created but could not be linked to ${client.name}: ${linkErr.message}. `
+             + `Do not re-send the invite — the account already exists. This needs the link repairing first.`,
+      }, { status: 500 });
+    }
   }
 
-  // Mark password as temporary in client_app_settings (upsert)
-  await admin.from("client_app_settings").upsert({
+  // Mark password as temporary in client_app_settings (upsert).
+  // Checked: without this row the first-login redirect never fires, so they set
+  // no real password and keep the ten-character temporary one indefinitely.
+  const { error: settingsErr } = await admin.from("client_app_settings").upsert({
     client_id: clientId,
     password_is_temporary: true,
     first_login_completed: false,
   }, { onConflict: "client_id" });
+  if (settingsErr) {
+    return NextResponse.json({
+      error: `Login is ready, but the first-login password reset could not be set up: ${settingsErr.message}. `
+           + `They would keep the temporary password. Fix this before sending the invite.`,
+    }, { status: 500 });
+  }
 
   // ── The one-tap link ──────────────────────────────────────────────────────
   //

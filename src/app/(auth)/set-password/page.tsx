@@ -74,10 +74,23 @@ export default function SetPasswordPage() {
           .eq("auth_user_id", user.id)
           .maybeSingle();
         if (clientRec) {
-          await supabase
+          // Checked, because failing here puts them in a LOOP. The password is
+          // already changed by this point; if the flag stays true, the
+          // first-login redirect sends them straight back to this screen, where
+          // they set a password that is already set, and land back here again.
+          const { error: flagErr } = await supabase
             .from("client_app_settings")
             .update({ password_is_temporary: false, first_login_completed: true })
             .eq("client_id", clientRec.id);
+          if (flagErr) {
+            setError(
+              "Your password was changed, but we could not finish setting up your account: "
+              + flagErr.message
+              + ". Please tell your coach — signing in again may bring you back here."
+            );
+            setLoading(false);
+            return;
+          }
         }
       }
 
