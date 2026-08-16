@@ -249,6 +249,10 @@ export async function POST(req: NextRequest) {
     const trainerAuth = (tr as { auth_user_id: string } | null)?.auth_user_id ?? null;
 
     const previews: { name: string; segment: string; tone: string; body: string; sent: boolean }[] = [];
+
+    // Ledger rows that did not land. Surfaced in the digest rather than
+    // swallowed: a missing row is a guardrail that will not hold next run.
+    const ledgerErrors: string[] = [];
     const escalations: string[] = [];
     let skipped = 0;
 
@@ -265,9 +269,15 @@ export async function POST(req: NextRequest) {
             r.everLoggedMeal ? "" : ", never logged nutrition"
           }`,
         );
-        await admin.from("ai_nudge_log").insert({
+        // ai_nudge_log IS the guardrail state — "one per client per 48h, max 3
+        // per rolling 7 days" is computed by reading this table back. A silent
+        // insert failure does not lose a log line, it defeats a stated rule:
+        // the same client comes round again on the next run as though nothing
+        // had happened.
+        const { error: escErr } = await admin.from("ai_nudge_log").insert({
           client_id: r.id, segment: seg, tone, body: null, sent: false, suppressed: "escalated_to_trainer",
         });
+        if (escErr) { ledgerErrors.push(`${r.name || r.id}: ${escErr.message}`); }
         continue;
       }
 
@@ -283,7 +293,10 @@ export async function POST(req: NextRequest) {
       }
       if (suppressed) {
         skipped++;
-        await admin.from("ai_nudge_log").insert({ client_id: r.id, segment: seg, tone, sent: false, suppressed });
+        const { error: supErr } = await admin
+          .from("ai_nudge_log")
+          .insert({ client_id: r.id, segment: seg, tone, sent: false, suppressed });
+        if (supErr) { ledgerErrors.push(`${r.name || r.id}: ${supErr.message}`); }
         continue;
       }
 
@@ -363,10 +376,13 @@ export async function POST(req: NextRequest) {
       // if he wants to, which was always the version worth having.
       const didSend = false;
 
-      await admin.from("ai_nudge_log").insert({
+      const { error: logErr } = await admin.from("ai_nudge_log").insert({
         client_id: r.id, segment: seg, tone, body: text, sent: didSend,
         suppressed: "digest_only",
       });
+      // The cooldown for THIS client. Unrecorded, they are eligible again in
+      // 24 hours instead of 48 and the weekly cap undercounts them.
+      if (logErr) { ledgerErrors.push(`${r.name || r.id}: ${logErr.message}`); }
       previews.push({ name: r.name || "?", segment: seg, tone, body: text, sent: didSend });
     }
 
@@ -383,7 +399,15 @@ export async function POST(req: NextRequest) {
       if (!previews.length && !escalations.length) lines.push("• Nobody needs a nudge tonight. Roster's healthy.");
       if (skipped) lines.push("", `(${skipped} held back by cooldown / weekly cap / opt-out)`);
 
-      await admin.from("messages").insert({
+      if (ledgerErrors.length) {
+        lines.push("", `⚠ ${ledgerErrors.length} nudge-log rows could not be written, so their cooldowns are not recorded:`);
+        lines.push(...ledgerErrors.slice(0, 10).map((e) => `• ${e}`));
+      }
+
+      // The digest IS the output of this run. Unchecked, a failed insert left
+      // the response reporting `generated: N` to a caller nobody reads while
+      // the one person it was written for was told nothing at all.
+      const { error: digestErr } = await admin.from("messages").insert({
         from_id: trainerAuth,
         to_id: trainerAuth,
         client_id: null,
@@ -392,6 +416,12 @@ export async function POST(req: NextRequest) {
         sender_kind: "coachbot",
         body: lines.join("\n").slice(0, 4000),
       });
+      if (digestErr) {
+        return NextResponse.json(
+          { error: "Nudges were computed but the digest could not be delivered", detail: digestErr.message },
+          { status: 500 },
+        );
+      }
     }
 
     return NextResponse.json({

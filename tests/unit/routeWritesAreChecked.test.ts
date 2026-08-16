@@ -258,3 +258,59 @@ test("a failed rejection is not reported as rejected", () => {
   assert.match(body, /const \{ error \} = await db/);
   assert.match(body, /Not rejected/);
 });
+
+// ── The two cron writers ───────────────────────────────────────────────────
+//
+// /api/cron/weekly-ai writes the Saturday focus drafts. Both draft writes were
+// unchecked and `results.push({ status: "written" })` followed regardless, so a
+// client whose draft never landed was reported as written. That is the worst
+// possible place for it: the Saturday review screen renders NOTHING when there
+// are no drafts, so a silent failure looks exactly like a quiet week — and the
+// run report agreed with it. They now throw into the per-client catch that
+// already records `status: "failed"` with a detail, so the summary names who
+// has no draft.
+//
+// /api/ai-nudges never messages clients (that was deleted deliberately, and
+// stays deleted). But `ai_nudge_log` IS the guardrail state: "one per client
+// per 48h, max 3 per rolling 7 days" is computed by reading that table back. An
+// unchecked insert does not lose a log line, it defeats a stated rule — the
+// same client comes round again next run as though nothing happened. And the
+// digest to Dustin, which is the entire output of the run, was inserted
+// unchecked while the response reported `generated: N` to a caller nobody
+// reads.
+
+const WEEKLY = read("src/app/api/cron/weekly-ai/route.ts");
+const NUDGES = read("src/app/api/ai-nudges/route.ts");
+
+test("a focus draft that did not save is not reported as written", () => {
+  assert.match(WEEKLY, /if \(insErr\) throw new Error\(`draft not written/);
+  assert.match(WEEKLY, /if \(updErr\) throw new Error\(`draft not refreshed/);
+  const bare = WEEKLY.match(/(?<!=\s)await\s+db\s*\n?\s*\.from\("weekly_focus_drafts"\)/g) || [];
+  assert.equal(bare.length, 0, "a draft write still discards its result");
+});
+
+test("the programming question can report a failure it could never report before", () => {
+  assert.match(WEEKLY, /const \{ error: qErr \}/);
+  assert.match(WEEKLY, /if \(qErr\) console\.error/);
+});
+
+test("every nudge-ledger write is checked, because the ledger IS the cooldown", () => {
+  const bare = NUDGES.match(/(?<!=\s)await\s+admin\s*\n?\s*\.from\("ai_nudge_log"\)\s*\n?\s*\.insert\(/g) || [];
+  assert.equal(bare.length, 0, `${bare.length} ledger writes still discard their result`);
+  for (const name of ["escErr", "supErr", "logErr"]) {
+    assert.match(NUDGES, new RegExp(`error: ${name}`), `${name} is gone — a ledger row is unchecked again`);
+  }
+});
+
+test("a cooldown that was not recorded is reported to Dustin, not swallowed", () => {
+  assert.match(NUDGES, /ledgerErrors\.push\(/);
+  assert.match(NUDGES, /cooldowns are not recorded/);
+});
+
+test("a digest that never arrived is not reported as a successful run", () => {
+  assert.match(NUDGES, /const \{ error: digestErr \}/);
+  assert.match(NUDGES, /if \(digestErr\)/);
+  const guard = NUDGES.indexOf("if (digestErr)");
+  const ok = NUDGES.indexOf('mode: "digest_only"', guard);
+  assert.ok(guard > 0 && ok > guard, "the success response is returned before the digest is known to have landed");
+});

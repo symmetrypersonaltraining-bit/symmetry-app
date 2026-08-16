@@ -230,15 +230,26 @@ async function runSweep(opts: {
           .eq("week_start", week)
           .maybeSingle();
         const ex = existing as { id: string; approved_at: string | null; edited_at: string | null } | null;
+        // Both checked, and both throw into this client's catch below — which
+        // already records `status: "failed"` with a detail, so the run summary
+        // names exactly who has no draft.
+        //
+        // Unchecked, a client whose draft never landed was pushed into that
+        // same summary as "written". This is the single worst place in the app
+        // for that: the Saturday review screen renders NOTHING when there are
+        // no drafts, so a silent failure here looks identical to a quiet week,
+        // and the run report agreed with it.
         if (!ex) {
-          await db.from("weekly_focus_drafts").insert({
+          const { error: insErr } = await db.from("weekly_focus_drafts").insert({
             client_id: c.id, week_start: week,
             focus: result.value.focus, focus_ai: result.value.focus,
           });
+          if (insErr) throw new Error(`draft not written: ${insErr.message}`);
         } else if (!ex.approved_at && !ex.edited_at) {
-          await db.from("weekly_focus_drafts")
+          const { error: updErr } = await db.from("weekly_focus_drafts")
             .update({ focus: result.value.focus, focus_ai: result.value.focus })
             .eq("id", ex.id);
+          if (updErr) throw new Error(`draft not refreshed: ${updErr.message}`);
         }
       }
 
@@ -252,14 +263,19 @@ async function runSweep(opts: {
       // already given is never overwritten by a re-run.
       if (result.value.programmingQuestion && isQuestionWeek(week)) {
         try {
-          await db
+          // Still best-effort — the reasoning above holds. But it has to be
+          // able to SAY so: a PostgREST call returns its error rather than
+          // throwing, so this catch has never seen a failed question and the
+          // console line it exists to produce has never fired.
+          const { error: qErr } = await db
             .from("client_program_feedback")
             .upsert(
               { client_id: c.id, week_start: week, question: result.value.programmingQuestion },
               { onConflict: "client_id,week_start", ignoreDuplicates: true },
             );
+          if (qErr) console.error("weekly-ai: programming question failed for", c.id, qErr.message);
         } catch (qe) {
-          console.error("weekly-ai: programming question failed for", c.id, qe);
+          console.error("weekly-ai: programming question threw for", c.id, qe);
         }
       }
 
