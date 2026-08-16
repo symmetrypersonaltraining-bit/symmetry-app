@@ -131,14 +131,43 @@ export const TRAINER_TOOLS: Anthropic.Tool[] = [
 
 interface UndoPayload { kind: string; [k: string]: unknown }
 
+/**
+ * Run a write and THROW when it fails.
+ *
+ * A PostgREST call RETURNS its error; it does not throw. So a try/catch wrapped
+ * around one catches nothing, and the code inside reads as guarded while being
+ * completely unguarded. That is not hypothetical here: the entire undo block
+ * below is written as a try/catch over these calls, so every failed undo fell
+ * out of the bottom and answered "Undone: …" — the agent telling Dustin a
+ * change had been reversed when nothing had happened. This file's own comment,
+ * three branches into that block, says the quiet part: "the undo would silently
+ * do nothing and report success — which is worse than not offering undo at all."
+ *
+ * Rather than rewrite every branch to destructure and return, this makes the
+ * calls behave the way the surrounding code already assumes they behave.
+ */
+async function must<T extends { error: { message: string } | null }>(
+  q: PromiseLike<T>,
+  what: string,
+): Promise<T> {
+  const r = await q;
+  if (r.error) throw new Error(`${what} — ${r.error.message}`);
+  return r;
+}
+
 async function logAction(db: Db, action: string, clientId: string | null, summary: string, undo: UndoPayload | null): Promise<void> {
   try {
-    await db.from("ai_action_log").insert({ action, client_id: clientId, summary, undo });
+    // Captured, not merely wrapped: the catch below could never see a failed
+    // insert, so the console line it exists to produce has never once fired.
+    // The consequence is specific — no row means `undo_action` can never
+    // reverse this change, and nobody finds out until they try to.
+    const { error } = await db.from("ai_action_log").insert({ action, client_id: clientId, summary, undo });
+    if (error) console.error("agent: action log failed —", error.message);
   } catch (e) {
     // Never fail a completed write because the audit row did not land. The
     // change already happened; losing the undo record is bad, pretending the
     // change failed is worse.
-    console.error("agent: action log failed", e);
+    console.error("agent: action log threw", e);
   }
 }
 
@@ -558,7 +587,19 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
         .eq("active", true);
       // All of them, so the undo can put back everything this deactivates.
       const prev = (prevRows as unknown[] | null) || [];
-      await db.from("program_assignments").update({ active: false }).eq("client_id", clientId).eq("active", true);
+      // A failure here must STOP the assignment, not precede it. Unchecked, the
+      // insert below still ran and the client ended up with TWO active
+      // assignments — which is exactly the state the comment in advance_phase
+      // records breaking on ("she has TWO, PGRST116 was raised"). The write
+      // that prevents it was the one write nobody was checking.
+      const { error: deactErr } = await db
+        .from("program_assignments")
+        .update({ active: false })
+        .eq("client_id", clientId)
+        .eq("active", true);
+      if (deactErr) {
+        return `Couldn't close the current programme, so nothing was assigned: ${deactErr.message}`;
+      }
       const phaseId = str("phase_id") || null;
       const { data: created, error } = await db.from("program_assignments")
         .insert({ client_id: clientId, program_id: programId, current_phase_id: phaseId, active: true })
@@ -650,25 +691,58 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
 
       const u = row.undo;
       try {
+        // Every write below goes through must(), so a refusal reaches the catch
+        // instead of falling out of the bottom into "Undone: …".
         if (u.kind === "message") {
-          await db.from("messages").update({ deleted_at: new Date().toISOString() }).eq("id", u.message_id as string);
+          await must(
+            db.from("messages").update({ deleted_at: new Date().toISOString() }).eq("id", u.message_id as string),
+            "could not withdraw the message",
+          );
         } else if (u.kind === "delete_row") {
-          await db.from(u.table as string).delete().eq("id", u.id as string);
+          await must(
+            db.from(u.table as string).delete().eq("id", u.id as string),
+            `could not remove the ${u.table} row`,
+          );
         } else if (u.kind === "sw_restore_date") {
           // Put a moved workout back on the date it came from. Without this
           // branch the undo would silently do nothing and report success —
           // which is worse than not offering undo at all.
-          await db.from("scheduled_workouts")
-            .update({ scheduled_date: u.scheduled_date as string, position: (u.position as number) ?? 1, updated_at: new Date().toISOString() })
-            .eq("id", u.id as string);
+          await must(
+            db.from("scheduled_workouts")
+              .update({ scheduled_date: u.scheduled_date as string, position: (u.position as number) ?? 1, updated_at: new Date().toISOString() })
+              .eq("id", u.id as string),
+            "could not move the workout back",
+          );
         } else if (u.kind === "restore_row") {
-          await db.from(u.table as string).update(u.values as Record<string, unknown>).eq("id", u.id as string);
+          await must(
+            db.from(u.table as string).update(u.values as Record<string, unknown>).eq("id", u.id as string),
+            `could not restore the ${u.table} row`,
+          );
         } else if (u.kind === "macro_targets") {
-          if (u.inserted_id) await db.from("macro_targets").delete().eq("id", u.inserted_id as string);
+          if (u.inserted_id) {
+            await must(
+              db.from("macro_targets").delete().eq("id", u.inserted_id as string),
+              "could not remove the new macro targets",
+            );
+          }
         } else if (u.kind === "reassign_program") {
-          if (u.new_id) await db.from("program_assignments").update({ active: false }).eq("id", u.new_id as string);
+          // Order matters and BOTH halves matter: deactivating the new one
+          // without reactivating the old leaves the client on no programme,
+          // and reactivating the old without deactivating the new leaves them
+          // on two — which is the state advance_phase already breaks on.
+          if (u.new_id) {
+            await must(
+              db.from("program_assignments").update({ active: false }).eq("id", u.new_id as string),
+              "could not deactivate the new programme",
+            );
+          }
           const prev = u.previous as { id: string } | null;
-          if (prev?.id) await db.from("program_assignments").update({ active: true }).eq("id", prev.id);
+          if (prev?.id) {
+            await must(
+              db.from("program_assignments").update({ active: true }).eq("id", prev.id),
+              "could not put the previous programme back",
+            );
+          }
         } else if (u.kind === "workout_adjust") {
           // Newest-first: a later change can depend on an earlier one, so the
           // reversal has to run backwards through the list. A step that fails
@@ -679,14 +753,21 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
           for (let i = steps.length - 1; i >= 0; i--) {
             const st = steps[i];
             try {
-              if (st.op === "reinsert") await db.from(st.table).insert(st.values);
-              else if (st.op === "restore") await db.from(st.table).update(st.values).eq("id", st.id);
-              else if (st.op === "delete") await db.from(st.table).delete().eq("id", st.id);
-              else if (st.op === "repoint") await db.from("scheduled_workouts").update({ day_id: st.day_id }).in("id", st.ids);
+              // must() again: without it this loop collected no failures at
+              // all, so `failures.length === steps.length` never fired and a
+              // wholly failed reversal reported itself as a clean undo.
+              if (st.op === "reinsert") await must(db.from(st.table).insert(st.values), "reinsert");
+              else if (st.op === "restore") await must(db.from(st.table).update(st.values).eq("id", st.id), "restore");
+              else if (st.op === "delete") await must(db.from(st.table).delete().eq("id", st.id), "delete");
+              else if (st.op === "repoint") await must(db.from("scheduled_workouts").update({ day_id: st.day_id }).in("id", st.ids), "repoint");
             } catch (e) { failures.push(`${st.op}: ${(e as Error).message}`); }
           }
           if (failures.length === steps.length) throw new Error(failures[0] || "nothing could be reversed");
           if (failures.length) {
+            // Deliberately unchecked: this is a note about a partial reversal
+            // that has already been decided. Dustin is told about the partial
+            // undo through the return value either way, so a failure to record
+            // it changes nothing he sees and must not derail the undo.
             await db.from("ai_action_log").update({ undo_error: failures.join("; ").slice(0, 300) }).eq("id", row.id);
           }
         } else if (u.kind === "gcal_delete") {
@@ -707,10 +788,23 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
         }
       } catch (e) {
         const msg = (e as Error).message;
+        // Deliberately unchecked, same reasoning: the failure is already being
+        // reported to Dustin on the next line. Recording it is a nicety.
         await db.from("ai_action_log").update({ undo_error: msg.slice(0, 300) }).eq("id", row.id);
         return `Couldn't undo that: ${msg}`;
       }
-      await db.from("ai_action_log").update({ undone_at: new Date().toISOString() }).eq("id", row.id);
+      // The change IS reversed by this point, so this cannot fail the undo. But
+      // an unmarked row stays in the "not yet undone" list, and a second undo
+      // would apply the reversal twice — reinserting rows, deleting a message
+      // again. Worth saying out loud rather than swallowing.
+      const { error: markErr } = await db
+        .from("ai_action_log")
+        .update({ undone_at: new Date().toISOString() })
+        .eq("id", row.id);
+      if (markErr) {
+        console.error("agent: undo succeeded but could not be marked —", markErr.message);
+        return `Undone: ${row.summary} — but I couldn't mark it as undone, so don't undo it again.`;
+      }
       return `Undone: ${row.summary}`;
     }
 
