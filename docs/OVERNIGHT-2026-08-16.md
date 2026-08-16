@@ -212,50 +212,73 @@ say which way. Everything that BUILDS the workout — the section clear, the day
 rename, every exercise insert — is now checked and fails cleanly, because a
 doubled or short workout in front of a client has no such trade-off.
 
-### NEEDS YOU — the whole list
+### NEEDS YOU — ordered by what it buys you
 
-1. **`ANTHROPIC_API_KEY` on the symmetry-app-v2 Vercel project.** The variable
-   must be named exactly that — you created `ANTHROPIC_API_KEY_2`, which the app
-   never reads (34 call sites, all `ANTHROPIC_API_KEY`). There is also one from
-   3 Aug already sitting there; if that one still works you need nothing.
-   **Env vars only apply on a NEW deployment** — nothing you set takes effect
-   until something redeploys.
-2. **Invite the tester to the Symmetry Dev Supabase org** —
+**Do these two and the app is meaningfully better by lunchtime.**
+
+1. **VAPID keys, so push works at all.** Two env vars and a redeploy;
+   `docs/PUSH-SETUP-FOR-DUSTIN.md` has the exact steps. **Until these exist no
+   client can be notified about anything**, which is the whole reason the group
+   chat is silent — 29 clients, 2 reachable. Everything built for notifications
+   last night is inert without them.
+2. **Then send the group message** — `docs/GROUP-MESSAGE-DRAFT-2026-08-16.md`.
+   Read it first; change anything that does not sound like you. Deliberately NOT
+   sent overnight: asking people to switch notifications on before push works is
+   the fastest way to get the group muted.
+
+**Three decisions, each one line from me and then I can act.**
+
+3. **Exercise video ceiling: 30 seconds or 60?** One rule with two homes.
+   `verify/route.ts` says `MAX_SECONDS = 60`; the database job says 30. Both were
+   running, and the table shows it — ten candidates at 35–60s sit `pending`
+   while three at 48, 49 and 53 sit `too_long`, all created within the same
+   hour. Worth knowing before you pick: **the number barely matters.** Only one
+   library entry has a candidate under 60s, and none of the 48 exercises without
+   a video is programmed for anybody. Pick a number so the two agree.
+4. **May I touch `aiItemsToCustom` in `NutritionV3Client.tsx`?** A meal logged
+   through the AI coach still keeps **four of its 33 nutrients** — the same fault
+   I fixed in two other places last night, one door along. That file is on your
+   off-limits list so I left it. Ten lines, one function, no change to either
+   logger's behaviour, and the guard already exists next to it.
+5. **What should a client be told when only half a workout write lands?**
+   `/api/workout-ai` logs the session, then writes the matching
+   `scheduled_workouts` row. If the second half fails the two counts drift —
+   that file's own comments record what that cost last time ("165 minutes across
+   two walks; she took one"). I made it report rather than fail, because by then
+   the workout IS logged and saying "not logged" would be its own lie. Your call
+   which way; two lines either way.
+
+**Worth twenty minutes when you have them.**
+
+6. **Review nine videos.** Not 175 — nine. They are the auto-published ones on
+   exercises anybody is actually programmed, 9 to 26 seconds each. Library →
+   Videos, top of the list, "Use this" or undo. Everything else in that queue is
+   on library entries nobody has ever prescribed and can wait for ever.
+7. **Glance at the Saturday review screen this afternoon.** Today's 6am run is
+   the first since the publisher crashed on 9 Aug and was fixed on the 13th. If
+   ~33 drafts are waiting, it works. If it is empty, the generator is what to
+   look at, not the publisher.
+
+**Background, no rush.**
+
+8. **`ANTHROPIC_API_KEY` on the symmetry-app-v2 Vercel project.** Must be named
+   exactly that — `ANTHROPIC_API_KEY_2` is never read (34 call sites). One from
+   3 Aug may already be there and working. Env vars only apply on a NEW
+   deployment.
+9. **Invite the tester to the Symmetry Dev Supabase org** —
    `https://supabase.com/dashboard/org/qmfsauherdswigrbhklh/team`, that org only,
-   never the live one. Send me the email address when you know it and the
-   trainer-identity change is five minutes: one env var and one migration.
-3. **Your 24 Aug plan** stays archived unless you say otherwise. Correctly
-   archived as far as I can tell — nothing to do.
-4. **17 clients run out of programming on 31 Aug.** Your call, not a build task.
-5. **Supabase Pro** if you ever want the other 4M foods and the full micros. Not
-   urgent — the catalog stops growing now and the barcode scanner backfills any
-   product a client actually scans.
-6. **VAPID keys, so push actually works.** Two env vars plus a redeploy —
-   `docs/PUSH-SETUP-FOR-DUSTIN.md` has the exact steps. **Until these exist, no
-   client can be notified about anything**, which is why the group chat is
-   silent. This is the highest-value thing on your list.
-7. **Read and send the group message** —
-   `docs/GROUP-MESSAGE-DRAFT-2026-08-16.md`. Drafted, deliberately NOT sent:
-   asking people to turn notifications on before push works, at 1am, is the
-   fastest way to get the group muted. Send it in the morning, after the keys.
-8. **Exercise video ceiling: 30 seconds or 60?** They currently disagree —
-   `verify/route.ts` says `MAX_SECONDS = 60`, the database job that actually runs
-   says 30. Found by watching it reject clips at 48s, 49s and 53s tonight, all
-   inside the documented ceiling. Aligning to 60 gains one or two exercises, so
-   the number matters less than the fact that one rule has two homes and the
-   analysis in `EXERCISE-VIDEOS-THE-REAL-NUMBERS.md` was written against the one
-   the system does not enforce. Addendum added to that document.
+   never the live one. Send me the address and the trainer-identity change is
+   five minutes.
+10. **17 clients run out of programming on 31 Aug.** Your call, not a build task.
+11. **Supabase Pro** only if you ever want the other 4M foods and full micros.
+    Not urgent — the catalog stops growing and the barcode scanner backfills
+    anything a client actually scans.
+12. **Your 24 Aug plan** stays archived unless you say otherwise. Correctly
+    archived as far as I can tell. Nothing to do.
 
-9. **One yes/no: may I touch `aiItemsToCustom` in `NutritionV3Client.tsx`?**
-   A meal logged through the AI coach still keeps **four of its 33 nutrients** —
-   the same fault I fixed in two other places tonight, one door along. That file
-   is on your off-limits list so I left it. Ten lines, one function, no change to
-   either logger's behaviour, and the guard for it already exists. Say yes and it
-   goes out in the next session.
-
-`UPSTREAM_SYNC_TOKEN` and `VERCEL_DEPLOY_HOOK` came OFF this list during the
-night: the sync now uses GitHub's built-in token, and v2's Vercel is already
-connected to git and deployed the seed by itself.
+`UPSTREAM_SYNC_TOKEN` and `VERCEL_DEPLOY_HOOK` came OFF this list: the sync uses
+GitHub's built-in token now, and v2's Vercel is connected to git and deployed
+the seed by itself.
 
 ### Left deliberately undone
 
