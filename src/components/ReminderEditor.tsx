@@ -331,7 +331,19 @@ export default function ReminderEditor() {
         patch.notification_status = "sent";
         patch.approved_at = new Date().toISOString();
       }
-      await sup.from("payment_reminders").update(patch).eq("id", r.id);
+      // Checked, and it has to be checked BEFORE the email. The notice below
+      // says "Reminder approved and the in-app banner is showing, but the email
+      // didn't send" — on a refused update that sentence is two lies and an
+      // email to the client about a reminder that was never approved.
+      const { error: saveErr } = await sup.from("payment_reminders").update(patch).eq("id", r.id);
+      if (saveErr) {
+        alert(
+          (publish ? "Not approved" : "Not saved") +
+            " — nothing was changed and the client was not contacted. " +
+            saveErr.message,
+        );
+        return;
+      }
       if (publish) {
         // Auto-email the client the reminder on approval. Best-effort: the approval
         // + in-app banner already committed above, so an email failure never blocks
@@ -358,12 +370,27 @@ export default function ReminderEditor() {
     setBusy(r.id);
     try {
       const sup = createClient() as any;
-      await sup.from("payment_reminders").update({
+      // This is the write that means PAID. Everything after it is downstream of
+      // it being true, so nothing after it may run until it is known to have
+      // landed: unchecked, a refused update still thanked the client for a
+      // payment the books did not record and still rolled the cycle forward.
+      // There is precedent for the shape in paymentActions.ts's own history —
+      // markClientPaid once inserted with a column that did not exist,
+      // unchecked, right after deleting the current reminder, and quietly wiped
+      // a client's billing schedule.
+      const { error: paidErr } = await sup.from("payment_reminders").update({
         notification_status: "paid",
         paid_confirmed_at: new Date().toISOString(),
       }).eq("id", r.id);
-      // Notify the client their payment was received (feedback b0ee64d6)
-      await sup.from("client_notifications").insert({
+      if (paidErr) {
+        alert("Not marked paid — nothing was changed and the client was not notified. " + paidErr.message);
+        return;
+      }
+      // Notify the client their payment was received (feedback b0ee64d6).
+      // Best-effort by design: they HAVE been marked paid, and failing that
+      // back out over a notification would be worse. But it must be capable of
+      // saying so — a client who never hears is a client who asks.
+      const { error: notifyErr } = await sup.from("client_notifications").insert({
         client_id: r.client_id,
         type: "payment_received",
         title: "Payment received ✓",
@@ -372,12 +399,19 @@ export default function ReminderEditor() {
       // Roll forward. Seed 0, NOT the fee or the previous amount: under the
       // sessions-trained rule the next cycle's amount is not knowable yet — it
       // is whatever they train. The editor computes it at send time.
-      await sup.from("payment_reminders").insert({
+      const { error: rollErr } = await sup.from("payment_reminders").insert({
         client_id: r.client_id,
         due_date: nextDueDate(r.due_date, r.cadence),
         amount_due: 0,
         notification_status: "pending",
       });
+      // Named separately: a missing next cycle is a reminder that never goes
+      // out, and it is invisible — nothing on the screen shows the absence.
+      if (rollErr) {
+        alert("Marked paid, but the next cycle was NOT created — add it by hand. " + rollErr.message);
+      } else if (notifyErr) {
+        alert("Marked paid, but the client wasn't notified. " + notifyErr.message);
+      }
       await load();
     } finally { setBusy(null); }
   };
@@ -387,7 +421,10 @@ export default function ReminderEditor() {
     setBusy(r.id);
     try {
       const sup = createClient() as any;
-      await sup.from("payment_reminders").delete().eq("id", r.id);
+      // The reload would put the row back, which is honest but mute — a Delete
+      // that visibly does nothing reads as a broken button, not a refusal.
+      const { error } = await sup.from("payment_reminders").delete().eq("id", r.id);
+      if (error) alert("Not deleted — the reminder is still there. " + error.message);
       await load();
     } finally { setBusy(null); }
   };

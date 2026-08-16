@@ -62,10 +62,14 @@ export async function POST(req: NextRequest) {
   };
 
   if (action === "reject") {
-    await db
+    const { error } = await db
       .from("exercise_video_candidates")
       .update({ status: "rejected", reviewed_at: new Date().toISOString() })
       .eq("id", id);
+    // A rejection that did not land leaves the candidate in the queue, and the
+    // screen says rejected — so the same clip comes back tomorrow and the queue
+    // stops being read.
+    if (error) return NextResponse.json({ error: `Not rejected — ${error.message}` }, { status: 500 });
     return NextResponse.json({ ok: true, status: "rejected" });
   }
 
@@ -75,11 +79,33 @@ export async function POST(req: NextRequest) {
     }
     // Back to whatever was there before — usually null, which is correct: an
     // exercise with no video is the state we started from, not an error state.
-    await db.from("exercises").update({ video_url: c.previous_video_url }).eq("id", c.exercise_id);
-    await db
+    //
+    // This is the write that IS the undo. Unchecked, a failure left the bad
+    // video in front of clients while the queue said pending — the one state
+    // that reads as "handled" and is not.
+    const { error: restoreErr } = await db
+      .from("exercises")
+      .update({ video_url: c.previous_video_url })
+      .eq("id", c.exercise_id);
+    if (restoreErr) {
+      return NextResponse.json(
+        { error: `Not undone — the video is still live on that exercise. ${restoreErr.message}` },
+        { status: 500 },
+      );
+    }
+    const { error: markErr } = await db
       .from("exercise_video_candidates")
       .update({ status: "pending", reviewed_at: null })
       .eq("id", id);
+    if (markErr) {
+      // The video IS off the exercise, which is what mattered. The candidate
+      // still reads approved, so say so rather than let the queue disagree
+      // with what clients see.
+      return NextResponse.json(
+        { error: `Video removed, but the candidate still shows as approved — ${markErr.message}`, restored: true },
+        { status: 500 },
+      );
+    }
     return NextResponse.json({ ok: true, status: "pending" });
   }
 
@@ -112,7 +138,14 @@ export async function POST(req: NextRequest) {
     .eq("id", c.exercise_id);
   if (exErr) return NextResponse.json({ error: exErr.message }, { status: 500 });
 
-  await db
+  // THE write that makes an approval reversible. This file opens by promising
+  // "Approving is REVERSIBLE and the route makes sure of it" — and that promise
+  // lived entirely in this one unchecked call. If it failed, the candidate
+  // stayed `pending`, so the undo path refuses outright ("That one was never
+  // approved"), and `previous_video_url` was never stashed, so the old URL is
+  // gone. The video is live in front of clients and cannot be taken back from
+  // the screen that put it there.
+  const { error: markErr } = await db
     .from("exercise_video_candidates")
     .update({
       status: "approved",
@@ -120,16 +153,45 @@ export async function POST(req: NextRequest) {
       previous_video_url: previous,
     })
     .eq("id", id);
+  if (markErr) {
+    // Put the exercise back rather than leave an un-undoable approval standing.
+    const { error: rollbackErr } = await db
+      .from("exercises")
+      .update({ video_url: previous })
+      .eq("id", c.exercise_id);
+    if (!rollbackErr) {
+      return NextResponse.json(
+        { error: `Not approved — nothing changed. ${markErr.message}` },
+        { status: 500 },
+      );
+    }
+    // Both failed. Hand back the previous URL, because it exists nowhere else
+    // now and it is the only thing that makes this recoverable by hand.
+    return NextResponse.json(
+      {
+        error:
+          `The video is now live on that exercise but the approval could not be recorded, ` +
+          `so it cannot be undone from here. Previous video: ${previous ?? "none"}. ${markErr.message}`,
+        live: true,
+        previous,
+      },
+      { status: 500 },
+    );
+  }
 
   // The others for this exercise are moot the moment one is chosen. Left
   // pending they would sit in the queue forever asking about a job already
   // done, which is how a review queue stops being read.
-  await db
+  //
+  // Not fatal — the approval stands either way — but it must be capable of
+  // saying so, or the queue quietly regrows.
+  const { error: supErr } = await db
     .from("exercise_video_candidates")
     .update({ status: "superseded", reviewed_at: new Date().toISOString() })
     .eq("exercise_id", c.exercise_id)
     .neq("id", id)
     .in("status", ["pending", "too_long"]);
+  if (supErr) console.error("video-candidates/decide: could not supersede siblings —", supErr.message);
 
   return NextResponse.json({ ok: true, status: "approved", replaced: previous });
 }

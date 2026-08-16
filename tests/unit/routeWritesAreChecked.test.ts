@@ -197,3 +197,64 @@ for (const fn of ["start", "end", "leave"]) {
     assert.match(body, /window\.alert\(/, `${fn} fails silently`);
   });
 }
+
+// ── /api/video-candidates/decide — the promise in its own header ───────────
+//
+// That file opens with: "Approving is REVERSIBLE and the route makes sure of
+// it." The promise lived entirely in one unchecked write — the one that marks
+// the candidate approved and stashes the exercise's PREVIOUS video_url.
+//
+// If it failed: the exercise's video_url had already been updated (that write
+// was checked), so the new clip was live in front of clients; the candidate
+// stayed `pending`, so the undo path refuses outright ("That one was never
+// approved"); and previous_video_url was never written, so the old URL existed
+// nowhere. Live, wrong, and unrecoverable from the screen that did it.
+//
+// The undo path had the mirror fault: restoring the exercise was unchecked and
+// marking the candidate pending was not, so a failed restore left the bad video
+// in front of clients while the queue read as handled.
+
+const DECIDE = read("src/app/api/video-candidates/decide/route.ts");
+
+test("every write in the decide route captures its result", () => {
+  const writes = (DECIDE.match(/\.(insert|update|delete|upsert)\(/g) || []).length;
+  assert.ok(writes > 0);
+  assert.equal((DECIDE.match(BARE_WRITE) || []).length, 0);
+});
+
+// The approve block, not the undo block — both have a `markErr`, and only one
+// of them is the reversibility promise.
+const APPROVE = DECIDE.slice(DECIDE.indexOf("if (c.duration_sec == null)"));
+
+test("an approval that could not be recorded does not stand", () => {
+  const i = APPROVE.indexOf("const { error: markErr }");
+  assert.ok(i > 0, "the approval mark is unchecked again");
+  const after = APPROVE.slice(i);
+  assert.match(after, /if \(markErr\)/);
+  // Rolled back rather than left live-and-un-undoable.
+  assert.match(after, /update\(\{ video_url: previous \}\)/, "no rollback of the exercise");
+});
+
+test("when even the rollback fails, the previous URL is handed back", () => {
+  // It exists nowhere else at that point. Without it the exercise cannot be
+  // put right by hand either.
+  const after = APPROVE.slice(APPROVE.indexOf("if (markErr)"));
+  assert.match(after, /previous,/);
+  assert.match(after, /live: true/);
+});
+
+test("a failed undo does not report the video as removed", () => {
+  const i = DECIDE.indexOf('action === "undo"');
+  const body = DECIDE.slice(i, DECIDE.indexOf("if (c.duration_sec == null)"));
+  const guard = body.indexOf("if (restoreErr)");
+  const mark = body.indexOf('status: "pending"');
+  assert.ok(guard > 0, "the restore is unchecked again");
+  assert.ok(guard < mark, "the candidate is marked pending before the video is known to be off");
+});
+
+test("a failed rejection is not reported as rejected", () => {
+  const i = DECIDE.indexOf('action === "reject"');
+  const body = DECIDE.slice(i, i + 600);
+  assert.match(body, /const \{ error \} = await db/);
+  assert.match(body, /Not rejected/);
+});

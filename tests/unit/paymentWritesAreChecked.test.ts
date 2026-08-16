@@ -188,3 +188,73 @@ test("a failed send leaves the person's typed message where it was", () => {
   assert.match(after.slice(guard, guard + 220), /alert\(sendErr\)/);
   assert.match(after.slice(guard, guard + 220), /return;/);
 });
+
+// ── The reminder editor: the same fault, on the same money ─────────────────
+//
+// paymentActions.ts was fixed on 16 Aug. ReminderEditor.tsx — the screen where
+// a reminder is actually approved and a client is actually marked paid — was
+// not, and it is the worse of the two.
+//
+// `save(r, publish=true)` updated the reminder unchecked and then emailed the
+// client. On a refused update the notice it shows reads "Reminder approved and
+// the in-app banner is showing, but the email didn't send" — two lies in one
+// sentence, followed by an email to the client about a reminder that was never
+// approved.
+//
+// `confirmPaid` made three writes, none checked, in an order that matters: mark
+// paid → thank the client → roll the cycle forward. A refused first write still
+// thanked them for a payment the books did not record.
+//
+// The precedent is in paymentActions.ts's own history, quoted at the top of
+// this file: markClientPaid once inserted with a column that did not exist,
+// unchecked, immediately after deleting the current reminder, and quietly wiped
+// a client's billing schedule.
+
+const EDITOR = strip(readFileSync(join(process.cwd(), "src/components/ReminderEditor.tsx"), "utf8"));
+
+test("every write in the reminder editor captures its result", () => {
+  // Writes only — the loader legitimately reads `? await sup.from(…)` out of a
+  // ternary, and a select whose error is ignored is a weaker complaint than a
+  // write whose error is ignored.
+  const W = /await\s+sup\s*\n?\s*\.from\([^)]*\)\s*\n?\s*\.(insert|update|delete|upsert)\(/g;
+  const BARE = /(?<!=\s)await\s+sup\s*\n?\s*\.from\([^)]*\)\s*\n?\s*\.(insert|update|delete|upsert)\(/g;
+  const writes = (EDITOR.match(W) || []).length;
+  const bare = EDITOR.match(BARE) || [];
+  assert.ok(writes > 0, "expected write calls");
+  assert.equal(bare.length, 0, `${bare.length} of ${writes} writes still discard their result`);
+});
+
+test("a reminder that was not approved does not email the client", () => {
+  const i = EDITOR.indexOf("const save = async");
+  const body = EDITOR.slice(i, EDITOR.indexOf("const confirmPaid"));
+  const guard = body.indexOf("if (saveErr)");
+  const email = body.indexOf("/api/reminders/send");
+  assert.ok(guard > 0, "the update is unchecked again");
+  assert.ok(guard < email, "the client is emailed before the approval is known to have landed");
+  assert.match(body.slice(guard, guard + 400), /return;/);
+});
+
+test("nothing downstream of 'paid' runs until paid is true", () => {
+  const i = EDITOR.indexOf("const confirmPaid");
+  const body = EDITOR.slice(i, EDITOR.indexOf("const deleteReminder"));
+  const guard = body.indexOf("if (paidErr)");
+  const notify = body.indexOf("payment_received");
+  const roll = body.indexOf("nextDueDate(");
+  assert.ok(guard > 0, "the paid write is unchecked again");
+  assert.ok(guard < notify, "the client is thanked before the payment is recorded");
+  assert.ok(guard < roll, "the cycle rolls forward before the payment is recorded");
+});
+
+test("a missing next cycle is named, because nothing on the screen shows its absence", () => {
+  const i = EDITOR.indexOf("const confirmPaid");
+  const body = EDITOR.slice(i, EDITOR.indexOf("const deleteReminder"));
+  assert.match(body, /const \{ error: rollErr \}/);
+  assert.match(body, /next cycle was NOT created/);
+});
+
+test("a refused delete says so rather than looking like a dead button", () => {
+  const i = EDITOR.indexOf("const deleteReminder");
+  const body = EDITOR.slice(i, i + 700);
+  assert.match(body, /const \{ error \} = await sup/);
+  assert.match(body, /alert\(/);
+});

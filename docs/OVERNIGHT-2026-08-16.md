@@ -394,7 +394,7 @@ Still worth doing when someone has an authenticated session: run the builder
 against real targets and see how OFTEN it reaches for the library. That is a
 prompt-quality question, and it is now separable from the accuracy one.
 
-### [~] D. Unchecked writes — inventoried, payments fixed, the rest queued
+### [~] D. Unchecked writes — the ones where somebody was being lied to are done
 
 Swept: **139 sites across 60 files**, written up in
 `docs/UNCHECKED-WRITES-INVENTORY.md` along with the scan that produced it.
@@ -415,8 +415,29 @@ noise everywhere and still miss the ones that matter. The document says so, and
 gives the single question that decides each site: **if this write fails, does
 anyone find out?**
 
-Next, by who gets lied to: schedule actions (6), message actions (6), the
-onboarding routes (7), then trainer-facing, then cron. The three logger files
+**Worked through overnight, in that order.** Schedule actions, message actions
+and the onboarding routes were done earlier in the night. Then, in `804d0d2`,
+`88af90b` and `4a2f964`:
+
+| Surface | What was being said that was not true |
+|---|---|
+| `/api/focus-drafts` | Every write unchecked, every answer `{ ok: true }`. A failed APPROVAL published nothing, returned 200 and cleared the queue off his screen — and Sunday's 6am fallback then published all 35 drafts unreviewed. That is the outcome the review screen exists to prevent. |
+| `/api/program-feedback` | The write that IS the answer was unchecked; `delivered` meant "was it substantive", not "did it arrive". Both best-effort writes were wrapped in try/catch, which cannot work. |
+| `/api/challenge` | `join` swallowed every error to forgive a duplicate. `start` ends the running challenge before inserting the new one, unchecked — causing the one thing that write prevents: two live at once. |
+| `agent-tools.ts` undo | **The worst of them.** The whole undo block is a try/catch over PostgREST calls, which never throw — so every failed reversal answered "Undone: …" in prose. The file's own comment says it: "the undo would silently do nothing and report success — which is worse than not offering undo at all." |
+| `agent-tools.ts` assign | Deactivating the current programme was unchecked, so the insert ran anyway and left the client on TWO — the exact state `advance_phase` records breaking on. |
+| `ReminderEditor.tsx` | A refused approval still emailed the client, under a notice reading "Reminder approved and the in-app banner is showing". `confirmPaid` thanked the client and rolled the cycle forward without knowing the payment was recorded. |
+| `/api/video-candidates/decide` | That file promises "Approving is REVERSIBLE and the route makes sure of it" — and the promise lived entirely in one unchecked write. Failed, it left the new clip live in front of clients, the candidate un-undoable, and the previous URL existing nowhere. |
+
+**The recurring shape, worth naming once:** a `try/catch` wrapped around a
+PostgREST call. It reads as careful and is the opposite — the call RETURNS its
+error rather than throwing, so the catch cannot fire and the code inside is
+completely unguarded while looking guarded. Four of the seven above were this,
+including every "best-effort, just log it" block, whose console lines had
+therefore never once fired.
+
+**Still open:** ~100 sites, now mostly genuine fire-and-forget plus the cron
+routes (where the right fix is logging, not alerts). The three logger files
 (11 sites) are OFF LIMITS and listed only so they are not forgotten.
 
 ### [ ] E. Photographs for the meal library — BLOCKED HERE, and here is why
