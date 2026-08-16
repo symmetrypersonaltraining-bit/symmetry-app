@@ -4,20 +4,27 @@
 things that genuinely need Dustin. Scheduled sessions read this, take the top
 unfinished item, ship it, tick it off here, and stop.
 
-Last updated **03:30 CT, Sunday 16 Aug**, mid-session.
+Last updated **03:50 CT, Sunday 16 Aug**, mid-session.
 
 ---
 
 ## MORNING SUMMARY — read this, then stop reading
 
-Written at **03:30 CT**. Later runs update it; if the timestamp says 05:xx it
+Written at **03:50 CT**. Later runs update it; if the timestamp says 05:xx it
 is the final version.
 
 **If you read three things:** the video pipeline was publishing to clients on
-its own and no video in the app had ever been approved by a person (stopped);
-your Saturday review queue has been empty because the publisher crashed on 9 Aug
-and has not had a Sunday since (fixed already, fires tomorrow); and push still
+its own, from two places, and no video in this app had ever been approved by a
+person (stopped, reversibly, nothing pulled); your Saturday review queue has
+been empty because the publisher crashed on 9 Aug and has not had a Sunday since
+(already fixed on the 13th — this morning is its first real run); and push still
 needs two keys from you before any client can be notified about anything.
+
+**The thread running through the night**, if you want one sentence for it: the
+app was repeatedly telling somebody a thing had happened when it had not. A
+video was approved that nobody approved. A write "landed" that was refused. An
+undo said "Undone". A streak counted a session that was walked away from. None
+of it threw an error, because none of it ever asked.
 
 ### Shipped to live, each gated and verified
 
@@ -51,6 +58,7 @@ needs two keys from you before any client can be notified about anything.
 | `652d2db` | The catches that could never fire, swept and closed |
 | `c58ff31` | Live app verified healthy on tonight's code |
 | `47d1b99` | NEEDS YOU list reordered by value |
+| `ceef51f` | **The streak counted sessions nobody finished** |
 
 ### Added mid-session, and it turned out to be the big one
 
@@ -362,13 +370,13 @@ users — so the schema catch-up can be done from here without Dustin.
 
 ---
 
-## STATE RIGHT NOW — 03:30 CT
+## STATE RIGHT NOW — 03:50 CT
 
 | | |
 |---|---|
-| `origin/main` (live) | `4a3922c`, shipped and verified against `origin/main` |
-| Unit tests | **1,393 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
-| Ship bridge | **v2, repo-aware, up** — sixteen real pushes tonight, no failures |
+| `origin/main` (live) | `ceef51f`, shipped and verified against `origin/main` |
+| Unit tests | **1,397 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
+| Ship bridge | **v2, repo-aware, up** — nineteen real pushes tonight, no failures |
 | Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
 | Video pipeline | **no longer publishes on its own**, from either place. 175 live videos untouched, all reviewable |
 | Live app | **verified healthy at 03:18 CT** — `/api/health` on `6dc889a`, auth 208 ms, db 344 ms, `ok: true`. Vercel is deploying tonight's commits. |
