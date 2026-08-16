@@ -19,9 +19,15 @@ Written while you were out. Everything below is either **done and live**, or
 3. **The AI's workout adjuster has been reporting changes it never made.** Not
    a silent failure — it counted the failed writes and told you "Applied 3
    changes". Fixed. Detail in §2.
-4. **Jerry Bourgeois has no programming at all.** Not a gap — zero workouts have
-   ever been scheduled for him. Active since 17 Jul, logging meals 5 of 7 days.
-   He needs a decision from you, not from me.
+4. **Jerry Bourgeois has no programming at all** — but he has 16 meal plans and
+   115 meal logs, so he is a coached NUTRITION client, not a neglected one. I
+   overstated this first time round; §5 has the corrected picture. Still worth a
+   decision, because he is the only one of 29 without training.
+
+**Also worth knowing:** the meal + recipe library is LIVE and verified as a real
+client (50 meals / 20 recipes / 116 ingredients readable, 0 rows writable), and
+it took two separate fixes to get there — both found by checking the database
+rather than believing a success response. §11.
 
 ---
 
@@ -287,7 +293,36 @@ to be, and now it is checked rather than assumed.
 
 ---
 
-## 8 · What I checked and found clean
+## 8 · The app_feedback queue — triaged, one closed
+
+Three items were sitting at `new`. All three are feature requests; none is a bug.
+
+| Item | Verdict |
+|---|---|
+| **"Nedd full add workout custom from schedule page"** (you, 6 Aug) | **ALREADY BUILT — closed.** The schedule page has "Build a workout for this day" wired to ManualWorkoutBuilder, and the source comment cites this exact feedback id (`73fcd284`). The queue was stale, the same way the backlog was stale about Bugs A and B this morning. Marked resolved. |
+| **"Need to track full nutrients everywhere in food logger"** (you, 4 Aug) | **GENUINELY OPEN, and narrower than it looks.** Micros are captured, carried through the AI, and stored on `meal_items` — the whole pipeline exists. What does not exist is any UI that RENDERS them. Nothing in the app displays a single micronutrient to a client today. So this is a display job, not a data job, and it does not depend on the 180-hour backfill. |
+| **"Pull info from Garmin, Google, Apple"** (Todd, 29 Jul) | **Open, and needs your call.** A real integration, not an evening's work. |
+
+Feedback queue is now 100 resolved / 2 open.
+
+---
+
+## 9 · A deliberate NON-decision: 57 remaining auth call sites
+
+Overnight I converted the page-level auth to local verification. **57 files still
+make a network `getUser()` call** — all API routes and server actions.
+
+I have not swept them, and I do not think I should have. The outage benefit was
+almost entirely on page loads, which are done; these are write paths, and my own
+note when I stopped the first time still holds — *"a write path deserves its own
+read rather than a sweep."* Doing 57 of them at midnight with you unreachable is
+how a good change becomes an incident.
+
+Listed here so it is a decision on the record rather than something forgotten.
+
+---
+
+## 10 · What I checked and found clean
 
 - **Every other commit today touches no schema.** The library policy was the
   only one, and it now has its migration.
@@ -300,3 +335,46 @@ to be, and now it is checked rather than assumed.
 ---
 
 *Nothing in here is guessed. Where I could not verify something, it says so.*
+
+
+---
+
+## 11 · The library took three goes, and only checking caught it
+
+Worth reading because the pattern is the useful part.
+
+**Attempt 1 — a 500, honestly reported.** `source: "library"` violated
+`recipe_ingredients_source_check` (allowed: manual / database / ai). 20 recipes
+in, **0 ingredients**. The route caught this itself because it checks its own
+writes — the exact discipline I spent the evening adding elsewhere. Had it been
+written the way the workout adjuster was, it would have returned 200 and I would
+have told you the library was live.
+
+**What should have caught it earlier:** `dbCheckConstraintValues.test.ts` exists
+for precisely this, and the fixture already had the right three values. It
+missed mine because of the SHAPE — the rows were built in a `.map()` and inserted
+as a variable, and the scanner only followed `const x = {`. Extended, and
+verified by putting the bad value back.
+
+**Attempt 2 — a 200 with correct numbers, and still broken.** All 20 recipes
+came out `visibility='private'`. `trg_recipe_publish` downgrades a public insert
+unless `is_trainer()`, and the service role is not a trainer. Twenty recipes and
+116 ingredients in the database, readable by **nobody**, with nothing in any log
+or response body to show it. I only found it because I queried the rows.
+
+**I did not touch that trigger.** It is what stops a client publishing a recipe
+to everyone else. Fixed the read policy instead, in a migration, so Dylan gets
+it too.
+
+**Then I swept every trigger in the database** for the same class. Eight rewrite
+a column on write — eight places where what the app sends is not what gets
+stored, silently. The four that change a *submitted* value (the isolation and
+publish triggers) are all behaving correctly. No further bugs of that shape.
+
+**And that sweep found one more real thing.** Moving a real completed workout in
+a rolled-back transaction raised `23505` on
+`uq_scheduled_workout_one_per_slot (client_id, day_id, scheduled_date, position)`.
+Both AI move paths computed a free destination slot; the drag set only the date.
+So on your "move anywhere to anywhere, period" instruction, the drag would still
+have been refused — on exactly the busy days somebody drags. Fixed and
+re-verified against the real constraint.
