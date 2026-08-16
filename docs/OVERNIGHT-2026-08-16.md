@@ -173,6 +173,27 @@ future-dated plan to a bug I had just found and asserted the cause without
 reading the evidence that was already in the row. The bug is real and fixed; the
 claim about your plan was not.
 
+### One decision I stopped short of, on purpose
+
+`/api/workout-ai` builds a workout, writes a `workout_logs` row, then writes the
+matching `scheduled_workouts` row. That file's own comments record what happened
+last time the second half went wrong — *"3 attempts + 1 completed read as 1/4 =
+25% adherence for the week instead of 1/1"*, and *"Jennifer's 30 Jul reads 165
+minutes across two walks; she took one"*.
+
+The `workout_logs` half was fixed then. **The `scheduled_workouts` half is still
+unchecked**, and it was wrapped in a try/catch that could never fire — so the
+two counts can still drift apart in silence. I made those writes capable of
+reporting (they log now, with the consequence named), and I did **not** make
+them fail the request, because by that point the workout IS logged and failing
+would tell a client nothing was recorded when a completed session exists.
+
+Deciding what to tell a client when only half landed is a real product call on a
+workout surface, and your rule says those are yours. Two lines of work once you
+say which way. Everything that BUILDS the workout — the section clear, the day
+rename, every exercise insert — is now checked and fails cleanly, because a
+doubled or short workout in front of a client has no such trade-off.
+
 ### NEEDS YOU — the whole list
 
 1. **`ANTHROPIC_API_KEY` on the symmetry-app-v2 Vercel project.** The variable

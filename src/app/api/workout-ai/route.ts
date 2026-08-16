@@ -336,8 +336,16 @@ export async function POST(req: NextRequest) {
       // prescribed_exercises, and activity days carry no set_logs (verified:
       // zero across every ai_activity day), so nothing logged is lost.
       dayIdNew = reusedDayId;
-      await admin.from("days").update({ label: workout.title }).eq("id", dayIdNew);
-      await admin.from("sections").delete().eq("day_id", dayIdNew);
+      const { error: labelErr } = await admin.from("days").update({ label: workout.title }).eq("id", dayIdNew);
+      if (labelErr) throw labelErr;
+      // The clear-before-rewrite. This one is not cosmetic: unchecked, a failed
+      // delete followed by successful inserts leaves the OLD sections AND the
+      // new ones on the same day, and the client opens a doubled workout that
+      // the response has just told them was created. Both errors now reach the
+      // catch below, which is the path that already exists and already says
+      // "Designed the workout but couldn't save it".
+      const { error: clearErr } = await admin.from("sections").delete().eq("day_id", dayIdNew);
+      if (clearErr) throw clearErr;
     } else {
     const { data: posRow } = await admin.from("days").select("position").eq("phase_id", phaseId).order("position", { ascending: false }).limit(1);
     const nextPos = ((posRow && posRow[0] ? (posRow[0] as { position: number }).position : 0) || 0) + 1;
@@ -362,11 +370,16 @@ export async function POST(req: NextRequest) {
         const exId = await resolveExerciseId(admin, clientId, ex.name);
         if (!exId) continue;
         const t = mapTracking(ex);
-        await admin.from("prescribed_exercises").insert({
+        // Checked like its two parents. Unchecked, an exercise the AI designed
+        // and the RESPONSE still describes — the reply hands back every section
+        // and exercise verbatim — simply is not in the workout the client
+        // opens. Nothing about a short workout looks wrong.
+        const { error: peErr } = await admin.from("prescribed_exercises").insert({
           section_id: secId, exercise_id: exId, position: pPos++, sets: ex.sets,
           volume_type: t.volume_type, volume_value: t.volume_value, tracked_fields: t.tracked,
           cue: ex.note, load_descriptor: null,
         });
+        if (peErr) throw peErr;
       }
     }
   } catch (e) {
@@ -426,16 +439,34 @@ export async function POST(req: NextRequest) {
       // uq_scheduled_workout_one_per_day (client_id, day_id, scheduled_date)
       // WHERE deleted_at IS NULL — so on a reuse this is an update by
       // necessity as well as by correctness.
+      //
+      // NOT converted to a throw, deliberately. The workout_logs write above
+      // has already landed by this point, so failing the request here would
+      // tell the client nothing was logged when a completed session exists —
+      // swapping one wrong answer for another. What these needed was to be
+      // CAPABLE of reporting: a PostgREST call returns its error rather than
+      // throwing, so the catch on this block has never seen one of these and
+      // the console line it exists to produce has never fired.
+      //
+      // This is the unfixed half of the bug described at the top of this
+      // block. Streaks and session counts read workout_logs; the weekly
+      // done-count reads scheduled_workouts. That half was fixed; this half
+      // can still leave the two disagreeing — now at least it says so in the
+      // log. Making it right needs a decision about what to tell the client
+      // when only half landed, and this file is a workout surface, so that is
+      // Dustin's call, not a 3am one. Written up in the overnight doc.
       if (reusedDayId) {
-        await admin.from("scheduled_workouts")
+        const { error: schedErr } = await admin.from("scheduled_workouts")
           .update({ status: "completed", workout_log_id: wl?.id ?? null, updated_at: new Date().toISOString() })
           .eq("client_id", clientId).eq("day_id", dayIdNew).eq("scheduled_date", today)
           .is("deleted_at", null);
+        if (schedErr) console.error("workout-ai: log landed but schedule row not completed —", schedErr.message);
       } else {
-        await admin.from("scheduled_workouts").insert({
+        const { error: schedErr } = await admin.from("scheduled_workouts").insert({
           client_id: clientId, day_id: dayIdNew, scheduled_date: today, status: "completed",
           workout_log_id: wl ? (wl as { id: string }).id : null, source: "client_self_assign",
         });
+        if (schedErr) console.error("workout-ai: log landed but no schedule row —", schedErr.message);
       }
       logged = true;
     } else {
@@ -449,19 +480,26 @@ export async function POST(req: NextRequest) {
         .select("id").eq("client_owner_id", clientId).neq("id", dayIdNew);
       const priorAiDayIds = ((priorAiDays as { id: string }[] | null) || []).map((d) => d.id);
       if (priorAiDayIds.length) {
-        await admin.from("scheduled_workouts").update({ status: "skipped" })
+        // This retirement IS the adherence-denominator fix described above. If
+        // it fails quietly the "3 attempts + 1 completed reads as 25% instead
+        // of 1/1" bug comes straight back with nothing to show for it, which is
+        // how it went unnoticed the first time.
+        const { error: retireErr } = await admin.from("scheduled_workouts").update({ status: "skipped" })
           .eq("client_id", clientId).eq("scheduled_date", today).eq("status", "scheduled")
           .eq("source", "client_self_assign").is("deleted_at", null)
           .in("day_id", priorAiDayIds);
+        if (retireErr) console.error("workout-ai: earlier AI attempts NOT retired, adherence will read low —", retireErr.message);
       }
-      await admin.from("scheduled_workouts").insert({
+      const { error: schedErr } = await admin.from("scheduled_workouts").insert({
         client_id: clientId, day_id: dayIdNew, scheduled_date: today, status: "scheduled", source: "client_self_assign",
       });
+      if (schedErr) console.error("workout-ai: replacement built but not scheduled —", schedErr.message);
       if (body.dayId) {
         // deleted_at guard: never resurrect a workout the client already deleted.
-        await admin.from("scheduled_workouts").update({ status: "skipped" })
+        const { error: skipErr } = await admin.from("scheduled_workouts").update({ status: "skipped" })
           .eq("client_id", clientId).eq("day_id", body.dayId).eq("scheduled_date", today).eq("status", "scheduled")
           .is("deleted_at", null);
+        if (skipErr) console.error("workout-ai: original workout NOT marked replaced —", skipErr.message);
       }
     }
   } catch (e) { console.error("workout-ai schedule error", e); }
@@ -472,7 +510,7 @@ export async function POST(req: NextRequest) {
     const trainerAuth = (tr as { auth_user_id: string } | null)?.auth_user_id;
     if (trainerAuth && scope.userId && trainerAuth !== scope.userId) {
       const verb = mode === "activity" ? "logged an extra activity" : mode === "equipment" ? "AI-built a workout from available equipment" : "AI-replaced today's workout";
-      await admin.from("messages").insert({
+      const { error: notifyErr } = await admin.from("messages").insert({
         from_id: scope.userId, to_id: trainerAuth, client_id: clientId, is_group: false,
         // The app wrote this, not the client whose id is on from_id. It only
         // goes to Dustin so the stakes are lower than the client nudges — but
@@ -480,8 +518,14 @@ export async function POST(req: NextRequest) {
         sender_kind: "coachbot",
         body: `🤖 [AI Workout] ${verb}: "${workout.title}". ${workout.rationale || workout.focus || ""}`.trim().slice(0, 500),
       });
+      // Best-effort by design — a client's workout must not fail because the
+      // trainer's inbox did. But it has to be able to SAY so: this insert
+      // returns its error rather than throwing, so the catch below has never
+      // seen a failed notification and "Dustin was told" was an assumption,
+      // never a fact.
+      if (notifyErr) console.error("workout-ai: trainer NOT notified —", notifyErr.message);
     }
-  } catch (e) { console.error("workout-ai notify error", e); }
+  } catch (e) { console.error("workout-ai notify threw", e); }
 
   return NextResponse.json({
     ok: true, dayId: dayIdNew, mode, logged,
