@@ -48,7 +48,7 @@ needs two keys from you before any client can be notified about anything.
 | `f36698d` | Unchecked-write sweep marked done, summary refreshed |
 | `6dc889a` | Three of the "harmless" remainder were not harmless |
 | `4a3922c` | Bot-message audit recorded — clean |
-| _this_ | The catches that could never fire, swept and closed |
+| `652d2db` | The catches that could never fire, swept and closed |
 
 ### Added mid-session, and it turned out to be the big one
 
@@ -317,6 +317,7 @@ users — so the schema catch-up can be done from here without Dustin.
 | Ship bridge | **v2, repo-aware, up** — sixteen real pushes tonight, no failures |
 | Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
 | Video pipeline | **no longer publishes on its own**, from either place. 175 live videos untouched, all reviewable |
+| Live app | **verified healthy at 03:18 CT** — `/api/health` on `6dc889a`, auth 208 ms, db 344 ms, `ok: true`. Vercel is deploying tonight's commits. |
 | `symmetry-app-v2` repo | **seeded** — main is live main byte for byte |
 | `symmetry-app-v2.vercel.app` | serving, but an OLDER build — `/api/health` 404s. Confirm this. |
 | Dev Supabase `giiovjfpbuzmrvpdglhv` | **caught up** — 88 tables, 1,169 columns, 166 policies |
