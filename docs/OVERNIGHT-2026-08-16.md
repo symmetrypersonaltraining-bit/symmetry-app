@@ -4,13 +4,13 @@
 things that genuinely need Dustin. Scheduled sessions read this, take the top
 unfinished item, ship it, tick it off here, and stop.
 
-Last updated **03:00 CT, Sunday 16 Aug**, mid-session.
+Last updated **03:15 CT, Sunday 16 Aug**, mid-session.
 
 ---
 
 ## MORNING SUMMARY — read this, then stop reading
 
-Written at **03:00 CT**. Later runs update it; if the timestamp says 05:xx it
+Written at **03:15 CT**. Later runs update it; if the timestamp says 05:xx it
 is the final version.
 
 **If you read three things:** the video pipeline was publishing to clients on
@@ -45,6 +45,8 @@ needs two keys from you before any client can be notified about anything.
 | `03eda73` | The programme editor stops showing changes that never saved |
 | `9fc63a8` | Plan editor, workout builder and Week Ahead stop losing changes quietly |
 | `94d850f` | The two cron writers can say when they failed |
+| `f36698d` | Unchecked-write sweep marked done, summary refreshed |
+| `6dc889a` | Three of the "harmless" remainder were not harmless |
 
 ### Added mid-session, and it turned out to be the big one
 
@@ -304,13 +306,13 @@ users — so the schema catch-up can be done from here without Dustin.
 
 ---
 
-## STATE RIGHT NOW — 03:00 CT
+## STATE RIGHT NOW — 03:15 CT
 
 | | |
 |---|---|
-| `origin/main` (live) | `94d850f`, shipped and verified against `origin/main` |
-| Unit tests | **1,382 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
-| Ship bridge | **v2, repo-aware, up** — twelve real pushes tonight, no failures |
+| `origin/main` (live) | `6dc889a`, shipped and verified against `origin/main` |
+| Unit tests | **1,386 passed, 0 failed**; `tsc` 0 errors in `src/`; `next build` compiled |
+| Ship bridge | **v2, repo-aware, up** — fourteen real pushes tonight, no failures |
 | Live Supabase | trim COMPLETE — **956 MB → 363 MB**, 574,605 foods, under the 500 MB free limit |
 | Video pipeline | **no longer publishes on its own**, from either place. 175 live videos untouched, all reviewable |
 | `symmetry-app-v2` repo | **seeded** — main is live main byte for byte |
@@ -320,6 +322,14 @@ users — so the schema catch-up can be done from here without Dustin.
 Both food import cron jobs are **stopped** (`off-bulk-import` job 36,
 `off-micros-backfill` job 39). Do not restart them without Dustin: the catalog
 cannot grow further on the free tier. `trim-off-catalog` has been unscheduled.
+
+**Checked and clean, so nobody re-checks it:** no bot has ever DM'd a client.
+Thirty days of `messages` shows 6 app-written rows — five challenge posts in the
+group and one AI-workout notice to Dustin himself — against 337 human ones. The
+client-DM path was deleted rather than flagged in August and it has stayed
+deleted. Bot messages also render distinctly (purple, own label, never
+right-aligned as Dustin), so the honesty guarantee that replaced the DM holds on
+screen as well as in the table.
 
 Every pg_cron job's run history was swept tonight. Apart from the focus
 publisher (documented above) the only real failure in 21 days was
