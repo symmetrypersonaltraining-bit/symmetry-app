@@ -224,7 +224,12 @@ export default function NutritionV3Client(props: Props) {
   const [logs, setLogs] = useState<DbLog[]>(todayLogs);
   const [sheetStack, setSheetStack] = useState<NonNullable<SheetState>[]>([]);
   const sheet = sheetStack.length ? sheetStack[sheetStack.length - 1] : null;
-  const [myMeals, setMyMeals] = useState<{ id: string; name: string; items: CustomItem[] }[]>([]);
+  // `library` was being computed in loadMyMeals and thrown away here: the state
+  // type had no such field, so the flag never reached a single render and every
+  // row looked identical. Dustin, 17 Aug, opening My Meals and finding his own
+  // three buried in the fifty shared ones with nothing telling them apart.
+  const [myMeals, setMyMeals] = useState<{ id: string; name: string; items: CustomItem[]; library?: boolean }[]>([]);
+  const [mealTab, setMealTab] = useState<"mine" | "library">("mine");
   const [myMealsOk, setMyMealsOk] = useState(true);
   const [showGrocery, setShowGrocery] = useState(false);
   const [showNutrients, setShowNutrients] = useState(false);
@@ -380,7 +385,13 @@ export default function NutritionV3Client(props: Props) {
   }
   // Remove a saved meal from the library. Undoable — the restore re-inserts the
   // same name/items (a new id; nothing references my_meals rows by id).
-  async function deleteMyMeal(m: { id: string; name: string; items: CustomItem[] }) {
+  async function deleteMyMeal(m: { id: string; name: string; items: CustomItem[]; library?: boolean }) {
+    // A library meal belongs to everybody. For a CLIENT the delete is refused by
+    // RLS and the row reappears on refresh — annoying. For DUSTIN it succeeds,
+    // and removes the meal from all 30 clients from inside his own meal list,
+    // with an undo toast that would then re-save it as his personal copy. The
+    // button is hidden for library rows; this is the second lock.
+    if (m.library) { toast("That one is from the shared library — it stays put."); return; }
     const snapshot = { name: m.name, items: JSON.parse(JSON.stringify(m.items)) as CustomItem[] };
     setMyMeals((prev) => prev.filter((x) => x.id !== m.id));
     const { error } = await supabase.from("my_meals").delete().eq("id", m.id);
@@ -2282,13 +2293,19 @@ export default function NutritionV3Client(props: Props) {
         )}
         <p className="text-xs font-bold uppercase tracking-widest mt-2 mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Meals</p>
         {myMeals.length === 0 && <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>No saved meals yet — swap for custom below and it saves automatically.</p>}
-        {myMeals.map((mm2) => {
+        {/* This one is a swap list rather than a manager, so it stays a single
+            list — but yours come first and the shared ones say so, instead of
+            three of your meals being lost among fifty. */}
+        {[...myMeals.filter((m) => !m.library), ...myMeals.filter((m) => m.library)].map((mm2) => {
           const tot = customMealMacros({ name: mm2.name, items: mm2.items });
           return (
             <div key={mm2.id} className="flex items-center gap-2 rounded-xl p-2.5 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold truncate" style={{ color: "var(--brand-text)" }}>{mm2.name}</p>
-                <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>{mm2.items.length} items · {r(tot.kcal)} cal</p>
+                <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>
+                  {mm2.library && <span style={{ fontWeight: 800, letterSpacing: ".04em" }}>LIBRARY · </span>}
+                  {mm2.items.length} items · {r(tot.kcal)} cal
+                </p>
               </div>
               <button onClick={async () => {
                 const meta: CustomMeta = { name: mm2.name, time: rowTime(row), items: JSON.parse(JSON.stringify(mm2.items)), kind: "swap", unlogged: true, sourceMealId: row.chosen?.id ?? null };
@@ -2392,11 +2409,36 @@ export default function NutritionV3Client(props: Props) {
   }
 
   function MyMealsSheetView({ at }: { at: number | null; replaceRowKey?: string }) {
+    // Split once, here, so the tab counts and the list can never disagree.
+    const mineMeals = myMeals.filter((m) => !m.library);
+    const libraryMeals = myMeals.filter((m) => m.library);
+    const shownMeals = mealTab === "mine" ? mineMeals : libraryMeals;
     return (
-      <Sheet title="My Meals" subtitle="Saved customs — reuse anywhere" onClose={closeAllSheets} onBack={backSheet}>
+      <Sheet title="My Meals" subtitle="Yours, plus the shared library" onClose={closeAllSheets} onBack={backSheet}>
         {!myMealsOk && <p className="text-xs mb-2" style={{ color: "#b45309" }}>My Meals storage isn&apos;t ready yet — saves will start working once it&apos;s live.</p>}
-        {myMeals.length === 0 && <p className="text-sm py-3 text-center" style={{ color: "var(--brand-text-secondary)" }}>No saved meals yet — create a custom meal and it lands here.</p>}
-        {myMeals.map((mm2) => {
+        {/* Two tabs, Dustin's choice on 17 Aug over tagging the rows. His three
+            meals were sitting in a 53-row list with fifty shared ones, in no
+            order that helped. Same shape the Recipes screen already uses. */}
+        <div className="flex gap-1.5 mb-2.5">
+          {([["mine", `Mine (${mineMeals.length})`], ["library", `Library (${libraryMeals.length})`]] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setMealTab(k)}
+              aria-pressed={mealTab === k}
+              className="px-3 py-1.5 rounded-full text-xs font-bold"
+              style={{
+                border: "1px solid " + (mealTab === k ? "var(--brand-primary)" : "var(--brand-border)"),
+                background: mealTab === k ? "var(--brand-primary)" : "transparent",
+                color: mealTab === k ? "#fff" : "var(--brand-text)",
+              }}>{label}</button>
+          ))}
+        </div>
+        {shownMeals.length === 0 && (
+          <p className="text-sm py-3 text-center" style={{ color: "var(--brand-text-secondary)" }}>
+            {mealTab === "mine"
+              ? "Nothing saved yet — create a custom meal and it lands here."
+              : "The shared library is empty."}
+          </p>
+        )}
+        {shownMeals.map((mm2) => {
           const tot = customMealMacros({ name: mm2.name, items: mm2.items });
           return (
             <div key={mm2.id} className="flex items-center gap-2 rounded-xl p-2.5 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
@@ -2412,9 +2454,14 @@ export default function NutritionV3Client(props: Props) {
                 }} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white flex-shrink-0" style={{ background: "var(--brand-primary)" }}>Add here</button>
               )}
               {/* A library you can only add to fills up with junk. Delete is
-                  undoable (same pattern as deleting a meal from the day). */}
-              <button onClick={() => deleteMyMeal(mm2)} aria-label={`Remove ${mm2.name} from My Meals`}
-                className="flex-shrink-0" style={{ color: "var(--brand-text-secondary)", padding: 6, fontSize: 13 }}>✕</button>
+                  undoable (same pattern as deleting a meal from the day).
+                  Not offered on a shared-library row: a client's delete is
+                  refused by RLS and the row returns on refresh, and Dustin's
+                  would succeed and take the meal away from all 30 clients. */}
+              {!mm2.library && (
+                <button onClick={() => deleteMyMeal(mm2)} aria-label={`Remove ${mm2.name} from My Meals`}
+                  className="flex-shrink-0" style={{ color: "var(--brand-text-secondary)", padding: 6, fontSize: 13 }}>✕</button>
+              )}
             </div>
           );
         })}
