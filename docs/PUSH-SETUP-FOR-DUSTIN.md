@@ -1,55 +1,133 @@
-# Turning push on — the two env vars
+# Turning push on — 5 minutes, three env vars, one redeploy
 
-Everything is built and shipped. It is **inert** until these exist, and no
-client can be notified until then.
+Everything is built, shipped and **inert** until these exist. No client can be
+notified until then. Verified live at the time of writing:
+`/api/push/subscribe` → `{"configured":false,"publicKey":null}`, 0 rows in
+`push_subscriptions`.
 
-## 1. Generate a key pair
+Do these in order. Every command is Git Bash, never PowerShell.
 
-Anywhere with Node, or in the symmetry-app folder:
+---
+
+## 1. Generate the key pair — on your laptop, not through me
+
+Open Git Bash anywhere and run:
 
 ```bash
 npx web-push generate-vapid-keys
 ```
 
-It prints a **Public Key** and a **Private Key**.
+Say yes if it offers to install `web-push`. It prints:
 
-## 2. Put them in Vercel — the LIVE project
+```
+Public Key:
+BN4G...    ← long, starts with B
+Private Key:
+k3Jd...    ← shorter
+```
 
-https://vercel.com/dashboard → **symmetry-app** → **Settings** →
-**Environment Variables** → Add New, three times, all three environments ticked:
+Leave that window open. You need both values in the next step.
+
+**Generate them on your machine, not in the chat.** The private key is the thing
+that proves messages are from you — it should never travel through anything it
+does not have to, including me.
+
+---
+
+## 2. Three environment variables in Vercel
+
+**https://vercel.com/dashboard** → click **symmetry-app** (the LIVE one, serving
+`symmetry-app-omega.vercel.app` — *not* symmetry-app-v2) → **Settings** →
+**Environment Variables**.
+
+Add New, three times. **Tick all three environments** (Production, Preview,
+Development) on each one.
 
 | Key | Value |
 |---|---|
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | the Public Key |
-| `VAPID_PRIVATE_KEY` | the Private Key |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | the **Public** Key from step 1 |
+| `VAPID_PRIVATE_KEY` | the **Private** Key from step 1 |
 | `VAPID_SUBJECT` | `mailto:symmetrypersonaltraining@gmail.com` |
 
-The `NEXT_PUBLIC_` prefix on the public one is required — the browser reads it.
-The private one must **not** have it.
+Two things that silently break this:
 
-## 3. Redeploy
+- The `NEXT_PUBLIC_` prefix on the public one is **required** — the browser reads
+  that variable directly. The private one must **not** have it.
+- Copy the keys with no trailing space or newline. A stray space is the most
+  common reason this looks right and does not work.
 
-Vercel only picks up environment variables on a **new deployment**. Deployments
-tab → top deployment → ⋯ → **Redeploy**.
+---
 
-## 4. Check it worked
+## 3. Redeploy — use the command, not the dashboard button
 
-Open the app → **Settings** → **Notifications**. There should be a **"Turn on
-notifications"** button at the top. Press it, allow the prompt, and it should
-change to **"✓ Notifications are on for this device"**.
+Vercel only picks up environment variables on a **new deployment**.
 
-If it says *"Push notifications aren't set up yet"*, the keys did not take —
-usually the redeploy, occasionally a typo in a variable name.
+In Git Bash:
 
-## Then tell people
+```bash
+cd /c/Users/dusti/Claude/Projects/symmetry-app
+git pull
+git commit --allow-empty -m "Redeploy: pick up VAPID keys"
+git push
+```
 
-Nothing reaches a client until **they** press that button on **their** device —
-browser permission cannot be granted on someone's behalf, by anyone. That is
-what the group message draft is for.
+That deploys whatever is currently on `main`, which is what you want.
 
-Worth knowing: it is **per device**. Somebody with the app on a phone and a
-laptop needs to press it in both.
+**Deliberately not the dashboard's Redeploy button.** On 15 Aug I pointed you at
+"the top deployment" on the v2 project, the top one was an old build, and you
+promoted the wrong thing. The command above cannot pick the wrong build — there
+is only one `main`.
 
-**iPhone:** the app has to be added to the home screen before iOS will allow
-notifications at all. Share → Add to Home Screen. Android has no such
-requirement.
+---
+
+## 4. Check it worked — click this
+
+**https://symmetry-app-omega.vercel.app/api/push/subscribe**
+
+Wait for the deploy to finish (~2 min), then open that link. You want:
+
+```json
+{"configured":true,"publicKey":"BN4G..."}
+```
+
+Still `false`? Almost always the redeploy not having finished, or a typo in a
+variable name. Send me what the link says and I will tell you which.
+
+Then open the app → **Settings** → **Notifications**. The "Push notifications
+aren't set up yet" box should be gone, replaced by a **Turn on notifications**
+button. Press it, allow the browser prompt, and it becomes **✓ Notifications are
+on for this device**.
+
+---
+
+## 5. Tell me, and I do the rest
+
+Message me when step 4 shows `configured:true`. I will:
+
+- verify it against the database rather than the response — a row appearing in
+  `push_subscriptions` is the first real proof anything can reach a client
+- send the group message (Version A in
+  `docs/GROUP-MESSAGE-DRAFT-2026-08-16.md`, the one that includes the
+  notification ask) once you have okayed the final text
+
+---
+
+## What to expect afterwards
+
+**Nothing reaches a client until THEY press that button on THEIR device.**
+Browser permission cannot be granted on someone's behalf, by anyone. That is
+what the group message is for.
+
+**It is per device.** Somebody with the app on a phone and a laptop has to press
+it in both.
+
+**iPhone:** the app must be added to the home screen before iOS allows
+notifications at all — Share → Add to Home Screen. Android has no such
+requirement. Worth knowing which your clients are actually on before the message
+goes out; if they are mostly Android, that line is noise and should be cut.
+
+**In-app notifications already work and do not depend on any of this.** The
+Messages badge, the bell, and the red banner-plus-buzz when a message is from
+you all run off a 15-second poll. What push adds is their phone telling them
+when the app is **closed** — the difference between a client seeing your message
+today and seeing it next time they happen to open the app.
