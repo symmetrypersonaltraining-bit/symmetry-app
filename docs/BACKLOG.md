@@ -42,8 +42,24 @@
 > - `3f831cc` the group message, every claim fact-checked:
 >   `docs/GROUP-MESSAGE-READY-2026-08-17.md`. **Written, not sent. He sends it.**
 >
+> **Evening, from his screenshots:**
+>
+> - `7d3f53c` finishing a workout credited the wrong DATE. A fork mid-session
+>   moved the day underneath the open logger, so it fell through to the make-up
+>   fallback and marked **10 August** done. It now uses the row the session was
+>   opened from, which a fork cannot move.
+> - `c38148d` the logger shows full movement names again — a 2-line clamp added
+>   4 Aug (`0a512b4`) was cutting them off.
+> - 🔴 **STILL OPEN, NOT DIAGNOSED:** his Stair Master was completed and the app
+>   wrote NOTHING — no log, no sets, no off-plan row. Reaching Complete inserts
+>   a log, so this is not a missed tap. See PART 2c of the handoff for what was
+>   ruled out and what would settle it.
+> - The group message IS POSTED to the group chat, and was rewritten in place as
+>   plain text: nothing in the app renders markdown, so `**bold**` showed as
+>   literal asterisks to all 30 clients.
+>
 > **Open, and Dustin's call:** whether to RUN the generator (58 inserts,
-> dry-run verified, not on cron), and posting the message.
+> dry-run verified, not on cron).
 
 
 > ## 👉 17 Aug — START AT `docs/HANDOFF-COMPLETE-8-17.md`

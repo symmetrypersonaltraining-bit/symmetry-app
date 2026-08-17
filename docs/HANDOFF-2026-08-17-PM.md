@@ -233,9 +233,61 @@ nothing.
 
 ---
 
+# PART 2c — TWO LOGGER FAULTS, ONE FIXED AND ONE STILL OPEN
+
+### `7d3f53c` — finishing a workout credited the wrong DATE (FIXED)
+
+Dustin finished Upper Push and the app marked the session dated **10 August**
+done, leaving today's open and the week at 0%. At 17:02, mid-session, the day
+was forked (`origin: 'library_fork'`) and today's row repointed at the copy,
+while the logger still held the day id it loaded with at 16:15. The day_id
+lookup found nothing and the make-up fallback reached back a week.
+
+The page already resolves the exact row as `scheduledWorkoutId` and
+completeWorkout never used it. A row id survives a fork; day_id does not.
+
+### 🔴 STILL OPEN — a completed workout wrote NOTHING
+
+His Stair Master, same day. In his words: *"Tapped Start on the home card, then
+finished it"*, 30 minutes. The database had **no trace of it anywhere**:
+
+- no `workout_logs` row (last one 6 Aug)
+- no `set_logs`, no `offplan_workout_logs`, no cardio row
+
+**This is not a missed tap.** `completeWorkout` calls `ensureWorkoutLog()`,
+which INSERTS a log when none exists, so reaching Complete at all should have
+produced a row. And on every previous Stair Master session the log was created
+the moment the screen opened — 6 Aug shows created and completed two seconds
+apart.
+
+**Not diagnosed. Do not guess in a commit.** What was ruled out: the day has a
+section with 1 exercise, so the logger renders normally; the day is his own
+(`client_owner_id` = Dustin) so no fork was involved; he has completed this
+exact day five times before.
+
+What would settle it: the browser console from a repeat attempt, or a
+`query_logs` sweep of `postgrest_logs`/`edge_logs` around the attempt for a
+refused INSERT on `workout_logs`. Ask him to try it once and screenshot anything
+that appears.
+
+**Partial mitigation already shipped in `7d3f53c`:** the completion now checks
+which rows it actually changed and throws a visible message when nothing did. A
+silent "finished but nothing happened" should now say so on screen. It does NOT
+fix a log that was never created — that is upstream of the guard.
+
+**His data was corrected by hand**, backed up in
+`bak_sw_misdated_completion_20260817` and `bak_stair_master_recovery_20260817`:
+Upper Push credited to today, 10 August released, and the Stair Master recorded
+as 30 minutes on his word with a note on the log saying so.
+
+
+---
+
 # PART 3 — OPEN, IN ORDER
 
-## 1. 🟠 Run the generator — HIS DECISION, ASKED AND NOT YET ANSWERED
+## 1. 🔴 See PART 2c — a completed workout wrote nothing. Not diagnosed.
+
+## 2. 🟠 Run the generator — HIS DECISION, ASKED AND NOT YET ANSWERED
 
 A dry run says **58 inserts** over five weeks: 51 are the ordinary September
 backlog already waiting, plus the 7 the fix unblocked. Generation is **not on
