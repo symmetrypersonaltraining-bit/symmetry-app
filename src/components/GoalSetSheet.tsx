@@ -55,7 +55,19 @@ export default function GoalSetSheet({
     const holding = rate != null && (goingDown ? rate < 0 : rate > 0) ? Math.abs(rate) : 0;
 
     const needTxt = `That's ${Math.round(need * 100) / 100} ${unit} a week for ${Math.round(weeks)} weeks`;
-    const kcal = metric === "weight" ? ` — roughly ${kcalPerDayFor(need)} kcal a day below maintenance` : "";
+    // ABOVE or BELOW, taken from the direction of travel.
+    //
+    // Dustin, 17 Aug, setting a goal to GAIN from 207.2 lb to 235: "That's 1.87
+    // lb a week for 15 weeks — roughly 925 kcal a day BELOW maintenance." The
+    // number was right (kcalPerDayFor takes an absolute value); the word was
+    // hard-coded, because every goal this was written against was a cut. It told
+    // him to eat 925 under to gain 28 lb — the exact opposite of the plan.
+    //
+    // `goingDown` is computed two lines up and already drives the pace copy.
+    // This line simply never asked it.
+    const kcal = metric === "weight"
+      ? ` — roughly ${kcalPerDayFor(need)} kcal a day ${goingDown ? "below" : "above"} maintenance`
+      : "";
 
     if (holding === 0) {
       return { line: `${needTxt}${kcal}.`, tone: "ok" as const };

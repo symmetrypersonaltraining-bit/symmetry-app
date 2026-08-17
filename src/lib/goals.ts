@@ -184,9 +184,19 @@ export function analyseGoal(goal: Goal, readings: Reading[], today: string): Goa
   const projRate = rate == null ? null : flatDays >= STALL_DAYS ? 0 : rate;
   const projected = thin || projRate == null ? null : now + projRate * weeksLeft;
 
-  // Progress toward the goal from where they started.
+  // Progress toward the goal from where they started — SIGNED toward the
+  // target, so moving the wrong way is 0% and not credit.
+  //
+  // Dustin, 17 Aug: goal changed to GAIN to 235 lb, start_value still 212 from
+  // the cut it replaced, currently 207.2. `Math.abs(start - now)` made that 4.8
+  // lb in the WRONG direction read as "21% of the way there". He has not gained
+  // an ounce toward it; he is further from the target than the day the goal
+  // began, and the bar said a fifth done.
+  //
+  // Absolute distance answers "how far have you moved", which is only the same
+  // question as "how far along are you" while you are moving the right way.
   const total = Math.abs(start - goal.targetValue);
-  const done = Math.abs(start - now);
+  const done = goingDown ? start - now : now - start;
   const percent = total === 0 ? 100 : Math.max(0, Math.min(100, (done / total) * 100));
 
   // Moving the right way? The six-week trend says one thing; a flat fortnight
