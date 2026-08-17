@@ -1,5 +1,28 @@
 # Backlog — the single work queue
 
+> ## 👉 17 Aug — START AT `docs/HANDOFF-COMPLETE-8-17.md`
+>
+> Complete session handoff: every connection, the shipping protocol, the working
+> rules, what is already done, and the full ordered task list with the reasoning
+> behind each item. Written so a fresh session needs nothing from chat history.
+>
+> **The two things that outrank all code work:**
+>
+> 1. **There are NO database backups**, and the database is **364 MB of a 500 MB
+>    hard ceiling** — at 500 MB Supabase forces it read-only and the app stops
+>    accepting weigh-ins. 30 clients' history with no restore path.
+> 2. **This morning's outage was disk I/O starvation on the NANO tier**, not CPU
+>    — 96 buffers taking 10 seconds, ~60x slower than NANO's own throttled floor.
+>    CPU read 10% *because* everything was blocked on disk. Same disease as
+>    15 Aug. It will recur. `docs/DATABASE-DECISION-8-17.md` has the diagnosis,
+>    the options and the prices.
+>
+> Open build work, in order: the swap not removing the workout it replaces
+> (diagnosed, two questions outstanding for Dustin), library search on swap,
+> adding a food by unit rather than grams, the group message, and the third copy
+> of the occupancy bug in `generate_scheduled_workouts`.
+
+
 > ## 16 Aug — the calendar detector, and why no move could ever apply
 >
 > Dustin's spec, in his words: *"My programmed schedule is the default and it
