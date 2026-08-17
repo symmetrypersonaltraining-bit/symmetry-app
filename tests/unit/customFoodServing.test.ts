@@ -44,7 +44,32 @@ test("a newly created food goes through the amount picker", () => {
 test("the picker seeds from the food's own serving, and the multiplier is real", () => {
   // openPicked parses the serving into amount+unit; mult drives every macro.
   assert.match(SRC, /function openPicked\(f: CatalogFood\) \{\s*\n\s*const ps = parseServing\(f\.serving\);/);
-  assert.match(SRC, /const mult = picked \? servingsFor\(amtNum, unit, picked\.serving\) : 0;/);
+  // 17 Aug: named units ("1 egg") were added, so mult is no longer a single
+  // call — a named unit is resolved against the food's serving_options first.
+  // The dimensional path must remain the FALLBACK, not be replaced: it is what
+  // handles grams, ounces and every food without serving_options, which is the
+  // whole legacy `foods` table.
+  assert.match(SRC, /servingsFor\(amtNum, unit, picked\.serving\)/,
+    "the dimensional multiplier is gone — grams and ounces no longer scale anything");
+  assert.match(SRC, /const mult = namedMult \?\? /,
+    "mult no longer prefers the named unit, so '2 eggs' falls through to a unit servingsFor cannot parse");
+});
+
+test("a named unit never silently reads as zero", () => {
+  // multiplierForNamed returns null when it cannot answer — no base weight, an
+  // unknown unit — and `??` is deliberate: `||` would swallow a legitimate
+  // small multiplier the same way it swallows null, and 0.44 of an egg is
+  // exactly the number this feature exists to produce.
+  assert.doesNotMatch(SRC, /const mult = namedMult \|\| /,
+    "|| treats a real multiplier of 0 as 'no answer' and falls through to the wrong branch");
+});
+
+test("a named unit is only offered when its weight is actually known", () => {
+  // The legacy `foods` table has no serving_grams. Listing "egg" for a food
+  // whose base weight is unknown produces a unit that cannot be converted, and
+  // the macro line would read as a dash while the client thinks they logged it.
+  assert.match(SRC, /picked\.named\.filter\(\(x\) => picked\.baseGrams\)/,
+    "named units are offered for foods with no base weight to scale them against");
 });
 
 test("a failed catalog write still logs what they typed", () => {

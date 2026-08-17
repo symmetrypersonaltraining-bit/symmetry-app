@@ -18,6 +18,7 @@ import {
   scaleNutrients,
 } from "@/lib/nutrition/nutrients";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
+import { namedServings, multiplierForNamed, defaultAmountFor, type NamedServing } from "@/lib/servingOptions";
 import Sheet from "./Sheet";
 import BarcodeScanner from "./BarcodeScanner";
 
@@ -54,6 +55,14 @@ export interface CatalogFood {
    * by the AI path and read by the registry. Only this sheet never filled it.
    */
   micros?: NutrientMap | null;
+  /**
+   * What ONE of this food weighs, per unit it actually comes in — "egg", 44 g.
+   * From food_catalog.serving_options, which the sheet already fetched with
+   * select("*") and mapRow simply dropped. Empty for the legacy `foods` table.
+   */
+  named: NamedServing[];
+  /** food_catalog.serving_grams — what the stored macros are per. */
+  baseGrams: number | null;
 }
 
 function n(v: unknown): number { const x = Number(v); return isFinite(x) ? x : 0; }
@@ -89,6 +98,11 @@ function mapRow(raw: Record<string, unknown>, fromCatalog: boolean): CatalogFood
     // that has only the legacy four still produces a valid four-entry map and a
     // row with a full panel produces all of it. One reader, one shape.
     micros: readNutrients(raw.micros, raw as Record<string, unknown>),
+    // Dustin, 17 Aug: "I need to be able to adjust it by unit of measurements.
+    // for exp 1 egg, 2 eggs etc." His HARD BOILED EGGS row has carried
+    // {desc: "1 EGG (44 g)", grams: 44} the whole time; nothing read it.
+    named: namedServings(raw.serving_options),
+    baseGrams: nOrNull(raw.serving_grams),
   };
 }
 
@@ -176,14 +190,21 @@ export default function FoodSearchSheet({
     const ps = parseServing(f.serving);
     setPicked(f);
     setShowNutrients(false);
-    setAmt(String(ps.amount));
-    setUnit(ps.unit);
+    // "100 g" is how the macros are STORED, not how anyone eats. When the food
+    // knows what one of itself weighs, open on one of those — Dustin, 17 Aug,
+    // opening HARD BOILED EGGS and being offered a hundred grams of egg.
+    const better = defaultAmountFor(f.serving, f.named, f.baseGrams);
+    setAmt(String(better ? better.amount : ps.amount));
+    setUnit(better ? better.unit : ps.unit);
   }
 
   // Step size that suits the unit: 5 for g/ml (nobody nudges oil by 0.25 g),
   // 0.1 for the big mass/volume units, 0.25 for counts and servings.
   function stepFor(u: string): number {
     const k = u.toLowerCase();
+    // You eat whole eggs. Nudging a count by 0.25 is the stepper being clever
+    // at the client's expense.
+    if (picked && picked.named.some((x) => x.label === k)) return 1;
     if (k === "g" || k === "ml") return 5;
     if (k === "mg") return 50;
     if (k === "kg" || k === "lb" || k === "l") return 0.1;
@@ -191,8 +212,17 @@ export default function FoodSearchSheet({
   }
 
   const amtNum = (() => { const x = parseFloat(amt); return isFinite(x) && x > 0 ? x : 0; })();
-  const mult = picked ? servingsFor(amtNum, unit, picked.serving) : 0;
-  const unitOptions = picked ? unitsForServing(picked.serving) : ["serving"];
+  // A named unit is not dimensionally derivable from the base serving string —
+  // nothing about "100 g" says an egg weighs 44 — so it is resolved against the
+  // food's own serving_options first, and only then handed to servingsFor().
+  const namedMult = picked ? multiplierForNamed(amtNum, unit, picked.named, picked.baseGrams) : null;
+  const mult = namedMult ?? (picked ? servingsFor(amtNum, unit, picked.serving) : 0);
+  // Named units first: "egg" is what he came here to pick, and burying it under
+  // six masses is most of why he could not find it.
+  const unitOptions = picked
+    ? [...picked.named.filter((x) => picked.baseGrams).map((x) => x.label), ...unitsForServing(picked.serving)]
+        .filter((u, i, a) => a.indexOf(u) === i)
+    : ["serving"];
 
   function bumpAmt(dir: 1 | -1) {
     const s = stepFor(unit);
@@ -203,8 +233,28 @@ export default function FoodSearchSheet({
   // Switching units keeps the SAME real quantity where the dimensions allow it
   // (25 g → 0.882 oz), so changing the unit never silently changes the food.
   function changeUnit(next: string) {
+    if (next === unit) { setUnit(next); return; }
+    // Switching units keeps the SAME real quantity, so changing the unit never
+    // silently changes the food. Named units have no dimension servingsFor()
+    // understands, so anything involving one converts through grams instead —
+    // 2 eggs becomes 88 g, not 2 g.
+    const gramsPer = (u: string) => {
+      const hit = picked && picked.named.find((x) => x.label === u);
+      return hit ? hit.gramsPerUnit : null;
+    };
+    const fromG = gramsPer(unit);
+    const toG = gramsPer(next);
+    if (fromG || toG) {
+      const grams = fromG ? amtNum * fromG : servingsFor(amtNum, unit, "1 g");
+      if (isFinite(grams) && grams > 0) {
+        const out = toG ? grams / toG : servingsFor(grams, "g", `1 ${next}`);
+        if (isFinite(out) && out > 0) setAmt(String(Math.round(out * 1000) / 1000));
+      }
+      setUnit(next);
+      return;
+    }
     const converted = servingsFor(amtNum, unit, `1 ${next}`);
-    if (isFinite(converted) && converted > 0 && next !== unit) {
+    if (isFinite(converted) && converted > 0) {
       setAmt(String(Math.round(converted * 1000) / 1000));
     }
     setUnit(next);
