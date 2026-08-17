@@ -22,6 +22,7 @@ import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
 import { pickExistingLog, type ExistingLog } from "@/lib/workoutLogLookup";
 import { feetToMeters, metersToFeet } from "@/lib/distanceField";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { exerciseTitleSize } from "@/lib/exerciseTitleSize";
 import AiBadge from "@/components/AiBadge";
 import {
   newTimer, start as tStart, pause as tPause, setMode as tSetMode,
@@ -414,7 +415,13 @@ function SwapModal({ pe, onClose, onSwap }: { pe: PrescribedExercise; onClose: (
                 <i className="ti ti-barbell text-sm" style={{ color: "var(--brand-primary)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate" style={{ color: "var(--brand-text)" }}>{ex.name}</p>
+                {/* Same complaint, one screen along: this is the swap picker
+                    reached from the logger, and `truncate` meant choosing a
+                    movement you could not fully read. The row is nearly full
+                    width, so almost every name already fitted on one line and
+                    only the long ones wrap — the list does not visibly change
+                    for the movements he programs most. */}
+                <p className="font-semibold text-sm" style={{ color: "var(--brand-text)", overflowWrap: "anywhere" }}>{ex.name}</p>
                 {ex.muscle_group && (
                   <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{ex.muscle_group}</p>
                 )}
@@ -2221,8 +2228,20 @@ export default function WorkoutLogger({
                 </button>
               );
             })()}
-            <h2 className="text-xl font-bold text-white leading-tight flex-1 min-w-0"
-              style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {/* Dustin, 17 Aug: "I have to see the full name of every movement
+                from logger screen." 0a512b4 (4 Aug) added WebkitLineClamp: 2
+                here, which is the "changed back" he remembers — his screenshot
+                shows "Cable Rope Tricep…" on a 27-character name.
+
+                The clamp is gone, so nothing is ever hidden. The size steps
+                down with length instead, so the heading stays about the same
+                height rather than growing: at a fixed 20px the longest name he
+                programs (55 characters) is four lines and pushes the Track
+                chips and the whole set grid down the screen.
+
+                Everything else on this row is untouched, and 317 of his 627
+                movements still render at text-xl exactly as they do today. */}
+            <h2 className={`${exerciseTitleSize(currentExercise.exercises?.name)} font-bold text-white leading-tight flex-1 min-w-0`}>
               {currentExercise.exercises?.name || "Exercise"}
             </h2>
             <button onClick={() => setHistoryExercise({ id: currentExercise.id, exId: currentExercise.exercises?.id, name: currentExercise.exercises?.name })}
