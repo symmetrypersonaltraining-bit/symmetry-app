@@ -152,9 +152,38 @@ export async function POST(req: NextRequest) {
       // reason it was a proposal the first time. A client changing their own
       // stays active.
       const becomesProposed = isTrainer && goal.client_id !== ownClientId;
+
+      // RE-BASELINE. Dustin, 17 Aug: "yes resetting goal resets baseline. we can
+      // still set chart dates to see full picture."
+      //
+      // He changed a cut to 185 into a gain to 235 and the row kept
+      // start_value 212 from the goal it replaced. Every "from where you
+      // started" number was then measured against a baseline belonging to a
+      // different goal, in the opposite direction — which is how the card came
+      // to say "21% of the way there" while he was further from the target than
+      // the day it began.
+      //
+      // Adjusting a goal restates what you are chasing, so today is the honest
+      // starting line. The weigh-in history is untouched: nothing here deletes a
+      // reading, and the chart's own date range still shows the full picture.
+      const { data: latestM } = await admin
+        .from("metrics")
+        .select(`metric_date, ${COLUMN[metric]}`)
+        .eq("client_id", goal.client_id)
+        .not(COLUMN[metric], "is", null)
+        .order("metric_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const rebaseRow = latestM as unknown as Record<string, unknown> | null;
+      const rebaseValue = rebaseRow ? Number(rebaseRow[COLUMN[metric]]) : null;
+
       const { error } = await admin.from("client_goals").update({
         target_value: tv,
         target_date: td,
+        // Only when there is a reading to move to. With none, the old baseline
+        // is worth more than null — null makes analyseGoal fall back to the
+        // first reading in the window, which moves as the window does.
+        ...(rebaseValue != null ? { start_value: rebaseValue, start_date: today } : {}),
         note: trail.slice(0, 2000),
         status: becomesProposed ? "proposed" : goal.status,
         set_by: becomesProposed ? "trainer" : goal.set_by,

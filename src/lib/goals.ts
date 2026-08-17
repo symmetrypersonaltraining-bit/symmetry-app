@@ -66,7 +66,19 @@ export interface Goal {
   status: "proposed" | "active" | "hit" | "rolled" | "declined" | "closed";
 }
 
-export type GoalStatus = "on_track" | "behind" | "too_thin" | "hit";
+/**
+ * `overshooting` — this pace does not miss the target, it sails past it.
+ *
+ * Dustin, 17 Aug: goal 235 lb, projection landing at 248.8, chip reading "On
+ * track". The status had no way to say otherwise — for a gain, "behind" meant
+ * projected BELOW target, so 13.8 lb past it was indistinguishable from
+ * arriving on time.
+ *
+ * It matters more on a cut than a bulk. A client projected to blow 15 lb THROUGH
+ * their fat-loss target is under-eating badly, and the app was calling that on
+ * track. One state covers both directions: past the target is past the target.
+ */
+export type GoalStatus = "on_track" | "behind" | "overshooting" | "too_thin" | "hit";
 
 export interface GoalAnalysis {
   now: number;
@@ -210,12 +222,35 @@ export function analyseGoal(goal: Goal, readings: Reading[], today: string): Goa
       ? iso(ms(today) + (remaining / Math.abs(rate)) * 7 * DAY)
       : null;
 
+  // How far past the target counts as overshooting rather than arriving.
+  //
+  // A QUARTER of the journey, floored at one unit. Proportional because 2 lb
+  // past a 30 lb goal is noise and 2 percentage points past a 5-point body-fat
+  // goal is not.
+  //
+  // A quarter rather than something tighter because `rate` is an estimate from
+  // a handful of weigh-ins projected over months, and the error in it grows
+  // with the horizon. At 10% a real lean-mass goal in the fixtures — 140 → 155,
+  // projecting to 156.6 nine weeks out — tripped the alarm by 0.1 lb. Crying
+  // overshoot on a rounding difference is how a status everyone eventually
+  // ignores gets made.
+  //
+  // For scale, the case this was built for: projected 248.8 against a 235
+  // target on a 23 lb goal — 60% of the journey past it, not 10%.
+  const overshootMargin = Math.max(1, total * 0.25);
+  const overshoot =
+    projected != null &&
+    (goingDown ? projected < goal.targetValue - overshootMargin : projected > goal.targetValue + overshootMargin);
+
   let status: GoalStatus;
   if (remaining <= 0) status = "hit";
   else if (thin) status = "too_thin";
   else if (stalled) status = "behind";
   else if (projected != null && (goingDown ? projected > goal.targetValue + 0.5 : projected < goal.targetValue - 0.5))
     status = "behind";
+  // After "behind", never before it: a stalled or short projection is the more
+  // urgent thing to say, and the two cannot both be true anyway.
+  else if (overshoot) status = "overshooting";
   else status = "on_track";
 
   return {

@@ -20,6 +20,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { analyseGoal, type Goal, type Reading } from "../../src/lib/goals";
 
 const goal = (over: Partial<Goal> = {}): Goal => ({
@@ -80,10 +82,87 @@ test("percent never exceeds 100 when they overshoot", () => {
 });
 
 test("the goal-setting sheet says above or below to match the direction", () => {
-  const src = require("node:fs").readFileSync(
-    require("node:path").join(process.cwd(), "src/components/GoalSetSheet.tsx"), "utf8",
-  ).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const src = readFileSync(join(process.cwd(), "src/components/GoalSetSheet.tsx"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   assert.match(src, /\$\{goingDown \? "below" : "above"\} maintenance/,
     "the sheet still hard-codes 'below maintenance' — it told him to eat under to gain 28 lb");
   assert.doesNotMatch(src, /kcal a day below maintenance`/, "the hard-coded wording is still there");
+});
+
+// ── Overshooting ───────────────────────────────────────────────────────────
+//
+// Dustin, 17 Aug: "we need to set up an overshooting or undershooting state for
+// projections." His card read "On track" under a projection landing at 248.8
+// against a 235 target — 13.8 lb past it. The status had no way to say
+// otherwise: for a gain, "behind" meant projected BELOW target, so sailing
+// through it was indistinguishable from arriving on time.
+//
+// One state covers both directions, because past the target is past the target.
+// It matters MORE on a cut: a client projected to blow 15 lb through their
+// fat-loss target is under-eating badly, and that read as on track too.
+//
+// Six weekly readings in each case, which clears MIN_READINGS_TO_PROJECT (5)
+// and MIN_SPAN_DAYS_TO_PROJECT (30). Five would be thin and every one of these
+// would answer "can't project yet" instead of what is being tested.
+
+/** `n` weekly readings from `startIso`, moving `perWeek` each time. */
+const ramp = (from: number, perWeek: number, n: number, startIso: string): Reading[] => {
+  const base = new Date(`${startIso}T12:00:00`).getTime();
+  return Array.from({ length: n }, (_, i) => ({
+    date: new Date(base + i * 7 * 86400000).toISOString().slice(0, 10),
+    value: Math.round((from + perWeek * i) * 100) / 100,
+  }));
+};
+
+test("a gain that sails past the target is overshooting, not on track", () => {
+  // +4 lb/wk with three months to run: lands far beyond 235.
+  const a = analyseGoal(goal(), ramp(212, 4, 6, "2026-06-01"), "2026-08-17");
+  assert.ok(a);
+  assert.equal(a!.status, "overshooting");
+});
+
+test("a cut that blows through the target is overshooting too", () => {
+  const a = analyseGoal(
+    goal({ targetValue: 185, startValue: 212 }),
+    ramp(212, -4, 6, "2026-06-01"),
+    "2026-08-17",
+  );
+  assert.ok(a);
+  assert.equal(a!.status, "overshooting", "losing far past a fat-loss target read as on track");
+});
+
+test("landing on the target is still on track", () => {
+  // 230 on 10 Aug, +1 lb/wk, 4 weeks left → projected 234, which IS the target.
+  const a = analyseGoal(
+    goal({ targetValue: 234, startValue: 225, targetDate: "2026-09-14" }),
+    ramp(225, 1, 6, "2026-07-06"),
+    "2026-08-17",
+  );
+  assert.ok(a);
+  assert.equal(a!.status, "on_track");
+});
+
+test("being short is still 'behind', never overshooting", () => {
+  // Same pace, target moved out of reach: projected 234 against 240.
+  const a = analyseGoal(
+    goal({ targetValue: 240, startValue: 225, targetDate: "2026-09-14" }),
+    ramp(225, 1, 6, "2026-07-06"),
+    "2026-08-17",
+  );
+  assert.ok(a);
+  assert.equal(a!.status, "behind");
+});
+
+test("a stall outranks an overshoot", () => {
+  // Flat readings mean a flat projection. "You have stopped" is the more urgent
+  // thing to say, and the two cannot both be true anyway.
+  const a = analyseGoal(goal(), ramp(212, 0, 6, "2026-06-01"), "2026-08-17");
+  assert.ok(a);
+  assert.equal(a!.status, "behind");
+});
+
+test("the card names the direction and the distance", () => {
+  const src = readFileSync(join(process.cwd(), "src/components/GoalCard.tsx"), "utf8");
+  assert.match(src, /Overshooting — this pace lands ~/, "the chip does not say by how much");
+  assert.match(src, /overshooting: "#B45309"/, "overshooting is not toned as something to correct");
+  assert.doesNotMatch(src, /overshooting: "#15803D"/, "an overshoot is being coloured as a win");
 });

@@ -33,6 +33,10 @@ const TONE = {
   on_track: "#15803D",
   hit: "#15803D",
   behind: "#B45309",
+  // Amber, like "behind" — a pace worth correcting, not a win. Green here would
+  // repeat the mistake this state exists to fix: a projection sailing past the
+  // target used to read as success.
+  overshooting: "#B45309",
   too_thin: "#4E6080",
 } as const;
 
@@ -110,6 +114,12 @@ export default function GoalCard({
     : a.flatDays >= STALL_DAYS ? `Behind pace — flat ${a.flatDays} days`
     : a.status === "behind" && a.projected != null ? `Behind — lands ~${Math.round(Math.abs(a.projected - goal.targetValue) * 10) / 10} ${unit} short`
     : a.status === "behind" ? "Behind pace"
+    // Says which way and by how much, because the correction differs. Past a
+    // fat-loss target means eating more; past a gain target means easing off.
+    // "Overshooting" on its own would leave them to work out which.
+    : a.status === "overshooting" && a.projected != null
+      ? `Overshooting — this pace lands ~${Math.round(Math.abs(a.projected - goal.targetValue) * 10) / 10} ${unit} past ${goal.targetValue}`
+    : a.status === "overshooting" ? "Overshooting the target"
     : a.arrivesOn ? `On track — arriving ~${fmtD(ms(a.arrivesOn))}` : "On track";
 
   return (
