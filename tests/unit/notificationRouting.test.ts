@@ -134,7 +134,14 @@ test("one nudge in the thread does not demote a message Dustin typed", () => {
 test("a person's banner is louder, and longer, and named", () => {
   const s = src("src/components/MessageNotifier.tsx");
   assert.match(s, /banner\.fromPerson \? 12000 : 6000/, "six seconds is not long enough to act on");
-  assert.match(s, /COACH_FIRST_NAME/, "naming the coach is what makes somebody stop");
+  // Was `COACH_FIRST_NAME`. Naming a person is still what makes somebody stop —
+  // but naming the COACH specifically was only ever right for a client reading
+  // their own thread. In the trainer app it produced "Dustin messaged you —
+  // Claudine Ocon" for a message Claudine sent HIM (17 Aug). The name now comes
+  // off the row, so it is whoever actually sent it.
+  // See tests/unit/notifierNamesTheRealSender.test.ts.
+  assert.match(s, /\$\{i\.fromName\} messaged you/, "naming the sender is what makes somebody stop");
+  assert.doesNotMatch(s, /COACH_FIRST_NAME/, "the sender must not be assumed to be the coach");
   assert.match(s, /banner\.fromPerson \? "#E53935"/, "brand blue is what every nudge already looks like");
   assert.match(s, /cw-alert 1\.6s/, "it should keep pulsing the whole time it is up");
 });

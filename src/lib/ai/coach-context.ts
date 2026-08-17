@@ -1,4 +1,4 @@
-import { COACH_FIRST_NAME } from "../trainer";
+import { COACH_FIRST_NAME, isTrainerEmail } from "../trainer";
 // Shared coach context assembly for the nutrition AI chat endpoints.
 // /api/nutrition-ai/coach, /api/nutrition-ai/act and /api/coach/focus all
 // assemble through this module, so every AI surface sees identical numbers.
@@ -245,18 +245,21 @@ export async function fetchMealPlanSummary(db: Db, clientId: string): Promise<st
 export async function fetchClientProfile(
   db: Db,
   clientId: string,
-): Promise<{ line: string; firstName: string | null } | null> {
+): Promise<{ line: string; firstName: string | null; isCoachThemselves: boolean } | null> {
   const { data } = await db
     .from("clients")
-    .select("name, primary_goal, secondary_goals, experience_level, training_frequency, days_per_week, injuries_limitations, injuries, start_date")
+    // email, so the coach can be recognised when the client IS the coach. He
+    // trains himself, so his own client record flows through this exact path.
+    .select("name, email, primary_goal, secondary_goals, experience_level, training_frequency, days_per_week, injuries_limitations, injuries, start_date")
     .eq("id", clientId)
     .maybeSingle();
   const c = data as {
-    name: string | null; primary_goal: string | null; secondary_goals: string | null;
+    name: string | null; email: string | null; primary_goal: string | null; secondary_goals: string | null;
     experience_level: string | null; training_frequency: number | null; days_per_week: number | null;
     injuries_limitations: string | null; injuries: string | null; start_date: string | null;
   } | null;
   if (!c) return null;
+  const isCoachThemselves = isTrainerEmail(c.email);
   const firstName = (c.name || "").trim().split(/\s+/)[0] || null;
   const parts: string[] = [];
   if (c.name) parts.push(`Name: ${c.name}`);
@@ -268,8 +271,8 @@ export async function fetchClientProfile(
   const inj = [c.injuries_limitations, c.injuries].filter(Boolean).join("; ");
   if (inj) parts.push(`Injuries/limitations: ${inj}`);
   if (c.start_date) parts.push(`Coaching since: ${c.start_date}`);
-  if (!parts.length) return { line: "", firstName };
-  return { line: `CLIENT PROFILE — coach this person specifically, by name, toward their goal:\n- ${parts.join("\n- ")}`, firstName };
+  if (!parts.length) return { line: "", firstName, isCoachThemselves };
+  return { line: `CLIENT PROFILE — coach this person specifically, by name, toward their goal:\n- ${parts.join("\n- ")}`, firstName, isCoachThemselves };
 }
 
 // Body-composition trajectory (not just the latest point) so the coach can say
@@ -572,6 +575,28 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
 
   const lines: string[] = [nowBlock(mealProgress.planned, mealProgress.logged), `Today's date: ${today}`];
   if (profile?.line) lines.push(profile.line);
+  // THE READER IS THE COACH.
+  //
+  // Dustin, 17 Aug, screenshotting his own nutrition screen: the coach card had
+  // written "Shoot Dustin a message if something's making it hard to get the
+  // food in — he needs to know what's getting in the way so he can adjust."
+  // It was telling him to message himself, about himself, in the third person.
+  //
+  // Every instruction in the system prompt assumes the reader is a client and
+  // the coach is somebody else — "run it by Dustin", "plan changes are his
+  // call". For his own record that is nonsense, and it reads as the app not
+  // knowing who is using it. He trains himself, so his client record goes
+  // through this identical path.
+  if (profile?.isCoachThemselves) {
+    lines.push(
+      `WHO IS READING THIS — IMPORTANT: this client IS ${COACH_FIRST_NAME}, the trainer, coaching himself. ` +
+      `He is not a client with a coach to defer to. NEVER tell him to message, ask, check with, or run anything by ${COACH_FIRST_NAME} — ` +
+      `he is ${COACH_FIRST_NAME}, and being told to contact himself reads as the app not knowing who it is talking to. ` +
+      `Never refer to ${COACH_FIRST_NAME} in the third person. Where you would normally hand a decision to the coach, ` +
+      `either make the call and say so plainly, or name the thing he should decide. Address him directly as the person who ` +
+      `sets the plan. Everything else — the numbers, the honesty, the specificity — is unchanged.`
+    );
+  }
   // High up, right under who they are: a goal is the frame everything else on
   // this screen is read through. A client with a target date does not want an
   // observation about their protein average that ignores it.

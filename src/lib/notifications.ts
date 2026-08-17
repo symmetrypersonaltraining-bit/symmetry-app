@@ -36,6 +36,23 @@ export interface NotifRow {
    * not borrow the emphasis meant for him.
    */
   fromPerson?: boolean;
+  /**
+   * WHO sent it, from the reader's point of view. Undefined when we cannot say.
+   *
+   * Dustin, 17 Aug, looking at his own TRAINER app: a banner reading
+   * "Dustin messaged you — Claudine Ocon". Claudine had messaged him, and the
+   * app told him he had messaged himself.
+   *
+   * The banner hard-coded the coach's name, which is right for the only reader
+   * it was written for — a client, for whom every message does come from
+   * Dustin. For the trainer the sender is the CLIENT, and the copy had no way
+   * to say so.
+   *
+   * Left undefined for the group thread on purpose: anyone in it can post and
+   * the unread query does not resolve names, so naming a sender there would be
+   * a guess. Neutral copy is used instead. A wrong name is worse than no name.
+   */
+  fromName?: string;
   key: string;
   kind: "client" | "trainer" | "group";
   clientId?: string;
@@ -56,7 +73,14 @@ function snippetOf(body: string | null, hasImage: boolean): string {
 // client shaping + trainer client-name lookup.
 export function aggregateNotifications(
   rows: RawUnread[],
-  opts: { isTrainer: boolean; myUserId: string; clientNames?: Record<string, string>; clientMode?: boolean },
+  opts: {
+    isTrainer: boolean;
+    myUserId: string;
+    clientNames?: Record<string, string>;
+    clientMode?: boolean;
+    /** Passed in rather than imported: this module is pure and unit-tested. */
+    coachFirstName?: string;
+  },
 ): NotifRow[] {
   // In client mode (Dustin's own client app) carry the ?as=client marker on
   // deep-links so tapping a notification lands on the CLIENT view, never the
@@ -117,10 +141,15 @@ export function aggregateNotifications(
     } else if (opts.isTrainer) {
       const clientId = key.slice("client:".length);
       const title = (opts.clientNames && opts.clientNames[clientId]) || "Client";
-      out.push({ key, kind: "client", clientId, title, snippet, count: g.rows.length, time: g.latest, fromPerson, href: "/messages?client=" + clientId + m });
+      // The trainer is reading, so the sender is the CLIENT. Only named when we
+      // actually resolved the name — "Client messaged you" is worse than
+      // neutral copy.
+      const fromName = (opts.clientNames && opts.clientNames[clientId]) || undefined;
+      out.push({ key, kind: "client", clientId, title, snippet, count: g.rows.length, time: g.latest, fromPerson, fromName, href: "/messages?client=" + clientId + m });
     } else {
       const base = opts.clientMode ? "/messages?as=client" : "/messages";
-      out.push({ key, kind: "trainer", title: "Trainer", snippet, count: g.rows.length, time: g.latest, fromPerson, href: base + (m ? (base.includes("?") ? m : "?" + m.slice(1)) : "") });
+      // A client is reading their own thread with the coach, so it is from him.
+      out.push({ key, kind: "trainer", title: "Trainer", snippet, count: g.rows.length, time: g.latest, fromPerson, fromName: opts.coachFirstName, href: base + (m ? (base.includes("?") ? m : "?" + m.slice(1)) : "") });
     }
   }
 

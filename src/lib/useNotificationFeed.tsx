@@ -26,7 +26,7 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { aggregateNotifications, type NotifRow, type RawUnread } from "@/lib/notifications";
 import { fetchGroupUnread, markGroupRead } from "@/lib/groupUnread";
-import { isTrainerEmail } from "@/lib/trainer";
+import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 
 export interface NotificationFeed {
   items: NotifRow[];
@@ -130,6 +130,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       const agg = aggregateNotifications(unread, {
         isTrainer, myUserId: user.id, clientNames, clientMode,
+        coachFirstName: COACH_FIRST_NAME,
       });
 
       // fetchGroupUnread owns the group watermark. aggregate only sees rows

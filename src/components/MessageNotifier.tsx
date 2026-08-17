@@ -9,7 +9,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useNotificationFeed } from "@/lib/useNotificationFeed";
 import { type Banner } from "@/lib/messageBanners";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 export default function MessageNotifier() {
   const router = useRouter();
@@ -81,12 +80,22 @@ export default function MessageNotifier() {
     // One banner per SOURCE, not per message: three group posts is one "Group
     // Chat" banner, not three. Sources are already grouped by the feed.
     const queued: Banner[] = items.slice(0, 2).map((i) => ({
-      // A person's message says so. "New message — Group Chat" reads like
-      // system chatter; naming the coach is what makes somebody stop.
-      text: i.fromPerson
+      // A person's message says so, and says WHO — read from the row rather
+      // than assumed.
+      //
+      // This used to hard-code the coach's name, which is correct for the only
+      // reader it was written for: a client, for whom every message really is
+      // from Dustin. In his own TRAINER app it produced "Dustin messaged you —
+      // Claudine Ocon" when Claudine had messaged HIM. The app told him he had
+      // messaged himself, and named the actual sender as the destination.
+      //
+      // The name is dropped when the row cannot say who sent it — the group
+      // thread, where anyone can post and no name is resolved. Neutral copy
+      // there is honest; a confidently wrong name is what this is fixing.
+      text: i.fromPerson && i.fromName
         ? i.count > 1
-          ? `${i.count} new from ${COACH_FIRST_NAME} in ${i.title}`
-          : `${COACH_FIRST_NAME} messaged you — ${i.title}`
+          ? `${i.count} new from ${i.fromName}`
+          : `${i.fromName} messaged you`
         : i.count > 1
           ? `${i.count} new in ${i.title}`
           : `New message — ${i.title}`,
