@@ -124,6 +124,12 @@ test("all three copies of this bug are fixed together", () => {
   // The same unfiltered occupancy test appeared in three functions. Fixing one
   // and leaving another is how it comes back: whichever path is used next is
   // still blocked, and it reads as the fix not having worked.
+  //
+  // The third, generate_scheduled_workouts, was fixed on 17 Aug and is checked
+  // separately below — it writes the guard as a positive `exists ... as
+  // slot_already_covered` rather than the `not exists` these two share, so one
+  // regex cannot cover all three. The count in this test's name is the point:
+  // when it said "three" and listed two, the third had been left behind.
   for (const fn of ["resolve_schedule_proposal", "sync_supervised_workouts_to_appointments"]) {
     const { file, body } = lastDefinition(fn);
     // Bounded window rather than "up to the next )": the guard's own body
@@ -196,4 +202,81 @@ test("the column ships as a migration", () => {
   // was found in the detector guard earlier today.
   const m = files.find((f) => /add column if not exists moved_by\b/i.test(readFileSync(join(DIR, f), "utf8")));
   assert.ok(m, "moved_by exists only in the database — it must ship as a migration");
+});
+
+// ── The third copy: generation refused a whole pattern-day over homework ────
+//
+// Dustin, 17 Aug: "it should never refuse if me or my client does it. it goes
+// wherever we put it. the app should only auto generate or move assigned
+// workouts to days they are on the schedule so it's right in the app but if we
+// override it leave it alone."
+//
+// Measured the same day over five weeks: seven pattern-days refused for no
+// reason — four supervised sessions blocked by that client's own homework
+// (Sharon Rambo 22 Aug, Greg Lennon 7/14/21 Sep) and three of Greg's Daily
+// Reset Walks blocked by his supervised Saturday session.
+
+const GEN = lastDefinition("generate_scheduled_workouts");
+
+test("generation asks whether the SLOT is filled, not whether the date is", () => {
+  assert.doesNotMatch(
+    GEN.body,
+    /date_already_covered/i,
+    `${GEN.file}: the unfiltered date check is back — a client's own homework suppresses the session they are booked in for`,
+  );
+  assert.match(
+    GEN.body,
+    /exists \([\s\S]{0,400}?from scheduled_workouts sw[\s\S]{0,400}?sw\.supervised = cd\.is_sup/i,
+    `${GEN.file}: generation no longer compares supervised against supervised`,
+  );
+});
+
+test("two supervised sessions in one day is still refused", () => {
+  // Widening this into "generate everything always" is the opposite failure and
+  // would double-book him at the gym.
+  assert.match(
+    GEN.body,
+    /slot_already_covered\s+then\s+'skipped_existing'/i,
+    `${GEN.file}: nothing is skipped for being already filled — sessions can now stack`,
+  );
+});
+
+test("a session moved off its pattern day is not put back", () => {
+  // Rule 1 opens this hole and the over-broad guard was accidentally covering
+  // it. Sara Prince pulled her 19 Aug ankle mobility forward to the 17th and
+  // completed it; without this, generation hands the 19th straight back to her.
+  assert.match(
+    GEN.body,
+    /exists \([\s\S]{0,400}?sw\.moved_from_date = cd\.sched_date/i,
+    `${GEN.file}: generation re-creates sessions a human has already moved away`,
+  );
+  assert.match(
+    GEN.body,
+    /moved_off_this_date\s+then\s+'skipped_moved_away'/i,
+    `${GEN.file}: the moved-away skip is computed and then not acted on`,
+  );
+});
+
+test("the new log action is allowed by the log's CHECK constraint", () => {
+  // The constraint listed three actions and this function is its only writer,
+  // so shipping the action without widening the CHECK turns every skipped_moved_away
+  // row into a failed insert — and the failure would surface as generation
+  // dying, not as a missing log line.
+  const sql = readFileSync(join(DIR, GEN.file), "utf8");
+  assert.match(sql, /schedule_generation_log_action_check/,
+    `${GEN.file}: the action CHECK is untouched but a new action was added`);
+  assert.match(sql, /'skipped_moved_away'::text/,
+    `${GEN.file}: the CHECK does not allow the action the function writes`);
+  // And it must be widened BEFORE the body: a statement placed after a
+  // dollar-quoted body in one migration is silently dropped (16 Aug).
+  assert.ok(sql.indexOf("schedule_generation_log_action_check") < sql.indexOf("AS $function$"),
+    `${GEN.file}: the constraint change sits after the function body, where it is silently dropped`);
+});
+
+test("the old generation definition is captured before it is replaced", () => {
+  const sql = readFileSync(join(DIR, GEN.file), "utf8");
+  assert.match(sql, /create table if not exists public\.bak_generate_scheduled_workouts/i,
+    `${GEN.file}: no backup table — the change is not reversible from the repo`);
+  assert.ok(sql.indexOf("bak_generate_scheduled_workouts") < sql.indexOf("create or replace function public.generate_scheduled_workouts"),
+    `${GEN.file}: the backup is taken after the replacement, so it captures the NEW definition`);
 });
