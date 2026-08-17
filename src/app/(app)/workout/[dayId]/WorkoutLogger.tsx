@@ -23,6 +23,7 @@ import { pickExistingLog, type ExistingLog } from "@/lib/workoutLogLookup";
 import { feetToMeters, metersToFeet } from "@/lib/distanceField";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { exerciseTitleSize } from "@/lib/exerciseTitleSize";
+import { chooseCompletionTargets, completionVerdict, type CompletionCandidate } from "@/lib/completionTarget";
 import AiBadge from "@/components/AiBadge";
 import {
   newTimer, start as tStart, pause as tPause, setMode as tSetMode,
@@ -1684,14 +1685,41 @@ export default function WorkoutLogger({
         //
         // Soft-deleted rows are excluded: a removed session must not be
         // resurrected as "completed".
+        // THE ROW THIS SESSION WAS OPENED FROM WINS.
+        //
+        // Dustin, 17 Aug: he finished Upper Push and the app credited the
+        // session dated 10 AUGUST, leaving today's on Start and the week at 0%.
+        // At 17:02, mid-session, the day was forked — a personal copy was
+        // created and today's scheduled row was repointed at it — while this
+        // screen still held the day id it loaded with at 16:15. The lookup
+        // below found nothing, and the make-up fallback reached back a week.
+        //
+        // The page already resolves the exact scheduled_workouts row when it
+        // opens the session and hands it over as `scheduledWorkoutId`. This
+        // never looked at it. A row id does not change when a fork rewrites
+        // day_id, so preferring it closes the whole class: fork, swap, anything
+        // that moves the day while somebody is lifting.
+        const { data: __openedRows } = scheduledWorkoutId
+          ? await (supabase as any)
+              .from("scheduled_workouts")
+              .select("id, day_id, scheduled_date, status, deleted_at")
+              .eq("id", scheduledWorkoutId)
+              .limit(1)
+          : { data: null };
+        const __opened = ((__openedRows as CompletionCandidate[] | null) ?? [])[0] ?? null;
         const { data: __todayRows } = await (supabase as any)
           .from("scheduled_workouts")
-          .select("id")
+          .select("id, day_id, scheduled_date, status, deleted_at")
           .eq("client_id", clientId)
           .eq("day_id", day.id)
           .eq("scheduled_date", __today)
           .is("deleted_at", null);
-        let __swIds: string[] = ((__todayRows as { id: string }[] | null) ?? []).map((r) => r.id);
+        const __choice = chooseCompletionTargets(
+          __opened,
+          (__todayRows as CompletionCandidate[] | null) ?? [],
+          __today,
+        );
+        let __swIds: string[] = __choice.ids;
         if (!__swIds.length) {
           const { data: __pastRows } = await (supabase as any)
             .from("scheduled_workouts")
@@ -1752,11 +1780,21 @@ export default function WorkoutLogger({
         if (__swIds.length === 1 && __swIds[0] === "__moved__") {
           // Already handled by the pull-forward above.
         } else if (__swIds.length) {
-          const { error: __swErr } = await (supabase as any)
+          // `.select("id")` is not decoration. An update matching ZERO rows is
+          // not an error in PostgREST, so without asking which rows changed the
+          // session reports itself finished while the schedule still says
+          // otherwise — which is the shape of most of this week's bugs.
+          const { data: __changed, error: __swErr } = await (supabase as any)
             .from("scheduled_workouts")
             .update({ status: "completed", workout_log_id: logId })
-            .in("id", __swIds);
+            .in("id", __swIds)
+            .select("id");
           if (__swErr) throw __swErr;
+          const __verdict = completionVerdict(
+            __swIds,
+            ((__changed as { id: string }[] | null) ?? []).map((r) => r.id),
+          );
+          if (__verdict) throw new Error(__verdict);
         } else {
           // No scheduled row matched (unscheduled / make-up session) - create a completed
           // one so the workout still counts in every tracking tile and counter.
