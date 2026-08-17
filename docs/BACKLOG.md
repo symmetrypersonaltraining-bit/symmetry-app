@@ -26,9 +26,24 @@
 > - `52fc120` foods log as "1 egg". The data was already in
 >   `food_catalog.serving_options` and nothing in the app had ever read it.
 >
-> **Open, and both are Dustin's call, not the next session's:** whether to RUN
-> the generator (58 inserts, dry-run verified, not on cron), and the group
-> message, which must never be sent without his okay on the exact words.
+> **Later the same day, from one question — "is everything in the group msg live
+> in app now?":**
+>
+> - `b1a95d4` the recipe library could NEVER be published. A trigger rewrote
+>   every library recipe back to private on insert because it decides with
+>   `is_trainer()` and the service role has no `auth.uid()`. The insert
+>   succeeded, an UPDATE reported 20 rows and RETURNED 20 ids, and `updated_at`
+>   moved — three "successful" migrations changed nothing. **Read the value
+>   back.** 20 recipes now live; shared library 14 → 34.
+> - `8aea0c2` My Meals splits into Mine and Library. The flag was already
+>   computed and thrown away by the state type. Also: delete was offered on
+>   shared rows, and for Dustin it SUCCEEDED — removing a meal from all 30
+>   clients from inside his own list.
+> - `3f831cc` the group message, every claim fact-checked:
+>   `docs/GROUP-MESSAGE-READY-2026-08-17.md`. **Written, not sent. He sends it.**
+>
+> **Open, and Dustin's call:** whether to RUN the generator (58 inserts,
+> dry-run verified, not on cron), and posting the message.
 
 
 > ## 👉 17 Aug — START AT `docs/HANDOFF-COMPLETE-8-17.md`

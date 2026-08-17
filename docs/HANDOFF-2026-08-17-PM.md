@@ -22,12 +22,12 @@ Parts 1, 2 and 5 in particular. Read it first, then this.
 
 | | |
 |---|---|
-| `origin/main` | `52fc120` |
+| `origin/main` | `3f831cc` |
 | Tree | clean, nothing unshipped |
 | Supabase plan | **Pro**, compute **Small** (`max_connections` 90, 512 MB shared buffers) |
 | Managed backups | **on**, 7-day retention |
 | Storage ceiling | **8 GB** (was 500 MB); database 364 MB |
-| Unit tests | 1539 tests, 0 failing |
+| Unit tests | 1551 tests, 0 failing |
 | `npx tsc --noEmit` | 0 errors in `src/` |
 | `npx next build` | Compiled successfully |
 
@@ -149,6 +149,90 @@ looks normal. Everything is normalised to grams-per-ONE-unit in
 
 ---
 
+# PART 2b — LATE SESSION: FACT-CHECKING THE GROUP MESSAGE
+
+Dustin asked one question — *"is everything in the group msg live in app now?"* —
+and it was the highest-value question of the day. Every claim was checked against
+the live app and database rather than the changelog. Most held. **One was false
+and it exposed a bug nobody had finished fixing.**
+
+### `b1a95d4` — the recipe library could never be published
+
+The message told 30 clients they had "20 cook-from-scratch recipes". They had
+none. All 20 library rows were `private`; the Shared library tab asks for
+`public`. What clients saw was a different, older set of 14 under Dustin's own
+client record.
+
+`enforce_recipe_publish` — the BEFORE INSERT OR UPDATE trigger that stops a
+client self-publishing — **rewrites the row rather than refusing it**, and
+decides with `is_trainer()`, which resolves through `auth.uid()`. The service
+role that builds the library has no `auth.uid()`, so every library recipe was
+demoted on the way in.
+
+**This is the most invisible failure found this week, and every angle was tried
+in turn:**
+
+- the insert succeeds, and the sync route's `{"ok":true,"recipes":20}` was TRUE
+- a plain UPDATE reports success and changes nothing
+- **RETURNING hands back all 20 ids**, so a row count does not catch it either
+- `updated_at` moves, because the same trigger sets it
+
+Three "successful" migrations changed nothing before the cause was found, and it
+was only found by writing before/updated/after counts into a table and reading
+them back. **Checking the error is not enough. Checking the row count is not
+enough. Read the value back.**
+
+Fix: library rows (`client_id is null`) are exempt from the guard. A client
+cannot create one — the INSERT policy is
+`((client_id = my_client_id()) OR is_trainer())` and `NULL = my_client_id()` is
+never true. Verified live afterwards that the guard still bites: publishing a
+client-owned private recipe as a non-trainer touched 1 row and left it private.
+
+**A prior decision was narrowed with reasoning.** An earlier session diagnosed
+this exact bug, added the `recipes_library_read` RLS policy, stopped, and left a
+test forbidding any change to the trigger. RLS cannot make a `private` row
+satisfy a filter the APP applies. Half a fix reads exactly like a whole one
+until somebody opens the screen.
+
+### `8aea0c2` — My Meals splits into Mine and Library
+
+His 3 saved meals sat in a 53-row list with the 50 shared ones and nothing
+marking them apart. **The flag was already computed and thrown away**:
+`loadMyMeals` set `library: m.client_id == null` with a comment explaining why,
+and the `useState` type had no such field.
+
+**Not in the request, and worse:** delete was offered on every row. For a client
+RLS refuses it; **for Dustin it succeeds** — removing a meal from all 30 clients
+from inside his own list, with an undo that would re-save it as his personal
+copy. Two locks now: the button is not rendered, and `deleteMyMeal` refuses
+before it touches anything.
+
+### `3f831cc` — the message itself
+
+`docs/GROUP-MESSAGE-READY-2026-08-17.md`. Version A, his choice, with the iPhone
+line kept (he confirmed a mix of platforms). Changes from the 16 Aug draft:
+recipe count 20 → **34**; "you'll see the full panel" → "tap Show nutrients"
+(it is collapsed behind a button); the "faster" line now says what actually made
+it faster; two lines added for today's work.
+
+**STILL NOT SENT. He sends it.**
+
+### New mutation harnesses
+
+```
+bash tests/mutate-recipe-publish.sh   # 9 mutations, all caught
+bash tests/mutate-mymeals.sh          # 10 mutations, all caught
+```
+
+One `mutate-mymeals` case initially failed to APPLY rather than failing the
+suite — bash expands `${...}` inside double quotes, so it died as a "bad
+substitution" and was skipped, scoring 9/9 instead of 9/10. **Read the harness
+output, not just its total.** Third instance today of a mutation that proved
+nothing.
+
+
+---
+
 # PART 3 — OPEN, IN ORDER
 
 ## 1. 🟠 Run the generator — HIS DECISION, ASKED AND NOT YET ANSWERED
@@ -164,15 +248,14 @@ select * from generate_scheduled_workouts(5, false);   -- p_dry_run = false
 
 Dry-run first and show him the list. Do not run it unprompted.
 
-## 2. 🟡 The group message
+## 2. 🟡 The group message — WRITTEN AND FACT-CHECKED, NOT SENT
 
-Two versions in `docs/GROUP-MESSAGE-DRAFT-2026-08-16.md`. **Version A** includes
-the notification ask and is valid now that push is configured.
+`docs/GROUP-MESSAGE-READY-2026-08-17.md`. Version A, every claim verified,
+iPhone line kept. **He sends it. Claude never messages a client.** Do not
+re-verify it — the evidence for each line is in that file.
 
-**NEVER SEND WITHOUT HIS EXPLICIT OKAY ON THE FINAL TEXT.** He has approved
-sending in principle, not the words. Worth telling him: nothing reaches anyone
-until each person presses the button on their own device, per device, and iPhone
-users must add the app to the home screen first.
+Expect push subscriptions to climb over days, not at once. 0 for an hour after
+he posts is normal, not a fault.
 
 ## 3. 🟡 A backup that Supabase does not control
 
