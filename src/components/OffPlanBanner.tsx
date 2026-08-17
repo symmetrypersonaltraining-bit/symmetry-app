@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import MicButton from "@/components/MicButton";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import AiBadge from "@/components/AiBadge";
+import { slotForReplacement, skipVerdict, type DateOccupant } from "@/lib/replaceOnDate";
 
 interface SwapDay { id: string; label: string; }
 interface OffPlanRow { id: string; description: string; details: string | null; status: string; }
@@ -18,6 +19,8 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
   const [aiOn, setAiOn] = useState<boolean | null>(null);
   const [mode, setMode] = useState<"closed" | "menu" | "swap" | "type" | "replace" | "equipment" | "activity" | "library">("closed");
   const [library, setLibrary] = useState<SwapDay[]>([]);
+  const [swapQ, setSwapQ] = useState("");
+  const [swapError, setSwapError] = useState<string | null>(null);
   const [myLib, setMyLib] = useState<LibDay[]>([]);
   const [typed, setTyped] = useState("");
   const [details, setDetails] = useState("");
@@ -48,11 +51,40 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
+  // "Swap for one I pick" could not reach the workout Dustin actually wanted.
+  //
+  // 17 Aug: he went to replace his programmed walk with "Fat Loss Cardio
+  // Phase 3: Stair Master" — one of his OWN saved workouts — and this list has
+  // never contained it, because it asked only for `client_owner_id is null`.
+  // He went and found it under "Add a workout" instead, which is add-only, and
+  // finished the day with both sessions on his schedule.
+  //
+  // Two filters were doing one filter's job. `swappable` is the gate on the
+  // SHARED library: which of the 641 programmed sessions are safe to offer
+  // anybody as a generic substitute (11 of them). It has no business gating a
+  // client's own saved workouts — those are already theirs, chosen by them, and
+  // requiring `swappable` hid 8 of Dustin's 9. So: shared library must be
+  // swappable, your own does not have to be.
+  //
+  // Dustin, 17 Aug, on whether to widen it further to other clients' forks:
+  // no — shared plus your own. One client's personal fork stays out of another
+  // client's picker.
   async function openSwap() {
     setMode("swap");
     if (library.length === 0) {
-      const { data } = await (supabase as any).from("days").select("id, label").eq("swappable", true).is("client_owner_id", null).neq("id", dayId).order("label");
-      setLibrary((data as SwapDay[]) || []);
+      const shared = (supabase as any).from("days").select("id, label")
+        .eq("swappable", true).is("client_owner_id", null).neq("id", dayId).order("label");
+      const mine = (supabase as any).from("days").select("id, label")
+        .eq("client_owner_id", clientId).neq("id", dayId).order("label");
+      const [{ data: sharedRows, error: sharedErr }, { data: myRows, error: myErr }] = await Promise.all([shared, mine]);
+      // PostgREST hands back an error, it does not throw — so a refused read
+      // used to land here as an empty library that looked exactly like a small
+      // one. Say which half is missing rather than showing a short list as if
+      // it were the whole truth.
+      if (sharedErr || myErr) setSwapError("Couldn't load all of your workouts — this list may be incomplete.");
+      const merged = [...((myRows as SwapDay[]) || []), ...((sharedRows as SwapDay[]) || [])];
+      const seen = new Set<string>();
+      setLibrary(merged.filter((d) => (seen.has(d.id) ? false : (seen.add(d.id), true))));
     }
   }
 
@@ -68,9 +100,13 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
     try {
       const today = CT_TODAY();
       const { data: origRows } = await (supabase as any).from("scheduled_workouts")
-        .select("id, position").eq("client_id", clientId).eq("day_id", dayId)
+        .select("id, position, day_id, status, deleted_at, days(label)")
+        .eq("client_id", clientId).eq("day_id", dayId)
         .eq("scheduled_date", today).eq("status", "scheduled").order("id");
-      const orig = origRows && origRows[0] ? origRows[0] : null;
+      const replacing: DateOccupant[] = (((origRows as any[]) || []).map((r) => ({
+        id: r.id, day_id: r.day_id, position: r.position, status: r.status,
+        deleted_at: r.deleted_at, label: r.days ? r.days.label : null,
+      })));
       // Order matters and both halves matter. Unchecked, a refused insert was
       // followed by skipping the ORIGINAL and then navigating to the
       // replacement anyway — so the client ended the swap with no workout
@@ -80,22 +116,33 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
       // theoretical one.
       const { error: addErr } = await (supabase as any).from("scheduled_workouts").insert({
         client_id: clientId, day_id: target.id, scheduled_date: today,
-        status: "scheduled", source: "client_self_assign", position: orig ? orig.position : 0,
+        status: "scheduled", source: "client_self_assign", position: slotForReplacement(replacing),
       });
       if (addErr) {
         window.alert("Couldn't swap that in — your original workout is still there. " + addErr.message);
         return;
       }
-      if (orig) {
-        const { error: skipErr } = await (supabase as any).from("scheduled_workouts")
-          .update({ status: "skipped" }).eq("id", orig.id);
-        // The new one IS scheduled by now, so this cannot undo the swap — but
-        // both sitting there is a confusing day and worth saying.
-        if (skipErr) window.alert("Swapped in, but your original workout is still on today as well.");
-      }
+      // The skip has to PROVE it happened. `.select("id")` makes PostgREST hand
+      // back the rows it really changed; without it an update matching zero
+      // rows returns no error and this reported a replacement it had not made.
+      // That is exactly how Dustin ended 17 Aug looking at two cardio sessions
+      // on a day he thought he had swapped.
+      const { data: skipped, error: skipErr } = await (supabase as any).from("scheduled_workouts")
+        .update({ status: "skipped" })
+        .in("id", replacing.map((r) => r.id))
+        .eq("status", "scheduled")
+        .select("id");
+      // The new one IS scheduled by now, so neither case can undo the swap —
+      // but a day with both on it is a confusing day and worth saying out loud.
+      const verdict = skipErr
+        ? "Swapped in, but your original workout is still on today as well."
+        : skipVerdict(replacing, (((skipped as { id: string }[] | null) || []).map((s) => s.id)));
+      if (verdict) window.alert(verdict);
       window.location.href = "/workout/" + target.id + window.location.search;
     } finally { setBusy(false); }
   }
+
+  const swapLibrary = library.filter((d) => d.label.toLowerCase().includes(swapQ.trim().toLowerCase()));
 
   async function saveOffPlan() {
     if (!typed.trim()) return;
@@ -393,8 +440,18 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
       {mode === "swap" && (
         <div className="p-3 mt-2" style={box}>
           <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Swap today for:</p>
+          {/* Dustin, 17 Aug: "I should be able to search library to pick what I
+              switch it with." A flat unfiltered list is fine at eleven
+              workouts and useless at a real library. */}
+          <input value={swapQ} onChange={(e) => setSwapQ(e.target.value)} type="search"
+            placeholder="Search your workouts" aria-label="Search workouts to swap in"
+            className="w-full rounded-xl px-3 py-2 mb-2 text-xs outline-none" style={field} />
+          {swapError && <p className="text-xs py-1" style={{ color: "var(--brand-primary)" }}>{swapError}</p>}
           {library.length === 0 && <p className="text-xs py-2" style={{ color: "var(--brand-text-secondary)" }}>Loading…</p>}
-          {library.map((d) => (
+          {library.length > 0 && swapLibrary.length === 0 && (
+            <p className="text-xs py-2" style={{ color: "var(--brand-text-secondary)" }}>No workout matches “{swapQ}”.</p>
+          )}
+          {swapLibrary.map((d) => (
             <button key={d.id} onClick={() => doSwap(d)} disabled={busy}
               className="w-full flex items-center justify-between py-2.5 px-1 text-left" style={{ borderBottom: "1px solid var(--brand-border)" }}>
               <span className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>{d.label}</span>

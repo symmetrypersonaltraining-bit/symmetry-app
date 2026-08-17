@@ -7,6 +7,7 @@ import { FunLoader } from "@/components/FunMoments";
 import ManualWorkoutBuilder from "@/components/ManualWorkoutBuilder";
 import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { sessionsReplacedBy, slotForReplacement, skipVerdict, describeReplaced, type DateOccupant } from "@/lib/replaceOnDate";
 
 type LibDay = { id: string; label: string };
 
@@ -33,6 +34,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
   const [busy, setBusy] = useState(false);
   const [pickedDate, setPickedDate] = useState<string>(dateStr || ctToday());
   const [markDone, setMarkDone] = useState(false);
+  const [ask, setAsk] = useState<{ day: LibDay; replacing: DateOccupant[] } | null>(null);
   const minDate = daysAgoCT(90);
 
   async function resolveClientId(): Promise<string | null> {
@@ -73,7 +75,42 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
     setLoading(false);
   }
 
-  async function addLibrary(d: LibDay) {
+  // Adding a workout to a day that already has one is TWO different intentions
+  // and the tap alone cannot tell them apart.
+  //
+  // Dustin, 17 Aug: he came here to *replace* his programmed walk with the
+  // stair master — this is where his own saved workouts are searchable, so it
+  // is where he looked — and this button has only ever added. He ended the day
+  // with both sessions scheduled and reported it as the swap being broken.
+  //
+  // He chose being asked over always-replace: doubling up on a day and swapping
+  // a day out are both things he does, so the app should not guess.
+  async function askOrAdd(d: LibDay) {
+    if (busy) return;
+    // Backlogging a FINISHED workout is never a replacement — it is a record of
+    // something that already happened, and it must not clear the day's plan.
+    if (markDone) { await addLibrary(d, "add"); return; }
+    setBusy(true);
+    try {
+      const cid = await effectiveClientId();
+      if (!cid) { window.alert("Could not find your client profile."); return; }
+      const { data, error } = await supabase.from("scheduled_workouts")
+        .select("id, day_id, position, status, deleted_at, days(label)")
+        .eq("client_id", cid).eq("scheduled_date", pickedDate);
+      // A refused read must not silently become "the day is empty", which would
+      // skip the question and add — the exact behaviour being fixed.
+      if (error) { window.alert("Couldn't check what's already on that day: " + error.message); return; }
+      const occupants: DateOccupant[] = ((data as any[]) || []).map((r) => ({
+        id: r.id, day_id: r.day_id, position: r.position, status: r.status,
+        deleted_at: r.deleted_at, label: r.days ? r.days.label : null,
+      }));
+      const replacing = sessionsReplacedBy(occupants, d.id);
+      if (replacing.length === 0) { setBusy(false); await addLibrary(d, "add"); return; }
+      setAsk({ day: d, replacing });
+    } finally { setBusy(false); }
+  }
+
+  async function addLibrary(d: LibDay, intent: "add" | "replace", replacing: DateOccupant[] = []) {
     if (busy) return;
     setBusy(true);
     try {
@@ -81,7 +118,11 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
       if (!cid) { window.alert("Could not find your client profile."); return; }
       const ex = await supabase.from("scheduled_workouts").select("position").eq("client_id", cid).eq("scheduled_date", pickedDate).order("position", { ascending: false }).limit(1);
       const last = (ex.data as any[]) || [];
-      const pos = last[0] && last[0].position ? last[0].position + 1 : 1;
+      // A replacement takes the slot it displaces so it lands where the old
+      // session sat in the day's order; an add goes on the end as before.
+      const pos = intent === "replace"
+        ? slotForReplacement(replacing)
+        : (last[0] && last[0].position ? last[0].position + 1 : 1);
       if (markDone) {
         // Backlog a FINISHED workout: mirror completeWorkout() — write a completed
         // workout_logs row and a completed scheduled_workouts row linked to it, so it
@@ -117,6 +158,24 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
       }
       const ins = await (supabase as any).from("scheduled_workouts").insert({ client_id: cid, day_id: d.id, scheduled_date: pickedDate, position: pos, status: "scheduled", source: clientId ? "trainer" : "client_self_assign" });
       if (ins.error) { window.alert(scheduleWriteError(ins.error, "add")); return; }
+      if (intent === "replace" && replacing.length) {
+        // Order matters: the new session is on the schedule BEFORE anything is
+        // cleared, so a failure here can never leave the day empty.
+        //
+        // `.select("id")` is the whole guard. PostgREST returns its error, it
+        // does not throw, and an update matching ZERO rows is not an error at
+        // all — so without asking which rows actually changed this would report
+        // a replacement it had not made. That is the bug, not a precaution.
+        const { data: skipped, error: skipErr } = await (supabase as any).from("scheduled_workouts")
+          .update({ status: "skipped", updated_at: new Date().toISOString() })
+          .in("id", replacing.map((r) => r.id))
+          .eq("status", "scheduled")
+          .select("id");
+        const verdict = skipErr
+          ? `Added, but ${describeReplaced(replacing)} is still on that day too — ${skipErr.message}`
+          : skipVerdict(replacing, (((skipped as { id: string }[] | null) || []).map((s) => s.id)));
+        if (verdict) window.alert(verdict);
+      }
       window.location.reload();
     } finally { setBusy(false); }
   }
@@ -209,7 +268,34 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
               <input type="date" value={pickedDate} min={minDate} max={ctToday()} onChange={(e) => setPickedDate(e.target.value)} style={{ flex: 1, minWidth: 150, padding: "9px 10px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", fontSize: 14, fontFamily: "inherit" }} />
               {pickedDate !== ctToday() && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--brand-primary, #7c9cf5)" }}>backdated</span>}
             </div>
-            {build ? (
+            {ask ? (
+              /* Replace or add as well — Dustin's answer, 17 Aug. Both wordings
+                 name the sessions involved, because "replace" with nothing named
+                 is how you clear a day you meant to add to. */
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>
+                  {pickedDate === ctToday() ? "Today" : pickedDate} already has {describeReplaced(ask.replacing)}.
+                </div>
+                <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 14, lineHeight: 1.45 }}>
+                  What should &ldquo;{ask.day.label}&rdquo; do?
+                </div>
+                <button disabled={busy} onClick={() => { const a = ask; setAsk(null); addLibrary(a.day, "replace", a.replacing); }}
+                  style={{ width: "100%", padding: "12px", borderRadius: 12, border: "none", background: "var(--brand-primary, #7c9cf5)", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 800 }}>
+                  Replace it
+                </button>
+                <div style={{ fontSize: 11.5, opacity: 0.65, margin: "6px 2px 12px", lineHeight: 1.4 }}>
+                  {describeReplaced(ask.replacing)} {ask.replacing.length > 1 ? "get" : "gets"} marked skipped. Nothing is deleted, and your programme is unchanged.
+                </div>
+                <button disabled={busy} onClick={() => { const a = ask; setAsk(null); addLibrary(a.day, "add"); }}
+                  style={{ width: "100%", padding: "12px", borderRadius: 12, border: "1px dashed rgba(140,150,180,.5)", background: "transparent", cursor: "pointer", fontSize: 14, fontWeight: 700, color: "inherit" }}>
+                  Add as well
+                </button>
+                <div style={{ fontSize: 11.5, opacity: 0.65, margin: "6px 2px 0", lineHeight: 1.4 }}>
+                  Two sessions on that day.
+                </div>
+                <button onClick={() => setAsk(null)} style={{ marginTop: 14, width: "100%", padding: "10px", borderRadius: 12, border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: "inherit", opacity: 0.7 }}>← Back</button>
+              </div>
+            ) : build ? (
               <ManualWorkoutBuilder
                 clientId={clientId}
                 date={pickedDate}
@@ -227,7 +313,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {filtered.map((d) => (
-                      <button key={d.id} disabled={busy} onClick={() => addLibrary(d)} style={{ textAlign: "left", padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(140,150,180,.2)", background: "rgba(140,150,180,.06)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "inherit" }}>{d.label}</button>
+                      <button key={d.id} disabled={busy} onClick={() => askOrAdd(d)} style={{ textAlign: "left", padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(140,150,180,.2)", background: "rgba(140,150,180,.06)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "inherit" }}>{d.label}</button>
                     ))}
                     {filtered.length === 0 && <div style={{ padding: 12, opacity: 0.6, fontSize: 13 }}>No matching workouts.</div>}
                   </div>
