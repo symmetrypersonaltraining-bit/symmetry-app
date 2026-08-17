@@ -117,6 +117,50 @@ export default function GoalsPanel({
         );
       })}
 
+      {/* ADDING A SECOND GOAL.
+
+          Dustin, 17 Aug: "i dont see an option to add goals anywhere in my
+          client app."
+
+          He was right, and it was not the Client View mount from 2254450 — it
+          was this. The invitation below is gated on `!active.length &&
+          !proposed.length`, so the moment you have ONE goal of any kind the
+          only way to make another disappears, permanently. The feature carries
+          three metrics and the UI could only ever set the first one.
+
+          He has 23 weight readings, 20 body fat and 19 lean mass, and one
+          active weight goal — so two of the three metrics were unreachable for
+          him personally, with no control on screen to say so.
+
+          Same rule as the big invitation: only metrics with readings are
+          offered. Asking somebody to pick a lean mass target when they have
+          never had lean mass measured is asking them to guess. */}
+      {canSet && (active.length > 0 || proposed.length > 0) && (() => {
+        const taken = new Set(goals.map((g) => g.metric));
+        const free = (["weight", "body_fat_pct", "lean_mass"] as GoalMetric[])
+          .filter((m) => !taken.has(m) && (readingsByMetric[m] || []).length > 0);
+        if (!free.length) return null;
+        return (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {free.map((m) => (
+              <button
+                key={m}
+                onClick={() => setSheet({ metric: m, existing: null })}
+                style={{
+                  flex: "1 1 auto", minHeight: 44, padding: "11px 13px", borderRadius: 12,
+                  background: "var(--brand-surface)", border: "1px dashed var(--brand-border)",
+                  color: "var(--brand-text)", fontSize: 12.5, fontWeight: 800, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 7, justifyContent: "center",
+                }}
+              >
+                <span style={{ fontSize: 15, lineHeight: 1 }}>+</span>
+                {METRIC_LABEL[m]} goal
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* The invitation, shown only when there is history to hang a goal on.
           Asking somebody with no weigh-ins to pick a target is asking them to
           guess, and the weigh-in nudge above is already the better ask. */}
