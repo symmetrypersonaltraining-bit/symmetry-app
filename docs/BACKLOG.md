@@ -1,5 +1,36 @@
 # Backlog — the single work queue
 
+> ## 👉 17 Aug PM — START AT `docs/HANDOFF-2026-08-17-PM.md`
+>
+> Supersedes the morning handoff's task list. `docs/HANDOFF-COMPLETE-8-17.md` is
+> still the right read for HOW work gets done here (shipping, gates, mutation
+> testing, the recurring bug shapes).
+>
+> **The two emergencies are closed.** Supabase is on Pro + Small — verified from
+> the database itself, `max_connections` 90 and 512 MB shared buffers — managed
+> daily backups are on, and the storage ceiling went 500 MB → 8 GB.
+>
+> **Four commits shipped, `origin/main` = `52fc120`:**
+>
+> - `128e7da` replacing a workout removes the one it replaces, and can PROVE it.
+>   The morning handoff named the wrong button: he used "Add a workout", not the
+>   swap picker, and could not have used the swap picker because it never listed
+>   his own saved workouts. Swap now has search and his own workouts; Add asks
+>   replace-or-add.
+> - `4b5a351` two existing guards were passing on broken code — a comment
+>   satisfied a structural assertion, and a fixed-size source slice decided what
+>   a test could see.
+> - `5c7ac2f` the third copy of the occupancy bug, in `generate_scheduled_workouts`.
+>   Seven pattern-days were being refused, not three. Plus his second rule: a
+>   session a human moved off a date is not put back.
+> - `52fc120` foods log as "1 egg". The data was already in
+>   `food_catalog.serving_options` and nothing in the app had ever read it.
+>
+> **Open, and both are Dustin's call, not the next session's:** whether to RUN
+> the generator (58 inserts, dry-run verified, not on cron), and the group
+> message, which must never be sent without his okay on the exact words.
+
+
 > ## 👉 17 Aug — START AT `docs/HANDOFF-COMPLETE-8-17.md`
 >
 > Complete session handoff: every connection, the shipping protocol, the working
