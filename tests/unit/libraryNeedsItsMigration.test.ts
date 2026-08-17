@@ -59,7 +59,7 @@ test("it drops before it creates, so re-running a migration is safe", () => {
   assert.ok(dropAt < createAt, "the drop has to come first");
 });
 
-test("the RECIPE library is readable too, and the publish trigger is untouched", () => {
+test("the RECIPE library is readable, and the publish guard still stops clients", () => {
   // The recipes went in as `private` — enforce_recipe_publish() downgrades a
   // public insert unless is_trainer(), and the service role is not a trainer.
   // All twenty were invisible to every client while the sync route reported
@@ -75,8 +75,46 @@ test("the RECIPE library is readable too, and the publish trigger is untouched",
   // The fix must NOT have been to weaken the trigger or is_trainer(). That
   // trigger is what stops a client publishing a recipe to everybody else.
   assert.doesNotMatch(sql, /drop trigger[^;]*trg_recipe_publish/i);
-  assert.doesNotMatch(sql, /create or replace function[^;]*enforce_recipe_publish/i);
-  assert.doesNotMatch(sql, /create or replace function[^;]*is_trainer/i);
+  // Anchored to the function NAME. `create or replace function[^;]*is_trainer`
+  // spans from any function header to the next semicolon, so it fired on the
+  // 17 Aug trigger fix because that function's COMMENT quotes the RLS policy
+  // "((client_id = my_client_id()) OR is_trainer())" before its first `;` —
+  // and it had always been one stray mention away from firing on an unrelated
+  // migration. Same lesson as the other source-reading guards this week.
+  assert.doesNotMatch(sql, /create\s+or\s+replace\s+function\s+(public\.)?is_trainer\b/i,
+    "is_trainer() has been redefined — that would relax every RLS policy in the database at once");
+
+  // 17 AUG — THIS RULE IS NARROWED, ON PURPOSE, AND HERE IS WHY.
+  //
+  // It used to forbid touching enforce_recipe_publish() at all. That was the
+  // right instinct and the wrong bound: it forbade the FIX as well as the
+  // weakening. The read policy this file checks for was added and the recipes
+  // still never appeared, because the Recipes screen asks for
+  // `.eq("visibility","public")` and RLS cannot make a 'private' row satisfy a
+  // filter the app itself applies. Half a fix reads exactly like a whole one
+  // until somebody opens the screen.
+  //
+  // What shipped instead: library rows — `client_id is null` — are exempt from
+  // the guard. A client cannot create one. The INSERT policy is
+  // ((client_id = my_client_id()) OR is_trainer()) and NULL = my_client_id() is
+  // never true, so a client_id-null row comes only from a trainer or the
+  // service role that builds the library. The guard exists to stop a CLIENT
+  // self-publishing THEIR OWN recipe, and a library row is neither.
+  //
+  // Verified against the live database after applying, not reasoned about:
+  // updating every client-owned private recipe to 'public' as a non-trainer
+  // touched 1 row and left it 'private'; client-owned public stayed at 14.
+  //
+  // So the rule becomes: the two client branches must survive intact. Their
+  // content is pinned in tests/unit/recipeLibraryPublishes.test.ts, with a
+  // mutation harness at tests/mutate-recipe-publish.sh covering both directions
+  // — the library going dark again, and a client gaining the ability to publish.
+  assert.match(sql, /if new\.client_id is null then/i,
+    "library recipes are demoted to private on insert again, so the shelf is empty");
+  assert.match(sql, /new\.visibility := 'private'/i,
+    "a client's public INSERT is no longer demoted — anyone can publish to the shared library");
+  assert.match(sql, /new\.visibility := old\.visibility/i,
+    "a client's UPDATE to public is no longer reverted — anyone can publish an existing recipe");
 });
 
 test("the library read policies are SELECT-only, both tables", () => {
