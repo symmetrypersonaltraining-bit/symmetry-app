@@ -1,5 +1,56 @@
 # Backlog — the single work queue
 
+> ## 👉 18 Aug — the wrong-date credit, twice, and what actually causes it
+>
+> **`origin/main` = `9033065`.**
+>
+> Dustin, 18 Aug: *"hassan has 2 workouts today, I logged one but 2nd one is
+> showing."* Same shape as his own on the 17th, one day after that fix shipped,
+> and the fix did not catch it.
+>
+> **THE CAUSE, now known for certain — it is the in-logger EXERCISE SWAP.**
+> `swap_exercise()` calls `fork_day_for_client()`, which clones the shared
+> library day into a private copy (`days.swapped_from_day_id`, `created_by
+> 'swap'`) and repoints that scheduled row at the copy. That is correct — one
+> client's swap must not rewrite everybody's workout. But it means **any client
+> who swaps an exercise mid-session moves the day underneath their own open
+> logger.** This is not rare and it is not going away; it fires every time
+> somebody taps swap. Hassan's fork was created at 13:38:31, mid-session.
+>
+> - `5cef2f4` **the day id was never an identity.** Completion now matches the
+>   whole swap FAMILY — the day, its root, and every fork of that root — so
+>   which of the two ids the logger happens to hold stops mattering. The point
+>   is not that the family finds the row; it is that finding it means the past
+>   and future fallbacks are never reached, and both wrong credits came from
+>   reaching them. Pull-forward widened the same way. Degrades safely: if `days`
+>   cannot be read the family is still `[the opened day]`, i.e. today's
+>   behaviour. 25 mutations, all caught; **two of the new ones were not caught
+>   on the first run and the gap was in the test, not the code.**
+> - `9033065` **the reach-back had no bound.** Found while confirming Hassan's
+>   repair: Todd Prine's 23 June session was closed by a workout done 14 August
+>   — 52 days. Jennifer Day 42, Stacie Weever 42. The fallback walked backwards
+>   until it hit anything still 'scheduled'. Now stopped at seven days, the same
+>   window pull-forward uses, with a test pinning the two constants equal.
+>   Deliberately opening an old card is a different path and stays unbounded.
+>
+> **Hassan's data was repaired by hand** (18 Aug completed and linked, 11 Aug
+> back to scheduled; backup `bak_sw_hassan_20260818`). The historical rows above
+> are NOT rewritten — months old, some may have been deliberate, and nothing in
+> the data distinguishes the two after the fact. **Dustin's call.**
+>
+> Also shipped earlier on the 18th: `eba6a1d` add-to-tomorrow and the delete
+> that removed the wrong session, `d083b6d`/`2dc971c` photo-logged meals
+> editable (Megan), `3a096d9` the logger no longer re-renders four times a
+> second while you rest.
+>
+> **Still open, not diagnosed:** the Stair Master completion that wrote nothing
+> at all (PART 2c of `docs/HANDOFF-2026-08-17-PM.md`); why the delete removed a
+> different row than the one tapped. **Dustin's call:** whether to RUN
+> `generate_scheduled_workouts` (58 inserts, dry-run verified, not on cron);
+> Tyler Dorsett's $15 session rate, Robert Miller's null rate, Madeleine Coker's
+> $75/0 sessions.
+
+
 > ## 👉 17 Aug PM — START AT `docs/HANDOFF-2026-08-17-PM.md`
 >
 > Supersedes the morning handoff's task list. `docs/HANDOFF-COMPLETE-8-17.md` is
