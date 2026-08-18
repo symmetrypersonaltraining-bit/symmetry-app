@@ -52,11 +52,18 @@ function daysBetween(a: string, b: string): number {
  */
 export function findSlotToPullForward(
   candidates: SlotCandidate[],
-  dayId: string,
+  dayId: string | string[],
   pickedDate: string,
 ): SlotCandidate | null {
+  // `dayId` accepts the whole swap FAMILY, not just one id. A swap forks the
+  // shared day into a private copy (`days.swapped_from_day_id`) and repoints
+  // the scheduled row at the copy — so "the same session" stops being one id
+  // the moment anybody swaps. Matching on identity here is what let a session
+  // done early insert a second card instead of consuming its own slot, which is
+  // Sara Prince's complaint arriving through the fork door.
+  const family = new Set(Array.isArray(dayId) ? dayId : [dayId]);
   const eligible = candidates
-    .filter((c) => c.day_id === dayId)
+    .filter((c) => !!c.day_id && family.has(c.day_id))
     .filter((c) => !c.deleted_at)
     .filter((c) => c.status === "scheduled")
     .filter((c) => {

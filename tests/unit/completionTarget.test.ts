@@ -12,6 +12,8 @@ import { join } from "node:path";
 import {
   chooseCompletionTargets,
   completionVerdict,
+  dayFamilyIds,
+  lineageRoot,
   type CompletionCandidate,
 } from "../../src/lib/completionTarget.ts";
 
@@ -174,4 +176,125 @@ test("completeWorkout uses the row it was opened from", () => {
   assert.ok(verdict > upd, "the completion's result is never checked");
   assert.match(body.slice(upd, verdict), /\.select\("id"\)/,
     "the completion does not ask which rows it actually changed");
+});
+
+// ─── the swap family: Hassan Kareem, 18 Aug ─────────────────────────────────
+//
+// "hassan has 2 workouts today, I logged one but 2nd one is showing."
+//
+// A swap at 13:38 forked the shared day f344828c into d89af543 (owner Hassan,
+// swapped_from f344828c) and repointed today's scheduled row at the fork. The
+// page had been rendered holding the ORIGINAL id, so `scheduledWorkoutId` came
+// back null — the opened-row preference had nothing to prefer, and everything
+// downstream matched on day_id and reached back to 11 August.
+
+const SHARED = "f344828c";
+const FORK = "d89af543";
+
+test("a day forked by a swap resolves back to the shared day it came from", () => {
+  const root = lineageRoot(FORK, [{ id: FORK, swapped_from_day_id: SHARED }]);
+  assert.equal(root, SHARED);
+});
+
+test("a shared day is its own root", () => {
+  assert.equal(lineageRoot(SHARED, [{ id: SHARED, swapped_from_day_id: null }]), SHARED);
+});
+
+test("opening the shared day still matches the fork today's row was moved to", () => {
+  // This is Hassan's exact lookup. Without the family the today query returns
+  // nothing and the make-up fallback credits 11 August.
+  const ids = dayFamilyIds(SHARED, SHARED, [
+    { id: SHARED, swapped_from_day_id: null },
+    { id: FORK, swapped_from_day_id: SHARED },
+  ]);
+  assert.ok(ids.includes(FORK), "the fork is not treated as the same session — 11 August gets credited again");
+  assert.ok(ids.includes(SHARED));
+});
+
+test("opening the fork still matches a row left on the shared day", () => {
+  const ids = dayFamilyIds(FORK, SHARED, [
+    { id: FORK, swapped_from_day_id: SHARED },
+    { id: SHARED, swapped_from_day_id: null },
+  ]);
+  assert.ok(ids.includes(SHARED));
+  assert.ok(ids.includes(FORK));
+});
+
+test("two clients' forks of the same shared day are siblings, not strangers", () => {
+  const ids = dayFamilyIds(FORK, SHARED, [
+    { id: FORK, swapped_from_day_id: SHARED },
+    { id: "someone-else", swapped_from_day_id: SHARED },
+  ]);
+  assert.ok(ids.includes("someone-else"));
+  // Sibling forks belong to other clients; the scheduled_workouts query is
+  // still scoped by client_id, so this widens nothing across people.
+});
+
+test("an unrelated day is never pulled into the family", () => {
+  const ids = dayFamilyIds(SHARED, SHARED, [
+    { id: SHARED, swapped_from_day_id: null },
+    { id: "different-session", swapped_from_day_id: "some-other-root" },
+  ]);
+  assert.deepEqual(ids, [SHARED], "completion would close a session the client did not do");
+});
+
+test("the root comes from the opened day, not whatever row came back first", () => {
+  // `days` returns rows in no particular order, and a sibling fork belonging to
+  // another client can arrive ahead of this one. Reading swapped_from off the
+  // first row would inherit a stranger's lineage.
+  const root = lineageRoot(FORK, [
+    { id: "someone-elses-fork", swapped_from_day_id: "a-different-session" },
+    { id: FORK, swapped_from_day_id: SHARED },
+  ]);
+  assert.equal(root, SHARED);
+});
+
+test("the opened day is in the family even when `days` returned nothing for it", () => {
+  // The fork is readable, its root may not be, or the read may simply fail.
+  // Dropping the day the client is standing on sends the completion looking for
+  // a session it never opened.
+  const ids = dayFamilyIds(FORK, SHARED, []);
+  assert.ok(ids.includes(FORK), "the day being logged fell out of its own family");
+  assert.ok(ids.includes(SHARED));
+});
+
+test("the opened day survives being unable to read `days` at all", () => {
+  // RLS, a dropped request, anything. An empty family would become `IN ()`,
+  // match nothing, and send every completion straight to the make-up fallback —
+  // strictly worse than the bug being fixed.
+  assert.deepEqual(dayFamilyIds(SHARED, SHARED, []), [SHARED]);
+  assert.equal(lineageRoot(SHARED, []), SHARED);
+});
+
+test("the family has no duplicates", () => {
+  const ids = dayFamilyIds(FORK, SHARED, [
+    { id: FORK, swapped_from_day_id: SHARED },
+    { id: FORK, swapped_from_day_id: SHARED },
+    { id: SHARED, swapped_from_day_id: null },
+  ]);
+  assert.equal(new Set(ids).size, ids.length);
+});
+
+test("completeWorkout matches the whole swap family, not one day id", () => {
+  const i = LOGGER.indexOf("async function completeWorkout");
+  const after = i + "async function completeWorkout".length;
+  const rest = LOGGER.slice(after);
+  const end = rest.search(/\n {2}(?:async )?function |\n {2}const \w+ = /);
+  const body = LOGGER.slice(i, end === -1 ? LOGGER.length : after + end);
+
+  assert.match(body, /const __dayIds = dayFamilyIds\(day\.id, __root, __kin\)/,
+    "the family is not computed — a swap mid-session sends the credit to another week again");
+  assert.match(body, /const __root = lineageRoot\(day\.id, __kin\)/,
+    "the lineage root is not resolved, so opening a fork cannot find the shared day");
+  // The three lookups that used to key off day.id. Any one of them left on an
+  // equality match is a door back to Hassan's 11 August credit.
+  assert.equal((body.match(/\.in\("day_id", __dayIds\)/g) || []).length, 3,
+    "a scheduled_workouts lookup still matches a single day_id");
+  assert.doesNotMatch(body, /\.eq\("day_id", day\.id\)/,
+    "a lookup is still matching one day id");
+  assert.match(body, /findSlotToPullForward\(\(__futureRows as SlotCandidate\[\]\) \|\| \[\], __dayIds, __today\)/,
+    "pull-forward still matches one day id, so a forked session done early inserts a second card");
+  // No filter-string concatenation in the completion path.
+  assert.doesNotMatch(body, /\.or\(`/,
+    "a PostgREST filter is being built by string concatenation from a route param");
 });

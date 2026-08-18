@@ -117,3 +117,62 @@ export function completionVerdict(expectedIds: string[], changedIds: string[]): 
     ? "Your sets are saved, but the schedule still shows this workout as not done. Refresh, and tell your coach if it stays that way."
     : "Your sets are saved, but part of today's schedule still shows as not done. Refresh, and tell your coach if it stays that way.";
 }
+
+// ─── THE SAME HOLE, ONE DAY LATER ────────────────────────────────────────────
+//
+// Hassan Kareem, 18 Aug: "hassan has 2 workouts today, I logged one but 2nd one
+// is showing." Identical shape to Dustin's the day before, and the fix above
+// did not catch it:
+//
+//   days              d89af543  'library_fork'  swapped_from f344828c  created 13:38:31
+//   workout_logs      P2 A — Lower / Posterior Chain   day_id f344828c  done 13:57
+//   scheduled_workouts 2026-08-18  day_id d89af543  'scheduled'   <- today, untouched
+//   scheduled_workouts 2026-08-11  day_id f344828c  'completed', workout_log_id = today's
+//
+// The opened-row preference above only helps while the logger HAS the opened
+// row. `scheduledWorkoutId` is resolved server-side by (day_id, date) when the
+// page renders. Render the page after the swap has repointed today's row at the
+// fork, holding the original day id, and that lookup finds nothing — the prop
+// is null, the day_id lookup for today is empty, and the make-up fallback
+// reaches back to 11 August exactly as before.
+//
+// So the day_id itself has to stop being treated as an identity. A swap does
+// not create a different session; it creates a private copy of the same one,
+// and `days.swapped_from_day_id` records that. Completion now matches on the
+// whole FAMILY — the day, whatever it was forked from, and every fork of that
+// root — so the original and the copy are one session for the purpose of
+// deciding what today's workout closes.
+//
+// The point is not that the family lookup finds the row. It is that finding it
+// means the past and future fallbacks are never reached, which is where both
+// wrong credits came from.
+
+/** A `days` row, reduced to what lineage needs. */
+export interface DayKin {
+  id: string;
+  swapped_from_day_id?: string | null;
+}
+
+/**
+ * The root of a day's swap lineage: the shared day it was forked from, or
+ * itself when it is the shared day.
+ */
+export function lineageRoot(openedDayId: string, kin: DayKin[]): string {
+  const self = kin.find((d) => d.id === openedDayId);
+  return self?.swapped_from_day_id || openedDayId;
+}
+
+/**
+ * Every day id that means "the session the client is actually doing".
+ *
+ * The opened day always comes first and is always present, so a caller that
+ * cannot read `days` at all degrades to today's behaviour rather than to an
+ * empty `IN ()` that would silently match nothing.
+ */
+export function dayFamilyIds(openedDayId: string, root: string, kin: DayKin[]): string[] {
+  const out = [openedDayId, root];
+  for (const d of kin) {
+    if (d.id === root || d.swapped_from_day_id === root) out.push(d.id);
+  }
+  return [...new Set(out.filter(Boolean))];
+}

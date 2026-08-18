@@ -23,7 +23,7 @@ import { pickExistingLog, type ExistingLog } from "@/lib/workoutLogLookup";
 import { feetToMeters, metersToFeet } from "@/lib/distanceField";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { exerciseTitleSize } from "@/lib/exerciseTitleSize";
-import { chooseCompletionTargets, completionVerdict, type CompletionCandidate } from "@/lib/completionTarget";
+import { chooseCompletionTargets, completionVerdict, dayFamilyIds, lineageRoot, type CompletionCandidate, type DayKin } from "@/lib/completionTarget";
 import AiBadge from "@/components/AiBadge";
 import {
   newTimer, start as tStart, pause as tPause, setMode as tSetMode,
@@ -1757,11 +1757,41 @@ export default function WorkoutLogger({
               .limit(1)
           : { data: null };
         const __opened = ((__openedRows as CompletionCandidate[] | null) ?? [])[0] ?? null;
+        // A SWAP DOES NOT MAKE THIS A DIFFERENT SESSION.
+        //
+        // Hassan Kareem, 18 Aug — one day after the fix above, same wrong
+        // credit. A swap at 13:38 forked the shared day into a private copy and
+        // repointed today's row at the copy; the page had been rendered holding
+        // the ORIGINAL day id, so `scheduledWorkoutId` came back null and the
+        // opened-row preference had nothing to prefer. Everything below matched
+        // on `day.id`, found nothing today, and reached back to 11 August.
+        //
+        // `days.swapped_from_day_id` records the fork, so the family — this day,
+        // its root, and every fork of that root — is the honest identity of "the
+        // session this client is doing". Matching on it means the past and
+        // future fallbacks are not reached, which is the whole bug.
+        // Two plain equality reads rather than one `.or()` with the id spliced
+        // into a filter string: the day id arrives from a route param, and a
+        // PostgREST filter built by string concatenation is not something to
+        // leave lying in the completion path.
+        const { data: __kinSelf } = await (supabase as any)
+          .from("days")
+          .select("id, swapped_from_day_id")
+          .eq("id", day.id)
+          .limit(1);
+        const __kin = ((__kinSelf as DayKin[] | null) ?? []).slice();
+        const __root = lineageRoot(day.id, __kin);
+        const { data: __kinForks } = await (supabase as any)
+          .from("days")
+          .select("id, swapped_from_day_id")
+          .eq("swapped_from_day_id", __root);
+        for (const k of ((__kinForks as DayKin[] | null) ?? [])) __kin.push(k);
+        const __dayIds = dayFamilyIds(day.id, __root, __kin);
         const { data: __todayRows } = await (supabase as any)
           .from("scheduled_workouts")
           .select("id, day_id, scheduled_date, status, deleted_at")
           .eq("client_id", clientId)
-          .eq("day_id", day.id)
+          .in("day_id", __dayIds)
           .eq("scheduled_date", __today)
           .is("deleted_at", null);
         const __choice = chooseCompletionTargets(
@@ -1775,7 +1805,7 @@ export default function WorkoutLogger({
             .from("scheduled_workouts")
             .select("id")
             .eq("client_id", clientId)
-            .eq("day_id", day.id)
+            .in("day_id", __dayIds)
             .eq("status", "scheduled")
             .is("deleted_at", null)
             .lte("scheduled_date", __today)
@@ -1803,13 +1833,13 @@ export default function WorkoutLogger({
             .from("scheduled_workouts")
             .select("id, day_id, scheduled_date, status, deleted_at")
             .eq("client_id", clientId)
-            .eq("day_id", day.id)
+            .in("day_id", __dayIds)
             .eq("status", "scheduled")
             .is("deleted_at", null)
             .gt("scheduled_date", __today)
             .order("scheduled_date", { ascending: true })
             .limit(10);
-          const __slot = findSlotToPullForward((__futureRows as SlotCandidate[]) || [], day.id, __today);
+          const __slot = findSlotToPullForward((__futureRows as SlotCandidate[]) || [], __dayIds, __today);
           if (__slot) {
             // Move it to today rather than completing it in place: the calendar
             // should show the session on the day it was actually done.
