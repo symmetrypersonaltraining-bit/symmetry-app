@@ -176,3 +176,36 @@ export function dayFamilyIds(openedDayId: string, root: string, kin: DayKin[]): 
   }
   return [...new Set(out.filter(Boolean))];
 }
+
+// ─── HOW FAR BACK A FALLBACK MAY REACH ───────────────────────────────────────
+//
+// Found while confirming Hassan's repair: rows where the completed schedule
+// date and the log's own date are WEEKS apart.
+//
+//   Todd Prine       scheduled 2026-06-23   logged 2026-08-14   52 days
+//   Jennifer Day     scheduled 2026-06-22   logged 2026-08-03   42 days
+//   Stacie Weever    scheduled 2026-06-23   logged 2026-08-04   42 days
+//
+// Nobody makes up a session six weeks late. That is the same accidental credit
+// as Dustin's and Hassan's, with a bigger gap — a workout finished today, no
+// row found for today, and the fallback walking backwards until it hit
+// something still marked 'scheduled', which on an abandoned old programme can
+// be any distance away.
+//
+// Note what is NOT bounded: deliberately opening an old card and finishing it.
+// That takes the opened-row branch above, reports `crossesDate: true`, and is
+// left alone at any distance — it is a real thing people do and Madeleine's
+// complaint on 6 Aug was about it being broken.
+//
+// The bound applies only to the FALLBACK, which fires when nothing was opened
+// and nothing matches today: the accidental case, by construction. Seven days,
+// the same window pullForward.ts uses to decide a session done early is "the
+// one I was going to do anyway" — symmetric on purpose, since the two are the
+// same judgement pointed in opposite directions.
+export const MAKEUP_WINDOW_DAYS = 7;
+
+/** Is this scheduled date near enough to be the session that was just done? */
+export function isWithinMakeupWindow(scheduledDate: string, sessionDate: string): boolean {
+  const delta = Math.round((Date.parse(sessionDate) - Date.parse(scheduledDate)) / 86400000);
+  return delta >= 0 && delta <= MAKEUP_WINDOW_DAYS;
+}

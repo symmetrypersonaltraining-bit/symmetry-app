@@ -23,7 +23,7 @@ import { pickExistingLog, type ExistingLog } from "@/lib/workoutLogLookup";
 import { feetToMeters, metersToFeet } from "@/lib/distanceField";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { exerciseTitleSize } from "@/lib/exerciseTitleSize";
-import { chooseCompletionTargets, completionVerdict, dayFamilyIds, lineageRoot, type CompletionCandidate, type DayKin } from "@/lib/completionTarget";
+import { chooseCompletionTargets, completionVerdict, dayFamilyIds, isWithinMakeupWindow, lineageRoot, type CompletionCandidate, type DayKin } from "@/lib/completionTarget";
 import AiBadge from "@/components/AiBadge";
 import {
   newTimer, start as tStart, pause as tPause, setMode as tSetMode,
@@ -1803,7 +1803,7 @@ export default function WorkoutLogger({
         if (!__swIds.length) {
           const { data: __pastRows } = await (supabase as any)
             .from("scheduled_workouts")
-            .select("id")
+            .select("id, scheduled_date")
             .eq("client_id", clientId)
             .in("day_id", __dayIds)
             .eq("status", "scheduled")
@@ -1811,7 +1811,13 @@ export default function WorkoutLogger({
             .lte("scheduled_date", __today)
             .order("scheduled_date", { ascending: false })
             .limit(1);
-          if (__pastRows && __pastRows.length) __swIds = [__pastRows[0].id];
+          // ...but not to any distance. Todd Prine's 23 June session was closed
+          // by a workout done on 14 August: this walked backwards until it found
+          // something still 'scheduled', and on an abandoned old programme that
+          // can be six weeks away. Opening an old card deliberately is a
+          // different path and stays unbounded.
+          const __past = ((__pastRows as { id: string; scheduled_date: string }[] | null) ?? [])[0];
+          if (__past && isWithinMakeupWindow(__past.scheduled_date, __today)) __swIds = [__past.id];
         }
         // ...and if there is nothing today and nothing missed, look FORWARD.
         //

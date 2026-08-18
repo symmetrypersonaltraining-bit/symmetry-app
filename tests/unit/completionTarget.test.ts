@@ -13,9 +13,12 @@ import {
   chooseCompletionTargets,
   completionVerdict,
   dayFamilyIds,
+  isWithinMakeupWindow,
   lineageRoot,
+  MAKEUP_WINDOW_DAYS,
   type CompletionCandidate,
 } from "../../src/lib/completionTarget.ts";
+import { PULL_FORWARD_WINDOW_DAYS } from "../../src/lib/pullForward.ts";
 
 const LOGGER = readFileSync(
   join(process.cwd(), "src/app/(app)/workout/[dayId]/WorkoutLogger.tsx"),
@@ -297,4 +300,67 @@ test("completeWorkout matches the whole swap family, not one day id", () => {
   // No filter-string concatenation in the completion path.
   assert.doesNotMatch(body, /\.or\(`/,
     "a PostgREST filter is being built by string concatenation from a route param");
+});
+
+// ─── how far back the fallback may reach ────────────────────────────────────
+//
+// Found while confirming Hassan's repair. Real rows, all of them:
+//   Todd Prine    scheduled 2026-06-23  logged 2026-08-14  — 52 days
+//   Jennifer Day  scheduled 2026-06-22  logged 2026-08-03  — 42 days
+//   Stacie Weever scheduled 2026-06-23  logged 2026-08-04  — 42 days
+
+test("a session done today does not close one from six weeks ago", () => {
+  assert.equal(isWithinMakeupWindow("2026-06-23", "2026-08-14"), false, "Todd Prine's 23 June");
+  assert.equal(isWithinMakeupWindow("2026-06-22", "2026-08-03"), false, "Jennifer Day's 22 June");
+});
+
+test("yesterday's missed session is still a make-up", () => {
+  assert.equal(isWithinMakeupWindow("2026-08-17", "2026-08-18"), true);
+  assert.equal(isWithinMakeupWindow("2026-08-13", "2026-08-18"), true);
+});
+
+test("the window is inclusive at exactly a week, and shut past it", () => {
+  assert.equal(isWithinMakeupWindow("2026-08-11", "2026-08-18"), true);
+  assert.equal(isWithinMakeupWindow("2026-08-10", "2026-08-18"), false);
+});
+
+test("the same day is within the window", () => {
+  assert.equal(isWithinMakeupWindow("2026-08-18", "2026-08-18"), true);
+});
+
+test("a FUTURE date is not a make-up", () => {
+  // The pull-forward path handles doing a session early, and it MOVES the row
+  // rather than completing it in place. Letting this branch claim it too would
+  // credit a session on a day it was not done.
+  assert.equal(isWithinMakeupWindow("2026-08-19", "2026-08-18"), false);
+});
+
+test("the make-up window matches the pull-forward window", () => {
+  // Same judgement pointed in opposite directions. If one moves, both should,
+  // and a silent divergence would make "early" and "late" behave differently
+  // for no reason anyone could explain to a client.
+  assert.equal(MAKEUP_WINDOW_DAYS, PULL_FORWARD_WINDOW_DAYS);
+});
+
+test("deliberately opening an old card is NOT bounded", () => {
+  // Madeleine Coker, 6 Aug: "Trying to log my cardio for yesterday and it keeps
+  // completing my cardio for today instead." Opening a specific old card takes
+  // the opened-row branch, which has no distance limit — the bound is only on
+  // the fallback, which fires when nothing was opened at all.
+  const choice = chooseCompletionTargets(
+    row({ id: "very-old", scheduled_date: "2026-06-23" }), [], TODAY);
+  assert.deepEqual(choice.ids, ["very-old"]);
+  assert.equal(choice.crossesDate, true);
+});
+
+test("completeWorkout bounds the reach-back", () => {
+  const i = LOGGER.indexOf("async function completeWorkout");
+  const after = i + "async function completeWorkout".length;
+  const rest = LOGGER.slice(after);
+  const end = rest.search(/\n {2}(?:async )?function |\n {2}const \w+ = /);
+  const body = LOGGER.slice(i, end === -1 ? LOGGER.length : after + end);
+  assert.match(body, /if \(__past && isWithinMakeupWindow\(__past\.scheduled_date, __today\)\) __swIds = \[__past\.id\];/,
+    "the fallback can walk back to any date again — Todd Prine's 23 June");
+  assert.match(body, /\.select\("id, scheduled_date"\)/,
+    "the fallback stopped selecting the date it is about to be judged on");
 });

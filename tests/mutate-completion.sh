@@ -83,6 +83,14 @@ mutate "pull-forward back to one day"    "$LOG" "s.replace('findSlotToPullForwar
 mutate "family built by string concat"   "$LOG" "s.replace('          .eq(\"id\", day.id)\n          .limit(1);', '          .or(\`id.eq.\${day.id}\`);')"
 mutate "pullForward ignores the family"  "src/lib/pullForward.ts" "s.replace('    .filter((c) => !!c.day_id && family.has(c.day_id))', '    .filter((c) => !!c.day_id)')"
 
+echo
+echo "the reach-back loses its bound — Todd Prine's 23 June:"
+mutate "window check removed"            "$LOG" "s.replace('if (__past && isWithinMakeupWindow(__past.scheduled_date, __today)) __swIds = [__past.id];', 'if (__past) __swIds = [__past.id];')"
+mutate "window widened to a month"       "$LIB" "s.replace('export const MAKEUP_WINDOW_DAYS = 7;', 'export const MAKEUP_WINDOW_DAYS = 30;')"
+mutate "window shut on yesterday"        "$LIB" "s.replace('export const MAKEUP_WINDOW_DAYS = 7;', 'export const MAKEUP_WINDOW_DAYS = 0;')"
+mutate "future dates count as make-ups"  "$LIB" "s.replace('  return delta >= 0 && delta <= MAKEUP_WINDOW_DAYS;', '  return delta <= MAKEUP_WINDOW_DAYS;')"
+mutate "boundary flips to exclusive"     "$LIB" "s.replace('delta <= MAKEUP_WINDOW_DAYS', 'delta < MAKEUP_WINDOW_DAYS')"
+
 restore
 echo
 echo "caught $pass, missed $fail"
