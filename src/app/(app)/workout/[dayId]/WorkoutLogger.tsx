@@ -1495,11 +1495,41 @@ export default function WorkoutLogger({
    * number comes from Date.now(). That is what makes a backgrounded phone
    * come back with the right time instead of however many ticks it managed.
    */
+  // WHY THIS TICKS ONCE A SECOND AND STOPS WHEN THE SCREEN IS AWAY.
+  //
+  // Dustin, 18 Aug: "If I leave the app open in my workout logger for a few
+  // minutes without touching it while I'm rolling or doing an exercise, when I
+  // go to log the exercise, it's very laggy. Sometimes it takes minutes to
+  // actually click the movement."
+  //
+  // `timerNow` is state on the TOP-LEVEL logger component, so every tick
+  // re-rendered the entire screen — every section, every exercise, every set
+  // row and all of its controlled inputs. At 250ms that was FOUR FULL RENDERS
+  // A SECOND, for as long as any rest timer ran, which is exactly the window he
+  // describes: the timer is running while he rolls. On a phone that is minutes
+  // of continuous main-thread work, and taps queue behind it.
+  //
+  // Two changes, neither of which touches a pixel:
+  //
+  //   1. Once a second, not four times. The clock is displayed as mm:ss by
+  //      fmtSecs, so three of every four renders produced an identical screen.
+  //      Expiry is detected a fraction later; a rest timer does not care.
+  //   2. Nothing runs while the screen is hidden. It used to keep going until
+  //      the OS throttled it, and the backlog landed on resume — which is why
+  //      the lag is worst after leaving it sitting. On return it syncs
+  //      immediately, so the time is right the moment he looks.
+  //
+  // The clock itself is still read from Date.now(), never accumulated from
+  // ticks, so a phone that slept comes back with the correct time regardless of
+  // how many ticks it missed.
   useEffect(() => {
     if (!anyTimerRunning) return;
-    const id = setInterval(() => {
+    let id: ReturnType<typeof setInterval> | null = null;
+    const tick = () => {
       const now = Date.now();
-      setTimerNow(now);
+      // Whole seconds only. A re-render that redraws the same mm:ss is pure
+      // cost, and this keeps that true if the interval is ever shortened again.
+      setTimerNow(prev => (Math.floor(prev / 1000) === Math.floor(now / 1000) ? prev : now));
       setSetTimers(prev => {
         let changed = false;
         const next = { ...prev };
@@ -1519,8 +1549,28 @@ export default function WorkoutLogger({
         }
         return changed ? next : prev;
       });
-    }, 250);
-    return () => clearInterval(id);
+    };
+    const start = () => { if (id == null) id = setInterval(tick, 1000); };
+    const stop = () => { if (id != null) { clearInterval(id); id = null; } };
+    const onVis = () => {
+      if (typeof document === "undefined") return;
+      if (document.visibilityState === "hidden") { stop(); return; }
+      // Back on screen: catch up in one go, then resume ticking. A timer that
+      // expired while the phone was in his pocket is finished here, not left
+      // running until the next tick.
+      tick();
+      start();
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVis);
+      if (document.visibilityState === "hidden") stop(); else start();
+    } else {
+      start();
+    }
+    return () => {
+      stop();
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVis);
+    };
     // logSet/updateSet are stable enough for this: the effect only restarts
     // when something starts or stops running, which is exactly when it should.
     // eslint-disable-next-line react-hooks/exhaustive-deps
