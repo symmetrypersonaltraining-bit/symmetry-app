@@ -23,6 +23,8 @@ import {
   reminderSendDate,
   Cadence,
   BillingType,
+  billedRateOf,
+  describeAdjustment,
 } from "@/lib/reminder-calc";
 
 type DatedSession = { date: string; type: "trained" | "full" | "half" };
@@ -38,6 +40,8 @@ interface Rem {
   name: string;
   fee: number | null;
   sessionRate: number | null;
+  /** The rate THIS reminder was billed at. Frozen once sent; see reminder-calc.ts. */
+  billedRate: number | null;
   cadence: Cadence | null;
   billingType: BillingType;
   sessionsTrained: number;
@@ -213,6 +217,14 @@ export default function ReminderEditor() {
             name: c.name || "?",
             fee: c.current_fees == null ? null : Number(c.current_fees),
             sessionRate: c.session_rate == null ? null : Number(c.session_rate),
+            // FROZEN ONCE SENT, live while pending. A bill she has already been
+            // emailed must keep itemising at the rate it was calculated with; a
+            // draft should follow the client's current rate, because that is
+            // what it will actually be billed at.
+            billedRate: billedRateOf(
+              storedIsNewShape && r.notification_status !== "pending" ? cd.rate : null,
+              c.session_rate == null ? null : Number(c.session_rate),
+            ),
             cadence: cad,
             billingType,
             sessionsTrained,
@@ -280,14 +292,16 @@ export default function ReminderEditor() {
 
   const resetAmountToCount = (r: Rem) => {
     const n = parseInt(edits[r.id]?.count ?? "0", 10) || 0;
-    const amt = r.billingType === "flat" ? (r.fee ?? 0) : round2(n * (r.sessionRate ?? 0));
+    const amt = r.billingType === "flat" ? (r.fee ?? 0) : round2(n * (r.billedRate ?? 0));
     setEdit(r.id, { amount: String(amt), amountOverridesCount: false, override: false });
   };
 
   const calcFor = (r: Rem, e: Edit) =>
     calcReminder({
       fee: r.fee,
-      sessionRate: r.sessionRate,
+      // The rate on the ROW, not the client's rate today — a sent bill must not
+      // re-itemise itself when the client's rate changes.
+      sessionRate: r.billedRate,
       cadence: r.cadence,
       dueDate: e.due,
       sessionsTrained: parseInt(e.count, 10) || 0,
@@ -474,9 +488,25 @@ export default function ReminderEditor() {
             <div className="rounded-2xl p-3 space-y-1" style={{ background: "var(--brand-bg)" }}>
               <div className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>
                 {perSession
-                  ? r.sessionsTrained + " sessions × $" + (r.sessionRate ?? "?") + " = $" + calc.expected
+                  ? r.sessionsTrained + " sessions × $" + (r.billedRate ?? "?") + " = $" + calc.expected
                   : "Flat " + (r.cadence || "monthly") + " fee = $" + calc.expected}
               </div>
+              {/* A discount nobody can see is a discount you get no credit for.
+                  Dustin, 18 Aug: "so I can screenshot the dates n show her I gave
+                  her 2 free." */}
+              {(() => {
+                const adj = describeAdjustment(calc.expected, r.amount_due, r.billedRate);
+                if (!adj) return null;
+                const noun = adj.sessions
+                  ? adj.sessions + (adj.sessions === 1 ? " session" : " sessions")
+                  : "$" + adj.amount;
+                return (
+                  <div className="text-xs font-semibold" style={{ color: "#22c55e" }}>
+                    {"Billed $" + r.amount_due + " — " + noun +
+                      (adj.direction === "covered" ? " covered" : " added")}
+                  </div>
+                );
+              })()}
               <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
                 {"Billing cycle " + calc.cycleStart + " → " + calc.cycleEnd + " · due " + r.due_date}
               </div>
@@ -541,6 +571,14 @@ export default function ReminderEditor() {
               </div>
             )}
 
+            {/* Once sent the textarea below is gone, and with it the only place
+                the client-facing line was visible — including on the screen that
+                gets screenshotted TO the client. Show it read-only instead. */}
+            {sent && r.sms_message && (
+              <div className="text-xs rounded-xl p-2" style={{ background: "var(--brand-bg)", color: "var(--brand-text-secondary)" }}>
+                {"Message shown to client: " + r.sms_message}
+              </div>
+            )}
             {!sent && (
               <label className="text-xs block" style={{ color: "var(--brand-text-secondary)" }}>Message shown to client
                 <textarea value={e.note} rows={2}

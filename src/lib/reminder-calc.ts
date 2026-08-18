@@ -218,3 +218,68 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
 
   return { ...base, notApplicable: false, expected, blocking, warnings };
 }
+
+// ─── A REMINDER IS ITEMISED AT THE RATE IT WAS BILLED AT ─────────────────────
+//
+// Lesly Spencer, 18 Aug. Her rate went 75 -> 80 for the cycle starting 11 Aug.
+// The payments screen read the rate off `clients.session_rate` — the rate she
+// has TODAY — so her already-sent 18 Aug reminder, billed at 75, immediately
+// re-itemised itself as "8 sessions x $80 = $640" while the amount on the row
+// still said what she owed. One row contradicting itself, on the screen Dustin
+// screenshots for clients.
+//
+// Raising somebody's rate must never rewrite the arithmetic on a bill they have
+// already been sent. The rate that applied is stored on the reminder
+// (`credit_details.rate`), written at the time it was calculated, and that is
+// the number to itemise with. The client's current rate is only a fallback for
+// rows too old to carry one.
+//
+// Pending rows are unaffected: the sync recalculates `credit_details.rate` from
+// the client on every run, so for anything not yet sent the two agree by
+// construction.
+
+/** The rate this reminder was actually billed at. `stored` is credit_details.rate. */
+export function billedRateOf(stored: unknown, clientRate: number | null): number | null {
+  const n =
+    typeof stored === "number" ? stored :
+    typeof stored === "string" ? Number(stored) :
+    NaN;
+  return Number.isFinite(n) && n > 0 ? n : clientRate;
+}
+
+export interface AdjustmentNote {
+  /** Always positive. The size of the gap. */
+  amount: number;
+  /** Whole sessions the gap works out to, when it divides evenly. Else null. */
+  sessions: number | null;
+  /** "covered" = billed LESS than itemised. "added" = billed more. */
+  direction: "covered" | "added";
+}
+
+/**
+ * How does the billed amount differ from the sessions x rate above it?
+ *
+ * Returns null when they agree — the ordinary case, and nothing is rendered.
+ *
+ * When they do not, the screen has to say so in the client's own terms rather
+ * than leaving them to subtract. Dustin, 18 Aug, billing Lesly 6 of 8 sessions:
+ * "create a reminder in app so I can screenshot the dates n show her I gave her
+ * 2 free." A discount nobody can see is a discount you do not get credit for.
+ */
+export function describeAdjustment(
+  expected: number,
+  billed: number,
+  rate: number | null,
+): AdjustmentNote | null {
+  const diff = Math.round((expected - billed) * 100) / 100;
+  if (diff === 0) return null;
+  const amount = Math.abs(diff);
+  let sessions: number | null = null;
+  if (rate && rate > 0) {
+    const n = amount / rate;
+    // Only claim "2 sessions covered" when it is exactly two sessions. A $50
+    // goodwill knock off a $75 rate is not two-thirds of a session to anybody.
+    if (Math.abs(n - Math.round(n)) < 0.005 && Math.round(n) > 0) sessions = Math.round(n);
+  }
+  return { amount, sessions, direction: diff > 0 ? "covered" : "added" };
+}
