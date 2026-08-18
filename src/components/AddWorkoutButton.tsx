@@ -12,6 +12,12 @@ import { sessionsReplacedBy, slotForReplacement, skipVerdict, describeReplaced, 
 type LibDay = { id: string; label: string };
 
 function ctToday() { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }); }
+function daysAheadCT(n: number) {
+  const t = ctToday(); const [y, m, d] = t.split("-").map(Number);
+  const dt = new Date(y, m - 1, d); dt.setDate(dt.getDate() + n);
+  const p = (x: number) => String(x).padStart(2, "0");
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+}
 function daysAgoCT(n: number) {
   const t = ctToday(); const [y, m, d] = t.split("-").map(Number);
   const dt = new Date(y, m - 1, d); dt.setDate(dt.getDate() - n);
@@ -36,6 +42,20 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
   const [markDone, setMarkDone] = useState(false);
   const [ask, setAsk] = useState<{ day: LibDay; replacing: DateOccupant[] } | null>(null);
   const minDate = daysAgoCT(90);
+  // FORWARD, not just backward.
+  //
+  // Dustin, 17 Aug: "I tried to add one to tomorrow, it popped up on today as a
+  // 3rd." He was not misreading it — `max` was ctToday(), so the date box could
+  // not accept tomorrow at all. A phone clamps an out-of-range date back into
+  // range, so picking tomorrow silently became today and the workout landed on
+  // the wrong day. Then he deleted the stray one, which is how the rest of that
+  // evening happened.
+  //
+  // The sheet was built for BACKDATING a session already done — 90 days back,
+  // a "backdated" label, a "mark completed" checkbox — and nobody ever wired
+  // the other direction. Adding a session ahead is the more common thing to
+  // want, and generation only materialises five weeks out, so that is the bound.
+  const maxDate = daysAheadCT(35);
 
   async function resolveClientId(): Promise<string | null> {
     const { data: u } = await supabase.auth.getUser();
@@ -265,8 +285,8 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
               <label style={{ fontSize: 12.5, fontWeight: 700, opacity: 0.75 }}>Date</label>
-              <input type="date" value={pickedDate} min={minDate} max={ctToday()} onChange={(e) => setPickedDate(e.target.value)} style={{ flex: 1, minWidth: 150, padding: "9px 10px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", fontSize: 14, fontFamily: "inherit" }} />
-              {pickedDate !== ctToday() && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--brand-primary, #7c9cf5)" }}>backdated</span>}
+              <input type="date" value={pickedDate} min={minDate} max={maxDate} onChange={(e) => setPickedDate(e.target.value)} style={{ flex: 1, minWidth: 150, padding: "9px 10px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", fontSize: 14, fontFamily: "inherit" }} />
+              {pickedDate !== ctToday() && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--brand-primary, #7c9cf5)" }}>{pickedDate > ctToday() ? "scheduled ahead" : "backdated"}</span>}
             </div>
             {ask ? (
               /* Replace or add as well — Dustin's answer, 17 Aug. Both wordings

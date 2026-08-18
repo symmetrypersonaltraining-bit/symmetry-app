@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { extraConfirmFor, removalVerdict } from "@/lib/removeGuard";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isPeakWeekLocked } from "@/lib/peak-week";
@@ -214,11 +215,34 @@ export default function ScheduleBoard({
   async function removeWorkout(w: BoardWorkout) {
     if (isLockedDate(w.date)) { flash("Peak Week workouts are locked."); return; }
     if (typeof window !== "undefined" && !window.confirm(`Delete "${w.label}" from ${shortLabel(w.date)}? This just removes it — to keep it for another day, use Move instead. You can also re-add it later.`)) return;
+    // A FINISHED session is not tidying, it is erasing training that happened.
+    //
+    // Dustin, 17 Aug: he deleted a stray third workout and his COMPLETED Upper
+    // Push — 70 minutes, a real log behind it — is what disappeared. Whatever
+    // routed the delete there, a completed session should never come off on a
+    // single tap.
+    const extra = extraConfirmFor({ id: w.id, label: w.label, date: w.date, status: w.status });
+    if (extra && typeof window !== "undefined" && !window.confirm(extra)) return;
     setWorkouts((prev) => prev.filter((x) => x.id !== w.id));
     try {
       const supabase: any = createClient();
-      const { error } = await supabase.from("scheduled_workouts").update({ deleted_at: new Date().toISOString() }).eq("id", w.id);
+      // `.select("id")` is the guard, not decoration. The row is filtered off
+      // the screen BEFORE this write, so a delete that hits a different row —
+      // or no row — looks identical to one that worked, and the damage lands
+      // somewhere nobody is looking. That is exactly how 17 Aug went unnoticed.
+      const { data: gone, error } = await supabase
+        .from("scheduled_workouts")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", w.id)
+        .select("id");
       if (error) throw error;
+      const verdict = removalVerdict(w.id, ((gone as { id: string }[] | null) ?? []).map((r) => r.id));
+      if (verdict) {
+        setWorkouts((prev) => [...prev, w]);
+        if (typeof window !== "undefined") window.alert(verdict);
+        router.refresh();
+        return;
+      }
       flash("Removed");
       router.refresh();
     } catch {
