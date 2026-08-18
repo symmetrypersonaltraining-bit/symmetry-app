@@ -117,3 +117,54 @@ test("off-plan rows are documented as carrying the itemisation", () => {
   assert.match(TOTALS, /est_\* fields \(\+ item_overrides\.__custom for itemization\)/,
     "dailyTotals no longer expects off-plan rows to itemise — re-check that totals still read est_*");
 });
+
+// ─── the other half: editing BEFORE it saves ────────────────────────────────
+//
+// Megan's original question was "is there a way to edit if it sees something
+// wrong?" — asked about the moment the estimate appears. That screen listed
+// every item and offered one button, "Log it".
+
+function estimateBlock(): string {
+  const i = CODE.indexOf("{est.items?.map(");
+  assert.ok(i > 0, "the estimate's item list has gone");
+  const end = CODE.indexOf("commit(false)", i);
+  assert.ok(end > i, "could not bound the estimate block");
+  return CODE.slice(i, end);
+}
+
+test("the estimate is editable before anything is logged", () => {
+  const block = estimateBlock();
+  assert.match(block, /reprice\(/,
+    "the items on the estimate screen are read-only again — the only way out is Log it");
+  assert.match(block, /fac: Math\.max\(0\.25,/, "a portion cannot be taken down");
+  assert.match(block, /fac: Math\.min\(4,/, "a portion cannot be taken up");
+  assert.match(block, /est\.items!\.filter\(\(_, j\) => j !== i\)/,
+    "an item the AI invented cannot be removed");
+});
+
+test("the portion controls are bounded", () => {
+  // 0 would log a phantom item at no calories; unbounded growth is a typo away
+  // from a 40,000 calorie day.
+  const block = estimateBlock();
+  assert.match(block, /Math\.max\(0\.25/, "a portion can be driven to zero or negative");
+  assert.match(block, /Math\.min\(4/, "a portion is unbounded upward");
+});
+
+test("editing re-prices the whole estimate, not just the line", () => {
+  assert.match(CODE, /function reprice\(items: CustomItem\[\]\)[\s\S]{0,400}?customMealMacros\(\{ name: prev\.desc, items \}\)/,
+    "the totals are not recalculated from the items she left, so the number logged is the AI's original");
+  assert.match(CODE, /k: r\(m\.kcal\), p: r\(m\.protein\), c: r\(m\.carbs\), f: r\(m\.fats\)/,
+    "est_* is not updated from the re-priced meal");
+});
+
+test("the stored analysis is re-priced with it, or the two disagree", () => {
+  // The write that consumes this says est_* and off_plan_macros "always land
+  // together ... so the two can never disagree". An edit has to move both.
+  assert.match(CODE, /opm: prev\.opm\s*\?\s*\{ \.\.\.prev\.opm, kcal: r\(m\.kcal\), protein: r\(m\.protein\), carbs: r\(m\.carbs\), fats: r\(m\.fats\)/,
+    "off_plan_macros keeps the AI's original numbers while est_* moves — the day's totals and the stored analysis drift apart");
+});
+
+test("an edited estimate is marked as edited", () => {
+  assert.match(CODE, /edited_by_client: true/,
+    "nothing records that the client corrected the AI, so a bad model cannot be told from a bad photo later");
+});

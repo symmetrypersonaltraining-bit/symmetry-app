@@ -3198,6 +3198,28 @@ function OffPlanFlow({
     setEst({ desc: result.description || text.trim().slice(0, 80), k: tot.kcal, p: tot.protein, c: tot.carbs, f: tot.fats, items: result.items });
   }
 
+  // Re-price the estimate from the items she has left.
+  //
+  // est_* and off_plan_macros are written together and the code that writes
+  // them says they "can never disagree" — so an edit here has to move BOTH, or
+  // the day's totals and the stored analysis drift apart the moment she takes
+  // a portion down. `description`, restaurant and source are kept: what she ate
+  // is still what the photo saw, in a smaller amount.
+  function reprice(items: CustomItem[]) {
+    setEst((prev) => {
+      if (!prev) return prev;
+      const m = customMealMacros({ name: prev.desc, items });
+      return {
+        ...prev,
+        items,
+        k: r(m.kcal), p: r(m.protein), c: r(m.carbs), f: r(m.fats),
+        opm: prev.opm
+          ? { ...prev.opm, kcal: r(m.kcal), protein: r(m.protein), carbs: r(m.carbs), fats: r(m.fats), edited_by_client: true }
+          : prev.opm,
+      };
+    });
+  }
+
   async function commit(pending: boolean) {
     setSaving(true);
     try {
@@ -3304,11 +3326,46 @@ function OffPlanFlow({
               {est.desc}
               <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.5, background: "rgba(66,165,245,0.18)", color: "#42A5F5", padding: "2px 6px", borderRadius: 5 }}>EST</span>
             </p>
-            {est.items?.map((it, i) => (
-              <p key={i} className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>
-                {it.n}{it.a ? ` · ${it.a}` : ""} — {r(it.k ?? kcalOf(it.p, it.c, it.f))} cal · {r(it.p)}P/{r(it.c)}C/{r(it.f)}F
+            {/* EDIT IT BEFORE IT SAVES.
+                Megan Gautreaux, 17 Aug: "When i log with a photo is there a way
+                to edit if it sees something wrong?" This screen listed every
+                item the AI found and then gave her one button — Log it. The
+                correction had to happen after the fact, and until today it
+                could not happen at all on a planned meal.
+                Same controls as the after-the-fact editor (CustomEditSheet):
+                a ×0.25 factor per item and an ✕ to drop one, so a portion the
+                AI over-read is two taps and an item it invented is one. */}
+            {est.items?.map((it, i) => {
+              const fac = it.fac ?? 1;
+              const kc = (it.k ?? kcalOf(it.p, it.c, it.f)) * fac;
+              return (
+                <div key={i} className="flex items-center gap-2 mt-1.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold" style={{ color: "var(--brand-text)", overflowWrap: "anywhere" }}>{it.n}</p>
+                    <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>
+                      {it.a || "1 serving"}{fac !== 1 ? ` ×${fac}` : ""} — {r(kc)} cal · {r(it.p * fac)}P/{r(it.c * fac)}C/{r(it.f * fac)}F
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button aria-label={`Less ${it.n}`}
+                      onClick={() => reprice(est.items!.map((x, j) => j === i ? { ...x, fac: Math.max(0.25, Math.round((((x.fac ?? 1) - 0.25)) * 100) / 100) } : x))}
+                      className="w-7 h-7 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>−</button>
+                    <span className="text-xs font-bold text-center" style={{ color: "var(--brand-text-secondary)", minWidth: 30 }}>×{fac}</span>
+                    <button aria-label={`More ${it.n}`}
+                      onClick={() => reprice(est.items!.map((x, j) => j === i ? { ...x, fac: Math.min(4, Math.round((((x.fac ?? 1) + 0.25)) * 100) / 100) } : x))}
+                      className="w-7 h-7 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>＋</button>
+                  </div>
+                  <button aria-label={`Remove ${it.n}`}
+                    onClick={() => reprice(est.items!.filter((_, j) => j !== i))}
+                    className="flex-shrink-0" style={{ color: "var(--brand-text-secondary)", padding: 6, fontSize: 13 }}>✕</button>
+                </div>
+              );
+            })}
+            {!!est.items?.length && (
+              <p className="text-center mt-2" style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>
+                Wrong? Adjust or remove anything above — the total updates as you go.
               </p>
-            ))}
+            )}
             <p className="text-base font-extrabold mt-2" style={{ color: "var(--brand-text)" }}>
               ~{r(est.k)} cal <span className="text-xs font-semibold" style={{ color: "var(--brand-text-secondary)" }}>· {r(est.p)}P / {r(est.c)}C / {r(est.f)}F</span>
             </p>

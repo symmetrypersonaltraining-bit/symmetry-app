@@ -44,6 +44,19 @@ mutate "custom rows lose the editor"  "s.replace('if (row.kind === \"custom\" &&
 mutate "__custom stops making a custom row" "s.replace('        const meta = log?.item_overrides?.__custom;\n        if (meta) {', '        const meta = undefined as any;\n        if (meta) {')"
 mutate "custom plan row loses options" "s.replace('kind: \"custom\", position: pos, meta, log, options,', 'kind: \"custom\", position: pos, meta, log,')"
 mutate "edits stop recomputing macros" "s.replace('    const m = customMealMacros(meta);\n    const logged = !meta.unlogged;', '    const m = { kcal: 0, protein: 0, carbs: 0, fats: 0 };\n    const logged = !meta.unlogged;')"
+
+echo
+echo "the estimate stops being editable before it saves:"
+mutate "items read-only again"        "re.sub(r'\{est\.items\?\.map\(\(it, i\) => \{[\s\S]*?\n            \}\)\}', '{est.items?.map((it, i) => (<p key={i} className=\"text-xs mt-1\">{it.n}</p>))}', s)"
+mutate "cannot take a portion down"   "s.replace('fac: Math.max(0.25, Math.round((((x.fac ?? 1) - 0.25)) * 100) / 100)', 'fac: x.fac ?? 1')"
+mutate "portion can hit zero"         "s.replace('Math.max(0.25,', 'Math.max(0,')"
+mutate "portion unbounded upward"     "s.replace('Math.min(4,', 'Math.min(4000,')"
+mutate "cannot remove an item"        "s.replace('est.items!.filter((_, j) => j !== i)', 'est.items!')"
+mutate "edit does not re-price"       "s.replace('const m = customMealMacros({ name: prev.desc, items });', 'const m = { kcal: prev.k, protein: prev.p, carbs: prev.c, fats: prev.f };')"
+mutate "est_* not updated"            "s.replace('k: r(m.kcal), p: r(m.protein), c: r(m.carbs), f: r(m.fats),', '')"
+mutate "opm left on old numbers"      "s.replace('          ? { ...prev.opm, kcal: r(m.kcal), protein: r(m.protein), carbs: r(m.carbs), fats: r(m.fats), edited_by_client: true }', '          ? { ...prev.opm }')"
+mutate "edit not recorded"            "s.replace(', edited_by_client: true }', ' }')"
+
 restore
 echo
 echo "caught $pass, missed $fail"
