@@ -2199,7 +2199,42 @@ export default function NutritionV3Client(props: Props) {
             // (description/source/restaurant) so the two can never disagree.
             off_plan_macros: est.pending ? null : est.opm ?? { kcal: r(est.k), protein: r(est.p), carbs: r(est.c), fats: r(est.f), description: est.desc, estimated: true },
             ...(est.pending ? {} : est.opm ? { analysis_status: "complete" } : {}),
-            item_overrides: keepOv(row),
+            // KEEP THE ITEMS. This is the whole fix.
+            //
+            // Megan Gautreaux, 17 Aug: "when I click on edit it pulls up the
+            // list of original meal plan, not the meal I logged with the
+            // picture." She was exactly right. The photo screen shows her every
+            // item it found, and this write kept only the TOTALS — est_* plus
+            // an off_plan_macros lump with no item list. The row therefore
+            // stayed kind "plan", so "Edit items" opened the plan's editor and
+            // seeded it from the meal plan's food. There was no way to correct
+            // a photo once it was saved onto a planned meal.
+            //
+            // Both sibling branches on this same screen already persist
+            // __custom.items — addExtra for a Quick log, patchCustom for an
+            // open slot — and dailyTotals.ts documents off-plan rows as
+            // "est_* fields (+ item_overrides.__custom for itemization)". This
+            // branch was the one that never wrote it.
+            //
+            // With the items stored the row becomes kind "custom", so
+            // AdjustSheetView opens CustomEditSheet: a stepper per item, add a
+            // food it missed, rename, and patchCustom recomputes the macros
+            // from what she leaves behind. `options` are still carried on the
+            // row, so she can switch back to the planned meal afterwards.
+            // est_* here still win, so nothing about tonight's totals moves.
+            item_overrides: keepOv(
+              row,
+              est.items && est.items.length
+                ? {
+                    __custom: {
+                      name: est.desc,
+                      items: est.items,
+                      kind: "swap",
+                      sourceMealId: row.kind === "plan" ? row.chosen?.id ?? null : null,
+                    } as CustomMeta,
+                  }
+                : undefined,
+            ),
           });
           closeAllSheets();
           toast.success(est.pending ? "Saved — macros tonight" : "Logged off-plan ✓ — totals updated");
