@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, name, email, auth_user_id")
+    .select("id, name, email, auth_user_id, trainer_id")
     .eq("id", clientId)
     .maybeSingle();
 
@@ -134,13 +134,26 @@ export async function POST(req: NextRequest) {
 
   // Send invite email via Resend
   const resendKey = process.env.RESEND_API_KEY;
+  let inviteCoachFirstName: string | null = null;
+  if ((client as { trainer_id?: string }).trainer_id) {
+    const { data: tRow } = await admin
+      .from("trainers")
+      .select("first_name, name")
+      .eq("id", (client as { trainer_id?: string }).trainer_id)
+      .limit(1);
+    const t = tRow?.[0] as { first_name?: string; name?: string } | undefined;
+    inviteCoachFirstName = t?.first_name || (t?.name || "").split(/\s+/)[0] || null;
+  }
+
   if (resendKey) {
     const resend = new Resend(resendKey);
     await resend.emails.send({
       from: "Symmetry Corrective <noreply@symmetrypersonaltraining.com>",
       to: client.email,
       subject: "You're invited to the Symmetry Training App",
-      html: buildInviteEmailHtml({ firstName, email: client.email, tempPassword, apkUrl: APK_URL, oneTapUrl }),
+      // Named from the client's OWN trainer, so a client Stephanie invites is
+      // told Stephanie set up their account.
+      html: buildInviteEmailHtml({ firstName, email: client.email, tempPassword, apkUrl: APK_URL, oneTapUrl, coachFirstName: inviteCoachFirstName }),
     });
   }
 

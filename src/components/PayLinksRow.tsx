@@ -7,16 +7,28 @@
 
 import { useState, type CSSProperties } from "react";
 import {
-  VENMO_USERNAME,
-  ZELLE,
   ZELLE_INSTRUCTIONS,
   SQUARE_LINK,
-  CASHTAG,
   buildVenmoLink,
   buildCashAppLink,
+  OWNER_PAY_DESTINATION,
+  type PayDestination,
 } from "@/lib/pay-links";
 
-export default function PayLinksRow({ amount }: { amount: number }) {
+/**
+ * WHOSE ACCOUNT THIS PAYS.
+ *
+ * Every button here pointed at module constants naming Dustin. From 20 Aug
+ * Stephanie's clients pay her directly, and a client paying the wrong trainer
+ * is the worst thing this app could do without saying so.
+ *
+ * `to` is resolved from the client's own trainer row by whoever renders this.
+ * The fallback is the owner's details — used only when a trainer cannot be
+ * resolved, which the NOT NULL trainer_id makes impossible in practice. Showing
+ * no way to pay at all would be worse than showing the business default.
+ */
+export default function PayLinksRow({ amount, to }: { amount: number; to?: PayDestination | null }) {
+  const dest = to ?? OWNER_PAY_DESTINATION;
   const [zelleOpen, setZelleOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -68,9 +80,9 @@ export default function PayLinksRow({ amount }: { amount: number }) {
   return (
     <div style={{ marginTop: 10 }}>
       <div style={{ display: "flex", gap: 8 }}>
-        {VENMO_USERNAME && (
+        {dest.venmoUsername && (
           <a
-            href={buildVenmoLink(amount)}
+            href={buildVenmoLink(amount, "Personal Training", dest.venmoUsername)}
             target="_blank"
             rel="noopener noreferrer"
             style={{ ...btnBase, background: "#3D95CE" }}
@@ -94,9 +106,9 @@ export default function PayLinksRow({ amount }: { amount: number }) {
             Card
           </a>
         )}
-        {CASHTAG && (
+        {dest.cashtag && (
           <a
-            href={buildCashAppLink(amount)}
+            href={buildCashAppLink(amount, dest.cashtag)}
             target="_blank"
             rel="noopener noreferrer"
             style={{ ...btnBase, background: "#00C244" }}
@@ -123,15 +135,15 @@ export default function PayLinksRow({ amount }: { amount: number }) {
           </div>
           <div style={rowStyle}>
             <span style={{ wordBreak: "break-all" }}>
-              <strong>{ZELLE.recipientName}</strong> &middot; {ZELLE.email}
+              <strong>{dest.recipientName}</strong> &middot; {dest.zelleEmail}
             </span>
-            <button onClick={() => copy("email", ZELLE.email)} style={copyBtn}>
+            <button onClick={() => copy("email", dest.zelleEmail || "")} style={copyBtn}>
               {copied === "email" ? "Copied" : "Copy"}
             </button>
           </div>
           <div style={rowStyle}>
-            <span>or {ZELLE.phone}</span>
-            <button onClick={() => copy("phone", ZELLE.phone)} style={copyBtn}>
+            <span>or {dest.zellePhone}</span>
+            <button onClick={() => copy("phone", dest.zellePhone || "")} style={copyBtn}>
               {copied === "phone" ? "Copied" : "Copy"}
             </button>
           </div>

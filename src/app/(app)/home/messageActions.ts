@@ -14,11 +14,11 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://symmetry-app-omega.v
 // backstop. Reuses the exact Resend REST setup + verified sender the reminders/
 // invites use. Best-effort: any failure is swallowed so it NEVER blocks the
 // message insert.
-async function emailTrainerNewMessage(clientName: string, body: string, hasImage: boolean): Promise<void> {
+async function emailTrainerNewMessage(clientName: string, body: string, hasImage: boolean, toEmail?: string | null): Promise<void> {
   try {
     const key = process.env.RESEND_API_KEY;
     if (!key) return;
-    const payload = buildTrainerMessageEmail(clientName, body, hasImage, APP_URL);
+    const payload = buildTrainerMessageEmail(clientName, body, hasImage, APP_URL, toEmail);
     await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -88,8 +88,18 @@ export async function sendClientMessage(body: string, imageUrl?: string | null):
     .maybeSingle();
   if (!clientRecord) return 'We could not find your client record.';
 
-  const { data: trainerId } = await supabase.rpc("trainer_user_id");
+  // THEIR coach, not THE coach. `trainer_user_id` returns the single configured
+  // trainer, so from 20 Aug every one of Stephanie's clients would have
+  // messaged Dustin — his inbox, his push, and she would never have known they
+  // wrote. Falls back to the old behaviour if a client somehow has no trainer,
+  // because a message reaching the owner beats one reaching nobody.
+  const { data: ownTrainerId } = await supabase.rpc("my_trainer_user_id");
+  const { data: fallbackTrainerId } = ownTrainerId
+    ? { data: null }
+    : await supabase.rpc("trainer_user_id");
+  const trainerId = ownTrainerId || fallbackTrainerId;
   if (!trainerId) return 'No trainer is configured to receive this.';
+  const { data: trainerEmail } = await supabase.rpc("my_trainer_email");
 
   const { error } = await supabase.from('messages').insert({
     from_id: user.id,
@@ -108,7 +118,7 @@ export async function sendClientMessage(body: string, imageUrl?: string | null):
   try {
     await sendPushToUser(trainerId as string, NOTIFICATION_EVENTS.MESSAGE_FROM_CLIENT, `New message from ${who}`, (body || '📷 Photo').slice(0, 140), { url: `/messages?client=${clientRecord.id}` });
   } catch (e) { console.error('trainer push failed', e); }
-  await emailTrainerNewMessage(who, body || '', !!imageUrl);
+  await emailTrainerNewMessage(who, body || '', !!imageUrl, trainerEmail as string | null);
   return null;
 }
 
@@ -117,6 +127,18 @@ export async function sendBroadcastMessage(body: string, imageUrl?: string | nul
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || !isTrainerEmail(user.email)) return 0;
   // Archived clients are off the roster — a broadcast never reaches them.
+  //
+  // AND IT ONLY REACHES YOUR OWN. This read the whole table, so from 20 Aug
+  // Stephanie's announcement would have gone to all 35 of Dustin's clients and
+  // his to hers. RLS already scopes what this select returns — the owner sees
+  // everyone, a trainer sees her own — so the fix is that the query is now
+  // trusted to be scoped rather than being run with an admin client.
+  //
+  // The GROUP CHAT below is deliberately NOT scoped: one Symmetry community,
+  // Dustin's decision — "All clients can go in there since they're all going to
+  // train with Symmetry Personal Training." A broadcast is addressed FROM a
+  // coach TO their people, which is a different thing from the room everyone
+  // shares.
   const { data: clients } = await supabase
     .from('clients')
     .select('id, auth_user_id')

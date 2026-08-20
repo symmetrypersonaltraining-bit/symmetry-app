@@ -11,7 +11,6 @@
 // previous shape let any caller push with no preference check at all simply by
 // not knowing preferences existed.
 
-import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 export interface NotificationEventDef {
   /** Stored in notification_preferences.event_key. Never rename in place. */
@@ -45,7 +44,10 @@ type EventName =
 export const NOTIFICATION_EVENTS: Record<EventName, NotificationEventDef> = {
   MESSAGE_FROM_COACH: {
     key: "message_from_coach",
-    label: `Messages from ${COACH_FIRST_NAME}`,
+    // "your coach", not a name. This is a settings label shown to every
+    // client, and with two trainers a name here is wrong for one of them.
+    // The live notification already reads "New message from your coach".
+    label: "Messages from your coach",
     description: "When your coach sends you a message.",
   },
   MESSAGE_FROM_CLIENT: {

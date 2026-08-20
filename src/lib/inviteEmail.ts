@@ -11,8 +11,16 @@ export function buildInviteEmailHtml(opts: {
   apkUrl: string;
   /** One-tap sign-in link. Null if Supabase could not mint one. */
   oneTapUrl?: string | null;
+  /**
+   * The coach who is actually inviting them. COACH_FIRST_NAME is one global
+   * value, so from 20 Aug every client Stephanie invited would have been told
+   * Dustin had set up their account — the first thing they ever read from the
+   * app, naming the wrong person.
+   */
+  coachFirstName?: string | null;
 }): string {
   const { firstName, email, tempPassword, apkUrl, oneTapUrl } = opts;
+  const coach = opts.coachFirstName || COACH_FIRST_NAME;
   return `
 <!DOCTYPE html>
 <html>
@@ -28,7 +36,7 @@ export function buildInviteEmailHtml(opts: {
     <div style="padding: 32px;">
       <p style="color: #333; font-size: 16px; margin: 0 0 8px;">Hi ${firstName},</p>
       <p style="color: #555; font-size: 15px; margin: 0 0 24px; line-height: 1.5;">
-        ${COACH_FIRST_NAME} has set up your Symmetry Training App account. Your training, nutrition, and progress — all in one place.
+        ${coach} has set up your Symmetry Training App account. Your training, nutrition, and progress — all in one place.
       </p>
 
       ${oneTapUrl ? `
@@ -82,7 +90,7 @@ export function buildInviteEmailHtml(opts: {
       </div>
 
       <p style="color: #999; font-size: 13px; margin: 0; text-align: center;">
-        Questions? Reply to this email or contact ${COACH_FIRST_NAME} directly.
+        Questions? Reply to this email or contact ${coach} directly.
       </p>
     </div>
     <!-- Footer -->

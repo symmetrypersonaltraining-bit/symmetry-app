@@ -14,7 +14,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { TRAINER_EMAIL } from "@/lib/trainer";
 // Module-level cache so multiple badges on one screen don't each hit the DB.
 let cachedUrl: string | null | undefined; // undefined = not fetched, null = none
 
@@ -27,11 +26,22 @@ export default function CoachBadge({ size = 30, initials = "DG" }: { size?: numb
     (async () => {
       try {
         const supabase: any = createClient();
-        const { data } = await supabase
+        // The COACH the viewer actually has — their own trainer's avatar, not
+        // the owner's. A client of Stephanie's saw Dustin's face on every
+        // coach badge in the app.
+        //
+        // Resolved through the viewer's own client row, so it works for a
+        // client (their trainer) and degrades to nothing rather than to the
+        // wrong person when there is no row to resolve from.
+        const { data: me } = await supabase
           .from("clients")
-          .select("avatar_url")
-          .eq("email", TRAINER_EMAIL)
+          .select("trainer_id")
+          .eq("auth_user_id", (await supabase.auth.getUser()).data?.user?.id || "")
           .limit(1);
+        const tid = me && me[0]?.trainer_id;
+        const { data } = tid
+          ? await supabase.from("trainers").select("avatar_url").eq("id", tid).limit(1)
+          : { data: null };
         const u = (data && data[0]?.avatar_url) || null;
         cachedUrl = u;
         if (on) setUrl(u);

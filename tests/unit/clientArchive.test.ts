@@ -51,9 +51,37 @@ for (const { file, near } of ROSTER_QUERIES) {
     const text = src(file);
     const at = text.indexOf(near);
     assert.notEqual(at, -1, `anchor "${near}" no longer exists in ${file} — update this test`);
-    // The filter has to sit within the same query expression, not just somewhere
-    // in the file, so only look at the window around the anchor.
-    const window = text.slice(Math.max(0, at - 600), at + 900);
+    // The filter has to sit within the same query EXPRESSION, not just
+    // somewhere in the file — and "expression" is what we bound to, never a
+    // character count.
+    //
+    // This was `slice(at - 600, at + 900)` and it failed on correct code on
+    // 20 Aug: a comment added above the query pushed `.is('archived_at', null)`
+    // past +900. That is the third fixed-size source window in this codebase to
+    // do exactly that, and the file's own comment above warns that widening is
+    // the wrong repair. So: from the anchor, take the client query and stop at
+    // the statement that ends it.
+    // Pick the clients query that BELONGS to this anchor, then bound it at the
+    // end of its own statement. Never a character count.
+    //
+    // Neither direction alone works, and both were tried on 20 Aug:
+    //   - anchors like "primary_goal, created_at" sit INSIDE the query's
+    //     .select(), so searching forward lands on the NEXT query (7 failures);
+    //   - anchors like "sendBroadcastMessage" are a function NAME above the
+    //     query, so searching backward lands on the previous one (1 failure).
+    // So: the query whose own statement contains the anchor, else the first one
+    // after it.
+    const spans = [...text.matchAll(/\.from\(['"]clients['"]\)/g)].map((m) => {
+      const from = m.index ?? 0;
+      const semi = text.indexOf(";", from);
+      return { from, to: semi === -1 ? text.length : semi };
+    });
+    assert.notEqual(spans.length, 0, `${file}: no clients query at all`);
+    const span =
+      spans.find((sp) => sp.from <= at && at <= sp.to) ??
+      spans.find((sp) => sp.from > at) ??
+      spans[spans.length - 1];
+    const window = text.slice(span.from, span.to);
     assert.match(
       window,
       /\.is\((['"])archived_at\1,\s*null\)/,

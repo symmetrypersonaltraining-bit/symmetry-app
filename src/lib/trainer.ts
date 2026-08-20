@@ -24,7 +24,20 @@
 // RLS in the database, never by this file. Nothing here grants access; it only
 // decides which controls to draw. Treat it as presentation.
 
-const DEFAULT_TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
+// The trainers on this instance, as code. Kept in step with the `trainers`
+// table, which is the AUTHORITY — `is_trainer()` and every RLS policy resolve
+// through that table, not through this list. What this list does is decide
+// which controls get drawn before the database has been asked.
+//
+// Stephanie added 20 Aug 2026. Deliberately here rather than only in an
+// environment variable: adding a trainer should not depend on somebody
+// remembering to edit Vercel config, and a mismatch between the two would show
+// a real trainer a client's interface over data she can perfectly well read.
+const DEFAULT_TRAINER_EMAILS = [
+  "symmetrypersonaltraining@gmail.com",
+  "steph.rgautreaux@gmail.com",
+];
+const DEFAULT_TRAINER_EMAIL = DEFAULT_TRAINER_EMAILS[0];
 
 function parse(raw: string | undefined | null): string[] {
   if (!raw) return [];
@@ -39,19 +52,36 @@ function parse(raw: string | undefined | null): string[] {
  * Never empty — an instance with no configuration is Dustin's.
  */
 export const TRAINER_EMAILS: string[] = (() => {
+  // UNION, not override.
+  //
+  // This used to be "env if set, otherwise the default", which means setting
+  // the variable to one address silently REMOVES everyone else — and nothing
+  // would say so. Adding a trainer would then require an env edit on top of the
+  // database work, and forgetting it draws a trainer the client interface over
+  // rows she can read perfectly well: broken in a way that looks like a bug in
+  // the app rather than a missing setting.
+  //
+  // Removing a trainer is a database change (trainers.active = false) or a code
+  // change, not an env edit. That is the correct place for it — RLS is the real
+  // boundary and it has never read this list.
   const configured = [
     ...parse(process.env.NEXT_PUBLIC_TRAINER_EMAILS),
     ...parse(process.env.TRAINER_EMAILS),
+    ...DEFAULT_TRAINER_EMAILS.map((e) => e.toLowerCase()),
   ];
   const seen = new Set<string>();
-  const out = configured.filter((e) => (seen.has(e) ? false : (seen.add(e), true)));
-  return out.length ? out : [DEFAULT_TRAINER_EMAIL];
+  return configured.filter((e) => (seen.has(e) ? false : (seen.add(e), true)));
 })();
 
 /**
- * The PRIMARY trainer — the one address to use when a single value is needed
- * rather than a test: looking up the trainer's own `clients` row, addressing a
- * digest, seeding a message. Not for permission checks; use isTrainerEmail.
+ * The PRIMARY trainer — the OWNER, and the only correct use of this constant is
+ * a fact about the business rather than about a person: where an
+ * infrastructure alert goes, who a cost warning emails.
+ *
+ * IT IS NOT "the current trainer". Using it to find the signed-in trainer's own
+ * client row, address a digest, or name a coach lands on Dustin no matter who is
+ * signed in — 34 call sites did exactly that before 20 Aug. Use
+ * `resolveTrainer()` for anything about the person using the app.
  */
 export const TRAINER_EMAIL: string = TRAINER_EMAILS[0];
 

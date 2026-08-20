@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import PayLinksRow from "./PayLinksRow";
+import type { PayDestination } from "@/lib/pay-links";
 import { parseInvoiceDetail, explainAmount, shortDate, type InvoiceDetail } from "@/lib/invoiceDetail";
 
 interface Due {
@@ -16,6 +17,8 @@ interface Due {
 
 export default function PaymentDueBanner() {
   const [dues, setDues] = useState<Due[]>([]);
+  // Whose account this client pays. Their own trainer's, not the business's.
+  const [payTo, setPayTo] = useState<PayDestination | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -24,9 +27,29 @@ export default function PaymentDueBanner() {
         const { data: userData } = await sup.auth.getUser();
         const uid = userData?.user?.id;
         if (!uid) return;
-        const { data: me } = await sup.from("clients").select("id").eq("auth_user_id", uid).limit(1);
+        const { data: me } = await sup.from("clients").select("id, trainer_id").eq("auth_user_id", uid).limit(1);
         const cid = me?.[0]?.id;
         if (!cid) return;
+        // Resolved before the reminders render, so the pay buttons are never
+        // briefly pointed at the wrong trainer.
+        const tid = me?.[0]?.trainer_id;
+        if (tid) {
+          const { data: t } = await sup
+            .from("trainers")
+            .select("name, pay_display_name, venmo_username, zelle_email, cashapp_handle, pay_phone")
+            .eq("id", tid)
+            .limit(1);
+          const tr = t?.[0];
+          if (tr) {
+            setPayTo({
+              recipientName: tr.pay_display_name || tr.name || "",
+              venmoUsername: tr.venmo_username ?? null,
+              zelleEmail: tr.zelle_email ?? null,
+              zellePhone: tr.pay_phone ?? null,
+              cashtag: tr.cashapp_handle ?? null,
+            });
+          }
+        }
         const { data: rems } = await sup
           .from("payment_reminders")
           .select("id, due_date, amount_due, sms_message, client_ack_at, credit_details, half_price_sessions")
@@ -97,7 +120,7 @@ export default function PaymentDueBanner() {
               </div>
             );
           })()}
-          <PayLinksRow amount={d.amount} />
+          <PayLinksRow amount={d.amount} to={payTo} />
           <button onClick={() => ack(d.id)} className="mt-2 w-full rounded-xl py-2 text-sm font-bold"
             style={{ background: "var(--brand-primary)", color: "#fff", border: "none", cursor: "pointer" }}>
             ✓ I've paid this

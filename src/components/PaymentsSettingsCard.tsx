@@ -2,11 +2,13 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import PayLinksRow from "./PayLinksRow";
+import type { PayDestination } from "@/lib/pay-links";
 
 type DueReminder = { id: string; due_date: string; amount_due: number };
 
 export default function PaymentsSettingsCard() {
   const [due, setDue] = useState<DueReminder[]>([]);
+  const [payTo, setPayTo] = useState<PayDestination | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -22,12 +24,30 @@ export default function PaymentsSettingsCard() {
         }
         const { data: client } = await supabase
           .from("clients")
-          .select("id")
+          .select("id, trainer_id")
           .eq("auth_user_id", user.id)
           .maybeSingle();
         if (!client) {
           setLoaded(true);
           return;
+        }
+        // Their trainer's payment details, not the business's.
+        if (client.trainer_id) {
+          const { data: t } = await supabase
+            .from("trainers")
+            .select("name, pay_display_name, venmo_username, zelle_email, cashapp_handle, pay_phone")
+            .eq("id", client.trainer_id)
+            .limit(1);
+          const tr = t?.[0];
+          if (tr) {
+            setPayTo({
+              recipientName: tr.pay_display_name || tr.name || "",
+              venmoUsername: tr.venmo_username ?? null,
+              zelleEmail: tr.zelle_email ?? null,
+              zellePhone: tr.pay_phone ?? null,
+              cashtag: tr.cashapp_handle ?? null,
+            });
+          }
         }
         const { data } = await supabase
           .from("payment_reminders")
@@ -83,7 +103,7 @@ export default function PaymentsSettingsCard() {
           <div style={{ fontSize: 13, color: "var(--brand-text-secondary)", marginBottom: 10 }}>
             {"Due " + fmtDate(d.due_date)}
           </div>
-          <PayLinksRow amount={Number(d.amount_due)} />
+          <PayLinksRow amount={Number(d.amount_due)} to={payTo} />
         </div>
       ))}
       <p style={{ fontSize: 12, color: "var(--brand-text-secondary)", margin: 0 }}>

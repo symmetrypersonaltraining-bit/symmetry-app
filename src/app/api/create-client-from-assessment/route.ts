@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+
   const { data, aiResult } = await req.json();
   if (!data?.first_name || !data?.last_name || !data?.email) {
     return NextResponse.json({ error: "First name, last name, and email are required to create a client." }, { status: 400 });
@@ -48,6 +49,24 @@ export async function POST(req: NextRequest) {
   const email = String(data.email).trim();
   const name = `${data.first_name} ${data.last_name}`.trim();
   const admin = createAdminClient();
+
+  // WHOSE ROSTER THIS CLIENT LANDS ON.
+  //
+  // These routes run with the ADMIN client, where auth.uid() is null — so the
+  // stamp_client_trainer() trigger cannot see who is creating the client and
+  // falls back to the owner. Every client Stephanie created would have appeared
+  // on Dustin's roster and vanished from hers.
+  //
+  // The route knows who is signed in, so it says so explicitly.
+  let creatorTrainerId: string | null = null;
+  {
+    const { data: tRows } = await admin
+      .from("trainers")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .limit(1);
+    creatorTrainerId = (tRows?.[0] as { id?: string } | undefined)?.id ?? null;
+  }
 
   // Don't collide with an existing client
   const { data: existing } = await supabase.from("clients").select("id").eq("email", email).maybeSingle();
@@ -105,6 +124,8 @@ export async function POST(req: NextRequest) {
   // 3) Create the client profile with all assessment info
   const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
   const { data: clientRow, error: cErr } = await admin.from("clients").insert({
+    // Explicit: the trigger cannot see the creator through the admin client.
+    ...(creatorTrainerId ? { trainer_id: creatorTrainerId } : {}),
     name, email, phone: nn(data.phone), date_of_birth: nn(data.date_of_birth),
     start_date: new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }), // Central, not UTC: after 7pm Central the UTC date is already tomorrow
     experience_level: nn(data.experience_level), primary_goal: nn(data.primary_goal),

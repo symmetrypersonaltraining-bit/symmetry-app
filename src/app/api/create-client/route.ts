@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+
   const body = await req.json();
   const {
     name, email, phone, date_of_birth, start_date,
@@ -49,6 +50,24 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient();
+
+  // WHOSE ROSTER THIS CLIENT LANDS ON.
+  //
+  // These routes run with the ADMIN client, where auth.uid() is null — so the
+  // stamp_client_trainer() trigger cannot see who is creating the client and
+  // falls back to the owner. Every client Stephanie created would have appeared
+  // on Dustin's roster and vanished from hers.
+  //
+  // The route knows who is signed in, so it says so explicitly.
+  let creatorTrainerId: string | null = null;
+  {
+    const { data: tRows } = await admin
+      .from("trainers")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .limit(1);
+    creatorTrainerId = (tRows?.[0] as { id?: string } | undefined)?.id ?? null;
+  }
 
   // Check if client record already exists
   const { data: existing } = await supabase
@@ -84,6 +103,8 @@ export async function POST(req: NextRequest) {
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
     .insert({
+      // Explicit: the trigger cannot see the creator through the admin client.
+      ...(creatorTrainerId ? { trainer_id: creatorTrainerId } : {}),
       name,
       email,
       phone: phone || null,

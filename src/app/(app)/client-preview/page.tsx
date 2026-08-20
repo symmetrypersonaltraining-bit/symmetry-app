@@ -13,7 +13,10 @@ export default async function ClientPreviewPage() {
   const { data: clientRecord } = await supabase
     .from("clients")
     .select("id, name")
-    .eq("email", TRAINER_EMAIL)
+    // The PREVIEWING trainer's own client row, by account id. TRAINER_EMAIL is
+    // the owner, so this handed Stephanie Dustin's data in her own client
+    // preview. See home/page.tsx.
+    .eq("auth_user_id", user.id)
     .maybeSingle();
 
   if (!clientRecord) {

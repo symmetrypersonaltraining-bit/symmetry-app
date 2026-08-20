@@ -22,10 +22,20 @@ import {
 
 // ── The module ───────────────────────────────────────────────────────────────
 
-test("an unconfigured instance is still Dustin's", () => {
-  // The default is what makes this change invisible in production. Nothing in
-  // Vercel has to be set for the app to behave exactly as it did yesterday.
-  assert.deepEqual(TRAINER_EMAILS, ["symmetrypersonaltraining@gmail.com"]);
+test("an unconfigured instance knows both trainers", () => {
+  // CHANGED 20 Aug. This asserted the list was EXACTLY Dustin, which was right
+  // when he was the only trainer and became wrong the moment Stephanie was
+  // added — the test would have blocked her from being recognised at all.
+  //
+  // The defaults still make the change invisible in production: nothing in
+  // Vercel has to be set. What changed is that there are two of them, and the
+  // list is now a union so setting the env var cannot silently drop either.
+  assert.deepEqual(
+    [...TRAINER_EMAILS].sort(),
+    ["steph.rgautreaux@gmail.com", "symmetrypersonaltraining@gmail.com"],
+  );
+  // TRAINER_EMAIL stays the OWNER — it means the business, not "whoever is
+  // signed in". Using it for the latter is what 34 call sites did wrong.
   assert.equal(TRAINER_EMAIL, "symmetrypersonaltraining@gmail.com");
 });
 

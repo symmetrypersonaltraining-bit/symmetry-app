@@ -233,10 +233,21 @@ export default async function HomePage(props: {
 
   // ── CLIENT VIEW ───────────────────────────────────────────────────────────
   // Trainer in client-preview mode (cookie set) or an actual client
+  // THE SIGNED-IN PERSON'S OWN CLIENT ROW — by account id, never by email.
+  //
+  // This looked the trainer's row up with `.eq("email", TRAINER_EMAIL)`, a
+  // single constant. With two trainers from 20 Aug that lands on Dustin no
+  // matter who is signed in: Stephanie's own client view would have shown HIS
+  // weight, HIS meals, HIS workouts.
+  //
+  // auth_user_id is right for everybody and always was — both trainers' client
+  // rows carry the same auth account as their trainer row. The workout page
+  // reached this conclusion already: "Matching a person by a substring of their
+  // name was always a guess; his account id is a fact."
   const { data: clientRecord } = await supabase
     .from("clients")
     .select("id, name")
-    .eq(isTrainer ? "email" : "auth_user_id", isTrainer ? TRAINER_EMAIL : user.id)
+    .eq("auth_user_id", user.id)
     .maybeSingle();
 
   if (!clientRecord) {

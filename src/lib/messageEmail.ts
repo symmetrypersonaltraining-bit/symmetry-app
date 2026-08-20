@@ -4,6 +4,15 @@ import { TRAINER_EMAIL } from "./trainer";
 // send uses the same Resend REST setup + verified sender the reminders/invites
 // use.
 
+/**
+ * FALLBACK ONLY. This used to BE the answer — every client's message emailed
+ * one address — so from 20 Aug Stephanie's clients would have reached Dustin's
+ * inbox and she would never have known they wrote.
+ *
+ * The address is now resolved from the client's own trainer and passed in. This
+ * constant remains for a client whose trainer cannot be resolved: an alert
+ * landing with the owner beats an alert going nowhere.
+ */
 export const TRAINER_ALERT_EMAIL = TRAINER_EMAIL;
 export const RESEND_FROM = 'Symmetry Corrective <noreply@symmetrypersonaltraining.com>';
 
@@ -24,6 +33,8 @@ export function buildTrainerMessageEmail(
   body: string,
   hasImage: boolean,
   appUrl: string,
+  /** The client's own trainer's address. Falls back to the owner. */
+  toEmail?: string | null,
 ): ResendPayload {
   const name = (clientName || 'A client').trim() || 'A client';
   const raw = body || '';
@@ -50,7 +61,7 @@ export function buildTrainerMessageEmail(
 </div>`;
   return {
     from: RESEND_FROM,
-    to: [TRAINER_ALERT_EMAIL],
+    to: [toEmail || TRAINER_ALERT_EMAIL],
     subject: `New message from ${name}`,
     html,
   };

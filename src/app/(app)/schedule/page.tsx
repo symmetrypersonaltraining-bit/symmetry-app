@@ -37,10 +37,12 @@ export default async function SchedulePage() {
 
   let clientId: string | null = null;
   if (isTrainer) {
+    // By account id, not TRAINER_EMAIL — that constant is the OWNER and would
+    // hand Stephanie Dustin's schedule. See the note in home/page.tsx.
     const { data } = await supabase
       .from("clients")
       .select("id")
-      .eq("email", TRAINER_EMAIL)
+      .eq("auth_user_id", user.id)
       .maybeSingle();
     clientId = data?.id || null;
   } else {
