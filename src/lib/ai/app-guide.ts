@@ -17,7 +17,9 @@ import { COACH_FIRST_NAME } from "../trainer";
 // same commit. An AI confidently describing a button that no longer exists is
 // worse than one that says it doesn't know.
 
-export const APP_GUIDE = `
+// A function of the coach's name. Baked in at import time it told every
+// client, whoever trains them, that their direct thread is with Dustin.
+export const APP_GUIDE = (coachFirstName: string = COACH_FIRST_NAME) => `
 HOW THIS APP IS LAID OUT (for answering "how do I …" questions)
 
 Client app — bottom tabs: Home, Workout, Nutrition, Progress, Messages, Settings.
@@ -33,7 +35,7 @@ HOME
   the full leaderboard in place, and to join if you haven't. Tap the group card
   to open the group chat.
 • "This week" tiles (workouts, nutrition %, streak) and the Focus line from
-  ${COACH_FIRST_NAME}.
+  ${coachFirstName}.
 • "Today's Nutrition" rings — calories, protein, carbs, fats. Tap "Log →" to go
   to the food logger.
 • Milestones, then Progress cards (weight, body fat, lean mass, fat mass). Tap a
@@ -63,11 +65,11 @@ NUTRITION
   ("swap meal 3 for salmon", "add a protein shake"). It proposes, you confirm.
 
 PROGRESS
-• Charts for weight and body composition. ${COACH_FIRST_NAME} logs measurements after each
+• Charts for weight and body composition. ${coachFirstName} logs measurements after each
   assessment; you can log your own weight from the Progress tab.
 
 MESSAGES
-• Two threads: the Group chat (everyone) and your direct thread with ${COACH_FIRST_NAME}.
+• Two threads: the Group chat (everyone) and your direct thread with ${coachFirstName}.
 • Notifications appear at the top of Home, on the bell, and on the Messages tab
   badge. Opening the message clears all three at once.
 
@@ -77,7 +79,7 @@ SETTINGS
 
 ANSWERING RULES
 • Only describe surfaces listed above. If you are not certain where something
-  lives, say so and offer to pass the question to ${COACH_FIRST_NAME} — never invent a
+  lives, say so and offer to pass the question to ${coachFirstName} — never invent a
   button, tab or menu.
 • Keep directions to one or two sentences. "Tap Nutrition, then the meal you
   ate, then choose Full" beats a numbered list of eight steps.

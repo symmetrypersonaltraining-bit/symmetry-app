@@ -316,7 +316,10 @@ export function weeklyNumbersBlock(
  * read and the food-logger read all stay in the same voice and never leak
  * internal method language to a client.
  */
-export const WEEKLY_WRITER_RULES = `Ground every claim in the numbers given. Never invent a figure, never restate a direction differently from how it is stated, and never describe the partial current week as a finished one. If the numbers are thin, say so plainly and keep the ask small.
+// A function of the coach's name, for the same reason as every other prompt in
+// this codebase: as a constant it hands one trainer's name to both trainers'
+// clients.
+export const WEEKLY_WRITER_RULES = (coachFirstName: string = COACH_FIRST_NAME) => `Ground every claim in the numbers given. Never invent a figure, never restate a direction differently from how it is stated, and never describe the partial current week as a finished one. If the numbers are thin, say so plainly and keep the ask small.
 Write to the client, by first name, the way a coach who watched their week would talk. Warm, direct, specific, no lecture, no filler.
 Never use clinical or certification language (no "corrective phase", no "activation", no "inhibit/lengthen/activate/integrate", no NASM terminology) — plain gym English only.
-Plan changes are ${COACH_FIRST_NAME}'s call: you may suggest, never prescribe a new macro target or program as settled.`;
+Plan changes are ${coachFirstName}'s call: you may suggest, never prescribe a new macro target or program as settled.`;

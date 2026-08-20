@@ -18,7 +18,7 @@ import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope, Db } from "@/lib/ai/scope";
-import { inboxAuthUidForClient } from "@/lib/trainerResolve";
+import { inboxAuthUidForClient, trainerForClient } from "@/lib/trainerResolve";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type Anthropic from "@anthropic-ai/sdk";
 import { findExerciseIdByName } from "@/lib/exerciseLookup";
@@ -142,8 +142,12 @@ async function buildContext(db: Db, clientId: string, dayId: string | null): Pro
   return { text: lines.join("\n"), phaseId };
 }
 
-function systemPrompt(mode: string): string {
-  const base = `You are the workout designer for Symmetry Personal Training (corrective + physique coach ${COACH_NAME}). You create ONE workout for a specific client that COMPLEMENTS ${COACH_FIRST_NAME}'s current programming for them and does NOT clash with what's scheduled next (e.g. don't hammer legs the day before a programmed leg day; keep corrective clients within safe patterns). Prefer common, well-known exercises so they map to the app's library and have demo videos.
+// The coach whose programming this must COMPLEMENT — so it has to be the
+// client's own coach, not the owner. Named the wrong trainer, the instruction
+// is not merely mislabelled: it tells the model to work around a programme that
+// does not exist for this client.
+function systemPrompt(mode: string, coachFirstName: string, coachFullName: string): string {
+  const base = `You are the workout designer for Symmetry Personal Training (corrective + physique coach ${coachFullName}). You create ONE workout for a specific client that COMPLEMENTS ${coachFirstName}'s current programming for them and does NOT clash with what's scheduled next (e.g. don't hammer legs the day before a programmed leg day; keep corrective clients within safe patterns). Prefer common, well-known exercises so they map to the app's library and have demo videos.
 
 Respond with ONLY valid JSON — no markdown, no fences, no prose — exactly this shape:
 {"title":string,"focus":string,"rationale":string,"duration_min":number|null,"sections":[{"name":"Warm-Up"|"Strength"|"Accessory"|"Cardio","exercises":[{"name":string,"type":"weight"|"reps"|"time","sets":number,"reps":string|null,"duration":string|null,"note":string|null}]}]}
@@ -243,11 +247,12 @@ export async function POST(req: NextRequest) {
   // experiences an assistant that is inconsistently clever, which is more
   // confusing than one that is consistently ordinary.
   const buildModel = modelFor("coach", await aiTierFor(admin, clientId));
+  const buildCoach = await trainerForClient(admin, clientId);
   const { value: workout, tokensIn, tokensOut } = await callClaudeJson<AiWorkout>({
     meter: { clientId: clientId, feature: "workout_build" },
     apiKey: process.env.ANTHROPIC_API_KEY,
     model: buildModel,
-    system: systemPrompt(mode),
+    system: systemPrompt(mode, buildCoach?.firstName || COACH_FIRST_NAME, buildCoach?.name || COACH_NAME),
     maxTokens: 1600,
     messages: [{ role: "user", content: userContent }],
     validate: validateWorkout,

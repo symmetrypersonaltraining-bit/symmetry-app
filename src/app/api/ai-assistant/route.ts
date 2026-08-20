@@ -5,14 +5,15 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveAiScope, enforceMeter } from "@/lib/ai/scope";
 import { logUsage } from "@/lib/ai/meter";
 import { SYMMETRY_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
-import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
+import { isTrainerEmail } from "@/lib/trainer";
+import { coachForViewer } from "@/lib/coachIdentity";
 import { modelFor } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { assistantContext } from "@/lib/ai/assistantContext";
 import { runClientAssistant } from "@/lib/ai/clientAssistantRun";
 import { CT_TODAY } from "@/lib/ai/coach-context";
 
-const SYSTEM_PROMPT = SYMMETRY_SYSTEM_PROMPT;
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: `AI assistant not configured yet. Ask ${COACH_FIRST_NAME} to add ANTHROPIC_API_KEY to Vercel.` },
+        { error: "AI assistant not configured yet. Ask your coach to add ANTHROPIC_API_KEY to Vercel." },
         { status: 503 }
       );
     }
@@ -52,8 +53,13 @@ export async function POST(req: NextRequest) {
     const anthropic = new Anthropic({ apiKey });
     const isTrainer = isTrainerEmail(user.email);
 
-    let systemPrompt = SYSTEM_PROMPT;
-    systemPrompt += `\n\nCurrent user: ${isTrainer ? `Trainer (${COACH_FIRST_NAME})` : "Client"} — ${user.email}`;
+    // WHOSE app this is. The prompt used to be a module constant carrying the
+    // owner's name, credentials and biography, and the line below told the
+    // model that any trainer signed in was him — so Stephanie's session opened
+    // with "Current user: Trainer (Dustin)".
+    const me = await coachForViewer(supabase as never, user.id);
+    let systemPrompt = SYMMETRY_SYSTEM_PROMPT(me.firstName, me.name);
+    systemPrompt += `\n\nCurrent user: ${isTrainer ? `Trainer (${me.name})` : "Client"} — ${user.email}`;
 
     // What it actually knows about the person typing.
     //

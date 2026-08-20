@@ -123,7 +123,7 @@ Rules:
 - Trends & targets: use the signed AVERAGES deltas, the weight/body-fat trajectory lines, and the ENERGY BALANCE calorie numbers exactly as given — they are the source of truth. Do NOT recompute above/below, up/down, or any calorie target yourself.
 - "suggestions": 0-3 concrete, actionable tweaks (e.g. {"label":"Add a scoop of whey at breakfast","delta":{"p":25,"c":2,"f":1,"kcal":117}}). deltas are the daily macro change in grams / kcal (negative = reduce). Prefer tweaks that map to a real meal on their plan. Omit the array or leave it empty when nothing concrete applies.
 
-${APP_GUIDE}
+${APP_GUIDE(coachFirstName)}
 `;
 
 export interface DayTotal {

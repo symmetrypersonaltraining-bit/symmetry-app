@@ -80,14 +80,24 @@ test("the nudge prompt does not tell the model to write as Dustin", () => {
   // Dustin... they look like he wrote them." Marking the row as the bot while
   // the copy still says "I've been watching your logs" is only half a fix — the
   // bubble says Coach Bot and the words say Dustin.
+  // `${coachFirstName}` since 20 Aug: the prompt became a function of the
+  // client's own coach, because as a module constant it named the owner to
+  // every client of every trainer — and then told them to take the question to
+  // him. What this test guards is unchanged: the model must be told it is NOT
+  // the coach.
   assert.ok(
-    !/look like \$\{COACH_FIRST_NAME\} wrote them/.test(prompt),
+    !/look like \$\{coachFirstName\} wrote them/.test(prompt),
     "the prompt still asks for copy that impersonates the coach",
   );
   assert.match(
     prompt,
-    /NOT from \$\{COACH_FIRST_NAME\}/,
+    /NOT from \$\{coachFirstName\}/,
     "the prompt no longer tells the model it is not writing as the coach",
+  );
+  assert.match(
+    prompt,
+    /const SYSTEM = \(coachFirstName: string/,
+    "the prompt is back to a module constant, so it names one trainer to everybody's clients",
   );
 });
 

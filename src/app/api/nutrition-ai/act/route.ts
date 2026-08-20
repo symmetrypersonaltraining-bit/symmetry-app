@@ -231,7 +231,7 @@ export async function POST(req: NextRequest) {
     if (clientId && apiKey) {
       try {
         const assistantSystem =
-          SYMMETRY_SYSTEM_PROMPT +
+          SYMMETRY_SYSTEM_PROMPT(await coachFirstNameForClient(supabase, clientId, COACH_FIRST_NAME)) +
           `\n\nCurrent user: Client` +
           (await assistantContext(supabase, clientId)) +
           `\n\nTODAY IS ${logDate}. Only reach for a tool when the client is asking about their ` +

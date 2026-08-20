@@ -38,6 +38,7 @@ import { TRAINER_EMAIL, Db, enforceMeter } from "@/lib/ai/scope";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
+import { coachFirstNameForClient } from "@/lib/trainerResolve";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,10 @@ function daysBetween(a: string, b: string): number {
 const TAGS = ["escalate", "onboard", "rest", "quiet", "slipping", "nutrition"] as const;
 type Tag = (typeof TAGS)[number];
 
-const SYSTEM = `You draft short messages that ${COACH_FIRST_NAME}, a personal trainer, sends to one client in his own app. You are writing AS ${COACH_FIRST_NAME}, first person.
+// A function of the coach's name. As a module constant it was built at import
+// time from one build-time environment variable, so every client of every
+// trainer got a line written as the owner.
+const SYSTEM = (coachFirstName: string = COACH_FIRST_NAME) => `You draft short messages that ${coachFirstName}, a personal trainer, sends to one client in their own app. You are writing AS ${coachFirstName}, first person.
 
 Respond with ONLY valid JSON, no markdown, no fences:
 {"drafts": [string, string, string, string, string]}
@@ -77,7 +81,7 @@ Hard rules:
 - If the client is a rehab or injury case, be gentler everywhere and never push intensity.
 
 HUMOUR RULES — the funny two have to be safe to send to a paying client:
-- Joke about the SITUATION, the gym, the calendar, ${COACH_FIRST_NAME} himself. Never about the person's
+- Joke about the SITUATION, the gym, the calendar, ${coachFirstName} themselves. Never about the person's
   body, discipline, character or worth.
 - Playful exaggeration is good. Sarcasm aimed at them is not.
 - Mock-formal, mock-dramatic and deadpan all work. "Missing person report", "the dumbbells
@@ -90,7 +94,7 @@ HUMOUR RULES — the funny two have to be safe to send to a paying client:
 - For a rehab or injury client, humour stays soft and never references pushing harder.
 
 DUSTIN'S VOICE — match this, it is the whole point.
-These are real lines ${COACH_FIRST_NAME} has written to his clients. Study the rhythm, not the words:
+These are real lines a coach here has written to their clients. Study the rhythm, not the words:
   "The more you log, the more I can see, and the faster we get you to your goals. Let's get after it."
   "Let's get you back in the app — open it daily and log a workout so we stay on track."
   "Great start — finish out all 4 sessions this week and log each one."
@@ -124,7 +128,7 @@ PERSONAL — use what you actually know about them:
 - Only use details present in the FACTS. If a detail is null or missing, do not reach for it
   and do not invent a substitute.
 
-Write these as if ${COACH_FIRST_NAME} typed them himself on his phone between sessions.`;
+Write these as if ${coachFirstName} typed them on their phone between sessions.`;
 
 interface Facts {
   firstName: string | null;
@@ -348,7 +352,9 @@ export async function POST(req: NextRequest) {
       meter: { clientId: trainerClientId, feature: "outbox_draft" },
       apiKey: process.env.ANTHROPIC_API_KEY,
       model: HAIKU_MODEL,
-      system: SYSTEM,
+      // These drafts are SENT TO A CLIENT AS THEIR TRAINER, first person. Written
+      // as the owner they put his voice and his name in Stephanie's outbox.
+      system: SYSTEM(await coachFirstNameForClient(admin, clientId, COACH_FIRST_NAME)),
       maxTokens: 900,
       messages: [
         {

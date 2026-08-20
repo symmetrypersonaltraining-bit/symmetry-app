@@ -181,3 +181,50 @@ test("the group-chat birthday prompt interpolates rather than printing its own p
   assert.ok(!/[^$]\{COACH_FIRST_NAME\}/.test(c),
     "the missing $ is back: the model is being handed the placeholder text");
 });
+
+// ─── every prompt a client's words come out of names THEIR coach ────────────
+
+test("no AI prompt bakes the coach's name in at import time", () => {
+  // A `const X = \`...${COACH_FIRST_NAME}...\`` is evaluated once, when the
+  // module loads. Whatever name it captures is the name every client of every
+  // trainer gets — and these are the strings that decide whose voice the app
+  // speaks in.
+  const PROMPT_FILES = [
+    "src/lib/ai/system-prompt.ts",
+    "src/lib/ai/app-guide.ts",
+    "src/lib/ai/coach-context.ts",
+    "src/lib/ai/weekly-numbers.ts",
+    "src/app/api/celebration/route.ts",
+    "src/app/api/cron/weekly-ai/route.ts",
+    "src/app/api/coach/focus-suggestions/route.ts",
+    "src/app/api/ai-nudges/route.ts",
+    "src/app/api/attention-drafts/route.ts",
+    "src/app/api/workout-ai/route.ts",
+    "src/app/api/agent/route.ts",
+  ];
+  const offenders: string[] = [];
+  for (const f of PROMPT_FILES) {
+    const c = code(read(f));
+    // Anything still interpolating the CONSTANT rather than a parameter.
+    for (const m of c.matchAll(/\$\{COACH_(?:FIRST_)?NAME\}/g)) {
+      const line = c.slice(0, m.index).split("\n").length;
+      offenders.push(`${f}:${line}`);
+    }
+  }
+  assert.deepEqual(offenders, [],
+    "these interpolate the build-time constant into a prompt:\n  " + offenders.join("\n  "));
+});
+
+test("the trainer agent addresses whoever is signed in", () => {
+  // Dustin, 20 Aug: "her AI bots in her trainer app all act the exact same way
+  // that mine do." Same rules, same tools — addressed to the right person. The
+  // persona used to say the business was "his" and that the owner "is the only
+  // user".
+  const c = code(read("src/app/api/agent/route.ts"));
+  assert.match(c, /const SYSTEM = \(coachFirstName: string\)/,
+    "the agent persona is a module constant again");
+  assert.ok(!/is the only user; act on his behalf/.test(c),
+    "the agent still tells the model the owner is its only user");
+  assert.match(c, /const base = SYSTEM\(me\.firstName\)/,
+    "the persona is not built from the signed-in trainer");
+});

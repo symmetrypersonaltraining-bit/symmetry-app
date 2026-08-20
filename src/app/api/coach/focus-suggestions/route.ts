@@ -15,10 +15,14 @@ import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { COACH_FIRST_NAME, BUSINESS_NAME } from "@/lib/trainer";
+import { coachFirstNameForClient } from "@/lib/trainerResolve";
 
-const SUGGEST_SYSTEM_PROMPT = `You write the client-facing "weekly focus" line for ${COACH_FIRST_NAME}, the trainer at ${BUSINESS_NAME}. The client reads this on their home screen as a note FROM ${COACH_FIRST_NAME} for the week. ${COACH_FIRST_NAME} will pick one of your options and may tweak it, so make each one strong enough to send as-is.
+// A function of the coach's name. As a module constant it was built at import
+// time from one build-time environment variable, so every client of every
+// trainer got a line written as the owner.
+const SUGGEST_SYSTEM_PROMPT = (coachFirstName: string = COACH_FIRST_NAME) => `You write the client-facing "weekly focus" line for ${coachFirstName}, the trainer at ${BUSINESS_NAME}. The client reads this on their home screen as a note FROM ${coachFirstName} for the week. ${coachFirstName} will pick one of your options and may tweak it, so make each one strong enough to send as-is.
 
-You know THIS client from the context (name, goal, workout adherence, streak, weigh-in cadence, body-comp trend). Write in ${COACH_FIRST_NAME}'s voice: direct, warm, motivating, specific — a real coach who watched their week, not a generic app nudge.
+You know THIS client from the context (name, goal, workout adherence, streak, weigh-in cadence, body-comp trend). Write in ${coachFirstName}'s voice: direct, warm, motivating, specific — a real coach who watched their week, not a generic app nudge.
 
 Give exactly 3 DIFFERENT options, each a distinct angle drawn from the data:
 - One that names their single biggest lever this week (a slipped streak, an overdue weigh-in, finishing all scheduled sessions, protecting a hot streak).
@@ -64,15 +68,19 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return missingKeyResponse();
 
     const context = await assembleTrainingContext(supabase, clientId);
+    // The client reads this on their home screen as a note FROM their coach, so
+    // it has to be written as their coach. As a module constant it was always
+    // the owner's voice, on every client of every trainer.
+    const coachFirstName = await coachFirstNameForClient(supabase, clientId, COACH_FIRST_NAME);
     const result = await callClaudeJson({
       meter: { clientId: clientId, feature: "focus_suggest" },
       apiKey,
       model: HAIKU_MODEL,
-      system: SUGGEST_SYSTEM_PROMPT,
+      system: SUGGEST_SYSTEM_PROMPT(coachFirstName),
       maxTokens: 500,
       messages: [{
         role: "user",
-        content: `CONTEXT (server-assembled, trusted):\n${context}\n\nWrite 3 weekly-focus options for ${COACH_FIRST_NAME} to choose from for this client.`,
+        content: `CONTEXT (server-assembled, trusted):\n${context}\n\nWrite 3 weekly-focus options for ${coachFirstName} to choose from for this client.`,
       }],
       validate: validateSuggestions,
     });

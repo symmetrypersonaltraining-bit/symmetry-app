@@ -46,7 +46,7 @@ import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter } from "@/lib/ai/scope";
-import { ownerAuthUid } from "@/lib/trainerResolve";
+import { ownerAuthUid, coachFirstNameForClient } from "@/lib/trainerResolve";
 import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
@@ -75,7 +75,10 @@ function daysBetween(a: string, b: string): number {
   return Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 }
 
-const SYSTEM = `You are the Symmetry app's coach assistant, writing a short re-engagement message to one of ${COACH_FIRST_NAME}'s clients inside the app. It arrives in their inbox clearly labelled as coming from the app, NOT from ${COACH_FIRST_NAME} — so never write as though you are him, never sign as him, and never say "I" about something only he would know or do. Refer to him in the third person, and hand anything that needs his judgement to him by name.
+// A function of the coach's name. The nudge lands in a CLIENT's inbox, and as a
+// module constant it named the owner to every client of every trainer — and
+// then told them to take the question to him.
+const SYSTEM = (coachFirstName: string = COACH_FIRST_NAME) => `You are the Symmetry app's coach assistant, writing a short re-engagement message to one of ${coachFirstName}'s clients inside the app. It arrives in their inbox clearly labelled as coming from the app, NOT from ${coachFirstName} — so never write as though you are them, never sign as them, and never say "I" about something only they would know or do. Refer to them in the third person, and hand anything that needs their judgement to them by name.
 
 Respond with ONLY valid JSON, no markdown, no fences:
 {"body": string}
@@ -90,7 +93,7 @@ HARD RULES:
 - Ask for the SMALLEST possible next step, not a big commitment.
 - Sound like a person texting, not a marketing email.
 
-BE USEFUL, NOT JUST ENCOURAGING (${COACH_FIRST_NAME}, 10 Aug: "be more helpful with tips
+BE USEFUL, NOT JUST ENCOURAGING (${coachFirstName}, 10 Aug: "be more helpful with tips
 based on their real data and what they are actually using"):
 - Where the data supports it, give ONE concrete, specific tip they could act on
   today — tied to what they are actually doing, not generic advice. A tip they
@@ -112,7 +115,7 @@ ASK, DO NOT ONLY TELL:
   survey, and only when it does not make the message longer than it should be.
 - The point of the question is to LEARN this specific client: what they
   respond to, what they ignore, what they are really trying to do. Their answer
-  goes to ${COACH_FIRST_NAME}, so ask something whose answer he could act on.`;
+  goes to ${coachFirstName}, so ask something whose answer they could act on.`;
 
 function validate(raw: unknown): { body: string } | null {
   if (!raw || typeof raw !== "object") return null;
@@ -331,7 +334,7 @@ export async function POST(req: NextRequest) {
           meter: { clientId: r.id, feature: "nudge_sweep" },
           apiKey: process.env.ANTHROPIC_API_KEY,
           model: modelFor("coach", await aiTierFor(admin, r.id)),
-          system: SYSTEM,
+          system: SYSTEM(await coachFirstNameForClient(admin, r.id, COACH_FIRST_NAME)),
           maxTokens: 220,
           messages: [{ role: "user", content: `CLIENT FACTS:\n${JSON.stringify(facts)}\n\nWrite the message as strict JSON.` }],
           validate,
