@@ -11,9 +11,12 @@ import { createClient } from "@/lib/supabase/client";
 import { LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
 import { summariseLogRange } from "@/lib/nutrition/rangeAverages";
 
-export type RangeKey = "1w" | "2w" | "4w" | "8w" | "custom";
+export type RangeKey = "wtd" | "1w" | "2w" | "4w" | "8w" | "custom";
 
 export const AVG_RANGES: { key: RangeKey; label: string; days: number }[] = [
+  // "wtd" has no fixed length — it is Sunday to today, so `days` is 0 and the
+  // window is computed. See the comment on `weekToDateStart` below.
+  { key: "wtd", label: "Week", days: 0 },
   { key: "1w", label: "1W", days: 7 },
   { key: "2w", label: "2W", days: 14 },
   { key: "4w", label: "4W", days: 28 },
@@ -46,6 +49,28 @@ export function shiftDate(iso: string, delta: number): string {
   dt.setUTCDate(dt.getUTCDate() + delta);
   return dt.toISOString().slice(0, 10);
 }
+/**
+ * Sunday of the week containing `iso`.
+ *
+ * Dustin, 2026-08-20: "Logic on the daily average needs to go by days so far
+ * this week dont include days in the future for averages for tge week."
+ *
+ * The summary card was a ROLLING SEVEN DAYS labelled "7d". On a Thursday that
+ * denominator is 7 even though the week is four days old, so logging Mon, Tue
+ * and Wed read as "3 of 7 days · 43%" when it is three of four. Nothing was
+ * counting a future date — the window simply was not the week, while being
+ * labelled and read as one.
+ *
+ * Sunday-start matches `weekStartOf` in weekly-numbers.ts, `coach-context.ts`
+ * ("weeks run Sunday to Saturday") and every other "This week" range in the UI.
+ * A second definition of when a week starts is its own bug.
+ */
+export function weekToDateStart(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0 = Sunday
+  return shiftDate(iso, -dow);
+}
+
 function diffDays(a: string, b: string): number {
   const [ay, am, ad] = a.split("-").map(Number);
   const [by, bm, bd] = b.split("-").map(Number);
@@ -70,6 +95,10 @@ export function useNutritionAverages(
     if (range === "custom") {
       start = customStart; end = customEnd;
       if (start > end) { const t = start; start = end; end = t; }
+    } else if (range === "wtd") {
+      // Sunday → today. Never past today, so a day that has not happened can
+      // never sit in the denominator.
+      start = weekToDateStart(today);
     } else {
       const rg = AVG_RANGES.find((x) => x.key === range)!;
       start = shiftDate(today, -(rg.days - 1));

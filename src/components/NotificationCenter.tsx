@@ -139,7 +139,10 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
               </div>
             ) : (
               rows.map((r) => (
-                <button key={r.key} onClick={() => openRow(r)} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", padding: "12px 14px", background: "none", border: "none", borderBottom: "1px solid var(--brand-border)", cursor: "pointer" }}>
+                // A row is a button inside a row, so the two cannot be nested —
+                // the dismiss × sits alongside the tap target, not inside it.
+                <div key={r.key} style={{ display: "flex", alignItems: "stretch", borderBottom: "1px solid var(--brand-border)" }}>
+                <button onClick={() => openRow(r)} style={{ display: "flex", alignItems: "center", gap: 11, flex: 1, minWidth: 0, textAlign: "left", padding: "12px 4px 12px 14px", background: "none", border: "none", cursor: "pointer" }}>
                   <span style={{ flexShrink: 0, width: 38, height: 38, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "color-mix(in srgb, var(--brand-primary) 16%, transparent)", color: "var(--brand-primary)" }}>
                     <i className={`ti ${r.kind === "group" ? "ti-users-group" : "ti-message-circle"}`} style={{ fontSize: 18 }} />
                   </span>
@@ -154,6 +157,23 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
                     </span>
                   </span>
                 </button>
+                {/* CLEAR IT WITHOUT GOING THERE.
+                    Dustin, 2026-08-20: "trainer needs to be able to dismiss
+                    notifications quickly so they're not in the way on the
+                    screen."
+
+                    Tapping a notification navigates. So the only way to empty
+                    the list was to visit every single one, or to use "Mark all
+                    read" and lose the ones still worth opening. There was no
+                    way to clear ONE. */}
+                <button
+                  aria-label={"Dismiss " + r.title}
+                  title="Dismiss"
+                  onClick={(ev) => { ev.stopPropagation(); void markRead(r); }}
+                  style={{ flexShrink: 0, width: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", color: "var(--brand-text-secondary)", fontSize: 17, lineHeight: 1 }}>
+                  ×
+                </button>
+                </div>
               ))
             )}
           </div>

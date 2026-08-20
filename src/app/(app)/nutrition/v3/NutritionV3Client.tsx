@@ -472,7 +472,10 @@ export default function NutritionV3Client(props: Props) {
   // fetch a 1W window so ADHERENCE % and LOGGING RATE stay visible; when a
   // range is selected the card shows that range's averages. refreshKey ties it
   // to today's live logs so the rolling stats update as meals are logged.
-  const statsRangeKey: AvgRangeKey = summaryRange === "today" ? "1w" : summaryRange;
+  // The hero card's default window is THIS WEEK SO FAR, not a rolling seven
+  // days. Dustin, 20 Aug: "dont include days in the future for averages for tge
+  // week." A rolling window put seven days in the denominator on a Thursday.
+  const statsRangeKey: AvgRangeKey = summaryRange === "today" ? "wtd" : summaryRange;
   const avgRefreshKey = `${selectedDate}:${logs.length}:${r(totals.kcal)}`;
   const { loading: avgLoading, result: avgResult } = useNutritionAverages(
     clientId, today, statsRangeKey, customStart, customEnd, avgRefreshKey,
@@ -1538,7 +1541,7 @@ export default function NutritionV3Client(props: Props) {
                     no macro target and the old meal-status average had to run. */}
                 <p style={{ color: "var(--brand-text-secondary)", fontSize: 9 }}>
                   {avgResult?.adherenceBasis === "meal-status" ? "plan meals" : "logging × macros"}
-                  {isToday ? " · 7d" : ""}
+                  {isToday ? " · this week" : ""}
                 </p>
               </div>
               <div className="text-center flex-1">
@@ -1546,7 +1549,7 @@ export default function NutritionV3Client(props: Props) {
                   {avgResult ? Math.round((avgResult.loggedDays / avgResult.totalDays) * 100) + "%" : "—"}
                 </p>
                 <p style={{ color: "var(--brand-text-secondary)", fontSize: 9, fontWeight: 700, letterSpacing: 0.8 }}>LOGGING RATE</p>
-                <p style={{ color: "var(--brand-text-secondary)", fontSize: 9 }}>{avgResult ? `${avgResult.loggedDays} of ${avgResult.totalDays} days` : (isToday ? "last 7 days" : "")}</p>
+                <p style={{ color: "var(--brand-text-secondary)", fontSize: 9 }}>{avgResult ? `${avgResult.loggedDays} of ${avgResult.totalDays} day${avgResult.totalDays === 1 ? "" : "s"}` : (isToday ? "this week" : "")}</p>
               </div>
             </div>
           </div>
