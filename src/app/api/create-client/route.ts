@@ -69,6 +69,18 @@ export async function POST(req: NextRequest) {
     creatorTrainerId = (tRows?.[0] as { id?: string } | undefined)?.id ?? null;
   }
 
+  // The creating coach's first name, for the invite email's signature.
+  let creatorFirstName: string | null = null;
+  if (creatorTrainerId) {
+    const { data: nRows } = await admin
+      .from("trainers")
+      .select("first_name, name")
+      .eq("id", creatorTrainerId)
+      .limit(1);
+    const row = nRows?.[0] as { first_name?: string | null; name?: string | null } | undefined;
+    creatorFirstName = (row?.first_name || (row?.name || "").split(/\s+/)[0] || null);
+  }
+
   // Check if client record already exists
   const { data: existing } = await supabase
     .from("clients")
@@ -171,7 +183,12 @@ export async function POST(req: NextRequest) {
         from: "Symmetry Corrective <noreply@symmetrypersonaltraining.com>",
         to: email,
         subject: "You're invited to the Symmetry Training App",
-        html: buildInviteEmailHtml({ firstName, email, tempPassword: tempPassword ?? "", apkUrl: APK_URL }),
+  // Signed by the coach who created them, not by whoever the module constant
+  // names. `buildInviteEmailHtml` falls back to COACH_FIRST_NAME when no
+  // coachFirstName is passed, so omitting it does not look like a bug — it
+  // looks like an email, and it tells a client of Stephanie's that Dustin has
+  // set up their account. /api/invite-client already does this correctly.
+        html: buildInviteEmailHtml({ firstName, email, tempPassword: tempPassword ?? "", apkUrl: APK_URL, ...(creatorFirstName ? { coachFirstName: creatorFirstName } : {}) }),
       });
     }
   }

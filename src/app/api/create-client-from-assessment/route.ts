@@ -68,6 +68,20 @@ export async function POST(req: NextRequest) {
     creatorTrainerId = (tRows?.[0] as { id?: string } | undefined)?.id ?? null;
   }
 
+  // The creating coach's first name, for the invite email's signature. Without
+  // it buildInviteEmailHtml falls back to the module constant and tells a
+  // client of Stephanie's that Dustin has set up their account.
+  let creatorFirstName: string | null = null;
+  if (creatorTrainerId) {
+    const { data: nRows } = await admin
+      .from("trainers")
+      .select("first_name, name")
+      .eq("id", creatorTrainerId)
+      .limit(1);
+    const row = nRows?.[0] as { first_name?: string | null; name?: string | null } | undefined;
+    creatorFirstName = (row?.first_name || (row?.name || "").split(/\s+/)[0] || null);
+  }
+
   // Don't collide with an existing client
   const { data: existing } = await supabase.from("clients").select("id").eq("email", email).maybeSingle();
   if (existing) {
@@ -186,7 +200,7 @@ export async function POST(req: NextRequest) {
         from: "Symmetry Corrective <noreply@symmetrypersonaltraining.com>",
         to: email,
         subject: "You're invited to the Symmetry Training App",
-        html: buildInviteEmailHtml({ firstName: data.first_name, email, tempPassword, apkUrl: APK_URL }),
+        html: buildInviteEmailHtml({ firstName: data.first_name, email, tempPassword, apkUrl: APK_URL, ...(creatorFirstName ? { coachFirstName: creatorFirstName } : {}) }),
       });
       emailSent = true;
     } catch { /* onboarding already succeeded; email can be re-sent from the profile */ }

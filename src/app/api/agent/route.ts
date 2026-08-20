@@ -16,7 +16,8 @@ import { SONNET_MODEL } from "@/lib/ai/anthropic";
 import { logUsage, logFailure } from "@/lib/ai/meter";
 import { resolveAiScope, enforceMeter, missingKeyResponse, Db } from "@/lib/ai/scope";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { TRAINER_TOOLS, execTrainerTool } from "@/lib/ai/agent-tools";
+import { TRAINER_TOOLS, execTrainerTool, type ToolCaller } from "@/lib/ai/agent-tools";
+import { trainerForAuthUser } from "@/lib/trainerResolve";
 import { CONTEXT_TYPE, MAX_TURNS } from "./session/route";
 import { COACH_FIRST_NAME, BUSINESS_NAME } from "@/lib/trainer";
 
@@ -112,6 +113,14 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient() as unknown as Db;
   if (!admin) return NextResponse.json({ error: "Not configured" }, { status: 500 });
 
+  // WHICH trainer is asking. `scope.isTrainer` is a boolean and the tools run on
+  // the service role, which bypasses RLS entirely — so without this, either
+  // trainer could ask the agent for the other's payment_reminders and get them.
+  // It also decides whose Google Calendar `book_session` writes to.
+  const me = await trainerForAuthUser(admin, scope.userId, scope.email);
+  if (!me) return NextResponse.json({ error: "Trainer only" }, { status: 403 });
+  const caller: ToolCaller = { trainerId: me.id, authUserId: scope.userId, isOwner: me.isOwner };
+
   const ALLOWED_IMAGE = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
   // ~5MB of base64 is roughly 3.7MB of image. Beyond that the request is slow
   // enough on a phone that it reads as broken, and the model gains nothing from
@@ -186,7 +195,7 @@ const client = new Anthropic({ apiKey });
         for (const block of resp.content) {
           if (block.type === "tool_use") {
             toolTrail.push(block.name);
-            const out = await execTrainerTool(admin, block.name, (block.input as Record<string, unknown>) || {});
+            const out = await execTrainerTool(admin, block.name, (block.input as Record<string, unknown>) || {}, caller);
             results.push({ type: "tool_result", tool_use_id: block.id, content: out });
           }
         }

@@ -93,10 +93,14 @@ export async function sendClientMessage(body: string, imageUrl?: string | null):
   // messaged Dustin — his inbox, his push, and she would never have known they
   // wrote. Falls back to the old behaviour if a client somehow has no trainer,
   // because a message reaching the owner beats one reaching nobody.
+  //
+  // The fallback used to be `trainer_user_id()`, which is `trainer_settings ...
+  // LIMIT 1` with no ORDER BY — an arbitrary coach, which is a worse answer
+  // than a deliberate one. `my_trainer_owner_user_id()` names the owner.
   const { data: ownTrainerId } = await supabase.rpc("my_trainer_user_id");
   const { data: fallbackTrainerId } = ownTrainerId
     ? { data: null }
-    : await supabase.rpc("trainer_user_id");
+    : await supabase.rpc("owner_trainer_user_id");
   const trainerId = ownTrainerId || fallbackTrainerId;
   if (!trainerId) return 'No trainer is configured to receive this.';
   const { data: trainerEmail } = await supabase.rpc("my_trainer_email");
@@ -203,13 +207,22 @@ export async function sendGroupMessage(body: string, imageUrl?: string | null, s
   // Uses the admin client so the recipient list isn't limited by the sender's RLS.
   try {
     const admin: any = createAdminClient();
-    const [{ data: members }, { data: trainerId }] = await Promise.all([
+    // EVERY active trainer, not "the" trainer. This asked `trainer_user_id()`,
+    // whose body is `trainer_settings ... LIMIT 1` with no ORDER BY and a
+    // hardcoded fallback to Dustin's address — it can only ever return one
+    // person, so the second coach was never on the list. It happens not to bite
+    // today only because both trainers also have a client row of their own and
+    // therefore fall out of the member sweep; archive either row, or add a
+    // trainer who is not also a client, and that coach silently stops hearing
+    // the group chat. The group itself is shared by decision, so both coaches
+    // belong on it.
+    const [{ data: members }, { data: coaches }] = await Promise.all([
       admin.from('clients').select('auth_user_id').not('auth_user_id', 'is', null).is('archived_at', null),
-      supabase.rpc('trainer_user_id'),
+      admin.from('trainers').select('auth_user_id').eq('active', true).not('auth_user_id', 'is', null),
     ]);
     const targets = new Set<string>();
     (members || []).forEach((m: any) => { if (m.auth_user_id) targets.add(m.auth_user_id as string); });
-    if (trainerId) targets.add(trainerId as string);
+    (coaches || []).forEach((t: any) => { if (t.auth_user_id) targets.add(t.auth_user_id as string); });
     targets.delete(user.id);
     await Promise.all([...targets].map((uid) =>
       sendPushToUser(uid, NOTIFICATION_EVENTS.GROUP_MESSAGE, 'New group message', (body || '📷 Photo').slice(0, 140), { url: '/messages?client=group' }).catch(() => {})

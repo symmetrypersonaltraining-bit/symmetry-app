@@ -141,15 +141,32 @@ test("the group post is a normal group message, never a broadcast", () => {
   assert.match(ROUTE, /sender_kind: "coachbot"/, "Coach Bot's badge, not Dustin's photo — his own choice");
 });
 
-test("the heads-up to Dustin is invisible to the client", () => {
-  // from_id = to_id = Dustin. The RLS on messages is
+test("the heads-up goes to that client's own coach, and only to them", () => {
+  // from_id = to_id = the coach. The RLS on messages is
   // (auth.uid() = from_id OR auth.uid() = to_id), so nobody else can read it —
   // verified against the live policy. A client seeing "worth a word from you in
   // person" would undo the entire point of it.
+  //
+  // This used to require `trainerUid`, the OWNER. That was the same person as
+  // "this client's coach" until 20 Aug and is not any more: the whole purpose
+  // of this message is to prompt the human who will be standing in front of
+  // them at their next session, and sent to the owner it tells Dustin about a
+  // session he is not running and tells Stephanie nothing.
   const block = ROUTE.slice(ROUTE.indexOf("Tomorrow: the quiet nudge"), ROUTE.indexOf("Today: the group chat"));
-  assert.match(block, /from_id: trainerUid,\s*to_id: trainerUid,/);
+  assert.match(block, /const coachUid = await inboxAuthUidForClient\(db, p\.id\);/,
+    "the heads-up no longer resolves the client's own coach");
+  assert.match(block, /from_id: coachUid,\s*to_id: coachUid,/,
+    "self-addressed is what keeps it invisible to the client");
   assert.match(block, /is_group: false,/);
   assert.match(block, /kind: "heads_up"/);
+});
+
+test("the GROUP post still comes from the owner", () => {
+  // Shared room, one voice. Dustin, 20 Aug: "let's keep the group chat the
+  // same. All clients can go in there."
+  const block = ROUTE.slice(ROUTE.indexOf("Today: the group chat"));
+  assert.match(block, /from_id: trainerUid,\s*to_id: trainerUid,/);
+  assert.match(block, /is_group: true,/);
 });
 
 test("the model is never told the date of birth", () => {

@@ -28,7 +28,13 @@ async function sendEmail(to: string, subject: string, html: string) {
   return res.ok;
 }
 
-function reminderEmailHtml(clientName: string, amountDue: number, dueDate: string, notes?: string | null) {
+// `coachFirstName` is a parameter, not the module constant it used to read.
+//
+// This email asks somebody for money and then tells them who to talk to about
+// it. Signed with COACH_FIRST_NAME it told every client of Stephanie's to
+// contact Dustin about a bill she is owed — the one message in the app where
+// naming the wrong coach has a number attached to it.
+function reminderEmailHtml(clientName: string, amountDue: number, dueDate: string, coachFirstName: string, notes?: string | null) {
   const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
   return `
 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:24px">
@@ -53,7 +59,7 @@ function reminderEmailHtml(clientName: string, amountDue: number, dueDate: strin
     </div>
     ${notes ? `<p style="color:#4E6080;font-size:14px;font-style:italic;margin:0 0 20px">${notes}</p>` : ""}
     <p style="color:#4E6080;font-size:14px;margin:0">
-      Questions? Reply to this email or contact ${COACH_FIRST_NAME} directly.
+      Questions? Reply to this email or contact ${coachFirstName} directly.
     </p>
   </div>
   <p style="color:#4E6080;font-size:12px;text-align:center;margin:16px 0 0">
@@ -80,7 +86,7 @@ export async function POST(request: Request) {
   // Fetch the reminder with client info
   const { data: reminder, error } = await supabase
     .from("payment_reminders")
-    .select("*, clients(name, email, payment_reminders_enabled, flat_billing)")
+    .select("*, clients(name, email, payment_reminders_enabled, flat_billing, trainer_id)")
     .eq("id", reminderId)
     .maybeSingle();
 
@@ -133,10 +139,21 @@ export async function POST(request: Request) {
   // double-counted the credit and under-billed the client).
   const netDue = parseFloat(reminder.amount_due) || 0;
 
+  // Whose bill this is. Falls back to the owner's name rather than a blank —
+  // an unsigned demand for money is worse than one signed by the wrong person,
+  // and the fallback is only reachable if the client has no trainer row at all.
+  let coachFirstName: string = COACH_FIRST_NAME;
+  if (client.trainer_id) {
+    const { data: tRows } = await supabase
+      .from("trainers").select("first_name, name").eq("id", client.trainer_id).limit(1);
+    const t = tRows?.[0] as { first_name?: string | null; name?: string | null } | undefined;
+    coachFirstName = t?.first_name || (t?.name || "").split(/\s+/)[0] || COACH_FIRST_NAME;
+  }
+
   const sent = await sendEmail(
     client.email,
     `Payment Reminder — $${netDue.toFixed(2)} due ${new Date(reminder.due_date + "T12:00:00Z").toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric" })}`,
-    reminderEmailHtml(client.name, netDue, dueDate, reminder.notes)
+    reminderEmailHtml(client.name, netDue, dueDate, coachFirstName, reminder.notes)
   );
 
   if (!sent) {

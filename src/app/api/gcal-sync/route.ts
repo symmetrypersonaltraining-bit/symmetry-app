@@ -229,9 +229,13 @@ async function syncOneCalendar(
       continue;
     }
 
-    // Business rules: Steph's paycheck is NEVER a client payment; Gerard and Dustin are never billed.
+    // Business rules, and they are the OWNER's business rules: on Dustin's
+    // calendar "paycheck" means Stephanie's wages going out, and Gerard and
+    // Dustin are never billed. Applied to her calendar as well, "paycheck"
+    // would silently drop one of HER clients' payments — a rule written about
+    // one calendar quietly deciding what another one means.
     const PAYMENT_EXCLUDED_CLIENTS = ['d970da5e-9c46-45c4-be9c-e27e1893b575', '69021074-1708-4d73-9245-918862048709'];
-    if (isPayment && (/paycheck/i.test(summary) || PAYMENT_EXCLUDED_CLIENTS.includes(clientId))) continue;
+    if (isPayment && trainer.is_owner && (/paycheck/i.test(summary) || PAYMENT_EXCLUDED_CLIENTS.includes(clientId))) continue;
 
     if (isPayment) {
       const payDate = event.start?.date || event.start?.dateTime?.split('T')[0];

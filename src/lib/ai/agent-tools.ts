@@ -190,9 +190,58 @@ function ctIso(date: string, time: string, minutes: number): { start: string; en
 
 // ── executor ────────────────────────────────────────────────────────────────
 
-export async function execTrainerTool(db: Db, name: string, input: Record<string, unknown>): Promise<string> {
+// ── WHOSE AGENT IS THIS ─────────────────────────────────────────────────────
+//
+// `execTrainerTool` runs on the SERVICE ROLE, which bypasses row-level security
+// completely, and its only gate was `scope.isTrainer` — a boolean. With one
+// trainer that was the same question as "is this Dustin". With two it means any
+// trainer can ask the agent to list `payment_reminders` and get the other
+// trainer's entire book, RLS or no RLS. Dustin, 20 Aug: "there can be no
+// crossover on payments and payment reminders."
+//
+// So the caller has to say who they are. Required, not optional: an optional
+// parameter here is a parameter somebody forgets, and forgetting it would
+// restore the exact hole this closes.
+export interface ToolCaller {
+  /** The caller's row in `trainers`. Null only if they are not a trainer at all. */
+  trainerId: string | null;
+  /** Their auth account — this decides WHOSE Google Calendar the agent books on. */
+  authUserId: string;
+  /** The owner runs the business and sees all of it. */
+  isOwner: boolean;
+}
+
+// Tables in READABLE that carry a client_id, and are therefore filterable to a
+// trainer's own roster. Verified against information_schema, not assumed.
+const CLIENT_SCOPED_TABLES = new Set([
+  "appointments", "scheduled_workouts", "workout_logs", "set_logs", "metrics",
+  "skinfold_logs", "macro_targets", "meal_adherence_logs", "daily_logs",
+  "cardio_logs", "exercise_notes", "program_assignments", "payment_reminders",
+  "calendar_payments", "billing_adjustments", "challenge_participants",
+  "client_app_settings", "client_program_feedback", "schedule_change_proposals",
+  "messages", "ai_usage_daily", "ai_action_log",
+]);
+
+// Tables with no client dimension at all: the shared exercise library, the
+// programme skeleton, the food catalogue, the group challenges. Shared on
+// purpose — Dustin, 20 Aug, on the library: "yes same library".
+const SHARED_TABLES = new Set([
+  "programs", "phases", "days", "exercises", "prescribed_exercises", "sections",
+  "group_challenges", "food_catalog", "ai_usage_monthly",
+]);
+
+export async function execTrainerTool(db: Db, name: string, input: Record<string, unknown>, caller: ToolCaller): Promise<string> {
   const str = (k: string): string => (typeof input[k] === "string" ? (input[k] as string).trim() : "");
   const num = (k: string): number | null => (input[k] == null || input[k] === "" ? null : Number(input[k]));
+
+  // The caller's own roster, fetched at most once per tool call.
+  let rosterIds: string[] | null = null;
+  async function myClientIds(): Promise<string[]> {
+    if (rosterIds) return rosterIds;
+    const { data } = await db.from("clients").select("id").eq("trainer_id", caller.trainerId);
+    rosterIds = ((data as { id: string }[] | null) || []).map((c) => c.id);
+    return rosterIds;
+  }
 
   try {
     // ── reads ───────────────────────────────────────────────────────────────
@@ -200,6 +249,8 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
       const q = str("query");
       let query = db.from("clients").select("id, name, primary_goal").is("archived_at", null).order("name").limit(60);
       if (q) query = db.from("clients").select("id, name, primary_goal").ilike("name", `%${q}%`).is("archived_at", null).order("name").limit(60);
+      // A trainer's roster is their own. The owner's is the whole business.
+      if (!caller.isOwner) query = query.eq("trainer_id", caller.trainerId);
       const { data } = await query;
       return JSON.stringify(data || []);
     }
@@ -215,6 +266,19 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
       }
       const cols = str("columns") || "*";
       let q = db.from(table).select(cols);
+      // The scope, applied before any caller-supplied filter so nothing they
+      // pass can widen it. Refuses rather than guessing on an unclassified
+      // table: a new table added to READABLE and forgotten here must fail
+      // closed, not quietly return the whole business.
+      if (!caller.isOwner) {
+        if (table === "clients") {
+          q = q.eq("trainer_id", caller.trainerId);
+        } else if (CLIENT_SCOPED_TABLES.has(table)) {
+          q = q.in("client_id", await myClientIds());
+        } else if (!SHARED_TABLES.has(table)) {
+          return `Error: "${table}" is not readable from your account.`;
+        }
+      }
       const where = (input.where && typeof input.where === "object" ? input.where : {}) as Record<string, unknown>;
       for (const [k, v] of Object.entries(where)) {
         if (v === null) q = q.is(k, null);
@@ -275,6 +339,12 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
     }
 
     const clientId = str("client_id");
+    // One guard for every tool that names a client. Placed here rather than
+    // repeated per tool so a new tool cannot be added without it.
+    if (clientId && !caller.isOwner) {
+      const mine = await myClientIds();
+      if (!mine.includes(clientId)) return "Error: that client is not on your roster.";
+    }
 
     if (name === "client_overview") {
       if (!clientId) return "Error: client_id required.";
@@ -436,7 +506,7 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
       if (!clientName) return "Error: client not found.";
 
       const { start, end } = ctIso(date, time, Number(input.duration_minutes) || 60);
-      const { token } = await getValidAccessToken();
+      const { token } = await getValidAccessToken(caller.authUserId);
       const created = await gcalFetch(token, "/calendars/primary/events", {
         method: "POST",
         body: JSON.stringify({
@@ -503,7 +573,7 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
       const date = str("date");
       const time = str("start_time");
       if (!eventId || !date || !time) return "Error: gcal_event_id, date and start_time are required.";
-      const { token } = await getValidAccessToken();
+      const { token } = await getValidAccessToken(caller.authUserId);
       const before = await gcalFetch(token, `/calendars/primary/events/${encodeURIComponent(eventId)}`);
       const { start, end } = ctIso(date, time, Number(input.duration_minutes) || 60);
       await gcalFetch(token, `/calendars/primary/events/${encodeURIComponent(eventId)}`, {
@@ -518,7 +588,7 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
     if (name === "cancel_session") {
       const eventId = str("gcal_event_id");
       if (!eventId) return "Error: gcal_event_id required.";
-      const { token } = await getValidAccessToken();
+      const { token } = await getValidAccessToken(caller.authUserId);
       const before = await gcalFetch(token, `/calendars/primary/events/${encodeURIComponent(eventId)}`);
       await gcalFetch(token, `/calendars/primary/events/${encodeURIComponent(eventId)}`, {
         method: "PATCH",
@@ -789,15 +859,15 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
             await db.from("ai_action_log").update({ undo_error: failures.join("; ").slice(0, 300) }).eq("id", row.id);
           }
         } else if (u.kind === "gcal_delete") {
-          const { token } = await getValidAccessToken();
+          const { token } = await getValidAccessToken(caller.authUserId);
           await gcalFetch(token, `/calendars/primary/events/${encodeURIComponent(u.gcal_event_id as string)}`, { method: "DELETE" });
         } else if (u.kind === "gcal_restore_time") {
-          const { token } = await getValidAccessToken();
+          const { token } = await getValidAccessToken(caller.authUserId);
           await gcalFetch(token, `/calendars/primary/events/${encodeURIComponent(u.gcal_event_id as string)}`, {
             method: "PATCH", body: JSON.stringify({ start: u.start, end: u.end }),
           });
         } else if (u.kind === "gcal_restore_color") {
-          const { token } = await getValidAccessToken();
+          const { token } = await getValidAccessToken(caller.authUserId);
           await gcalFetch(token, `/calendars/primary/events/${encodeURIComponent(u.gcal_event_id as string)}`, {
             method: "PATCH", body: JSON.stringify({ colorId: u.colorId ?? null }),
           });

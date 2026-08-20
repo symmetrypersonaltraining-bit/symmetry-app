@@ -41,7 +41,7 @@ import { isCronRequest } from "@/lib/cron-auth";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import { enforceMeter, resolveAiScope, type Db } from "@/lib/ai/scope";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
-import { ownerAuthUid } from "@/lib/trainerResolve";
+import { ownerAuthUid, inboxAuthUidForClient } from "@/lib/trainerResolve";
 import {
   BIRTHDAY_SYSTEM, centralToday, effectiveMonthDay, fallbackLine, isPrintable,
   joinNames, monthDay, nextDay, type BirthdayPerson,
@@ -107,16 +107,26 @@ export async function runBirthdays(
   const today = opts.today || centralToday();
   const year = Number(today.slice(0, 4));
 
-  // The OWNER's account, explicitly. This was
+  // The OWNER's account, for the GROUP POST only. This was
   // `trainer_settings.select("user_id").limit(1)` — unambiguous while that
   // table held one row, arbitrary the moment Stephanie connects her Google
   // Calendar and it holds two. The group chat is shared by decision (Dustin,
   // 20 Aug: "All clients can go in there since they're all going to train with
   // Symmetry Personal Training"), so the business owner is who posts in it.
+  //
+  // The private heads-up below is a DIFFERENT question and gets a different
+  // answer — see there.
   const trainerUid = await ownerAuthUid(db);
   if (!trainerUid) return { posted: false, reason: "no trainer account" };
 
-  // ── Tomorrow: the quiet nudge to Dustin ──────────────────────────────────
+  // ── Tomorrow: the quiet nudge to THAT CLIENT'S COACH ─────────────────────
+  //
+  // The whole point of this half, in Dustin's words, is that the app posting
+  // "happy birthday" is pleasant and the coach saying it at their session is
+  // what the client remembers. That only works if it reaches the coach who
+  // will actually be standing in front of them. Sent to the owner instead, a
+  // heads-up about one of Stephanie's clients tells Dustin about a session he
+  // is not running and tells her nothing.
   const headsUp: string[] = [];
   const tomorrowIso = nextDay(today);
   const tomorrowPeople = await whoseBirthday(db, tomorrowIso);
@@ -126,13 +136,15 @@ export async function runBirthdays(
       if (done.has(p.id)) continue;
       headsUp.push(p.firstName);
       if (opts.dry) continue;
-      // client_id scopes it to their thread in Dustin's inbox so one tap
-      // answers it — but from_id = to_id = Dustin, and the RLS on messages is
-      // (auth.uid() = from_id OR auth.uid() = to_id), so the client cannot see
-      // it. Checked against the live policy before writing this.
+      // client_id scopes it to their thread in their coach's inbox so one tap
+      // answers it — but from_id = to_id = that coach, and the RLS on messages
+      // is (auth.uid() = from_id OR auth.uid() = to_id), so the client cannot
+      // see it. Checked against the live policy before writing this.
+      const coachUid = await inboxAuthUidForClient(db, p.id);
+      if (!coachUid) continue;
       const { error } = await db.from("messages").insert({
-        from_id: trainerUid,
-        to_id: trainerUid,
+        from_id: coachUid,
+        to_id: coachUid,
         client_id: p.id,
         body: `🎂 ${p.firstName}'s birthday is tomorrow. The group chat will say something in the morning — worth a word from you in person.`,
         is_group: false,
