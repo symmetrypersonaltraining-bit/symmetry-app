@@ -17,6 +17,8 @@ import { TRAINER_EMAIL } from "@/lib/trainer";
 
 export interface TrainerRecord {
   id: string;
+  /** The auth.users id. Null for a trainer who has a row but has never signed in. */
+  authUserId: string | null;
   email: string;
   name: string;
   firstName: string;
@@ -29,25 +31,45 @@ export interface TrainerRecord {
   payDisplayName: string | null;
 }
 
+// PromiseLike, not Promise. supabase-js query builders are thenables that only
+// become real promises when awaited — they have no .catch/.finally — so a
+// `Promise<...>` here made every real client fail to satisfy this interface.
+// It went unnoticed while nothing imported this module; the first four call
+// sites all failed to typecheck at once.
+type Result = PromiseLike<{ data: unknown; error?: unknown }>;
+
+// What callers hand in.
+//
+// Deliberately one shallow member. A precise structural interface here is not
+// free: supabase-js clients are deeply generic, and checking one against a
+// hand-written shape made tsc give up with "type instantiation is excessively
+// deep" at some call sites and not others — a compile error that moved around
+// as unrelated files changed. The narrow shape below is what this module
+// actually uses; the cast happens once, at the boundary.
+export type AnyDb = { from: (table: string) => unknown };
+
+const q = (db: AnyDb) => db as unknown as Queryable;
+
+// Only the three methods this module actually calls. `order` was declared here
+// too, unused, and its `options?: unknown` parameter alone was enough to make
+// every real supabase client fail the check — an unused member of a structural
+// type is not free.
 interface Queryable {
   from: (t: string) => {
     select: (c: string) => {
       eq: (col: string, v: unknown) => {
-        maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
-        limit: (n: number) => Promise<{ data: unknown; error: unknown }>;
+        maybeSingle: () => Result;
+        limit: (n: number) => Result;
       };
       ilike: (col: string, v: string) => {
-        limit: (n: number) => Promise<{ data: unknown; error: unknown }>;
-      };
-      order: (col: string, o?: unknown) => {
-        limit: (n: number) => Promise<{ data: unknown; error: unknown }>;
+        limit: (n: number) => Result;
       };
     };
   };
 }
 
 const COLS =
-  "id, email, name, first_name, role, venmo_username, zelle_email, cashapp_handle, pay_phone, pay_display_name";
+  "id, auth_user_id, email, name, first_name, role, venmo_username, zelle_email, cashapp_handle, pay_phone, pay_display_name";
 
 function shape(row: Record<string, unknown> | null): TrainerRecord | null {
   if (!row) return null;
@@ -55,6 +77,7 @@ function shape(row: Record<string, unknown> | null): TrainerRecord | null {
   const role = row.role === "owner" ? "owner" : "trainer";
   return {
     id: String(row.id),
+    authUserId: (row.auth_user_id as string) ?? null,
     email: String(row.email || ""),
     name,
     // Falls back to splitting the full name so a row created without one still
@@ -75,12 +98,12 @@ const first = (data: unknown): Record<string, unknown> | null =>
 
 /** The trainer row for a signed-in auth user. Null when they are not a trainer. */
 export async function trainerForAuthUser(
-  db: Queryable,
+  db: AnyDb,
   authUserId: string | null | undefined,
   email?: string | null,
 ): Promise<TrainerRecord | null> {
   if (authUserId) {
-    const { data } = await db.from("trainers").select(COLS).eq("auth_user_id", authUserId).limit(1);
+    const { data } = await q(db).from("trainers").select(COLS).eq("auth_user_id", authUserId).limit(1);
     const row = first(data);
     if (row) return shape(row);
   }
@@ -88,7 +111,7 @@ export async function trainerForAuthUser(
   // not been stamped. Case-insensitive, because an address typed into a config
   // and an address in auth.users differ by case more often than anyone expects.
   if (email) {
-    const { data } = await db.from("trainers").select(COLS).ilike("email", email).limit(1);
+    const { data } = await q(db).from("trainers").select(COLS).ilike("email", email).limit(1);
     const row = first(data);
     if (row) return shape(row);
   }
@@ -97,15 +120,15 @@ export async function trainerForAuthUser(
 
 /** The trainer a CLIENT belongs to — whose name they see, whose Venmo they pay. */
 export async function trainerForClient(
-  db: Queryable,
+  db: AnyDb,
   clientId: string | null | undefined,
 ): Promise<TrainerRecord | null> {
   if (!clientId) return null;
-  const { data: cRows } = await db.from("clients").select("trainer_id").eq("id", clientId).limit(1);
+  const { data: cRows } = await q(db).from("clients").select("trainer_id").eq("id", clientId).limit(1);
   const c = first(cRows);
   const tid = c?.trainer_id;
   if (!tid) return null;
-  const { data } = await db.from("trainers").select(COLS).eq("id", tid).limit(1);
+  const { data } = await q(db).from("trainers").select(COLS).eq("id", tid).limit(1);
   return shape(first(data));
 }
 
@@ -114,8 +137,8 @@ export async function trainerForClient(
  * infrastructure alert goes, who a spend warning emails, which calendar the
  * shared library was built from.
  */
-export async function ownerTrainer(db: Queryable): Promise<TrainerRecord | null> {
-  const { data } = await db.from("trainers").select(COLS).eq("role", "owner").limit(1);
+export async function ownerTrainer(db: AnyDb): Promise<TrainerRecord | null> {
+  const { data } = await q(db).from("trainers").select(COLS).eq("role", "owner").limit(1);
   const row = first(data);
   if (row) return shape(row);
   return null;
@@ -132,7 +155,7 @@ export async function ownerTrainer(db: Queryable): Promise<TrainerRecord | null>
  * must degrade to the old behaviour, never to a blank where a name goes.
  */
 export async function coachFirstNameForClient(
-  db: Queryable,
+  db: AnyDb,
   clientId: string | null | undefined,
   fallback: string,
 ): Promise<string> {
@@ -146,7 +169,7 @@ export async function coachFirstNameForClient(
 
 /** The address a client's messages and alerts should reach. */
 export async function alertEmailForClient(
-  db: Queryable,
+  db: AnyDb,
   clientId: string | null | undefined,
 ): Promise<string> {
   try {
@@ -154,5 +177,47 @@ export async function alertEmailForClient(
     return t?.email || TRAINER_EMAIL;
   } catch {
     return TRAINER_EMAIL;
+  }
+}
+
+/**
+ * The auth user id an inbox message should be addressed TO for a given client.
+ *
+ * Five routes used to answer this with
+ * `trainer_settings.select("user_id").limit(1)` — "the trainer's auth user id
+ * lives in trainer_settings, the same row the calendar sync reads". That was
+ * true while trainer_settings held exactly one row. It gains a second the
+ * moment Stephanie connects her Google Calendar, at which point `limit(1)` with
+ * no ORDER BY decides, per request, which coach receives a client's escalation.
+ * The client is told "sent"; it lands in the wrong inbox.
+ *
+ * A client's own trainer is the answer, with the owner as the fallback so a
+ * client with no reachable trainer still reaches somebody.
+ */
+export async function inboxAuthUidForClient(
+  db: AnyDb,
+  clientId: string | null | undefined,
+): Promise<string | null> {
+  try {
+    const t = await trainerForClient(db, clientId);
+    if (t?.authUserId) return t.authUserId;
+  } catch {
+    // fall through to the owner
+  }
+  return ownerAuthUid(db);
+}
+
+/**
+ * The owner's auth user id — for things that belong to the BUSINESS rather than
+ * to one coach's client: the shared group chat, the birthday post, coachbot.
+ * Dustin's decision, 20 Aug: "let's keep the group chat the same. All clients
+ * can go in there since they're all going to train with Symmetry."
+ */
+export async function ownerAuthUid(db: AnyDb): Promise<string | null> {
+  try {
+    const o = await ownerTrainer(db);
+    return o?.authUserId ?? null;
+  } catch {
+    return null;
   }
 }

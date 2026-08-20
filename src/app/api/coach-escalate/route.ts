@@ -29,6 +29,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { inboxAuthUidForClient } from "@/lib/trainerResolve";
 
 export const dynamic = "force-dynamic";
 
@@ -80,12 +81,12 @@ export async function POST(req: NextRequest) {
 
   const db = createAdminClient();
 
-  // The trainer's auth user id lives in trainer_settings — the same row the
-  // calendar sync reads. Looking the trainer up as a *client* happens to work
-  // today only because Dustin also trains himself, and would break the first
-  // time it did not.
-  const { data: ts } = await db.from("trainer_settings").select("user_id").limit(1).maybeSingle();
-  const trainerUid = (ts as { user_id: string } | null)?.user_id ?? null;
+  // THIS client's own coach. It used to read trainer_settings with
+  // `.limit(1)` — "the same row the calendar sync reads" — which is one row
+  // only while one trainer has a calendar connected. With two it picks
+  // arbitrarily, and an escalation is exactly the message that must not land in
+  // a stranger's inbox: the client is told it reached their coach.
+  const trainerUid = await inboxAuthUidForClient(db, me.id);
   if (!trainerUid) {
     return NextResponse.json({ error: "Could not reach your coach right now" }, { status: 500 });
   }

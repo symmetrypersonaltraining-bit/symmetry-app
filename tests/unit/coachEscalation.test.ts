@@ -75,11 +75,27 @@ test("the route itself has no automatic trigger and no way to name someone else"
   );
 });
 
-test("the trainer is looked up in trainer_settings, not as a client", () => {
-  // Finding the trainer by searching `clients` works today only because Dustin
-  // also trains himself, and breaks the first time that is not true — silently,
-  // by delivering nowhere.
-  assert.match(ROUTE_CODE, /from\("trainer_settings"\)[\s\S]{0,80}select\("user_id"\)/);
+test("the escalation is addressed to the sender's OWN coach", () => {
+  // Two wrong ways to answer "which trainer", and this test has now pinned
+  // both — the second one as the correct answer, which is how a test ends up
+  // enforcing a bug.
+  //
+  //   Searching `clients` for the trainer works only because Dustin also trains
+  //   himself. Still wrong, still asserted against below.
+  //
+  //   Taking `trainer_settings.select("user_id").limit(1)` — what this test
+  //   REQUIRED until 20 Aug — was right while that table held one row. It holds
+  //   one per trainer with a Google Calendar connected, and Stephanie connects
+  //   hers on day one. From then on `.limit(1)` with no ORDER BY picks a coach
+  //   per request, and the client is told their message was delivered either way.
+  //
+  // The answer is the client's own trainer, resolved through `trainers`.
+  assert.match(ROUTE_CODE, /inboxAuthUidForClient\(db, me\.id\)/,
+    "the escalation no longer resolves the sender's own coach");
+  assert.ok(
+    !/from\("trainer_settings"\)[\s\S]{0,80}limit\(1\)/.test(ROUTE_CODE),
+    "back to whichever trainer_settings row sorts first",
+  );
   assert.ok(
     !/TRAINER_EMAIL[\s\S]{0,120}from\("clients"\)/.test(ROUTE_CODE),
     "the trainer is being resolved via the clients table",

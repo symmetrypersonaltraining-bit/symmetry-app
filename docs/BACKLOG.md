@@ -80,6 +80,30 @@
 > `gcal_list_connected_trainers()` returns only Dustin and her sync simply does
 > not run — no error, no half state.
 >
+> **Five more `limit(1)` trainer lookups, fixed the same day.** Every one of
+> them read `trainer_settings.select("user_id").limit(1)`, each with a comment
+> claiming that table "holds the single trainer auth user id". It holds one row
+> per trainer with a calendar connected — so all five become a coin flip the
+> moment Stephanie connects hers, and none of them error:
+>
+> | route | was | now |
+> |---|---|---|
+> | `/api/coach-escalate` | arbitrary trainer | the client's own coach |
+> | `/api/program-feedback` | arbitrary trainer | the client's own coach |
+> | `/api/cron/birthdays` | arbitrary trainer | the owner (shared group chat) |
+> | `/api/cron/coachbot` | arbitrary trainer | the owner (shared group chat) |
+> | agent `send_message` | arbitrary trainer, both branches | owner for the group, the client's coach for a DM |
+>
+> This is what `src/lib/trainerResolve.ts` was written for in `aef27de`, and it
+> had **zero importers** until now — dead code that also failed to typecheck the
+> instant anything used it (`Promise` where supabase-js returns a thenable, and
+> an unused `order` member whose `options?: unknown` alone broke assignability).
+> `tests/unit/coachEscalation.test.ts` had to be rewritten: it *required* the
+> `trainer_settings` grab, so a passing suite was enforcing the bug. Pinned by
+> `tests/unit/trainerInbox.test.ts` (10 tests) and `tests/mutate-trainer-inbox.sh`
+> — 12 mutations, 12 caught, one of which only started failing after the test's
+> fake database was taught to project the SELECT column list.
+>
 > **KNOWN NOT DONE:** the Claude trainer agent (`execTrainerTool`) still has no
 > trainer identity — it takes `(db, name, input)` and acts roster-wide, and its
 > calendar tools fall back to the owner's calendar. That is fine while Dustin is

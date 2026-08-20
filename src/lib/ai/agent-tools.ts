@@ -29,6 +29,7 @@ import { applyProposal, loadDayTree, CT_TODAY, Proposal, type WorkoutUndoStep } 
 import { assembleCoachContext, assembleTrainingContext } from "@/lib/ai/coach-context";
 import { getValidAccessToken, gcalFetch } from "@/lib/gcal";
 import { COACH_FIRST_NAME } from "../trainer";
+import { ownerAuthUid, inboxAuthUidForClient } from "@/lib/trainerResolve";
 
 // ── Read-only surface for the general query tool ────────────────────────────
 //
@@ -379,8 +380,25 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
       if (!body) return "Error: body required.";
       const isGroup = input.group === true || (!clientId && input.group !== false);
 
-      const { data: ts } = await db.from("trainer_settings").select("user_id").limit(1).maybeSingle();
-      const trainerUid = (ts as { user_id: string } | null)?.user_id;
+      // WHOSE account this is sent from. It used to be
+      // `trainer_settings.select("user_id").limit(1)` for both branches, which
+      // is one row only while one trainer has a calendar connected.
+      //
+      // The two branches want different answers. The group chat is shared by
+      // decision, so it posts as the OWNER. A direct message is from that
+      // client's own coach — sending it from the other trainer's account puts a
+      // stranger's name on it and files the thread in the wrong inbox.
+      //
+      // Written as an if/else rather than a ternary: the conditional form made
+      // tsc give up with "type instantiation is excessively deep", because both
+      // arms carry the full generic supabase client type through inference.
+      //
+      // Written as an if/else rather than a ternary: the conditional form made
+      // tsc give up with "type instantiation is excessively deep", because both
+      // arms carry the full generic supabase client type through inference.
+      let trainerUid: string | null;
+      if (isGroup) trainerUid = await ownerAuthUid(db);
+      else trainerUid = await inboxAuthUidForClient(db, clientId);
       if (!trainerUid) return "Error: trainer account not found.";
 
       if (isGroup) {

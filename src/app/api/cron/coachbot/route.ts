@@ -32,6 +32,7 @@ import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { Db } from "@/lib/ai/scope";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { ownerAuthUid } from "@/lib/trainerResolve";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -166,8 +167,13 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
 
   if (opts.dry) return { posted: false, reason: "dry run — nothing posted", message: body };
 
-  const { data: ts } = await db.from("trainer_settings").select("user_id").limit(1).maybeSingle();
-  const trainerUid = (ts as { user_id: string } | null)?.user_id;
+  // The OWNER's account, explicitly. This was
+  // `trainer_settings.select("user_id").limit(1)` — unambiguous while that
+  // table held one row, arbitrary the moment Stephanie connects her Google
+  // Calendar and it holds two. The group chat is shared by decision (Dustin,
+  // 20 Aug: "All clients can go in there since they're all going to train with
+  // Symmetry Personal Training"), so the business owner is who posts in it.
+  const trainerUid = await ownerAuthUid(db);
   if (!trainerUid) return { posted: false, reason: "no trainer account" };
 
   const { error } = await db.from("messages").insert({

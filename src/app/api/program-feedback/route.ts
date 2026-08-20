@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { inboxAuthUidForClient } from "@/lib/trainerResolve";
 
 export const dynamic = "force-dynamic";
 /**
@@ -151,14 +152,16 @@ export async function POST(req: NextRequest) {
   let delivered = false;
   if (substantive) {
     try {
-      const [{ data: ts }, { data: c }] = await Promise.all([
-        db.from("trainer_settings").select("user_id").limit(1).maybeSingle(),
+      const [trainerUid, { data: c }] = await Promise.all([
+        // THIS client's coach. It used to read trainer_settings with
+        // `.limit(1)` on the note that the table "holds the single trainer auth
+        // user id". It holds one row per trainer with a connected calendar, and
+        // there are two trainers now — so `.limit(1)` would have decided, per
+        // request, which coach receives a client's programming answer. The
+        // client is told `delivered: true` either way.
+        inboxAuthUidForClient(db, cid),
         db.from("clients").select("name, auth_user_id").eq("id", cid).maybeSingle(),
       ]);
-      // trainer_settings holds the single trainer auth user id — the same row
-      // the calendar sync reads. Looking the trainer up as a *client* would
-      // work today only because Dustin also trains himself.
-      const trainerUid = (ts as { user_id: string } | null)?.user_id ?? null;
       const from = (c as { auth_user_id: string | null } | null)?.auth_user_id ?? null;
 
       if (trainerUid && from) {
