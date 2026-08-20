@@ -116,6 +116,92 @@
 > the only one driving it; it is the piece to build when Stephanie wants to run
 > her clients through Claude herself.
 
+> ## 👉 20 Aug LATE — NO CROSSOVER: MONEY, NOTIFICATIONS, NAMES, FACES
+>
+> **`origin/main` = `57ad884`.**
+>
+> **Sixteen RLS policies still named Dustin** — including all four money tables
+> and `appointments`. Each was wrong BOTH ways: Stephanie was locked out of her
+> own clients' billing, and `is_trainer()` would have handed her Dustin's entire
+> book. All now go through `trainer_can_see_client(client_id)`. `device_tokens`
+> was `is_trainer()` for ALL commands: any trainer could read and write every
+> push token in the system. `trainer_settings` had an owner-wide policy on a
+> table holding Google refresh tokens in plaintext.
+> Probed live: she sees 1/1/1/0/0/0 of her own probe rows and the shared
+> 843-exercise library; the owner sees everything and exactly one
+> `trainer_settings` row — his own.
+>
+> **The AI agent bypasses RLS** (service role, gated on an `isTrainer` boolean).
+> `execTrainerTool` now requires a caller identity, scopes every read, fails
+> closed on unclassified tables, refuses a client not on the caller's roster,
+> and books on the caller's own calendar.
+>
+> **Seven "which coach?" lookups** — escalations, programming answers,
+> self-built-workout notices and agent DMs now reach the client's own coach;
+> group chat, birthdays, coachbot and the nudge digest stay with the owner
+> deliberately. One of them matched a trainer **by first name**, which with two
+> Gautreauxes is a coin flip dressed as a lookup.
+>
+> **A client of Stephanie's was seeing Dustin** — two photographs of him
+> (`/coach-flex.webp` ~1 session in 38, `/coach-head.webp` on every big PR), his
+> bodyweight in the "coach Dustins lifted" unit, his "DG" monogram on every
+> weekly focus card, "Dr. Gautreaux's Diagnosis", "Dustin messaged you", and a
+> privacy policy telling them their progress photos are visible to him.
+> `COACH_NAME` is ONE BUILD-TIME ENV VAR: this was never fixable by
+> configuration. `src/lib/coachIdentity.ts` + `CoachProvider` resolve the
+> viewer's coach once, server-side. The fallback is the owner's NAME and **no
+> face** — a generic name is a small wrong, another trainer's photograph is the
+> thing this prevents.
+>
+> **Every AI prompt** was a module constant evaluated at import. All are
+> functions of a coach name now, resolved per client (or per signed-in trainer
+> for the agent). `isCoachThemselves` was an email allowlist — the day
+> Stephanie joined it, her own nutrition card told the model she WAS Dustin, in
+> the masculine.
+>
+> **Two SQL migrations that existed only in prod are now in the repo.** An audit
+> could not find `p_trainer_id` anywhere while the running code passed it to
+> three RPCs and called a fourth that was not defined here.
+>
+> **NINE tests were pinning single-trainer behaviour** and had to be rewritten.
+> A green suite was enforcing the bug in every case.
+>
+> ### NEEDS DUSTIN
+> - **Stephanie must connect her own Google Calendar** (Settings → Connect).
+>   Only she can; Claude cannot perform sign-ins. Until she does her sync simply
+>   does not run — no error, no half state.
+> - **Her avatar**: send the image and it goes in `trainers.avatar_url`. That
+>   ONE column now drives the coach badge, the celebration card and her group
+>   posts — group chat used to read `clients.avatar_url`, a different column.
+> - **Read the privacy policy** (`src/app/privacy/page.tsx`). It now says "your
+>   coach", states trainers cannot see each other's clients, and discloses the
+>   owner's access explicitly — because RLS does grant it, so silence was the
+>   inaccurate version. It is a legal notice about health data.
+> - **The cartoon bot (`AiBadge`) is still global on purpose** — it means "the
+>   app wrote this", not "your coach wrote this". If her clients should see
+>   different bot art, say so; it is a separate decision from the coach face.
+> - **An owner announcement still reaches HER clients too** (full-screen, forced,
+>   no opt-out) because `trainer_can_see_client` short-circuits for the owner.
+>   Intended?
+> - **The nightly nudge digest stays owner-wide.** Splitting it per trainer is
+>   your call.
+>
+> ### KNOWN NOT DONE
+> - Trainer-FACING prompts still name the owner: `weekly-brief`,
+>   `workout-assist`, `nutrition-ai/plan-build`, `assessment-recommend`, and the
+>   `agent-tools` tool descriptions. Wrong name on her screen; no client sees
+>   them.
+> - **PWA manifest** says "…with Dustin" and offers a "Message Dustin" shortcut.
+>   One manifest per deployment — needs a dynamic route to fix.
+> - `PrankInvoice` targets `steph.rgautreaux@gmail.com`, who is now a trainer.
+>   Expired (`EXPIRES` has passed) but `?prank=1` still fires it.
+> - `exclude_from_rankings` was backfilled by the owner's email only, so her
+>   client row may appear on the client leaderboard.
+> - Claudine's 20 Aug report was checked and was **not a bug** — the move worked
+>   (`moved_from_date` 08-22 → `scheduled_date` 08-20). The empty-looking day was
+>   her own replace-then-delete. A `replaced_by` column was started for it and
+>   dropped again rather than left half-wired.
+
 > ## QUEUED — added 20 Aug, details to be locked
 >
 > - **Near-real-time calendar sync.** `trainer_settings` already has
