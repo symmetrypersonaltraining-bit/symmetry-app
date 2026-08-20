@@ -184,6 +184,48 @@ export function readNutrients(micros: unknown, flat?: Record<string, unknown> | 
   return out;
 }
 
+/**
+ * The counterpart to readNutrients: split a map into what goes in the flat
+ * legacy columns and what goes in `micros`.
+ *
+ * THE MISSING HALF. `readNutrients` has existed since the registry landed and
+ * is used everywhere; there was no writer, so every call site did the split by
+ * hand — and all but one of them only did the four legacy keys, dropping the
+ * other 29 on the floor at the moment of storage.
+ *
+ * Measured 20 Aug: of 937 meal logs in 30 days, 26 carried micronutrients on
+ * their items and ZERO had them stored. `food_catalog` holds micros for 177,584
+ * foods and sodium for 543,178. The data was reaching the log row and being
+ * discarded one step before it was written.
+ *
+ * The storage rule this enforces (see the header): NO DUAL WRITE. On
+ * food_catalog and meal_adherence_logs the four legacy keys live in their own
+ * columns and everything else lives in `micros`. Writing fibre to both is how
+ * the same fact starts disagreeing with itself.
+ */
+export interface NutrientStorage {
+  /** The four legacy keys, for the flat columns. Absent keys stay absent. */
+  legacy: NutrientMap;
+  /** Everything else, for the `micros` jsonb. Null when there is nothing. */
+  micros: NutrientMap | null;
+}
+
+export function splitNutrientsForStorage(n: NutrientMap): NutrientStorage {
+  const legacy: NutrientMap = {};
+  const micros: NutrientMap = {};
+  for (const [k, v] of Object.entries(n)) {
+    if (v == null || !isNutrientKey(k)) continue;
+    if (LEGACY_NUTRIENT_KEYS.includes(k)) legacy[k] = v;
+    else micros[k] = v;
+  }
+  return {
+    legacy,
+    // An empty object and null both mean "nothing known", and storing {} makes
+    // "we looked and found nothing" indistinguishable from "we never looked".
+    micros: Object.keys(micros).length ? micros : null,
+  };
+}
+
 /** Scale every known value by a fraction (adherence proration). */
 export function scaleNutrients(n: NutrientMap, pct: number): NutrientMap {
   const out: NutrientMap = {};

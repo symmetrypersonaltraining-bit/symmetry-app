@@ -18,14 +18,14 @@ import { startDictation } from "@/lib/dictation";
 import {
   PlanMeal, LogRow, CustomMeta, CustomItem, ItemOverrides, Macros,
   computeDayTotals, planMealMacros, customMealMacros, adherencePct,
-  customMealNutrients, hasAnyNutrient,
+  customMealNutrientMap,
   kcalOf, EXTRA_POSITIONS, INSERT_POSITION_MIN, INSERT_POSITION_MAX,
 } from "@/lib/nutrition/dailyTotals";
 import { planItemsToCustom } from "@/lib/nutrition/mealToCustom";
 import { parseFoodText, lastParseFailure, parseFailureMessage } from "@/lib/nutrition/parseClient";
 import AiBadge from "@/components/AiBadge";
 import { pickPlanForDate } from "@/lib/nutrition/resolvePlan";
-import { groupedNutrients, pctOfDaily } from "@/lib/nutrition/nutrients";
+import { groupedNutrients, pctOfDaily, splitNutrientsForStorage } from "@/lib/nutrition/nutrients";
 import Sheet from "./Sheet";
 import FoodSearchSheet from "./FoodSearchSheet";
 import ComposerSheet from "./ComposerSheet";
@@ -523,12 +523,27 @@ export default function NutritionV3Client(props: Props) {
     // Explicit values in `patch` still win (the AI path sets its own).
     const custom = (patch.item_overrides as ItemOverrides | undefined)?.__custom;
     if (custom?.items?.length && patch.est_fiber === undefined && patch.est_sodium === undefined) {
-      const nut = customMealNutrients(custom);
-      if (hasAnyNutrient(nut)) {
-        payload.est_fiber = nut.fiber == null ? null : Math.round(nut.fiber * 10) / 10;
-        payload.est_sugar = nut.sugar == null ? null : Math.round(nut.sugar * 10) / 10;
-        payload.est_sodium = nut.sodium == null ? null : Math.round(nut.sodium);
-        payload.est_sat_fat = nut.satFat == null ? null : Math.round(nut.satFat * 10) / 10;
+      // THE FULL PANEL, not four of it.
+      //
+      // This read `customMealNutrients` — a deliberate PROJECTION down to
+      // fibre/sugar/sodium/sat-fat — and wrote only those four. The other 29
+      // were computed by customMealNutrientMap, carried onto the item by the
+      // food picker (`mi:`), aggregated correctly, and then thrown away here.
+      //
+      // Measured before this change: 26 logs in 30 days had micronutrients on
+      // their items, 0 had est_micros stored. `food_catalog` holds micros for
+      // 177,584 foods. The ALL NUTRIENTS panel had nothing to show for anything
+      // logged from the catalog, because storage stopped one step short.
+      const full = customMealNutrientMap(custom);
+      const { legacy, micros } = splitNutrientsForStorage(full);
+      if (Object.keys(legacy).length || micros) {
+        // Legacy four keep their own columns; everything else goes to micros.
+        // No dual write — see the storage rule in nutrients.ts.
+        payload.est_fiber = legacy.fiber == null ? null : Math.round(legacy.fiber * 10) / 10;
+        payload.est_sugar = legacy.sugar == null ? null : Math.round(legacy.sugar * 10) / 10;
+        payload.est_sodium = legacy.sodium == null ? null : Math.round(legacy.sodium);
+        payload.est_sat_fat = legacy.sat_fat == null ? null : Math.round(legacy.sat_fat * 10) / 10;
+        payload.est_micros = micros;
       }
     }
     const { data, error } = await supabase

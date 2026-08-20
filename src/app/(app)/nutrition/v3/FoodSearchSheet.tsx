@@ -32,6 +32,12 @@ export interface CatalogFood {
   fats: number | null;
   kcal?: number | null;
   verified?: boolean | null;
+  /**
+   * Carried so a correction can keep it. Editing a scanned food saves the
+   * client's own row WITH the barcode, so the next scan of that product finds
+   * their corrected version rather than the wrong one again.
+   */
+  barcode?: string | null;
   source?: string | null; // usda | brand | restaurant | client | ...
   client_id?: string | null;
   // food_catalog has carried these since the OFF/USDA import and nothing ever
@@ -86,6 +92,7 @@ function mapRow(raw: Record<string, unknown>, fromCatalog: boolean): CatalogFood
     fats: n(raw.fats ?? raw.fat ?? raw.fat_g),
     kcal: raw.kcal != null || raw.calories != null ? n(raw.kcal ?? raw.calories) : null,
     verified: (raw.verified as boolean) ?? null,
+    barcode: (raw.barcode as string) ?? null,
     source: (raw.source as string) ?? (fromCatalog ? null : "foods"),
     client_id: (raw.created_by_client_id as string) ?? (raw.client_id as string) ?? null,
     // The legacy `foods` table has no nutrient columns at all, so these stay
@@ -146,6 +153,7 @@ export default function FoodSearchSheet({
   const [scanBusy, setScanBusy] = useState(false);
   const [scanStage, setScanStage] = useState<{ barcode: string; stage: "catalog-miss" | "off-miss" } | null>(null);
   const [pendingBarcode, setPendingBarcode] = useState<string | null>(null);
+  const [saveWarning, setSaveWarning] = useState<string | null>(null);
 
   useEffect(() => {
     let on = true;
@@ -299,10 +307,18 @@ export default function FoodSearchSheet({
     setScanStage(null);
     setScanBusy(true);
     try {
+      // THEIR correction first, the shared row second.
+      //
+      // Since 20 Aug a client can save their own version of a scanned product
+      // (see editPicked). Ordering by created_by_client_id descending puts a
+      // row with an owner ahead of the shared one, and the .eq on client scopes
+      // it to theirs — so a food they have already fixed never comes back wrong.
       const { data } = await supabase
         .from("food_catalog")
         .select("*")
         .eq("barcode", barcode)
+        .or(`created_by_client_id.eq.${clientId},created_by_client_id.is.null`)
+        .order("created_by_client_id", { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
       if (data) {
@@ -344,6 +360,43 @@ export default function FoodSearchSheet({
     setCreating(true);
   }
 
+  /**
+   * FIX THE NUMBERS ON A FOOD THAT IS ALREADY IN THE CATALOG.
+   *
+   * app_feedback 2026-08-17, client app, /nutrition: "Need to be able to edit
+   * scanned barcode foods."
+   *
+   * A scan resolves straight to the amount picker, where you can change how
+   * MUCH but not what it says the food contains. Most of the catalog is Open
+   * Food Facts — 574,632 rows, crowd-entered — so wrong macros on a scanned
+   * product are common and there was no way to correct one.
+   *
+   * The correction goes through the custom-food path that already exists,
+   * pre-filled from what was scanned, so it is SAVED rather than applied once:
+   * the next scan of that barcode finds their corrected version first. It keeps
+   * the barcode, which is what makes that true.
+   *
+   * Their row, not the shared one. Correcting a Quest bar must not rewrite it
+   * for all thirty clients — the same rule that stopped a shared meal being
+   * deleted from one person's list on 17 Aug.
+   */
+  function editPicked() {
+    if (!picked) return;
+    setPendingBarcode(picked.barcode ?? null);
+    setCf({
+      name: picked.name || "",
+      // The base serving, not the amount currently dialled in — the numbers
+      // being corrected are per-serving, and mixing the two is how a "2 Tbsp
+      // (30 g)" food ends up doubled.
+      serving: picked.serving || "1 serving",
+      p: picked.protein == null ? "" : String(picked.protein),
+      c: picked.carbs == null ? "" : String(picked.carbs),
+      f: picked.fats == null ? "" : String(picked.fats),
+    });
+    setPicked(null);
+    setCreating(true);
+  }
+
   // Save a food you typed yourself, then hand it to the SAME amount picker every
   // searched food goes through.
   //
@@ -363,9 +416,10 @@ export default function FoodSearchSheet({
     if (!cf.name.trim() || p + c + f === 0) return;
     setBusy(true);
     let id: string | null = null;
+    setSaveWarning(null);
     let saved: Record<string, unknown> | null = null;
     try {
-      const { data } = await supabase
+      const { data, error: insErr } = await supabase
         .from("food_catalog")
         .insert({
           created_by_client_id: clientId,
@@ -379,9 +433,20 @@ export default function FoodSearchSheet({
         })
         .select()
         .single();
+      // supabase-js resolves {data, error} rather than throwing, so this catch
+      // never fired for a refusal — a duplicate barcode, an RLS denial, a
+      // constraint. The food was logged locally and the client believed it was
+      // saved to their catalog. It was not, and the next scan brought back the
+      // same wrong numbers.
+      if (insErr) throw insErr;
       saved = (data as Record<string, unknown> | null) ?? null;
       id = (data as { id?: string } | null)?.id ?? null;
-    } catch { /* catalog not ready — still log the item locally */ }
+    } catch (e) {
+      // Still log the item locally — losing the entry as well would be worse —
+      // but do not pretend it was saved.
+      console.error("saveCustomFood", e);
+      setSaveWarning("Logged for today, but couldn't save it to your foods.");
+    }
     setBusy(false);
     setPendingBarcode(null);
     if (saved && id) {
@@ -606,6 +671,9 @@ export default function FoodSearchSheet({
           <button onClick={() => pickItem(picked, mult)} disabled={amtNum <= 0} className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)", opacity: amtNum > 0 ? 1 : 0.5 }}>
             Add it ✓
           </button>
+          <button onClick={editPicked} className="w-full mt-2 py-2.5 rounded-2xl text-sm font-semibold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)", background: "transparent" }}>
+            These numbers look wrong — fix them
+          </button>
           <button onClick={() => setPicked(null)} className="w-full mt-2 py-2.5 rounded-2xl text-sm font-semibold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)", background: "transparent" }}>
             ‹ Back to search
           </button>
@@ -614,7 +682,12 @@ export default function FoodSearchSheet({
 
       {creating && (
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Create custom food — saved to your catalog</p>
+          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>
+            {pendingBarcode ? "Fix these numbers — saved as your own copy" : "Create custom food — saved to your catalog"}
+          </p>
+          {saveWarning && (
+            <p className="text-xs mb-2" style={{ color: "#f59e0b" }}>{saveWarning}</p>
+          )}
           <input value={cf.name} onChange={(e) => setCf({ ...cf, name: e.target.value })} placeholder="Food name — e.g. Mom's meatloaf" style={{ ...inputStyle, marginBottom: 8 }} />
           <input value={cf.serving} onChange={(e) => setCf({ ...cf, serving: e.target.value })} placeholder="Serving — e.g. 1 slice" style={{ ...inputStyle, marginBottom: 8 }} />
           <div className="grid grid-cols-3 gap-2">
