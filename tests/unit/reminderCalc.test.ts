@@ -94,7 +94,8 @@ test("flat billing with no fee on file BLOCKS", () => {
 test("flat billing surfaces cancels as reference only", () => {
   const r = calcReminder(base({ billingType: "flat", fee: 300, cancelledFull: 2, draftAmount: 300 }));
   assert.equal(r.expected, 300);
-  assert.ok(r.warnings.some((w) => w.includes("full fee billed")));
+  assert.ok(r.warnings.some((w) => w.includes("the full rate is billed")),
+    "Tyler, Robert and Bobbie meet Dustin on the calendar and it must never move their rate");
 });
 
 test("billing_type='none' returns not-applicable and never blocks", () => {
@@ -267,4 +268,134 @@ test("a sent reminder still shows the message the client sees", () => {
   // line vanished from the very screen that gets screenshotted TO the client.
   assert.match(EDITOR, /\{sent && r\.sms_message && \(/,
     "the client-facing message is invisible once the reminder is sent");
+});
+
+// ─── THE RULE, 20 Aug 2026 ──────────────────────────────────────────────────
+//
+// Dustin: "$640 for 2 x a week, their monthly on due date is $640 minus any
+// cancelled sessions based on that monthly rate divided by the number of
+// sessions (8) in this case. cancelled sessions are only to be deducted when i
+// mark them cancelled (orange) in my gcal."
+//
+// Every fixture below is a real client's real numbers.
+
+const adj = (over: Partial<ReminderCalcInput> = {}): ReminderCalcInput =>
+  base({ billingType: "monthly_adjusted", ...over });
+
+test("Grant Weever: $640, four cancelled at $80, pays $320", () => {
+  const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 4, sessionsTrained: 5, draftAmount: 320 }));
+  assert.equal(r.expected, 320);
+  assert.equal(r.cancelDeduction, 320);
+  assert.equal(r.baseRate, 640);
+  assert.deepEqual(r.blocking, []);
+});
+
+test("sessions TRAINED never move the amount", () => {
+  // Stacie trained 9 against an 8-session rate. The old rule billed her $720.
+  const nine = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 0, sessionsTrained: 9, draftAmount: 640 }));
+  const five = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 0, sessionsTrained: 5, draftAmount: 640 }));
+  assert.equal(nine.expected, 640, "training extra sessions charged the client more");
+  assert.equal(five.expected, 640, "training fewer sessions with no cancellation reduced the bill");
+});
+
+test("Hassan Kareem: $990, five cancelled at $82.50, pays $577.50", () => {
+  const r = calcReminder(adj({ fee: 990, sessionRate: 82.5, expectedSessions: 12,
+    cancelledFull: 5, sessionsTrained: 6, draftAmount: 577.5 }));
+  assert.equal(r.expected, 577.5);
+});
+
+test("nobody cancelling pays the rate exactly", () => {
+  const r = calcReminder(adj({ fee: 900, sessionRate: 75, expectedSessions: 12,
+    cancelledFull: 0, sessionsTrained: 12, draftAmount: 900 }));
+  assert.equal(r.expected, 900);
+  assert.equal(r.cancelDeduction, 0);
+});
+
+test("deductions can never take a bill below zero", () => {
+  const r = calcReminder(adj({ fee: 350, sessionRate: 87.5, expectedSessions: 4,
+    cancelledFull: 6, sessionsTrained: 0, draftAmount: 0 }));
+  assert.equal(r.expected, 0, "a negative invoice is not a thing");
+  assert.ok(r.warnings.some((w) => /exceed the rate/.test(w)),
+    "six cancels against a four-session rate has to say something");
+});
+
+// ─── half price while he is away ────────────────────────────────────────────
+//
+// "only time i will bill half price is when im on vacation and i am going to
+// train them from the app. this will be done manually so ill need an option
+// for that somehow."
+
+test("a remote session at half price takes off half the session rate", () => {
+  const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 0, halfPriceSessions: 2, sessionsTrained: 8, draftAmount: 560 }));
+  assert.equal(r.halfPriceDeduction, 80);
+  assert.equal(r.expected, 560);
+});
+
+test("half price and cancellations both come off", () => {
+  const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 1, halfPriceSessions: 2, sessionsTrained: 5, draftAmount: 480 }));
+  assert.equal(r.cancelDeduction, 80);
+  assert.equal(r.halfPriceDeduction, 80);
+  assert.equal(r.expected, 480);
+});
+
+test("half price is never applied on its own", () => {
+  // It is manual by design. Zero unless Dustin sets it.
+  const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 0, sessionsTrained: 8, draftAmount: 640 }));
+  assert.equal(r.halfPriceDeduction, 0);
+});
+
+// ─── the three numbers have to agree with each other ────────────────────────
+
+test("a rate that does not divide into the session count is flagged", () => {
+  // Madeleine Coker's $75 session rate ended up in the monthly fee field. The
+  // row still calculated cleanly; it was simply the wrong $75.
+  const r = calcReminder(adj({ fee: 75, sessionRate: 75, expectedSessions: 8,
+    cancelledFull: 0, sessionsTrained: 0, draftAmount: 75 }));
+  assert.ok(r.warnings.some((w) => /sessions, but 8 are set/.test(w)));
+});
+
+test("rates that do agree say nothing", () => {
+  const r = calcReminder(adj({ fee: 990, sessionRate: 82.5, expectedSessions: 12,
+    cancelledFull: 0, sessionsTrained: 12, draftAmount: 990 }));
+  assert.ok(!r.warnings.some((w) => /are set/.test(w)));
+});
+
+// ─── blocking ───────────────────────────────────────────────────────────────
+
+test("no session rate blocks, because the deduction cannot be worked out", () => {
+  const r = calcReminder(adj({ fee: 640, sessionRate: null, expectedSessions: 8,
+    cancelledFull: 3, draftAmount: 640 }));
+  assert.ok(r.blocking.some((b) => /session rate/.test(b)),
+    "without a rate this would silently bill the full $640 for a month with three cancels");
+});
+
+test("no monthly rate blocks", () => {
+  const r = calcReminder(adj({ fee: null, sessionRate: 80, expectedSessions: 8, draftAmount: 0 }));
+  assert.ok(r.blocking.some((b) => /monthly rate/.test(b)));
+});
+
+test("paid_by_other is not billed and never blocks", () => {
+  const r = calcReminder(base({ billingType: "paid_by_other", fee: null, sessionRate: null, draftAmount: 350 }));
+  assert.equal(r.notApplicable, true);
+  assert.deepEqual(r.blocking, []);
+});
+
+test("an override still downgrades the mismatch to a warning", () => {
+  const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 0, draftAmount: 450, override: true }));
+  assert.deepEqual(r.blocking, []);
+  assert.ok(r.warnings.some((w) => /OVERRIDDEN/.test(w)));
+});
+
+test("the mismatch message explains the rule, not a session count", () => {
+  const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 2, sessionsTrained: 6, draftAmount: 999 }));
+  assert.ok(r.blocking.some((b) => /\$640 less 2 cancelled x \$80/.test(b)),
+    "a blocked amount has to say what the right number was made of");
 });
