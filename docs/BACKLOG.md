@@ -1,8 +1,8 @@
 # Backlog — the single work queue
 
-> ## 👉 20 Aug — BILLING REBUILT, MULTI-TRAINER STARTED
+> ## 👉 20 Aug — BILLING REBUILT, STEPHANIE IS A TRAINER
 >
-> **`origin/main` = `1464195`.** Everything below shipped today.
+> **`origin/main` = `<this commit>`.** Everything below shipped today.
 >
 > **Billing rebuilt end to end.** Dustin's rule, his words: *"$640 for 2 x a week,
 > their monthly on due date is $640 minus any cancelled sessions based on that
@@ -32,12 +32,59 @@
 > despite 26 carrying them on their items), and a scanned barcode food can be
 > corrected.
 >
-> **MULTI-TRAINER PHASES 1–2 ARE IN THE DATABASE.** Ownership + RLS. See
+> **MULTI-TRAINER IS LIVE — Stephanie is a trainer.** Ownership + RLS (phases
+> 1–2), then her own clients, her own name on coach messages, her own money
+> (phases 3–7), then her own calendar (phase 8, below). See
 > `claude/PLAN-SECOND-TRAINER.md` and `claude/PLAN-SECOND-TRAINER-DECISIONS.md`.
-> Verified four ways against a throwaway second trainer: she saw 0 clients and
-> the full 843-exercise shared library; given one client she saw exactly that
-> one; the owner still sees all 35. 41 policies scoped.
-> **Stephanie's email is NOT in TRAINER_EMAILS yet — phases 3–8 first.**
+> RLS verified four ways against a throwaway second trainer: she saw 0 clients
+> and the full 843-exercise shared library; given one client she saw exactly
+> that one; the owner still sees all 35. 41 policies scoped. Her trainer row
+> reuses the client account she already had, so she switches trainer ↔ client
+> view exactly like Dustin does.
+>
+> **Calendar sync is now per trainer.** Three things were load-bearing on "there
+> is exactly one trainer", and every one of them fails silently:
+>
+> | | was | now |
+> |---|---|---|
+> | `gcal_get_tokens()` | `LIMIT 1`, no `ORDER BY` — an arbitrary Google account | takes `p_user_id`; owner-first when omitted, so the default is deterministic |
+> | `gcal_get_clients()` | the whole roster — Dustin's calendar could match "Sarah" to one of Stephanie's clients and bill it to the wrong trainer | takes `p_trainer_id`; "unique first name" now means unique *within that trainer's roster* |
+> | `gcal_reconcile_*()` | deletes future rows absent from the seen-event list — trainer A's list does not contain trainer B's events, so A's first run would delete B's entire future schedule, and the "more than half the window" guard would NOT fire because from A's side the deletion looks legitimate | takes `p_trainer_id` |
+>
+> `/api/gcal-sync` runs the fetch/match/write body once per connected trainer,
+> sequentially (each pass can write thousands of rows inside a 60s budget), and
+> one trainer's dead credential no longer aborts the other's sync. The
+> whole-table `gcal_clear_appointments()` and the three roster-wide recalcs run
+> ONCE, outside the loop. `synced`/`payments` stay at the top level because
+> `GcalSyncButton` and the Settings buttons read them.
+>
+> Scoping is a **no-op today** and that was checked against live data before it
+> shipped, not assumed: 465 future appointments and 698 payment rows in the
+> window, identical unscoped and scoped to Dustin. `clients.trainer_id` is NOT
+> NULL, so no row can fall out of every trainer's scope.
+>
+> Two more single-tenant footguns found on the way and fixed:
+> - **Disconnect revoked the wrong grant.** It read tokens unqualified but
+>   cleared `.eq('user_id', user.id)`. Stephanie pressing Disconnect would have
+>   revoked DUSTIN's Google grant at Google and cleared her own empty row — his
+>   sync dead, the database still saying he was connected.
+> - **Schedule actions patched the wrong calendar.** `updateGCalEvent`,
+>   `setGCalEventColor` and `deleteGCalEvent` all edited "the trainer's"
+>   calendar unqualified. They now name the signed-in viewer.
+>
+> Pinned by `tests/unit/gcalMultiTrainer.test.ts` (12 tests) and
+> `tests/mutate-gcal-multitrainer.sh` — 15 mutations, 15 caught.
+>
+> **STILL NEEDS STEPHANIE, and only she can do it:** connect her Google Calendar
+> at Settings → Connect. Claude cannot perform sign-ins. Until she does,
+> `gcal_list_connected_trainers()` returns only Dustin and her sync simply does
+> not run — no error, no half state.
+>
+> **KNOWN NOT DONE:** the Claude trainer agent (`execTrainerTool`) still has no
+> trainer identity — it takes `(db, name, input)` and acts roster-wide, and its
+> calendar tools fall back to the owner's calendar. That is fine while Dustin is
+> the only one driving it; it is the piece to build when Stephanie wants to run
+> her clients through Claude herself.
 
 > ## QUEUED — added 20 Aug, details to be locked
 >

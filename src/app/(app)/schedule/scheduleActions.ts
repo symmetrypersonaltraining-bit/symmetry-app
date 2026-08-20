@@ -2,6 +2,25 @@
 import { createClient } from '@/lib/supabase/server';
 import { getValidAccessToken, gcalFetch } from '@/lib/gcal';
 
+// WHOSE calendar this action edits.
+//
+// These three actions move, recolour and delete events on "the trainer's"
+// Google Calendar. That was unambiguous while there was one trainer. It is not
+// any more: an unqualified getValidAccessToken() returns the owner's
+// credentials, so Stephanie dragging one of HER sessions in the schedule would
+// have patched an event id against DUSTIN's calendar — a 404 if he has no such
+// event, and a silent edit of a stranger's session if the ids ever collided.
+//
+// The signed-in user is the calendar being edited. Returns undefined when
+// there is no session, which falls back to the owner exactly as before rather
+// than throwing on a path that used to work.
+async function viewerCalendarUserId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<string | undefined> {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id;
+}
+
 export async function updateGCalEvent(params: {
   appointmentId: string;
   gcalEventId: string;
@@ -12,7 +31,7 @@ export async function updateGCalEvent(params: {
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient();
-    const { token } = await getValidAccessToken();
+    const { token } = await getValidAccessToken(await viewerCalendarUserId(supabase));
 
     const patch: Record<string, unknown> = {};
     if (params.title !== undefined) patch.summary = params.title;
@@ -73,7 +92,7 @@ export async function setGCalEventColor(params: {
       .maybeSingle();
     const eventId = (appt as { gcal_event_id?: string } | null)?.gcal_event_id;
     if (!eventId) return { success: true, skipped: true };
-    const { token } = await getValidAccessToken();
+    const { token } = await getValidAccessToken(await viewerCalendarUserId(supabase));
     await gcalFetch(token, `/calendars/primary/events/${eventId}`, {
       method: 'PATCH',
       body: JSON.stringify({ colorId: params.colorId }),
@@ -91,7 +110,7 @@ export async function deleteGCalEvent(params: {
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient();
-    const { token } = await getValidAccessToken();
+    const { token } = await getValidAccessToken(await viewerCalendarUserId(supabase));
 
     const eventId = params.deleteSeries
       ? params.gcalEventId.split('_')[0]

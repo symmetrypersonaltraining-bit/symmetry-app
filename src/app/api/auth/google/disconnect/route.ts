@@ -44,7 +44,13 @@ export async function POST() {
     }
 
     const sb = service();
-    const { data: rows, error: rpcErr } = await sb.rpc('gcal_get_tokens');
+    // THE CALLER'S OWN TOKENS, explicitly. This read used to take no argument,
+    // which resolved to whichever trainer_settings row came back first. With a
+    // second trainer on the roster that is a live footgun: Stephanie tapping
+    // Disconnect would revoke DUSTIN's Google grant at Google, then clear her
+    // own (empty) row — his calendar sync dead, the database still claiming he
+    // is connected. Revoke and clear must name the same person.
+    const { data: rows, error: rpcErr } = await sb.rpc('gcal_get_tokens', { p_user_id: user.id });
     if (rpcErr) {
       return NextResponse.json({ ok: false, error: 'Could not read tokens: ' + rpcErr.message }, { status: 500 });
     }

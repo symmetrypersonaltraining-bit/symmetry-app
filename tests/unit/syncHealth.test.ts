@@ -32,7 +32,10 @@ test("code() strips comments and keeps code", () => {
 test("a narrow run covers a quarter ahead, a full run two years", () => {
   assert.match(code(ROUTE), /const narrow = body\.window === "narrow";/,
     "there is no narrow mode, so an hourly sync would pull two years every hour");
-  assert.match(code(ROUTE), /\(narrow \? 90 : 730\)/,
+  // `opts.` is permitted because the sync body became a per-trainer function on
+  // 2026-08-20 and the flag is passed in rather than closed over. The assertion
+  // is unchanged in what it guards: the ternary, and both of its numbers.
+  assert.match(code(ROUTE), /\((?:opts\.)?narrow \? 90 : 730\)/,
     "the window does not change with the mode");
 });
 

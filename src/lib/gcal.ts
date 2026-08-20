@@ -37,10 +37,21 @@ function getServiceClient() {
   );
 }
 
-export async function getValidAccessToken(): Promise<{ token: string; userId: string }> {
+// `userId` names WHOSE calendar. It is optional because most callers only ever
+// meant "the trainer's calendar", back when there was exactly one of those.
+//
+// With two trainers connected, omitting it used to mean `LIMIT 1` with no
+// ORDER BY — an arbitrary Google account, and therefore silently the wrong
+// calendar on some runs and not others. gcal_get_tokens now orders owner-first,
+// so the no-argument call is deterministic: it is Dustin's calendar, always.
+// Anything that acts on behalf of a specific trainer must pass their auth user
+// id rather than rely on that default.
+export async function getValidAccessToken(userId?: string): Promise<{ token: string; userId: string }> {
   const supabase = getServiceClient();
 
-  const { data: rows, error: rpcErr } = await supabase.rpc('gcal_get_tokens');
+  const { data: rows, error: rpcErr } = await supabase.rpc('gcal_get_tokens', {
+    p_user_id: userId ?? null,
+  });
   const settings = Array.isArray(rows) ? rows[0] : null;
 
   if (rpcErr) throw new Error('Failed to load tokens: ' + rpcErr.message);

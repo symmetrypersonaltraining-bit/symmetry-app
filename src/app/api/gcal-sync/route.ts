@@ -49,6 +49,295 @@ function getServiceClient() {
   );
 }
 
+// ── ONE CALENDAR, ONE TRAINER ───────────────────────────────────────────────
+//
+// Everything below used to run exactly once, against "the" Google Calendar and
+// "the" client roster, because there was only ever one of each. Stephanie ends
+// that. The body is unchanged in what it does; it now does it for a named
+// trainer, and the route runs it once per connected trainer.
+//
+// The three places where "there is only one trainer" was load-bearing:
+//
+//   getValidAccessToken()  picked an arbitrary trainer_settings row.
+//   gcal_get_clients()     returned the WHOLE roster, so Dustin's calendar
+//                          could match "Sarah" to one of Stephanie's clients
+//                          and bill the session to the wrong trainer.
+//   gcal_reconcile_*()     deletes future rows absent from p_seen_ids. Trainer
+//                          A's event list does not contain trainer B's events,
+//                          so unscoped, A's sync would delete B's entire future
+//                          schedule on its first run.
+//
+// Each of those now takes a scope. With one connected trainer who owns every
+// client row, the scoped result is identical to the unscoped one — verified
+// against live data before this shipped (465 appointments and 698 payment rows
+// in the window, both ways).
+type ConnectedTrainer = {
+  user_id: string;
+  trainer_id: string | null;
+  trainer_name: string;
+  is_owner: boolean;
+};
+
+type TrainerSyncResult = {
+  trainer: string;
+  synced: number;
+  payments: number;
+  reconciled: number;
+  reconciled_payments: number;
+  unmatched: number;
+  unmatched_samples: string[];
+  total: number;
+  dollar_events: number;
+  client_dollar: number;
+  errors: string[];
+  skipped?: string;
+};
+
+function emptyResult(name: string, skipped: string): TrainerSyncResult {
+  return {
+    trainer: name, synced: 0, payments: 0, reconciled: 0, reconciled_payments: 0,
+    unmatched: 0, unmatched_samples: [], total: 0, dollar_events: 0,
+    client_dollar: 0, errors: [], skipped,
+  };
+}
+
+async function syncOneCalendar(
+  supabase: ReturnType<typeof getServiceClient>,
+  trainer: ConnectedTrainer,
+  opts: { narrow: boolean; resetHappened: boolean },
+): Promise<TrainerSyncResult> {
+  const who = trainer.trainer_name || trainer.user_id;
+  const { token } = await getValidAccessToken(trainer.user_id);
+
+  const { data: clientRows, error: clientErr } = await supabase.rpc('gcal_get_clients', {
+    p_trainer_id: trainer.trainer_id,
+  });
+  if (clientErr) throw new Error('clients: ' + clientErr.message);
+  const clients = clientRows as Array<{ id: string; name: string }> | null;
+  // No clients is not an error for a trainer who has not been given any yet —
+  // it is Stephanie's state on day one. Skipping her leaves Dustin's run alone;
+  // failing the request would have taken his sync down with her.
+  if (!clients?.length) return emptyResult(who, 'no clients assigned');
+
+  const clientMap = clients.map((c: { id: string; name: string }) => {
+    const parts = (c.name || '').toLowerCase().split(/\s+/).filter(Boolean);
+    return {
+      id: c.id,
+      name: (c.name || '').toLowerCase(),
+      first: parts[0] || '',
+      last: parts.length > 1 ? parts[parts.length - 1] : '',
+    };
+  });
+
+  // Word-boundary test, regex-escaped (names can contain punctuation).
+  const hasWord = (s: string, t: string) =>
+    t.length > 1 && new RegExp('\\b' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(s);
+
+  // Match an event title to a client by the strongest, least-ambiguous signal:
+  //   full name > first AND last both present > a UNIQUE last name > a UNIQUE first name.
+  // Last name outranks a bare first-name match so "Robert Burns" resolves to
+  // "Robby Burns" (shared last name) instead of "Robert Miller" (shared first name).
+  // When a signal is ambiguous (matches >1 client), fall through rather than mis-guess.
+  //
+  // "Unique" now means unique WITHIN THIS TRAINER'S ROSTER, which is stricter in
+  // the way that matters: two trainers can each have a Sarah without either
+  // calendar becoming ambiguous, and neither can claim the other's.
+  function matchClient(summary: string): string | null {
+    const s = (summary || '').toLowerCase();
+    const full = clientMap.find(c => c.name.length > 0 && s.includes(c.name));
+    if (full) return full.id;
+    const both = clientMap.filter(c => c.first && c.last && hasWord(s, c.first) && hasWord(s, c.last));
+    if (both.length === 1) return both[0].id;
+    const byLast = clientMap.filter(c => c.last.length > 2 && hasWord(s, c.last));
+    if (byLast.length === 1) return byLast[0].id;
+    const byFirst = clientMap.filter(c => c.first.length > 2 && hasWord(s, c.first));
+    if (byFirst.length === 1) return byFirst[0].id;
+    return null;
+  }
+
+  // ── WINDOW ────────────────────────────────────────────────────────────
+  //
+  // A full run pulls two years of events — ~6,500 of them, ~4,000 upserts,
+  // up to 55 seconds. That cost is why the schedule was cut from every 15
+  // minutes to twice a day on 1 Aug, and twice a day is what Dustin
+  // experiences as "my manual sync isn't picking up everything": anything he
+  // changes during the workday is invisible until 4am.
+  //
+  // Almost nothing that changes is two years out. A NARROW run covers the
+  // month behind and the quarter ahead — the range where sessions actually
+  // move, get cancelled, or get booked — and is small enough to run hourly.
+  // The full window still runs twice a day so the far future stays correct.
+  //
+  // The behind-edge is 35 days, not 30. A monthly billing cycle opens at
+  // due_date - 1 month - 7 days = up to 37 days back, so a 30-day floor left
+  // a week at the start of every cycle that billing reads and the sync could
+  // no longer correct.
+  const now = new Date();
+  const timeMin = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000).toISOString();
+  const timeMax = new Date(
+    now.getTime() + (opts.narrow ? 90 : 730) * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  let allEvents: Array<Record<string, any>> = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({ timeMin, timeMax, singleEvents: 'true', maxResults: '500', orderBy: 'startTime' });
+    if (pageToken) params.set('pageToken', pageToken);
+    const data = await gcalFetch(token, '/calendars/primary/events?' + params.toString());
+    allEvents = allEvents.concat(data.items || []);
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  const appointmentBatch: any[] = [];
+  const paymentBatch: any[] = [];
+  let unmatched = 0;
+  const unmatchedSamples: string[] = [];
+
+  for (const event of allEvents) {
+    const colorId = event.colorId || null;
+    const summary = event.summary || '';
+    const isPayment = colorId === COLOR_PAYMENT || /\$\s?\d/.test(summary);
+    // The colour filter that used to sit here dropped every event carrying an
+    // explicit colour other than cancelled/half — Peacock, Blueberry, anything
+    // Dustin had tinted for his own reasons. Under the sessions-trained rule a
+    // dropped event is an UNBILLED SESSION, so the filter is gone entirely:
+    // a session is a session whatever colour it happens to be.
+    // COLOR_CANCELLED / COLOR_HALF still decide status below, untouched.
+
+    const clientId = matchClient(summary);
+    if (!clientId) {
+      // ── WHAT GETS SILENTLY DROPPED ──────────────────────────────────────
+      //
+      // This was a bare `continue`. No counter, no log, no error. On today's
+      // roster 1,975 of 6,545 events matched nothing and vanished — mostly
+      // Dustin's own diary, which is fine, but a mistyped client name lands
+      // in exactly the same bucket and is indistinguishable from it.
+      //
+      // Live examples from this week, all rescued only by luck: "Sarah
+      // Prince" (client is Sara — matched on surname alone), "Chris Latham"
+      // (Christine), "Krysta  Ruiz-Schnitzler" (double space defeats the
+      // full-name test). A second Prince on the roster and the session is
+      // gone with no error anywhere.
+      //
+      // Counting them is the cheap half. A sample of the titles is what makes
+      // the count actionable — 1,975 is a number, "Sarah Prince" is a fix.
+      unmatched += 1;
+      if (unmatchedSamples.length < 40 && summary.trim()) {
+        const t = summary.trim();
+        if (!unmatchedSamples.includes(t)) unmatchedSamples.push(t);
+      }
+      continue;
+    }
+
+    // Business rules: Steph's paycheck is NEVER a client payment; Gerard and Dustin are never billed.
+    const PAYMENT_EXCLUDED_CLIENTS = ['d970da5e-9c46-45c4-be9c-e27e1893b575', '69021074-1708-4d73-9245-918862048709'];
+    if (isPayment && (/paycheck/i.test(summary) || PAYMENT_EXCLUDED_CLIENTS.includes(clientId))) continue;
+
+    if (isPayment) {
+      const payDate = event.start?.date || event.start?.dateTime?.split('T')[0];
+      if (!payDate) continue;
+      paymentBatch.push({ client_id: clientId, title: summary, payment_date: payDate, google_event_id: event.id, source: 'gcal_sync' });
+      continue;
+    }
+
+    if (!event.start?.dateTime) continue;
+    appointmentBatch.push({
+      client_id: clientId,
+      scheduled_at: event.start.dateTime,
+      ends_at: event.end?.dateTime || '',
+      status: colorId === COLOR_CANCELLED ? 'cancelled_client' : (colorId === COLOR_HALF ? 'cancelled_half' : 'scheduled'),
+      gcal_event_id: event.id,
+      gcal_recurring_id: event.recurringEventId || '',
+      title: summary,
+      source: 'gcal',
+    });
+  }
+
+  let synced = 0;
+  let payments = 0;
+  const errors: string[] = [];
+
+  if (appointmentBatch.length > 0) {
+    const { data: r, error: e } = await supabase.rpc('gcal_sync_appointments', { p_appointments: appointmentBatch });
+    if (e) errors.push('appts: ' + e.message);
+    else { synced = (r as any)?.synced || 0; ((r as any)?.errors || []).forEach((x: string) => errors.push(x)); }
+  }
+
+  if (paymentBatch.length > 0) {
+    const { data: r, error: e } = await supabase.rpc('gcal_sync_payments', { p_payments: paymentBatch });
+    if (e) errors.push('pays: ' + e.message);
+    else { payments = (r as any)?.synced || 0; }
+  }
+
+  // Reconcile: remove FUTURE app rows whose GCal event vanished (deleted event
+  // or ended/shortened recurrence). Only on a full, healthy fetch (not a manual
+  // reset, and enough events came back) so a transient auth blip can never wipe
+  // the schedule. Deletes are self-healing — a still-live event re-inserts on the
+  // next sync via the upsert above.
+  //
+  // p_trainer_id is what keeps this honest across two calendars: without it,
+  // every row belonging to the OTHER trainer is "not in p_seen_ids" and gets
+  // deleted. Passing null (a trainer with no trainers row) keeps the old
+  // whole-table behaviour, which is only correct while there is one of them.
+  let reconciled = 0;
+  if (!opts.resetHappened && allEvents.length >= 50) {
+    const seenIds = allEvents.map((e: any) => e.id).filter(Boolean);
+    const { data: rc, error: rcErr } = await supabase.rpc('gcal_reconcile_appointments', {
+      p_seen_ids: seenIds,
+      p_time_min: timeMin,
+      p_time_max: timeMax,
+      p_trainer_id: trainer.trainer_id,
+    });
+    if (rcErr) errors.push('reconcile: ' + rcErr.message);
+    else {
+      reconciled = (rc as any)?.removed || 0;
+      // The reconcile can now REFUSE — it returns a `skipped` reason rather
+      // than deleting when more than half the window would disappear, which
+      // is a bad fetch and not a bad calendar. A refusal that nobody sees is
+      // the same as no guard at all.
+      const skipped = (rc as any)?.skipped;
+      if (skipped) errors.push('reconcile_skipped: ' + skipped);
+    }
+  }
+
+  // Payments reconcile: same safe pattern as appointments — remove FUTURE
+  // gcal-synced payment rows whose event vanished, so a deleted calendar
+  // payment can't linger as a phantom upcoming charge. Self-healing.
+  let reconciledPayments = 0;
+  if (!opts.resetHappened && allEvents.length >= 50) {
+    const seenPayIds = allEvents.map((e: any) => e.id).filter(Boolean);
+    const { data: rcp, error: rcpErr } = await supabase.rpc('gcal_reconcile_payments', {
+      p_seen_ids: seenPayIds,
+      p_time_min: timeMin,
+      p_time_max: timeMax,
+      p_trainer_id: trainer.trainer_id,
+    });
+    if (rcpErr) errors.push('reconcile_payments: ' + rcpErr.message);
+    else {
+      reconciledPayments = (rcp as any)?.removed || 0;
+      const skippedP = (rcp as any)?.skipped;
+      if (skippedP) errors.push('reconcile_payments_skipped: ' + skippedP);
+    }
+  }
+
+  const dollarEvents = allEvents.filter((e: any) => /\$\s?\d/.test(e.summary || ''));
+  const clientDollar = dollarEvents.filter((e: any) => matchClient(e.summary || ''));
+
+  return {
+    trainer: who,
+    synced,
+    payments,
+    reconciled,
+    reconciled_payments: reconciledPayments,
+    unmatched,
+    unmatched_samples: unmatchedSamples,
+    total: allEvents.length,
+    dollar_events: dollarEvents.length,
+    client_dollar: clientDollar.length,
+    errors,
+  };
+}
+
 export async function POST(req: NextRequest) {
   // POST had no auth of its own. GET was hardened in a691c73 while this sat
   // open: a route that writes appointments, payment rows AND now recalculates
@@ -69,208 +358,55 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const resetFirst = body.reset === true;
+  const narrow = body.window === "narrow";
 
   try {
-    const { token } = await getValidAccessToken();
     const supabase = getServiceClient();
 
-    const { data: clientRows } = await supabase.rpc('gcal_get_clients');
-    const clients = clientRows as Array<{id: string; name: string}> | null;
-    if (!clients?.length) return NextResponse.json({ error: 'No clients found' }, { status: 500 });
-
-    const clientMap = clients.map((c: any) => {
-      const parts = (c.name || '').toLowerCase().split(/\s+/).filter(Boolean);
-      return {
-        id: c.id,
-        name: (c.name || '').toLowerCase(),
-        first: parts[0] || '',
-        last: parts.length > 1 ? parts[parts.length - 1] : '',
-      };
-    });
-
-    // Word-boundary test, regex-escaped (names can contain punctuation).
-    const hasWord = (s: string, t: string) =>
-      t.length > 1 && new RegExp('\\b' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(s);
-
-    // Match an event title to a client by the strongest, least-ambiguous signal:
-    //   full name > first AND last both present > a UNIQUE last name > a UNIQUE first name.
-    // Last name outranks a bare first-name match so "Robert Burns" resolves to
-    // "Robby Burns" (shared last name) instead of "Robert Miller" (shared first name).
-    // When a signal is ambiguous (matches >1 client), fall through rather than mis-guess.
-    function matchClient(summary: string): string | null {
-      const s = (summary || '').toLowerCase();
-      const full = clientMap.find(c => c.name.length > 0 && s.includes(c.name));
-      if (full) return full.id;
-      const both = clientMap.filter(c => c.first && c.last && hasWord(s, c.first) && hasWord(s, c.last));
-      if (both.length === 1) return both[0].id;
-      const byLast = clientMap.filter(c => c.last.length > 2 && hasWord(s, c.last));
-      if (byLast.length === 1) return byLast[0].id;
-      const byFirst = clientMap.filter(c => c.first.length > 2 && hasWord(s, c.first));
-      if (byFirst.length === 1) return byFirst[0].id;
-      return null;
+    const { data: trainerRows, error: trainerErr } = await supabase.rpc('gcal_list_connected_trainers');
+    if (trainerErr) throw new Error('trainers: ' + trainerErr.message);
+    const trainers = (trainerRows || []) as ConnectedTrainer[];
+    if (!trainers.length) {
+      return NextResponse.json({ skipped: true, reason: 'Google Calendar not connected, or sync is disabled.' });
     }
 
-    // ── WINDOW ────────────────────────────────────────────────────────────
-    //
-    // A full run pulls two years of events — ~6,500 of them, ~4,000 upserts,
-    // up to 55 seconds. That cost is why the schedule was cut from every 15
-    // minutes to twice a day on 1 Aug, and twice a day is what Dustin
-    // experiences as "my manual sync isn't picking up everything": anything he
-    // changes during the workday is invisible until 4am.
-    //
-    // Almost nothing that changes is two years out. A NARROW run covers the
-    // month behind and the quarter ahead — the range where sessions actually
-    // move, get cancelled, or get booked — and is small enough to run hourly.
-    // The full window still runs twice a day so the far future stays correct.
-    //
-    // The behind-edge is 35 days, not 30. A monthly billing cycle opens at
-    // due_date - 1 month - 7 days = up to 37 days back, so a 30-day floor left
-    // a week at the start of every cycle that billing reads and the sync could
-    // no longer correct.
-    const narrow = body.window === "narrow";
-    const now = new Date();
-    const timeMin = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000).toISOString();
-    const timeMax = new Date(
-      now.getTime() + (narrow ? 90 : 730) * 24 * 60 * 60 * 1000,
-    ).toISOString();
-
-    let allEvents: any[] = [];
-    let pageToken: string | undefined;
-    do {
-      const params = new URLSearchParams({ timeMin, timeMax, singleEvents: 'true', maxResults: '500', orderBy: 'startTime' });
-      if (pageToken) params.set('pageToken', pageToken);
-      const data = await gcalFetch(token, '/calendars/primary/events?' + params.toString());
-      allEvents = allEvents.concat(data.items || []);
-      pageToken = data.nextPageToken;
-    } while (pageToken);
-
+    // gcal_clear_appointments() empties the WHOLE table, both trainers' rows
+    // included. It runs once, before the loop — inside it, trainer two would
+    // wipe out everything trainer one had just written.
     if (resetFirst) {
       await supabase.rpc('gcal_clear_appointments');
     }
 
-    const appointmentBatch: any[] = [];
-    const paymentBatch: any[] = [];
-    let unmatched = 0;
-    const unmatchedSamples: string[] = [];
-
-    for (const event of allEvents) {
-      const colorId = event.colorId || null;
-      const summary = event.summary || '';
-      const isPayment = colorId === COLOR_PAYMENT || /\$\s?\d/.test(summary);
-      // The colour filter that used to sit here dropped every event carrying an
-      // explicit colour other than cancelled/half — Peacock, Blueberry, anything
-      // Dustin had tinted for his own reasons. Under the sessions-trained rule a
-      // dropped event is an UNBILLED SESSION, so the filter is gone entirely:
-      // a session is a session whatever colour it happens to be.
-      // COLOR_CANCELLED / COLOR_HALF still decide status below, untouched.
-
-      const clientId = matchClient(summary);
-      if (!clientId) {
-        // ── WHAT GETS SILENTLY DROPPED ──────────────────────────────────────
-        //
-        // This was a bare `continue`. No counter, no log, no error. On today's
-        // roster 1,975 of 6,545 events matched nothing and vanished — mostly
-        // Dustin's own diary, which is fine, but a mistyped client name lands
-        // in exactly the same bucket and is indistinguishable from it.
-        //
-        // Live examples from this week, all rescued only by luck: "Sarah
-        // Prince" (client is Sara — matched on surname alone), "Chris Latham"
-        // (Christine), "Krysta  Ruiz-Schnitzler" (double space defeats the
-        // full-name test). A second Prince on the roster and the session is
-        // gone with no error anywhere.
-        //
-        // Counting them is the cheap half. A sample of the titles is what makes
-        // the count actionable — 1,975 is a number, "Sarah Prince" is a fix.
-        unmatched += 1;
-        if (unmatchedSamples.length < 40 && summary.trim()) {
-          const t = summary.trim();
-          if (!unmatchedSamples.includes(t)) unmatchedSamples.push(t);
-        }
-        continue;
+    // Sequential, not Promise.all. Each pass can pull thousands of events and
+    // write thousands of rows inside a 60-second budget; running them at once
+    // is how the function times out and leaves half a calendar synced.
+    const results: TrainerSyncResult[] = [];
+    for (const t of trainers) {
+      try {
+        results.push(await syncOneCalendar(supabase, t, { narrow, resetHappened: resetFirst }));
+      } catch (e: any) {
+        // One trainer's dead credential must not take the other's sync down —
+        // that was the single-tenant behaviour and it is the wrong one now.
+        const msg = e?.message || String(e);
+        results.push(emptyResult(t.trainer_name || t.user_id, msg));
       }
-
-      // Business rules: Steph's paycheck is NEVER a client payment; Gerard and Dustin are never billed.
-      const PAYMENT_EXCLUDED_CLIENTS = ['d970da5e-9c46-45c4-be9c-e27e1893b575', '69021074-1708-4d73-9245-918862048709'];
-      if (isPayment && (/paycheck/i.test(summary) || PAYMENT_EXCLUDED_CLIENTS.includes(clientId))) continue;
-
-      if (isPayment) {
-        const payDate = event.start?.date || event.start?.dateTime?.split('T')[0];
-        if (!payDate) continue;
-        paymentBatch.push({ client_id: clientId, title: summary, payment_date: payDate, google_event_id: event.id, source: 'gcal_sync' });
-        continue;
-      }
-
-      if (!event.start?.dateTime) continue;
-      appointmentBatch.push({
-        client_id: clientId,
-        scheduled_at: event.start.dateTime,
-        ends_at: event.end?.dateTime || '',
-        status: colorId === COLOR_CANCELLED ? 'cancelled_client' : (colorId === COLOR_HALF ? 'cancelled_half' : 'scheduled'),
-        gcal_event_id: event.id,
-        gcal_recurring_id: event.recurringEventId || '',
-        title: summary,
-        source: 'gcal',
-      });
     }
 
-    let synced = 0;
-    let payments = 0;
+    const ran = results.filter(r => !r.skipped);
+    if (!ran.length) {
+      const reasons = results.map(r => (r.trainer || '?') + ': ' + r.skipped).join('; ');
+      // Preserve the old contract for the two cases callers already handle:
+      // nothing to sync reads as `skipped`, an empty roster as a 500.
+      if (results.every(r => (r.skipped || '').includes('no clients'))) {
+        return NextResponse.json({ error: 'No clients found', detail: reasons }, { status: 500 });
+      }
+      return NextResponse.json({ skipped: true, reason: reasons });
+    }
+
     const errors: string[] = [];
-
-    if (appointmentBatch.length > 0) {
-      const { data: r, error: e } = await supabase.rpc('gcal_sync_appointments', { p_appointments: appointmentBatch });
-      if (e) errors.push('appts: ' + e.message);
-      else { synced = (r as any)?.synced || 0; ((r as any)?.errors || []).forEach((x: string) => errors.push(x)); }
-    }
-
-    if (paymentBatch.length > 0) {
-      const { data: r, error: e } = await supabase.rpc('gcal_sync_payments', { p_payments: paymentBatch });
-      if (e) errors.push('pays: ' + e.message);
-      else { payments = (r as any)?.synced || 0; }
-    }
-
-    // Reconcile: remove FUTURE app rows whose GCal event vanished (deleted event
-    // or ended/shortened recurrence). Only on a full, healthy fetch (not a manual
-    // reset, and enough events came back) so a transient auth blip can never wipe
-    // the schedule. Deletes are self-healing — a still-live event re-inserts on the
-    // next sync via the upsert above.
-    let reconciled = 0;
-    if (!resetFirst && allEvents.length >= 50) {
-      const seenIds = allEvents.map((e: any) => e.id).filter(Boolean);
-      const { data: rc, error: rcErr } = await supabase.rpc('gcal_reconcile_appointments', {
-        p_seen_ids: seenIds,
-        p_time_min: timeMin,
-        p_time_max: timeMax,
-      });
-      if (rcErr) errors.push('reconcile: ' + rcErr.message);
-      else {
-        reconciled = (rc as any)?.removed || 0;
-        // The reconcile can now REFUSE — it returns a `skipped` reason rather
-        // than deleting when more than half the window would disappear, which
-        // is a bad fetch and not a bad calendar. A refusal that nobody sees is
-        // the same as no guard at all.
-        const skipped = (rc as any)?.skipped;
-        if (skipped) errors.push('reconcile_skipped: ' + skipped);
-      }
-    }
-
-    // Payments reconcile: same safe pattern as appointments — remove FUTURE
-    // gcal-synced payment rows whose event vanished, so a deleted calendar
-    // payment can't linger as a phantom upcoming charge. Self-healing.
-    let reconciledPayments = 0;
-    if (!resetFirst && allEvents.length >= 50) {
-      const seenPayIds = allEvents.map((e: any) => e.id).filter(Boolean);
-      const { data: rcp, error: rcpErr } = await supabase.rpc('gcal_reconcile_payments', {
-        p_seen_ids: seenPayIds,
-        p_time_min: timeMin,
-        p_time_max: timeMax,
-      });
-      if (rcpErr) errors.push('reconcile_payments: ' + rcpErr.message);
-      else {
-        reconciledPayments = (rcp as any)?.removed || 0;
-        const skippedP = (rcp as any)?.skipped;
-        if (skippedP) errors.push('reconcile_payments_skipped: ' + skippedP);
-      }
+    for (const r of results) {
+      r.errors.forEach(x => errors.push(results.length > 1 ? r.trainer + ': ' + x : x));
+      if (r.skipped) errors.push(r.trainer + ' skipped: ' + r.skipped);
     }
 
     // Appointments have just moved, so every pending payment reminder derived
@@ -281,13 +417,13 @@ export async function POST(req: NextRequest) {
     // The function is scoped to notification_status='pending' AND email_sent_at
     // IS NULL AND sms_sent_at IS NULL. Anything already sent to a client is a
     // statement of record and is never rewritten.
+    //
+    // These three run ONCE, after every calendar has landed — they are
+    // roster-wide by design and running them per trainer would just do the same
+    // work twice with a half-synced table underneath the first pass.
     let remindersRecalculated = 0;
     let remindersChanged = 0;
     let workoutsFollowed = 0;
-    // Same client as everything else in this route now — getServiceClient()
-    // throws when the key is missing, so there is no null branch to handle and
-    // no path where this silently degrades to the public key.
-    const svc = supabase;
     {
       // The calendar decides WHEN a supervised session happens, so supervised
       // workouts follow their linked appointment automatically -- no proposal,
@@ -295,12 +431,12 @@ export async function POST(req: NextRequest) {
       // anything in the past, anything moved by hand, or a day that is already
       // occupied. Runs BEFORE the billing recalc: the reminder counts read the
       // same rows this just corrected.
-      const { data: mv, error: mvErr } = await svc.rpc('sync_supervised_workouts_to_appointments', { p_dry_run: false });
+      const { data: mv, error: mvErr } = await supabase.rpc('sync_supervised_workouts_to_appointments', { p_dry_run: false });
       if (mvErr) errors.push('workout_follow: ' + mvErr.message);
       else workoutsFollowed = ((mv as any[]) || []).length;
     }
     {
-      const { data: rr, error: rrErr } = await svc.rpc('recalc_pending_payment_reminders');
+      const { data: rr, error: rrErr } = await supabase.rpc('recalc_pending_payment_reminders');
       if (rrErr) errors.push('reminder_recalc: ' + rrErr.message);
       else {
         const list = (rr as any[]) || [];
@@ -313,10 +449,31 @@ export async function POST(req: NextRequest) {
 
     await supabase.rpc('gcal_generate_payment_notifications');
 
-    const dollarEvents = allEvents.filter((e: any) => /\$\s?\d/.test(e.summary || ''));
-    const clientDollar = dollarEvents.filter((e: any) => matchClient(e.summary || ''));
-    const laurenEvents = allEvents.filter((e: any) => (e.summary || '').toLowerCase().includes('lauren')).slice(0, 4);
-    return NextResponse.json({ ok: true, window: narrow ? 'narrow' : 'full', unmatched, unmatched_samples: unmatchedSamples, synced, payments, reconciled, reconciled_payments: reconciledPayments, workouts_followed: workoutsFollowed, reminders_recalculated: remindersRecalculated, reminders_changed: remindersChanged, total: allEvents.length, dollar_events: dollarEvents.length, client_dollar: clientDollar.length, client_dollar_samples: clientDollar.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), lauren_samples: laurenEvents.map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), dollar_samples: dollarEvents.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | start:' + JSON.stringify(e.start || {})), errors: errors.slice(0, 10) });
+    const sum = (pick: (r: TrainerSyncResult) => number) => results.reduce((a, r) => a + pick(r), 0);
+    return NextResponse.json({
+      ok: true,
+      window: narrow ? 'narrow' : 'full',
+      trainers: results.map(r => ({
+        trainer: r.trainer, synced: r.synced, payments: r.payments,
+        reconciled: r.reconciled, reconciled_payments: r.reconciled_payments,
+        unmatched: r.unmatched, total: r.total, skipped: r.skipped,
+      })),
+      // Top-level totals stay exactly where they were: GcalSyncButton reads
+      // `synced`, the Settings buttons read `synced` and `payments`.
+      synced: sum(r => r.synced),
+      payments: sum(r => r.payments),
+      reconciled: sum(r => r.reconciled),
+      reconciled_payments: sum(r => r.reconciled_payments),
+      unmatched: sum(r => r.unmatched),
+      unmatched_samples: results.flatMap(r => r.unmatched_samples).slice(0, 40),
+      total: sum(r => r.total),
+      dollar_events: sum(r => r.dollar_events),
+      client_dollar: sum(r => r.client_dollar),
+      workouts_followed: workoutsFollowed,
+      reminders_recalculated: remindersRecalculated,
+      reminders_changed: remindersChanged,
+      errors: errors.slice(0, 10),
+    });
   } catch (e: any) {
     const msg = e.message || String(e);
     if (msg.includes('disabled') || msg.includes('not connected')) {
