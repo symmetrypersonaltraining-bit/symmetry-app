@@ -2,7 +2,7 @@
 
 > ## 👉 20 Aug — BILLING REBUILT, STEPHANIE IS A TRAINER
 >
-> **`origin/main` = `<this commit>`.** Everything below shipped today.
+> **`origin/main` = `26e11d3`.** Everything below shipped today.
 >
 > **Billing rebuilt end to end.** Dustin's rule, his words: *"$640 for 2 x a week,
 > their monthly on due date is $640 minus any cancelled sessions based on that
