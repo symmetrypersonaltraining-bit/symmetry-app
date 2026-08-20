@@ -52,7 +52,11 @@ test("the logger actually renders and saves the field", () => {
   assert.match(src, /xFields\.includes\("distance"\)/, "session mode must render a distance input");
   assert.match(src, /sFields\.includes\("distance"\)/, "list mode must render a distance input");
   assert.equal(
-    (src.match(/distance_meters: feetToMeters\(s\.distance\)/g) ?? []).length, 2,
-    "BOTH logSet writers must persist distance — there are two, and missing one loses data in that mode only",
+    (src.match(/distance_meters: feetToMeters\(s\.distance\)/g) ?? []).length, 3,
+    // Three since 20 Aug: logSet, logAllCurrentSets, and saveTypedSet — the
+    // on-blur write for a set that has been typed but not ticked. Missing any
+    // one of them loses distance in that path only, which is the hardest kind
+    // of loss to notice.
+    "EVERY set writer must persist distance — there are three, and missing one loses data in that mode only",
   );
 });

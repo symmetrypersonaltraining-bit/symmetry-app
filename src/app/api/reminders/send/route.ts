@@ -93,6 +93,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Client has no email address" }, { status: 400 });
   }
 
+  // ── THE PROVISIONAL WINDOW, ENFORCED WHERE IT MATTERS ────────────────────
+  //
+  // Dustin, 2026-08-20: "add back in provisional windows on payments so I cant
+  // send until 7 days before."
+  //
+  // The cycle closes seven days before the due date and the amount is not final
+  // until it does — every orange mark he adds before then changes it. A reminder
+  // sent early quotes a client a number they will not be charged.
+  //
+  // This check is HERE, and not only on the payments screen, because a disabled
+  // button is not a guard. The older PaymentsClient list can call this route
+  // directly, an approval can be retried from a stale tab, and the screen's own
+  // idea of "today" comes from the browser's clock. The route is the one place
+  // every send has to pass through.
+  const todayCT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const cycleEnd = new Date(reminder.due_date + "T12:00:00Z");
+  cycleEnd.setUTCDate(cycleEnd.getUTCDate() - 7);
+  const cycleEndCT = cycleEnd.toISOString().slice(0, 10);
+  if (todayCT < cycleEndCT) {
+    return NextResponse.json(
+      {
+        error:
+          "That cycle closes " + cycleEndCT + ", so the amount can still change. " +
+          "This reminder can be sent from " + cycleEndCT + ".",
+        provisional: true,
+        sendsFrom: cycleEndCT,
+      },
+      { status: 409 },
+    );
+  }
+
   // Central, not UTC: a date-only string parses as midnight UTC, which renders as the previous day in Central.
   const dueDate = new Date(reminder.due_date + "T12:00:00Z").toLocaleDateString("en-US", {
     timeZone: "America/Chicago", weekday: "long", year: "numeric", month: "long", day: "numeric",

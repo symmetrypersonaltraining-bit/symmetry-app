@@ -195,7 +195,9 @@ test("a resumed workout log id is verified before it is trusted", () => {
     CODE,
     // `completed` joined the select on 11 Aug (Lauren) — a resumed id now has
     // to answer two questions, not one: are you real, and are you finished.
-    /const \{ data: alive \} = await supabase\s*\n?\s*\.from\("workout_logs"\)\.select\("id, completed"\)\.eq\("id", workoutLogId\)\.maybeSingle\(\);/,
+    // `error` joined the destructure on 20 Aug: discarding it meant a dropped
+    // request read as "the row was deleted" (see the next test).
+    /const \{ data: alive, error: aliveErr \} = await supabase\s*\n?\s*\.from\("workout_logs"\)\.select\("id, completed"\)\.eq\("id", workoutLogId\)\.maybeSingle\(\);/,
     "a draft-restored id must be checked against the database, not assumed live",
   );
   assert.ok(
@@ -242,7 +244,20 @@ test("re-completing does not re-run the schedule block when a row already points
 test("a dead id is discarded and the session continues on a fresh log", () => {
   // Stranding the user mid-workout is not an acceptable answer either. The sets
   // are in component state and get written against the new row.
-  assert.match(CODE, /setWorkoutLogId\(null\);\s*\n\s*__clearDraft\(\);/);
+  //
+  // CHANGED 20 Aug, and the old assertion was pinning the bug. It required
+  // `__clearDraft()` here — but the draft is the ONLY copy of every set typed
+  // and not yet ticked, and this branch was reached whenever the liveness read
+  // merely FAILED. Dustin: "most of what I logged was not logged anymore."
+  //
+  // The id is still dropped. The draft is not, and an errored read no longer
+  // reaches this branch at all.
+  assert.match(CODE, /setWorkoutLogId\(null\);/);
+  const i = CODE.indexOf("if (workoutLogId) {");
+  const j = CODE.indexOf("const { data: existing", i);
+  const branch = CODE.slice(i, j).replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  assert.doesNotMatch(branch, /__clearDraft\(\)/,
+    "the draft is wiped when a liveness check fails — that is the data-loss bug");
 });
 
 test("an update that matches no rows is treated as the failure it is", () => {

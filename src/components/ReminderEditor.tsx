@@ -345,6 +345,8 @@ export default function ReminderEditor() {
       // re-itemise itself when the client's rate changes.
       sessionRate: r.billedRate,
       expectedSessions: r.expectedSessions,
+      // Central, not the browser's clock. Drives the provisional lock below.
+      todayCT: new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }),
       halfPriceSessions: e.halfPrice === "" ? r.halfPriceSessions : (parseInt(e.halfPrice, 10) || 0),
       cadence: r.cadence,
       dueDate: e.due,
@@ -511,10 +513,10 @@ export default function ReminderEditor() {
             <div className="flex justify-between items-center">
               <div className="font-semibold" style={{ color: "var(--brand-text)" }}>{r.name}</div>
               <div className="flex items-center gap-2">
-                {r.provisional && !sent && (
+                {calc.provisional && !sent && (
                   <span className="text-xs font-bold px-2 py-1 rounded-full"
                     style={{ background: "#3b82f622", color: "#3b82f6" }}>
-                    {"PROVISIONAL — cycle ends " + fmtDay(calc.cycleEnd)}
+                    {"PROVISIONAL — can send from " + fmtDay(calc.cycleEnd)}
                   </span>
                 )}
                 <span key={sent ? "sent" : blocked ? "blk" : "rdy"} className="text-xs font-bold px-2 py-1 rounded-full cw-pop"

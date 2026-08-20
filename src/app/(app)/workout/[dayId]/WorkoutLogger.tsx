@@ -1173,14 +1173,40 @@ export default function WorkoutLogger({
     //
     // A resumed id is a claim about the database, not a fact. Check it.
     if (workoutLogId) {
-      const { data: alive } = await supabase
+      const { data: alive, error: aliveErr } = await supabase
         .from("workout_logs").select("id, completed").eq("id", workoutLogId).maybeSingle();
       if (alive) return { id: alive.id, alreadyCompleted: !!(alive as { completed?: boolean }).completed };
-      // Dead. Drop it and fall through rather than stranding the session — the
-      // sets are all still in component state and get written against whatever
-      // log we settle on.
+      // ── "MOST OF WHAT I LOGGED WAS NOT LOGGED ANYMORE" ──────────────────
+      //
+      // Dustin, 2026-08-20: "Went to look at nutrition while logging a workout.
+      // When I resumed workout, most of what I logged was not logged anymore."
+      //
+      // This branch was reached on `!alive` ALONE, and the error above was
+      // discarded. supabase-js does not throw on a PostgREST error — it
+      // resolves {data: null, error} — so gym wi-fi dropping for one request,
+      // or a JWT refresh racing the first call back from /nutrition, produced
+      // `alive === null` and was read as PROOF THE ROW WAS DELETED.
+      //
+      // What followed did the damage: __clearDraft() removes the localStorage
+      // draft, which is the ONLY copy of every set that was typed but not yet
+      // ticked (nothing is written to set_logs until the tick). Then the lookup
+      // below — whose error was also discarded — found nothing, and a brand new
+      // empty log was inserted. Everything logged after that landed on the new
+      // row, and the next mount rendered the new row. The old log still holds
+      // the work, orphaned. Most of the session gone, not all of it, which is
+      // exactly how he described it.
+      //
+      // A failed READ is not a deletion. Say so, keep the draft, and stop.
+      if (aliveErr) {
+        throw new Error(
+          "Couldn't reach your workout just now — nothing has been lost. " +
+          "Check your connection and tap again.",
+        );
+      }
+      // Genuinely gone (no error, no row). Drop the id, but KEEP the draft:
+      // the typed-but-unticked sets are in it and they are about to be written
+      // against whatever log we settle on below.
       setWorkoutLogId(null);
-      __clearDraft();
     }
     // Lauren Standefer, 11 Aug, 10:04am:
     //   "Couldn't finish the workout: duplicate key value violates unique
@@ -1198,11 +1224,20 @@ export default function WorkoutLogger({
     //
     // ASK before inserting. sessionDate, not the clock — logging yesterday's
     // session this morning must find yesterday's log.
-    const { data: existing } = await supabase
+    const { data: existing, error: existingErr } = await supabase
       .from("workout_logs")
       .select("id, completed, created_at")
       .eq("client_id", clientId).eq("day_id", day.id).eq("log_date", sessionDate)
       .order("created_at", { ascending: false });
+    // Same trap, one step down. A failed lookup used to read as "no log exists"
+    // and insert a second one — Lauren's duplicate above arrived through this
+    // door. Nought rows is an answer; an error is not.
+    if (existingErr) {
+      throw new Error(
+        "Couldn't reach your workout just now — nothing has been lost. " +
+        "Check your connection and tap again.",
+      );
+    }
     const found = pickExistingLog((existing as ExistingLog[]) || []);
     if (found) {
       setWorkoutLogId(found.id);
@@ -1306,7 +1341,7 @@ export default function WorkoutLogger({
     try {
       const { id: logId } = await ensureWorkoutLog();
       const s = { ...sets[peId][si], ...(overrides ?? {}) };
-      await supabase.from("set_logs").upsert({
+      const { data: setRows, error: setErr } = await supabase.from("set_logs").upsert({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
         exercise_id: allFlat.find(p => p.id === peId)?.exercises?.id ?? null,
         set_number: si + 1,
@@ -1317,7 +1352,28 @@ export default function WorkoutLogger({
         speed: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.speed ? parseFloat(s.speed) || 0 : null) : null,
         heart_rate: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
         completed: true, logged_at: new Date().toISOString(),
-      }, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
+      }, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" })
+        .select("id");
+      // THE TICK MUST NOT GO GREEN ON A FAILED WRITE.
+      //
+      // The upsert's return value was discarded entirely. supabase-js resolves
+      // {data, error} rather than throwing, so the catch below never fired for
+      // an RLS refusal, a dropped request or a constraint violation — and
+      // updateSet(..., "done", true) ran regardless. The set rendered green, the
+      // draft recorded done:true, and the client had every reason to believe it
+      // was saved. On the next mount buildInitialSets reads set_logs, finds no
+      // row, and the set comes back blank and unticked.
+      //
+      // That is "what I logged was not logged anymore" with no navigation
+      // needed — navigating is only when you find out.
+      //
+      // Nought rows changed is the same failure wearing a different hat: with
+      // client_id null (RLS: client_id = my_client_id()) every upsert matches
+      // nothing and reports no error at all.
+      if (setErr) throw setErr;
+      if (!setRows || !setRows.length) {
+        throw new Error("That set didn't save. Your other sets are safe — tap it again.");
+      }
       updateSet(peId, si, "done", true);
       if (navigator.vibrate) navigator.vibrate(50);
       const pe = allFlat.find(p => p.id === peId);
@@ -1325,8 +1381,69 @@ export default function WorkoutLogger({
         const match = pe.rest.match(/(\d+)/);
         if (match) setRestTimer(parseInt(match[1]));
       }
-    } catch(e) { console.error(e); }
+    } catch (e) {
+      // Say it. A failure the client cannot see is reported as flakiness and can
+      // never be diagnosed — the same lesson completeWorkout already learned on
+      // 4 August.
+      console.error("logSet", e);
+      setCompleteError(
+        (e as { message?: string })?.message ||
+        "That set didn't save — check your connection and tap it again.",
+      );
+    }
     finally { setSaving(false); }
+  }
+
+  /**
+   * TYPED, BUT NOT TICKED YET — SAVE IT ANYWAY.
+   *
+   * Dustin, 2026-08-20: "Went to look at nutrition while logging a workout.
+   * When I resumed workout, most of what I logged was not logged anymore."
+   *
+   * Until now NOTHING reached the database until the tick. Typing 185 x 8 and
+   * moving to the next set wrote nothing; onBlur only saved a set that was
+   * ALREADY done, and completeWorkout never swept the rest up either. The sole
+   * copy was the localStorage draft — so any of: a cleared draft, an iOS page
+   * discard, a different device, or clearing site data, and the work was gone.
+   *
+   * The row is written with completed:false, which is what `unlogSet` already
+   * writes and what `buildInitialSets` already reads (`done: ex?.completed ??
+   * false`). So the numbers come back on the next mount and the tick does not.
+   * Nothing about the green state changes — this only means the database, not
+   * one phone's local storage, is holding the work.
+   *
+   * Deliberately quiet: this is a background save of a half-finished set, not
+   * an action the client took. It must never interrupt someone mid-workout with
+   * an error about a set they have not claimed to have finished — the tick is
+   * where a failure has to be loud, and that is handled in logSet.
+   */
+  async function saveTypedSet(peId: string, si: number) {
+    const s = sets[peId]?.[si];
+    if (!s || s.done) return;
+    // Nothing typed = nothing to save. Writing empty rows for every set of
+    // every exercise the client merely scrolled past would be noise in the
+    // table and would make "was this attempted?" unanswerable.
+    if (!(s.weight?.trim() || s.reps?.trim() || s.time?.trim() ||
+          s.distance?.trim() || s.speed?.trim() || s.hr?.trim())) return;
+    try {
+      const { id: logId } = await ensureWorkoutLog();
+      const pe = allFlat.find(p => p.id === peId);
+      await supabase.from("set_logs").upsert({
+        workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
+        exercise_id: pe?.exercises?.id ?? null,
+        set_number: si + 1,
+        weight_lbs: isCardioEx(pe) ? null : (s.weight?.trim() ? (parseFloat(s.weight) || null) : null),
+        reps: isCardioEx(pe) ? null : (s.reps?.trim() ? (parseInt(s.reps) || null) : null),
+        duration_seconds: s.time ? parseTimeToSecs(s.time) : null,
+        distance_meters: feetToMeters(s.distance),
+        speed: isCardioEx(pe) ? (s.speed ? parseFloat(s.speed) || 0 : null) : null,
+        heart_rate: isCardioEx(pe) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
+        completed: false,
+      }, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
+    } catch (e) {
+      // The draft still holds it, and the tick will write it properly.
+      console.error("saveTypedSet", e);
+    }
   }
 
   // ─── PER-SET TIMER — controls ─────────────────────────────────────────────
@@ -1596,7 +1713,20 @@ export default function WorkoutLogger({
         completed: true, logged_at: new Date().toISOString(),
       }));
       if (rows.length) {
-        await supabase.from("set_logs").upsert(rows, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
+        // Same check as logSet, and it matters more here: this marks an entire
+        // movement done in one action, so a discarded error turned every set of
+        // that exercise green against nothing.
+        const { data: bulkRows, error: bulkErr } = await supabase
+          .from("set_logs")
+          .upsert(rows, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" })
+          .select("id");
+        if (bulkErr) throw bulkErr;
+        if (!bulkRows || bulkRows.length !== rows.length) {
+          throw new Error(
+            "Only " + (bulkRows?.length ?? 0) + " of " + rows.length +
+            " sets saved. Tap the ones still unticked to try again.",
+          );
+        }
       }
       setSets(prev => {
         const u = { ...prev };
@@ -1604,7 +1734,13 @@ export default function WorkoutLogger({
         return u;
       });
       if (navigator.vibrate) navigator.vibrate(50);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error("logAllCurrentSets", e);
+      setCompleteError(
+        (e as { message?: string })?.message ||
+        "Those sets didn't save — check your connection and try again.",
+      );
+    }
     finally { setSaving(false); }
   }
 
@@ -2481,7 +2617,7 @@ export default function WorkoutLogger({
             <div key={si} className="flex items-center gap-1.5 mb-1">
               <div className="w-8 text-center text-sm font-bold"
                 style={{ color: setEntry.done ? "#22c55e" : "rgba(255,255,255,0.25)" }}>S{si + 1}</div>
-              {xFields.includes("weight") && (<input type="text" value={setEntry.weight} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); }}
+              {xFields.includes("weight") && (<input type="text" value={setEntry.weight} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); else saveTypedSet(currentExercise.id, si); }}
                 onChange={e => updateSet(currentExercise.id, si, "weight", e.target.value)}
                 /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
@@ -2490,7 +2626,7 @@ export default function WorkoutLogger({
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="decimal" />)}
-              {xFields.includes("reps") && (<input type="text" value={setEntry.reps} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); }}
+              {xFields.includes("reps") && (<input type="text" value={setEntry.reps} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); else saveTypedSet(currentExercise.id, si); }}
                 onChange={e => updateSet(currentExercise.id, si, "reps", e.target.value)}
                 /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
@@ -2514,7 +2650,7 @@ export default function WorkoutLogger({
                   border: setTimerRunning(currentExercise.id, si) ? "1px solid rgba(245,179,74,0.55)" : setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                   fontVariantNumeric: "tabular-nums",
                 }} inputMode="decimal" />)}
-              {xFields.includes("distance") && (<input type="text" value={setEntry.distance} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); }}
+              {xFields.includes("distance") && (<input type="text" value={setEntry.distance} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); else saveTypedSet(currentExercise.id, si); }}
                 onChange={e => updateSet(currentExercise.id, si, "distance", e.target.value)}
                 /* a logged set stays editable (Troy, 6/29) */ placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
@@ -2523,7 +2659,7 @@ export default function WorkoutLogger({
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="decimal" />)}
-              {xFields.includes("speed") && (<input type="text" value={setEntry.speed} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); }}
+              {xFields.includes("speed") && (<input type="text" value={setEntry.speed} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); else saveTypedSet(currentExercise.id, si); }}
                 onChange={e => updateSet(currentExercise.id, si, "speed", e.target.value)}
                 /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
@@ -2532,7 +2668,7 @@ export default function WorkoutLogger({
                   color: setEntry.done ? "#22c55e" : "white",
                   border: setEntry.done ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.08)",
                 }} inputMode="decimal" />)}
-              {xFields.includes("hr") && (<input type="text" value={setEntry.hr} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); }}
+              {xFields.includes("hr") && (<input type="text" value={setEntry.hr} onFocus={focusScroll} onBlur={() => { focusBlur(); if (setEntry.done) logSet(currentExercise.id, si); else saveTypedSet(currentExercise.id, si); }}
                 onChange={e => updateSet(currentExercise.id, si, "hr", e.target.value)}
                 /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder=""
                 className="flex-1 min-w-0 text-center text-base font-bold py-1 rounded-lg outline-none"
@@ -2932,7 +3068,7 @@ export default function WorkoutLogger({
                       &ldquo;{pe.cue}&rdquo;
                     </p>
                   )}
-                  {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { unlogSet(pe.id, si); } else { logSet(pe.id, si); } }} disabled={saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="flex items-center gap-1.5 mb-1 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["weight","Weight"],["reps","Reps"],["time","Time"],["distance","Distance"],["each_side","Each side"]] as [string,string][]).map(([f, lab]) => { const on = sFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? sFields.filter((x: string) => x !== f) : [...sFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{sTimer && renderTimerModeSwitch(pe.id)}<div className="grid mb-2" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
+                  {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); else saveTypedSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); else saveTypedSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); else saveTypedSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { unlogSet(pe.id, si); } else { logSet(pe.id, si); } }} disabled={saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="flex items-center gap-1.5 mb-1 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["weight","Weight"],["reps","Reps"],["time","Time"],["distance","Distance"],["each_side","Each side"]] as [string,string][]).map(([f, lab]) => { const on = sFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? sFields.filter((x: string) => x !== f) : [...sFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{sTimer && renderTimerModeSwitch(pe.id)}<div className="grid mb-2" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
                     <div />
                     {sFields.includes("weight") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>{isPerHandLoad(pe) ? "LBS/HAND" : "LBS"}</div>}
                     {sFields.includes("reps") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>REPS</div>}
@@ -2949,7 +3085,7 @@ export default function WorkoutLogger({
                         {si + 1}
                       </div>
                       {sFields.includes("weight") && (<input type="text" value={setEntry.weight}
-                        onChange={e => updateSet(pe.id, si, "weight", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }}
+                        onChange={e => updateSet(pe.id, si, "weight", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); else saveTypedSet(pe.id, si); }}
                         /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={'\u2014'}
                         className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
@@ -2958,7 +3094,7 @@ export default function WorkoutLogger({
                           border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
                         }} inputMode="decimal" />)}
                       {sFields.includes("reps") && (<input type="text" value={setEntry.reps}
-                        onChange={e => updateSet(pe.id, si, "reps", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }}
+                        onChange={e => updateSet(pe.id, si, "reps", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); else saveTypedSet(pe.id, si); }}
                         /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={'\u2014'}
                         className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{
@@ -2967,7 +3103,7 @@ export default function WorkoutLogger({
                           border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
                         }} inputMode="numeric" />)}
                       {sFields.includes("distance") && (<input type="text" value={setEntry.distance}
-                        onChange={e => updateSet(pe.id, si, "distance", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); }}
+                        onChange={e => updateSet(pe.id, si, "distance", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); else saveTypedSet(pe.id, si); }}
                         /* a logged set stays editable (Troy, 6/29) */ placeholder={'\u2014'}
                         className="w-full min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
                         style={{

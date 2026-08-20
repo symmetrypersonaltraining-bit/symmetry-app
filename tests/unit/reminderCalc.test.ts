@@ -399,3 +399,88 @@ test("the mismatch message explains the rule, not a session count", () => {
   assert.ok(r.blocking.some((b) => /\$640 less 2 cancelled x \$80/.test(b)),
     "a blocked amount has to say what the right number was made of");
 });
+
+// ─── the provisional window ─────────────────────────────────────────────────
+//
+// Dustin, 2026-08-20: "add back in provisional windows on payments so I cant
+// send until 7 days before."
+//
+// A cycle closes seven days before the due date and the amount is not final
+// until it does — every orange mark added before then changes it. Sending early
+// quotes a client a number they will not be charged. Seven of the twenty open
+// reminders were mid-cycle when the billing rule changed today.
+
+const prov = (over: Partial<ReminderCalcInput> = {}): ReminderCalcInput =>
+  base({ billingType: "monthly_adjusted", fee: 640, sessionRate: 80, expectedSessions: 8,
+         cancelledFull: 0, draftAmount: 640, dueDate: "2026-09-18", ...over });
+
+test("a cycle that has not closed blocks the send", () => {
+  // Due 18 Sep, so the cycle closes 11 Sep. Today is 20 Aug.
+  const r = calcReminder(prov({ todayCT: "2026-08-20" }));
+  assert.equal(r.provisional, true);
+  assert.ok(r.blocking.some((b) => /can still change/.test(b)),
+    "a mid-cycle reminder can be approved and emailed");
+  assert.ok(r.blocking.some((b) => /2026-09-11/.test(b)), "it must say when it CAN be sent");
+});
+
+test("the day the cycle closes, it sends", () => {
+  const r = calcReminder(prov({ todayCT: "2026-09-11" }));
+  assert.equal(r.provisional, false);
+  assert.deepEqual(r.blocking, [], "the boundary is inclusive — 7 days before IS sendable");
+});
+
+test("after the cycle closes it stays sendable", () => {
+  assert.equal(calcReminder(prov({ todayCT: "2026-09-17" })).provisional, false);
+  assert.equal(calcReminder(prov({ todayCT: "2026-09-18" })).provisional, false);
+  assert.equal(calcReminder(prov({ todayCT: "2026-10-01" })).provisional, false);
+});
+
+test("the day before it closes, it does not", () => {
+  assert.equal(calcReminder(prov({ todayCT: "2026-09-10" })).provisional, true);
+});
+
+test("a caller that passes no date behaves exactly as before", () => {
+  // Older call sites must not start blocking because a field was added.
+  const r = calcReminder(prov({ todayCT: undefined }));
+  assert.equal(r.provisional, false);
+  assert.deepEqual(r.blocking, []);
+});
+
+test("provisional is NOT overridable", () => {
+  // Overriding an amount is a judgement call. Overriding a figure that is not
+  // knowable yet is not — there is nothing to exercise judgement about.
+  const r = calcReminder(prov({ todayCT: "2026-08-20", override: true, draftAmount: 123 }));
+  assert.ok(r.blocking.some((b) => /can still change/.test(b)),
+    "an override let a mid-cycle reminder through");
+});
+
+test("a not-billed client is never blocked by the window", () => {
+  const r = calcReminder(base({ billingType: "none", todayCT: "2026-08-20", dueDate: "2026-09-18" }));
+  assert.equal(r.notApplicable, true);
+  assert.deepEqual(r.blocking, []);
+});
+
+test("the window is measured from the due date, not the cycle length", () => {
+  // Sharon Rambo is semi-monthly: a 16-day cycle, but still a 7-day send lead.
+  // Due 7 Sep closes 31 Aug — NOT 16 days back. This fixture was wrong on the
+  // first run (it asserted 31 Aug was still provisional) and the code was right;
+  // fixed rather than deleted, because the boundary is the whole point.
+  assert.equal(calcReminder(prov({ cadence: "semimonthly", dueDate: "2026-09-07", todayCT: "2026-08-30" })).provisional,
+    true, "the day before close must still be locked");
+  assert.equal(calcReminder(prov({ cadence: "semimonthly", dueDate: "2026-09-07", todayCT: "2026-08-31" })).provisional,
+    false, "a 16-day cycle still gets a 7-day send lead, not a 16-day one");
+});
+
+test("the screen and the send route agree on the rule", () => {
+  const EDITOR = readFileSync(join(process.cwd(), "src/components/ReminderEditor.tsx"), "utf8");
+  const ROUTE = readFileSync(join(process.cwd(), "src/app/api/reminders/send/route.ts"), "utf8");
+  assert.match(EDITOR, /todayCT: new Date\(\)\.toLocaleDateString\("en-CA", \{ timeZone: "America\/Chicago" \}\)/,
+    "the editor is not feeding today into the calc, so nothing is provisional");
+  assert.match(EDITOR, /calc\.provisional && !sent/,
+    "the badge reads a stored flag again instead of the live calculation");
+  // A disabled button is not a guard: the old payments list can call the route
+  // directly, and an approval can be retried from a stale tab.
+  assert.match(ROUTE, /if \(todayCT < cycleEndCT\)/,
+    "the send route will email a provisional reminder — the button is the only thing stopping it");
+  assert.match(ROUTE, /status: 409/, "an early send must fail loudly, not silently no-op");
+});

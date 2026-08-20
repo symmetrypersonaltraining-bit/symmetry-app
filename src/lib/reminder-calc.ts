@@ -102,6 +102,12 @@ export interface ReminderCalcInput {
   override: boolean; // Dustin explicitly accepted a non-calculated amount
   /** @deprecated Use billingType. true is read as 'flat'. */
   flatBilling?: boolean;
+  /**
+   * Today's Central date. When supplied, a cycle that has not closed BLOCKS
+   * approval — see `provisional` below. Omitted by older callers, which then
+   * behave exactly as before.
+   */
+  todayCT?: string | null;
 }
 
 export interface ReminderCalcResult {
@@ -125,6 +131,11 @@ export interface ReminderCalcResult {
   cancelDeduction: number;
   /** Half-price remote sessions x (rate/2). Already subtracted. */
   halfPriceDeduction: number;
+  /**
+   * The cycle has not closed yet, so this figure can still move and must not
+   * be sent. True only when `todayCT` was supplied and is before `cycleEnd`.
+   */
+  provisional: boolean;
   blocking: string[];
   warnings: string[];
 }
@@ -229,6 +240,7 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
     baseRate: null as number | null,
     cancelDeduction: 0,
     halfPriceDeduction: 0,
+    provisional: false,
   };
 
   // Not billed by the app at all. 'paid_by_other' is on somebody else's
@@ -236,6 +248,30 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
   // Nothing is generated, nothing is shown, nothing blocks.
   if (billingType === "none" || billingType === "paid_by_other") {
     return { ...base, notApplicable: true, expected: 0, blocking: [], warnings: [] };
+  }
+
+  // ── NOTHING GOES OUT BEFORE THE CYCLE CLOSES ────────────────────────────
+  //
+  // Dustin, 2026-08-20: "add back in provisional windows on payments so I cant
+  // send until 7 days before."
+  //
+  // A cycle closes seven days before the due date, and only then is the amount
+  // final. Before that, every orange mark he adds changes it — so a reminder
+  // sent early is a number the client will be quoted and then charged something
+  // else. Seven of the twenty open reminders were mid-cycle when the rule
+  // changed today, which is exactly the window this closes.
+  //
+  // BLOCKING, not a warning. The screen already showed a PROVISIONAL badge and
+  // it stopped nothing; a badge beside a live Approve button is a label, not a
+  // guard. The override path is deliberately absent here: the point is that the
+  // figure is not knowable yet, and overriding an unknown is not a judgement
+  // call the way overriding an amount is.
+  const provisional = !!i.todayCT && i.todayCT < cycleEnd;
+  if (provisional) {
+    blocking.push(
+      "This cycle closes " + cycleEnd + " — the amount can still change until then. " +
+      "It can be sent from " + cycleEnd + ".",
+    );
   }
 
   if (!i.cadence) warnings.push("No payment cadence found in calendar history - assuming monthly");
@@ -318,7 +354,7 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
     else blocking.push(msg);
   }
 
-  return { ...base, notApplicable: false, expected, baseRate, cancelDeduction, halfPriceDeduction, blocking, warnings };
+  return { ...base, notApplicable: false, expected, baseRate, cancelDeduction, halfPriceDeduction, provisional, blocking, warnings };
 }
 
 // ─── A REMINDER IS ITEMISED AT THE RATE IT WAS BILLED AT ─────────────────────
