@@ -6,6 +6,7 @@ import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import AssignProgramModal from "./AssignProgramModal";
 import AssessmentTab from "./AssessmentTab";
+import BillingScheduleTab from "./BillingScheduleTab";
 import MetricCards from "@/components/MetricCards";
 import PrivateProfilePanel from "@/components/PrivateProfilePanel";
 import AssessmentPanel from "@/components/AssessmentPanel";
@@ -48,6 +49,13 @@ interface Client {
   is_self_coached: boolean | null;
   payment_reminders_enabled: boolean | null;
   created_at: string | null;
+  billing_type: string | null;
+  billing_cadence: string | null;
+  session_rate: number | null;
+  expected_sessions_per_cycle: number | null;
+  billing_anchor_day: number | null;
+  billing_anchor_day_2: number | null;
+  training_days: string | null;
 }
 
 interface Props {
@@ -911,13 +919,14 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
 // ---- Main component ----
 export default function ClientProfileTabs({ client, metrics, allWorkouts, clientId, programs, currentProgramId }: Props) {
   const searchParams = useSearchParams();
-  const initialTab = (searchParams.get("tab") as "overview" | "training" | "assessment" | "metrics" | "info") ?? "overview";
-  const [tab, setTab] = useState<"overview" | "training" | "assessment" | "metrics" | "info">(initialTab);
+  const initialTab = (searchParams.get("tab") as "overview" | "training" | "billing" | "assessment" | "metrics" | "info") ?? "overview";
+  const [tab, setTab] = useState<"overview" | "training" | "billing" | "assessment" | "metrics" | "info">(initialTab);
   const [showAssignModal, setShowAssignModal] = useState(false);
 
   const TABS = [
     { id: "overview" as const, label: "Overview", icon: "ti-layout-dashboard" },
     { id: "training" as const, label: "Training", icon: "ti-calendar" },
+    { id: "billing" as const, label: "Billing", icon: "ti-receipt-2" },
     { id: "assessment" as const, label: "Assessment", icon: "ti-clipboard-heart" },
     { id: "metrics" as const, label: "Progress", icon: "ti-chart-line" },
     { id: "info" as const, label: "Info", icon: "ti-user" },
@@ -960,6 +969,7 @@ export default function ClientProfileTabs({ client, metrics, allWorkouts, client
             </div>
           </>
         )}
+        {tab === "billing" && <BillingScheduleTab client={client} />}
         {tab === "assessment" && <AssessmentTab clientId={clientId} clientName={client.name} />}
         {tab === "metrics" && <MetricCards clientId={clientId} />}
         {tab === "info" && (

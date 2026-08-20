@@ -23,7 +23,7 @@ export default async function ClientProfilePage({
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, name, email, phone, auth_user_id, created_at, payment_reminders_enabled, injuries_limitations, primary_goal, secondary_goals, experience_level, training_frequency, current_weight, current_body_fat_pct, date_of_birth, start_date, notes, current_fees, is_self_coached, archived_at")
+    .select("id, name, email, phone, auth_user_id, created_at, payment_reminders_enabled, injuries_limitations, primary_goal, secondary_goals, experience_level, training_frequency, current_weight, current_body_fat_pct, date_of_birth, start_date, notes, current_fees, is_self_coached, archived_at, billing_type, billing_cadence, session_rate, expected_sessions_per_cycle, billing_anchor_day, billing_anchor_day_2, training_days")
     .eq("id", clientId)
     .maybeSingle();
   if (!client) notFound();
