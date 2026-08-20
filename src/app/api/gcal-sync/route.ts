@@ -110,9 +110,29 @@ export async function POST(req: NextRequest) {
       return null;
     }
 
+    // ── WINDOW ────────────────────────────────────────────────────────────
+    //
+    // A full run pulls two years of events — ~6,500 of them, ~4,000 upserts,
+    // up to 55 seconds. That cost is why the schedule was cut from every 15
+    // minutes to twice a day on 1 Aug, and twice a day is what Dustin
+    // experiences as "my manual sync isn't picking up everything": anything he
+    // changes during the workday is invisible until 4am.
+    //
+    // Almost nothing that changes is two years out. A NARROW run covers the
+    // month behind and the quarter ahead — the range where sessions actually
+    // move, get cancelled, or get booked — and is small enough to run hourly.
+    // The full window still runs twice a day so the far future stays correct.
+    //
+    // The behind-edge is 35 days, not 30. A monthly billing cycle opens at
+    // due_date - 1 month - 7 days = up to 37 days back, so a 30-day floor left
+    // a week at the start of every cycle that billing reads and the sync could
+    // no longer correct.
+    const narrow = body.window === "narrow";
     const now = new Date();
-    const timeMin = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const timeMax = new Date(now.getTime() + 730 * 24 * 60 * 60 * 1000).toISOString();
+    const timeMin = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000).toISOString();
+    const timeMax = new Date(
+      now.getTime() + (narrow ? 90 : 730) * 24 * 60 * 60 * 1000,
+    ).toISOString();
 
     let allEvents: any[] = [];
     let pageToken: string | undefined;
@@ -130,6 +150,8 @@ export async function POST(req: NextRequest) {
 
     const appointmentBatch: any[] = [];
     const paymentBatch: any[] = [];
+    let unmatched = 0;
+    const unmatchedSamples: string[] = [];
 
     for (const event of allEvents) {
       const colorId = event.colorId || null;
@@ -143,7 +165,29 @@ export async function POST(req: NextRequest) {
       // COLOR_CANCELLED / COLOR_HALF still decide status below, untouched.
 
       const clientId = matchClient(summary);
-      if (!clientId) continue;
+      if (!clientId) {
+        // ── WHAT GETS SILENTLY DROPPED ──────────────────────────────────────
+        //
+        // This was a bare `continue`. No counter, no log, no error. On today's
+        // roster 1,975 of 6,545 events matched nothing and vanished — mostly
+        // Dustin's own diary, which is fine, but a mistyped client name lands
+        // in exactly the same bucket and is indistinguishable from it.
+        //
+        // Live examples from this week, all rescued only by luck: "Sarah
+        // Prince" (client is Sara — matched on surname alone), "Chris Latham"
+        // (Christine), "Krysta  Ruiz-Schnitzler" (double space defeats the
+        // full-name test). A second Prince on the roster and the session is
+        // gone with no error anywhere.
+        //
+        // Counting them is the cheap half. A sample of the titles is what makes
+        // the count actionable — 1,975 is a number, "Sarah Prince" is a fix.
+        unmatched += 1;
+        if (unmatchedSamples.length < 40 && summary.trim()) {
+          const t = summary.trim();
+          if (!unmatchedSamples.includes(t)) unmatchedSamples.push(t);
+        }
+        continue;
+      }
 
       // Business rules: Steph's paycheck is NEVER a client payment; Gerard and Dustin are never billed.
       const PAYMENT_EXCLUDED_CLIENTS = ['d970da5e-9c46-45c4-be9c-e27e1893b575', '69021074-1708-4d73-9245-918862048709'];
@@ -199,7 +243,15 @@ export async function POST(req: NextRequest) {
         p_time_max: timeMax,
       });
       if (rcErr) errors.push('reconcile: ' + rcErr.message);
-      else reconciled = (rc as any)?.removed || 0;
+      else {
+        reconciled = (rc as any)?.removed || 0;
+        // The reconcile can now REFUSE — it returns a `skipped` reason rather
+        // than deleting when more than half the window would disappear, which
+        // is a bad fetch and not a bad calendar. A refusal that nobody sees is
+        // the same as no guard at all.
+        const skipped = (rc as any)?.skipped;
+        if (skipped) errors.push('reconcile_skipped: ' + skipped);
+      }
     }
 
     // Payments reconcile: same safe pattern as appointments — remove FUTURE
@@ -214,7 +266,11 @@ export async function POST(req: NextRequest) {
         p_time_max: timeMax,
       });
       if (rcpErr) errors.push('reconcile_payments: ' + rcpErr.message);
-      else reconciledPayments = (rcp as any)?.removed || 0;
+      else {
+        reconciledPayments = (rcp as any)?.removed || 0;
+        const skippedP = (rcp as any)?.skipped;
+        if (skippedP) errors.push('reconcile_payments_skipped: ' + skippedP);
+      }
     }
 
     // Appointments have just moved, so every pending payment reminder derived
@@ -260,7 +316,7 @@ export async function POST(req: NextRequest) {
     const dollarEvents = allEvents.filter((e: any) => /\$\s?\d/.test(e.summary || ''));
     const clientDollar = dollarEvents.filter((e: any) => matchClient(e.summary || ''));
     const laurenEvents = allEvents.filter((e: any) => (e.summary || '').toLowerCase().includes('lauren')).slice(0, 4);
-    return NextResponse.json({ ok: true, synced, payments, reconciled, reconciled_payments: reconciledPayments, workouts_followed: workoutsFollowed, reminders_recalculated: remindersRecalculated, reminders_changed: remindersChanged, total: allEvents.length, dollar_events: dollarEvents.length, client_dollar: clientDollar.length, client_dollar_samples: clientDollar.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), lauren_samples: laurenEvents.map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), dollar_samples: dollarEvents.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | start:' + JSON.stringify(e.start || {})), errors: errors.slice(0, 10) });
+    return NextResponse.json({ ok: true, window: narrow ? 'narrow' : 'full', unmatched, unmatched_samples: unmatchedSamples, synced, payments, reconciled, reconciled_payments: reconciledPayments, workouts_followed: workoutsFollowed, reminders_recalculated: remindersRecalculated, reminders_changed: remindersChanged, total: allEvents.length, dollar_events: dollarEvents.length, client_dollar: clientDollar.length, client_dollar_samples: clientDollar.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), lauren_samples: laurenEvents.map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | ' + JSON.stringify(e.start || {})), dollar_samples: dollarEvents.slice(0, 3).map((e: any) => (e.summary || '') + ' | color:' + (e.colorId || 'none') + ' | start:' + JSON.stringify(e.start || {})), errors: errors.slice(0, 10) });
   } catch (e: any) {
     const msg = e.message || String(e);
     if (msg.includes('disabled') || msg.includes('not connected')) {

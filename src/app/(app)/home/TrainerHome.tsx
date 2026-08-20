@@ -8,6 +8,7 @@ import SaturdayReview from "@/components/SaturdayReview";
 import LiveSessions from "@/components/LiveSessions";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
+import SyncHealth from "@/components/SyncHealth";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 interface TodaySession {
@@ -171,6 +172,7 @@ export default function TrainerHome({
       {/* In-page message bell removed — the single header NotificationCenter bell
           (in HeaderAssist) is the app-wide notification entry point. */}
       {/* Payment notifications moved OFF the trainer home into the Payments section (Dustin 7/9). */}
+      <SyncHealth />
       <GcalSyncButton />
 
         {/* Header */}
