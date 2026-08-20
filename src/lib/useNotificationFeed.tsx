@@ -26,7 +26,8 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { aggregateNotifications, type NotifRow, type RawUnread } from "@/lib/notifications";
 import { fetchGroupUnread, markGroupRead } from "@/lib/groupUnread";
-import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
+import {isTrainerEmail } from "@/lib/trainer";
+import { useCoach } from "@/lib/useCoach";
 
 export interface NotificationFeed {
   items: NotifRow[];
@@ -52,6 +53,10 @@ const Ctx = createContext<NotificationFeed>(EMPTY);
 const POLL_MS = 25000;
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
+  // The VIEWER's coach. This was COACH_FIRST_NAME, so a client of Stephanie's
+  // who received a message from Stephanie got the in-app toast "Dustin
+  // messaged you". Mounted inside CoachProvider in the app layout.
+  const coach = useCoach();
   const pathname = usePathname();
 
   const [items, setItems] = useState<NotifRow[]>([]);
@@ -130,7 +135,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       const agg = aggregateNotifications(unread, {
         isTrainer, myUserId: user.id, clientNames, clientMode,
-        coachFirstName: COACH_FIRST_NAME,
+        coachFirstName: coach.firstName,
       });
 
       // fetchGroupUnread owns the group watermark. aggregate only sees rows

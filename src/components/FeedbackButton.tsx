@@ -3,9 +3,11 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { submitFeedback } from "@/lib/feedback";
 import MicButton from "@/components/MicButton";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 
 export default function FeedbackButton() {
+  const { firstName: coachFirstName } = useCoach();
   const [open, setOpen] = useState(false);
   const [msg, setMsg] = useState("");
   const [sent, setSent] = useState(false);
@@ -54,11 +56,11 @@ export default function FeedbackButton() {
         }}>
           {sent ? (
             <div style={{ textAlign: "center", padding: "12px 0", fontWeight: 700, color: "#5ec9a3", fontSize: 15 }}>
-              &#10003; Thanks! {COACH_FIRST_NAME} will follow up.
+              &#10003; Thanks! {coachFirstName} will follow up.
             </div>
           ) : (
             <>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: "var(--brand-text,#2a3147)" }}>Send feedback to {COACH_FIRST_NAME}</div>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: "var(--brand-text,#2a3147)" }}>Send feedback to {coachFirstName}</div>
               <textarea
                 value={msg}
                 onChange={e => setMsg(e.target.value)}

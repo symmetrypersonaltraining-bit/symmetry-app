@@ -9,7 +9,7 @@ import LiveSessions from "@/components/LiveSessions";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
 import SyncHealth from "@/components/SyncHealth";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { useCoach } from "@/lib/useCoach";
 
 interface TodaySession {
   id: string;
@@ -135,6 +135,9 @@ export default function TrainerHome({
   notificationCount,
   dateLabel,
 }: Props) {
+  // The signed-in trainer greets themselves. This was COACH_FIRST_NAME, so
+  // Stephanie's home screen said "Dustin 👋".
+  const me = useCoach();
   const [chooserSession, setChooserSession] = useState<TodaySession | null>(null);
   const [selectedClient, setSelectedClient] = useState<string>("");
 
@@ -180,7 +183,7 @@ export default function TrainerHome({
           <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
             {"Good " + getGreeting() + ","}
           </p>
-          <h1 className="text-2xl font-bold gradient-text">{COACH_FIRST_NAME} 👋</h1>
+          <h1 className="text-2xl font-bold gradient-text">{me.firstName} 👋</h1>
           <p className="text-sm mt-1" style={{ color: "var(--brand-text-secondary)" }}>
             {dateLabel}
           </p>

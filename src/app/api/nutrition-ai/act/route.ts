@@ -25,6 +25,8 @@ import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
+import { coachFirstNameForClient } from "@/lib/trainerResolve";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { SYMMETRY_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
 import { assistantContext } from "@/lib/ai/assistantContext";
 import { runClientAssistant } from "@/lib/ai/clientAssistantRun";
@@ -357,7 +359,7 @@ export async function POST(req: NextRequest) {
       // the tier here is what makes "a lot higher model across the entire app"
       // true rather than true-on-the-screens-someone-remembered.
       model: modelFor("coach", tier),
-      system: COACH_SYSTEM_PROMPT,
+      system: COACH_SYSTEM_PROMPT(await coachFirstNameForClient(supabase, clientId, COACH_FIRST_NAME)),
       maxTokens: 900,
       messages: [
         ...priorTurns.map((t) => ({

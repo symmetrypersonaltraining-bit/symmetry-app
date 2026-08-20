@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "./Logo";
 import { useMyClientRow } from "@/components/Avatar";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { useCoach } from "@/lib/useCoach";
 
 interface SidebarItem {
   href?: string;
@@ -73,13 +73,26 @@ interface Props {
   mobileActions?: React.ReactNode;
 }
 
+function initialsOf(full: string): string {
+  const parts = full.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "";
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
 export default function TrainerSidebar({
   clientMode = false,
   onToggleClientMode,
-  userName = COACH_FIRST_NAME,
-  userInitials = "DG",
+  userName,
+  userInitials,
   mobileActions,
 }: Props) {
+  // The SIGNED-IN trainer's own name and monogram. These defaulted to
+  // COACH_FIRST_NAME and the literal "DG", so Stephanie's own sidebar greeted
+  // her as Dustin and wore his initials. useCoach() resolves a trainer to
+  // themselves, so this is right for both of them without a prop.
+  const me = useCoach();
+  const displayName = userName || me.firstName;
+  const displayInitials = userInitials || initialsOf(me.name);
   const { avatarUrl: myAvatarUrl } = useMyClientRow();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -219,16 +232,16 @@ export default function TrainerSidebar({
           style={{ background: isActive("/profile") ? "rgba(255,255,255,0.15)" : "transparent" }}>
           {myAvatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={myAvatarUrl} alt={userName} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+          <img src={myAvatarUrl} alt={displayName} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
         ) : (
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
             style={{ background: "rgba(255,255,255,0.2)", color: "white" }}>
-            {userInitials}
+            {displayInitials}
           </div>
         )}
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-white truncate">{userName}</div>
+              <div className="text-sm font-medium text-white truncate">{displayName}</div>
               <div className="text-[10px] chrome-subtle">Trainer</div>
             </div>
           )}

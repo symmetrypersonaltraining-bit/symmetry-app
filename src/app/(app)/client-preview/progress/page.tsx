@@ -8,7 +8,8 @@ import AchievementCard from "@/components/AchievementCard";
 import PersonalBests from "@/components/PersonalBests";
 import ThenVsNow from "@/components/ThenVsNow";
 import ProgressPhotos from "@/components/ProgressPhotos";
-import { TRAINER_EMAIL, isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
+import {TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
+import { coachForViewer } from "@/lib/coachIdentity";
 
 export default async function ClientPreviewProgressPage() {
   const supabase = await createClient();
@@ -34,7 +35,8 @@ export default async function ClientPreviewProgressPage() {
   }
 
   const clientId = clientRecord.id;
-  const clientName = clientRecord.name || `${COACH_FIRST_NAME}`;
+    // The previewing trainer's OWN name as the fallback, not the owner's.
+  const clientName = clientRecord.name || (await coachForViewer(supabase as never, user.id)).firstName;
 
   return (
     <>

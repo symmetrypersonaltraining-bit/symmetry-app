@@ -13,6 +13,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
+import { coachFirstNameForClient } from "@/lib/trainerResolve";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { validateCoachReply } from "@/lib/ai/nutrition-json";
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
       meter: { clientId: clientId, feature: "coach_card" },
       apiKey,
       model: cardModel,
-      system: COACH_SYSTEM_PROMPT,
+      system: COACH_SYSTEM_PROMPT(await coachFirstNameForClient(supabase, clientId, COACH_FIRST_NAME)),
       maxTokens: 900,
       messages: [{ role: "user", content: userText }],
       validate: validateCoachReply,

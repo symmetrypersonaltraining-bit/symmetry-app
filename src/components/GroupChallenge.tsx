@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import ShareToGroup from "@/components/ShareToGroup";
 import { createClient } from "@/lib/supabase/client";
 import { fx } from "@/lib/fx";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 
 /**
  * GroupChallenge — the slim pinned bar at the top of the group chat that opens
@@ -74,6 +75,7 @@ function firstName(n: string) {
 }
 
 export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
+  const { firstName: coachFirstName } = useCoach();
   const supabase = createClient();
 
   const [ch, setCh] = useState<Challenge | null>(null);
@@ -182,7 +184,7 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
         // Previously this fell through to setJoined(true) having written
         // nothing at all — the button said You're in and the board never
         // showed them.
-        window.alert(`Couldn't find your profile — tell ${COACH_FIRST_NAME} and they'll add you.`);
+        window.alert(`Couldn't find your profile — tell ${coachFirstName} and they'll add you.`);
         return;
       }
       const { error } = await supabase

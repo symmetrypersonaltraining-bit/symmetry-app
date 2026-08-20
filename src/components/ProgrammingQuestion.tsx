@@ -17,7 +17,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fx } from "@/lib/fx";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 import AiBadge from "@/components/AiBadge";
 
 interface OpenQuestion {
@@ -27,6 +28,7 @@ interface OpenQuestion {
 }
 
 export default function ProgrammingQuestion() {
+  const { firstName: coachFirstName } = useCoach();
   const [q, setQ] = useState<OpenQuestion | null>(null);
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
@@ -92,7 +94,7 @@ export default function ProgrammingQuestion() {
         }}
       >
         <i className="ti ti-circle-check" style={{ fontSize: 18 }} />
-        Got it — {COACH_FIRST_NAME} will see this before he writes your next block.
+        Got it — {coachFirstName} will see this before he writes your next block.
       </div>
     );
   }
@@ -122,7 +124,7 @@ export default function ProgrammingQuestion() {
             color: "var(--brand-primary)",
           }}
         >
-          A QUESTION FOR YOU · {COACH_FIRST_NAME.toUpperCase()} READS THE ANSWER
+          A QUESTION FOR YOU · {coachFirstName.toUpperCase()} READS THE ANSWER
         </span>
       </div>
 
@@ -167,7 +169,7 @@ export default function ProgrammingQuestion() {
           opacity: busy || !answer.trim() ? 0.55 : 1,
         }}
       >
-        {busy ? "Sending…" : `Send to ${COACH_FIRST_NAME}`}
+        {busy ? "Sending…" : `Send to ${coachFirstName}`}
       </button>
     </div>
   );

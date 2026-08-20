@@ -31,7 +31,8 @@
 
 import { useEffect, useState } from "react";
 import AiBadge from "@/components/AiBadge";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 
 /** Chicago date, so the reset the copy promises is the one the server uses. */
 function chicagoToday(): string {
@@ -102,6 +103,7 @@ export default function AiLimitTakeover({
   /** The number the server enforced, so the copy can never disagree with it. */
   limit?: number | null;
 }) {
+  const { firstName: coachFirstName } = useCoach();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -193,7 +195,7 @@ export default function AiLimitTakeover({
         </div>
 
         <p style={{ fontSize: 13, lineHeight: 1.5, color: "var(--brand-text-secondary)", marginTop: 22 }}>
-          If you are regularly running out, tell {COACH_FIRST_NAME} — the limit
+          If you are regularly running out, tell {coachFirstName} — the limit
           is a setting, not a wall, and he can raise yours.
         </p>
 

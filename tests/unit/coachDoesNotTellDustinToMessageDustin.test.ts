@@ -18,10 +18,23 @@
 // record flows through the identical path and inherits copy written for
 // somebody who has a coach to defer to.
 //
-// The fix is context, not prompt surgery: when the client record's email is the
-// trainer's, the assembled context carries an explicit block saying so. The
+// The fix is context, not prompt surgery: when a client record IS its own
+// trainer, the assembled context carries an explicit block saying so. The
 // prompt keeps working unchanged for everybody else, which matters — it is long,
 // carefully tuned, and shared by the Coach card and the /act surface.
+//
+// ── UPDATED 20 AUG, AND THE UPDATE IS THE POINT ────────────────────────────
+//
+// The detection was `isTrainerEmail(c.email)` — an allowlist. Stephanie's
+// address was added to that allowlist the day she became a trainer, and from
+// that moment opening HER OWN nutrition card told the model that she was
+// Dustin, in the masculine. The guard below was green throughout: it only ever
+// asked whether the coach's own record was recognised, never whose record it
+// was recognised AS.
+//
+// It now asks the honest question — is this client row's own account the
+// account of the trainer who trains it — and the prompt names whoever that
+// turns out to be.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -51,41 +64,71 @@ function db(row: Record<string, unknown> | null) {
 
 const TRAINER_EMAIL = "symmetrypersonaltraining@gmail.com";
 
-test("the coach's own record is recognised as the coach", async () => {
-  const d = db({ name: "Dustin Gautreaux", email: TRAINER_EMAIL, primary_goal: "Fat loss" });
-  const p = await fetchClientProfile(d, "any-id");
-  assert.equal(p?.isCoachThemselves, true, "his own record reads as an ordinary client");
+test("a coach's own record is recognised — for EITHER coach", async () => {
+  // The account on the client row is the account of the trainer who trains it.
+  const dustin = db({
+    name: "Dustin Gautreaux", email: TRAINER_EMAIL, primary_goal: "Fat loss",
+    auth_user_id: "uid-dustin", trainer_id: "t-dustin", trainers: { auth_user_id: "uid-dustin" },
+  });
+  assert.equal((await fetchClientProfile(dustin, "any-id"))?.isCoachThemselves, true,
+    "his own record reads as an ordinary client");
+
+  const steph = db({
+    name: "Steph Gautreaux", email: "steph.rgautreaux@gmail.com", primary_goal: "Strength",
+    auth_user_id: "uid-steph", trainer_id: "t-steph", trainers: { auth_user_id: "uid-steph" },
+  });
+  assert.equal((await fetchClientProfile(steph, "any-id"))?.isCoachThemselves, true,
+    "the second trainer's own record does not read as her own");
+});
+
+test("a trainer who is somebody ELSE's client is not coaching themselves", async () => {
+  // This is the case the email allowlist got wrong, and it is not hypothetical:
+  // Stephanie's client row is trained by Dustin. Under the old check she was
+  // "the coach" on her own nutrition card and the model was told she was him.
+  const d = db({
+    name: "Steph Gautreaux", email: "steph.rgautreaux@gmail.com",
+    auth_user_id: "uid-steph", trainer_id: "t-dustin", trainers: { auth_user_id: "uid-dustin" },
+  });
+  assert.equal((await fetchClientProfile(d, "any-id"))?.isCoachThemselves, false,
+    "a trainer trained by the other trainer still reads as self-coaching");
 });
 
 test("an ordinary client is not", async () => {
-  const d = db({ name: "Claudine Ocon", email: "claudine@example.com", primary_goal: "Fat loss" });
-  const p = await fetchClientProfile(d, "any-id");
-  assert.equal(p?.isCoachThemselves, false);
+  const d = db({
+    name: "Claudine Ocon", email: "claudine@example.com", primary_goal: "Fat loss",
+    auth_user_id: "uid-claudine", trainer_id: "t-dustin", trainers: { auth_user_id: "uid-dustin" },
+  });
+  assert.equal((await fetchClientProfile(d, "any-id"))?.isCoachThemselves, false);
 });
 
-test("a record with no email is treated as a client, not as the coach", async () => {
+test("a record with no account is treated as a client, not as the coach", async () => {
   // Fail toward the ordinary case: wrongly telling a real client they are the
   // trainer is far worse than the copy this fixes.
-  const d = db({ name: "Robby Burns", email: null, primary_goal: "Strength" });
-  const p = await fetchClientProfile(d, "any-id");
-  assert.equal(p?.isCoachThemselves, false);
+  const d = db({ name: "Robby Burns", email: null, auth_user_id: null, trainer_id: "t-dustin",
+                 trainers: { auth_user_id: "uid-dustin" } });
+  assert.equal((await fetchClientProfile(d, "any-id"))?.isCoachThemselves, false);
 });
 
-test("the profile query actually asks for email", async () => {
-  // Without the column the check silently answers false for everyone and the
-  // bug comes back with every test above still green.
-  const d = db({ name: "Dustin", email: TRAINER_EMAIL });
+test("the profile query asks for the columns the check depends on", async () => {
+  // Without these the check silently answers false for everyone and the bug
+  // comes back with every test above still green.
+  const d = db({ name: "Dustin", auth_user_id: "u", trainer_id: "t", trainers: { auth_user_id: "u" } });
   await fetchClientProfile(d, "any-id");
-  assert.match(d.selected, /\bemail\b/, "email is not selected — isCoachThemselves can never be true");
+  for (const col of ["auth_user_id", "trainer_id", "trainers(auth_user_id)"]) {
+    assert.ok(d.selected.includes(col), col + " is not selected — isCoachThemselves can never be true");
+  }
 });
 
 test("the context tells the model, in terms, not to redirect him to himself", () => {
   const i = SRC.indexOf("profile?.isCoachThemselves");
   assert.ok(i > 0, "the coach-reading-their-own-record case is not handled at all");
   const block = SRC.slice(i, i + 1400);
-  assert.match(block, /NEVER tell him to message, ask, check with, or run anything by/i,
+  assert.match(block, /NEVER tell them to message, ask, check with, or run anything by/i,
     "the instruction does not actually forbid the thing that went wrong");
-  assert.match(block, /third person/i, "nothing stops it talking about him as though he were absent");
+  assert.match(block, /third person/i, "nothing stops it talking about them as though they were absent");
+  // Gender-neutral, because there are two coaches now and one of them is not a
+  // "him". The old wording said "he/him" six times.
+  assert.doesNotMatch(block, /\bhimself\b|\bhe is\b/i, "the block still assumes the coach is a man");
 });
 
 test("the block is conditional — 29 other clients still have a coach to talk to", () => {
@@ -113,6 +156,13 @@ test("the block is conditional — 29 other clients still have a coach to talk t
 test("the shared system prompt is untouched", () => {
   // It is long, tuned, and shared by the Coach card and /act. The fix belongs
   // in context precisely so this keeps working for everyone.
-  assert.match(SRC, /suggestions for the client to run by \$\{COACH_FIRST_NAME\}/,
-    "the prompt was edited instead of the context — that changes behaviour for all 30 clients");
+  // `${coachFirstName}`, not `${COACH_FIRST_NAME}`: the prompt became a
+  // function of the coach's name on 20 Aug, because one build-time constant
+  // cannot name two trainers. The SHAPE of the instruction is what this guards
+  // — that plan changes are still handed to the coach rather than decided by
+  // the model — not which identifier supplies the name.
+  assert.match(SRC, /suggestions for the client to run by \$\{coachFirstName\}/,
+    "the prompt was edited instead of the context — that changes behaviour for every client");
+  assert.match(SRC, /export const COACH_SYSTEM_PROMPT = \(coachFirstName: string/,
+    "the prompt is back to a module constant, so it names one trainer for everybody");
 });

@@ -18,6 +18,8 @@ import RefreshHandle from "@/components/RefreshHandle";
 import GlobalCoach from "@/components/GlobalCoach";
 import { isTrainerEmail } from "@/lib/trainer";
 import { getServerUser } from "@/lib/auth/serverUser";
+import { coachForViewer } from "@/lib/coachIdentity";
+import { CoachProvider } from "@/lib/useCoach";
 
 export default async function AppLayout({
   children,
@@ -38,11 +40,20 @@ export default async function AppLayout({
   const email = user?.email ?? "";
   const isTrainer = isTrainerEmail(email);
 
+  // WHOSE COACH. Resolved once, here, and handed to every client component
+  // through the provider — 66 files rendered a coach's name from a build-time
+  // env var, which one deployment cannot make correct for two trainers.
+  // Degrades to the owner's name and NO FACE if it cannot resolve: a generic
+  // name is a small wrong, another trainer's photograph is the thing this
+  // exists to prevent.
+  const coach = await coachForViewer(supabase as never, user?.id);
+
   if (isTrainer) {
     return (
       // One provider, wrapping everything that reads unread — the bell in
       // HeaderAssist, the banner, and the nav badge. Mounted here so there can
       // only ever be one of it.
+      <CoachProvider value={coach}>
       <NotificationProvider>
         <RealtimeScheduleSync />
         <PushRegister />
@@ -50,10 +61,12 @@ export default async function AppLayout({
         <MessageNotifier />
           <TrainerLayoutWrapper>{children}</TrainerLayoutWrapper>
       </NotificationProvider>
+      </CoachProvider>
     );
   }
 
   return (
+    <CoachProvider value={coach}>
     <NotificationProvider>
     <div className="min-h-screen app-bg">
       <RealtimeScheduleSync />
@@ -81,5 +94,6 @@ export default async function AppLayout({
       <BottomNav />
     </div>
     </NotificationProvider>
+    </CoachProvider>
   );
 }

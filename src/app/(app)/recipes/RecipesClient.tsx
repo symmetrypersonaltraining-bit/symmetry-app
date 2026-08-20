@@ -14,7 +14,8 @@
 import { useMemo, useState } from "react";
 import NumericInput from "@/components/NumericInput";
 import { createClient } from "@/lib/supabase/client";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 import AiBadge from "@/components/AiBadge";
 import {
   perServing, recipeTotals, validateRecipe, visibilityLabel,
@@ -55,6 +56,7 @@ export default function RecipesClient({
   shared: RecipeRow[];
   pending: RecipeRow[];
 }) {
+  const { firstName: coachFirstName } = useCoach();
   const [tab, setTab] = useState<Tab>(mine.length || !shared.length ? "mine" : "shared");
   const [editing, setEditing] = useState<RecipeRow | "new" | null>(null);
   const [viewing, setViewing] = useState<RecipeRow | null>(null);
@@ -133,7 +135,7 @@ export default function RecipesClient({
           {tab === "mine"
             ? "Nothing here yet. Build one — type the ingredients in and let the app work out the numbers, or pull them from the food database."
             : tab === "shared"
-            ? `No shared recipes yet. Build one you're proud of and send it to ${COACH_FIRST_NAME}.`
+            ? `No shared recipes yet. Build one you're proud of and send it to ${coachFirstName}.`
             : "Nothing waiting on you."}
         </div>
       ) : (
@@ -168,7 +170,7 @@ export default function RecipesClient({
 
               {rec.review_note && rec.visibility === "rejected" && (
                 <div style={{ fontSize: 11.5, color: "var(--brand-text-secondary)", marginTop: 8, paddingLeft: 10, borderLeft: "2px solid var(--brand-border)" }}>
-                  {COACH_FIRST_NAME}: {rec.review_note}
+                  {coachFirstName}: {rec.review_note}
                 </div>
               )}
 
@@ -201,7 +203,7 @@ export default function RecipesClient({
                     ) : rec.visibility !== "public" ? (
                       <button disabled={busy} onClick={() => act({ action: "submit", id: rec.id })}
                         style={{ flex: 1, fontSize: 12.5, fontWeight: 800, padding: "9px 10px", borderRadius: 10, border: "1px solid var(--brand-primary)", background: "transparent", color: "var(--brand-primary)", cursor: "pointer" }}>
-                        Send to {COACH_FIRST_NAME}
+                        Send to {coachFirstName}
                       </button>
                     ) : null}
                     <button disabled={busy} onClick={() => { if (confirm("Delete this recipe?")) act({ action: "delete", id: rec.id }); }}
@@ -251,6 +253,7 @@ function RecipeCover({ title, size }: { title: string; size: number }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function RecipeView({ rec, planMeals, onClose }: { rec: RecipeRow; planMeals: { id: string; name: string; position: number }[]; onClose: () => void }) {
+  const { firstName: coachFirstName } = useCoach();
   const [ings, setIngs] = useState<{ food: string; amount: number | null; unit: string | null; protein: number; carbs: number; fats: number; source: string; note: string | null }[] | null>(null);
   const supabase = useMemo(() => createClient(), []);
   // Logging it is the point of having cooked it.
@@ -261,7 +264,7 @@ function RecipeView({ rec, planMeals, onClose }: { rec: RecipeRow; planMeals: { 
   // Make it a meal, not just today's entry. Which slot is the client's call —
   // this is their plan, and a recipe that lands in the wrong one is worse than
   // no button. The server clones a trainer-authored plan before writing, so
-  // {COACH_FIRST_NAME}'s original is archived and restorable, never overwritten.
+  // {coachFirstName}'s original is archived and restorable, never overwritten.
   const [slot, setSlot] = useState("");
   const [planning, setPlanning] = useState(false);
   // The permanent change asks once. See the confirm block below for why.
@@ -289,7 +292,7 @@ function RecipeView({ rec, planMeals, onClose }: { rec: RecipeRow; planMeals: { 
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) { setLogged((json && json.error) || "Couldn't add that to your plan."); return; }
       setLogged(json.cloned
-        ? `Swapped into your plan from today on 📌 — ${COACH_FIRST_NAME}'s version is saved under Plan versions if you want it back`
+        ? `Swapped into your plan from today on 📌 — ${coachFirstName}'s version is saved under Plan versions if you want it back`
         : "Swapped into your plan from today on 📌 — the old version is under Plan versions if you want it back");
     } catch {
       setLogged("Network error — check your connection.");
@@ -463,6 +466,7 @@ function RecipeBuilder({
   onCancel: () => void;
   onSaved: () => void;
 }) {
+  const { firstName: coachFirstName } = useCoach();
   const supabase = useMemo(() => createClient(), []);
   const [title, setTitle] = useState(initial?.title || "");
   const [description, setDescription] = useState(initial?.description || "");
@@ -829,7 +833,7 @@ function RecipeBuilder({
           </button>
           <button onClick={() => save(true)} disabled={busy}
             style={{ flex: "0 0 auto", padding: "12px 14px", borderRadius: 12, border: "1px solid var(--brand-primary)", background: "transparent", color: "var(--brand-primary)", fontWeight: 800, fontSize: 13, cursor: busy ? "default" : "pointer" }}>
-            Save + send to {COACH_FIRST_NAME}
+            Save + send to {coachFirstName}
           </button>
         </div>
       </div>

@@ -26,7 +26,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 import { createClient } from "@/lib/supabase/client";
 import {
   NOTIFICATION_EVENTS,
@@ -207,6 +208,7 @@ export default function NotificationSettings({ isTrainer }: { isTrainer: boolean
  * press, on a screen that has just told them what the notifications are for.
  */
 function EnablePushOnThisDevice() {
+  const { firstName: coachFirstName } = useCoach();
   const [state, setState] = useState<"checking" | "unsupported" | "unconfigured" | "on" | "off" | "blocked" | "working">("checking");
   const [err, setErr] = useState<string | null>(null);
 
@@ -319,7 +321,7 @@ function EnablePushOnThisDevice() {
     <div style={box}>
       <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>Turn on notifications</p>
       <p className="text-xs mt-1 mb-2" style={{ color: "var(--brand-text-secondary)", lineHeight: 1.5 }}>
-        Without this you won&rsquo;t hear about messages from {COACH_FIRST_NAME}, group chat, or your
+        Without this you won&rsquo;t hear about messages from {coachFirstName}, group chat, or your
         payment reminders — the switches below have nothing to reach you with.
       </p>
       {err && <p className="text-xs mb-2" style={{ color: "#DC2626" }}>{err}</p>}

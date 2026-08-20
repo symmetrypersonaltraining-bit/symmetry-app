@@ -27,7 +27,8 @@ import MicButton from "@/components/MicButton";
 import { surfaceMood, type Mood } from "@/lib/ai/faces";
 import { claimCoachSlot } from "@/lib/ai/coachMount";
 import { kcalOf } from "@/lib/nutrition/dailyTotals";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 import Sheet from "./Sheet";
 import AiLimitTakeover, { shouldShowTakeover } from "@/components/AiLimitTakeover";
 
@@ -137,7 +138,10 @@ const ACTION_CHIPS = ["Swap a meal", "Move a meal", "I ate something extra"];
  *
  * The opener is the one thing that should know where it is standing.
  */
-const OPENERS: Record<string, { greeting: string; chips: string[] }> = {
+// A FUNCTION of the coach's name, not a module constant. Two of these lines
+// name the coach, and baked in at import time they told a client of
+// Stephanie's to ask Dustin — and to ask "him".
+const OPENERS = (coachFirstName: string): Record<string, { greeting: string; chips: string[] }> => ({
   nutrition: {
     greeting:
       "Hey — I'm your coach. I can see your logs, targets and trends. Ask me anything — or tell me what to change (\"swap M4 for salmon and rice\", \"I ate a cookie\") and I'll set it up for you to confirm.",
@@ -161,8 +165,8 @@ const OPENERS: Record<string, { greeting: string; chips: string[] }> = {
     chips: ["What should I focus on this week?", "How did last week go?", "What am I behind on?"],
   },
   messages: {
-    greeting: "Ask me anything. If it needs a real decision from " + COACH_FIRST_NAME + ", I'll tell you to ask him rather than guess.",
-    chips: ["What should I ask " + COACH_FIRST_NAME + "?", "How's my week going?", "What should I focus on?"],
+    greeting: "Ask me anything. If it needs a real decision from " + coachFirstName + ", I'll tell you to ask rather than guess.",
+    chips: ["What should I ask " + coachFirstName + "?", "How's my week going?", "What should I focus on?"],
   },
   settings: {
     greeting: "Ask me how anything in here works — or anything about your training and eating, same as always.",
@@ -176,7 +180,7 @@ const OPENERS: Record<string, { greeting: string; chips: string[] }> = {
     greeting: "I'm your coach — I can see your training, your eating and your trend. Ask me anything.",
     chips: ["How's my week going?", "What should I focus on?", "What should I change?"],
   },
-};
+});
 
 const CAP_MESSAGE =
   "You've maxed out Coach for today — I'll be back with fresh answers tomorrow. Everything you log still counts as normal.";
@@ -315,6 +319,7 @@ export default function CoachChatSheet({
   /** Told when the sheet closes, so the owner can drop it. */
   onClose?: () => void;
 }) {
+  const { firstName: coachFirstName } = useCoach();
   const todayCT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   const isToday = selectedDate === todayCT;
   // "today" when it is, an unmissable date when it is not.
@@ -322,7 +327,8 @@ export default function CoachChatSheet({
     ? "today"
     : new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
-  const opener = OPENERS[surface] ?? OPENERS.app;
+  const openers = OPENERS(coachFirstName);
+  const opener = openers[surface] ?? openers.app;
   const GREETING = contextLine ? `${contextLine} ${opener.greeting}` : opener.greeting;
 
   const supabase = useMemo(() => createClient(), []);
@@ -612,7 +618,7 @@ export default function CoachChatSheet({
         ...m,
         {
           role: "coach" as const,
-          text: "Sent to " + COACH_FIRST_NAME + " — he'll come back to you in Messages. No need to ask me again in the meantime.",
+          text: "Sent to " + coachFirstName + " — he'll come back to you in Messages. No need to ask me again in the meantime.",
         },
       ]);
     } catch (e) {
@@ -621,7 +627,7 @@ export default function CoachChatSheet({
         ...m,
         {
           role: "coach" as const,
-          text: "I couldn't get that to " + COACH_FIRST_NAME + (why ? " — " + why : "") + ". Message him directly from the Messages tab and it'll reach him.",
+          text: "I couldn't get that to " + coachFirstName + (why ? " — " + why : "") + ". Message him directly from the Messages tab and it'll reach him.",
         },
       ]);
     } finally {
@@ -723,10 +729,10 @@ export default function CoachChatSheet({
                       }}
                     >
                       {escalated.has(mi)
-                        ? "✓ Sent to " + COACH_FIRST_NAME
+                        ? "✓ Sent to " + coachFirstName
                         : escalating === mi
                           ? "Sending…"
-                          : "Send this to " + COACH_FIRST_NAME}
+                          : "Send this to " + coachFirstName}
                     </button>
                   )}
                   {msg.action && (

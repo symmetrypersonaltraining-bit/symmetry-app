@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import SignOutButton from "./SignOutButton";
-import { isTrainerEmail, COACH_NAME } from "@/lib/trainer";
+import { isTrainerEmail } from "@/lib/trainer";
+import { coachForViewer } from "@/lib/coachIdentity";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -17,7 +18,10 @@ export default async function ProfilePage() {
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
-  const displayName = isTrainer ? `${COACH_NAME}` : client?.name || user.email || "Client";
+  // The SIGNED-IN trainer's own name. `COACH_NAME` is one build-time env var,
+  // so Stephanie's own profile said "Dustin Gautreaux".
+  const me = isTrainer ? await coachForViewer(supabase as never, user.id) : null;
+  const displayName = isTrainer ? me!.name : client?.name || user.email || "Client";
   const initials = displayName
     .split(" ")
     .map((n: string) => n[0])

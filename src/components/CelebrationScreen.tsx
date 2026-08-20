@@ -8,7 +8,8 @@ import CountUp from "@/components/CountUp";
 import ShareToGroup from "@/components/ShareToGroup";
 import { sendGroupMessage } from "@/app/(app)/home/messageActions";
 import { fx } from "@/lib/fx";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 import AiBadge from "@/components/AiBadge";
 import { winMood, type Mood } from "@/lib/ai/faces";
 
@@ -156,7 +157,36 @@ export default function CelebrationScreen({
   // widens the wheel. The ten new ones all read from the SESSION'S OWN numbers
   // rather than being generic art, because a screen that says the same thing to
   // everybody is a screen people stop reading after a fortnight.
-  const variant = seed % 38;
+  // ── WHOSE COACH, AND WHOSE FACE ─────────────────────────────────────────
+  //
+  // Two of the cards below were a PHOTOGRAPH OF DUSTIN, hardcoded:
+  // /coach-flex.webp on variant 26 (roughly 1 completed session in 38, every
+  // client in the app) and /coach-head.webp on every big PR, which overrides
+  // whichever variant rolled. A client of Stephanie's finished a workout and
+  // got a full-screen picture of a man they have never met, captioned COACH
+  // APPROVED.
+  //
+  // Those two files are cutouts of the owner specifically, so they are used
+  // only for the owner. Any other coach gets their own round avatar in the same
+  // slot. A coach with no avatar yet gets NEITHER — the card is skipped and a
+  // different one shows, because the alternative is putting somebody else's
+  // face on it.
+  const coach = useCoach();
+  const coachName = coach.firstName;
+  const coachIsOwnerWithCutout = coach.isOwner;
+  const coachFaceUrl: string | null = coach.avatarUrl;
+  const hasCoachFace = coachIsOwnerWithCutout || !!coachFaceUrl;
+
+  let variant = seed % 38;
+  // Coach Mode is the one card that is nothing but the coach's face. Without a
+  // face there is no card, so roll to the next one rather than render an empty
+  // frame.
+  //
+  // Written through a named constant deliberately: celebrationLayout.test.ts
+  // counts `variant === N` literals to prove every concept is reachable exactly
+  // once, and a second literal 26 here reads to it as a duplicated concept.
+  const COACH_MODE = 26;
+  if (variant === COACH_MODE && !hasCoachFace) variant = COACH_MODE + 1;
 
   const [tapIdx, setTapIdx] = useState(0);
   const [reroll, setReroll] = useState(0);
@@ -242,7 +272,7 @@ export default function CelebrationScreen({
   // constant so the list stays a plain module constant and the coach entry only
   // exists on the sessions where we actually know his weight.
   const units: [string, number, string][] = coachWeight
-    ? [...UNITS, [`coach ${COACH_FIRST_NAME}s (` + coachWeight + " lb, and cutting)", coachWeight, "🧍‍♂️"]]
+    ? [...UNITS, [`coach ${coachName}s (` + coachWeight + " lb)", coachWeight, "🧍"]]
     : UNITS;
   const unit = units[(seed + reroll) % units.length];
   const unitCount = Math.max(1, Math.round(volume / unit[1]));
@@ -251,9 +281,9 @@ export default function CelebrationScreen({
     ? `🏆 ${firstName} just hit a PR — ${topPr.movement} ${loadLabel(topPr.weight, !!topPr.assistance)} × ${topPr.reps}` +
       (topPr.previous ? ` (was ${loadLabel(topPr.previous, !!topPr.assistance)})` : "")
     : `💪 ${firstName} just finished ${dayLabel || "a session"} — ${setCount} sets, ${vStr} lb moved` +
-      (dustins ? ` — that's ${dustins} coach ${COACH_FIRST_NAME}${dustins === 1 ? "" : "s"}.` : ".");
+      (dustins ? ` — that's ${dustins} coach ${coachName}${dustins === 1 ? "" : "s"}.` : ".");
   // ── PR auto-share ────────────────────────────────────────────────────────
-  // {COACH_FIRST_NAME}: PRs go to the group on their own, with no notification.
+  // The coach: PRs go to the group on their own, with no notification.
   //
   // The Share button stays — sharing an ordinary session is still a choice —
   // but a PR is the thing most worth the group seeing and the thing a client is
@@ -851,11 +881,20 @@ export default function CelebrationScreen({
           </div>
 
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/coach-flex.webp"
-            alt={`Coach ${COACH_FIRST_NAME}, flexing`}
-            style={{ width: 168, height: "auto", display: "block", marginTop: 10, filter: "drop-shadow(0 14px 22px rgba(0,0,0,.5))", animation: "cs-flex 2.6s ease-in-out .4s 3", transformOrigin: "50% 100%" }}
-          />
+          {coachIsOwnerWithCutout ? (
+            <img
+              src="/coach-flex.webp"
+              alt={`Coach ${coachName}, flexing`}
+              style={{ width: 168, height: "auto", display: "block", marginTop: 10, filter: "drop-shadow(0 14px 22px rgba(0,0,0,.5))", animation: "cs-flex 2.6s ease-in-out .4s 3", transformOrigin: "50% 100%" }}
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={coachFaceUrl as string}
+              alt={`Coach ${coachName}`}
+              style={{ width: 132, height: 132, borderRadius: "50%", objectFit: "cover", display: "block", marginTop: 10, border: "3px solid rgba(255,255,255,.9)", filter: "drop-shadow(0 14px 22px rgba(0,0,0,.5))", animation: "cs-flex 2.6s ease-in-out .4s 3", transformOrigin: "50% 100%" }}
+            />
+          )}
         </button>
 
         <div style={{ position: "relative", zIndex: 1, background: "#E53935", color: "#fff", fontSize: 9.5, fontWeight: 900, letterSpacing: 2.5, padding: "5px 14px", borderRadius: "8px 8px 0 0" }}>
@@ -927,7 +966,7 @@ export default function CelebrationScreen({
           {min > 0 ? ` in ${min} minutes` : ""}, having been offered several perfectly
           reasonable opportunities not to.
         </div>
-        <div style={{ fontSize: 10, color: "#8a7f6b", marginTop: 14, fontStyle: "italic" }}>Signed, {COACH_FIRST_NAME}. Unframed, as is tradition.</div>
+        <div style={{ fontSize: 10, color: "#8a7f6b", marginTop: 14, fontStyle: "italic" }}>Signed, {coachName}. Unframed, as is tradition.</div>
       </div>
     );
   } else if (variant === 31) {
@@ -1120,7 +1159,10 @@ export default function CelebrationScreen({
   // so it stays a thing that happens to you a few times a year rather than a
   // card you get bored of. The PR plate above already carries the numbers, so
   // this card is the reaction, not a second scoreboard.
-  if (bigPr && topPr) {
+  // hasCoachFace: the apparition IS the coach's face. Without one there is
+  // nothing to materialise, so the ordinary variant stands rather than a
+  // stranger's photograph appearing in a golden halo.
+  if (bigPr && topPr && hasCoachFace) {
     const jump = Math.round(Math.abs(prGain));
     content = (
       <div style={{ ...bigCard, background: "radial-gradient(100% 80% at 50% 34%, #3a2c10 0%, #150f04 62%, #080602 100%)", padding: "22px 16px" }}>
@@ -1130,9 +1172,11 @@ export default function CelebrationScreen({
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/coach-head.webp"
-          alt={`Coach ${COACH_FIRST_NAME} has appeared`}
-          style={{ width: 132, height: "auto", display: "block", margin: "14px 0 4px", position: "relative", zIndex: 1, filter: "drop-shadow(0 0 26px rgba(224,168,62,.55))", animation: "cs-bob 3.4s ease-in-out .3s infinite" }}
+          src={coachIsOwnerWithCutout ? "/coach-head.webp" : (coachFaceUrl as string)}
+          alt={`Coach ${coachName} has appeared`}
+          style={coachIsOwnerWithCutout
+            ? { width: 132, height: "auto", display: "block", margin: "14px 0 4px", position: "relative", zIndex: 1, filter: "drop-shadow(0 0 26px rgba(224,168,62,.55))", animation: "cs-bob 3.4s ease-in-out .3s infinite" }
+            : { width: 120, height: 120, borderRadius: "50%", objectFit: "cover", display: "block", margin: "14px auto 4px", position: "relative", zIndex: 1, border: "3px solid rgba(224,168,62,.8)", filter: "drop-shadow(0 0 26px rgba(224,168,62,.55))", animation: "cs-bob 3.4s ease-in-out .3s infinite" }}
         />
         <div style={{ position: "relative", zIndex: 1, fontSize: 18.5, fontWeight: 900, color: "#ffe9b0", lineHeight: 1.25, marginTop: 8 }}>
           {topPr.assistance
@@ -1140,8 +1184,8 @@ export default function CelebrationScreen({
             : `${firstName} put ${jump} more pound${jump === 1 ? "" : "s"} on ${topPr.movement}.`}
         </div>
         <div style={{ position: "relative", zIndex: 1, fontSize: 12.5, color: "#d9c18a", marginTop: 8, maxWidth: 270, lineHeight: 1.55 }}>
-          Coach {COACH_FIRST_NAME} has materialised. He only does this for the big ones. He
-          will not be answering questions.
+          Coach {coachName} has materialised. {coachName} only does this for the big
+          ones, and will not be answering questions.
         </div>
       </div>
     );
@@ -1158,7 +1202,7 @@ export default function CelebrationScreen({
           the stats and the coach-units line had already used the screen up,
           "left over" was less than the card's content, and `overflow: hidden`
           plus `justifyContent: center` sheared it at BOTH ends: the top of
-          {COACH_FIRST_NAME}&rsquo;s head gone, the headline cut through the middle of a word,
+          {coachName}&rsquo;s head gone, the headline cut through the middle of a word,
           the paragraph under it missing entirely. Nothing scrolled, because a
           child that shrinks to fit never creates overflow to scroll. */}
       <div style={scrollArea}>
@@ -1216,10 +1260,10 @@ export default function CelebrationScreen({
         <div style={dustinBox}>
           <span style={{ fontSize: 20, lineHeight: 1 }}>🧍‍♂️</span>
           <span style={{ flex: 1, lineHeight: 1.45 }}>
-            That&rsquo;s <b style={{ color: "var(--brand-primary)", fontSize: 15 }}>{dustins}</b> coach {COACH_FIRST_NAME}
+            That&rsquo;s <b style={{ color: "var(--brand-primary)", fontSize: 15 }}>{dustins}</b> coach {coachName}
             {dustins === 1 ? "" : "s"} lifted today.
             <span style={{ display: "block", fontSize: 10.5, color: "var(--brand-text-secondary)", marginTop: 2 }}>
-              He weighs {coachWeight} lb. He did not consent to this.
+              {coachName} weighs {coachWeight} lb, and did not consent to this.
             </span>
           </span>
         </div>

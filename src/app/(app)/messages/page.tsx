@@ -49,6 +49,37 @@ export default async function MessagesPage(props: {
       senderNames[cc.auth_user_id] = full.split(" ")[0];
       senderAvatars[cc.auth_user_id] = { url: cc.avatar_url || null, initials: initialsOf(full) };
     }
+    // A COACH POSTING IN THE GROUP SHOWS THEIR COACH PHOTO.
+    //
+    // Dustin, 20 Aug: "In the group chat, either one of us can post and they
+    // should see our actual profile or our avatar."
+    //
+    // This map was built only from `clients`, so a trainer appeared here purely
+    // because they happen to also have a client row of their own — and the
+    // picture it found was `clients.avatar_url`, a different column from the one
+    // every other coach surface reads (`trainers.avatar_url`). Two consequences,
+    // both silent: a coach with no client row is a blank circle in the room they
+    // run, and an avatar uploaded for the coaching surfaces does not appear on
+    // their own group posts.
+    //
+    // Applied AFTER the client loop so the coach's own row cannot win over it,
+    // and only where a coach photo actually exists — an absent one leaves the
+    // initials that were already there.
+    const { data: coachRows } = await supabase
+      .from("trainers")
+      .select("auth_user_id, name, avatar_url")
+      .eq("active", true)
+      .not("auth_user_id", "is", null);
+    for (const t of (coachRows || []) as any[]) {
+      if (!t.auth_user_id) continue;
+      const full = String(t.name || "").trim();
+      if (!senderNames[t.auth_user_id] && full) senderNames[t.auth_user_id] = full.split(" ")[0];
+      const existing = senderAvatars[t.auth_user_id];
+      senderAvatars[t.auth_user_id] = {
+        url: t.avatar_url || existing?.url || null,
+        initials: existing?.initials || initialsOf(full),
+      };
+    }
     return (
       <MessagesClient
         isTrainer={isTrainer}

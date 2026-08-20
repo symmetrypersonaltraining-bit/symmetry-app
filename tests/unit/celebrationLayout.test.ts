@@ -89,7 +89,10 @@ test("Done is pinned outside the scrolling region", () => {
  * and the blocks written separately. This makes the two agree or fail the build.
  */
 test("every index the modulus can produce lands on a concept, and every concept is reachable", () => {
-  const mod = CODE.match(/const variant = seed % (\d+);/);
+  // `let`, not `const`, since 20 Aug: Coach Mode (26) is nothing but the
+  // coach's photograph, and a coach with no photo on file rolls past it rather
+  // than rendering an empty frame or somebody else's face.
+  const mod = CODE.match(/(?:const|let) variant = seed % (\d+);/);
   assert.ok(mod, "the variant rotation is no longer `seed % N` — this guard needs updating with it");
   const n = Number(mod![1]);
 

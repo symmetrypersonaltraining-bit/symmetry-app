@@ -33,7 +33,8 @@ import CoachChatSheet, { CoachActionItem, CoachActions } from "./CoachChatSheet"
 import GroceryPrepSheet from "./GroceryPrepSheet";
 import PlanRangeView from "../PlanRangeView";
 import { useNutritionAverages, RangeKey as AvgRangeKey, shiftDate } from "@/components/nutrition/useNutritionAverages";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -167,6 +168,7 @@ async function compressPhoto(file: File): Promise<{ base64: string; blob: Blob }
 // ---------------------------------------------------------------------------
 
 export default function NutritionV3Client(props: Props) {
+  const { firstName: coachFirstName } = useCoach();
   const { clientId, clientName, mealPlan, livePlans, incomingPlan, todayLogs, macroTarget, today } = props;
   const supabase = useMemo(() => createClient(), []);
 
@@ -1551,7 +1553,7 @@ export default function NutritionV3Client(props: Props) {
                   {avgResult && avgResult.adherence != null ? Math.round(avgResult.adherence) + "%" : "—"}
                 </p>
                 <p style={{ color: "var(--brand-text-secondary)", fontSize: 9, fontWeight: 700, letterSpacing: 0.8 }}>ADHERENCE</p>
-                {/* Adherence = logging consistency × macro accuracy ({COACH_FIRST_NAME},
+                {/* Adherence = logging consistency × macro accuracy ({coachFirstName},
                     2026-07-31). It only reads "plan meals" when the client has
                     no macro target and the old meal-status average had to run. */}
                 <p style={{ color: "var(--brand-text-secondary)", fontSize: 9 }}>
@@ -2299,7 +2301,7 @@ export default function NutritionV3Client(props: Props) {
             if (!res.ok || !json?.ok) { toast.error((json && json.error) || "Couldn't save that to your plan"); return; }
             closeAllSheets();
             toast.success(json.cloned
-              ? `Saved to your plan 📌 — this is your version now, ${COACH_FIRST_NAME}'s is in your history`
+              ? `Saved to your plan 📌 — this is your version now, ${coachFirstName}'s is in your history`
               : "Saved to your plan 📌", { duration: 4000 });
             setTimeout(() => { try { window.location.reload(); } catch { /* noop */ } }, 1400);
           } catch {
@@ -2733,6 +2735,7 @@ function PlanAdjustSheet({
   onClose: () => void;
   onBack: () => void;
 }) {
+  const { firstName: coachFirstName } = useCoach();
   const [amounts, setAmounts] = useState<Record<string, number>>(() => {
     const seed: Record<string, number> = {};
     for (const it of meal.meal_items || []) {
@@ -2833,7 +2836,7 @@ function PlanAdjustSheet({
         📌 Save to my plan — every day
       </button>
       <p className="text-center mt-2" style={{ fontSize: 11, color: "var(--brand-text-secondary)", lineHeight: 1.4 }}>
-        Keeps this meal the way you just set it. {COACH_FIRST_NAME}&rsquo;s original plan is saved to your history, not overwritten.
+        Keeps this meal the way you just set it. {coachFirstName}&rsquo;s original plan is saved to your history, not overwritten.
       </p>
     </Sheet>
   );

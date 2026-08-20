@@ -45,10 +45,12 @@ export default function PrivacyPage() {
 
       <S title="Who this is about">
         <p style={{ marginTop: 0 }}>
-          Symmetry Personal Training is a personal training studio run by Dustin Gautreaux.
-          This app is used by Dustin and by the clients he trains. It is not a public
-          product and it is not sold to anyone. If you are reading this, you are almost
-          certainly one of about thirty-five people who train with him.
+          Symmetry Personal Training is a personal training studio owned by Dustin
+          Gautreaux. This app is used by the studio&rsquo;s trainers and by the clients they
+          train. It is not a public product and it is not sold to anyone. If you are
+          reading this, you are almost certainly one of the people who train here.
+          Where this policy says <b>your coach</b>, it means the trainer you are assigned
+          to — not every trainer at the studio.
         </p>
         <p>
           Questions about anything here go to <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
@@ -63,12 +65,12 @@ export default function PrivacyPage() {
             reps, weights, times and notes you log, and your session history.</li>
           <li><b>Nutrition</b> — your meal plan, what you log against it, foods and recipes
             you save, and photos you attach to a meal.</li>
-          <li><b>Body metrics</b> — weight, body fat and measurements, when you or Dustin
-            record them.</li>
+          <li><b>Body metrics</b> — weight, body fat and measurements, when you or your
+            coach record them.</li>
           <li><b>Photos</b> — progress photos you take, and screenshots you attach to
-            feedback. Progress photos are visible to you and to Dustin, and to nobody else
-            unless you choose to share one to the group chat.</li>
-          <li><b>Messages</b> — what you send to Dustin, and what you post in the group chat.</li>
+            feedback. Progress photos are visible to you and to your coach, and to nobody
+            else unless you choose to share one to the group chat.</li>
+          <li><b>Messages</b> — what you send to your coach, and what you post in the group chat.</li>
           <li><b>Scheduling and payments</b> — your sessions, cancellations, and what is
             owed for them. The app does not process card payments and never sees a card
             number.</li>
@@ -85,8 +87,12 @@ export default function PrivacyPage() {
       <S title="Who can see it">
         <ul style={{ paddingLeft: 20, marginTop: 0 }}>
           <li><b>You</b> — everything of yours.</li>
-          <li><b>Dustin</b> — your training, nutrition, metrics, photos, messages and
-            scheduling, because that is what coaching you requires.</li>
+          <li><b>Your coach</b> — your training, nutrition, metrics, photos, messages and
+            scheduling, because that is what coaching you requires. Another trainer at the
+            studio cannot see any of it.</li>
+          <li><b>The studio owner</b> (Dustin Gautreaux) — the same, for any client of the
+            studio. He runs the business and is responsible for it, so his access is not
+            limited to the clients he personally trains.</li>
           <li><b>Other clients</b> — only your <i>first name</i> and a count of days
             trained, and only on the community leaderboard and group challenge, and only if
             you turn that on. It is off by default. Nothing about your body, your weight,
@@ -128,7 +134,7 @@ export default function PrivacyPage() {
           <li>Nothing is read until you connect the source and grant permission, per data
             type.</li>
           <li>It is used for one purpose: showing your training and progress inside this
-            app, to you and to Dustin.</li>
+            app, to you and to your coach.</li>
           <li>It is <b>never</b> used for advertising or marketing, <b>never</b> sold, and
             <b> never</b> shared with a third party for their own purposes.</li>
           <li>Health data read from Apple Health is not stored in iCloud.</li>
@@ -140,7 +146,7 @@ export default function PrivacyPage() {
 
       <S title="How long it is kept, and how to get rid of it">
         <p style={{ marginTop: 0 }}>
-          Your data is kept while you are training with Dustin, because the value of it is
+          Your data is kept while you are training with us, because the value of it is
           the history. When you stop, ask and it will be deleted — or ask for a copy first
           and you will get one. Individual items (a photo, a message, a logged meal) you can
           delete yourself in the app at any time.

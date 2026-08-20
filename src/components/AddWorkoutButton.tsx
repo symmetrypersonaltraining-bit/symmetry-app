@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { FunLoader } from "@/components/FunMoments";
 import ManualWorkoutBuilder from "@/components/ManualWorkoutBuilder";
 import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 import { sessionsReplacedBy, slotForReplacement, skipVerdict, describeReplaced, type DateOccupant } from "@/lib/replaceOnDate";
 
 type LibDay = { id: string; label: string };
@@ -26,6 +27,7 @@ function daysAgoCT(n: number) {
 }
 
 export default function AddWorkoutButton({ dateStr, label = "+ Add workout", clientId }: { dateStr?: string; label?: string; clientId?: string }) {
+  const { firstName: coachFirstName } = useCoach();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [lib, setLib] = useState<LibDay[]>([]);
@@ -356,7 +358,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
                       &ldquo;{saved}&rdquo;
                     </div>
                     <div style={{ fontSize: 12.5, opacity: 0.7, marginTop: 10, lineHeight: 1.45 }}>
-                      Saved for {pickedDate === ctToday() ? "today" : pickedDate}. {COACH_FIRST_NAME} can see it.
+                      Saved for {pickedDate === ctToday() ? "today" : pickedDate}. {coachFirstName} can see it.
                     </div>
                     <button
                       onClick={() => { setSaved(null); setCustom(false); setOpen(false); window.location.reload(); }}

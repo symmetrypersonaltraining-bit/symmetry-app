@@ -31,7 +31,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { fx } from "@/lib/fx";
 import Confetti from "@/components/Confetti";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 import AiBadge from "@/components/AiBadge";
 import { lapseMood, type LapseTier } from "@/lib/ai/faces";
 
@@ -81,6 +82,7 @@ type Pick =
 const LAUNCH_KEY = "challenge-launch-2026-08";
 
 export default function ClientTakeovers({ basePath = "" }: { basePath?: string }) {
+  const { firstName: coachFirstName } = useCoach();
   const router = useRouter();
   const supabase = createClient();
 
@@ -430,7 +432,7 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
             Happy birthday, {pick.firstName}.
           </div>
           <div style={{ fontSize: 13.5, opacity: 0.9, marginTop: 8, lineHeight: 1.5 }}>
-            From {COACH_FIRST_NAME} and everyone who trains here.
+            From {coachFirstName} and everyone who trains here.
           </div>
         </div>
 
@@ -558,7 +560,7 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
     return shell(
       <>
         <div style={{ background: "var(--grad-hero, var(--brand-primary))", color: "#fff", padding: "calc(28px + env(safe-area-inset-top)) 20px 24px" }}>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, opacity: 0.85 }}>📣 FROM {COACH_FIRST_NAME.toUpperCase()}</div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, opacity: 0.85 }}>📣 FROM {coachFirstName.toUpperCase()}</div>
           <div style={{ fontSize: 12.5, opacity: 0.9, marginTop: 6 }}>
             {new Date(a.created_at).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
           </div>
@@ -620,12 +622,12 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
             <>
               It has been about {pick.daysSince} days since anything came through — no sessions, nothing.
               That might be exactly as it should be, and if so, say so below and I will leave you to it.
-              If life got in the way, {COACH_FIRST_NAME} would rather hear it than guess.
+              If life got in the way, {coachFirstName} would rather hear it than guess.
             </>
           ) : stern ? (
             <>
               You were logging {pick.priorDays} of every 28 days before this, so I know it is not
-              that you cannot. Something got in the way. Tell {COACH_FIRST_NAME} what it was —
+              that you cannot. Something got in the way. Tell {coachFirstName} what it was —
               he would rather fix the plan than watch it go quiet.
             </>
           ) : (
@@ -642,7 +644,7 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
             {quiet ? "Show me today" : "Log today"}
           </button>
           <button style={quietBtn} onClick={() => dismiss(() => { window.location.href = "/messages"; })}>
-            Tell {COACH_FIRST_NAME} why
+            Tell {coachFirstName} why
           </button>
 
           {/* The rule can only infer from behaviour; the client is the one who

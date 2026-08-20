@@ -9,7 +9,7 @@ import SessionDock from "./SessionDock";
 import AppBottomNav, { type NavItem } from "./AppBottomNav";
 import RefreshHandle from "./RefreshHandle";
 import GlobalCoach from "./GlobalCoach";
-import { COACH_NAME } from "@/lib/trainer";
+
 
 interface Props {
   children: React.ReactNode;
@@ -147,8 +147,9 @@ export default function TrainerLayoutWrapper({ children }: Props) {
       <TrainerSidebar
         clientMode={clientMode}
         onToggleClientMode={handleToggleMode}
-        userName={COACH_NAME}
-        userInitials="DG"
+        /* Both intentionally unset: the sidebar resolves the signed-in
+           trainer itself. Passing COACH_NAME and "DG" here is what put the
+           owner's name and monogram on Stephanie's own screen. */
         // On mobile these live INSIDE the blue bar, in normal flow. They used
         // to be a second position:fixed element aimed at the same corner,
         // which is why the bell kept coming back half-covered.

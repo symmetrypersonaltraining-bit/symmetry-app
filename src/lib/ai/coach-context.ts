@@ -1,4 +1,21 @@
-import { COACH_FIRST_NAME, isTrainerEmail } from "../trainer";
+import { COACH_FIRST_NAME } from "../trainer";
+
+// The client's OWN coach, resolved per request. Every prompt in this file used
+// to bake COACH_FIRST_NAME in at import time, so the nutrition coach told a
+// client of Stephanie's to run plan changes by Dustin and to "shoot Dustin a
+// message" — about a plan Dustin has never seen.
+async function coachNameFor(db: Db, clientId: string): Promise<string> {
+  try {
+    const { data: cRow } = await db.from("clients").select("trainer_id").eq("id", clientId).maybeSingle();
+    const tid = (cRow as { trainer_id?: string } | null)?.trainer_id;
+    if (!tid) return COACH_FIRST_NAME;
+    const { data: tRow } = await db.from("trainers").select("first_name, name").eq("id", tid).maybeSingle();
+    const t = tRow as { first_name?: string; name?: string } | null;
+    return t?.first_name || (t?.name || "").split(/\s+/)[0] || COACH_FIRST_NAME;
+  } catch {
+    return COACH_FIRST_NAME;
+  }
+}
 // Shared coach context assembly for the nutrition AI chat endpoints.
 // /api/nutrition-ai/coach, /api/nutrition-ai/act and /api/coach/focus all
 // assemble through this module, so every AI surface sees identical numbers.
@@ -84,7 +101,7 @@ export function nowBlock(mealsPlanned?: number | null, mealsLogged?: number | nu
   ].join("\n");
 }
 
-export const COACH_SYSTEM_PROMPT = `You are the personal nutrition coach inside the Symmetry Personal Training app (physique coaching, trainer: ${COACH_FIRST_NAME}). You are not a generic chatbot — you know THIS client: their name, their goal, their body-composition trend, their actual meal plan, and exactly how they've been eating. Speak to them by first name, like a coach who has watched their numbers all week. Be encouraging, honest, specific, and brief — no fluff, no lecture, no hedging platitudes. Ground every statement in the context data provided; never invent numbers. If the data is sparse (few logged days), say so plainly and keep advice modest. You may suggest small macro adjustments, but frame them as suggestions for the client to run by ${COACH_FIRST_NAME} — plan changes are his call.
+export const COACH_SYSTEM_PROMPT = (coachFirstName: string = COACH_FIRST_NAME) => `You are the personal nutrition coach inside the Symmetry Personal Training app (physique coaching, trainer: ${coachFirstName}). You are not a generic chatbot — you know THIS client: their name, their goal, their body-composition trend, their actual meal plan, and exactly how they've been eating. Speak to them by first name, like a coach who has watched their numbers all week. Be encouraging, honest, specific, and brief — no fluff, no lecture, no hedging platitudes. Ground every statement in the context data provided; never invent numbers. If the data is sparse (few logged days), say so plainly and keep advice modest. You may suggest small macro adjustments, but frame them as suggestions for the client to run by ${coachFirstName} — plan changes are theirs to make.
 
 What makes your coaching stand out — the best AI coach in any fitness app (do this every time there's data for it):
 - Tie advice to their SPECIFIC goal and trend. A fat-loss client who's stalled hears something different from one dropping fast; a client above their protein target hears something different from one below it.
@@ -93,7 +110,7 @@ What makes your coaching stand out — the best AI coach in any fitness app (do 
 - Name the single most useful thing right now. Don't list five observations; find the one that matters and be specific.
 - Reference real meals from their plan by name when suggesting where to add or cut, instead of abstract macros.
 - Coach like a human who's in their corner: CONGRATULATE real wins specifically (a logging streak, hitting protein all week, the scale moving the right way), ENCOURAGE when it's grindy, and be honest when something's off — without scolding.
-- When you need info the data can't give you (energy, sleep, hunger, why a stretch of days went off-plan), ASK ONE pointed question and tell them to send the answer to ${COACH_FIRST_NAME} ("How are your afternoons feeling energy-wise? Shoot ${COACH_FIRST_NAME} a message — if you're dragging we may shift carbs earlier."). One question, not an interrogation.
+- When you need info the data can't give you (energy, sleep, hunger, why a stretch of days went off-plan), ASK ONE pointed question and tell them to send the answer to ${coachFirstName} ("How are your afternoons feeling energy-wise? Shoot ${coachFirstName} a message — if you're dragging we may shift carbs earlier."). One question, not an interrogation.
 - Land light humor here and there — a quick, warm one-liner, never forced, never at their expense, never in a genuinely tough moment. You're a sharp coach with a personality, not a stiff report.
 
 Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
@@ -250,16 +267,22 @@ export async function fetchClientProfile(
     .from("clients")
     // email, so the coach can be recognised when the client IS the coach. He
     // trains himself, so his own client record flows through this exact path.
-    .select("name, email, primary_goal, secondary_goals, experience_level, training_frequency, days_per_week, injuries_limitations, injuries, start_date")
+    .select("name, email, auth_user_id, trainer_id, primary_goal, secondary_goals, experience_level, training_frequency, days_per_week, injuries_limitations, injuries, start_date, trainers(auth_user_id)")
     .eq("id", clientId)
     .maybeSingle();
-  const c = data as {
-    name: string | null; email: string | null; primary_goal: string | null; secondary_goals: string | null;
+  const raw = data as (Record<string, unknown> & { trainers?: { auth_user_id?: string | null } | { auth_user_id?: string | null }[] | null }) | null;
+  const tj = Array.isArray(raw?.trainers) ? raw?.trainers[0] : raw?.trainers;
+  const c = (raw ? { ...raw, trainer_auth: tj?.auth_user_id ?? null } : null) as {
+    name: string | null; email: string | null; auth_user_id: string | null;
+    trainer_id: string | null; trainer_auth: string | null; primary_goal: string | null; secondary_goals: string | null;
     experience_level: string | null; training_frequency: number | null; days_per_week: number | null;
     injuries_limitations: string | null; injuries: string | null; start_date: string | null;
   } | null;
   if (!c) return null;
-  const isCoachThemselves = isTrainerEmail(c.email);
+  // "Is this client row the trainer who trains it?" — not "is this address on
+  // the trainer allowlist". The allowlist version became true for Stephanie the
+  // day she was added to it, and told the model she was Dustin.
+  const isCoachThemselves = !!c.trainer_id && !!c.trainer_auth && c.trainer_auth === c.auth_user_id;
   const firstName = (c.name || "").trim().split(/\s+/)[0] || null;
   const parts: string[] = [];
   if (c.name) parts.push(`Name: ${c.name}`);
@@ -313,6 +336,7 @@ export function energyBalanceLines(
   completedDays: DayTotal[],
   metrics: { metric_date: string; weight: number | null }[],
   target: { calories: number } | null,
+  coachFirstName: string = COACH_FIRST_NAME,
 ): string[] {
   const avgIntake = completedDays.length
     ? Math.round(completedDays.reduce((a, d) => a + d.kcal, 0) / completedDays.length)
@@ -385,7 +409,7 @@ ${targetLine}
   · lose 0.5 lb/wk → ~${eatFor(0.5)} kcal
   · lose 1 lb/wk → ~${eatFor(1)} kcal
   · lose 1.5 lb/wk → ~${eatFor(1.5)} kcal
-  · lose 2 lb/wk → ~${eatFor(2)} kcal (aggressive — fine short-term, clear long stretches with ${COACH_FIRST_NAME})
+  · lose 2 lb/wk → ~${eatFor(2)} kcal (aggressive — fine short-term, clear long stretches with ${coachFirstName})
   · gain 0.25 lb/wk (lean) → ~${eatFor(-0.25)} kcal
 When they ask "what do I eat to lose 2 lbs this week," give the exact number above and compare it to their ~${avgIntake} average (e.g. "trim ~${Math.max(0, avgIntake - eatFor(2))} kcal/day"). Estimate sharpens as they log more.`,
   ];
@@ -395,6 +419,7 @@ When they ask "what do I eat to lose 2 lbs this week," give the exact number abo
 // trend, logging consistency) — the non-nutrition picture. Shared by the
 // client-facing "Coach's Read" card and the trainer's AI focus-option suggester.
 export async function assembleTrainingContext(db: Db, clientId: string): Promise<string> {
+  const coachFirstName = await coachNameFor(db, clientId);
   const today = CT_TODAY();
   const win30 = ctShiftDays(today, -29);
   const win7 = ctShiftDays(today, -6);
@@ -486,7 +511,7 @@ export async function assembleTrainingContext(db: Db, clientId: string): Promise
       // Double-quoted, so ${COACH_FIRST_NAME} went to the model as those literal
       // characters. Every client with no weigh-in on file had that token sitting
       // in their coach context instead of his name.
-      ? `WEIGH-INS: none on file yet — a first weigh-in would let ${COACH_FIRST_NAME} track progress.`
+      ? `WEIGH-INS: none on file yet — a first weigh-in would let ${coachFirstName} track progress.`
       : `WEIGH-INS: last one was ${daysSinceWeighIn} day${daysSinceWeighIn === 1 ? "" : "s"} ago (${latestWeighIn!.metric_date}).${daysSinceWeighIn >= 10 ? " That's getting stale — a fresh weigh-in would help." : ""}`
   );
   lines.push(`FOOD-LOGGING CONSISTENCY: logged on ${loggedDays14} of the last 14 days (context only — do not give a nutrition breakdown here).`);
@@ -530,6 +555,7 @@ async function fetchTodayMealProgress(
 }
 
 export async function assembleCoachContext(db: Db, clientId: string): Promise<string> {
+  const coachFirstName = await coachNameFor(db, clientId);
   const today = CT_TODAY();
   const [dailyTotals, targetRes, metricsRes, planSummary, profile, weekBlock, goalBlock, mealProgress, trainingHistory] = await Promise.all([
     fetchDailyTotals(db, clientId, 14),
@@ -587,13 +613,19 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
   // call". For his own record that is nonsense, and it reads as the app not
   // knowing who is using it. He trains himself, so his client record goes
   // through this identical path.
+  //
+  // `isCoachThemselves` used to be `isTrainerEmail(c.email)` — an allowlist. The
+  // day Stephanie's address was added to it, opening her own nutrition card told
+  // the model that SHE was Dustin, in the masculine. It is now "is this client's
+  // own client row the trainer who trains them", which is true for exactly the
+  // person it is meant to be true for, and names whoever that is.
   if (profile?.isCoachThemselves) {
     lines.push(
-      `WHO IS READING THIS — IMPORTANT: this client IS ${COACH_FIRST_NAME}, the trainer, coaching himself. ` +
-      `He is not a client with a coach to defer to. NEVER tell him to message, ask, check with, or run anything by ${COACH_FIRST_NAME} — ` +
-      `he is ${COACH_FIRST_NAME}, and being told to contact himself reads as the app not knowing who it is talking to. ` +
-      `Never refer to ${COACH_FIRST_NAME} in the third person. Where you would normally hand a decision to the coach, ` +
-      `either make the call and say so plainly, or name the thing he should decide. Address him directly as the person who ` +
+      `WHO IS READING THIS — IMPORTANT: this client IS ${coachFirstName}, the trainer, coaching themselves. ` +
+      `They are not a client with a coach to defer to. NEVER tell them to message, ask, check with, or run anything by ${coachFirstName} — ` +
+      `they ARE ${coachFirstName}, and being told to contact themselves reads as the app not knowing who it is talking to. ` +
+      `Never refer to ${coachFirstName} in the third person. Where you would normally hand a decision to the coach, ` +
+      `either make the call and say so plainly, or name the thing they should decide. Address them directly as the person who ` +
       `sets the plan. Everything else — the numbers, the honesty, the specificity — is unchanged.`
     );
   }
@@ -620,7 +652,7 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
   const { todaySoFar, completedDays } = splitTodayFromCompleted(dailyTotals, today);
   const avgLine = averagesVsTargetsLine(completedDays, target);
   if (avgLine) lines.push(avgLine);
-  for (const l of energyBalanceLines(completedDays, metrics, target)) lines.push(l);
+  for (const l of energyBalanceLines(completedDays, metrics, target, coachFirstName)) lines.push(l);
   lines.push(
     completedDays.length
       ? `completedDays — FINISHED days over the last 14 days (only days with logs; "logged" = meals logged that day). Use ONLY these for averages, trends and consistency:\n${JSON.stringify(completedDays)}`

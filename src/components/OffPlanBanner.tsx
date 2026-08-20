@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import MicButton from "@/components/MicButton";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 import AiBadge from "@/components/AiBadge";
 import { slotForReplacement, skipVerdict, type DateOccupant } from "@/lib/replaceOnDate";
 
@@ -15,6 +16,7 @@ interface GenResult { title: string; focus: string; rationale: string; duration_
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
 export default function OffPlanBanner({ clientId, dayId }: { clientId: string; dayId: string }) {
+  const { firstName: coachFirstName } = useCoach();
   const supabase = createClient();
   const [aiOn, setAiOn] = useState<boolean | null>(null);
   const [mode, setMode] = useState<"closed" | "menu" | "swap" | "type" | "replace" | "equipment" | "activity" | "library">("closed");
@@ -264,7 +266,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
           ▶ Start this workout
         </button>
       )}
-      <p className="text-center mt-2" style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>Saved to your library for next time. {COACH_FIRST_NAME} was notified.</p>
+      <p className="text-center mt-2" style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>Saved to your library for next time. {coachFirstName} was notified.</p>
     </div>
   );
 
@@ -278,7 +280,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
                 itself, where it sat next to a PENDING chip that never cleared.
                 A status badge that never changes is a bug report waiting to
                 happen. */}
-            <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>Recorded — {COACH_FIRST_NAME} can see it</p>
+            <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>Recorded — {coachFirstName} can see it</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className="font-extrabold px-2 py-0.5 rounded-full" style={{ background: "color-mix(in srgb, #22c55e 16%, transparent)", color: "#16a34a", fontSize: 9 }}>LOGGED</span>
@@ -349,7 +351,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
           <button onClick={() => setMode("type")} className="w-full flex items-center gap-3 p-2.5 text-left rounded-2xl">
             <span className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0" style={{ background: "#fef3c7" }}>✍️</span>
             <span><span className="block text-sm font-bold" style={{ color: "var(--brand-text)" }}>I did something else</span>
-            <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>Type it — recorded straight away, {COACH_FIRST_NAME} sees it. No warm-up invented.</span></span>
+            <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>Type it — recorded straight away, {coachFirstName} sees it. No warm-up invented.</span></span>
           </button>
         </div>
       )}
@@ -433,7 +435,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
                 copy promised a thing that no longer happened, which is worse
                 than promising nothing. It is recorded immediately now, and the
                 sentence says only what is actually true. */}
-            <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>Type it — recorded straight away, {COACH_FIRST_NAME} sees it</span></span>
+            <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>Type it — recorded straight away, {coachFirstName} sees it</span></span>
           </button>
         </div>
       )}

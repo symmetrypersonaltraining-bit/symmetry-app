@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { pausePaymentReminder } from './actions';
 import { createClient } from '@/lib/supabase/client';
 import { submitFeedback } from '@/lib/feedback';
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { useCoach } from "@/lib/useCoach";
 import AiBadge from "@/components/AiBadge";
 
 type TodaySession = { id: string; clientId: string; clientName: string; workoutLabel: string; dayId: string; status: string; };
@@ -17,6 +17,8 @@ function initials(name: string) { return name.split(' ').map((w: string) => w[0]
 function avatarColor(cid: string, clients: Client[]) { const i = clients.findIndex((c: Client) => c.id === cid); return AVATAR_COLORS[Math.max(0,i) % AVATAR_COLORS.length]; }
 
 export default function TrainerHomeClient({ clients, todaySessions, loggedTodayCount, reminders, notifCount }: Props) {
+  // The signed-in trainer, not the owner.
+  const me = useCoach();
   const router = useRouter();
   const [selectedClientId, setSelectedClientId] = useState(clients[0]?.id ?? '');
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -91,7 +93,7 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
         <div>
           <div style={{ fontSize: 13, color: 'var(--brand-text-secondary)', fontWeight: 600 }}>{greeting}</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--brand-text)', lineHeight: 1.2 }}>{COACH_FIRST_NAME}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--brand-text)', lineHeight: 1.2 }}>{me.firstName}</div>
           <div style={{ fontSize: 12, color: 'var(--brand-text-secondary)', marginTop: 2 }}>{dateStr}</div>
         </div>
         <button onClick={() => router.push('/payments')} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--brand-card)', border: 'none', boxShadow: '0 2px 8px rgba(20,30,55,.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}>

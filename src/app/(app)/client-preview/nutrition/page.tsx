@@ -4,7 +4,8 @@ import { getServerUser } from "@/lib/auth/serverUser";
 import MealPlanClient from "../../nutrition/MealPlanClient";
 import NutritionV3Client from "../../nutrition/v3/NutritionV3Client";
 import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
-import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
+import {isTrainerEmail } from "@/lib/trainer";
+import { coachForViewer } from "@/lib/coachIdentity";
 import { fetchOwnClientRow } from "@/lib/ownClient";
 
 export default async function ClientPreviewNutritionPage() {
@@ -25,7 +26,8 @@ export default async function ClientPreviewNutritionPage() {
   }
 
   const clientId = clientRecord.id;
-  const clientName = clientRecord.name || `${COACH_FIRST_NAME}`;
+    // The previewing trainer's OWN name as the fallback, not the owner's.
+  const clientName = clientRecord.name || (await coachForViewer(supabase as never, user.id)).firstName;
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
   // Central, not UTC: derive the 7-day floor from the Central date, not Date.now() in UTC.
   const weekFloor = (() => {

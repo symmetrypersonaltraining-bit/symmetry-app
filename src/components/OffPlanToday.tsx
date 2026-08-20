@@ -19,7 +19,8 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 
 interface Row {
   id: string;
@@ -33,6 +34,7 @@ function ctToday(): string {
 }
 
 export default function OffPlanToday({ clientId }: { clientId?: string }) {
+  const { firstName: coachFirstName } = useCoach();
   const [rows, setRows] = useState<Row[]>([]);
 
   useEffect(() => {
@@ -90,7 +92,7 @@ export default function OffPlanToday({ clientId }: { clientId?: string }) {
         </div>
       ))}
       <p style={{ color: "var(--brand-text-secondary)", fontSize: 10, marginTop: 2 }}>
-        {COACH_FIRST_NAME} can see this.
+        {coachFirstName} can see this.
       </p>
     </div>
   );

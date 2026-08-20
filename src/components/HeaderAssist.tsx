@@ -4,7 +4,8 @@ import { startDictation, type DictationHandle } from "@/lib/dictation";
 import { createClient } from "@/lib/supabase/client";
 import { submitFeedback } from "@/lib/feedback";
 import NotificationCenter from "@/components/NotificationCenter";
-import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
+import { isTrainerEmail } from "@/lib/trainer";
+import { useCoach } from "@/lib/useCoach";
 /**
  * HeaderAssist — feedback (all users) + AI assistant (trainer only) buttons
  * living in the AppHeader top-right corner. Replaces the floating dock.
@@ -42,6 +43,7 @@ export function looksLikeAMealLog(text: string): boolean {
 }
 
 export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
+  const { firstName: coachFirstName } = useCoach();
   const [isTrainer, setIsTrainer] = useState(false);
   const [clientMode, setClientMode] = useState(false);
   const [open, setOpen] = useState(false);
@@ -75,7 +77,7 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
       onResult: (t) => setMsg((m) => (m ? m + " " : "") + t),
       onStart: () => setListening(true),
       onEnd: () => setListening(false),
-      onUnavailable: (reason) => { setListening(false); console.error("dictation unavailable:", reason); alert("Voice input couldn't start — " + reason + `\n\nTap the mic again; if it keeps failing, tell ${COACH_FIRST_NAME} this message.`); },
+      onUnavailable: (reason) => { setListening(false); console.error("dictation unavailable:", reason); alert("Voice input couldn't start — " + reason + `\n\nTap the mic again; if it keeps failing, tell ${coachFirstName} this message.`); },
     });
   }
 
@@ -133,7 +135,7 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
               <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={3} placeholder="What do you like, or what should change?" style={{ width: "100%", resize: "vertical", borderRadius: 11, padding: "9px 10px", fontSize: 14, background: "var(--brand-surface, rgba(0,0,0,.25))", color: "inherit", border: "1px solid var(--brand-border, rgba(255,255,255,.15))", boxSizing: "border-box" }} />
               {looksLikeAMealLog(msg) && (
                 <div style={{ marginTop: 8, padding: "9px 11px", borderRadius: 11, border: "1px solid #e0a83e", background: "rgba(224,168,62,0.12)", fontSize: 12.5, lineHeight: 1.45 }}>
-                  That reads like a meal. This box goes to {COACH_FIRST_NAME} as feedback — it will <b>not</b> count toward your day.
+                  That reads like a meal. This box goes to {coachFirstName} as feedback — it will <b>not</b> count toward your day.
                   <a href="/nutrition" style={{ display: "block", marginTop: 6, fontWeight: 800, color: "var(--brand-primary)", textDecoration: "none" }}>
                     Log it in Nutrition instead →
                   </a>

@@ -40,7 +40,11 @@ function shiftDays(iso: string, delta: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-const SYSTEM = `You write ONE sentence that appears on the workout-complete screen of the Symmetry Personal Training app. You are ${COACH_FIRST_NAME}, the trainer: warm, direct, specific, never corny, never a motivational poster.
+// A FUNCTION, not a constant. It was a module-level template literal that
+// baked COACH_FIRST_NAME in at import time — so the model was told it was
+// Dustin when writing the line a client of Stephanie's reads on their
+// workout-complete screen.
+const SYSTEM = (coachFirstName: string) => `You write ONE sentence that appears on the workout-complete screen of the Symmetry Personal Training app. You are ${coachFirstName}, the trainer: warm, direct, specific, never corny, never a motivational poster.
 
 Respond with ONLY valid JSON, no markdown, no fences:
 {"line": string}
@@ -97,15 +101,39 @@ export async function POST(req: NextRequest) {
 
   const today = CT_TODAY();
 
-  // Dustin's latest weigh-in, for the "coach Dustins lifted" unit. Looked up by
-  // email so it survives any client-row rebuild, and wrapped so a miss here can
-  // never take the celebration down with it.
+  // This client's coach, resolved once: their first name goes into the prompt
+  // (the line is written AS them) and their email finds the weigh-in below.
+  const { coachFirstName, coachEmail } = await (async () => {
+    try {
+      const { data: cRow } = await admin
+        .from("clients").select("trainer_id").eq("id", clientId).maybeSingle();
+      const tid = (cRow as { trainer_id?: string } | null)?.trainer_id;
+      if (!tid) return { coachFirstName: COACH_FIRST_NAME, coachEmail: null as string | null };
+      const { data: tRow } = await admin
+        .from("trainers").select("email, first_name, name").eq("id", tid).maybeSingle();
+      const t = tRow as { email?: string; first_name?: string; name?: string } | null;
+      return {
+        coachFirstName: t?.first_name || (t?.name || "").split(/\s+/)[0] || COACH_FIRST_NAME,
+        coachEmail: t?.email ?? null,
+      };
+    } catch {
+      return { coachFirstName: COACH_FIRST_NAME, coachEmail: null as string | null };
+    }
+  })();
+
+  // THIS CLIENT'S OWN COACH's latest weigh-in, for the "coach Dustins lifted"
+  // unit. It was looked up by the owner's email — so a client of Stephanie's
+  // was told their session volume in units of Dustin's bodyweight, which is
+  // both the wrong joke and the owner's personal health data crossing a client
+  // boundary. Wrapped so a miss here can never take the celebration down: no
+  // weight simply drops the unit from the list.
   const coachWeight = await (async (): Promise<number | null> => {
     try {
+      if (!coachEmail) return null;
       const { data: coach } = await admin
         .from("clients")
         .select("id")
-        .eq("email", COACH_EMAIL)
+        .eq("email", coachEmail)
         .maybeSingle();
       const coachId = (coach as { id?: string } | null)?.id;
       if (!coachId) return null;
@@ -271,7 +299,7 @@ export async function POST(req: NextRequest) {
             meter: { clientId: clientId, feature: "celebration" },
             apiKey: process.env.ANTHROPIC_API_KEY,
             model: celebModel,
-            system: SYSTEM,
+            system: SYSTEM(coachFirstName),
             maxTokens: 160,
             messages: [
               {

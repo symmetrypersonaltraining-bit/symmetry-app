@@ -31,7 +31,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { startDictation, dictationMessage } from "@/lib/dictation";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 
 export default function MicButton({
   onText,
@@ -58,6 +59,7 @@ export default function MicButton({
    */
   onListeningChange?: (listening: boolean) => void;
 }) {
+  const { firstName: coachFirstName } = useCoach();
   const [listening, setListeningState] = useState(false);
   const recRef = useRef<{ stop?: () => void } | null>(null);
   const notifyRef = useRef(onListeningChange);
@@ -96,7 +98,7 @@ export default function MicButton({
         // A modal from inside a WebView overlay is ignored at best and wedges
         // the page at worst — so alert() is the LAST resort, only where the
         // caller gave us nowhere better to put it.
-        else alert(`${msg}\n\nIf it keeps happening, send ${COACH_FIRST_NAME} this message.`);
+        else alert(`${msg}\n\nIf it keeps happening, send ${coachFirstName} this message.`);
       },
     }) as { stop?: () => void } | null;
   }

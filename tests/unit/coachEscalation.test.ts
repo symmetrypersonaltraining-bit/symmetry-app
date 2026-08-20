@@ -115,14 +115,17 @@ test("the client is told it was sent, and told to stop asking the AI", () => {
   // Silence here is the failure mode Dustin explicitly ruled out: they rephrase
   // the same question at the coach three more times, then decide they were
   // ignored.
-  assert.match(SHEET_CODE, /Sent to " \+ COACH_FIRST_NAME \+ " — he'll come back to you in Messages/);
+  // `coachFirstName` (the resolved, per-viewer name) rather than the module
+  // constant, since 20 Aug. What this guards is that the confirmation NAMES the
+  // coach and says where the reply lands — not which identifier supplies it.
+  assert.match(SHEET_CODE, /Sent to " \+ coachFirstName \+ " — he'll come back to you in Messages/);
   assert.ok(
     /No need to ask me again/.test(SHEET_CODE),
     "the confirmation no longer tells them the waiting is the right thing to do",
   );
   // And a failure has to say so and give them a route that works. Swallowing it
   // would mean they believe Dustin has their question when he does not.
-  assert.match(SHEET_CODE, /I couldn't get that to " \+ COACH_FIRST_NAME/);
+  assert.match(SHEET_CODE, /I couldn't get that to " \+ coachFirstName/);
   assert.match(SHEET_CODE, /Messages tab/);
 });
 

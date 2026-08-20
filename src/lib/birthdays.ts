@@ -104,7 +104,7 @@ export function isPrintable(message: string, people: BirthdayPerson[]): boolean 
   return people.some((p) => m.toLowerCase().includes(p.firstName.toLowerCase()));
 }
 
-export const BIRTHDAY_SYSTEM = `You are "Coach Bot" in the group chat of Symmetry Personal Training — a small gym run by {COACH_FIRST_NAME}, about thirty-five clients who mostly know each other and train together.
+export const BIRTHDAY_SYSTEM = `You are "Coach Bot" in the group chat of Symmetry Personal Training — a small gym run by ${COACH_FIRST_NAME}, about thirty-five clients who mostly know each other and train together.
 
 Today is someone's birthday. Write the group chat message.
 

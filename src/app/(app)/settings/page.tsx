@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import SettingsClient from "./SettingsClient";
-import { isTrainerEmail, COACH_NAME } from "@/lib/trainer";
+import { isTrainerEmail } from "@/lib/trainer";
+import { coachForViewer } from "@/lib/coachIdentity";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ gcal?: string; as?: string }> }) {
   const supabase = await createClient();
@@ -18,7 +19,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   // before the client-mode cookie propagates) — fixes intermittent trainer-UI
   // leak in Client View (settings hides trainer-only sections in client mode).
   const isInClientMode = isTrainer && (sp?.as === "client" || cookieStore.get("symmetry_client_mode")?.value === "1");
-  const userName = isTrainer ? `${COACH_NAME}` : (profile?.name ?? user.email ?? "");
+  // The SIGNED-IN trainer's own name. `COACH_NAME` is one build-time env var,
+  // so Stephanie's own profile said "Dustin Gautreaux".
+  const me = isTrainer ? await coachForViewer(supabase as never, user.id) : null;
+  const userName = isTrainer ? me!.name : (profile?.name ?? user.email ?? "");
 
   const { data: trainerSettings } = isTrainer
     ? await supabase.from("trainer_settings").select("gcal_sync_enabled, google_refresh_token").eq("user_id", user.id).maybeSingle()

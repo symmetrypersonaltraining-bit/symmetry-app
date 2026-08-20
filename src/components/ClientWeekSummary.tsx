@@ -6,7 +6,8 @@ import { useNutritionAverages } from "@/components/nutrition/useNutritionAverage
 import CoachBadge from "@/components/CoachBadge";
 import AiBadge from "@/components/AiBadge";
 import { fetchOwnClientRow } from "@/lib/ownClient";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
+import { useCoach } from "@/lib/useCoach";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -56,6 +57,7 @@ interface Summary {
 }
 
 export default function ClientWeekSummary() {
+  const { firstName: coachFirstName } = useCoach();
   const [s, setS] = useState<Summary | null>(null);
   const [showBrief, setShowBrief] = useState(false);
   const [clientId, setClientId] = useState<string | null>(null);
@@ -242,7 +244,7 @@ export default function ClientWeekSummary() {
             <div className="focus-panel" style={{ padding: 11 }}>
               {focusIsAi ? <AiBadge size={30} mood="plan" /> : <CoachBadge size={30} />}
               <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
-                <b>{focusIsAi ? "Your focus:" : `${COACH_FIRST_NAME}:`}</b> {focusText || ("You've got " + s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " scheduled this week. Show up and stack another good one.")}
+                <b>{focusIsAi ? "Your focus:" : `${coachFirstName}:`}</b> {focusText || ("You've got " + s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " scheduled this week. Show up and stack another good one.")}
               </div>
             </div>
             <button onClick={dismissBrief} style={{ display: "block", textAlign: "center", background: "var(--brand-primary)", color: "#fff", fontWeight: 800, padding: 14, borderRadius: 15, fontSize: 15, border: "none", width: "100%", cursor: "pointer", marginTop: "auto" }}>

@@ -158,10 +158,31 @@ test("the trainer's own client row is found by account, never by email", () => {
 });
 
 test("the coach badge shows the viewer's own coach", () => {
+  // It used to run its own query per mount, with a module-level cache keyed on
+  // nothing and never invalidated — so one badge fetched and every other badge
+  // in the session reused the answer, including across a switch into Client
+  // View where the coach is a different person. And its `initials` parameter
+  // DEFAULTED to the literal "DG", which neither call site overrode: until
+  // Stephanie uploads a photo, her clients wore the owner's monogram.
+  //
+  // The resolution moved to the app layout, which does it once, server-side.
   const c = code(read("src/components/CoachBadge.tsx"));
   assert.ok(!c.includes("TRAINER_EMAIL"), "every client saw the owner's face");
-  assert.match(c, /from\("trainers"\)/);
-  assert.match(c, /trainer_id/);
+  assert.match(c, /useCoach\(\)/, "the badge no longer reads the viewer's resolved coach");
+  assert.match(c, /coach\.avatarUrl/, "the badge is not showing the coach's own photo");
+  assert.ok(!/initials = "DG"/.test(c), 'the "DG" default is back — her clients get his monogram');
+  assert.ok(!/let cachedUrl/.test(c), "the un-keyed module cache is back");
+});
+
+test("the coach the layout resolves is the viewer's own, and never a fallback face", () => {
+  const c = code(read("src/lib/coachIdentity.ts"));
+  assert.match(c, /avatarUrl: null,/, "the default identity carries a face");
+  assert.match(c, /export async function coachForViewer/);
+  // A trainer is their own coach. Resolving them through their client row would
+  // hand Stephanie whoever trains HER.
+  const body = c.slice(c.indexOf("export async function coachForViewer"));
+  assert.ok(body.indexOf('from("trainers")') < body.indexOf('from("clients")'),
+    "a trainer is resolved through their client row first, so a coach who is also a client gets the wrong answer");
 });
 
 // ─── a new client lands on the right roster ─────────────────────────────────
