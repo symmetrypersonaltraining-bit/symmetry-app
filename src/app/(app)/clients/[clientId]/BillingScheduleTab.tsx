@@ -16,6 +16,7 @@
 // field for weeks.
 
 import { useState } from "react";
+import BillingHistory from "@/components/BillingHistory";
 import {
   BILLING_TYPES, BILLING_TYPE_LABEL, CADENCES, CADENCE_LABEL,
   fieldsFor, clearUnusedFields, validateBillingFields,
@@ -319,6 +320,11 @@ export default function BillingScheduleTab({ client }: { client: BillingClient }
           {saving ? "Saving…" : "Save billing & schedule"}
         </button>
       </div>
+
+      {/* The same records the client sees, on the trainer's side of the app, so
+          a question about a past bill can be answered without leaving the
+          client's profile. */}
+      <BillingHistory clientId={client.id} />
     </div>
   );
 }

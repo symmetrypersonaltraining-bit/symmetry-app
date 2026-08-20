@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useTheme, THEMES, DEPTH_LEVELS } from "@/components/ThemeProvider";
 import { AvatarSelf } from "@/components/Avatar";
 import PaymentsSettingsCard from "@/components/PaymentsSettingsCard";
+import BillingHistory from "@/components/BillingHistory";
 import ExperienceSettings from "@/components/ExperienceSettings";
 import NotificationSettings from "@/components/NotificationSettings";
 import HelpCenter from "@/components/HelpCenter";
@@ -101,6 +102,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
       </section>
 
         <PaymentsSettingsCard />
+        <BillingHistory />
 
       {/* Switches for the 2026-07-25 polish features: sound, vibration,
           leaderboard opt-in, check-in nudges, plus the trainer-only master

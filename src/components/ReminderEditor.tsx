@@ -42,6 +42,11 @@ interface Rem {
   sessionRate: number | null;
   /** The rate THIS reminder was billed at. Frozen once sent; see reminder-calc.ts. */
   billedRate: number | null;
+  /** clients.current_fees — the monthly/cycle rate the deduction comes off. */
+  monthlyRate: number | null;
+  expectedSessions: number | null;
+  /** Remote sessions run at half rate while Dustin was away. Manual. */
+  halfPriceSessions: number;
   cadence: Cadence | null;
   billingType: BillingType;
   sessionsTrained: number;
@@ -63,6 +68,8 @@ interface Edit {
   /** session count, editable; recomputes amount as count x rate */
   count: string;
   note: string;
+  /** Remote sessions at half rate. Blank means "unchanged from the row". */
+  halfPrice: string;
   /** true when Dustin typed an amount directly, so the count no longer drives it */
   amountOverridesCount: boolean;
   override: boolean;
@@ -85,13 +92,13 @@ export default function ReminderEditor() {
       const sup = createClient() as any;
       const { data: rems } = await sup
         .from("payment_reminders")
-        .select("id, client_id, due_date, amount_due, billing_credits, sms_message, notification_status, approved_at, credit_details")
+        .select("id, client_id, due_date, amount_due, billing_credits, sms_message, notification_status, approved_at, credit_details, half_price_sessions")
         .in("notification_status", ["pending", "sent"])
         .lte("due_date", new Date(Date.now() + 45 * 86400000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
         .order("due_date");
       const { data: clients } = await sup
         .from("clients")
-        .select("id, name, current_fees, session_rate, billing_type, billing_cadence, flat_billing")
+        .select("id, name, current_fees, session_rate, billing_type, billing_cadence, flat_billing, expected_sessions_per_cycle")
         .is("archived_at", null);
       const { data: pays } = await sup
         .from("calendar_payments")
@@ -221,6 +228,9 @@ export default function ReminderEditor() {
             // emailed must keep itemising at the rate it was calculated with; a
             // draft should follow the client's current rate, because that is
             // what it will actually be billed at.
+            monthlyRate: c.current_fees == null ? null : Number(c.current_fees),
+            expectedSessions: c.expected_sessions_per_cycle == null ? null : Number(c.expected_sessions_per_cycle),
+            halfPriceSessions: Number(r.half_price_sessions ?? 0),
             billedRate: billedRateOf(
               storedIsNewShape && r.notification_status !== "pending" ? cd.rate : null,
               c.session_rate == null ? null : Number(c.session_rate),
@@ -250,6 +260,7 @@ export default function ReminderEditor() {
           due: r.due_date,
           count: String(r.sessionsTrained),
           note: r.sms_message || "",
+          halfPrice: String(r.halfPriceSessions || 0),
           amountOverridesCount: false,
           override: false,
         };
@@ -266,6 +277,27 @@ export default function ReminderEditor() {
 
   const setEdit = (id: string, patch: Partial<Edit>) =>
     setEdits((p) => ({ ...p, [id]: { ...p[id], ...patch } }));
+
+  /**
+   * Editing half-price recomputes the amount the same way editing the count
+   * does. Without this the deduction shows in the itemisation while the Amount
+   * box keeps the old figure — and the Amount box is what actually gets billed.
+   */
+  const setHalfPrice = (r: Rem, raw: string) => {
+    const n = Math.max(0, parseInt(raw, 10) || 0);
+    const patch: Partial<Edit> = { halfPrice: raw };
+    const rate = r.billedRate ?? 0;
+    if (r.billingType === "monthly_adjusted" && r.monthlyRate != null) {
+      patch.amount = String(round2(Math.max(0,
+        r.monthlyRate - r.cancelledFull * rate - n * (rate / 2))));
+      patch.amountOverridesCount = false;
+    } else if (r.billingType === "per_session") {
+      patch.amount = String(round2(Math.max(0,
+        r.sessionsTrained * rate - n * (rate / 2))));
+      patch.amountOverridesCount = false;
+    }
+    setEdit(r.id, patch);
+  };
 
   /** Editing the count recomputes the amount as count x rate. */
   const setCount = (r: Rem, raw: string) => {
@@ -292,7 +324,17 @@ export default function ReminderEditor() {
 
   const resetAmountToCount = (r: Rem) => {
     const n = parseInt(edits[r.id]?.count ?? "0", 10) || 0;
-    const amt = r.billingType === "flat" ? (r.fee ?? 0) : round2(n * (r.billedRate ?? 0));
+    const half = parseInt(edits[r.id]?.halfPrice ?? "0", 10) || 0;
+    const rate = r.billedRate ?? 0;
+    // "Reset" has to reset to the rule this client is actually on. It used to
+    // assume sessions x rate for everyone who was not flat, which on a
+    // monthly-rate client silently replaced their rate with a session count.
+    const amt =
+      r.billingType === "flat"
+        ? (r.fee ?? 0)
+        : r.billingType === "monthly_adjusted"
+          ? round2(Math.max(0, (r.monthlyRate ?? 0) - r.cancelledFull * rate - half * (rate / 2)))
+          : round2(Math.max(0, n * rate - half * (rate / 2)));
     setEdit(r.id, { amount: String(amt), amountOverridesCount: false, override: false });
   };
 
@@ -302,6 +344,8 @@ export default function ReminderEditor() {
       // The rate on the ROW, not the client's rate today — a sent bill must not
       // re-itemise itself when the client's rate changes.
       sessionRate: r.billedRate,
+      expectedSessions: r.expectedSessions,
+      halfPriceSessions: e.halfPrice === "" ? r.halfPriceSessions : (parseInt(e.halfPrice, 10) || 0),
       cadence: r.cadence,
       dueDate: e.due,
       sessionsTrained: parseInt(e.count, 10) || 0,
@@ -326,6 +370,7 @@ export default function ReminderEditor() {
         // Cancellations are never deducted, so there are no credits to carry.
         billing_credits: 0,
         sms_message: e.note || null,
+        half_price_sessions: parseInt(e.halfPrice, 10) || 0,
         credit_details: {
           basis: "sessions_trained",
           cycle: calc.cycleStart + " to " + calc.cycleEnd,
@@ -459,6 +504,7 @@ export default function ReminderEditor() {
         const blocked = calc.blocking.length > 0;
         const sent = r.notification_status === "sent";
         const perSession = r.billingType === "per_session";
+        const adjusted = r.billingType === "monthly_adjusted";
         return (
           <div key={r.id} className="rounded-3xl p-4 space-y-2"
             style={{ background: "var(--brand-surface)", border: "1px solid " + (blocked ? "#ef4444" : "var(--brand-border)"), boxShadow: "0 8px 26px rgba(20,30,55,0.08)" }}>
@@ -486,11 +532,35 @@ export default function ReminderEditor() {
 
             {/* THE ITEMISATION — what this amount is made of. */}
             <div className="rounded-2xl p-3 space-y-1" style={{ background: "var(--brand-bg)" }}>
-              <div className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>
-                {perSession
-                  ? r.sessionsTrained + " sessions × $" + (r.billedRate ?? "?") + " = $" + calc.expected
-                  : "Flat " + (r.cadence || "monthly") + " fee = $" + calc.expected}
-              </div>
+              {/* THE RULE, shown as arithmetic. Dustin, 20 Aug: "$640 minus any
+                  cancelled sessions based on that monthly rate divided by the
+                  number of sessions (8)." Written out rather than summarised,
+                  because this is the screen he screenshots for clients. */}
+              {adjusted ? (
+                <div className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>
+                  {"$" + (r.monthlyRate ?? "?") +
+                    (calc.cancelDeduction > 0
+                      ? " − " + r.cancelledFull + " cancelled × $" + (r.billedRate ?? "?") +
+                        " ($" + calc.cancelDeduction + ")"
+                      : "") +
+                    (calc.halfPriceDeduction > 0
+                      ? " − " + (parseInt(e.halfPrice, 10) || 0) + " remote at half ($" +
+                        calc.halfPriceDeduction + ")"
+                      : "") +
+                    " = $" + calc.expected}
+                </div>
+              ) : (
+                <div className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>
+                  {perSession
+                    ? r.sessionsTrained + " sessions × $" + (r.billedRate ?? "?") + " = $" + calc.expected
+                    : "Flat " + (r.cadence || "monthly") + " rate = $" + calc.expected}
+                </div>
+              )}
+              {adjusted && calc.cancelDeduction === 0 && calc.halfPriceDeduction === 0 && (
+                <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+                  Nothing cancelled this cycle — the full rate.
+                </div>
+              )}
               {/* A discount nobody can see is a discount you get no credit for.
                   Dustin, 18 Aug: "so I can screenshot the dates n show her I gave
                   her 2 free." */}
@@ -510,21 +580,25 @@ export default function ReminderEditor() {
               <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
                 {"Billing cycle " + calc.cycleStart + " → " + calc.cycleEnd + " · due " + r.due_date}
               </div>
-              {perSession && r.trainedDates.length > 0 && (
+              {(perSession || adjusted) && r.trainedDates.length > 0 && (
                 <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                  {"Trained: " + r.trainedDates.map(fmtDay).join(", ")}
+                  {"Trained (" + r.trainedDates.length + "): " + r.trainedDates.map(fmtDay).join(", ")}
                 </div>
               )}
-              {perSession && r.trainedDates.length === 0 && (
+              {(perSession || adjusted) && r.trainedDates.length === 0 && (
                 <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
                   No sessions trained in this cycle.
                 </div>
               )}
               {r.cancelledDates.length > 0 && (
-                <div className="text-xs" style={{ color: "var(--brand-text-secondary)", opacity: 0.6 }}>
+                <div className="text-xs" style={{ color: "var(--brand-text-secondary)", opacity: 0.75 }}>
                   {"Cancelled (" + r.cancelledDates.length + "): " +
                     r.cancelledDates.map((c) => fmtDay(c.date) + (c.type === "half" ? " (½)" : "")).join(", ") +
-                    " — not billed, not deducted"}
+                    (adjusted
+                      ? " — deducted"
+                      : perSession
+                        ? " — not billed"
+                        : " — flat rate, not deducted")}
                 </div>
               )}
             </div>
@@ -559,6 +633,36 @@ export default function ReminderEditor() {
                   style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} />
               </label>
             </div>
+
+            {/* HALF PRICE WHILE HE IS AWAY. Dustin, 20 Aug: "only time i will bill
+                half price is when im on vacation and i am going to train them
+                from the app. this will be done manually so ill need an option
+                for that somehow."
+
+                Manual by design and it stays manual: nothing in the calendar
+                marks a remote session, and inferring one from a gap would be
+                guessing at a discount. Only shown on models where a session
+                rate means anything — on a flat client it would do nothing. */}
+            {!sent && (adjusted || perSession) && (
+              <div className="flex items-center justify-between gap-3 rounded-xl p-2.5"
+                style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+                <label className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+                  Remote sessions at half price
+                  <span className="block" style={{ opacity: 0.7 }}>
+                    {r.billedRate ? "−$" + (r.billedRate / 2) + " each" : "set a session rate first"}
+                  </span>
+                </label>
+                <input type="number" min="0" step="1" value={e.halfPrice}
+                  onChange={(ev) => setHalfPrice(r, ev.target.value)}
+                  className="rounded-xl p-2 text-sm text-right"
+                  style={{ width: 74, background: "var(--brand-card)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} />
+              </div>
+            )}
+            {sent && r.halfPriceSessions > 0 && (
+              <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+                {r.halfPriceSessions + " remote session" + (r.halfPriceSessions === 1 ? "" : "s") + " billed at half rate"}
+              </div>
+            )}
 
             {!sent && e.amountOverridesCount && (
               <div className="flex items-center justify-between text-xs" style={{ color: "#f59e0b" }}>
