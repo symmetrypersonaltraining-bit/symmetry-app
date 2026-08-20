@@ -1,5 +1,54 @@
 # Backlog — the single work queue
 
+> ## 👉 20 Aug — BILLING REBUILT, MULTI-TRAINER STARTED
+>
+> **`origin/main` = `1464195`.** Everything below shipped today.
+>
+> **Billing rebuilt end to end.** Dustin's rule, his words: *"$640 for 2 x a week,
+> their monthly on due date is $640 minus any cancelled sessions based on that
+> monthly rate divided by the number of sessions (8)... cancelled sessions are
+> only to be deducted when i mark them cancelled (orange) in my gcal."* The old
+> rule was `sessions_trained x rate`, and 16 of 20 open reminders disagreed with
+> the payment markers in his own calendar — $2,660 under, $318 over, in ONE
+> cycle. New `monthly_adjusted` billing type, a Billing & Schedule tab, client-
+> visible dates/cycle/detail, billing records both sides, and all 20 reminders
+> rebuilt. Nothing emailed.
+>
+> **Provisional lock** — a reminder cannot be sent until the cycle closes
+> (7 days before due). Enforced in the send route, not just the button.
+>
+> **Workout logger data loss** — three faults: nothing typed was saved until the
+> tick; a failed liveness READ was treated as a deletion and wiped the draft; the
+> tick went green on failed writes. All fixed. Two existing tests were pinning
+> the bug and had to be rewritten.
+>
+> **Calendar sync** — hourly narrow window (was twice daily), sync health on the
+> home screen (the run log had never been read by anything), unmatched events
+> counted and listed, and the reconcile guard made proportional. It could
+> previously delete every future appointment from a fetch that returned 1% of
+> the calendar.
+>
+> **Nutrition** — micronutrients now reach storage (0 of 937 logs had them
+> despite 26 carrying them on their items), and a scanned barcode food can be
+> corrected.
+>
+> **MULTI-TRAINER PHASES 1–2 ARE IN THE DATABASE.** Ownership + RLS. See
+> `claude/PLAN-SECOND-TRAINER.md` and `claude/PLAN-SECOND-TRAINER-DECISIONS.md`.
+> Verified four ways against a throwaway second trainer: she saw 0 clients and
+> the full 843-exercise shared library; given one client she saw exactly that
+> one; the owner still sees all 35. 41 policies scoped.
+> **Stephanie's email is NOT in TRAINER_EMAILS yet — phases 3–8 first.**
+
+> ## QUEUED — added 20 Aug, details to be locked
+>
+> - **Near-real-time calendar sync.** `trainer_settings` already has
+>   `google_sync_token` and `google_channel_id` and nothing reads them. Google
+>   push notifications + a sync token replaces the full poll entirely. Would make
+>   the hourly narrow run unnecessary.
+> - **Food logger interaction rework** — adding a meal, replacing a meal, editing
+>   a meal. Dustin: "Will lock details later."
+> - **Garmin / Apple / Google Health import** — parked by Dustin, 20 Aug.
+
 > ## 👉 18 Aug — the wrong-date credit, twice, and what actually causes it
 >
 > **`origin/main` = `9033065`.**
