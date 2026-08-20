@@ -14,6 +14,8 @@ PF=src/app/api/program-feedback/route.ts
 BD=src/app/api/cron/birthdays/route.ts
 CB=src/app/api/cron/coachbot/route.ts
 AT=src/lib/ai/agent-tools.ts
+WA=src/app/api/workout-ai/route.ts
+NU=src/app/api/ai-nudges/route.ts
 TEST=tests/unit/trainerInbox.test.ts
 
 pass=0; fail=0
@@ -80,6 +82,12 @@ mutate "coachbot posts as a random trainer" "$CB" \
   '''s.replace("const trainerUid = await ownerAuthUid(db);", "const { data: ts } = await db.from(\"trainer_settings\").select(\"user_id\").limit(1).maybeSingle();\n  const trainerUid = (ts as { user_id: string } | null)?.user_id;")'''
 mutate "agent DM sent from the owner instead of the client's coach" "$AT" \
   '''s.replace("else trainerUid = await inboxAuthUidForClient(db, clientId);", "else trainerUid = await ownerAuthUid(db);")'''
+mutate "self-built workout notice sent to the owner" "$WA" \
+  '''s.replace("inboxAuthUidForClient(admin, clientId)", "ownerAuthUid(admin)").replace("import { inboxAuthUidForClient }", "import { ownerAuthUid }")'''
+mutate "trainer found by guessing the owner email in clients" "$WA" \
+  '''s.replace("const trainerAuth = await inboxAuthUidForClient(admin, clientId);", "const { data: tr } = await admin.from(\"clients\").select(\"auth_user_id\").eq(\"email\", TRAINER_EMAIL).limit(1).maybeSingle();\n    const trainerAuth = (tr as { auth_user_id: string } | null)?.auth_user_id;")'''
+mutate "nudge digest addressed by an arbitrary trainer_settings row" "$NU" \
+  '''s.replace("const trainerAuth = await ownerAuthUid(admin);", "const { data: ts } = await admin.from(\"trainer_settings\").select(\"user_id\").limit(1).maybeSingle();\n    const trainerAuth = (ts as { user_id: string } | null)?.user_id ?? null;")'''
 mutate "agent group post sent from a client's coach" "$AT" \
   '''s.replace("if (isGroup) trainerUid = await ownerAuthUid(db);", "if (isGroup) trainerUid = await inboxAuthUidForClient(db, clientId);")'''
 

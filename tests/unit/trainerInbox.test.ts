@@ -126,16 +126,24 @@ test("a database that throws does not take the message down", async () => {
 const PER_CLIENT = [
   ["src/app/api/coach-escalate/route.ts", "inboxAuthUidForClient(db, me.id)"],
   ["src/app/api/program-feedback/route.ts", "inboxAuthUidForClient(db, cid)"],
+  // "Your client just AI-built their own workout" belongs to whoever coaches
+  // them. This one searched the CLIENTS table for
+  // `email = TRAINER_EMAIL OR name ILIKE '%Dustin%'` — two owner-shaped guesses
+  // rather than a lookup.
+  ["src/app/api/workout-ai/route.ts", "inboxAuthUidForClient(admin, clientId)"],
 ] as const;
 
 const OWNER_WIDE = [
-  "src/app/api/cron/birthdays/route.ts",
-  "src/app/api/cron/coachbot/route.ts",
+  ["src/app/api/cron/birthdays/route.ts", "ownerAuthUid(db)"],
+  ["src/app/api/cron/coachbot/route.ts", "ownerAuthUid(db)"],
+  // The nightly nudge digest covers the whole roster, so it goes to the owner.
+  // Splitting it per trainer is Dustin's call, not a default to slide in.
+  ["src/app/api/ai-nudges/route.ts", "ownerAuthUid(admin)"],
 ] as const;
 
 test("no route resolves a trainer by taking whatever trainer_settings row comes first", () => {
   for (const [f] of PER_CLIENT) assertNoSettingsGrab(f);
-  for (const f of OWNER_WIDE) assertNoSettingsGrab(f);
+  for (const [f] of OWNER_WIDE) assertNoSettingsGrab(f);
   assertNoSettingsGrab("src/lib/ai/agent-tools.ts");
 });
 
@@ -152,9 +160,24 @@ test("client-facing messages go to that client's coach", () => {
 });
 
 test("the shared surfaces post as the owner, deliberately", () => {
-  for (const f of OWNER_WIDE) {
-    assert.match(code(read(f)), /ownerAuthUid\(db\)/,
-      f + " does not resolve the owner — the group chat would post from whichever trainer sorted first");
+  for (const [f, call] of OWNER_WIDE) {
+    assert.ok(code(read(f)).includes(call),
+      f + " does not resolve the owner (" + call + ") — it would post from whichever trainer sorted first");
+  }
+});
+
+test("nobody finds a trainer by guessing at the owner's email or name", () => {
+  // Two more shapes of the same mistake, both live until 20 Aug:
+  //   .eq("email", TRAINER_EMAIL) against the CLIENTS table — works only
+  //   because Dustin also trains himself.
+  //   .or(`email.eq.${TRAINER_EMAIL},name.ilike.%${COACH_FIRST_NAME}%`) — a
+  //   name match, which would happily return the OTHER Gautreaux.
+  for (const f of [...PER_CLIENT.map(x => x[0]), ...OWNER_WIDE.map(x => x[0])]) {
+    const c = code(read(f));
+    assert.ok(!/from\("clients"\)[\s\S]{0,160}?TRAINER_EMAIL/.test(c),
+      f + " looks the trainer up in the clients table by the owner's email");
+    assert.ok(!/name\.ilike\.%\$\{COACH_FIRST_NAME\}%/.test(c),
+      f + " matches a trainer by first name — there are two Gautreauxes");
   }
 });
 

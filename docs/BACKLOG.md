@@ -93,6 +93,12 @@
 > | `/api/cron/birthdays` | arbitrary trainer | the owner (shared group chat) |
 > | `/api/cron/coachbot` | arbitrary trainer | the owner (shared group chat) |
 > | agent `send_message` | arbitrary trainer, both branches | owner for the group, the client's coach for a DM |
+> | `/api/workout-ai` | `clients` where `email = TRAINER_EMAIL OR name ILIKE '%Dustin%'` — a NAME match, which would happily return the other Gautreaux | the client's own coach |
+> | `/api/ai-nudges` | `clients` where `email = TRAINER_EMAIL` | the owner (the digest is roster-wide) |
+>
+> **Deliberately left on the owner:** `/api/celebration`'s "coach Dustins
+> lifted" novelty unit, and the nightly nudge digest above. Splitting the digest
+> per trainer is Dustin's call, not a default to slide in.
 >
 > This is what `src/lib/trainerResolve.ts` was written for in `aef27de`, and it
 > had **zero importers** until now — dead code that also failed to typecheck the

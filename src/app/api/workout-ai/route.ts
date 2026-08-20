@@ -17,7 +17,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
-import { enforceMeter, missingKeyResponse, resolveAiScope, TRAINER_EMAIL, Db } from "@/lib/ai/scope";
+import { enforceMeter, missingKeyResponse, resolveAiScope, Db } from "@/lib/ai/scope";
+import { inboxAuthUidForClient } from "@/lib/trainerResolve";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type Anthropic from "@anthropic-ai/sdk";
 import { findExerciseIdByName } from "@/lib/exerciseLookup";
@@ -506,8 +507,11 @@ export async function POST(req: NextRequest) {
 
   // ─── notify the trainer (self-serve + notified) ───
   try {
-    const { data: tr } = await admin.from("clients").select("auth_user_id").or(`email.eq.${TRAINER_EMAIL},name.ilike.%${COACH_FIRST_NAME}%`).not("auth_user_id", "is", null).limit(1).maybeSingle();
-    const trainerAuth = (tr as { auth_user_id: string } | null)?.auth_user_id;
+    // THIS client's coach. It used to search the CLIENTS table for
+    // `email = TRAINER_EMAIL OR name ILIKE '%Dustin%'` — two owner-shaped
+    // guesses, both of which send Stephanie's client's "I built my own workout"
+    // notice to Dustin instead of to her.
+    const trainerAuth = await inboxAuthUidForClient(admin, clientId);
     if (trainerAuth && scope.userId && trainerAuth !== scope.userId) {
       const verb = mode === "activity" ? "logged an extra activity" : mode === "equipment" ? "AI-built a workout from available equipment" : "AI-replaced today's workout";
       const { error: notifyErr } = await admin.from("messages").insert({

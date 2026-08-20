@@ -45,7 +45,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
-import { Db, TRAINER_EMAIL, enforceMeter } from "@/lib/ai/scope";
+import { Db, enforceMeter } from "@/lib/ai/scope";
+import { ownerAuthUid } from "@/lib/trainerResolve";
 import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
@@ -238,15 +239,15 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    // Trainer auth id — needed as the message sender.
-    const { data: tr } = await admin
-      .from("clients")
-      .select("auth_user_id")
-      .eq("email", TRAINER_EMAIL)
-      .not("auth_user_id", "is", null)
-      .limit(1)
-      .maybeSingle();
-    const trainerAuth = (tr as { auth_user_id: string } | null)?.auth_user_id ?? null;
+    // Who the nightly digest is addressed to (from_id = to_id, so it is a
+    // private note to that account and RLS shows it to nobody else).
+    //
+    // This used to find the trainer by looking up TRAINER_EMAIL in the CLIENTS
+    // table, which works only because Dustin also trains himself. It reads the
+    // trainers table now. The OWNER is deliberate: the digest covers the whole
+    // roster, and splitting it per trainer is a decision for Dustin, not a
+    // default to slide in — noted in the backlog.
+    const trainerAuth = await ownerAuthUid(admin);
 
     const previews: { name: string; segment: string; tone: string; body: string; sent: boolean }[] = [];
 
