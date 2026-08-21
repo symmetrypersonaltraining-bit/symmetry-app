@@ -8,6 +8,10 @@ import AiBadge from "@/components/AiBadge";
 import { fetchOwnClientRow } from "@/lib/ownClient";
 
 import { useCoach } from "@/lib/useCoach";
+import { useTakeoverSlot } from "@/lib/useTakeoverSlot";
+import { TAKEOVER_PRIORITY } from "@/lib/takeoverSlot";
+
+const briefKey = (weekStart: string) => "weekbrief-" + weekStart;
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -64,6 +68,9 @@ interface Summary {
 
 export default function ClientWeekSummary() {
   const { firstName: coachFirstName } = useCoach();
+  // Component-scope client. The loader below makes its own for the big parallel
+  // read; this one is for the brief's seen-marker, which outlives that closure.
+  const [sup] = useState(() => createClient() as any);
   const [s, setS] = useState<Summary | null>(null);
   const [showBrief, setShowBrief] = useState(false);
   const [clientId, setClientId] = useState<string | null>(null);
@@ -164,24 +171,90 @@ export default function ClientWeekSummary() {
   // Once-weekly full-screen review trigger (shown once/day-guarded). Fires when
   // the summary + last-week nutrition (canonical) have loaded and there's real
   // activity. Not shown in trainer preview (?forClient=…).
+  //
+  // WHEN THIS IS ALLOWED TO COVER THE SCREEN — rewritten 21 Aug.
+  //
+  // It used to fire on the first open of EVERY day, despite the comment above
+  // it saying "once-weekly". Dustin: "i dont want screen take overs popping up
+  // constantly and causing too much annoyance and clutter."
+  //
+  // Now: the first open of SUNDAY or MONDAY only. A "week in review" on a
+  // Thursday is reviewing a week that is still happening, and by Tuesday the
+  // week just gone is not news. Two days is its shelf life, so two days is what
+  // it gets.
+  //
+  // "Seen" moved off localStorage and onto client_announcements_seen — the same
+  // per-PERSON table ClientTakeovers uses — so dismissing it on the phone does
+  // not leave it waiting on the iPad. The old key was written the moment it
+  // OPENED, so a client who closed the app without reading it was recorded as
+  // having seen it; the row is now written when they actually dismiss. The
+  // localStorage day-key stays as a second belt: it caps an undismissed brief
+  // at one appearance per day.
   useEffect(() => {
     if (!s || !clientId) return;
-    try {
-      const hasActivity = s.totalLast > 0 || s.doneLast > 0 || s.streak > 0 || s.totalThis > 0 || (lastWkAdh.result?.loggedDays || 0) > 0;
-      let isPreview = false;
-      try { isPreview = !!new URLSearchParams(window.location.search).get("forClient"); } catch { isPreview = false; }
-      const key = "symmetry_weekbrief_v1_" + clientId + "_" + today;
-      if (hasActivity && !isPreview && !localStorage.getItem(key)) {
-        try { localStorage.setItem(key, "1"); } catch { /* ignore */ }
+    let on = true;
+    (async () => {
+      try {
+        const dow = new Date(today + "T12:00:00Z").getUTCDay(); // 0 Sun, 1 Mon
+        if (dow !== 0 && dow !== 1) return;
+
+        const hasActivity = s.totalLast > 0 || s.doneLast > 0 || s.streak > 0 || s.totalThis > 0 || (lastWkAdh.result?.loggedDays || 0) > 0;
+        if (!hasActivity) return;
+
+        let isPreview = false;
+        try { isPreview = !!new URLSearchParams(window.location.search).get("forClient"); } catch { isPreview = false; }
+        if (isPreview) return;
+
+        const dayKey = "symmetry_weekbrief_v2_" + clientId + "_" + today;
+        const weekKey = "symmetry_weekbrief_v2_seen_" + clientId + "_" + thisWk;
+        try {
+          if (localStorage.getItem(dayKey)) return;
+          // Written only when the server-side marker failed to save.
+          if (localStorage.getItem(weekKey)) return;
+        } catch { /* ignore */ }
+
+        const { data } = await sup
+          .from("client_announcements_seen")
+          .select("key")
+          .eq("client_id", clientId)
+          .eq("key", briefKey(thisWk))
+          .limit(1);
+        if (!on || (data && data.length > 0)) return;
+
+        try { localStorage.setItem(dayKey, "1"); } catch { /* ignore */ }
         setShowBrief(true);
-      }
-    } catch { /* ignore */ }
-  }, [s, clientId, today, lastWkAdh.result]);
+      } catch { /* a status screen must never break the dashboard */ }
+    })();
+    return () => { on = false; };
+  }, [s, clientId, today, thisWk, sup, lastWkAdh.result]);
+
+  // One full-screen interrupt at a time, app-wide. ClientTakeovers' six
+  // announcements outrank this: a birthday is worth saying today only, a week
+  // in review is still worth saying tomorrow. See src/lib/takeoverSlot.ts.
+  const mayTakeOver = useTakeoverSlot("weekbrief", TAKEOVER_PRIORITY.WEEK_BRIEF, showBrief);
 
   if (!s) return null;
 
-  function dismissBrief() {
+  async function dismissBrief() {
     setShowBrief(false);
+    // Recorded per PERSON so it does not reappear on their other device.
+    //
+    // Checked, and with a real fallback rather than a shrug: if the row does not
+    // land, this device at least remembers for the rest of the week, so a failed
+    // write costs them one repeat on another device instead of one every Sunday
+    // forever. There is nothing useful to show a client here — the card is
+    // already closed and the thing that failed is bookkeeping — so the handling
+    // is the fallback, not a message.
+    if (!clientId) return;
+    try {
+      const { error } = await sup
+        .from("client_announcements_seen")
+        .insert({ client_id: clientId, key: briefKey(thisWk) });
+      if (error) throw new Error(error.message);
+    } catch (e) {
+      console.error("week brief: seen-marker not saved", e);
+      try { localStorage.setItem("symmetry_weekbrief_v2_seen_" + clientId + "_" + thisWk, "1"); } catch { /* ignore */ }
+    }
   }
 
   const focusText = s.focus && s.focus.trim() ? s.focus.trim() : null;
@@ -233,7 +306,7 @@ export default function ClientWeekSummary() {
 
       {/* C1 — once-weekly full-screen briefing: a review of LAST week (header +
           all tiles = last week; nutrition uses the SAME canonical adherence). */}
-      {showBrief && (
+      {showBrief && mayTakeOver && (
         <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--brand-bg)", display: "flex", flexDirection: "column", overflowY: "auto" }}>
           <div style={{ background: "linear-gradient(135deg,#7c9cf5,#8b6ff0)", color: "#fff", padding: "20px 18px 18px" }}>
             <div style={{ fontSize: 12, opacity: 0.9, fontWeight: 600 }}>{fmtRange(s.lastWkStart, s.lastWkEnd).toUpperCase()}</div>

@@ -35,6 +35,8 @@ import Confetti from "@/components/Confetti";
 import { useCoach } from "@/lib/useCoach";
 import AiBadge from "@/components/AiBadge";
 import { lapseMood, type LapseTier } from "@/lib/ai/faces";
+import { useTakeoverSlot } from "@/lib/useTakeoverSlot";
+import { TAKEOVER_PRIORITY } from "@/lib/takeoverSlot";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function pretty(iso: string): string {
@@ -357,6 +359,8 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
     } catch { /* they still get the rest of the month off via the seen-key */ }
   }
 
+  const holdsSlot = useTakeoverSlot("announcements", TAKEOVER_PRIORITY.ANNOUNCEMENTS, !!pick);
+
   async function saveDob() {
     if (busy) return;
     // A date they have to fix later is worse than no date. Reject the two
@@ -378,6 +382,14 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
     }
   }
 
+  // One full-screen interrupt at a time, APP-WIDE — not just among the six
+  // below. The header comment above promised that and could only deliver it
+  // inside this file; src/lib/takeoverSlot.ts is what makes it true of the app.
+  // These outrank the week-in-review: everything here has a shorter shelf life.
+  //
+  // Claimed unconditionally (hooks cannot sit behind a return) with `want` set
+  // to whether there is actually something to show, so nothing is starved.
+  if (!holdsSlot) return null;
   if (!pick) return null;
 
   const shell = (children: React.ReactNode) => (

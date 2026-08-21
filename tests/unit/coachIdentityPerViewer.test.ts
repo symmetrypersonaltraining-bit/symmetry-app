@@ -16,7 +16,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_COACH } from "../../src/lib/coachIdentity.ts";
 
@@ -71,8 +71,6 @@ const ALLOWED = new Map<string, string>([
   // remaining hits are inside JSX comments quoting Dustin's design decisions —
   // not rendered to anybody.
   ["src/app/(app)/workout/[dayId]/WorkoutLogger.tsx", "comments only, and the file is off limits"],
-  // An expired one-off gag aimed at his own family, inert unless ?prank=1.
-  ["src/components/PrankInvoice.tsx", "expired personal prank, signed by the owner on purpose"],
 ]);
 
 test("no rendered component names the coach from the build-time constant", () => {
@@ -366,11 +364,10 @@ test("the shared group bots are handed the owner explicitly", () => {
   }
 });
 
-test("the prank cannot take over a trainer's app", () => {
-  // Expired, and its target list now contains a TRAINER's address. `?prank=1`
-  // still fires it regardless of the date.
-  const c = code(read("src/components/PrankInvoice.tsx"));
-  assert.match(c, /isTrainerEmail/, "the prank has no trainer guard");
-  assert.equal((c.match(/isTrainerEmail\(/g) || []).length, 2,
-    "both the automatic path and the ?prank=1 path must be guarded");
+test("the prank is gone, not merely expired", () => {
+  // It was an expired one-off gag aimed at two family addresses, still mounted
+  // on every client dashboard load at z-index 99999 — the highest in the app.
+  // Removed 21 Aug in the takeover cull. Re-adding it would put a flashing fake
+  // invoice back above every other screen.
+  assert.ok(!existsSync(join(process.cwd(), "src/components/PrankInvoice.tsx")), "PrankInvoice is back");
 });

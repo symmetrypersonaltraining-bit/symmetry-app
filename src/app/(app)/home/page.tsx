@@ -4,11 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import TrainerCalendarPanel from "@/components/TrainerCalendarPanel";
 import ClientDashboard from "./ClientDashboard";
 import TrainerHome from "./TrainerHome";
-import PwaInstallBanner from "@/components/PwaInstallBanner";
 import PendingRemindersPanel from "@/components/PendingRemindersPanel";
 import ClientNotesPanel, { type ClientNote } from "@/components/ClientNotesPanel";
 import { isSymptomNote } from "@/lib/trainingNoteRouting";
-import SlackerGate from "@/components/SlackerScreen";
 import { TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
 import { getServerUser } from "@/lib/auth/serverUser";
 
@@ -418,8 +416,16 @@ export default async function HomePage(props: {
 
   return (
     <>
-      <PwaInstallBanner />
-      <SlackerGate clientId={clientRecord.id} />
+      {/* PwaInstallBanner and SlackerGate both removed 21 Aug.
+          - Two install prompts existed with two different dismiss keys and
+            could show at once; InstallPrompt in (app)/layout.tsx is the one
+            that stayed.
+          - SlackerGate ("welcome back slacker") duplicated the lapse screen
+            inside ClientTakeovers, at z-index 9999 — ABOVE it — so a lapsed
+            client got both. Worse, it ignored checkin_nudges_off and
+            checkin_snoozed_until, which the lapse screen honours: a client who
+            had explicitly asked not to be nudged got a comedy wanted poster
+            anyway. See ClientTakeovers for the one-takeover rule. */}
       <ClientDashboard
         firstName={firstName}
         todayWorkouts={todayWorkouts as any[]}

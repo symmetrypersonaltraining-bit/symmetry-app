@@ -9,12 +9,10 @@ import HomeMacrosCard from "@/components/HomeMacrosCard";
 import CountUp from "@/components/CountUp";
 import StreakFlame from "@/components/StreakFlame";
 import MilestoneToast from "@/components/MilestoneToast";
-import PrankInvoice from "@/components/PrankInvoice";
 import PaymentDueBanner from "@/components/PaymentDueBanner";
 import MilestoneBadges from "@/components/MilestoneBadges";
 import ClientWeekSummary from "@/components/ClientWeekSummary";
 import ProgrammingQuestion from "@/components/ProgrammingQuestion";
-import SundayWeighInReminder from "@/components/SundayWeighInReminder";
 import CommunityPair from "@/components/CommunityPair";
 import ClientTakeovers from "@/components/ClientTakeovers";
 import { RestDaySlip } from "@/components/FunMoments";
@@ -670,7 +668,6 @@ export default function ClientDashboard({
       )}
 
       <div className="p-4 pb-28 space-y-4 max-w-lg mx-auto cw-reveal">
-        <PrankInvoice />
         <PaymentDueBanner />
       {isMilestone && streakDays > 0 && (
         <MilestoneToast emoji="🎉" message={`${streakDays}-day streak — keep it going!`} once={`streak-${streakDays}`} />
@@ -828,7 +825,10 @@ export default function ClientDashboard({
         )}
 
         {/* Full-screen Sunday weigh-in reminder (fires only on Sundays, once) */}
-        <SundayWeighInReminder />
+        {/* SundayWeighInReminder removed 21 Aug: a full-screen takeover for a
+            job WeighInNudge already does as a card on /progress. It also read
+            ?forClient= from the URL, so it fired at the TRAINER inside
+            /client-preview. */}
 
         {/* Challenge + group, as a split pair directly under today's workout.
             Deliberately here rather than further down: buried below the fold

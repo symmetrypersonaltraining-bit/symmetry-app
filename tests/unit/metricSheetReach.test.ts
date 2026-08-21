@@ -57,13 +57,22 @@ test("there is a route from the app to the screen that takes a weigh-in", () => 
   assert.ok(logAt < progressAt, "logging should come before the chart on a card somebody opened by tapping their weight");
 });
 
-test("the Sunday reminder points at the screen that can take the number", () => {
-  const rem = fs
-    .readFileSync(path.join(process.cwd(), "src/components/SundayWeighInReminder.tsx"), "utf8")
+test("the weigh-in nudge points at a screen that can take the number", () => {
+  // SundayWeighInReminder (a full-screen Sunday takeover) was removed 21 Aug —
+  // WeighInNudge already did the same job as a card, and the takeover also
+  // fired at the trainer inside /client-preview. The property this test exists
+  // to protect is unchanged: whatever asks for a weigh-in must lead somewhere
+  // that actually records one.
+  assert.ok(
+    !fs.existsSync(path.join(process.cwd(), "src/components/SundayWeighInReminder.tsx")),
+    "the Sunday weigh-in takeover is back",
+  );
+  const nudge = fs
+    .readFileSync(path.join(process.cwd(), "src/components/WeighInNudge.tsx"), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "");
-  assert.doesNotMatch(rem, /progress\?log=weight/, "the reminder points at a parameter no page reads");
-  assert.match(rem, /window\.location\.href = "\/log"/, "the weigh-in reminder does not lead to the weigh-in screen");
+  assert.doesNotMatch(nudge, /progress\?log=weight/, "the nudge points at a parameter no page reads");
+  assert.match(nudge, /href="\/log-bodyfat"/, "the weigh-in nudge does not lead to a screen that saves a metric");
 });
 
 test("/log still exists and still writes a metric", () => {
