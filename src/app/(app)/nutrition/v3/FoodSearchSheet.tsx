@@ -160,14 +160,29 @@ export default function FoodSearchSheet({
     const t = setTimeout(async () => {
       const term = q.trim();
       if (term.length < 2 && tab === "all") { if (on) setResults([]); return; }
-      // Prefer food_catalog (v3); fall back to the legacy foods table.
+      // RANKED, via search_food_catalog. See that function for why.
+      //
+      // This used to be `.ilike("%term%").limit(10)` with no order at all — on
+      // 574,636 rows Postgres returns whichever ten it finds first, so
+      // "chicken breast" put "Chicken breast with ginger soy sauce" at the top
+      // and the plain one sixth, and a vaguer search dropped it off the list
+      // entirely. That is the whole of "it's not picking up the most basic of
+      // foods": the row was always there, nothing had an opinion about which
+      // one was meant.
+      //
+      // The function ranks by their own saved foods, then exact/prefix/word
+      // match, then verified, then whether the calories agree with the macros —
+      // which keeps a 653-kcal "chicken breast" out of first place. 25 rather
+      // than 10 because ranked results are worth scrolling.
       let rows: CatalogFood[] = [];
       if (catalogOk.current !== false) {
         try {
-          let query = supabase.from("food_catalog").select("*").limit(10);
-          if (term.length >= 2) query = query.ilike("name", "%" + term + "%");
-          if (tab === "mine") query = query.eq("created_by_client_id", clientId);
-          const { data, error } = await query;
+          const { data, error } = await supabase.rpc("search_food_catalog", {
+            p_term: term,
+            p_client_id: clientId || null,
+            p_limit: 25,
+            p_mine_only: tab === "mine",
+          });
           if (error) throw error;
           catalogOk.current = true;
           rows = ((data as Record<string, unknown>[]) || []).map((r) => mapRow(r, true));
