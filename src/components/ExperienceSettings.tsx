@@ -81,6 +81,7 @@ export default function ExperienceSettings({ isTrainer }: { isTrainer: boolean }
   const [board, setBoard] = useState(false);
   const [nudges, setNudges] = useState(true);
   const [coachbotLive, setCoachbotLive] = useState(false);
+  const [tutorialLive, setTutorialLive] = useState(false);
   const [clientId, setClientId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -108,8 +109,14 @@ export default function ExperienceSettings({ isTrainer }: { isTrainer: boolean }
           }
         }
         if (isTrainer) {
-          const { data: cb } = await supabase.from("app_flags").select("enabled").eq("key", "coachbot_live").maybeSingle();
-          setCoachbotLive((cb as { enabled: boolean } | null)?.enabled === true);
+          const { data: flags } = await supabase
+            .from("app_flags")
+            .select("key, enabled")
+            .in("key", ["coachbot_live", "trainer_tutorial_live"]);
+          const on = (k: string) =>
+            ((flags || []) as { key: string; enabled: boolean }[]).some((f) => f.key === k && f.enabled === true);
+          setCoachbotLive(on("coachbot_live"));
+          setTutorialLive(on("trainer_tutorial_live"));
         }
       } catch {
         /* leave defaults */
@@ -245,6 +252,40 @@ export default function ExperienceSettings({ isTrainer }: { isTrainer: boolean }
               })();
             }}
           />
+          <Row
+            icon="ti-school"
+            title="New-trainer walkthrough"
+            sub={
+              tutorialLive
+                ? "ON — a Set up your app card appears in Settings, and the walkthrough is reachable at /tutorial."
+                : "Off. The walkthrough exists and is finished; nobody can reach it. Turn it on when you want a new trainer to be walked through the app."
+            }
+            on={tutorialLive}
+            disabled={!ready}
+            onToggle={() => {
+              const next = !tutorialLive;
+              setTutorialLive(next);
+              fx(next ? "pr" : "tap");
+              (async () => {
+                // .select("id") on purpose. An update that matches no row is
+                // not an error in supabase-js, so without this the switch
+                // would flip on screen and change nothing in the database —
+                // which is exactly how you ship a feature to nobody and
+                // believe it went live.
+                try {
+                  const { data, error } = await supabase
+                    .from("app_flags")
+                    .update({ enabled: next, updated_at: new Date().toISOString() })
+                    .eq("key", "trainer_tutorial_live")
+                    .select("key");
+                  if (error || !data || data.length === 0) setTutorialLive(!next);
+                } catch {
+                  setTutorialLive(!next);
+                }
+              })();
+            }}
+          />
+
         </>
       ) : null}
     </div>

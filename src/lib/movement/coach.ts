@@ -260,13 +260,12 @@ export function nextCoachingCue(checks: GateCheck[]): { text: string; spoken: st
   return { text: fail.fixPrompt, spoken: fail.fixSpoken };
 }
 
-/** Browser TTS helper — clear, calm, one instruction at a time. */
-export function speak(line: string, opts?: { rate?: number; pitch?: number }) {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  const u = new SpeechSynthesisUtterance(line);
-  u.rate = opts?.rate ?? 0.98;
-  u.pitch = opts?.pitch ?? 1.0;
-  u.volume = 1;
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(u);
-}
+/**
+ * Browser TTS helper — clear, calm, one instruction at a time.
+ *
+ * The implementation moved to src/lib/speech.ts when the trainer tutorial
+ * needed to speak too. Two independent speechSynthesis callers would fight:
+ * cancel() is global, so whichever spoke last would silently kill the other.
+ * Re-exported here so every existing call site keeps working unchanged.
+ */
+export { speak } from '@/lib/speech';

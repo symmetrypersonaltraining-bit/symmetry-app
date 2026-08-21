@@ -474,6 +474,23 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    id: "trainer-walkthrough",
+    title: "The end-to-end walkthrough",
+    category: "Trainer Tools",
+    audience: "trainer",
+    icon: "school",
+    keywords: ["tutorial", "walkthrough", "training", "new trainer", "onboarding", "setup", "guide", "tour", "voice"],
+    intro: "Every screen and every setting, in order, narrated. Settings, then \"Set up your app\".",
+    steps: [
+      "It runs about forty steps across thirteen chapters: your account, getting around, Home, clients, programming, the library, nutrition, progress, the calendar, payments, messages, the AI, and going live.",
+      "It reads itself out loud if you want it to. Voice is off until you turn it on, and the button is on every step.",
+      "Most steps open the real screen in a second tab, so you are learning on your own account rather than watching somebody else's.",
+      "It remembers where you stopped. Close it, come back next week, carry on from the same step.",
+      "The last chapter checks your actual setup — photo, pay details, calendar, first client, first program, first message, notifications — by reading your account rather than asking you to tick boxes.",
+      "If the card is not in your Settings, the walkthrough is switched off for this instance. A trainer can turn it on under Settings, Experience, \"New-trainer walkthrough\".",
+    ],
+  },
+  {
     id: "instance-first-run",
     title: "First-run setup checklist",
     category: "Running Your Own Instance",

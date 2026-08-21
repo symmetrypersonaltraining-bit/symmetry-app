@@ -20,10 +20,11 @@ interface Props {
   gcalSyncEnabled?: boolean;
   gcalConnected?: boolean;
   gcalStatus?: string | null;
+  tutorialLive?: boolean;
 }
 
 export default function SettingsClient({ userEmail, userName, isTrainer,
-  isInClientMode, userId, gcalSyncEnabled, gcalConnected, gcalStatus }: Props) {
+  isInClientMode, userId, gcalSyncEnabled, gcalConnected, gcalStatus, tutorialLive }: Props) {
   const { theme, setTheme, depth, setDepth } = useTheme();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -309,6 +310,27 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
           </div>
         </section>
         )}
+
+      {/* The end-to-end walkthrough. Only appears once trainer_tutorial_live
+          is on, which is why the card and the toggle are in different places:
+          the toggle (Experience, trainer only) is how you turn it on, this is
+          where a new trainer finds it afterwards. It sits above AI health
+          because on somebody's first morning it is the only card that matters. */}
+      {isTrainer && !isInClientMode && tutorialLive && (
+        <section>
+          <p className="section-header">New here?</p>
+          <a href="/tutorial" className="card p-4 flex items-center gap-3" style={{ textDecoration: "none" }}>
+            <i className="ti ti-school text-2xl" style={{ color: "var(--brand-primary)" }} />
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Set up your app</span>
+              <span className="block text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
+                Every screen, every setting, start to finish. It reads itself out loud and remembers where you stopped.
+              </span>
+            </span>
+            <i className="ti ti-chevron-right" style={{ color: "var(--brand-text-secondary)" }} />
+          </a>
+        </section>
+      )}
 
       {/* Is the AI actually working? Every AI surface in this app degrades
           quietly by design — a coach card that fails just does not appear — so
