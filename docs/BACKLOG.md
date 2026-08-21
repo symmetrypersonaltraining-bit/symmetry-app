@@ -113,6 +113,47 @@
 > filed as one of Dustin's, three dead components removed, and the db-schema
 > fixture regenerated — it was twelve columns behind production.
 >
+> **`2890d28` — the nightly nudge sweep is off. The engine is kept.**
+> Dustin, 21 Aug: "stop that for now. keep engine for later if i decide to add
+> it back." It was writing a message about every active client, in his voice,
+> every night — ~30 a run, 657 rows — into a table nothing in the app reads.
+> The client-DM path went on 13 Aug and nothing replaced it.
+>   - **Unscheduled** (`vercel.json`). That entry was what actually fired it,
+>     and it explains a thing that never fitted: the cron string says Mondays,
+>     the rows land nightly at 9:10pm CT — Vercel running a daily job whenever
+>     it likes.
+>   - **Flag-gated** on `app_flags.nudges_live` (false), checked before anything
+>     can spend, so an off sweep cannot pay for itself. That flag existed, was
+>     read by nothing, and a comment in the route described it as the safety
+>     mechanism anyway. Reviving = one row, no deploy.
+>   - `segment.ts`, the guardrails and `nudgeSegments.test.ts` untouched, with a
+>     test asserting they still exist.
+>
+> **STILL OPEN, for whoever revives it:**
+>   1. **It was never metered.** The route calls `logUsage(…, "nudge_sweep", …)`
+>      and `ai_usage_log` has ZERO rows for that feature, despite the model
+>      demonstrably running (the drafts are LLM prose). ~900 calls/month sat
+>      outside the $95 ceiling. NOT fixed — diagnosing it properly needs the
+>      route to actually run. The `$14.44/month` figure quoted for the trainer
+>      decision is what is MEASURED and excludes this.
+>   2. **`slipping` mislabels people who are following their programme.** The
+>      rule is `w7 <= 3 && w30 <= 10`, which for a client programmed 2–3x/week
+>      is normal. Grant Weever, Hassan Kareem and Krysta Ruiz-Schnitzler all
+>      trained within a day or two and were tagged slipping; the copy then reads
+>      "good session yesterday… can you fit one more in before Sunday?" It needs
+>      to compare against that client's PROGRAMMED frequency, not a constant.
+>   3. **There is nowhere for a draft to land.** Turning the sweep on again
+>      without answering that just refills a table nobody opens.
+>
+> **Trainer AI, decided 21 Aug.** New trainers get the in-app AI by default,
+> and are ENCOURAGED to connect their own Claude — framed as the upgrade that
+> lets them run every client from Claude chat instead of the app, not as a cost
+> measure. Cost scales with CLIENTS, not trainers: $0.42/client/month measured
+> across 34 clients, $14.44/month total, heaviest single client $4.30. Four
+> trainers at ~30 clients each ≈ $50/month against the $95 ceiling. A trainer
+> with no AI must get a tutorial that BRANCHES every AI step to its manual
+> equivalent — not a bolt-on chapter, and not hidden steps.
+
 > **`be2b58c` — the calendar stops outranking the person who moved the workout.**
 > Two rules, 21 Aug, both in his words.
 >   - **The online-only wall is populated.** "Tyler, Bobbie, Celeste, Robert,
