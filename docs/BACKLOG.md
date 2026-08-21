@@ -113,6 +113,41 @@
 > filed as one of Dustin's, three dead components removed, and the db-schema
 > fixture regenerated — it was twelve columns behind production.
 >
+> **`be2b58c` — the calendar stops outranking the person who moved the workout.**
+> Two rules, 21 Aug, both in his words.
+>   - **The online-only wall is populated.** "Tyler, Bobbie, Celeste, Robert,
+>     Gerard, krysta, Troy, Maddy, sharon gautreaux, me, steph, these do not get
+>     moved automatically due to schedule." Eleven clients now carry
+>     `online_only`. The mover already skipped the flag in all three branches;
+>     the PROPOSAL detector did not, so their appointments kept arriving as
+>     decisions about a rule already made. Six pending proposals superseded —
+>     the queue went from seven to one (Greg Lennon, real).
+>   - **A manual move is final.** "make sure if anyone moves a workout manually
+>     it stays regardless of gcal sessions." The guard existed and was correct
+>     BY ACCIDENT: all seven manual paths set `moved_from_date`, none sets
+>     `moved_by`, so `moved_from_date is null or moved_by = 'calendar_sync'`
+>     came out NULL and the row fell out of the WHERE. The luck ran out once
+>     calendar_sync had moved a row: it stamped `'calendar_sync'`, a human
+>     moving it afterwards changed only `moved_from_date`, the guard PASSED, and
+>     the next sync dragged the workout back off the chosen day — on exactly the
+>     sessions most likely to have been moved already. `trg_stamp_workout_mover`
+>     (BEFORE UPDATE) now stamps the mover; the sync identifies itself with a
+>     transaction-local `symmetry.mover`, and everything else is a person.
+>     Verified in a rolled-back transaction against production: app move, sync
+>     move, human overriding the sync. 66 historical rows backfilled to
+>     `'manual'`.
+>   - The detector also stops proposing to re-cover a day the trainer uncovered
+>     himself by moving that week's workout.
+>   - **Drift found:** `detect_schedule_changes` had been replaced in the
+>     database by `20260821171049` (orphan/pairing machinery and the 'moved' and
+>     'cancelled' reasons removed, because he removed the approval step) and
+>     that migration was never written into `supabase/migrations`. The repo
+>     still described the 16 Aug design. Now carried in full, with the gap
+>     explained. Four tests in `detectorAbsenceIsNotASignal` were guarding the
+>     deleted machinery — rewritten to assert it stays deleted.
+>   - Backups: `bak_clients_online_only_20260821`,
+>     `bak_scheduled_workouts_movedby_20260821`.
+
 > **`b23a2d7` + `cec6bcb` — the tutorial is audible, findable, and dismissible.**
 > Reported off the first phone test: "there is no voice on tutorial and needs to
 > be easier to find for new trainers", then "give trainers the option to turn
