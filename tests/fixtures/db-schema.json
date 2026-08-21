@@ -1241,7 +1241,8 @@
     "google_channel_resource_id",
     "google_channel_expiry",
     "trainer_email",
-    "gcal_sync_enabled"
+    "gcal_sync_enabled",
+    "tutorial_dismissed_at"
   ],
   "trainers": [
     "id",

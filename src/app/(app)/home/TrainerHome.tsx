@@ -9,6 +9,7 @@ import LiveSessions from "@/components/LiveSessions";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
 import SyncHealth from "@/components/SyncHealth";
+import TutorialCard from "@/components/TutorialCard";
 import { useCoach } from "@/lib/useCoach";
 
 interface TodaySession {
@@ -194,6 +195,12 @@ export default function TrainerHome({
       {/* The manual sync button now lives ON the sync bar rather than as a
           separate control underneath it — the status and the way to act on it
           are one thing. GcalSyncButton is no longer mounted separately. */}
+      {/* Above the sync bar, and only until it is finished. A new trainer's
+          first screen should tell them where to start; Settings did not, and
+          on a phone Settings was the only door the tutorial had. Renders
+          nothing once every step has been seen. */}
+      <TutorialCard />
+
       <SyncHealth />
       {/* Renders NOTHING while the weekly sweep is healthy. Dustin, 21 Aug:
           "now that daily focus is auto we can get rid of that block". Right —

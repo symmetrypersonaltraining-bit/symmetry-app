@@ -10,6 +10,7 @@ import BillingHistory from "@/components/BillingHistory";
 import ExperienceSettings from "@/components/ExperienceSettings";
 import NotificationSettings from "@/components/NotificationSettings";
 import HelpCenter from "@/components/HelpCenter";
+import { useTutorialVisibility } from "@/lib/useTutorialVisibility";
 
 interface Props {
   userEmail: string;
@@ -25,6 +26,9 @@ interface Props {
 
 export default function SettingsClient({ userEmail, userName, isTrainer,
   isInClientMode, userId, gcalSyncEnabled, gcalConnected, gcalStatus, tutorialLive }: Props) {
+  // Per-trainer, not the app-wide flag above it: one trainer finishing the
+  // guide must not take it away from the next one being onboarded.
+  const { dismissed: tutorialHidden, hide: hideTutorial, show: showTutorial } = useTutorialVisibility();
   const { theme, setTheme, depth, setDepth } = useTheme();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -329,7 +333,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
           because on somebody's first morning it is the only card that matters. */}
       {isTrainer && !isInClientMode && tutorialLive && (
         <section>
-          <p className="section-header">New here?</p>
+          <p className="section-header">{tutorialHidden ? "Setup guide" : "New here?"}</p>
           <a href="/tutorial" className="card p-4 flex items-center gap-3" style={{ textDecoration: "none" }}>
             <i className="ti ti-school text-2xl" style={{ color: "var(--brand-primary)" }} />
             <span className="flex-1 min-w-0">
@@ -340,6 +344,22 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
             </span>
             <i className="ti ti-chevron-right" style={{ color: "var(--brand-text-secondary)" }} />
           </a>
+
+          {/* Hiding is per trainer and reversible, so it belongs next to the
+              card rather than behind the app-wide flag in Experience. This is
+              the row that undoes it once the guide is off Home. */}
+          {tutorialHidden === undefined ? null : (
+            <button
+              type="button"
+              onClick={() => { void (tutorialHidden ? showTutorial() : hideTutorial()); }}
+              className="mt-2 text-xs font-semibold"
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--brand-text-secondary)", textDecoration: "underline" }}
+            >
+              {tutorialHidden
+                ? "Show it on my Home screen again"
+                : "I'm done with it — hide it from Home and the sidebar"}
+            </button>
+          )}
         </section>
       )}
 

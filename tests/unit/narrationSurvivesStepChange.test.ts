@@ -103,3 +103,64 @@ describe("the voice control is findable", () => {
     );
   });
 });
+describe("the tutorial is reachable", () => {
+  const entryPoints = [
+    ["the dashboard", "src/app/(app)/home/TrainerHome.tsx", /<TutorialCard \/>/],
+    ["the sidebar", "src/components/TrainerSidebar.tsx", /href: "\/tutorial"/],
+    ["settings", "src/app/(app)/settings/SettingsClient.tsx", /href="\/tutorial"/],
+  ] as const;
+
+  for (const [where, file, pattern] of entryPoints) {
+    it(`has a door from ${where}`, () => {
+      const src = fs.readFileSync(path.join(ROOT, file), "utf8");
+      assert.match(
+        src,
+        pattern,
+        `${where} lost its link to /tutorial. Settings alone is not findable — that is ` +
+          "the state this was reported in.",
+      );
+    });
+  }
+});
+
+describe("a trainer can put the guide away", () => {
+  const hook = fs.readFileSync(path.join(ROOT, "src/lib/useTutorialVisibility.ts"), "utf8");
+
+  it("hides per trainer, never with the global flag", () => {
+    // The failure this prevents: "I'm done" wired to app_flags, so the trainer
+    // who finishes first switches the guide off for every trainer onboarded
+    // after them — including the one person who actually needs it.
+    assert.match(
+      hook,
+      /trainer_settings[\s\S]{0,200}tutorial_dismissed_at/,
+      "the dismissal must live on the trainer's own settings row",
+    );
+    assert.doesNotMatch(
+      stripComments(hook),
+      /from\("app_flags"\)[\s\S]{0,200}(update|upsert|insert)/,
+      "hiding the guide must never write to app_flags — that switch is global",
+    );
+  });
+
+  it("a failed read shows the guide rather than hiding it", () => {
+    // Opposite default to lib/flags.ts, on purpose. An unwanted card is an
+    // annoyance; a new trainer whose only signpost silently vanished is not.
+    assert.match(
+      hook,
+      /setDismissed\(false\)/,
+      "the catch/no-user paths must fall back to NOT dismissed",
+    );
+  });
+
+  it("hiding is reversible", () => {
+    assert.match(hook, /export interface TutorialVisibility[\s\S]*?show: \(\) => Promise<void>/,
+      "there must be a way back — hiding the guide cannot be one-way");
+    for (const [where, file] of [
+      ["the tutorial's own last screen", "src/app/(app)/tutorial/TutorialClient.tsx"],
+      ["Settings", "src/app/(app)/settings/SettingsClient.tsx"],
+    ] as const) {
+      const src = fs.readFileSync(path.join(ROOT, file), "utf8");
+      assert.match(src, /show(Tutorial)?\(\)/, `${where} lost the control that restores it`);
+    }
+  });
+});

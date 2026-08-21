@@ -6,6 +6,7 @@ import { TUTORIAL, SETUP_CHECKS, allSteps, type SetupCheckKey } from "@/lib/tuto
 import { narrate, speechSupported, stopSpeaking, unlockNarration, type Narration } from "@/lib/speech";
 import { resolveAudio } from "@/lib/tutorial/audio";
 import { setPageContext } from "@/lib/pageContext";
+import { useTutorialVisibility } from "@/lib/useTutorialVisibility";
 
 /**
  * The player.
@@ -57,6 +58,7 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
   const [ready, setReady] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const active = useRef<Narration | null>(null);
+  const { dismissed, hide, show } = useTutorialVisibility();
 
   useEffect(() => {
     setSeen(loadSeen());
@@ -364,6 +366,46 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
               : `${outstanding.length} still open. None of them stops you working today.`}
           </p>
 
+          {/* The off switch, here at the end because this is where a trainer is
+              standing when they decide they are finished.
+
+              It is THEIR row, not the app-wide flag. Dustin turning the guide
+              off after his own run must not take it away from the trainer being
+              onboarded next week, which is exactly what the global switch would
+              do. And it hides rather than deletes: this screen keeps working,
+              and Settings can put it back. */}
+          <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--brand-border)" }}>
+            {dismissed ? (
+              <>
+                <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>
+                  The guide is hidden from your Home screen and sidebar. It is still here whenever you want it.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { void show(); }}
+                  className="text-sm px-3 py-2 rounded-lg font-semibold"
+                  style={{ background: "var(--brand-surface-2)", color: "var(--brand-text)", border: "none" }}
+                >
+                  Put it back on my Home screen
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>
+                  Finished with it? Hide it and it stops appearing on Home and in the sidebar — for you only.
+                  Other trainers keep theirs, and you can bring yours back from Settings.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { void hide(); }}
+                  className="text-sm px-3 py-2 rounded-lg font-semibold"
+                  style={{ background: "var(--brand-surface-2)", color: "var(--brand-text)", border: "none" }}
+                >
+                  I&apos;m done — hide the setup guide
+                </button>
+              </>
+            )}
+          </div>
         </div>
       ) : null}
 

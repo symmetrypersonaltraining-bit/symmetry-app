@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import Logo from "./Logo";
 import { useMyClientRow } from "@/components/Avatar";
 import { useCoach } from "@/lib/useCoach";
+import { useTutorialVisibility } from "@/lib/useTutorialVisibility";
 
 interface SidebarItem {
   href?: string;
@@ -45,6 +46,16 @@ const TRAINER_NAV: SidebarItem[] = [
   { href: "/payments", label: "Payments", icon: "ti-credit-card" },
   { href: "/settings", label: "Settings", icon: "ti-settings" },
 ];
+
+/**
+ * The walkthrough, appended for a trainer who can reach it.
+ *
+ * It lived in exactly one place — a card most of the way down Settings — which
+ * is not where a new trainer looks on their first morning. Last in the list on
+ * purpose: it is where you go when you are lost, not part of the daily round.
+ * Flag-gated so it is never a link that dead-ends in a redirect back to /home.
+ */
+const TUTORIAL_ITEM: SidebarItem = { href: "/tutorial", label: "Setup guide", icon: "ti-school" };
 
 function isChildActive(children: { href: string }[], pathname: string) {
   return children.some((c) => pathname.startsWith(c.href));
@@ -98,6 +109,8 @@ export default function TrainerSidebar({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openAccordion, setOpenAccordion] = useState<string | null>(null);
+  const { visible: tutorialLive } = useTutorialVisibility();
+  const navItems = tutorialLive === true ? [...TRAINER_NAV, TUTORIAL_ITEM] : TRAINER_NAV;
 
   useEffect(() => {
     for (const item of TRAINER_NAV) {
@@ -148,7 +161,7 @@ export default function TrainerSidebar({
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-3 px-2">
-        {TRAINER_NAV.map((item) => {
+        {navItems.map((item) => {
           if (item.children) {
             const expanded = openAccordion === item.label;
             const childActive = isChildActive(item.children, pathname);
