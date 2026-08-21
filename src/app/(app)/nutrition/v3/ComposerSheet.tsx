@@ -21,6 +21,9 @@ export default function ComposerSheet({
   compare,
   saveLabel,
   keepOption,
+  draft,
+  onDraftChange,
+  onOpenFoodSearch,
   onSave,
   onClose,
   onBack,
@@ -29,6 +32,7 @@ export default function ComposerSheet({
   subtitle?: string;
   clientId: string;
   askName?: boolean;
+  /** Seeds draft.name when the parent opens this sheet. Read there, not here. */
   initialName?: string;
   compare?: { label: string; macros: Macros } | null;
   saveLabel: string;
@@ -44,15 +48,42 @@ export default function ComposerSheet({
    *
    * A tick here rather than a second button: the moment he wants is "log this
    * AND keep it", and two buttons would make him pick one.
+   *
+   * 21 Aug: it is now on EVERY mode. Swap and unlogged-insert used to call
+   * saveMyMeal whether or not anybody asked, which is how a library fills with
+   * meals nobody chose to keep. Dustin: "when i hit swap for custom, it should
+   * not force to save the meal in library, it's an option but may just be a
+   * one time off plan swap they type and ai parse for macros and cal."
    */
   keepOption?: boolean;
+  /**
+   * The draft, owned by the parent.
+   *
+   * It used to live in here, which was fine while typing was the only way to
+   * get an item into a custom meal. It stopped being fine the moment the food
+   * library became reachable from this sheet: only the TOP sheet in the stack
+   * renders, so pushing the search unmounts this component, and a locally-held
+   * draft is gone — the typed name, the parsed items, all of it — by the time
+   * the food comes back. Lifting it up means the round trip to the library is
+   * invisible, and Back out of the search returns to the meal as it was.
+   *
+   * Only the DRAFT moves. The textarea, the parsing spinner and the nutrient
+   * disclosure stay local: they are about this render, not about the meal.
+   */
+  draft: { name: string; items: CustomItem[] };
+  onDraftChange: (next: { name: string; items: CustomItem[] }) => void;
+  /** Opens the food library. Omit and the button is not drawn. */
+  onOpenFoodSearch?: () => void;
   onSave: (items: CustomItem[], name: string, keep: boolean) => void | Promise<void>;
   onClose: () => void;
   onBack?: () => void;
 }) {
-  const [name, setName] = useState(initialName || "");
+  const name = draft.name;
+  const items = draft.items;
+  const setName = (v: string) => onDraftChange({ name: v, items });
+  const setItems = (fn: (prev: CustomItem[]) => CustomItem[]) =>
+    onDraftChange({ name, items: fn(items) });
   const [text, setText] = useState("");
-  const [items, setItems] = useState<CustomItem[]>([]);
   const [parsing, setParsing] = useState(false);
   const [parseFailed, setParseFailed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -117,6 +148,24 @@ export default function ComposerSheet({
       <button onClick={runParse} disabled={parsing || !text.trim()} className="w-full mt-2 py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)", opacity: text.trim() && !parsing ? 1 : 0.6 }}>
         {parsing ? "Parsing items & estimating macros…" : "AI parse items →"}
       </button>
+
+      {/* The library, from here.
+          Dustin, 21 Aug: "make sure that the app can access full food library
+          from every option." Every other way of building a meal could reach the
+          catalogue; this one — the sheet behind "Swap for custom" — could only
+          be typed into, so a food with a known label was re-typed and
+          re-estimated by the model instead of read off the row that already
+          had the real numbers. Sits under the parse button rather than above
+          it: typing is still the fast path, this is the accurate one. */}
+      {onOpenFoodSearch && (
+        <button
+          onClick={onOpenFoodSearch}
+          className="w-full mt-1.5 py-2.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2"
+          style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}
+        >
+          <span aria-hidden>🗄</span> Pick from the food library
+        </button>
+      )}
       {parsing && (
         <div className="flex items-center gap-3 mt-3 rounded-2xl p-3" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
           <AiBadge size={22} mood="thinking" title="" />
@@ -267,7 +316,7 @@ export default function ComposerSheet({
               <span className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>
                 ⭐ Keep this in My Meals
                 <span className="block text-xs font-normal" style={{ color: "var(--brand-text-secondary)" }}>
-                  So you can log it again in one tap
+                  Off by default — a one-off swap stays a one-off. Tick it and it is in the library to reuse.
                 </span>
               </span>
             </button>

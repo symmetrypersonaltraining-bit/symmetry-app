@@ -76,7 +76,7 @@ type SheetState =
   | { kind: "copyto"; rowKey: string }
   | { kind: "addmeal"; at: number }
   | { kind: "mymeals"; at: number | null; replaceRowKey?: string }
-  | { kind: "foodsearch"; target: "adjust" | "extra" | "slot"; rowKey?: string }
+  | { kind: "foodsearch"; target: "adjust" | "extra" | "slot" | "composer"; rowKey?: string }
   | { kind: "menu" }
   | { kind: "trends" }
   | { kind: "versions" }
@@ -898,6 +898,24 @@ export default function NutritionV3Client(props: Props) {
   }, []);
 
   // ---- sheet helpers ------------------------------------------------------
+  // The custom-meal draft.
+  //
+  // Held here rather than inside ComposerSheet because only the TOP sheet in
+  // the stack renders: pushing the food library unmounts the composer, and a
+  // draft owned by the composer would be gone — typed name, parsed items and
+  // all — by the time the food came back. Up here the round trip is invisible.
+  const [composerDraft, setComposerDraft] = useState<{ name: string; items: CustomItem[] }>({ name: "", items: [] });
+
+  /** Open the composer fresh. Any other route in would inherit the last draft. */
+  function openComposer(
+    s: Extract<NonNullable<SheetState>, { kind: "composer" }>,
+    opts?: { push?: boolean; seedName?: string },
+  ) {
+    setComposerDraft({ name: opts?.seedName || "", items: [] });
+    if (opts?.push) setSheetStack((prev) => [...prev, s]);
+    else setSheetStack((prev) => [...prev.slice(0, -1), s]);
+  }
+
   function openSheet(s: NonNullable<SheetState>) { setSheetStack((prev) => [...prev, s]); }
   function replaceSheet(s: NonNullable<SheetState>) { setSheetStack((prev) => [...prev.slice(0, -1), s]); }
   function backSheet() { setSheetStack((prev) => prev.slice(0, -1)); }
@@ -1871,10 +1889,18 @@ export default function NutritionV3Client(props: Props) {
           <FoodSearchSheet
             clientId={clientId}
             title="Food database"
-            subtitle={s.target === "extra" ? "Quick log" : "Add a food"}
+            subtitle={s.target === "extra" ? "Quick log" : s.target === "composer" ? "Add to this meal" : "Add a food"}
             onClose={closeAllSheets}
             onBack={backSheet}
             onPick={async (item) => {
+              // Back into the composer with the food added. Nothing is written
+              // to the database here — the draft is not a meal until it is
+              // saved, and the composer is still holding the rest of it.
+              if (s.target === "composer") {
+                setComposerDraft((prev) => ({ ...prev, items: [...prev.items, item] }));
+                backSheet();
+                return;
+              }
               if (s.target === "extra") { backSheet(); await addExtra([item], item.n); return; }
               const row = s.rowKey ? rowByKey(s.rowKey) : undefined;
               if (!row) { closeAllSheets(); return; }
@@ -1976,16 +2002,24 @@ export default function NutritionV3Client(props: Props) {
         clientId={clientId}
         askName={s.mode === "swap" || s.mode === "insert"}
         compare={compare}
+        draft={composerDraft}
+        onDraftChange={setComposerDraft}
+        onOpenFoodSearch={() => openSheet({ kind: "foodsearch", target: "composer" })}
         saveLabel={
-          s.mode === "swap" ? "Swap it in (saves to My Meals)"
-          : s.mode === "insert" ? (s.logNow ? "Log it ✓" : "Add meal (saves to My Meals)")
+          s.mode === "swap" ? "Swap it in"
+          : s.mode === "insert" ? (s.logNow ? "Log it ✓" : "Add meal")
           : "Log it — totals update ✓"
         }
-        // The tick only appears where the meal is NOT already being kept.
-        // "Swap it in" and "Add meal" already save to My Meals unconditionally
-        // and say so on their own button, so a tick there would be an option
-        // that does nothing.
-        keepOption={s.mode === "slot" || s.mode === "extra" || (s.mode === "insert" && !!s.logNow)}
+        // The tick now appears on EVERY mode, because no mode saves without it
+        // any more. Dustin, 21 Aug: "when i hit swap for custom, it should not
+        // force to save the meal in library, it's an option but may just be a
+        // one time off plan swap they type and ai parse for macros and cal."
+        //
+        // Swap and unlogged-insert used to call saveMyMeal unconditionally and
+        // say so on the button, which made the library fill up with meals
+        // nobody chose to keep — "chicken and rice at Mum's" sitting in My
+        // Meals forever because it was eaten once. The tick defaults off.
+        keepOption
         onClose={closeAllSheets}
         onBack={backSheet}
         onSave={async (items, name, keep) => {
@@ -1996,20 +2030,21 @@ export default function NutritionV3Client(props: Props) {
               off_plan_details: name, macros_pending: false,
               item_overrides: keepOv(row, { __custom: meta }),
             });
-            await saveMyMeal(name, items);
+            if (keep) await saveMyMeal(name, items);
             closeAllSheets();
-            toast.success(`Swapped for “${name}” — saved to My Meals ✓`);
+            toast.success(keep ? `Swapped for “${name}” — kept in My Meals ✓` : `Swapped for “${name}” ✓`);
           } else if (s.mode === "insert") {
             await insertCustomMeal(s.at ?? rows.length, { name, items, kind: "insert" }, !!s.logNow);
-            // Unlogged inserts always went to My Meals. A LOGGED one — "type
-            // what you ate" — never did, and that is the gap Robert fell into.
-            const kept = !s.logNow || keep;
-            if (kept) await saveMyMeal(name, items);
+            // Unlogged inserts USED to go to My Meals whether or not anyone
+            // asked. Robert's gap — a logged "type what you ate" that could
+            // not be kept — was fixed by the tick, and the tick is now the
+            // only thing that keeps anything, in either direction.
+            if (keep) await saveMyMeal(name, items);
             closeAllSheets();
             toast.success(
               s.logNow
-                ? (kept ? "Logged ✓ — and kept in My Meals" : "Logged ✓ — totals updated")
-                : `“${name}” added ✓`
+                ? (keep ? "Logged ✓ — and kept in My Meals" : "Logged ✓ — totals updated")
+                : (keep ? `“${name}” added ✓ — kept in My Meals` : `“${name}” added ✓`)
             );
           } else if (s.mode === "slot" && row) {
             const meta: CustomMeta = row.meta
@@ -2063,7 +2098,7 @@ export default function NutritionV3Client(props: Props) {
           </button>
           <div className="grid grid-cols-2 gap-2 mt-2">
             {actionBtn("📷", "Photo → AI", () => openSheet({ kind: "offplan", rowKey }))}
-            {actionBtn("⌨", "Typed → AI parse", () => openSheet({ kind: "composer", mode: "slot", rowKey }))}
+            {actionBtn("⌨", "Typed → AI parse", () => openComposer({ kind: "composer", mode: "slot", rowKey }, { push: true }))}
           </div>
           {built && (
             <>
@@ -2123,8 +2158,12 @@ export default function NutritionV3Client(props: Props) {
         </button>
         <p className="text-xs font-bold uppercase tracking-widest mt-3 mb-2" style={{ color: "var(--brand-text-secondary)" }}>Meal actions</p>
         <div className="grid grid-cols-2 gap-1.5">
-          {actionBtn("⇄", "Swap for custom", () => replaceSheet({ kind: "composer", mode: "swap", rowKey }))}
-          {actionBtn("▤", "Replace…", () => replaceSheet({ kind: "replace", rowKey }))}
+          {/* These two were "Swap for custom" and "Replace…", which read as the
+              same action twice. They are not: one types a meal that does not
+              exist yet, the other picks one that does. Named for what they
+              pick FROM. */}
+          {actionBtn("⇄", "Swap for custom", () => openComposer({ kind: "composer", mode: "swap", rowKey }))}
+          {actionBtn("▤", "Replace with library meal", () => replaceSheet({ kind: "replace", rowKey }))}
           {actionBtn("⧉", "Copy to slot…", () => replaceSheet({ kind: "copyto", rowKey }))}
           {/* 4a7256d2: "Ability to save a meal to library to use in future."
               The library (My Meals) already existed and open slots could save
@@ -2330,7 +2369,7 @@ export default function NutritionV3Client(props: Props) {
     if (!row) return null;
     const idx = rows.findIndex((x) => x.key === rowKey);
     return (
-      <Sheet title={`Replace ${rowLabel(row, idx)}`} subtitle="Plan options · My Meals · custom" onClose={closeAllSheets} onBack={backSheet}>
+      <Sheet title={`Replace ${rowLabel(row, idx)} with a library meal`} subtitle="Plan options · My Meals · or type a custom one" onClose={closeAllSheets} onBack={backSheet}>
         {(row.options?.length || 0) > 1 && (
           <>
             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Plan options for this slot</p>
@@ -2347,7 +2386,7 @@ export default function NutritionV3Client(props: Props) {
           </>
         )}
         <p className="text-xs font-bold uppercase tracking-widest mt-2 mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Meals</p>
-        {myMeals.length === 0 && <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>No saved meals yet — swap for custom below and it saves automatically.</p>}
+        {myMeals.length === 0 && <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>No saved meals yet — type one below and tick “keep this in My Meals” to start the library.</p>}
         {/* This one is a swap list rather than a manager, so it stays a single
             list — but yours come first and the shared ones say so, instead of
             three of your meals being lost among fifty. */}
@@ -2374,7 +2413,7 @@ export default function NutritionV3Client(props: Props) {
             </div>
           );
         })}
-        <button onClick={() => replaceSheet({ kind: "composer", mode: "swap", rowKey })} className="w-full flex items-center gap-3 rounded-2xl p-3 mt-2 text-left" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+        <button onClick={() => openComposer({ kind: "composer", mode: "swap", rowKey })} className="w-full flex items-center gap-3 rounded-2xl p-3 mt-2 text-left" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
           <span style={{ fontSize: 15 }}>✍</span>
           <span className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Create a custom meal instead</span>
           <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
@@ -2432,9 +2471,9 @@ export default function NutritionV3Client(props: Props) {
     );
     return (
       <Sheet title="Add a meal here" subtitle={`Position ${at + 1} — everything renumbers automatically`} onClose={closeAllSheets} onBack={backSheet}>
-        {rowBtn("✍", "Create custom meal", "Name it + type items with amounts → AI parse", () => replaceSheet({ kind: "composer", mode: "insert", at }))}
+        {rowBtn("✍", "Create custom meal", "Name it + type items with amounts → AI parse", () => openComposer({ kind: "composer", mode: "insert", at }))}
         {rowBtn("⭐", "From My Meals", `${myMeals.length} saved custom${myMeals.length === 1 ? "" : "s"}`, () => replaceSheet({ kind: "mymeals", at }))}
-        {rowBtn("⌨", "Type what you ate (with amounts)", "AI parses items → new logged meal → totals update", () => replaceSheet({ kind: "composer", mode: "insert", at, logNow: true }))}
+        {rowBtn("⌨", "Type what you ate (with amounts)", "AI parses items → new logged meal → totals update", () => openComposer({ kind: "composer", mode: "insert", at, logNow: true }))}
         <p className="text-xs font-bold uppercase tracking-widest mt-3 mb-2" style={{ color: "var(--brand-text-secondary)" }}>Copy an existing meal here</p>
         {rows.map((rw, i) => (
           <button key={rw.key} onClick={async () => {
@@ -2521,7 +2560,7 @@ export default function NutritionV3Client(props: Props) {
           );
         })}
         {at != null && (
-          <button onClick={() => replaceSheet({ kind: "composer", mode: "insert", at })} className="w-full flex items-center gap-3 rounded-2xl p-3 mt-2 text-left" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+          <button onClick={() => openComposer({ kind: "composer", mode: "insert", at })} className="w-full flex items-center gap-3 rounded-2xl p-3 mt-2 text-left" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
             <span style={{ fontSize: 15 }}>✍</span>
             <span className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Create a new custom meal</span>
             <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
@@ -2698,7 +2737,7 @@ export default function NutritionV3Client(props: Props) {
       <Sheet title="Quick-add extra" subtitle="Off-plan bites, drinks, extra scoops…" onClose={closeAllSheets}>
         {rowBtn("🗄", "Search the food database", "Instant search · verified badges", () => replaceSheet({ kind: "foodsearch", target: "extra" }))}
         {rowBtn("📷", "Photo → AI estimate", "Restaurant & receipt aware", () => replaceSheet({ kind: "offplan", rowKey: null, extra: true }))}
-        {rowBtn("⌨", "Type foods with amounts", "AI parses each item → totals update", () => replaceSheet({ kind: "composer", mode: "extra" }))}
+        {rowBtn("⌨", "Type foods with amounts", "AI parses each item → totals update", () => openComposer({ kind: "composer", mode: "extra" }))}
       </Sheet>
     );
   }

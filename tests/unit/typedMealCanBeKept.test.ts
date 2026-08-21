@@ -70,26 +70,49 @@ test("the keep state reaches onSave rather than being swallowed by the sheet", (
   );
 });
 
-test("the tick is shown on the typed paths and NOT on the ones that already save", () => {
-  // Offering an option that does nothing is its own small lie: "swap it in" and
-  // an unlogged "add meal" save to My Meals unconditionally and say so on the
-  // button.
+test("the tick is shown on EVERY path, because none of them save without it", () => {
+  // ── Rewritten 21 Aug, and the rule it guards is inverted ─────────────────
+  //
+  // This used to assert the opposite: that the tick was HIDDEN on swap and on
+  // unlogged insert, because those two saved to My Meals unconditionally and
+  // said so on their own button. Offering an option that does nothing is a
+  // small lie, so hiding it was right — GIVEN the unconditional save.
+  //
+  // Dustin removed the unconditional save: "when i hit swap for custom, it
+  // should not force to save the meal in library, it's an option but may just
+  // be a one time off plan swap they type and ai parse for macros and cal."
+  //
+  // A library is for meals you want again. Filling it with every one-off — the
+  // thing eaten once at somebody's house — makes it worse at the only job it
+  // has. So now nothing saves unless asked, and the tick belongs everywhere.
   assert.match(
     CLIENT,
-    /keepOption=\{s\.mode === "slot" \|\| s\.mode === "extra" \|\| \(s\.mode === "insert" && !!s\.logNow\)\}/,
-    "the keepOption condition has changed — check it still excludes swap and unlogged insert"
+    /^\s*keepOption\s*$/m,
+    "keepOption is conditional again. Every mode has to offer the tick now, because no " +
+      "mode saves without it — a hidden tick would mean a path that cannot keep anything."
   );
 });
 
-test("a LOGGED typed meal is kept only when asked, and an unlogged one still always is", () => {
-  // The asymmetry is deliberate and easy to flatten by accident. An unlogged
-  // insert has always gone to the library; a logged one never did.
-  assert.match(
+test("no path saves to the library unless it was asked to", () => {
+  // The pair to the test above, and the one that actually matters: the tick
+  // being VISIBLE is worthless if a code path ignores it.
+  assert.doesNotMatch(
     CLIENT,
     /const kept = !s\.logNow \|\| keep;/,
-    "the logged-vs-unlogged keep rule is gone"
+    "the old logged-vs-unlogged asymmetry is back — an unlogged insert is saving without asking"
   );
-  assert.match(CLIENT, /if \(kept\) await saveMyMeal\(name, items\)/, "the keep no longer saves");
+  const onSave = CLIENT.slice(
+    CLIENT.indexOf("onSave={async (items, name, keep)"),
+    CLIENT.indexOf("// ---- individual sheets"),
+  );
+  assert.ok(onSave.length > 0, "could not find the composer's onSave handler");
+  for (const m of onSave.matchAll(/(\S[^\n]*?)saveMyMeal\(/g)) {
+    assert.match(
+      m[1].trim(),
+      /if \(keep\)/,
+      `an unconditional saveMyMeal survives ("${m[1].trim()}saveMyMeal(…)")`
+    );
+  }
 });
 
 test("the toast tells them it was kept, so they do not go looking again", () => {
