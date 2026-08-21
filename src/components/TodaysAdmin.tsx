@@ -86,7 +86,7 @@ export default function TodaysAdmin() {
       const horizon = addDays(today, 14);
 
       try {
-        const [props, pays, notes, cov, focus] = await Promise.all([
+        const [props, pays, notes, cov, focus, integ] = await Promise.all([
           // Proposals the app is holding until he says so.
           sb.from("schedule_change_proposals").select("id", { count: "exact", head: true }).is("resolved_at", null),
           // Money: sent-but-unconfirmed AND ready-to-send. Dustin, 21 Aug:
@@ -98,6 +98,15 @@ export default function TodaysAdmin() {
           // Programming coverage. RLS scopes this to his own clients.
           sb.from("clients").select("id, name, nutrition_only").is("archived_at", null),
           sb.from("clients").select("weekly_focus_week").is("archived_at", null),
+          // The integrity checker's latest verdict.
+          //
+          // run_integrity_checks() has been running twice a day since 16 Aug
+          // and NOTHING in the app has ever read its table. A critical could
+          // sit there for weeks — and did: anon_writable_policies was red the
+          // whole time on a false positive, which is the same as being unread,
+          // because a check nobody looks at cannot tell anyone anything.
+          sb.from("integrity_checks").select("check_name, severity, count, detail, ran_at")
+            .order("ran_at", { ascending: false }).limit(60),
         ]);
 
         // ── coverage: who runs out inside two weeks ──────────────────────────
@@ -196,6 +205,38 @@ export default function TodaysAdmin() {
                 href: "/clients", cta: "Clients",
               },
         );
+
+        // ── the integrity checker, when it has something to say ─────────────
+        //
+        // Latest run only: the table keeps history, and counting every run
+        // would report the same fault a dozen times. Criticals only — the
+        // warns are context for a person already looking, not a reason to
+        // interrupt someone's morning.
+        const checks = (integ.data || []) as {
+          check_name: string; severity: string; count: number;
+          detail: unknown; ran_at: string;
+        }[];
+        const newest = checks.length ? checks[0].ran_at : null;
+        const live = checks.filter((c) => c.ran_at === newest && c.severity === "critical" && c.count > 0);
+        if (live.length) {
+          // Names, where the check collected them. "300" is not something
+          // anybody can act on; "Dustin, Maddy, Tyler, Steph" is.
+          const named = new Set<string>();
+          for (const c of live) {
+            for (const d of (Array.isArray(c.detail) ? c.detail : []) as { client?: string }[]) {
+              if (d?.client) named.add(d.client);
+            }
+          }
+          const who = [...named];
+          out.push({
+            key: "integrity", tone: "crit",
+            title: "Data check failing", count: String(live.length),
+            sub:
+              live.map((c) => c.check_name.replace(/_/g, " ")).slice(0, 2).join(" · ") +
+              (who.length ? " — " + who.slice(0, 4).join(", ") + (who.length > 4 ? " +" + (who.length - 4) : "") : ""),
+            href: "/clients", cta: "Look",
+          });
+        }
 
         if (missingFocus > 0) out.push({
           key: "focus", tone: "crit",
