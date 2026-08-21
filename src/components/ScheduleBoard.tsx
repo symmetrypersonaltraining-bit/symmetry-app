@@ -42,6 +42,14 @@ function addDays(dateStr: string, n: number): string {
   const p = (x: number) => String(x).padStart(2, "0");
   return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
 }
+/**
+ * The Sunday that starts `dateStr`'s week. Same Sunday-start convention the
+ * rest of the app uses for a training week.
+ */
+function weekStartOf(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return addDays(dateStr, -new Date(y, m - 1, d).getDay());
+}
 function shortLabel(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
@@ -111,9 +119,29 @@ export default function ScheduleBoard({
   // things should actually freeze a tile: it's already COMPLETED (history), or
   // it's Peak Week (locked by design). Being in the past just means you missed
   // it, and missing it is exactly when you need to move it.
+  /**
+   * Past workouts THIS WEEK. It resets on Sunday, and that is the point.
+   *
+   * Bobbie Page, 20 Aug: "The app keeps telling me I missed 13 workouts and to
+   * move them forward... I would not be moving 13 workouts forward." She was
+   * right. Counting from the beginning of time turns a nudge into a debt
+   * nobody can clear — the only way out of thirteen was to reschedule
+   * thirteen sessions she was never going to do, so the number just grew and
+   * the prompt became noise she learned to scroll past.
+   *
+   * A week is the unit a training week is actually planned in. Miss Tuesday,
+   * you can still fit it in by Saturday, and that is a real prompt. Miss it
+   * three weeks ago and there is nothing to do about it — it stays in the past
+   * section, still movable if she wants it, but it stops asking.
+   */
+  const weekStart = useMemo(() => weekStartOf(today), [today]);
   const missed = useMemo(
-    () => workouts.filter((w) => w.date < today && w.status !== "completed" && !isLockedDate(w.date)),
-    [workouts, today, isLockedDate],
+    () =>
+      workouts.filter(
+        (w) =>
+          w.date >= weekStart && w.date < today && w.status !== "completed" && !isLockedDate(w.date),
+      ),
+    [workouts, weekStart, today, isLockedDate],
   );
   // The past section used to auto-open whenever anything was missed, which meant
   // the board almost always opened onto last week rather than today — you had to
@@ -430,10 +458,15 @@ export default function ScheduleBoard({
             fontSize: 11.5, fontWeight: 700, cursor: "pointer",
           }}
         >
+          {/* "Past workouts", never "missed". Dustin, 21 Aug: "same button but
+              just label it past workouts not missed sessions." A tile that
+              says you missed something is a telling-off; the same tile saying
+              it is in the past is information, and the client decides what to
+              do about it. The count is this week's only — see `missed`. */}
           {showPast
             ? "▴ Hide past workouts"
             : missed.length > 0
-              ? "▾ " + missed.length + " missed workout" + (missed.length === 1 ? "" : "s") + " — move " + (missed.length === 1 ? "it" : "them") + " forward"
+              ? "▾ " + missed.length + " past workout" + (missed.length === 1 ? "" : "s") + " this week — move " + (missed.length === 1 ? "it" : "them") + " forward"
               : "▾ Show past workouts (" + pastDays.length + " days)"}
         </button>
       )}

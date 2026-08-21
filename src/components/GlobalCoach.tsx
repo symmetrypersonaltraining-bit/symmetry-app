@@ -43,10 +43,25 @@ import { surfaceMood } from "@/lib/ai/faces";
 export function surfaceFor(pathname: string): string | null {
   if (/^\/workout\/[^/]+/.test(pathname)) return null; // the logger
   if (pathname.startsWith("/login") || pathname.startsWith("/install")) return null;
+  // MESSAGES HAS NO FLOATING COACH. This is the second complaint about the
+  // same corner. On 13 Aug the fix was to lift the button 64px above the
+  // composer; on 20 Aug Bobbie Page, typing on that screen: "your face is
+  // still in the way to try and hit enter on this screen."
+  //
+  // A number was the wrong shape of fix. The composer's height is not ours —
+  // it grows with the text, it moves with the keyboard, and the send button
+  // lives in the one corner the coach floats in. Any constant we pick is right
+  // on the phone we tested and wrong on somebody's.
+  //
+  // Nothing is lost by removing it here. The coach is on home, workout,
+  // nutrition, progress and settings; this is the one screen whose entire
+  // purpose is already a conversation, and a floating "ask your coach" button
+  // on top of the screen where you talk to your coach was never worth a
+  // fight over the send button.
+  if (pathname.startsWith("/messages")) return null;
   if (pathname.startsWith("/nutrition")) return "nutrition";
   if (pathname.startsWith("/workout")) return "workout";
   if (pathname.startsWith("/progress") || pathname.startsWith("/client-preview/progress")) return "progress";
-  if (pathname.startsWith("/messages")) return "messages";
   if (pathname.startsWith("/home")) return "home";
   if (pathname.startsWith("/settings")) return "settings";
   if (pathname.startsWith("/help")) return "help";
@@ -57,18 +72,18 @@ export function surfaceFor(pathname: string): string | null {
  * Screens with something already pinned in the bottom-right, and how far the
  * coach has to rise to clear it.
  *
- * Messages pins a composer — text field, camera, send — across the bottom, and
- * the send button is in the same corner the coach floats in. It was sitting on
- * top of it, so the button could not be pressed. Screenshot from Dustin,
- * 13 Aug: "the ai bot [is] over a button blocking it."
+ * DELIBERATELY EMPTY. It held `messages: 64` — the 13 Aug attempt at the
+ * composer clash — and that lift was still not enough a week later. Messages
+ * now has no coach at all (see surfaceFor above), which is the fix.
  *
- * 64 clears the composer and still leaves the coach below the last message
- * bubble. It is a per-screen fact, so it lives here at the mount site rather
- * than inside CoachFab, which has no idea what is underneath it.
+ * The mechanism stays because it is the right shape for a screen that genuinely
+ * needs it: a per-screen fact belongs here at the mount site rather than inside
+ * CoachFab, which has no idea what is underneath it. But think twice before
+ * adding an entry. A constant that clears one phone's pinned bar is a guess
+ * about every other phone, and the honest answer for a corner we are fighting
+ * over is usually not to float anything in it.
  */
-const FAB_LIFT: Record<string, number> = {
-  messages: 64,
-};
+const FAB_LIFT: Record<string, number> = {};
 
 /** Nothing on this screen can execute an action, and none of these are called. */
 const NO_ACTIONS: CoachActions = {
