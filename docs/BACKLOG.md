@@ -1,5 +1,83 @@
 # Backlog — the single work queue
 
+> ## 👉 21 Aug (overnight) — THE TUTORIAL, AND FOURTEEN MORE LIES
+>
+> **`origin/main` = `2702a45`.** Five commits, each gated and shipped through
+> the bridge. Nothing left in the sandbox.
+>
+> **`17c4de5` — the cron doc said twenty runs a day; it is three hundred.**
+> SCHEDULED-JOBS.md had not been touched since the 1 Aug audit and had drifted
+> badly: `gcal_sync_harvest` back to every 15 minutes, `video-duration-measure`
+> every 10, and three jobs added since that were written down nowhere. Re-read
+> from `cron.job` and `vercel.json`. Also in that batch: `/api/reminders/send`
+> lost its GET and its daily Vercel cron (the handler's entire body returned the
+> string "Cron disabled — activate in Settings"; the reminders are made by
+> pg_cron jobid 5 and always were), the `/api/send-reminder` tombstone deleted,
+> feedback now records **who** reported it so a bug from Stephanie's app is not
+> filed as one of Dustin's, three dead components removed, and the db-schema
+> fixture regenerated — it was twelve columns behind production.
+>
+> **`318d559` — the new-trainer tutorial. BUILT, AND SWITCHED OFF.**
+> Thirteen chapters, forty-one steps, the whole app end to end. Narrated, and it
+> remembers where you stopped. `/tutorial` redirects to /home until
+> `trainer_tutorial_live` is turned on in **Settings → Experience → New-trainer
+> walkthrough**. Dustin reviews it before a real trainer meets it.
+>   - It describes the app that exists, **including what is broken** — the
+>     Calendar link that bounces to Home, the dead New Program button, the two
+>     Settings switches that show state they never save.
+>   - Per-trainer Claude accounts are marked NOT BUILT YET, and the very next
+>     step says out loud that a trainer who does not want one loses nothing.
+>   - The final checklist is **read from the account, not ticked** — photo, pay
+>     details, calendar, first client, first programme, first message,
+>     notifications.
+>   - `src/lib/speech.ts` is now the app's one speaking primitive, and
+>     `narrate()` prefers a pre-recorded file over the browser voice. **That is
+>     the Chatterbox seam** — recording it in Dustin's voice becomes setting
+>     `audioUrl` on a step and nothing else.
+>
+> **`9a5d4af` — fourteen more places the app said it worked when it had not.**
+> The inventory ended "Next — nothing, deliberately". It was wrong. Pausing a
+> payment, deleting a payment record, **marking a reminder sent after the email
+> had already gone out** (so it gets sent again tomorrow), a weigh-in card that
+> ticks regardless, "this can't be undone" on a photo that stayed in the
+> database, a calendar drag, a half-completed swap reporting "try again",
+> assigning a programme without closing the last one (**a client on two**), a
+> dismissed notice that came back, the calendar-sync switch, recipe ingredients
+> that **double** rather than replace, plan-restore leaving two live meal plans,
+> a goal reached again every morning, and birthday wishes repeating for three
+> days. Worst of them: `WelcomeClient` writes the flag middleware reads, so an
+> unchecked failure **loops a brand-new client on the welcome screen forever**.
+> 67 → 33. `tests/unit/uncheckedWrites.test.ts` now runs the sweep every commit
+> and each fix is pinned individually. Mutation-tested both ways.
+>
+> **`2702a45` — the plan builder was ignoring nineteen of the twenty recipes.**
+> Asked to verify rather than assume. `libraryPromptBlock()` offers meals AND
+> recipes; the matcher only ever searched the meals. Measured: 50/50 meals
+> substituted, **1/20 recipes** — and that one only because "Turkey Chili" is
+> also a meal, so picking the recipe returned a meal 127 kcal heavier. Now
+> 70/70. **Still open: one call against the real model.** There is no Anthropic
+> key in a sandbox, so "does Claude copy the names verbatim" needs one run in
+> Dustin's environment. Everything downstream of the reply is proven.
+>
+> **Two documents, no code:**
+>   - `docs/AI-COST-PER-TRAINER.md` — the AI cost question, ending in three
+>     decisions for Dustin. Headline: the $95 cap is **global**, so a test
+>     trainer can pause AI for his paying clients. Recommends per-trainer
+>     budgets first, then per-trainer app tokens so a trainer's own Claude works
+>     their own side of the app — and recommends **against** storing anyone's
+>     Anthropic key. Names the dangerous shortcut explicitly: giving a trainer
+>     the Supabase MCP connector bypasses RLS completely and undoes every
+>     boundary shipped on 20 Aug.
+>   - `docs/RETIRING-THE-SECOND-INSTANCE.md` — the steps, all of them left for
+>     Dustin to run, plus the honest note that one instance for every trainer is
+>     a **weaker** boundary than two databases and what that obliges.
+>   - `docs/ADDING-A-TRAINER.md` corrected: it still claimed "a trainer sees ALL
+>     clients… NOT yet multi-tenancy", which stopped being true on 20 Aug.
+>
+> **Waiting on Dustin:** review the tutorial and test it on Stephanie's account;
+> the three AI-cost decisions; whether to execute the instance retirement; and
+> Chatterbox, which was explicitly for today, not last night.
+
 > ## 👉 20 Aug — BILLING REBUILT, STEPHANIE IS A TRAINER
 >
 > **`origin/main` = `26e11d3`.** Everything below shipped today.

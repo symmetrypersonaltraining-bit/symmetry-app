@@ -45,12 +45,25 @@ they get a trainer-shaped screen with no data in it.
 
 ## The one thing to understand
 
-**A trainer sees ALL clients.** `is_trainer()` is still binary. There is no
-"these six clients" — that needs per-trainer scoping in the RLS policies
-themselves, which is a separate and larger piece of work than this was.
+**Superseded 20 Aug 2026.** What stood here said *"A trainer sees ALL clients…
+It is NOT yet multi-tenancy."* That was true when it was written on 11 August
+and it is false now, and a stale sentence saying a boundary does not exist is
+the kind that gets somebody to design around a problem that has been solved.
 
-So today this is safe for a second trainer at Sevens, and for Dylan running the
-same code as a configuration instead of a fork. It is NOT yet multi-tenancy.
+Per-trainer scoping shipped on 20 August: `trainer_can_see_client()` and 41
+policies covering payment reminders, calendar payments, billing adjustments,
+appointments, device tokens and client notifications. Verified live rather than
+assumed — a second trainer saw 1 reminder, 1 payment, 1 appointment, 0 billing
+adjustments, 0 device tokens and 0 client notifications, while the owner saw
+all of it and exactly one `trainer_settings` row, his own.
+
+Three things stay shared **on purpose**: the exercise library, the workout and
+programme library, and the group chat. And the owner sees everything, which is
+the one deliberate asymmetry.
+
+What this means for the two steps above is unchanged — they still only decide
+which controls get drawn and which data comes back. What has changed is that
+the answer to "which data" is now per trainer instead of everything.
 
 ## Rules for code
 
