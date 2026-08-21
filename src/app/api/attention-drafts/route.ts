@@ -1,3 +1,17 @@
+// ⚠ UNREACHABLE AS OF 2026-08-21. Nothing in the app calls this.
+//
+// Its only caller was <AttentionFeed/>, the "Who needs you today" panel, which
+// TrainerHome records as "removed entirely". The component was left in src/
+// unmounted for weeks, which reads as a bug rather than a retirement, so it has
+// now been deleted — and that leaves this route with no way in.
+//
+// Kept rather than deleted because the feature was wanted and may come back:
+// Dustin built it, and the one-tap drafts underneath it are genuinely good. If
+// it does come back, note that the draft prompt was made per-trainer on
+// 2026-08-21 and no longer writes as the owner regardless of who is signed in.
+//
+// If it is still unreachable in a month, delete it.
+
 // POST /api/attention-drafts
 // Body: { clientId: string, tag?: string }
 //

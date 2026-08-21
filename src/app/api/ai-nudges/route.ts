@@ -453,9 +453,14 @@ export async function POST(req: NextRequest) {
  *
  * A GET carries no body, so `send` is absent, so it is a PREVIEW run: it
  * segments the roster, writes the drafts to ai_nudge_log with sent=false, and
- * digests them to the trainer. Nothing reaches a client. That is the correct
- * default for a job whose first-ever execution is happening unattended — and
- * `nudges_live` still has to be on before send:true means anything at all.
+ * digests them to the trainer. Nothing reaches a client.
+ *
+ * This used to end "and `nudges_live` still has to be on before send:true means
+ * anything at all", which stopped being true and stayed written down. There is
+ * no `send` parameter any more — see the note above the handler — so there is
+ * nothing for a flag to gate, and `nudges_live` is read by nothing in src/.
+ * A comment describing a safety mechanism that no longer exists is worse than
+ * no comment: it is the one someone trusts while looking for the real gate.
  */
 export async function GET(req: NextRequest) {
   return POST(req);

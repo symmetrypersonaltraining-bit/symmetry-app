@@ -20,23 +20,59 @@ Runs and durations below are measured from `cron.job_run_details`, not estimated
 
 **Net: ~1,730 scheduled runs a day down to about 20.**
 
-## Live jobs
+> **2026-08-21 correction.** That last number is no longer true, and the table
+> below had drifted badly enough to be misleading. `gcal_sync_harvest` is back
+> to every 15 minutes, `video-duration-measure` runs every 10, and
+> `gcal_sync_hourly_narrow`, `coachbot_mwf` and `check-exercise-videos` were
+> added after the audit and never written down here. The real total is about
+> **300 scheduled runs a day**, and the Vercel list below was two entries short.
+> Everything from here down was re-read from `cron.job` and `vercel.json` on
+> 2026-08-21, not carried forward.
 
-| job | schedule (UTC) | what it does |
+## Live jobs — pg_cron (read from `cron.job`, 2026-08-21)
+
+Fifteen active, two paused. Schedules are UTC; pg_cron has no other option.
+
+| job | schedule (UTC) | runs/day | what it does |
+|---|---|---|---|
+| `gcal_sync_12h` | `0 9,21 * * *` | 2 | Full Google Calendar pull → appointments + payments. 4am / 4pm CT. |
+| `gcal_sync_hourly_narrow` | `25 * * * *` | 24 | Narrow window sync — catches same-day moves between the full pulls. |
+| `gcal_sync_harvest` | `5,20,35,50 * * * *` | 96 | Records each sync's outcome into `gcal_sync_runs` (pg_net is async, so the result arrives after the call returns). |
+| `video-duration-measure` | `*/10 * * * *` | 144 | Measures duration on exercise videos that have none. No-ops when the queue is empty. |
+| `challenge_cycle_hourly` | `5 * * * *` | 24 | Scores/closes a due challenge, announces the winner, generates next week's. No-ops except Sunday evening — hourly because a fixed UTC time drifts an hour at every DST change, so the tick reads the local clock instead. |
+| `calendar_derived_consistency` | `5 11,14,23 * * *` | 3 | Supervised workouts follow their appointment; recalculates pending reminder amounts. |
+| `detect_schedule_changes_12h` | `30 11,23 * * *` | 2 | Builds the schedule-change approval queue. |
+| `integrity_checks_12h` | `25 11,23 * * *` | 2 | Data integrity sweep. |
+| `check-exercise-videos` | `15 6,18 * * *` | 2 | Calls `/api/cron/check-videos` over `net.http_get`. 60 rows a run, oldest-unchecked first — new exercises sit unchecked until the next pass. That is normal, not a backlog. |
+| `generate-payment-reminders` | `0 13 * * *` | 1 | Due payment reminders. |
+| `autoclose-stale-workout-logs` | `0 9 * * *` | 1 | Closes workout logs left open. |
+| `generate_rotation_plans_daily` | `20 6 * * *` | 1 | Meal-plan rotation. |
+| `flip_due_meal_plans_daily` | `10 6 * * *` | 1 | Activates meal plans whose start date has arrived. |
+| `coachbot_mwf` | `0 22 * * 1,3,5` | 3/wk | Coach Bot's group post. |
+| `publish_focus_drafts_sunday` | `0 11 * * 0` | 1/wk | Publishes any focus draft Dustin didn't approve on Saturday. |
+
+Paused, not deleted — `off-bulk-import` (`*/5 * * * *`) and `off-micros-backfill`
+(`2-59/5 * * * *`). Both keep their cursors; see below.
+
+**About 303 runs a day.** The three highest — harvest, video-duration and the
+narrow sync — are 88% of that count and each costs a fraction of a second, so
+the number is larger than the audit's target but the database time is not.
+
+## Live jobs — Vercel (`vercel.json`)
+
+| path | schedule (UTC) | what it does |
 |---|---|---|
-| `gcal_sync_12h` | `0 9,21 * * *` | Google Calendar → appointments + payments. 4am / 4pm CT. |
-| `gcal_sync_harvest` | `5,20 9,21 * * *` | Records each sync's outcome into `gcal_sync_runs` (pg_net is async). |
-| `challenge_cycle_hourly` | `5 * * * *` | Scores/closes a due challenge, announces the winner, generates next week's. No-ops except Sunday evening. |
-| `publish_focus_drafts_sunday` | `0 11 * * 0` | Publishes any focus draft Dustin didn't approve on Saturday. |
-| `generate-payment-reminders` | `0 13 * * *` | Due payment reminders. |
-| `calendar_derived_consistency` | `5 11,14,23 * * *` | Supervised workouts follow their appointment; recalculates pending reminder amounts. |
-| `detect_schedule_changes_12h` | `30 11,23 * * *` | Builds the schedule-change approval queue. |
-| `integrity_checks_12h` | `25 11,23 * * *` | Data integrity sweep. |
-| `autoclose-stale-workout-logs` | `0 9 * * *` | Closes workout logs left open. |
-| `generate_rotation_plans_daily` | `20 6 * * *` | Meal-plan rotation. |
-| `flip_due_meal_plans_daily` | `10 6 * * *` | Activates meal plans whose start date has arrived. |
+| `/api/cron/weekly-ai?draft=1` | `0 11 * * 6` | Saturday focus lines, as drafts for Dustin to approve. |
+| `/api/cron/birthdays` | `0 13 * * *` | Birthday notices. |
+| `/api/cron/goals` | `0 12 * * *` | Goal progress sweep. |
+| `/api/ai-nudges` | `0 15 * * 1` | Monday nudge generation. |
 
-Vercel crons (`vercel.json`): `/api/reminders/send` daily, `/api/cron/weekly-ai?draft=1` Saturday.
+`/api/reminders/send` was removed from this list on 2026-08-21. It had been
+firing daily at 14:00 into a GET handler whose entire body returned the string
+`"Cron disabled — activate in Settings"`. The reminders themselves are created
+by `generate-payment-reminders` in pg_cron and always have been; Dustin sends
+them by hand through the same route's POST. The GET went with the cron entry.
+The POST is untouched.
 
 ## Resuming the food import
 

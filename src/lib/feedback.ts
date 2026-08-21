@@ -24,30 +24,80 @@ export interface FeedbackInput {
 }
 
 /**
- * Who is filing this. Resolved from the session, never typed.
+ * WHOSE BOARD THIS BELONGS ON.
  *
- * Returns null for the trainer and for anyone without a client row, and a null
- * here must never block the report — an unattributed bug report still beats a
- * lost one.
+ * `client_id` was already captured. `reported_by`, `trainer_email` and
+ * `app_instance` were not: on 21 Aug 2026 all three were empty on all 106 rows,
+ * while only 40 carried a client id at all. So a report recorded WHAT was said
+ * and, most of the time, not who said it — which is survivable with one trainer
+ * and one roster, and stops being survivable the moment there are two.
+ *
+ * `reported_by` is a name to read. `trainer_email` is the coach whose book the
+ * report belongs to — the reporter themselves if a trainer filed it, otherwise
+ * the trainer of the client who did. `app_instance` tags the deployment.
+ *
+ * Every field is best-effort and a failure anywhere returns what it has. An
+ * unattributed bug report still beats a lost one, and that has not changed.
  */
-async function resolveClientId(sb: SupabaseClient): Promise<string | null> {
+interface Reporter {
+  clientId: string | null;
+  reportedBy: string | null;
+  trainerEmail: string | null;
+}
+
+async function resolveReporter(sb: SupabaseClient): Promise<Reporter> {
+  const out: Reporter = { clientId: null, reportedBy: null, trainerEmail: null };
   try {
     const { data: { user } } = await sb.auth.getUser();
-    if (!user) return null;
-    const { data: byAuth } = await sb.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
-    if (byAuth?.id) return byAuth.id as string;
-    if (user.email) {
-      const { data: byEmail } = await sb.from("clients").select("id").eq("email", user.email).maybeSingle();
-      if (byEmail?.id) return byEmail.id as string;
+    if (!user) return out;
+    out.reportedBy = user.email ?? null;
+
+    // A trainer first: they are their own attribution, and a trainer who also
+    // has a client row must not be filed under whoever trains THEM.
+    const { data: tRows } = await sb
+      .from("trainers").select("name, email").eq("auth_user_id", user.id).limit(1);
+    const t = (tRows as { name?: string; email?: string }[] | null)?.[0];
+    if (t) {
+      out.reportedBy = t.name || t.email || out.reportedBy;
+      out.trainerEmail = t.email ?? null;
+      return out;
     }
-    return null;
+
+    const { data: byAuth } = await sb
+      .from("clients").select("id, name, trainers(email)").eq("auth_user_id", user.id).maybeSingle();
+    let c = byAuth as { id?: string; name?: string; trainers?: { email?: string } | { email?: string }[] } | null;
+    if (!c?.id && user.email) {
+      const { data: byEmail } = await sb
+        .from("clients").select("id, name, trainers(email)").eq("email", user.email).maybeSingle();
+      c = byEmail as typeof c;
+    }
+    if (c?.id) {
+      out.clientId = c.id;
+      out.reportedBy = c.name || out.reportedBy;
+      const tj = Array.isArray(c.trainers) ? c.trainers[0] : c.trainers;
+      out.trainerEmail = tj?.email ?? null;
+    }
+    return out;
   } catch {
-    return null;
+    return out;
   }
 }
 
+/**
+ * Which deployment. `live` unless something says otherwise.
+ *
+ * There was a second instance for a second trainer to test on; it is being
+ * retired in favour of running test trainers on the live app, so this will
+ * read `live` for everything for the foreseeable future. It is recorded anyway
+ * because a column that is populated is a column you can trust later, and one
+ * that is silently NULL is the state this whole change exists to fix.
+ */
+function appInstance(): string {
+  return process.env.NEXT_PUBLIC_APP_INSTANCE || "live";
+}
+
 export async function submitFeedback(sb: SupabaseClient, input: FeedbackInput): Promise<string | null> {
-  const clientId = await resolveClientId(sb);
+  const who = await resolveReporter(sb);
   const { data, error } = await sb
     .from("app_feedback")
     .insert({
@@ -56,7 +106,10 @@ export async function submitFeedback(sb: SupabaseClient, input: FeedbackInput): 
       transcript: input.transcript,
       status: "new",
       photo_url: input.imageUrl ?? null,
-      client_id: clientId,
+      client_id: who.clientId,
+      reported_by: who.reportedBy,
+      trainer_email: who.trainerEmail,
+      app_instance: appInstance(),
     })
     .select("id")
     .single();

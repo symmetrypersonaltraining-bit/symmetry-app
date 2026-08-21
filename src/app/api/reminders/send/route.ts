@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isCronRequest } from "@/lib/cron-auth";
 import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 
 // Scheduled in vercel.json. A route handler Next decides to render statically
@@ -173,17 +172,17 @@ export async function POST(request: Request) {
   return NextResponse.json({ success: true });
 }
 
-export async function GET(request: Request) {
-  // Vercel Cron endpoint (still a stub — the daily 0 14 * * * entry in
-  // vercel.json hits this and gets the message below; activate in Settings).
-  //
-  // This used to compare against `Bearer ${process.env.CRON_SECRET}`. CRON_SECRET
-  // is unset on this project, so that compared against the literal string
-  // "Bearer undefined" — meaning anyone sending exactly that header
-  // authenticated, while Vercel's real scheduler did not. isCronRequest fails
-  // closed and recognises the platform's own x-vercel-cron header.
-  if (!isCronRequest(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  return NextResponse.json({ message: "Cron disabled — activate in Settings" });
-}
+// THERE IS NO GET ANY MORE, AND NOTHING IS LOST.
+//
+// It existed for a Vercel cron at 14:00 daily that hit it and received the
+// string "Cron disabled — activate in Settings". That is all it ever did. The
+// cron entry is gone from vercel.json with it.
+//
+// Nothing in the billing rebuild depended on either. The reminders are created
+// by pg_cron jobid 5 (`generate-payment-reminders`, 13:00), their amounts are
+// recalculated by jobid 18 three times a day off the calendar, and Dustin sends
+// them by hand through POST above — which is deliberate, and now has the
+// provisional lock in front of it so a cycle cannot be billed before it closes.
+//
+// If auto-send is ever wanted it is a new build on top of that lock, not a
+// resurrection of this.

@@ -78,8 +78,8 @@
   "tokens_in",
   "tokens_out",
   "cost_usd",
-  "model",
   "created_at",
+  "model",
   "status",
   "error",
   "latency_ms",
@@ -91,6 +91,12 @@
   "tokens_in",
   "tokens_out",
   "cost_usd"
+ ],
+ "app_api_keys": [
+  "name",
+  "value",
+  "note",
+  "updated_at"
  ],
  "app_feedback": [
   "id",
@@ -106,12 +112,23 @@
   "resolved_at",
   "photo_url",
   "client_id",
-  "image_summary"
+  "image_summary",
+  "app_instance",
+  "reported_by",
+  "trainer_email",
+  "app_version",
+  "user_agent"
  ],
  "app_flags": [
   "key",
   "enabled",
   "updated_at"
+ ],
+ "app_scheduler_key": [
+  "id",
+  "key",
+  "created_at",
+  "rotated_at"
  ],
  "app_users": [
   "id",
@@ -186,6 +203,21 @@
   "client_id",
   "joined_at"
  ],
+ "challenge_templates": [
+  "ord",
+  "title",
+  "emoji",
+  "tagline",
+  "metric",
+  "scoring_note"
+ ],
+ "claude_handoff": [
+  "id",
+  "created_at",
+  "title",
+  "status",
+  "body"
+ ],
  "client_announcements_seen": [
   "client_id",
   "key",
@@ -216,7 +248,10 @@
   "ai_daily_verify_limit",
   "depth_level",
   "checkin_nudges_off",
-  "checkin_snoozed_until"
+  "checkin_snoozed_until",
+  "ai_tier",
+  "ai_daily_chat_limit_advanced",
+  "ai_pool_only"
  ],
  "client_assessments": [
   "id",
@@ -339,6 +374,20 @@
   "answered_at",
   "delivered_at"
  ],
+ "client_training_patterns": [
+  "id",
+  "client_id",
+  "weekday",
+  "day_id",
+  "supervised",
+  "position",
+  "effective_from",
+  "effective_to",
+  "gcal_recurring_id",
+  "note",
+  "is_active",
+  "created_at"
+ ],
  "clients": [
   "id",
   "name",
@@ -386,7 +435,14 @@
   "weekly_focus_source",
   "ai_food_focus",
   "ai_food_focus_week",
-  "exclude_from_rankings"
+  "billing_type",
+  "exclude_from_rankings",
+  "expected_sessions_per_cycle",
+  "billing_anchor_day",
+  "billing_anchor_day_2",
+  "billing_anchor_weekday",
+  "paid_by_client_id",
+  "trainer_id"
  ],
  "daily_logs": [
   "id",
@@ -406,7 +462,8 @@
   "swappable",
   "client_owner_id",
   "created_by",
-  "origin"
+  "origin",
+  "swapped_from_day_id"
  ],
  "device_tokens": [
   "id",
@@ -547,7 +604,8 @@
   "ai_verified_at",
   "created_by_client_id",
   "created_at",
-  "micros"
+  "micros",
+  "micros_source"
  ],
  "food_import_state": [
   "source",
@@ -573,27 +631,38 @@
   "kcal",
   "micros"
  ],
- "group_challenges": [
-  "announced_at",
-  "auto_generated",
-  "created_at",
-  "created_by",
-  "emoji",
-  "ended_at",
-  "ends_on",
+ "gcal_sync_runs": [
   "id",
-  "metric",
-  "next_pick_client_id",
-  "rules",
-  "scored_at",
-  "scoring_note",
-  "scoring_stat",
-  "starts_on",
-  "status",
-  "tagline",
+  "request_id",
+  "source",
+  "queued_at",
+  "status_code",
+  "ok",
+  "response",
+  "error",
+  "harvested_at"
+ ],
+ "group_challenges": [
+  "id",
   "title",
+  "metric",
+  "starts_on",
+  "ends_on",
+  "created_by",
+  "created_at",
+  "ended_at",
+  "emoji",
+  "tagline",
+  "rules",
+  "scoring_stat",
+  "scoring_note",
+  "status",
+  "auto_generated",
   "winner_client_id",
   "winner_score",
+  "next_pick_client_id",
+  "announced_at",
+  "scored_at",
   "counts_external"
  ],
  "group_reads": [
@@ -652,6 +721,14 @@
   "created_log_id",
   "ignored",
   "synced_at"
+ ],
+ "integrity_checks": [
+  "id",
+  "check_name",
+  "severity",
+  "count",
+  "detail",
+  "ran_at"
  ],
  "macro_targets": [
   "id",
@@ -853,7 +930,8 @@
   "email_sent_at",
   "client_ack_at",
   "paid_confirmed_at",
-  "credit_details"
+  "credit_details",
+  "half_price_sessions"
  ],
  "phases": [
   "id",
@@ -1029,6 +1107,33 @@
   "active",
   "created_at"
  ],
+ "schedule_change_proposals": [
+  "id",
+  "client_id",
+  "scheduled_workout_id",
+  "day_id",
+  "appointment_id",
+  "gcal_recurring_id",
+  "from_date",
+  "to_date",
+  "reason",
+  "confidence",
+  "status",
+  "detail",
+  "created_at",
+  "resolved_at"
+ ],
+ "schedule_generation_log": [
+  "id",
+  "generated_batch_id",
+  "client_id",
+  "pattern_id",
+  "scheduled_date",
+  "day_id",
+  "action",
+  "detail",
+  "created_at"
+ ],
  "scheduled_workouts": [
   "id",
   "client_id",
@@ -1044,7 +1149,9 @@
   "created_at",
   "updated_at",
   "supervised",
-  "deleted_at"
+  "deleted_at",
+  "appointment_id",
+  "moved_by"
  ],
  "sections": [
   "id",
@@ -1121,6 +1228,30 @@
   "google_channel_expiry",
   "trainer_email",
   "gcal_sync_enabled"
+ ],
+ "trainers": [
+  "id",
+  "email",
+  "name",
+  "active",
+  "created_at",
+  "auth_user_id",
+  "role",
+  "first_name",
+  "venmo_username",
+  "zelle_email",
+  "cashapp_handle",
+  "pay_phone",
+  "pay_display_name",
+  "avatar_url",
+  "bot_set"
+ ],
+ "usda_nutrient_map": [
+  "usda_id",
+  "nutrient_key",
+  "target_unit",
+  "max_plausible",
+  "usda_number"
  ],
  "weekly_focus_drafts": [
   "id",

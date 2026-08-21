@@ -85,19 +85,29 @@ export async function GET(req: Request) {
   let ok = 0;
   let errored = 0;
 
+  // A status that failed to WRITE is not a status. Unreported, a run that
+  // checked sixty videos and stored none of them looks identical to a clean
+  // sweep — and because `video_checked_at` stays null the same sixty come up
+  // first next time, so the library would appear to be checked twice a day
+  // while never advancing past the first batch. Self-healing, but silently
+  // stuck is still stuck.
+  let unwritten = 0;
   for (let i = 0; i < rows.length; i += CONCURRENCY) {
     const slice = rows.slice(i, i + CONCURRENCY);
     const results = await Promise.all(slice.map((r) => checkOne(r.video_url)));
     await Promise.all(
-      slice.map((r, j) => {
+      slice.map(async (r, j) => {
         const status = results[j];
         if (status === "dead") dead.push(r.name);
         else if (status === "ok") ok += 1;
         else errored += 1;
-        return db
+        const { data: wrote, error: wErr } = await db
           .from("exercises")
           .update({ video_status: status, video_checked_at: new Date().toISOString() })
-          .eq("id", r.id);
+          .eq("id", r.id)
+          .select("id");
+        if (wErr || !wrote || wrote.length === 0) unwritten += 1;
+        return null;
       }),
     );
   }
@@ -115,9 +125,14 @@ export async function GET(req: Request) {
           dead.slice(0, 25).join(", ") +
           (dead.length > 25 ? `, and ${dead.length - 25} more` : ""),
         status: "new",
+        // The library is shared by every trainer, so a dead video is the
+        // business's problem rather than one coach's. Attributed to the system
+        // and left without a trainer so it does not land on one book.
+        reported_by: "system · video check",
+        app_instance: process.env.NEXT_PUBLIC_APP_INSTANCE || "live",
       });
     } catch { /* the statuses are recorded either way */ }
   }
 
-  return NextResponse.json({ checked: rows.length, ok, dead: dead.length, errored, deadNames: dead });
+  return NextResponse.json({ checked: rows.length, ok, dead: dead.length, errored, unwritten, deadNames: dead });
 }

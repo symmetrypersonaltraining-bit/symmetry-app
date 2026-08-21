@@ -29,6 +29,12 @@ import path from "node:path";
  *     select table_name, json_agg(column_name order by ordinal_position) cols
  *     from information_schema.columns where table_schema='public'
  *     group by table_name) t;
+ *
+ * That query returns 246 tables. The fixture holds 95. THE DIFFERENCE IS
+ * DELIBERATE — filter out the bak_/backup/dedupe/fork_/demo_seed scratch tables
+ * and the v_ views before writing the file. They are one-off snapshots from
+ * migrations past, the app never writes to them, and 160 of them buries the 95
+ * that matter. Regenerated 2026-08-21.
  */
 
 const ROOT = process.cwd();
