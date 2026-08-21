@@ -57,38 +57,32 @@ function element(): HTMLAudioElement | null {
 }
 
 /**
- * Spend a user gesture to unlock playback, and speech synthesis with it.
+ * Prime SPEECH SYNTHESIS on a user gesture. Nothing to do with the recordings.
  *
- * Call this from inside a click/tap handler — NOT from an effect, or it buys
- * nothing. Both unlocks are silent and both are safe to repeat.
+ * An earlier version of this also poked the shared <audio> element: muted it,
+ * played it, and unmuted it in a promise callback. That was worse than useless.
+ * The callback landed AFTER the real line had already started, so it paused the
+ * narration a beat after it began and left `muted` in whatever state the race
+ * decided — a player that said "Playing…" and made no sound, and flickered
+ * between states while it fought itself. Reported exactly that way.
+ *
+ * The element does not need a separate unlock. The first line always starts
+ * inside a real tap (see go() and the play button), and a media element that
+ * has once played from a gesture keeps that permission for the session — which
+ * is the whole reason there is one shared element. So this only does the half
+ * that genuinely needs a gesture and cannot be folded into playback: Safari
+ * will not speak from a timer unless synthesis has spoken once inside one.
+ *
+ * Safe to call repeatedly. Silent by construction.
  */
 export function unlockNarration(): void {
-  const el = element();
-  if (el) {
-    const wasMuted = el.muted;
-    el.muted = true;
-    const p = el.play();
-    if (p && typeof p.then === "function") {
-      p.then(() => {
-        el.pause();
-        el.muted = wasMuted;
-      }).catch(() => {
-        el.muted = wasMuted;
-      });
-    } else {
-      el.muted = wasMuted;
-    }
-  }
-  // Safari will not speak later from a timer unless synthesis has spoken once
-  // inside a gesture. An empty utterance is inaudible and does the job.
-  if (speechSupported()) {
-    try {
-      const u = new SpeechSynthesisUtterance("");
-      u.volume = 0;
-      window.speechSynthesis.speak(u);
-    } catch {
-      /* an unlock that fails just means the fallback voice may stay quiet */
-    }
+  if (!speechSupported()) return;
+  try {
+    const u = new SpeechSynthesisUtterance("");
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+  } catch {
+    /* an unlock that fails only means the fallback voice may stay quiet */
   }
 }
 
@@ -159,25 +153,39 @@ export function narrate(line: string, audioUrl?: string | null): Narration {
     detach();
     settle();
   };
-  const onEnded = () => finish();
-  const onError = () => {
-    // A missing or unplayable recording must not leave the step silent.
+  const url = audioUrl as string;
+  const toBrowserVoice = () => {
     if (finished) return;
     fallback = speak(line);
     fallback.done.then(finish);
   };
+  const onEnded = () => finish();
+  const onError = () => {
+    if (finished) return;
+    // Swapping src while the previous line is still loading makes the browser
+    // fire an ABORT on this element. That is this call cancelling the last one,
+    // not a broken recording — reacting to it started the browser voice on top
+    // of the line that was about to play, which is what "glitches like crazy"
+    // looked like from the outside.
+    if (el.error && el.error.code === el.error.MEDIA_ERR_ABORTED) return;
+    // And an error that arrives for a line we have already moved on from
+    // belongs to that line, not this one.
+    if (el.currentSrc && !el.currentSrc.endsWith(url)) return;
+    // A missing or unplayable recording must not leave the step silent.
+    toBrowserVoice();
+  };
 
+  // Detach BEFORE touching src: whatever the previous line left in flight must
+  // land on nothing rather than on this line's handlers.
+  el.onended = null;
+  el.onerror = null;
+  el.pause();
+  el.src = url;
+  el.currentTime = 0;
   el.onended = onEnded;
   el.onerror = onError;
-  el.pause();
-  el.src = audioUrl as string;
-  el.currentTime = 0;
 
-  void el.play().catch(() => {
-    if (finished) return;
-    fallback = speak(line);
-    fallback.done.then(finish);
-  });
+  void el.play().catch(toBrowserVoice);
 
   return {
     stop: () => {

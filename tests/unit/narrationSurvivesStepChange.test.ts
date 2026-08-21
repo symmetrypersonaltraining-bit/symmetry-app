@@ -71,13 +71,80 @@ describe("narration survives a step change", () => {
     );
   });
 
-  it("spends the tap that moves between steps", () => {
+  it("starts the next line inside the tap, not in an effect afterwards", () => {
+    // Stronger than what this asserted first time round. The original fix
+    // spent the gesture on a separate "unlock" and still left the actual
+    // playback to the arrival effect — a tick past the gesture, which is the
+    // window mobile actually checks. Starting the line in go() itself is the
+    // thing that matters; the unlock is now only for speech synthesis.
     assert.match(
       player,
-      /unlockNarration\(\);[\s\S]{0,200}setIdx\(/,
-      "go() must call unlockNarration() before changing step. Next/Back ARE the user " +
-        "gesture; if it is not spent there, the line that plays a tick later is not " +
-        "user-initiated and mobile drops it.",
+      /setIdx\(at\);[\s\S]{0,400}play\(steps\[at\]\)/,
+      "go() must call play() for the step it is moving to, in the same handler as the tap",
+    );
+  });
+
+  it("does not tear down the line the tap just started", () => {
+    // The second half of the silence. The arrival effect returned `stop`, so:
+    // tap -> go() starts the line -> React re-renders -> the old effect's
+    // cleanup runs -> stop() kills it. Unmount cleanup belongs on its own
+    // effect, which exists.
+    const arrival = player.slice(
+      player.indexOf("Speak on arrival"),
+      player.indexOf("Never leave a voice talking"),
+    );
+    assert.ok(arrival.length > 0, "the arrival effect is gone — nothing plays on step change");
+    assert.doesNotMatch(
+      arrival,
+      /return stop;/,
+      "the arrival effect must not clean up with stop() — it fires after go() has already " +
+        "started the new line, and stops it",
+    );
+    assert.match(
+      arrival,
+      /startedFor\.current === step\.id/,
+      "and it must skip a step go() already started, or both fire and talk over each other",
+    );
+  });
+});
+
+describe("the player says nothing it is not doing", () => {
+  it("never mutes the shared element", () => {
+    // Reported: "botton is there to listen to tuturial but still no sound it
+    // says playing. and it glitches like crazy when you click listen button".
+    //
+    // The unlock muted the element, played it, and restored `muted` in a
+    // promise callback. That callback landed after the real line had started —
+    // so it paused the narration a beat in and left `muted` wherever the race
+    // put it. The UI said "Playing…" because React state had been set; the
+    // element was paused and silent.
+    assert.doesNotMatch(
+      speech,
+      /\.muted\s*=/,
+      "nothing may mute the shared audio element. If it needs unlocking, unlock it by " +
+        "playing the real line from a real tap — which is what go() and the play button do.",
+    );
+  });
+
+  it("never pauses the element from a promise callback", () => {
+    assert.doesNotMatch(
+      speech,
+      /\.then\([\s\S]{0,120}\.pause\(\)/,
+      "a deferred pause cannot know whether a newer line has started since — it silences it",
+    );
+  });
+
+  it("treats an aborted load as a cancellation, not a broken file", () => {
+    assert.match(
+      speech,
+      /MEDIA_ERR_ABORTED/,
+      "swapping src mid-load fires an abort on this element. Reacting to it starts the " +
+        "browser voice on top of the line about to play — the glitching he saw.",
+    );
+    assert.match(
+      speech,
+      /el\.currentSrc[\s\S]{0,80}endsWith\(url\)/,
+      "an error for a line already moved on from belongs to that line, not this one",
     );
   });
 });

@@ -58,6 +58,13 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
   const [ready, setReady] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const active = useRef<Narration | null>(null);
+  // Which step's line has already been started. go() starts the next step's
+  // narration inside the tap; without this the arrival effect would then start
+  // it a second time and the two would talk over each other.
+  const startedFor = useRef<string | null>(null);
+  // go() is a useCallback and must not change identity every time voice does.
+  const voiceOn = useRef(false);
+  voiceOn.current = voice;
   const { dismissed, hide, show } = useTutorialVisibility();
 
   useEffect(() => {
@@ -119,6 +126,7 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
       // from what actually exists in public/tutorial-audio. An explicit
       // audioUrl on the step still wins. Null falls back to the browser voice,
       // which is what every unrecorded step does.
+      startedFor.current = s.id;
       const n = narrate(s.narration, resolveAudio(s));
       active.current = n;
       setSpeaking(true);
@@ -132,11 +140,16 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
     [stop],
   );
 
-  // Speak on arrival, but only once voice has been asked for.
+  // Speak on arrival — but only for arrivals go() did not already handle.
+  //
+  // This used to `return stop`, which was the second half of the silence: go()
+  // started the new line inside the tap, React re-rendered, and this cleanup
+  // ran and killed it. Unmount is covered by the effect below, which is where
+  // that belongs.
   useEffect(() => {
     if (!ready || !voice || !step) return;
+    if (startedFor.current === step.id) return;
     play(step);
-    return stop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, voice, ready]);
 
@@ -145,15 +158,21 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
 
   const go = useCallback(
     (n: number) => {
-      // Every caller is a real tap. Spend it on the audio unlock BEFORE the
-      // state change, because the line for the new step is fired from an
-      // effect a tick later, by which point mobile no longer counts it as
-      // user-initiated. This is what keeps the voice alive past step one.
-      unlockNarration();
+      const at = Math.max(0, Math.min(steps.length - 1, n));
       stop();
-      setIdx(Math.max(0, Math.min(steps.length - 1, n)));
+      setIdx(at);
+      // Start the next line HERE, still inside the tap that asked for it.
+      // Firing it from the arrival effect instead put it a tick past the
+      // gesture, which is the window mobile actually checks — the first line
+      // played and every one after it was refused.
+      if (voiceOn.current) {
+        unlockNarration();
+        play(steps[at]);
+      }
     },
-    [steps.length, stop],
+    // play/stop are stable; voice is read through a ref so this keeps its
+    // identity and the buttons do not re-bind on every toggle.
+    [steps, stop, play],
   );
 
   if (!ready || !step) return null;
