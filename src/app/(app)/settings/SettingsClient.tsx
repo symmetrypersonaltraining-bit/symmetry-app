@@ -11,6 +11,7 @@ import ExperienceSettings from "@/components/ExperienceSettings";
 import NotificationSettings from "@/components/NotificationSettings";
 import HelpCenter from "@/components/HelpCenter";
 import { useTutorialVisibility } from "@/lib/useTutorialVisibility";
+import TrainerProfileCard from "@/components/TrainerProfileCard";
 
 interface Props {
   userEmail: string;
@@ -103,6 +104,15 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
         </div>
       )}
 
+      {/* A trainer gets an EDITOR; everyone else keeps the read-only card.
+          This card showed a trainer their own name and email as plain text and
+          offered no way to change either — and nothing anywhere in the app
+          wrote to the trainers table at all, so a trainer could not set a
+          photo or a payment handle even in principle. Dustin, 21 Aug: "they
+          need to be able to set it up on their own." */}
+      {isTrainer && !isInClientMode ? (
+        <TrainerProfileCard />
+      ) : (
       <section>
         <p className="section-header">Profile</p>
         <div className="card p-4 space-y-3">
@@ -112,10 +122,10 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
               <p className="font-semibold truncate" style={{ color: "var(--brand-text)" }}>{userName || "—"}</p>
               <p className="text-sm truncate" style={{ color: "var(--brand-text-secondary)" }}>{userEmail}</p>
             </div>
-            {isTrainer && !isInClientMode && <span className="badge badge-primary ml-auto flex-shrink-0">Trainer</span>}
           </div>
         </div>
       </section>
+      )}
 
         <PaymentsSettingsCard />
         <BillingHistory />

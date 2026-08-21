@@ -105,6 +105,12 @@ export default function TodaysAdmin() {
           // sit there for weeks — and did: anon_writable_policies was red the
           // whole time on a false positive, which is the same as being unread,
           // because a check nobody looks at cannot tell anyone anything.
+          //
+          // OWNER ONLY, by RLS rather than by a check here: the detail column
+          // names clients, and those clients belong to other trainers. A
+          // non-owner simply gets an empty set and no row is drawn, which is
+          // correct — these are whole-database faults and he is the one who
+          // fixes them.
           sb.from("integrity_checks").select("check_name, severity, count, detail, ran_at")
             .order("ran_at", { ascending: false }).limit(60),
         ]);
