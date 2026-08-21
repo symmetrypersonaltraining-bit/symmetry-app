@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import TrainerWeekDigest from "@/components/TrainerWeekDigest";
 import CommunityPair from "@/components/CommunityPair";
 import SaturdayReview from "@/components/SaturdayReview";
 import LiveSessions from "@/components/LiveSessions";
@@ -331,8 +330,24 @@ export default function TrainerHome({
             instead of being somewhere to navigate to. */}
         <CommunityPair />
 
-        {/* Week ahead — roster + focus editing. */}
-        <TrainerWeekDigest />
+        {/* WEEK AHEAD IS NOT ON THIS SCREEN ANY MORE.
+            Dustin, 21 Aug: "get rid of this table all together, this function
+            we will talk about later and needs to be fully automated not on my
+            home screen."
+
+            The component is deliberately still in the repo — TrainerWeekDigest
+            and /api/coach/focus-suggestions — because the FUNCTION is wanted,
+            automated, and is a conversation still to be had. Deleting it would
+            mean rebuilding the roster maths, the drift detection and the focus
+            editor from nothing when that conversation happens. Do not re-mount
+            it here, and do not delete it either.
+
+            Nothing is orphaned by its absence. SaturdayReview above owns the
+            focus-draft approval, publish_focus_drafts_sunday is the fallback,
+            and ClientWeekSummary only shows a focus stamped with the CURRENT
+            week — so a client sees no stale line, just no line. The only thing
+            that stops being written is digest_snoozed_until, which nothing
+            reads. */}
 
         {/* Stat Cards Row */}
         <div className="grid grid-cols-2 gap-3">

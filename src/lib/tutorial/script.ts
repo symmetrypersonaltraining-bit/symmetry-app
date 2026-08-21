@@ -267,14 +267,15 @@ export const TUTORIAL: TutorialChapter[] = [
         audioUrl: null,
       },
       {
-        id: "home-briefing",
-        title: "The weekly briefing",
+        id: "home-focus",
+        title: "Saturday's focus lines",
         body: [
-          "A week-ahead roster with a focus line per client. The focus lines are drafted for you on Saturday morning and they are drafts — you approve or rewrite them before they go anywhere.",
+          "Each client can carry one focus line for the week, and their app shows it. They are drafted for you on Saturday morning, and they are drafts — a review panel appears on Home with them in it, and you approve or rewrite each one.",
           "Anything you have not dealt with by Sunday morning publishes as written. If that makes you uncomfortable, deal with them on Saturday.",
+          "The panel only appears when there are drafts waiting. No drafts, no panel — that is not something being hidden from you.",
         ],
         narration:
-          "A week ahead roster, with a focus line for each client. Those lines are drafted for you on Saturday morning, and they are drafts. You approve them or rewrite them. Anything still sitting there on Sunday morning publishes as written, so if that makes you uncomfortable, handle them on Saturday.",
+          "Each client can carry one focus line for the week, and their app shows it. Those lines are drafted for you on Saturday morning, and they are drafts. A review panel turns up on Home with them in it, and you approve or rewrite each one. Anything still sitting there on Sunday morning publishes as written, so if that makes you uncomfortable, handle them on Saturday. The panel only appears when there are drafts waiting, so no panel means nothing is waiting.",
         route: "/home",
         routeLabel: "Open Home",
         audioUrl: null,
@@ -284,10 +285,11 @@ export const TUTORIAL: TutorialChapter[] = [
         title: "Needs your eyes",
         body: [
           "When a client leaves a note on an exercise, it surfaces here. Anything that reads like pain or a symptom sorts to the top.",
+          "Three show at a time. The count in the corner is the real total, and the button at the bottom opens the rest and closes it again.",
           "Mark it done when you have dealt with it. That is the whole workflow — the list only shrinks when you shrink it.",
         ],
         narration:
-          "When a client leaves a note on an exercise, it shows up here, and anything that reads like pain or a symptom sorts to the top. Mark it done once you have dealt with it. That is the whole workflow. The list only shrinks when you shrink it.",
+          "When a client leaves a note on an exercise, it shows up here, and anything that reads like pain or a symptom sorts to the top. Three show at a time. The count in the corner is the real total, and the button at the bottom opens the rest and closes it again. Mark it done once you have dealt with it. That is the whole workflow. The list only shrinks when you shrink it.",
         route: "/home",
         routeLabel: "Open Home",
         audioUrl: null,

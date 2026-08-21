@@ -366,17 +366,25 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
   },
   {
-    id: "trainer-who-needs-you",
-    title: "\"Who needs you\" & \"Week ahead\" blocks",
+    // Replaced 21 Aug 2026. This article described "Who needs you" and "Week
+    // ahead". Neither is on the home screen any more — the first was removed
+    // earlier, the second at Dustin's request because the function belongs
+    // automated rather than as a roster to work through by hand. A help
+    // article for a block that is not there sends somebody hunting for it and
+    // concluding they cannot find their way around their own app.
+    id: "trainer-needs-your-eyes",
+    title: "\"Needs your eyes\" on your home screen",
     category: "Trainer Tools",
     audience: "trainer",
     icon: "urgent",
-    keywords: ["who needs you", "week ahead", "home", "attention", "flags", "trainer"],
-    intro: "The two attention blocks on your trainer home.",
+    keywords: ["needs your eyes", "notes", "pain", "symptom", "home", "attention", "flags", "trainer", "week ahead"],
+    intro: "The notes your clients left that nobody has closed out.",
     steps: [
-      "\"Who needs you\" surfaces clients who need action — missed logs, off-plan streaks, or pending items.",
-      "\"Week ahead\" shows what's scheduled across your roster.",
-      "Tap a client to jump straight into their profile or session.",
+      "When a client leaves a note on an exercise — skipped it, something hurt, a question — it lands here.",
+      "Anything that reads like pain or a symptom sorts to the top, by the same wording that decides whether a note reaches you as a message.",
+      "Three show at a time. The number in the corner is the real total; the button at the bottom opens the rest and closes it again.",
+      "Tap \"open the workout\" to see it in context, and \"Done\" once you have dealt with it. The list only shrinks when you shrink it.",
+      "There is no longer a \"Week ahead\" roster on this screen. Focus lines for the week are drafted on Saturday and approved from the review panel that appears on Home when there are drafts waiting.",
     ],
   },
   {

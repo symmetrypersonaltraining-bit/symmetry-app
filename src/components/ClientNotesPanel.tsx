@@ -45,13 +45,21 @@ function ago(iso: string | null): string {
   return Math.round(days / 30) + " months ago";
 }
 
+/** How many show before you ask for more. */
+const PREVIEW = 3;
+
 export default function ClientNotesPanel({ notes }: { notes: ClientNote[] }) {
   const [done, setDone] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   const open = notes.filter((n) => !done.has(n.id));
-  const shown = showAll ? open : open.slice(0, 6);
+  // Three, not six. With 58 open notes the panel was taller than the phone and
+  // ran straight into the payments card below it — and a list that long is not
+  // a prompt to act, it is a wall. Symptoms sort first, so the three shown are
+  // the three that matter.
+  const shown = showAll ? open : open.slice(0, PREVIEW);
+  const hidden = open.length - Math.min(open.length, PREVIEW);
   const symptomCount = open.filter((n) => n.isSymptom).length;
 
   async function close(n: ClientNote) {
@@ -80,7 +88,7 @@ export default function ClientNotesPanel({ notes }: { notes: ClientNote[] }) {
 
   return (
     <div
-      className="rounded-2xl overflow-hidden mt-4"
+      className="rounded-2xl overflow-hidden mt-4 mb-4"
       style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}
     >
       <div
@@ -183,13 +191,16 @@ export default function ClientNotesPanel({ notes }: { notes: ClientNote[] }) {
               </button>
             </div>
           ))}
-          {open.length > shown.length && (
+          {hidden > 0 && (
             <button
-              onClick={() => setShowAll(true)}
+              onClick={() => setShowAll((v) => !v)}
               className="w-full px-4 py-2.5 text-xs font-semibold"
               style={{ color: "var(--brand-primary)", background: "none", border: "none", cursor: "pointer" }}
             >
-              {`Show the other ${open.length - shown.length}`}
+              {/* It expands AND collapses. Before, "Show the other 54" was a
+                  one-way door: open it once and the panel stayed 58 rows tall
+                  for the rest of the session with no way back. */}
+              {showAll ? "Show fewer ▴" : `Show the other ${hidden} ▾`}
             </button>
           )}
         </div>
