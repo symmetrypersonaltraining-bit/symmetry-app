@@ -45,7 +45,24 @@ export async function POST(req: NextRequest) {
     const context = await assembleCoachContext(supabase, clientId);
     const userText = question
       ? `CONTEXT (server-assembled, trusted):\n${context}\n\nCLIENT QUESTION:\n${question}`
-      : `CONTEXT (server-assembled, trusted):\n${context}\n\nNo question was asked. Produce ONE proactive insight for the client's coach card: the single most useful observation from the data right now (trend, gap vs targets, consistency win worth reinforcing), spoken to them by name, with suggestions only if clearly warranted.`;
+      // The CARD, not the chat. Length is constrained here rather than in
+      // COACH_SYSTEM_PROMPT because that prompt is shared with the coach chat,
+      // where six sentences is a reasonable answer and two would be curt.
+      //
+      // Dustin, 21 Aug: "this one needs to be a bit condensed its way too long.
+      // keep it short and straight to the point on what their stats are looking
+      // like compared to logging and where they can improove."
+      //
+      // It also shares the screen with the weekly "YOUR WEEK" read, so the two
+      // together were up to ten sentences of prose above the food logger.
+      : `CONTEXT (server-assembled, trusted):\n${context}\n\nNo question was asked. Produce ONE proactive insight for the client's coach card, spoken to them by name.
+
+HARD LIMITS for this card — it sits above their food logger, not in a chat:
+- TWO sentences. Three only if the third is a specific action. Never more.
+- The FIRST sentence must state a real number from the context — an average, an adherence figure, a signed delta against target, a logged-days count. No number, no sentence.
+- The SECOND says the one thing to do about it this week. Concrete and doable.
+- No preamble, no sign-off, no restating their goal back to them, no "keep it up" filler.
+- If there is too little logged data to say something true, say exactly that in one sentence and stop.`;
 
       // Tier-aware — see tests/unit/aiTier.test.ts for why partial coverage is
       // the failure worth guarding against.

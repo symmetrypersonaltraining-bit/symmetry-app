@@ -73,7 +73,7 @@ Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
 Rules:
 - "focus": ONE sentence, under 120 characters, no leading "Focus:".
 - "coachRead": 2-4 sentences, plain text, no question at the end.
-- "foodFocus": 2-4 sentences, plain text, grounded in the stated numbers.
+- "foodFocus": TWO sentences, plain text. The first states how last week actually went using the given numbers (averages, adherence, signed vs-target deltas) — a real figure, not an adjective. The second is the one thing to work on this week. It shares a screen with the nutrition coach card, so anything longer is a wall of text above their food logger.
 - "programmingQuestion": ONE question, under 140 characters, asking this client whether anything about their PROGRAMMING should change — exercises, volume, session length, days, an area they want more or less of, something that has been bothering them physically. Ground it in what actually happened in their last two weeks so it does not read as a form letter: if they skipped legs twice, ask about that; if every session ran long, ask about session length. Never ask about weight, diet or body composition. Never ask a yes/no question they can dismiss with one word.`;
 
 interface WeeklyReply {
