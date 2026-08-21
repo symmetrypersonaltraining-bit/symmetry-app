@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { TUTORIAL, SETUP_CHECKS, allSteps, type SetupCheckKey } from "@/lib/tutorial/script";
-import { narrate, speechSupported, stopSpeaking, type Narration } from "@/lib/speech";
+import { narrate, speechSupported, stopSpeaking, unlockNarration, type Narration } from "@/lib/speech";
 import { resolveAudio } from "@/lib/tutorial/audio";
 import { setPageContext } from "@/lib/pageContext";
 
@@ -143,6 +143,11 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
 
   const go = useCallback(
     (n: number) => {
+      // Every caller is a real tap. Spend it on the audio unlock BEFORE the
+      // state change, because the line for the new step is fired from an
+      // effect a tick later, by which point mobile no longer counts it as
+      // user-initiated. This is what keeps the voice alive past step one.
+      unlockNarration();
       stop();
       setIdx(Math.max(0, Math.min(steps.length - 1, n)));
     },
@@ -152,6 +157,11 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
   if (!ready || !step) return null;
 
   const pct = Math.round(((idx + 1) / steps.length) * 100);
+  // Show the player if EITHER route to sound exists. The old gate asked only
+  // whether the browser could do text-to-speech, which hid a real recording
+  // from anything with speech synthesis switched off or unavailable.
+  const recorded = !!resolveAudio(step);
+  const canHear = recorded || speechSupported();
   const outstanding = SETUP_CHECKS.filter((c) => !setup[c.key]);
   const onLastChapter = step.chapterId === "finish";
 
@@ -241,14 +251,74 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
           ) : null}
         </div>
 
+        {/* The player, at the top of the card where it is the first thing you
+            see. It used to be a grey "Voice off" button sitting fourth in a row
+            of grey buttons under the text, and the first person to test the
+            tutorial reported that it had no voice at all. A recording nobody
+            can find is the same as no recording. */}
+        {canHear ? (
+          <div
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 mb-4"
+            style={{ background: "var(--brand-surface-2)", border: "1px solid var(--brand-border)" }}
+          >
+            <button
+              type="button"
+              aria-label={speaking ? "Stop narration" : "Play narration"}
+              onClick={() => {
+                // A real tap: unlock first, then act. Turning voice on here is
+                // what arms auto-play for every step after this one.
+                unlockNarration();
+                if (speaking) { stop(); return; }
+                if (!voice) {
+                  setVoice(true);
+                  try { localStorage.setItem(VOICE_KEY, "1"); } catch { /* fine */ }
+                }
+                play(step);
+              }}
+              className="flex items-center justify-center rounded-full shrink-0"
+              style={{ width: 40, height: 40, background: "var(--brand-accent)", color: "#fff", border: "none" }}
+            >
+              <i className={`ti ${speaking ? "ti-player-pause-filled" : "ti-player-play-filled"} text-lg`} />
+            </button>
+
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>
+                {speaking ? "Playing…" : recorded ? "Listen instead" : "Read this out loud"}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
+                {recorded
+                  ? voice
+                    ? "Recorded narration. Plays automatically on each step."
+                    : "Recorded narration. Tap play and it follows you through."
+                  : "This step has no recording yet, so your phone reads it."}
+              </p>
+            </div>
+
+            {voice ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setVoice(false);
+                  try { localStorage.setItem(VOICE_KEY, "0"); } catch { /* fine */ }
+                  stop();
+                }}
+                className="text-xs font-semibold shrink-0 px-2 py-1 rounded-lg"
+                style={{ background: "transparent", border: "none", color: "var(--brand-text-secondary)", textDecoration: "underline" }}
+              >
+                Mute
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
         {step.body.map((p, i) => (
           <p key={i} className="text-sm mb-2.5 leading-relaxed" style={{ color: "var(--brand-text-secondary)" }}>
             {p}
           </p>
         ))}
 
-        <div className="flex flex-wrap gap-2 mt-4">
-          {step.route ? (
+        {step.route ? (
+          <div className="flex flex-wrap gap-2 mt-4">
             <Link
               href={step.route}
               target="_blank"
@@ -257,36 +327,8 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
             >
               {step.routeLabel || "Open this screen"} ↗
             </Link>
-          ) : null}
-
-          {speechSupported() ? (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !voice;
-                  setVoice(next);
-                  try { localStorage.setItem(VOICE_KEY, next ? "1" : "0"); } catch { /* fine */ }
-                  if (next) play(step); else stop();
-                }}
-                className="text-sm px-3 py-2 rounded-lg font-semibold"
-                style={{ background: "var(--brand-surface-2)", color: "var(--brand-text)" }}
-              >
-                {voice ? "Voice on" : "Voice off"}
-              </button>
-              {voice ? (
-                <button
-                  type="button"
-                  onClick={() => (speaking ? stop() : play(step))}
-                  className="text-sm px-3 py-2 rounded-lg font-semibold"
-                  style={{ background: "var(--brand-surface-2)", color: "var(--brand-text-secondary)" }}
-                >
-                  {speaking ? "Stop" : "Read it again"}
-                </button>
-              ) : null}
-            </>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
 
       {onLastChapter ? (
@@ -321,6 +363,7 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
               ? "Nothing outstanding. You are set up."
               : `${outstanding.length} still open. None of them stops you working today.`}
           </p>
+
         </div>
       ) : null}
 

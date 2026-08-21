@@ -7,10 +7,9 @@
  * a movement capture still running — cancel() is global, so whichever spoke
  * last silently kills the other.
  *
- * The pre-recorded branch is not speculative. Dustin wants the tutorial
- * narrated in his own voice (Chatterbox). When those files exist, they drop in
- * as `audioUrl` on a step and nothing else changes: `narrate()` prefers a real
- * recording and falls back to the browser voice for anything not yet recorded.
+ * The pre-recorded branch is not speculative: all 51 tutorial steps are cut in
+ * Dustin's voice and live in public/tutorial-audio. `narrate()` prefers the
+ * recording and falls back to the browser voice for anything unrecorded.
  * That is why this returns a handle instead of void — a recording has to be
  * stoppable, and the caller must be able to know when it ended.
  */
@@ -32,6 +31,65 @@ export function speechSupported(): boolean {
 export function stopSpeaking() {
   if (typeof window === "undefined") return;
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+}
+
+/**
+ * ONE <audio> element for the life of the tab, and the reason is mobile.
+ *
+ * The first version built `new Audio(url)` per line. That plays fine for the
+ * line the trainer tapped for, and then goes silent for every line after it:
+ * iOS and Android only let a media element start when the gesture that asked
+ * for it is still on the stack, and a step change fires the next line from an
+ * effect, one tick too late. A freshly constructed element has never been
+ * unlocked, so it is refused. The SAME element, once it has played inside a
+ * real tap, keeps its permission for the rest of the session — so we reuse it
+ * and only swap `src`. This is why the tutorial was silent from step two.
+ */
+let shared: HTMLAudioElement | null = null;
+
+function element(): HTMLAudioElement | null {
+  if (typeof window === "undefined" || typeof Audio === "undefined") return null;
+  if (!shared) {
+    shared = new Audio();
+    shared.preload = "auto";
+  }
+  return shared;
+}
+
+/**
+ * Spend a user gesture to unlock playback, and speech synthesis with it.
+ *
+ * Call this from inside a click/tap handler — NOT from an effect, or it buys
+ * nothing. Both unlocks are silent and both are safe to repeat.
+ */
+export function unlockNarration(): void {
+  const el = element();
+  if (el) {
+    const wasMuted = el.muted;
+    el.muted = true;
+    const p = el.play();
+    if (p && typeof p.then === "function") {
+      p.then(() => {
+        el.pause();
+        el.muted = wasMuted;
+      }).catch(() => {
+        el.muted = wasMuted;
+      });
+    } else {
+      el.muted = wasMuted;
+    }
+  }
+  // Safari will not speak later from a timer unless synthesis has spoken once
+  // inside a gesture. An empty utterance is inaudible and does the job.
+  if (speechSupported()) {
+    try {
+      const u = new SpeechSynthesisUtterance("");
+      u.volume = 0;
+      window.speechSynthesis.speak(u);
+    } catch {
+      /* an unlock that fails just means the fallback voice may stay quiet */
+    }
+  }
 }
 
 /**
@@ -77,29 +135,44 @@ export function speak(line: string, opts?: { rate?: number; pitch?: number }): N
  * `audioUrl` wins; browser TTS is the fallback for anything unrecorded.
  */
 export function narrate(line: string, audioUrl?: string | null): Narration {
-  if (!audioUrl || typeof window === "undefined" || typeof Audio === "undefined") {
-    return speak(line);
-  }
+  const el = audioUrl ? element() : null;
+  if (!el) return speak(line);
+
   stopSpeaking();
-  const el = new Audio(audioUrl);
+
   let settle: () => void = () => {};
   const done = new Promise<void>((res) => {
     settle = res;
   });
   let finished = false;
   let fallback: Narration | null = null;
+
+  // The element outlives this call, so its handlers must not: a stale onended
+  // from the previous line would resolve the wrong promise. Detach on finish.
+  const detach = () => {
+    if (el.onended === onEnded) el.onended = null;
+    if (el.onerror === onError) el.onerror = null;
+  };
   const finish = () => {
     if (finished) return;
     finished = true;
+    detach();
     settle();
   };
-  el.onended = finish;
-  el.onerror = () => {
+  const onEnded = () => finish();
+  const onError = () => {
     // A missing or unplayable recording must not leave the step silent.
     if (finished) return;
     fallback = speak(line);
     fallback.done.then(finish);
   };
+
+  el.onended = onEnded;
+  el.onerror = onError;
+  el.pause();
+  el.src = audioUrl as string;
+  el.currentTime = 0;
+
   void el.play().catch(() => {
     if (finished) return;
     fallback = speak(line);
