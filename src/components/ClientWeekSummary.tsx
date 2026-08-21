@@ -33,16 +33,22 @@ function fmtRange(a: string, b: string): string {
 }
 
 /**
- * A focus only shows if it belongs to the CURRENT week. Rows written before the
- * provenance columns existed carry no weekly_focus_week, so those are honoured
- * as-is rather than vanishing; anything stamped with an older Sunday is stale
- * and stays hidden until the Sunday sweep (/api/cron/weekly-ai) or Dustin
- * replaces it.
+ * A focus only shows if it belongs to the CURRENT week. No stamp, no display.
+ *
+ * This used to honour a NULL weekly_focus_week as "show it", so that rows
+ * written before the provenance columns existed would not vanish. Every row in
+ * production is a pre-provenance row, so the escape hatch WAS the rule: on
+ * 21 Aug all 34 clients carrying a focus were being shown a line written on or
+ * before 8 Aug, presented as this week's, with no date on it. Bobbie Page was
+ * reading "3 lifts and 2 cardio days this week"; Christine Latham was reading
+ * "It's been 9 days" on day 22.
+ *
+ * A line with no week stamp cannot be proven current, so it is not shown. The
+ * card renders without a focus, which is what the food-logger's weekly read
+ * (NutritionV3Client, ai_food_focus_week) has always done correctly.
  */
 function currentWeekFocus(row: { weekly_focus?: string | null; weekly_focus_week?: string | null }): string | null {
-  const wk = row.weekly_focus_week;
-  const thisWeek = weekStartOf(todayCT());
-  if (wk && wk !== thisWeek) return null;
+  if (row.weekly_focus_week !== weekStartOf(todayCT())) return null;
   return row.weekly_focus || null;
 }
 

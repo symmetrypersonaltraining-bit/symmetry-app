@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const [clientRes, assignRes, thisWkRes, lastWkRes, notesRes] = await Promise.all([
-      admin.from("clients").select("id, name, weekly_focus, week_brief_seen_week").eq("id", clientId).maybeSingle(),
+      admin.from("clients").select("id, name, weekly_focus, weekly_focus_week, week_brief_seen_week").eq("id", clientId).maybeSingle(),
       admin
         .from("program_assignments")
         .select("id, current_phase_id, programs(name), phases(label)")
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
         .limit(3),
     ]);
 
-    const client = (clientRes.data as { name?: string; weekly_focus?: string | null; week_brief_seen_week?: string | null } | null) || null;
+    const client = (clientRes.data as { name?: string; weekly_focus?: string | null; weekly_focus_week?: string | null; week_brief_seen_week?: string | null } | null) || null;
     const seen = client?.week_brief_seen_week === weekStart;
 
     type SwRow = {
@@ -205,7 +205,10 @@ export async function POST(req: NextRequest) {
       lastWeekScheduled,
       lastWeekCompleted,
       movements,
-      weeklyFocus: client?.weekly_focus || null,
+      // Same freshness rule as the client's own week card: a focus with no
+      // current-week stamp is not this week's and is not stated as if it were.
+      // Dustin reads this brief standing in front of the client.
+      weeklyFocus: client?.weekly_focus_week === weekStart ? client?.weekly_focus || null : null,
       recentNotes: ((notesRes.data as { note: string; created_at: string }[]) || []).filter((n) => n?.note),
     };
 
