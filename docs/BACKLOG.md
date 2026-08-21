@@ -1,5 +1,101 @@
 # Backlog — the single work queue
 
+> ## 👉 21 Aug — THE WEEKLY FOCUS RUNS ITSELF, AND THE TAKEOVERS ARE CULLED
+>
+> **`origin/main` = `7469ef9`.** Five commits, all gated, all shipped.
+>
+> **`2cdafed` — thirty-four clients were reading a focus line from before 9 Aug.**
+> `currentWeekFocus` honoured a NULL `weekly_focus_week` as "show it" — written
+> so pre-provenance rows would not vanish, except EVERY production row is a
+> pre-provenance row, so the escape hatch was the rule. Bobbie Page was reading
+> "3 lifts and 2 cardio days this week"; Christine Latham "It's been 9 days" on
+> day 22. Guard now strict here and in `/api/weekly-brief`, which had no stamp
+> check at all.
+>
+> **The 21 Aug handoff's diagnosis of this was WRONG in three ways** — it looked
+> for feature `weekly_ai` (the route logs `weekly_sweep`), it read zero usage
+> rows as proof the route never reached its metered call (metering only landed
+> 13 Aug, after the last good run), and it assumed no drafts ever existed. They
+> did: `cron.job_run_details` shows `publish_focus_drafts_sunday` FAILING on
+> 9 Aug with `operator does not exist: text = date`, an error that can only fire
+> from inside the row loop. **That bug is already fixed.** Only ONE Saturday was
+> actually missed — 15 Aug.
+>
+> **`0d3d46d` — the sweep publishes itself, late Saturday, no approval.**
+> Moved to `0 3 * * 0` (22:00 CT Saturday) so it grades seven whole days instead
+> of a Sunday-to-Friday stub. Target week now derives from TOMORROW — outside
+> draft mode it was `weekStartOf(today)`, which on a Saturday-night run stamps
+> every line with the week that just ENDED, so all 34 would have been filtered
+> out as stale the instant they published. No `?draft=1`, no drafts table, and
+> `SaturdayReview` unmounted (kept in repo, like `TrainerWeekDigest`).
+>   - **`/api/cron/focus-watchdog` is a SEPARATE route on pg_cron** (jobid 43,
+>     Sunday 08:00 CT). The 15 Aug failure was the sweep never being invoked; an
+>     alert inside it would have been just as absent. It asks the DATA one
+>     question — does every active client have a focus stamped for this week —
+>     which catches cron-never-fired, 500, model-junk, meter-paused and
+>     one-row-failed alike. Alerts PER TRAINER (Stephanie's one client is 100% of
+>     her roster). Email reuses meter.ts's Resend + marker-first pattern; push
+>     uses new `SYSTEM_ALERT`, trainer-only and forced.
+>   - **Dustin has NO push subscription.** There is exactly one in the whole
+>     database (Lauren's, 17 Aug). Push alerts reach him only once he turns
+>     notifications on in the app.
+>
+> **`7e226b9` — four takeovers could stack on one screen.** A lapsed client
+> opening on a Sunday got SlackerScreen (z9999), the ClientTakeovers lapse
+> screen (z2000), SundayWeighInReminder (z85) and the week brief (z80), all at
+> once. Deleted: **SlackerScreen** (duplicated the lapse screen from ABOVE it and
+> ignored `checkin_nudges_off`/`checkin_snoozed_until`, so a client who asked not
+> to be nudged got a comedy wanted poster), **PrankInvoice** (expired 12 July,
+> still mounted at z99999), **SundayWeighInReminder** (WeighInNudge already does
+> it as a card, and it fired at DUSTIN in /client-preview), **PwaInstallBanner**
+> (second install prompt, second dismiss key).
+>   - `src/lib/takeoverSlot.ts` — one global claim, lowest priority wins, ordered
+>     by shelf life. ClientTakeovers promised "at most ONE takeover ever" and
+>     could only deliver it inside itself; now it is true of the app.
+>   - Week brief is weekly again (Sun/Mon only — it fired every day while its own
+>     comment said "once-weekly"), seen moved to `client_announcements_seen`
+>     (per PERSON, not per device), and the marker is written on DISMISS rather
+>     than on open — the old key counted "closed the app without reading" as read.
+>
+> **`e535dc7` — one definition of "the week".** The card measured a ROLLING
+> trailing seven days for the review and printed the Sun–Sat focus line
+> underneath it: two different weeks, one screen, both labelled "week". "This
+> week" also put the WHOLE Sun–Sat in the denominator, so Thursday's sessions
+> counted against a client on Tuesday. Both now use `weekly-numbers.ts`, which
+> was right all along — **the AI was never the thing that was wrong.** Dustin's
+> rule: logged vs scheduled *so far this week*, resetting at the boundary.
+>
+> **`7469ef9` — ten sentences of AI prose above the food logger becomes four.**
+> TWO cards share that screen and neither knew about the other (coach card ~6
+> sentences, weekly read 2–4). Both capped at two, both must LEAD with a real
+> figure, and the coach card has an explicit sparse-data instruction. The cap
+> lives in the card's own prompt, not COACH_SYSTEM_PROMPT, which is shared with
+> the chat.
+>
+> ### OPEN, needs Dustin
+> 1. **The sweep has not completed successfully since 8 Aug.** Sat 22 Aug is the
+>    first real run of the new schedule. If it fails he now gets told.
+> 2. **Turn on notifications in the app** so push alerts reach him.
+> 3. **1,043 orphan `scheduled_workouts` rows** point at days in programmes their
+>    client is no longer assigned to (11 of Dustin's own 14 that week, 8 of
+>    Madeleine's 8). They inflate every denominator. Clearing them is destructive
+>    → needs a `bak_` table and his go-ahead. NOT touched.
+> 4. **`integrity_checks` is read by nothing** — twice a day since 1 Aug, and it
+>    is holding a `critical` `anon_writable_policies` flag nobody has seen. Same
+>    disease as the gcal sync runs and `ai_focus`.
+> 5. **`clients.ai_focus` is written weekly for 33 clients and read by NOTHING.**
+>    He said "wire it up" — but `CoachFocusCard` was removed on purpose on 1 Aug
+>    because it restated the focus line and clients read the same coaching twice.
+>    Decide: re-add with a different job, kill it, or repurpose it as his view.
+>    The help centre still tells clients to find a card that does not exist.
+> 6. **Justin Ray (justinrayaus@yahoo.com)** — third trainer, set up like
+>    Stephanie plus a client toggle, plus a choice of using his own connected
+>    Claude, with the tutorial branching on that choice.
+> 7. **"Needs your eyes"** — pull all open client notes and clear the backlog.
+> 8. `challenge-launch-2026-08` is a hardcoded key: a September challenge invites
+>    nobody. `WeighInNudge` dismissal is session-scoped, so it returns after a
+>    PWA restart the same day.
+
 > ## 👉 21 Aug (overnight) — THE TUTORIAL, AND FOURTEEN MORE LIES
 >
 > **`origin/main` = `2702a45`.** Five commits, each gated and shipped through
