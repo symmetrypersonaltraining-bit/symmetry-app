@@ -6,6 +6,8 @@ import ClientDashboard from "./ClientDashboard";
 import TrainerHome from "./TrainerHome";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
 import PendingRemindersPanel from "@/components/PendingRemindersPanel";
+import ClientNotesPanel, { type ClientNote } from "@/components/ClientNotesPanel";
+import { isSymptomNote } from "@/lib/trainingNoteRouting";
 import SlackerGate from "@/components/SlackerScreen";
 import { TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
 import { getServerUser } from "@/lib/auth/serverUser";
@@ -211,6 +213,52 @@ export default async function HomePage(props: {
       weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago",
     });
 
+    // ── THE NOTES NOBODY HAS CLOSED OUT ──────────────────────────────────────
+    //
+    // `exercise_notes.resolved` shipped with the table and nothing had ever
+    // written it: on 21 Aug, 63 rows and 63 unresolved, the oldest from 19 July.
+    // Most of them DID reach him as messages at the time — routeTrainingNote
+    // delivers symptoms and questions — but a message scrolls away and a note
+    // had no state, so "which of these have I actually dealt with?" had no
+    // answer for a month.
+    //
+    // Scoped by RLS (`trainer_can_see_client`), so Stephanie sees only her own
+    // clients' notes without this query knowing anything about it.
+    const { data: noteRows } = await supabase
+      .from("exercise_notes")
+      .select("id, client_id, note, author, log_date, day_id, exercises(name), clients(name)")
+      .eq("resolved", false)
+      .order("log_date", { ascending: false })
+      .limit(60);
+
+    const clientNotes: ClientNote[] = ((noteRows || []) as unknown as Array<{
+      id: string; client_id: string; note: string; author: string;
+      log_date: string | null; day_id: string | null;
+      exercises: { name?: string } | { name?: string }[] | null;
+      clients: { name?: string } | { name?: string }[] | null;
+    }>).map((r) => {
+      const ex = Array.isArray(r.exercises) ? r.exercises[0] : r.exercises;
+      const cl = Array.isArray(r.clients) ? r.clients[0] : r.clients;
+      return {
+        id: r.id,
+        clientId: r.client_id,
+        clientName: cl?.name || "A client",
+        exerciseName: ex?.name || "a movement",
+        note: r.note,
+        author: r.author,
+        logDate: r.log_date,
+        dayId: r.day_id,
+        isSymptom: isSymptomNote(r.note),
+      };
+    })
+      // Symptoms first, then newest. Same vocabulary that decides whether a note
+      // is worth interrupting him for, so the two rankings cannot drift.
+      .sort((a, b) =>
+        a.isSymptom === b.isSymptom
+          ? (b.logDate || "").localeCompare(a.logDate || "")
+          : a.isSymptom ? -1 : 1,
+      );
+
     return (
       <div className="p-4 lg:p-6">
         <TrainerHome
@@ -221,6 +269,7 @@ export default async function HomePage(props: {
           notificationCount={reminders.length}
           dateLabel={trainerDateLabel}
         />
+        <ClientNotesPanel notes={clientNotes} />
         <PendingRemindersPanel reminders={reminders} />
         <TrainerCalendarPanel
           clients={clients || []}

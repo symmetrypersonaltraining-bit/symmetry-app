@@ -32,7 +32,10 @@
  */
 
 /** Words that mean a body is complaining. Any one of these forces delivery. */
-const SYMPTOM = [
+// Exported since 21 Aug for the trainer's notes list, which sorts symptom notes
+// to the top. Same vocabulary, one definition — a note that is urgent enough to
+// interrupt him should also be the one he sees first in the list.
+export const SYMPTOM = [
   "pain", "painful", "hurt", "hurts", "hurting", "sore", "soreness", "ache",
   "aches", "aching", "achy", "tight", "tightness", "pull", "pulled", "strain",
   "strained", "tweak", "tweaked", "twinge", "spasm", "cramp", "cramping",
@@ -94,6 +97,27 @@ const BOOKKEEPING = [
 ];
 
 export type NoteRoute = "deliver" | "record-only";
+
+/**
+ * Does this note describe a symptom?
+ *
+ * Used to rank the trainer's unresolved-notes list. Deliberately the same list
+ * `routeTrainingNote` uses, so "worth interrupting him" and "worth showing him
+ * first" can never drift apart.
+ *
+ * A question mark does NOT count here, unlike in routing: "can I swap this?" is
+ * worth a reply but it is not a knee giving out, and putting both at the top
+ * would flatten the only ranking the list has.
+ */
+export function isSymptomNote(note: string): boolean {
+  const t = (note || "").trim().toLowerCase();
+  if (!t) return false;
+  return SYMPTOM.some((w) =>
+    w.includes(" ") || !/^[a-z']+$/.test(w)
+      ? t.includes(w)
+      : new RegExp(`(^|[^a-z])${w}([^a-z]|$)`, "i").test(t),
+  );
+}
 
 /**
  * Where a movement note goes.
