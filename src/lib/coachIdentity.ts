@@ -21,6 +21,12 @@ export interface CoachIdentity {
   name: string;
   /** Their photo, or null. NEVER falls back to another trainer's face. */
   avatarUrl: string | null;
+  /**
+   * Folder under /public/bots holding this coach's AI mood faces, or null for
+   * the original set. See faceSrc() — the art is a cartoon of a person, not a
+   * robot, so it is per-coach for the same reason the photograph is.
+   */
+  botSet: string | null;
   /** The trainers row id, for anything that needs to scope further. */
   trainerId: string | null;
   /**
@@ -46,6 +52,7 @@ export const DEFAULT_COACH: CoachIdentity = {
   firstName: COACH_FIRST_NAME,
   name: COACH_NAME,
   avatarUrl: null,
+  botSet: null,
   trainerId: null,
   isOwner: false,
   isSelf: false,
@@ -71,13 +78,14 @@ function shape(row: Record<string, unknown> | null, isSelf: boolean): CoachIdent
     firstName: String(row.first_name || name.split(/\s+/)[0] || COACH_FIRST_NAME),
     name: name || COACH_NAME,
     avatarUrl: (row.avatar_url as string) || null,
+    botSet: (row.bot_set as string) || null,
     trainerId: String(row.id),
     isOwner: row.role === "owner",
     isSelf,
   };
 }
 
-const COLS = "id, name, first_name, avatar_url, role";
+const COLS = "id, name, first_name, avatar_url, bot_set, role";
 
 /**
  * The coach for a specific client. Use this on any screen that is ABOUT a

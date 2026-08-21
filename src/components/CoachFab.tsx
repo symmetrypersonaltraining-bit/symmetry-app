@@ -19,6 +19,7 @@
 //     character everywhere instead of a generic sparkle.
 
 import { faceSrc, type Mood } from "@/lib/ai/faces";
+import { useCoach } from "@/lib/useCoach";
 import { useKeyboardInset } from "@/lib/useKeyboardInset";
 
 /** Big enough for the face to read, small enough not to be in the way. */
@@ -36,6 +37,8 @@ export default function CoachFab({
   label?: string;
   liftPx?: number;
 }) {
+  // The viewer's own coach's face set — see faceSrc().
+  const { botSet } = useCoach();
   const kb = useKeyboardInset();
   // Not "moved up" — gone. There is no position on a phone where a floating
   // button and an open keyboard both fit without one covering something.
@@ -66,7 +69,7 @@ export default function CoachFab({
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={faceSrc(mood)}
+        src={faceSrc(mood, botSet)}
         alt=""
         width={SIZE}
         height={SIZE}

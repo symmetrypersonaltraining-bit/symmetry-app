@@ -186,6 +186,28 @@
 > - **The nightly nudge digest stays owner-wide.** Splitting it per trainer is
 >   your call.
 >
+> ### DONE 21 Aug — HER FACE, HER BOTS, HER SANDBOX
+> Dustin sent two 15-tile sticker sheets. Sliced to 30 circular 256px webp
+> avatars and mapped onto all 20 moods in `src/lib/ai/faces.ts`.
+> - `trainers.bot_set` names a folder under `/public/bots`; NULL = the original
+>   set, so the owner is untouched and a trainer added later degrades to it
+>   rather than to a broken image. Hers is `steph`.
+> - `trainers.avatar_url` = `/coach/steph.webp` — one column now drives the
+>   coach badge, the celebration card AND her group posts.
+> - **The group chat keeps ONE bot** (the default set) on purpose: shared room,
+>   one voice.
+> - **Three of her 20 faces carry another gym's logo** — `flex`, `cool`,
+>   `hydrate` came off the mixed sheet because there was no Symmetry-branded
+>   flex, thumbs-up or water-bottle tile. Unreadable at 18–40px; regenerate
+>   those three if it matters.
+> - **Sandbox client** `Demo Client (Stephanie)` — 12 weigh-ins, macro targets,
+>   3 weeks of history and 2 weeks ahead on the calendar. Inert by construction:
+>   `.invalid` email, no `auth_user_id` (cannot be messaged or pushed),
+>   `billing_type = 'none'`, reminders off, excluded from the leaderboard. Safe
+>   to archive whenever. It has no avatar of its own — initials, which is what a
+>   real new client looks like; putting the coach's cartoon on a fake person
+>   would be the confusing option.
+>
 > ### KNOWN NOT DONE
 > - Trainer-FACING prompts still name the owner: `weekly-brief`,
 >   `workout-assist`, `nutrition-ai/plan-build`, `assessment-recommend`, and the

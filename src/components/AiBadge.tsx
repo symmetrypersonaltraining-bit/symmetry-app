@@ -18,12 +18,15 @@
 // insight, the coach chat. <CoachBadge /> only where he is genuinely the author.
 //
 // Same artwork as Coach Bot in the group chat, deliberately — one AI face
-// across the whole app, so clients learn it once.
+// across the whole app, so clients learn it once. "One face" means one face
+// PER COACH: the group chat is shared and keeps the owner's bot, but a client's
+// own screens wear their own coach's set.
 
 // One face across the app, but not one EXPRESSION. Which sticker gets used is
 // decided by mood in src/lib/ai/faces.ts — read the header there for why the
 // expression is carrying part of the message rather than decorating it.
 import { faceSrc, type Mood } from "@/lib/ai/faces";
+import { useCoach } from "@/lib/useCoach";
 
 export default function AiBadge({
   size = 30,
@@ -42,10 +45,14 @@ export default function AiBadge({
    */
   mood?: Mood;
 }) {
+  // The VIEWER's coach's set. Same rule as CoachBadge: this art is a cartoon of
+  // a specific person, so a client of Stephanie's must not be shown a cartoon
+  // of Dustin telling them how their week went.
+  const { botSet } = useCoach();
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={faceSrc(mood)}
+      src={faceSrc(mood, botSet)}
       alt=""
       title={title}
       width={size}

@@ -38,8 +38,12 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { faceSrc } from "@/lib/ai/faces";
+import { useCoach } from "@/lib/useCoach";
 
 export default function BigCoachBar() {
+  // The viewer's own coach's face set — see faceSrc().
+  const { botSet } = useCoach();
+
   const [show, setShow] = useState(false);
   const supabase = createClient();
 
@@ -104,7 +108,7 @@ export default function BigCoachBar() {
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={faceSrc("neutral")}
+        src={faceSrc("neutral", botSet)}
         alt=""
         width={56}
         height={56}

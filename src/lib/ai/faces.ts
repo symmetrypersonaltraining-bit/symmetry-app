@@ -72,10 +72,28 @@ const ART: Record<Mood, string> = {
 /** The cartoon that shipped before the sticker set. Any gap falls back here. */
 export const FALLBACK_FACE = "/coachbot.png";
 
-export function faceSrc(mood: Mood | null | undefined): string {
-  if (!mood) return `/bots/${ART.neutral}.webp`;
+/**
+ * WHOSE face.
+ *
+ * This art is not a robot — /public/bots is a cartoon of Dustin, and the mood
+ * set exists precisely so the picture carries part of the message. Shown to
+ * another trainer's clients it is a stranger's cartoon telling them how their
+ * week went, which is the same problem as his photograph appearing on their
+ * celebration screen, only more often.
+ *
+ * `set` names a folder under /public/bots and comes from `trainers.bot_set`.
+ * Empty or missing means the original set, so the owner is unchanged and a
+ * trainer added tomorrow degrades to it rather than to a broken image.
+ *
+ * The group chat deliberately does NOT pass one: that room is shared by
+ * decision, Coach Bot is one voice in it, and two different bots posting the
+ * same kind of message would read as two different bots.
+ */
+export function faceSrc(mood: Mood | null | undefined, set?: string | null): string {
+  const dir = set ? `/bots/${set}/` : "/bots/";
+  if (!mood) return `${dir}${ART.neutral}.webp`;
   const slug = ART[mood];
-  return slug ? `/bots/${slug}.webp` : FALLBACK_FACE;
+  return slug ? `${dir}${slug}.webp` : FALLBACK_FACE;
 }
 
 export const ALL_MOODS = Object.keys(ART) as Mood[];

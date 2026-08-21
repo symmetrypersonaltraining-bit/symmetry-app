@@ -228,3 +228,63 @@ test("the trainer agent addresses whoever is signed in", () => {
   assert.match(c, /const base = SYSTEM\(me\.firstName\)/,
     "the persona is not built from the signed-in trainer");
 });
+
+// ─── the AI's face is per coach too ─────────────────────────────────────────
+
+test("faceSrc puts the coach's set in the path, and no set means the original", async () => {
+  const { faceSrc, ALL_MOODS } = await import("../../src/lib/ai/faces.ts");
+  assert.equal(faceSrc("pr"), "/bots/pr.webp");
+  assert.equal(faceSrc("pr", "steph"), "/bots/steph/pr.webp");
+  assert.equal(faceSrc(null, "steph"), "/bots/steph/neutral.webp");
+  // A trainer with no set of their own must land on the original art, never on
+  // a 404 — a broken image on a coach badge is worse than the wrong cartoon.
+  assert.equal(faceSrc("pr", null), "/bots/pr.webp");
+  assert.equal(faceSrc("pr", ""), "/bots/pr.webp");
+  assert.ok(ALL_MOODS.length >= 20);
+});
+
+test("every mood has artwork in every set that exists", async () => {
+  // A half-copied folder is the failure mode here: the set resolves, most faces
+  // load, and one mood 404s on whichever screen happens to use it. Cheap to
+  // check, impossible to notice by eye across twenty moods.
+  const { ALL_MOODS } = await import("../../src/lib/ai/faces.ts");
+  const sets = readdirSync(join(process.cwd(), "public/bots"))
+    .filter((e) => statSync(join(process.cwd(), "public/bots", e)).isDirectory());
+  assert.ok(sets.includes("steph"), "Stephanie's set is missing from /public/bots");
+  const missing: string[] = [];
+  for (const set of ["", ...sets]) {
+    for (const mood of ALL_MOODS) {
+      const rel = set ? `public/bots/${set}` : "public/bots";
+      // Two moods share one file by design (`quiet` reuses `thinking`), so
+      // resolve through faceSrc rather than assuming mood === filename.
+      const { faceSrc } = await import("../../src/lib/ai/faces.ts");
+      const file = faceSrc(mood, set || null).replace(/^\//, "public/");
+      try { statSync(join(process.cwd(), file)); }
+      catch { missing.push(`${set || "(default)"}/${mood} → ${file}`); }
+      void rel;
+    }
+  }
+  assert.deepEqual(missing, [], "moods with no artwork:\n  " + missing.join("\n  "));
+});
+
+test("the client's own AI surfaces wear their coach's set; the group chat does not", () => {
+  for (const f of ["src/components/AiBadge.tsx", "src/components/CoachFab.tsx",
+                   "src/components/BigCoachBar.tsx"]) {
+    const c = code(read(f));
+    assert.match(c, /useCoach\(\)/, f + " does not resolve the viewer's coach");
+    assert.match(c, /faceSrc\([^)]*botSet\)/, f + " draws a fixed set for everybody");
+  }
+  // The group chat is shared by decision, so Coach Bot is ONE voice in it. Two
+  // different bots posting the same kind of message would read as two bots.
+  const msgs = code(read("src/app/(app)/messages/MessagesClient.tsx"));
+  assert.match(msgs, /faceSrc\("messages"\)/,
+    "the group-chat bot became per-coach — the shared room should keep one bot");
+});
+
+test("the coach identity carries the set, and defaults to no set", async () => {
+  const { DEFAULT_COACH } = await import("../../src/lib/coachIdentity.ts");
+  assert.equal(DEFAULT_COACH.botSet, null);
+  const c = code(read("src/lib/coachIdentity.ts"));
+  assert.match(c, /bot_set/, "the trainers query does not select bot_set");
+  assert.match(c, /botSet: \(row\.bot_set as string\) \|\| null/);
+});
