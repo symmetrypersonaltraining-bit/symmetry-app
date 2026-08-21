@@ -16,10 +16,14 @@ import { aiTierFor } from "@/lib/ai/tier";
 import { validatePlanDraft } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
+import { coachForViewer } from "@/lib/coachIdentity";
 import { nutrientPromptSpec } from "@/lib/nutrition/nutrients";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 
-const SYSTEM_PROMPT = `You build meal plans for Symmetry Personal Training (physique coach ${COACH_FIRST_NAME}). Plans use simple, repeatable whole foods in the style of his real plans: chicken breast, 93/7 ground beef, white fish, eggs / egg whites, Oikos Triple Zero yogurt, whey protein, cream of rice, jasmine rice, potatoes, oats, rice cakes, fruit, olive oil, almonds/nut butter, vegetables (free). Amounts are precise (grams or common measures, cooked basis unless noted).
+// A function of the trainer using it, not a module constant. This is
+// trainer-facing, so no client ever saw the wrong name — but it addressed
+// Stephanie as Dustin on her own screen, and told the model she was him.
+const SYSTEM_PROMPT = (coachFirstName: string) => `You build meal plans for Symmetry Personal Training (physique coach ${coachFirstName}). Plans use simple, repeatable whole foods in the style of his real plans: chicken breast, 93/7 ground beef, white fish, eggs / egg whites, Oikos Triple Zero yogurt, whey protein, cream of rice, jasmine rice, potatoes, oats, rice cakes, fruit, olive oil, almonds/nut butter, vegetables (free). Amounts are precise (grams or common measures, cooked basis unless noted).
 
 Respond with ONLY valid JSON — no markdown, no fences, no prose — exactly this shape:
 {"targets":{"kcal":number,"p":number,"c":number,"f":number},"reasoning":string|null,"meals":[{"name":string,"timing":string|null,"items":[{"food":string,"amount":number|null,"unit":string|null,"p":number,"c":number,"f":number,"kcal":number,"micros":object}]}],"totals":{"kcal":number,"p":number,"c":number,"f":number}}
@@ -106,6 +110,10 @@ export async function POST(req: NextRequest) {
     const scoped = await resolveAiScope(typeof body?.clientId === "string" ? body.clientId : null);
     if (!scoped.ok) return scoped.response;
     const { supabase, clientId } = scoped.scope;
+    // WHICH trainer is reading this. The prompt used to be built from a
+    // build-time constant and therefore always said Dustin, including on
+    // Stephanie's own screen.
+    const me = await coachForViewer(supabase as never, scoped.scope.userId);
 
     const metered = await enforceMeter(clientId, "plan_build");
     if (metered) return metered;
@@ -129,7 +137,7 @@ export async function POST(req: NextRequest) {
       meter: { clientId: clientId, feature: "plan_build" },
       apiKey,
       model: planModel,
-      system: SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT(me.firstName),
       maxTokens: 8000,
       messages: [{ role: "user", content: userText }],
       validate: validatePlanDraft,
@@ -139,7 +147,7 @@ export async function POST(req: NextRequest) {
 
     if (!result.value) {
       return NextResponse.json(
-        { error: `Couldn't produce a clean plan draft \u2014 please try again, or ask ${COACH_FIRST_NAME} to build it manually.` },
+        { error: "Couldn't produce a clean plan draft \u2014 please try again, or ask your coach to build it manually." },
         { status: 502 }
       );
     }

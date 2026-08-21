@@ -32,7 +32,7 @@ import { isDuplicateScheduleError, duplicateScheduleMessage } from "@/lib/schedu
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAiScope } from "@/lib/ai/scope";
 import { findExerciseIdByName } from "@/lib/exerciseLookup";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+
 import { pickPhases, type ActiveAssignment } from "@/lib/pickProgramPhase";
 
 export const dynamic = "force-dynamic";
@@ -270,7 +270,7 @@ export async function POST(req: Request) {
     phaseId = (rep as { phase_id?: string } | null)?.phase_id ?? phaseId;
   }
   if (!phaseId) {
-    return NextResponse.json({ error: `Could not set up a place to save this. Send ${COACH_FIRST_NAME} a message.` }, { status: 500 });
+    return NextResponse.json({ error: "Could not set up a place to save this. Send your coach a message." }, { status: 500 });
   }
 
   const created: { days?: string } = {};

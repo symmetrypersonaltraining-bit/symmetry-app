@@ -1,5 +1,4 @@
 import type { MetadataRoute } from "next";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
 
 /**
  * The web app manifest.
@@ -25,7 +24,12 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Symmetry Personal Training",
     short_name: "Symmetry",
-    description: `Your programme, your food, your progress — with ${COACH_FIRST_NAME}.`,
+    // NAMES NOBODY, deliberately. There is one manifest per deployment — it is
+    // fetched by the browser before any session exists and is what gets baked
+    // into the home-screen install — so any coach named here is named to every
+    // client of every trainer. It said "with Dustin", and a client of
+    // Stephanie's installed an app that told them so on the way in.
+    description: "Your programme, your food, your progress.",
     // The app is a single-page experience behind a login; deep-linking the
     // install to /home means a returning client lands on their day, not on a
     // marketing page they have never seen.
@@ -46,7 +50,7 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       { name: "Today's workout", url: "/workout" },
       { name: "Log food", url: "/nutrition" },
-      { name: `Message ${COACH_FIRST_NAME}`, url: "/messages" },
+      { name: "Message your coach", url: "/messages" },
     ],
   };
 }

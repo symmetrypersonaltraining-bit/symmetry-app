@@ -126,6 +126,19 @@ export async function sendClientMessage(body: string, imageUrl?: string | null):
   return null;
 }
 
+// THE OWNER'S ANNOUNCEMENT REACHES EVERY CLIENT OF EVERY TRAINER, AND THAT IS
+// THE DECISION — Dustin, 21 Aug: "yes for announcements about the app all
+// clients need to get it."
+//
+// The mechanism is `trainer_can_see_client()`, which short-circuits to true for
+// the owner, so the roster read below returns the whole business for him and
+// only her own clients for Stephanie. It looks exactly like a scoping hole and
+// it is not one; anyone tightening it will break something he asked for.
+//
+// Note the weight of it: ANNOUNCEMENT is `forced: true` in notificationEvents,
+// so it ignores every opt-out and puts a full-screen takeover in front of
+// everyone. That is what makes it the right tool for "the app changed" and the
+// wrong one for anything else.
 export async function sendBroadcastMessage(body: string, imageUrl?: string | null): Promise<number> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

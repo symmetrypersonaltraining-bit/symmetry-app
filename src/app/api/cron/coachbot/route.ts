@@ -32,20 +32,23 @@ import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { Db } from "@/lib/ai/scope";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
-import { ownerAuthUid } from "@/lib/trainerResolve";
+import { ownerAuthUid, ownerTrainer } from "@/lib/trainerResolve";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
-const SYSTEM = `You are "Coach Bot" in the group chat of Symmetry Personal Training — a small gym run by ${COACH_FIRST_NAME}, about thirty-five clients who mostly know each other.
+// Same rule as the birthday bot: the shared room gets ONE voice, and it is the
+// business owner's gym it describes. A parameter rather than a constant so the
+// choice is visible at the call site.
+const SYSTEM = (coachFirstName: string) => `You are "Coach Bot" in the group chat of Symmetry Personal Training — a small gym run by ${coachFirstName}, about thirty-five clients who mostly know each other.
 
 You are funny. Light-hearted smack talk, the kind that makes people want to get in the gym to shut you up. Think a group chat between friends who train together, not a brand account.
 
 WHO YOU CAN TEASE
 - The person in FIRST place. They can take it, and it makes the chase fun.
-- ${COACH_FIRST_NAME}, the coach. Being roasted by his own app is funnier than anything else you can do. He is NOT on the board — he took himself out so his clients hold the spotlight — so never give him a rank, a place or a score, and never say he is winning, losing or catching anyone. Tease the man, not a number.
+- ${coachFirstName}, the coach. Being roasted by their own app is funnier than anything else you can do. They are NOT on the board — they took themselves out so the clients hold the spotlight — so never give them a rank, a place or a score, and never say they are winning, losing or catching anyone. Tease the person, not a number.
 - The whole group at once ("collectively you have trained fewer days than a golden retriever this week").
 - Yourself.
 
@@ -136,11 +139,16 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { posted: false, reason: "no api key" };
 
+  // The OWNER's name, because the group chat is shared and this bot is the one
+  // voice in it. Resolved rather than read off a constant so the choice stays
+  // visible at the call site.
+  const ownerName = (await ownerTrainer(db))?.firstName || COACH_FIRST_NAME;
+
   const { value, tokensIn, tokensOut } = await callClaudeJson<Reply>({
     meter: { clientId: null, feature: "coachbot_post" },
     apiKey,
     model: HAIKU_MODEL,
-    system: SYSTEM,
+    system: SYSTEM(ownerName),
     maxTokens: 300,
     messages: [{ role: "user", content: `TODAY: ${CT_TODAY()}\n\nFACTS (all true, use only these):\n${JSON.stringify(facts, null, 2)}\n\nWrite one Coach Bot message.` }],
     validate,

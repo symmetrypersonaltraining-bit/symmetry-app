@@ -41,7 +41,7 @@ import { isCronRequest } from "@/lib/cron-auth";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import { enforceMeter, resolveAiScope, type Db } from "@/lib/ai/scope";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
-import { ownerAuthUid, inboxAuthUidForClient } from "@/lib/trainerResolve";
+import { ownerAuthUid, inboxAuthUidForClient, ownerTrainer } from "@/lib/trainerResolve";
 import {
   BIRTHDAY_SYSTEM, centralToday, effectiveMonthDay, fallbackLine, isPrintable,
   joinNames, monthDay, nextDay, type BirthdayPerson,
@@ -117,6 +117,10 @@ export async function runBirthdays(
   // The private heads-up below is a DIFFERENT question and gets a different
   // answer — see there.
   const trainerUid = await ownerAuthUid(db);
+  // The OWNER's name, because the group chat is shared and this bot is the
+  // one voice in it. Resolved rather than read off a constant so the choice
+  // stays visible.
+  const ownerName = (await ownerTrainer(db))?.firstName || COACH_FIRST_NAME;
   if (!trainerUid) return { posted: false, reason: "no trainer account" };
 
   // ── Tomorrow: the quiet nudge to THAT CLIENT'S COACH ─────────────────────
@@ -181,7 +185,7 @@ export async function runBirthdays(
         meter: { clientId: null, feature: "birthday_post" },
         apiKey,
         model: HAIKU_MODEL,
-        system: BIRTHDAY_SYSTEM,
+        system: BIRTHDAY_SYSTEM(ownerName),
         maxTokens: 200,
         messages: [{
           role: "user",

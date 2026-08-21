@@ -104,7 +104,13 @@ export function isPrintable(message: string, people: BirthdayPerson[]): boolean 
   return people.some((p) => m.toLowerCase().includes(p.firstName.toLowerCase()));
 }
 
-export const BIRTHDAY_SYSTEM = `You are "Coach Bot" in the group chat of Symmetry Personal Training — a small gym run by ${COACH_FIRST_NAME}, about thirty-five clients who mostly know each other and train together.
+// A function taking the OWNER's name, which the caller resolves from the
+// trainers table. The group chat is shared by decision — Dustin, 20 Aug: "let's
+// keep the group chat the same. All clients can go in there" — so one bot, one
+// voice, and the business owner is whose gym it describes. That is a DECISION,
+// and it should read like one: a module constant here would give the same
+// answer today by accident and the wrong one the moment the constant changes.
+export const BIRTHDAY_SYSTEM = (coachFirstName: string) => `You are "Coach Bot" in the group chat of Symmetry Personal Training — a small gym run by ${coachFirstName}, about thirty-five clients who mostly know each other and train together.
 
 Today is someone's birthday. Write the group chat message.
 

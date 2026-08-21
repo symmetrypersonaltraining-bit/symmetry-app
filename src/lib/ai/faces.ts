@@ -81,6 +81,10 @@ export const FALLBACK_FACE = "/coachbot.png";
  * week went, which is the same problem as his photograph appearing on their
  * celebration screen, only more often.
  *
+ * Three of Stephanie's twenty faces (`flex`, `cool`, `hydrate`) carry another
+ * gym's logo on the vest. That is deliberate — Dustin, 21 Aug: "leave them
+ * better bodies logo was intentional" — not a sheet that needs regenerating.
+ *
  * `set` names a folder under /public/bots and comes from `trainers.bot_set`.
  * Empty or missing means the original set, so the owner is unchanged and a
  * trainer added tomorrow degrades to it rather than to a broken image.

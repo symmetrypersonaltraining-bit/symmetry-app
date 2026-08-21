@@ -208,21 +208,66 @@
 >   real new client looks like; putting the coach's cartoon on a fake person
 >   would be the confusing option.
 >
+> ### CLOSED 21 Aug — the tail of the name sweep
+> - **Trainer-facing prompts** now take the signed-in trainer: `weekly-brief`,
+>   `workout-assist`, `nutrition-ai/plan-build`, `assessment-recommend`, plus
+>   the `agent-tools` tool descriptions (which the model reads).
+> - **The two group-chat bots** are handed the OWNER's name explicitly rather
+>   than reading a constant. One shared room, one voice — as a decision now, not
+>   a coincidence that holds while the constant happens to be right.
+> - **The install manifest names nobody.** It is one file per deployment,
+>   fetched before any session exists and baked into the home-screen install, so
+>   "with Dustin" and a "Message Dustin" shortcut went to every client of both
+>   trainers. No dynamic route needed — the copy simply should not name a coach.
+> - **Client-facing error copy** says "your coach": `ai/scope`, `ai/meter`,
+>   `workout-manual`, `recipes`, `ai-assistant`, `plan-build`. Easy to miss
+>   because nobody reads it until something has already gone wrong.
+> - **`PrankInvoice` cannot fire on a trainer** — both the automatic path and
+>   `?prank=1`, which ignored the expiry date.
+> - `exclude_from_rankings` **— the earlier note here was WRONG.** Both
+>   leaderboard routes go through `unrankedClientIds` in `src/lib/rankings.ts`,
+>   which excludes anyone on the trainer list; her address is on it, so she is
+>   already off the board and the DB column being false is harmless. Checked.
+>
+> ### DECIDED 21 Aug — do not "fix" these
+> - **An owner announcement reaches EVERY client of BOTH trainers.** Dustin:
+>   "yes for announcements about the app all clients need to get it." It is the
+>   owner branch of `trainer_can_see_client` and it looks exactly like a scoping
+>   hole. Written into `sendBroadcastMessage` and pinned by a test.
+> - **Three of her faces carry the other gym's logo** (`flex`, `cool`,
+>   `hydrate`). Dustin: "leave them better bodies logo was intentional." Noted
+>   in `faces.ts` so nobody regenerates the sheet over it.
+>
 > ### KNOWN NOT DONE
-> - Trainer-FACING prompts still name the owner: `weekly-brief`,
->   `workout-assist`, `nutrition-ai/plan-build`, `assessment-recommend`, and the
->   `agent-tools` tool descriptions. Wrong name on her screen; no client sees
->   them.
-> - **PWA manifest** says "…with Dustin" and offers a "Message Dustin" shortcut.
->   One manifest per deployment — needs a dynamic route to fix.
-> - `PrankInvoice` targets `steph.rgautreaux@gmail.com`, who is now a trainer.
->   Expired (`EXPIRES` has passed) but `?prank=1` still fires it.
-> - `exclude_from_rankings` was backfilled by the owner's email only, so her
->   client row may appear on the client leaderboard.
 > - Claudine's 20 Aug report was checked and was **not a bug** — the move worked
 >   (`moved_from_date` 08-22 → `scheduled_date` 08-20). The empty-looking day was
 >   her own replace-then-delete. A `replaced_by` column was started for it and
 >   dropped again rather than left half-wired.
+
+> ## 👉 AI REVAMP — Dustin wants to rework these himself. Do not guess.
+>
+> Raised 21 Aug: *"revamping the ai generated nudge is on list as well as other
+> ai functions I want to make a few adjustments."*
+>
+> 1. **The AI-generated nudge** (`/api/ai-nudges`). The whole thing: who gets
+>    one, how often, what it may say, how it reads. The escalation ladder in
+>    `faces.ts` (`lapseMood`, `QUIET_DAYS`) and the segment logic in the route
+>    are the two halves to look at together.
+> 2. **The nightly "who's drifting" digest**, same route — currently roster-wide
+>    and owner-only: every client of both trainers segmented into one message
+>    that only Dustin receives, escalation list included. Splitting it per
+>    trainer is the obvious change, but he wants to rethink the shape, so it
+>    lives here rather than in a fix list.
+> 3. **Other AI functions — adjustments to come.** Not yet named. The surfaces,
+>    so the conversation has a list: the nutrition coach card and `/act`
+>    (`coach-context.ts`), the weekly focus line (`focus-suggestions`), the
+>    weekly sweep (`cron/weekly-ai`), the celebration line, Coach Bot, the
+>    birthday bot, `attention-drafts`, the trainer agent, `workout-ai`,
+>    `workout-assist`.
+>
+> All of these are per-coach as of 21 Aug — every prompt is a function of a
+> resolved coach name — so changing behaviour is now a change to behaviour and
+> not a fight with a build-time constant.
 
 > ## QUEUED — added 20 Aug, details to be locked
 >

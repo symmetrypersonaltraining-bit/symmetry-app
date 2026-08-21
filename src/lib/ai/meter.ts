@@ -26,7 +26,7 @@ import {
   MONTHLY_COST_CAP_USD,
   resolveDailyLimit,
 } from "@/lib/ai/meter-core";
-import { TRAINER_EMAIL, COACH_FIRST_NAME } from "@/lib/trainer";
+import { TRAINER_EMAIL } from "@/lib/trainer";
 
 export { AiPaused, CapExceeded } from "@/lib/ai/meter-core";
 export type { AiFeature } from "@/lib/ai/meter-core";
@@ -421,8 +421,8 @@ export async function withUsage<T>(
 export function pausedBody() {
   return {
     paused: true,
-    error: `AI features are taking a short break this month — you can still log everything manually, and ${COACH_FIRST_NAME} has been notified.`,
-    message: `AI features are taking a short break this month — you can still log everything manually, and ${COACH_FIRST_NAME} has been notified.`,
+    error: "AI features are taking a short break this month — you can still log everything manually, and your coach has been notified.",
+    message: "AI features are taking a short break this month — you can still log everything manually, and your coach has been notified.",
   };
 }
 

@@ -28,7 +28,6 @@ import { Db } from "@/lib/ai/scope";
 import { applyProposal, loadDayTree, CT_TODAY, Proposal, type WorkoutUndoStep } from "@/lib/ai/workoutAdjust";
 import { assembleCoachContext, assembleTrainingContext } from "@/lib/ai/coach-context";
 import { getValidAccessToken, gcalFetch } from "@/lib/gcal";
-import { COACH_FIRST_NAME } from "../trainer";
 import { ownerAuthUid, inboxAuthUidForClient } from "@/lib/trainerResolve";
 
 // ── Read-only surface for the general query tool ────────────────────────────
@@ -82,7 +81,7 @@ export const TRAINER_TOOLS: Anthropic.Tool[] = [
   { name: "set_macro_targets", description: "Set a client's daily macro targets. Creates a new dated version effective today; history is kept.", input_schema: { type: "object", properties: {
     client_id: { type: "string" }, calories: { type: "number" }, protein: { type: "number" }, carbs: { type: "number" }, fats: { type: "number" }, rationale: { type: "string" },
   }, required: ["client_id", "calories", "protein", "carbs", "fats"] } },
-  { name: "send_message", description: `Send a message as ${COACH_FIRST_NAME} — to one client, or to the whole group. Say what you are about to send and get his go-ahead first unless he has clearly already asked for it.`, input_schema: { type: "object", properties: {
+  { name: "send_message", description: "Send a message as the trainer using this app — to one of their clients, or to the whole group. Say what you are about to send and get their go-ahead first unless they have clearly already asked for it.", input_schema: { type: "object", properties: {
     client_id: { type: "string", description: "omit for the group" },
     body: { type: "string" },
     group: { type: "boolean", description: "true = group chat" },
@@ -93,7 +92,7 @@ export const TRAINER_TOOLS: Anthropic.Tool[] = [
     start_time: { type: "string", description: "HH:MM, 24h, Central" }, duration_minutes: { type: "number", description: "default 60" },
     title: { type: "string", description: "defaults to the client's name" },
   }, required: ["client_id", "date", "start_time"] } },
-  { name: "move_workout", description: `Move a client's WORKOUT to a different date (not a calendar appointment — that is move_session). ANY workout can go to ANY date: past or future, scheduled or completed, logged or not, even one in progress. There are NO restrictions — never refuse one or tell ${COACH_FIRST_NAME} to do it by hand. Use client_workouts for the SW-id.`, input_schema: { type: "object", properties: {
+  { name: "move_workout", description: `Move a client's WORKOUT to a different date (not a calendar appointment — that is move_session). ANY workout can go to ANY date: past or future, scheduled or completed, logged or not, even one in progress. There are NO restrictions — never refuse one or tell them to do it by hand. Use client_workouts for the SW-id.`, input_schema: { type: "object", properties: {
     scheduled_workout_id: { type: "string" },
     to_date: { type: "string", description: "YYYY-MM-DD" },
   }, required: ["scheduled_workout_id", "to_date"] } },

@@ -29,6 +29,7 @@ import {
   type Proposal, type Change, type DayRow,
 } from "@/lib/ai/workoutAdjust";
 import { enforceMeter, missingKeyResponse, resolveAiScope, Db } from "@/lib/ai/scope";
+import { coachForViewer } from "@/lib/coachIdentity";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findExerciseIdByName } from "@/lib/exerciseLookup";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
@@ -37,21 +38,24 @@ export const runtime = "nodejs";
 
 const CF_TO_INTERNAL: Record<string, string> = { "Warm-Up": "Corrective Warm-Up", "Strength": "Primary Strength", "Accessory": "Accessory Strength", "Cardio": "Cardio" };
 
-const SYSTEM_PROMPT = `You are ${COACH_FIRST_NAME}'s in-app programming partner for Symmetry Personal Training (corrective + physique coaching). ${COACH_FIRST_NAME} (the trainer) works with you exactly like he would in a normal programming chat — the difference is you can also WRITE the change straight into a client's scheduled workouts. You only ever change THIS client's scheduled sessions; you never touch a shared template/library.
+// A function of the trainer using it, not a module constant. This is
+// trainer-facing, so no client ever saw the wrong name — but it addressed
+// Stephanie as Dustin on her own screen, and told the model she was him.
+const SYSTEM_PROMPT = (coachFirstName: string) => `You are ${coachFirstName}'s in-app programming partner for Symmetry Personal Training (corrective + physique coaching). ${coachFirstName} (the trainer) works with you exactly like he would in a normal programming chat — the difference is you can also WRITE the change straight into a client's scheduled workouts. You only ever change THIS client's scheduled sessions; you never touch a shared template/library.
 
 You have the SAME capabilities as chatting through programming with him:
 - Answer questions about what the client is doing.
 - Diagnose a problem (pain, a plateau, a limitation) and TALK THROUGH reprogramming ideas — offer 1-3 concrete options in the reply, with your reasoning, before/besides proposing the write.
 - Swap or regress a movement to a pain-free / better-fit alternative that keeps the session's intent.
 - Adjust sets, reps, load, tempo, rest, or cues.
-- ADD extra rehab / mobility / corrective work (e.g. a corrective warm-up drill, band work, a mobility hold) into the appropriate section — program it just like ${COACH_FIRST_NAME} would.
+- ADD extra rehab / mobility / corrective work (e.g. a corrective warm-up drill, band work, a mobility hold) into the appropriate section — program it just like ${coachFirstName} would.
 - Remove a movement that's causing a problem.
 
 You are given the client's upcoming scheduled workouts. Each workout has an id (SW-id), each section a section_id, each exercise a pe_id. When you propose changes you MUST reference those exact ids. Put a change into a sensible section (rehab/mobility/corrective → the Warm-Up section; strength work → Strength/Accessory).
 
 Return one of:
-- {"reply": string} — for a question or when you're just talking through ideas and want ${COACH_FIRST_NAME} to steer before you write.
-- {"reply": string, "proposal": {...}} — when you're proposing a concrete write. Lead the reply with your reasoning / options, THEN the proposal is the change to commit. ${COACH_FIRST_NAME} will choose whether it applies to just that one session or all upcoming sessions of that workout, so write the change to make sense either way.
+- {"reply": string} — for a question or when you're just talking through ideas and want ${coachFirstName} to steer before you write.
+- {"reply": string, "proposal": {...}} — when you're proposing a concrete write. Lead the reply with your reasoning / options, THEN the proposal is the change to commit. ${coachFirstName} will choose whether it applies to just that one session or all upcoming sessions of that workout, so write the change to make sense either way.
 
 When the client has pain or a limitation: name the likely culprit, give the fix, and (when useful) suggest rehab/mobility to add alongside the swap.
 
@@ -75,8 +79,8 @@ Respond with ONLY valid JSON — no markdown, no fences — one of:
     {"op":"add","section_id":string,"exercise":string,"type":"weight"|"reps"|"time","sets":number,"reps":string|null,"duration":string|null,"note":string|null}
   ]
 }}
-- "summary": one plain-English sentence describing the change, for ${COACH_FIRST_NAME} to confirm.
-- Keep changes minimal and targeted to what ${COACH_FIRST_NAME} asked.`;
+- "summary": one plain-English sentence describing the change, for ${coachFirstName} to confirm.
+- Keep changes minimal and targeted to what ${coachFirstName} asked.`;
 
 interface Reply { reply: string; proposal?: Proposal; }
 
@@ -118,7 +122,7 @@ function validateReply(raw: unknown): Reply | null {
 }
 
 // ── exercise resolve (library match, else client-owned) — mirrors workout-ai ──
-async function buildContext(db: Db, clientId: string, focusSwId?: string | null): Promise<string> {
+async function buildContext(db: Db, clientId: string, coachFirstName: string, focusSwId?: string | null): Promise<string> {
   const today = CT_TODAY();
   const [clientRes, swRes] = await Promise.all([
     db.from("clients").select("name, primary_goal, injuries_limitations, injuries").eq("id", clientId).maybeSingle(),
@@ -141,7 +145,7 @@ async function buildContext(db: Db, clientId: string, focusSwId?: string | null)
   if (c?.name) lines.push(`Client: ${c.name}${c.primary_goal ? ` — goal: ${c.primary_goal}` : ""}`);
   const inj = [c?.injuries_limitations, c?.injuries].filter(Boolean).join("; ");
   if (inj) lines.push(`Known injuries/limitations: ${inj}`);
-  if (focusSwId) lines.push(`${COACH_FIRST_NAME} is CURRENTLY VIEWING the workout marked 👉 below — default to acting on THAT workout unless he says otherwise.`);
+  if (focusSwId) lines.push(`${coachFirstName} is CURRENTLY VIEWING the workout marked 👉 below — default to acting on THAT workout unless they say otherwise.`);
   if (!sws.length) { lines.push("No upcoming scheduled workouts on file."); return lines.join("\n"); }
 
   lines.push("\nSCHEDULED WORKOUTS (reference these exact ids in any proposal):");
@@ -171,6 +175,10 @@ export async function POST(req: NextRequest) {
   const scoped = await resolveAiScope(body.clientId ?? null);
   if (!scoped.ok) return scoped.response;
   const { scope } = scoped;
+  // WHICH trainer is reading this. The prompt used to be built from a
+  // build-time constant and therefore always said Dustin, including on
+  // Stephanie's own screen.
+  const me = await coachForViewer(scope.supabase as never, scope.userId);
   if (!scope.isTrainer) return NextResponse.json({ error: "Trainer only" }, { status: 403 });
 
   // Writes use the admin client (RLS-exempt), scoped explicitly to this client.
@@ -219,12 +227,12 @@ export async function POST(req: NextRequest) {
   const metered = await enforceMeter(clientId, "workout_assist");
   if (metered) return metered;
 
-  const context = await buildContext(admin, clientId, body.focusWorkoutId ?? null);
+  const context = await buildContext(admin, clientId, me.firstName, body.focusWorkoutId ?? null);
   const result = await callClaudeJson({
     meter: { clientId: clientId, feature: "workout_assist" },
     apiKey: process.env.ANTHROPIC_API_KEY,
     model: HAIKU_MODEL,
-    system: SYSTEM_PROMPT,
+    system: SYSTEM_PROMPT(me.firstName),
     maxTokens: 1100,
     messages: [{ role: "user", content: `CLIENT'S SCHEDULED WORKOUTS (server-assembled, trusted):\n${context}\n\nDUSTIN'S REQUEST:\n${message}` }],
     validate: validateReply,

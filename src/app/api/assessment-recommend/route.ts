@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { resolveAiScope, enforceMeter } from '@/lib/ai/scope';
 import { logUsage } from '@/lib/ai/meter';
-import { COACH_NAME } from "@/lib/trainer";
+import { coachForViewer } from "@/lib/coachIdentity";
 import { HAIKU_MODEL } from "@/lib/ai/anthropic";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -19,8 +19,13 @@ export async function POST(req: NextRequest) {
   if (paused) return paused;
 
   const data = await req.json();
-  
-  const prompt = `You are ${COACH_NAME}'s AI programming assistant for Symmetry Corrective. Based on this client assessment, recommend a starting program and write a brief assessment summary.
+
+  // The trainer using it, not the owner. This is trainer-facing, so no client
+  // ever saw the wrong name — it just told the model Stephanie was Dustin.
+  const me = await coachForViewer(scoped.scope.supabase as never, scoped.scope.userId);
+  const coachName = me.name;
+
+  const prompt = `You are ${coachName}'s AI programming assistant for Symmetry Corrective. Based on this client assessment, recommend a starting program and write a brief assessment summary.
 
 PROGRAMMING PHILOSOPHY (NASM Corrective, internal only - never use this language with clients):
 - Movement assessment drives corrective backbone

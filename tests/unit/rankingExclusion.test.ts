@@ -96,5 +96,11 @@ test("Coach Bot cannot report a rank the coach does not have", () => {
   const src = read("src/app/api/cron/coachbot/route.ts");
   assert.doesNotMatch(src, /dustin_position/, "a rank for someone who is off the board is an invented fact");
   assert.match(src, /coach_is_not_ranked: true/);
-  assert.match(src, /He is NOT on the board/, "the prompt must say so, not just the facts");
+  // "They", not "He". The prompt became a function of the owner's name on
+  // 21 Aug — there are two coaches and one of them is not a "he" — but what
+  // this guards is unchanged: the model must be TOLD the coach is off the
+  // board, not merely left without a number for them.
+  assert.match(src, /They are NOT on the board/, "the prompt must say so, not just the facts");
+  assert.match(src, /never give them a rank, a place or a score/,
+    "the prompt no longer forbids inventing a placing for the coach");
 });

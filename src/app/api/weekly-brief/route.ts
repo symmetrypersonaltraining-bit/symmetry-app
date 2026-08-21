@@ -26,6 +26,7 @@ import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, resolveAiScope } from "@/lib/ai/scope";
+import { coachForViewer } from "@/lib/coachIdentity";
 import {
   addDaysISO,
   buildBrief,
@@ -46,7 +47,10 @@ const HISTORY_DAYS = 120; // enough to judge "ever done this" and to spot a stal
 const NOTE_DAYS = 14;
 const STALL_LOOKBACK = 8; // sessions of a movement to walk when counting a stall
 
-const SYSTEM = `You write ONE sentence for the top of a weekly programming brief in the Symmetry Personal Training trainer app. The reader is ${COACH_FIRST_NAME}, the coach, standing in the gym about to start a session with this client. You are talking to the coach, never to the client.
+// A function of the trainer using it, not a module constant. This is
+// trainer-facing, so no client ever saw the wrong name — but it addressed
+// Stephanie as Dustin on her own screen, and told the model she was him.
+const SYSTEM = (coachFirstName: string) => `You write ONE sentence for the top of a weekly programming brief in the Symmetry Personal Training trainer app. The reader is ${coachFirstName}, the coach, standing in the gym about to start a session with this client. You are talking to the coach, never to the client.
 
 Respond with ONLY valid JSON, no markdown, no fences:
 {"line": string}
@@ -78,6 +82,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Trainer only" }, { status: 403 });
   }
   const clientId = scoped.scope.clientId;
+  // WHICH trainer is reading this. The prompt used to be built from a
+  // build-time constant and therefore always said Dustin, including on
+  // Stephanie's own screen.
+  const me = await coachForViewer(scoped.scope.supabase as never, scoped.scope.userId);
   if (!clientId) return NextResponse.json({ brief: null, line: null, seen: true });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -229,7 +237,7 @@ export async function POST(req: NextRequest) {
             meter: { clientId: clientId, feature: "session_brief" },
             apiKey: process.env.ANTHROPIC_API_KEY,
             model: briefModel,
-            system: SYSTEM,
+            system: SYSTEM(me.firstName),
             maxTokens: 200,
             messages: [{ role: "user", content: JSON.stringify(facts) }],
             validate,

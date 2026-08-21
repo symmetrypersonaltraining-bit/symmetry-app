@@ -2,10 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { COACH_FIRST_NAME, isTrainerEmail } from "@/lib/trainer";
 
 type Who = "dad" | "wife";
 
+// A one-off gag on his own family, from July. It is expired (see EXPIRES) and
+// this list is kept only so the code reads as what it was.
+//
+// The second address is now a TRAINER's. A full-screen fake invoice signed by
+// the owner, on the screen of the other coach while she is working, is not the
+// same joke it was in July — and `?prank=1` still fires the thing regardless of
+// the date. isTrainerEmail() is the guard: whatever this list says, it never
+// takes over a trainer's app.
 const TARGETS: Record<string, Who> = {
   "gerardgautreaux@gmail.com": "dad",
   "steph.rgautreaux@gmail.com": "wife",
@@ -56,7 +64,10 @@ export default function PrankInvoice() {
       const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
       if (today > EXPIRES) return;
       if (window.location.search.indexOf("prank=1") >= 0) {
-        setWho("dad");
+        // Even the manual trigger stops at a trainer's session.
+        createClient().auth.getUser().then(({ data }) => {
+          if (!isTrainerEmail(data?.user?.email)) setWho("dad");
+        });
         return;
       }
       const supabase = createClient();
@@ -64,6 +75,9 @@ export default function PrankInvoice() {
         .getUser()
         .then(({ data }) => {
           const email = (data?.user?.email || "").toLowerCase();
+          // Never a trainer, whatever TARGETS says — she is on that list and is
+          // now the other coach.
+          if (isTrainerEmail(email)) return;
           const w = TARGETS[email];
           if (w) setWho(w);
         })

@@ -288,3 +288,89 @@ test("the coach identity carries the set, and defaults to no set", async () => {
   assert.match(c, /bot_set/, "the trainers query does not select bot_set");
   assert.match(c, /botSet: \(row\.bot_set as string\) \|\| null/);
 });
+
+// ─── the last of the build-time constant, and two standing decisions ────────
+
+test("no prompt anywhere still bakes a coach name in at import time", () => {
+  // The widened version of the earlier check: every prompt file, including the
+  // trainer-facing ones. `${COACH_FIRST_NAME}` inside a template literal is
+  // evaluated once when the module loads, so whatever name it captures is the
+  // name everyone gets.
+  const PROMPTS = [
+    "src/lib/ai/system-prompt.ts", "src/lib/ai/app-guide.ts",
+    "src/lib/ai/coach-context.ts", "src/lib/ai/weekly-numbers.ts",
+    "src/lib/ai/agent-tools.ts", "src/lib/birthdays.ts",
+    "src/app/api/celebration/route.ts", "src/app/api/cron/weekly-ai/route.ts",
+    "src/app/api/cron/coachbot/route.ts", "src/app/api/cron/birthdays/route.ts",
+    "src/app/api/coach/focus-suggestions/route.ts", "src/app/api/ai-nudges/route.ts",
+    "src/app/api/attention-drafts/route.ts", "src/app/api/workout-ai/route.ts",
+    "src/app/api/agent/route.ts", "src/app/api/weekly-brief/route.ts",
+    "src/app/api/workout-assist/route.ts", "src/app/api/nutrition-ai/plan-build/route.ts",
+    "src/app/api/assessment-recommend/route.ts",
+  ];
+  const offenders: string[] = [];
+  for (const f of PROMPTS) {
+    const c = code(read(f));
+    for (const m of c.matchAll(/\$\{COACH_(?:FIRST_)?NAME\}/g)) {
+      offenders.push(`${f}:${c.slice(0, m.index).split("\n").length}`);
+    }
+  }
+  assert.deepEqual(offenders, [], "interpolate the constant into a prompt:\n  " + offenders.join("\n  "));
+});
+
+test("nothing a client can read names a coach it has not resolved", () => {
+  // Error copy is easy to forget because nobody reads it until something has
+  // already gone wrong. These all said "Ask Dustin".
+  for (const f of ["src/lib/ai/scope.ts", "src/lib/ai/meter.ts",
+                   "src/app/api/workout-manual/route.ts", "src/app/api/recipes/route.ts",
+                   "src/app/api/ai-assistant/route.ts", "src/app/api/nutrition-ai/plan-build/route.ts"]) {
+    const c = code(read(f));
+    assert.ok(!/error: `[^`]*\$\{COACH_(?:FIRST_)?NAME\}/.test(c),
+      f + " names the owner in a message a client of either trainer can see");
+  }
+});
+
+test("the install manifest names nobody", () => {
+  // One manifest per deployment, fetched before any session exists and baked
+  // into the home-screen install. It said "with Dustin" and offered a "Message
+  // Dustin" shortcut, to every client of every trainer.
+  const c = code(read("src/app/manifest.ts"));
+  assert.ok(!/COACH_(?:FIRST_)?NAME/.test(c), "the manifest is back to naming a coach");
+  assert.match(c, /description: "Your programme, your food, your progress\."/);
+  assert.match(c, /name: "Message your coach"/);
+});
+
+test("an owner announcement reaching every client is recorded as a decision", () => {
+  // Dustin, 21 Aug: "yes for announcements about the app all clients need to
+  // get it." It looks exactly like a scoping hole — the owner branch of
+  // trainer_can_see_client returning the whole business — so it is written down
+  // where someone tightening the scoping will read it.
+  const c = read("src/app/(app)/home/messageActions.ts");
+  assert.match(c, /THE OWNER'S ANNOUNCEMENT REACHES EVERY CLIENT OF EVERY TRAINER, AND THAT IS\n\/\/ THE DECISION/,
+    "the deliberate breadth of a broadcast is undocumented and reads as a bug");
+});
+
+test("the shared group bots are handed the owner explicitly", () => {
+  // One room, one voice. Passing the name in rather than reading a constant is
+  // what makes that a decision rather than a coincidence that survives only
+  // while the constant happens to hold the right value.
+  for (const [f, sym] of [["src/app/api/cron/coachbot/route.ts", "SYSTEM"],
+                          ["src/lib/birthdays.ts", "BIRTHDAY_SYSTEM"]] as const) {
+    const c = code(read(f));
+    assert.match(c, new RegExp(`(?:export )?const ${sym} = \\(coachFirstName: string\\)`),
+      f + " builds the group prompt from a module constant again");
+  }
+  for (const f of ["src/app/api/cron/coachbot/route.ts", "src/app/api/cron/birthdays/route.ts"]) {
+    assert.match(code(read(f)), /ownerTrainer\(db\)\)\?\.firstName/,
+      f + " does not resolve the owner for the shared room");
+  }
+});
+
+test("the prank cannot take over a trainer's app", () => {
+  // Expired, and its target list now contains a TRAINER's address. `?prank=1`
+  // still fires it regardless of the date.
+  const c = code(read("src/components/PrankInvoice.tsx"));
+  assert.match(c, /isTrainerEmail/, "the prank has no trainer guard");
+  assert.equal((c.match(/isTrainerEmail\(/g) || []).length, 2,
+    "both the automatic path and the ?prank=1 path must be guarded");
+});
