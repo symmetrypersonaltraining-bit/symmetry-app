@@ -113,6 +113,79 @@
 > filed as one of Dustin's, three dead components removed, and the db-schema
 > fixture regenerated — it was twelve columns behind production.
 >
+> **`c3745a0` — the food logger stops saving meals nobody asked to keep.**
+> Three of the four spec items; the logger tutorial waits on where he wants it
+> docked.
+>   - **No forced library save.** Swap and unlogged-insert called `saveMyMeal`
+>     unconditionally and said so on the button. The keep tick was deliberately
+>     HIDDEN on those two paths — right, given the forced save; wrong once he
+>     removed it. Now the tick is on every mode, defaults off, and nothing saves
+>     without it. "it's an option but may just be a one time off plan swap."
+>   - **Library reachable from the composer.** Adjust, open slots and extras
+>     could already; the composer could only be typed into, so a food with real
+>     numbers in `food_catalog` got re-typed and re-ESTIMATED. Needed a
+>     structural change worth remembering: **only the TOP sheet in the stack
+>     renders**, so pushing the library unmounts the composer. The draft now
+>     lives in the parent; every route in seeds a fresh one, or a new custom
+>     meal opens holding the last one's items.
+>   - **"Replace…" → "Replace with library meal."** One types a meal that does
+>     not exist yet, the other picks one that does.
+>   - Two tests in `typedMealCanBeKept` rewritten, not relaxed — they asserted
+>     the tick was hidden on exactly the paths he asked to change.
+>
+> **`6839d38` — three permanent reds is not a monitor, it is wallpaper.**
+> `run_integrity_checks` has run twice a day since 16 Aug and NOTHING in the app
+> ever displayed its table.
+>   - `anon_writable_policies` matched `qual = 'true'` — the USING expression,
+>     which a SELECT policy has too — so `food_catalog_read` read as an anon
+>     WRITE. **The one check that could ever mean "somebody can change data they
+>     do not own" was permanently red because a public food catalogue is
+>     publicly readable.** Tests the COMMAND now. Reports 0.
+>   - `scheduled_day_outside_assigned_program`: no date filter, so workouts back
+>     to July 2024 were compared against the CURRENT assignment — finishing a
+>     programme turned a client's whole history critical. 772 of 1,072 were
+>     past. Scoped forward, archived excluded, names collected. 300.
+>   - `supervised_workout_no_appointment`: describes a link the mover stopped
+>     needing (it pairs by client+week now) and counted online-only clients who
+>     can never clear. Warn, wall applied. 371 → 250.
+>     `appointment_no_supervised_workout` gets the same: 14 → 1.
+>   - **The reason it could rot:** `integrity_checks` had RLS on and NOT ONE
+>     policy, so every browser read returned empty. Trainers can read it now,
+>     and Today's Admin carries a row on a live critical (latest run only).
+>
+> **`0c99e19` — 199 schedule rows get their paper trail back.** Additive only:
+> `assignment_id` filled via day → phase → program where exactly one assignment
+> matched (no ambiguous cases). Zero dates changed. Backed up to
+> `bak_sw_assignment_backfill_20260821`.
+>
+> **STILL OPEN — HIS CALL, NOT A REPAIR:**
+>   - **300 future workouts belong to programmes that are not the client's
+>     active assignment.** Dustin, Madeleine Coker, Tyler Dorsett, Steph.
+>     Maddy had NO active assignment and 80 scheduled workouts (her rows linked
+>     in the backfill; the assignment question stands). Dustin's active
+>     assignments say "8-Week Split Block (Jun 2026)" while his calendar for the
+>     next three months is "Symmetry Corrective Deload" + "Hypertrophy Bulk —
+>     14 Week". Which is the truth is a decision.
+>   - Of the 845 rows still unlinked, only Dustin (128) and Tyler (88) have
+>     FUTURE ones. Everyone else's leftovers are past — old programmes since
+>     removed, harmless.
+>   - **13 client notes still open**, 5 routine ones auto-closed (backup:
+>     `bak_exercise_notes_20260821b`). Two are unanswered client QUESTIONS —
+>     Lauren "Both sides? Or just right side?" (24 days) and Sara Prince "Is
+>     that ok?" (31 days). **Sara Prince appears five times**: upper-back
+>     soreness, hip cracking, knee pain end of set 1, burning at rep 14, and
+>     "I need to review this one in person." That reads like a reassessment.
+>   - **Exercise videos: one clip standing in for several different movements.**
+>     Bobbie Page, 13 Aug: "The video attached to this movement doesn't really
+>     help." She is right, and it generalises — Balance Disc Split Stance Hold /
+>     Squat / Tandem Stance Hold share one video; Foam Roll Glute Max / Glutes /
+>     Roll Glute Medius with Ball share one; Band and Dumbbell Bent Over Rear
+>     Delt Fly share one. Belongs with the 252-missing-videos item.
+>   - **The `slipping` bucket is close to inverted** — full evidence in
+>     `claude/NUDGE-SLIPPING-BUCKET-EVIDENCE.md`. Jerry Bourgeois did 1 of 1
+>     programmed (100%) and is flagged; Sharon Rambo did 0 of 13 (0%) and is
+>     not. Dustin asked to look at this together.
+
 > **`2890d28` — the nightly nudge sweep is off. The engine is kept.**
 > Dustin, 21 Aug: "stop that for now. keep engine for later if i decide to add
 > it back." It was writing a message about every active client, in his voice,
