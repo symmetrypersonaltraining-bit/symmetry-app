@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import WeeklyFocusHealth from "@/components/WeeklyFocusHealth";
 import TodaysAdmin from "@/components/TodaysAdmin";
+import ConfirmSwaps from "@/components/ConfirmSwaps";
 import LiveSessions from "@/components/LiveSessions";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
@@ -174,7 +175,7 @@ export default function TrainerHome({
         />
       )}
 
-      <div className="p-4 pb-24 space-y-4 max-w-lg mx-auto cw-reveal">
+      <div className="space-y-4 cw-reveal">
       {/* In-page message bell removed — the single header NotificationCenter bell
           (in HeaderAssist) is the app-wide notification entry point. */}
       {/* Payment notifications moved OFF the trainer home into the Payments section (Dustin 7/9). */}
@@ -204,6 +205,10 @@ export default function TrainerHome({
       {/* Everything in the app that needs doing, derived live so that dealing
           with anything at its source clears it here. */}
       <TodaysAdmin />
+
+      {/* Swaps Claude has picked, one tap each. Takes the slot the Progress
+          card had. Renders nothing when there are none. */}
+      <ConfirmSwaps />
 
         {/* Today's Sessions, first. It is the shape of the whole morning and
             the only block with a Start button on it — everything else on this
@@ -368,7 +373,12 @@ export default function TrainerHome({
             which nothing reads. */}
 
         {/* Stat Cards Row */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Full width, not a two-column grid. This grid held Today AND the
+            Progress card; with Progress removed on 21 Aug the single survivor
+            rendered at half width against full-width blocks above and below it,
+            which is the ragged edge Dustin flagged. One column, one card width,
+            all the way down. */}
+        <div>
 
           {/* Sessions Completed Card */}
           <div

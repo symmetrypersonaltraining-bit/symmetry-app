@@ -5,8 +5,6 @@ import TrainerCalendarPanel from "@/components/TrainerCalendarPanel";
 import ClientDashboard from "./ClientDashboard";
 import TrainerHome from "./TrainerHome";
 import PendingRemindersPanel from "@/components/PendingRemindersPanel";
-import ClientNotesPanel, { type ClientNote } from "@/components/ClientNotesPanel";
-import { isSymptomNote } from "@/lib/trainingNoteRouting";
 import { TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
 import { getServerUser } from "@/lib/auth/serverUser";
 
@@ -213,52 +211,19 @@ export default async function HomePage(props: {
 
     // ── THE NOTES NOBODY HAS CLOSED OUT ──────────────────────────────────────
     //
-    // `exercise_notes.resolved` shipped with the table and nothing had ever
-    // written it: on 21 Aug, 63 rows and 63 unresolved, the oldest from 19 July.
-    // Most of them DID reach him as messages at the time — routeTrainingNote
-    // delivers symptoms and questions — but a message scrolls away and a note
-    // had no state, so "which of these have I actually dealt with?" had no
-    // answer for a month.
-    //
-    // Scoped by RLS (`trainer_can_see_client`), so Stephanie sees only her own
-    // clients' notes without this query knowing anything about it.
-    const { data: noteRows } = await supabase
-      .from("exercise_notes")
-      .select("id, client_id, note, author, log_date, day_id, exercises(name), clients(name)")
-      .eq("resolved", false)
-      .order("log_date", { ascending: false })
-      .limit(60);
-
-    const clientNotes: ClientNote[] = ((noteRows || []) as unknown as Array<{
-      id: string; client_id: string; note: string; author: string;
-      log_date: string | null; day_id: string | null;
-      exercises: { name?: string } | { name?: string }[] | null;
-      clients: { name?: string } | { name?: string }[] | null;
-    }>).map((r) => {
-      const ex = Array.isArray(r.exercises) ? r.exercises[0] : r.exercises;
-      const cl = Array.isArray(r.clients) ? r.clients[0] : r.clients;
-      return {
-        id: r.id,
-        clientId: r.client_id,
-        clientName: cl?.name || "A client",
-        exerciseName: ex?.name || "a movement",
-        note: r.note,
-        author: r.author,
-        logDate: r.log_date,
-        dayId: r.day_id,
-        isSymptom: isSymptomNote(r.note),
-      };
-    })
-      // Symptoms first, then newest. Same vocabulary that decides whether a note
-      // is worth interrupting him for, so the two rankings cannot drift.
-      .sort((a, b) =>
-        a.isSymptom === b.isSymptom
-          ? (b.logDate || "").localeCompare(a.logDate || "")
-          : a.isSymptom ? -1 : 1,
-      );
-
+    // The notes QUERY went with the panel on 21 Aug. Today's Admin counts
+    // them itself, live, and links to where they get dealt with — so fetching
+    // sixty note rows on every trainer home render to feed a panel that is no
+    // longer mounted was pure cost. isSymptomNote still classifies them; that
+    // ranking now happens where they are read, not here.
     return (
-      <div className="p-4 lg:p-6">
+      // ONE container, ONE width, ONE gap. TrainerHome used to carry its own
+      // `max-w-lg mx-auto` while the panels below it were siblings of it here
+      // with no width at all — so the top of the dashboard was a narrow centred
+      // column and the bottom was edge-to-edge. Dustin, 21 Aug: "i want it
+      // organized to look good and professional. everything lined up, even and
+      // symmetrical." That starts with every block agreeing on how wide it is.
+      <div className="p-4 lg:p-6 pb-24 max-w-lg mx-auto space-y-4">
         <TrainerHome
           todaySessions={trainerHomeSessions}
           completedCount={loggedTodayCount}
@@ -267,7 +232,19 @@ export default async function HomePage(props: {
           notificationCount={reminders.length}
           dateLabel={trainerDateLabel}
         />
-        <ClientNotesPanel notes={clientNotes} />
+        {/* "Needs your eyes" is gone from Home as of 21 Aug. Dustin: "those
+            changes would also get rid of the need for the needs your eyes tab
+            right? that would declutter my trainer dashboard a lot and still
+            catch everything."
+
+            It caught everything by showing everything, which is why 63 notes
+            accumulated with a client's back injury underneath twelve pull-up
+            weights. It is now split three ways: equipment problems become swap
+            proposals (ConfirmSwaps), routine set data and cardio substitutions
+            close themselves and are never surfaced, and what is genuinely left
+            is one counted row in Today's Admin that links to it.
+
+            ClientNotesPanel stays in the repo, unmounted. */}
         <PendingRemindersPanel reminders={reminders} />
         <TrainerCalendarPanel
           clients={clients || []}

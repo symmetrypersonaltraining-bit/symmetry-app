@@ -14,7 +14,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isSymptomNote, routeTrainingNote } from "../../src/lib/trainingNoteRouting.ts";
 
@@ -90,22 +90,42 @@ test("an optimistic tick is put back when the write fails", () => {
   assert.match(c, /window\.alert\(err\)/, "a failed resolve says nothing to the person who tapped");
 });
 
-// ─── it is actually mounted, and scoped ─────────────────────────────────────
+// ─── unmounted 21 Aug, and deliberately kept ────────────────────────────────
 
-test("the panel is on trainer home and reads only unresolved notes", () => {
+test("the panel is off trainer home, and its query went with it", () => {
+  // Dustin, 21 Aug: "those changes would also get rid of the need for the needs
+  // your eyes tab right? that would declutter my trainer dashboard a lot and
+  // still catch everything."
+  //
+  // It caught everything by showing everything, which is how 63 notes piled up
+  // with a client's back injury buried under twelve pull-up weights. The work
+  // is now split three ways: equipment problems become swap proposals, routine
+  // set data and cardio substitutions close themselves and never surface, and
+  // what is genuinely left is one counted row in Today's Admin.
   const c = code(read("src/app/(app)/home/page.tsx"));
-  assert.match(c, /<ClientNotesPanel notes=\{clientNotes\} \/>/, "the panel is not rendered");
-  assert.match(c, /from\("exercise_notes"\)[\s\S]{0,300}?\.eq\("resolved", false\)/,
-    "the query does not filter to unresolved notes");
-  // Scoping is RLS's job (trainer_all_exercise_notes → trainer_can_see_client),
-  // and this query runs on the user's client so it inherits it. A service-role
-  // client here would hand Stephanie every client in the business.
-  assert.ok(!/createAdminClient[\s\S]{0,400}?from\("exercise_notes"\)/.test(c),
-    "the notes query runs on the admin client, which bypasses RLS");
+  assert.ok(!/<ClientNotesPanel\b/.test(c), "the notes panel is back on trainer home");
+  // The sixty-row query must go too. Fetching notes on every render to feed a
+  // panel that is not mounted is pure cost, and it is the kind of thing that
+  // survives a removal unnoticed.
+  assert.ok(!/from\("exercise_notes"\)/.test(c),
+    "trainer home still queries exercise_notes for a panel it no longer renders");
 });
 
-test("symptoms sort above everything else, then newest first", () => {
-  const c = code(read("src/app/(app)/home/page.tsx"));
-  assert.match(c, /a\.isSymptom === b\.isSymptom[\s\S]{0,200}?a\.isSymptom \? -1 : 1/,
-    "the sort no longer puts symptoms first");
+test("the component still exists, unmounted", () => {
+  // Same treatment as TrainerWeekDigest and SaturdayReview: the resolve/unresolve
+  // flow, the optimistic tick and its rollback are all worth keeping if notes
+  // ever come back to a screen of their own.
+  assert.ok(
+    existsSync(join(process.cwd(), "src/components/ClientNotesPanel.tsx")),
+    "ClientNotesPanel was deleted rather than unmounted",
+  );
+});
+
+test("Today's Admin counts the notes instead, and links to them", () => {
+  const c = code(read("src/components/TodaysAdmin.tsx"));
+  assert.match(c, /from\("exercise_notes"\)/, "Today's Admin no longer counts notes");
+  assert.match(c, /not\("resolved", "is", true\)/, "it counts resolved notes too");
+  // The routine classes must stay excluded or the count becomes the old panel
+  // again, just smaller.
+  assert.match(c, /ROUTINE/, "the routine-note filter is gone, so set weights would be counted as work");
 });
