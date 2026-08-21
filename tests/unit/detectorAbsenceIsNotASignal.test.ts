@@ -98,66 +98,75 @@ test("a client with no future appointment is out of scope entirely", () => {
     /from appointments a\s+where \(a\.scheduled_at at time zone 'America\/Chicago'\)::date >= v_today_ct/i,
     `${file} builds eligibility from something other than future appointments`,
   );
-  // And every source of a proposal is filtered through it. Counted, not
-  // matched: orphan candidates, uncovered candidates, cancelled and retired.
-  // A single one left unjoined is a whole reason that ignores the gate.
+  // This used to count FOUR joins, one per proposal source: orphan candidates,
+  // uncovered candidates, cancelled and retired. Three of those sources are
+  // gone — see "the detector no longer proposes moves" below — so the count is
+  // now one: 'uncovered'. 'retired' is gated the other way round, by its own
+  // "this client has nothing booked at all" check, which is the same rule
+  // inverted and cannot be expressed as a join to the eligible set.
   const joins = (body.match(/join _scd_eligible/gi) || []).length;
-  assert.equal(joins, 4, `${joins} of the 4 proposal sources are gated on having a future appointment`);
+  assert.equal(joins, 1, `expected the uncovered source gated on a future appointment, found ${joins} joins`);
+  assert.match(
+    body,
+    /where p\.is_retired[\s\S]*?not exists \([\s\S]*?from appointments a/i,
+    `${file} files 'retired' without checking the client has nothing booked — ` +
+      "which would report every client whose slot merely moved",
+  );
 });
 
-test("orphans are computed but never persisted on their own", () => {
+test("the detector no longer proposes moves at all", () => {
+  // ── What changed, 21 Aug ─────────────────────────────────────────────────
+  //
+  // Four tests used to live here: orphans are computed but never persisted,
+  // pairing is 1:1 in both directions, a paired appointment is not also
+  // reported uncovered, and exactly one pending move survives per session.
+  // Every one of them described the 'moved' proposal — the machinery that
+  // worked out where a session should go and then asked Dustin to approve it.
+  //
+  // He deleted the question:
+  //
+  //   "on the schedule moves, if it picks up where the session was moved and
+  //    the workout is not there and it's still on the day the original session
+  //    was on then move it. you shouldnt need my approval for that"
+  //
+  // So the pairing moved into sync_supervised_workouts_to_appointments(), which
+  // performs the move instead of proposing it, and the detector was reduced to
+  // the two reasons that still need a human: an appointment nothing covers, and
+  // a slot that has gone away. Migration
+  // 20260821171049_detector_stops_proposing_moves_and_cancellations.
+  //
+  // The four old tests are not weakened, they are inverted: what they guarded
+  // is now guarded by its ABSENCE here and by its presence in the mover, which
+  // tests/unit/scheduleNeverOverridesAPerson.test.ts holds to the same rules.
   const { file, body } = lastDefinition("detect_schedule_changes");
-  // Pairing needs them. Deleting the computation outright would silently kill
-  // the 'moved' proposal, which is the feature Dustin actually wants.
-  assert.match(body, /create temporary table _scd_orphan\b/i, `${file} no longer computes orphans — moves can never be proposed`);
-  // And the pairing must actually read them. Renaming the table away passes a
-  // "does it exist" check while leaving nothing to pair.
-  assert.match(body, /from _scd_orphan o\b/i, `${file} computes orphans but never pairs them — no move is ever proposed`);
-  // The only INSERT that may read from the orphan set is the paired one.
-  const insertBlocks = body.split(/insert into schedule_change_proposals/i).slice(1);
-  for (const b of insertBlocks) {
-    const upToNextInsert = b;
-    if (/_scd_orphan/i.test(upToNextInsert)) {
-      assert.fail(`${file} inserts straight from the orphan set — an unpaired orphan must emit nothing`);
-    }
+
+  assert.doesNotMatch(
+    body,
+    /insert into schedule_change_proposals[\s\S]{0,400}'moved'/i,
+    `${file} proposes moves again — the sync performs them, and asking twice is the friction he removed`,
+  );
+  assert.doesNotMatch(
+    body,
+    /insert into schedule_change_proposals[\s\S]{0,400}'cancelled'/i,
+    `${file} proposes cancellations again`,
+  );
+  // And it actively retires any left over from the old design, so a proposal
+  // filed before the change cannot sit in his queue forever.
+  assert.match(
+    body,
+    /set status = 'superseded'[\s\S]{0,200}reason in \('moved', 'cancelled'\)/i,
+    `${file} leaves pre-change 'moved' and 'cancelled' proposals pending`,
+  );
+  // Only two reasons may be written now.
+  const reasons = new Set(
+    [...body.matchAll(/insert into schedule_change_proposals[\s\S]*?'(\w+)',\s*(?:'|case)/gi)].map((m) => m[1]),
+  );
+  for (const r of reasons) {
+    assert.ok(
+      ["uncovered", "retired"].includes(r),
+      `${file} writes a '${r}' proposal — only 'uncovered' and 'retired' still need a human`,
+    );
   }
-});
-
-test("pairing is 1:1 in both directions", () => {
-  const { file, body } = lastDefinition("detect_schedule_changes");
-  // One move per session, and no two sessions claiming the same appointment.
-  // Without both, a cross join emits a proposal per combination.
-  assert.match(body, /distinct on \(sw_id\)/i, `${file} lets one session be moved to several dates`);
-  assert.match(body, /distinct on \(appt_id\)/i, `${file} lets several sessions claim one appointment`);
-  // Nearest date, not sort order.
-  assert.match(body, /abs\(u\.to_date - o\.from_date\) as gap/i, `${file} no longer pairs by distance`);
-  assert.match(body, /order by sw_id, gap/i, `${file} does not take the closest date first`);
-});
-
-test("an appointment absorbed by a pairing is not also reported uncovered", () => {
-  const { file, body } = lastDefinition("detect_schedule_changes");
-  assert.match(
-    body,
-    /'uncovered'[\s\S]*?where not exists \(select 1 from _scd_pair p where p\.appt_id = u\.appt_id\)/i,
-    `${file} reports a paired appointment twice — once as the move's target and once as uncovered`,
-  );
-});
-
-test("exactly one pending move survives per session", () => {
-  const { file, body } = lastDefinition("detect_schedule_changes");
-  // Found live: Sariah Duncan's 19 Aug session had a pending move to 18 Aug AND
-  // one to 20 Aug, from two different runs. The open-proposal unique index keys
-  // on to_date, so it did not stop them.
-  assert.match(
-    body,
-    /set status = 'superseded'[\s\S]*?from _scd_pair pr[\s\S]*?p\.scheduled_workout_id = pr\.sw_id[\s\S]*?p\.to_date is distinct from pr\.to_date/i,
-    `${file} leaves a stale move pending alongside today's answer`,
-  );
-  assert.match(
-    body,
-    /where not exists \(select 1 from schedule_change_proposals x\s+where x\.status = 'pending' and x\.reason = 'moved'\s+and x\.scheduled_workout_id = p\.sw_id\)/i,
-    `${file} can raise a second pending move for a session that already has one`,
-  );
 });
 
 test("the detector never deletes a scheduled workout", () => {
