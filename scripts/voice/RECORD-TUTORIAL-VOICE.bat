@@ -24,17 +24,25 @@ echo Symmetry - tutorial narration
 echo Log: %LOG%
 echo.
 
-if not exist "%~dp0voice-ref.wav" (
-  echo STOP: voice-ref.wav is not in this folder.
-  echo STOP: voice-ref.wav is not in this folder. >> "%LOG%"
+REM Any voice-ref.* will do - the script converts and trims it itself.
+set REF=
+for %%E in (wav m4a mp3 aac flac ogg mp4 mov) do (
+  if exist "%~dp0voice-ref.%%E" if not defined REF set REF=%~dp0voice-ref.%%E
+  if exist "%~dp0voice-ref-raw.%%E" if not defined REF set REF=%~dp0voice-ref-raw.%%E
+)
+if not defined REF (
+  echo STOP: there is no voice clip in this folder.
+  echo STOP: no voice-ref.* found >> "%LOG%"
   echo.
-  echo Record 15-20 seconds of yourself talking normally, save it as
-  echo    %~dp0voice-ref.wav
-  echo and run this again.
+  echo Either double-click GET-VOICE-CLIP.bat to pull yours down from
+  echo Descript, or record 15-20 seconds of yourself talking normally and
+  echo save it here as voice-ref.wav ^(m4a and mp3 are fine too^).
   echo.
   pause
   exit /b 2
 )
+echo Using: %REF%
+echo Using: %REF% >> "%LOG%"
 
 REM --- Python ---
 where py >nul 2>&1
@@ -74,12 +82,15 @@ if not exist "%~dp0venv\Scripts\python.exe" (
 
   "%~dp0venv\Scripts\python.exe" -m pip install chatterbox-tts >> "%LOG%" 2>&1
   if errorlevel 1 goto failed
+  REM A real ffmpeg as a pip wheel - decodes the m4a Descript exports without
+  REM asking him to install anything or touch PATH.
+  "%~dp0venv\Scripts\python.exe" -m pip install imageio-ffmpeg >> "%LOG%" 2>&1
 )
 
 echo Generating. On a CPU this takes a while - it is about 21 minutes of
 echo speech. You can close the window and re-run; it resumes.
 echo.
-"%~dp0venv\Scripts\python.exe" "%~dp0generate-narration.py" --ref "%~dp0voice-ref.wav" --out "%~dp0narration" 2>&1 | "%~dp0venv\Scripts\python.exe" -c "import sys;f=open(r'%LOG%','a',encoding='utf-8',errors='replace');[ (sys.stdout.write(l), f.write(l), f.flush()) for l in sys.stdin ]"
+"%~dp0venv\Scripts\python.exe" "%~dp0generate-narration.py" --ref "%REF%" --out "%~dp0narration" 2>&1 | "%~dp0venv\Scripts\python.exe" -c "import sys;f=open(r'%LOG%','a',encoding='utf-8',errors='replace');[ (sys.stdout.write(l), f.write(l), f.flush()) for l in sys.stdin ]"
 
 if errorlevel 1 goto failed
 echo.

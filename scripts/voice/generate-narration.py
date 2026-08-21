@@ -39,6 +39,101 @@ def log(msg):
     print(line, flush=True)
 
 
+
+# ── Turning whatever he gave us into a clean reference clip ─────────────────
+#
+# The reference is the single biggest determinant of how much the output sounds
+# like him, and it is also the step most likely to be done wrong by hand. So it
+# is not done by hand.
+#
+# Descript publishes m4a, phones record m4a or mp3, and Chatterbox wants a short
+# clean wav. Rather than make him convert and trim in an editor - and find out
+# an hour later that he picked a stretch with a breath in the middle - this
+# converts anything, then CHOOSES the best window itself.
+
+def _ffmpeg_exe():
+    """A real ffmpeg without asking him to install one.
+
+    imageio-ffmpeg ships a static binary as a pip wheel, so this works on a
+    machine that has never seen ffmpeg and needs no PATH surgery."""
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        import shutil
+        return shutil.which("ffmpeg")
+
+
+def prepare_reference(src, out_wav, want_sec=18.0, sr=24000):
+    """Convert `src` to mono wav and keep the best `want_sec` of speech.
+
+    "Best" = the window with the most sustained voice in it: highest median
+    energy, penalised for silence and for clipping. That beats "the first 18
+    seconds", which in a narrated clip is usually an intro breath and a pause.
+    """
+    import subprocess, wave, struct, math
+
+    ff = _ffmpeg_exe()
+    if not ff:
+        raise RuntimeError("no ffmpeg available - pip install imageio-ffmpeg")
+
+    full = out_wav + ".full.wav"
+    subprocess.run(
+        [ff, "-y", "-i", src, "-ac", "1", "-ar", str(sr), "-vn", full],
+        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+
+    with wave.open(full, "rb") as w:
+        n = w.getnframes()
+        raw = w.readframes(n)
+    samples = struct.unpack("<%dh" % (len(raw) // 2), raw)
+    total_sec = len(samples) / sr
+    log(f"Reference source: {total_sec:.1f}s")
+
+    if total_sec <= want_sec:
+        os.replace(full, out_wav)
+        log(f"Short enough - using all of it.")
+        return out_wav
+
+    # RMS in 100ms frames, then score every candidate window.
+    hop = sr // 10
+    frames = []
+    for i in range(0, len(samples) - hop, hop):
+        chunk = samples[i:i + hop]
+        frames.append(math.sqrt(sum(s * s for s in chunk) / len(chunk)))
+    peak = max(frames) or 1.0
+    norm = [f / peak for f in frames]
+    silence = 0.06  # below this a frame is a gap, not speech
+
+    win = int(want_sec * 10)
+    best_i, best_score = 0, -1.0
+    for i in range(0, len(norm) - win):
+        w = norm[i:i + win]
+        voiced = sum(1 for f in w if f > silence) / win
+        level = sum(w) / win
+        # Sustained speech, not one loud word next to a long gap.
+        score = level * (voiced ** 2)
+        if score > best_score:
+            best_score, best_i = score, i
+
+    start = int(best_i * hop)
+    end = start + int(want_sec * sr)
+    picked = samples[start:end]
+    log(f"Picked the best {want_sec:.0f}s: {start / sr:.1f}s to {end / sr:.1f}s "
+        f"(voiced {sum(1 for f in norm[best_i:best_i + win] if f > silence) / win:.0%})")
+
+    with wave.open(out_wav, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes(struct.pack("<%dh" % len(picked), *picked))
+    try:
+        os.remove(full)
+    except OSError:
+        pass
+    return out_wav
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ref", required=True, help="10-20s wav of the voice to clone")
@@ -50,10 +145,39 @@ def main():
     ap.add_argument("--only", default=None, help="regenerate a single step id")
     args = ap.parse_args()
 
-    if not os.path.isfile(args.ref):
-        log(f"STOP: no reference clip at {args.ref}")
-        log("Record 15-20 seconds of yourself talking normally, save it as a .wav, and point --ref at it.")
-        return 2
+    # Accept whatever is actually sitting in the folder. He should not have to
+    # know or care what Descript exported.
+    ref = args.ref
+    if not os.path.isfile(ref):
+        here = os.path.dirname(os.path.abspath(ref)) or HERE
+        found = None
+        for name in sorted(os.listdir(here)) if os.path.isdir(here) else []:
+            if name.lower().startswith("voice-ref") and os.path.splitext(name)[1].lower() in (
+                ".wav", ".m4a", ".mp3", ".aac", ".flac", ".ogg", ".mp4", ".mov"
+            ):
+                found = os.path.join(here, name)
+                break
+        if not found:
+            log(f"STOP: no reference clip at {ref}")
+            log("Either run GET-VOICE-CLIP.bat, or record 15-20 seconds of yourself")
+            log("talking normally and save it in this folder as voice-ref.wav.")
+            return 2
+        log(f"Using {os.path.basename(found)}")
+        ref = found
+
+    prepared = os.path.join(os.path.dirname(os.path.abspath(ref)), "voice-ref.prepared.wav")
+    if os.path.abspath(ref) != os.path.abspath(prepared):
+        try:
+            prepare_reference(ref, prepared)
+            ref = prepared
+        except Exception as e:
+            # A wav can be used as-is; anything else genuinely cannot.
+            if os.path.splitext(ref)[1].lower() == ".wav":
+                log(f"Could not trim the reference ({e}) - using it whole.")
+            else:
+                log(f"STOP: could not convert {os.path.basename(ref)}: {e}")
+                return 2
+    args.ref = ref
     if not os.path.isfile(args.manifest):
         log(f"STOP: no manifest at {args.manifest}")
         return 2
