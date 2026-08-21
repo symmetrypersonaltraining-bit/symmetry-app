@@ -1,0 +1,363 @@
+{
+  "version": 1,
+  "generatedFrom": "src/lib/tutorial/script.ts",
+  "lines": [
+    {
+      "id": "start-what",
+      "chapter": "start",
+      "title": "What you are looking at",
+      "text": "This app has two faces. The one you are in now is the trainer side. Your roster, your programming, your schedule, and your money. The other face is what your clients see on their phones. Everything they do lands here on its own. You do not have to chase any of it.",
+      "words": 52
+    },
+    {
+      "id": "start-how",
+      "chapter": "start",
+      "title": "How this tutorial works",
+      "text": "Every step reads itself out loud, and you can turn that off at any time. Most steps open the real screen in a second tab, so you are learning on your own account instead of watching a video of somebody else's. You cannot break anything by looking. And it remembers where you stopped.",
+      "words": 53
+    },
+    {
+      "id": "start-boundary",
+      "chapter": "start",
+      "title": "What you can and cannot see",
+      "text": "If there is more than one trainer here, you see your clients and only your clients. Payments, reminders, appointments, notifications. None of it crosses over, and that is enforced down in the database rather than in the screens, so it holds everywhere. Three things are shared on purpose. The exercise library, the workout library, and the group chat. The owner of the instance can see everything. That is the one asymmetry and it is deliberate.",
+      "words": 75
+    },
+    {
+      "id": "account-profile",
+      "chapter": "account",
+      "title": "Your name and your face",
+      "text": "Open Profile from the bottom of the sidebar. The name and photo here are what every client sees. On your messages, on their coach card, and on the celebration screens when they hit a personal best. Without a photo they get your initials in a circle. It works, but a face is the difference between an app and a person.",
+      "words": 60
+    },
+    {
+      "id": "account-password",
+      "chapter": "account",
+      "title": "Your password",
+      "text": "Settings, then Security. If somebody else set your account up, change your password now. A password another person chose is a password another person knows. And note that there is no reset email on this app yet. If you lock yourself out, the owner resets it for you.",
+      "words": 48
+    },
+    {
+      "id": "account-pay",
+      "chapter": "account",
+      "title": "How you get paid",
+      "text": "Still in Settings, find the payments card, and put in whichever of Venmo, Zelle, or Cash App you actually use. This is not decoration. When a client taps to pay you, the button sends them wherever this says. If it is empty, it sends them nowhere, and you will hear about that on the first of the month.",
+      "words": 58
+    },
+    {
+      "id": "account-notifications",
+      "chapter": "account",
+      "title": "Notifications",
+      "text": "Settings, then Notifications. Turn on push for this device, then pick what reaches you. Messages from clients is the one that matters. Announcements cannot be switched off, because those are gym wide and rare on purpose. And do this on the phone you actually carry, not just on a laptop. Push is per device.",
+      "words": 54
+    },
+    {
+      "id": "account-appearance",
+      "chapter": "account",
+      "title": "Make it yours",
+      "text": "Settings has a colour theme picker, and a depth setting that controls how much glow and shadow the interface uses. Both are yours alone. Your clients never see your theme. Sounds and vibration are in the Experience card, and they are per device too. Turn them off if you train somewhere quiet.",
+      "words": 52
+    },
+    {
+      "id": "around-sidebar",
+      "chapter": "around",
+      "title": "The sidebar",
+      "text": "Home, Schedule, Clients, Movement, Messages, Library, Nutrition, Progress, Payments, and Settings. Schedule and Library open into sub items. On a phone the sidebar becomes a hamburger in the top bar. One quirk worth knowing now. Tapping Calendar under Schedule brings you straight back to Home. That is a leftover link, not something you did. The trainer calendar lives on Home.",
+      "words": 60
+    },
+    {
+      "id": "around-clientview",
+      "chapter": "around",
+      "title": "Client View",
+      "text": "At the bottom of the sidebar there is a Client View toggle. Tap it, and the whole app becomes what your clients see, running against your own client record. Use it constantly. Before you tell somebody where a button is, go and look at their app and check that it is where you think it is. Tap it again to come back. It survives a refresh, so if the app looks wrong one morning, check whether you left yourself in client mode.",
+      "words": 82
+    },
+    {
+      "id": "around-header",
+      "chapter": "around",
+      "title": "The two buttons in the corner",
+      "text": "The star in the corner opens feedback. Type it or dictate it, attach a screenshot, send. It goes into the queue tagged with your name and which app it came from, so a bug you report is not filed as somebody else's. The A I button opens the assistant drawer, and that gets its own chapter. The bell is your notification centre.",
+      "words": 62
+    },
+    {
+      "id": "home-sessions",
+      "chapter": "home",
+      "title": "Today's Sessions",
+      "text": "Everything you are training today, merged from your calendar and from what is programmed. Tap a row to start the session. If a client has more than one thing scheduled, a lift and a walk for example, you get a chooser, and the app puts the supervised session first, because that is the one you are standing there for. Rows read Start, Choose, Done, or Cancelled, so you can see what is left at a glance.",
+      "words": 76
+    },
+    {
+      "id": "home-focus",
+      "chapter": "home",
+      "title": "Saturday's focus lines",
+      "text": "Each client can carry one focus line for the week, and their app shows it. Those lines are drafted for you on Saturday morning, and they are drafts. A review panel turns up on Home with them in it, and you approve or rewrite each one. Anything still sitting there on Sunday morning publishes as written, so if that makes you uncomfortable, handle them on Saturday. The panel only appears when there are drafts waiting, so no panel means nothing is waiting.",
+      "words": 82
+    },
+    {
+      "id": "home-notes",
+      "chapter": "home",
+      "title": "Needs your eyes",
+      "text": "When a client leaves a note on an exercise, it shows up here, and anything that reads like pain or a symptom sorts to the top. Three show at a time. The count in the corner is the real total, and the button at the bottom opens the rest and closes it again. Mark it done once you have dealt with it. That is the whole workflow. The list only shrinks when you shrink it.",
+      "words": 75
+    },
+    {
+      "id": "home-rest",
+      "chapter": "home",
+      "title": "The rest of Home",
+      "text": "Training right now shows anyone with a session open, which helps when you have two going at once. The community panel previews the group chat and the consistency board. Upcoming payments shows the next thirty days, but it is only a preview. The sending happens on the Payments screen. And the calendar panel is a week strip that expands into the full calendar.",
+      "words": 63
+    },
+    {
+      "id": "clients-add",
+      "chapter": "clients",
+      "title": "Adding a client",
+      "text": "Clients, then Add Client. That opens the assessment rather than a name and email box, and that is deliberate. The assessment builds the profile, the movement screen, and the first program recommendation, all in one pass. Seven steps. Personal info, medical history, movement screen, training profile, goals, lifestyle, and a recommendation at the end. You can dictate any text field instead of typing it. If you only need a name and an email there is a quick option on the Clients screen, but you will still want the assessment before you program anything.",
+      "words": 93
+    },
+    {
+      "id": "clients-screen",
+      "chapter": "clients",
+      "title": "The movement screen inside the assessment",
+      "text": "The third step is an overhead squat assessment. You tick what you actually see. Feet turning out, forward lean, knees caving, low back arching, arms falling forward, forward head, a lateral shift, balance. This drives the recommendation at the end, so tick it honestly and skip nothing. An assessment filled in from memory produces a program built on a guess.",
+      "words": 60
+    },
+    {
+      "id": "clients-invite",
+      "chapter": "clients",
+      "title": "Getting them into the app",
+      "text": "Open the client and use Invite. They get a link, set a password, and land in their own first run flow. Password, install to home screen, notifications, then a short intake. Reset login is there for when they forget. Archive takes somebody off the roster without deleting anything. Their history stays and you can bring them back. And there is an install Q R code in Settings for when you are standing right next to them.",
+      "words": 76
+    },
+    {
+      "id": "clients-tabs",
+      "chapter": "clients",
+      "title": "The client file",
+      "text": "Six tabs. Overview is the summary, with recent sessions and their weight and body fat trends. Training is their calendar. Billing is their schedule and reminders. Assessment is the clinical record. Progress is charts. Info is the editable profile. Two fields matter more than they look. Contraindicated movements is a hard never. Put anything there that must not be programmed under any circumstances. And trainer notes are internal. The client never sees them.",
+      "words": 73
+    },
+    {
+      "id": "clients-ai-assist",
+      "chapter": "clients",
+      "title": "AI Workout Assist",
+      "text": "On the client's page there is a chat that already knows this client. Their assessment, their history, their limits. Ask it for a workout or a change, and it comes back with a proposed change that you tap Apply on. Nothing happens until you tap Apply. And when you do, it makes a copy of the library day just for this client, rather than editing the shared one, so you cannot accidentally change a workout for everybody at once.",
+      "words": 79
+    },
+    {
+      "id": "prog-calendar",
+      "chapter": "programming",
+      "title": "The program calendar",
+      "text": "Open a client, then Program. It is a week view you move through with the arrows, and every workout sits on a date. The Library panel on the right is your workout library. Search it, tap a day, and it lands on the date you chose. Each card has a menu to copy it, delete it, or edit it.",
+      "words": 59
+    },
+    {
+      "id": "prog-copyweek",
+      "chapter": "programming",
+      "title": "Copy Week",
+      "text": "Copy Week takes the week you are looking at and pastes it forward as many weeks as you ask for, up to fifty two. This is the single biggest time saver in the app. Build one good week, paste it across the block, then go back and adjust only the weeks that need adjusting. And it will not create duplicates on a day that already has that workout on it.",
+      "words": 70
+    },
+    {
+      "id": "prog-editor",
+      "chapter": "programming",
+      "title": "Building a workout",
+      "text": "The editor has three tabs. Program assigns an existing library day. Create builds one from scratch. Name it, add sections, add exercises, and you can dictate instead of typing. Edit changes the one already assigned. For each exercise you set sets, volume, volume type, rest, and a cue. Volume type is what lets a single field hold twelve reps, or twelve to fifteen, or thirty seconds, or three sets of twenty second holds, without lying about any of them. Sets, reps, and load save when you click away. There is no separate save button on those.",
+      "words": 96
+    },
+    {
+      "id": "prog-launch",
+      "chapter": "programming",
+      "title": "Running the session",
+      "text": "Launch Session from the day, or just tap the client on Home. That opens the logger, which is what you use standing on the floor with them. One rule that will save you an argument with the app. Reps come from what you programmed. Weights come from their history. The logger is not trying to guess reps for you.",
+      "words": 59
+    },
+    {
+      "id": "lib-exercises",
+      "chapter": "library",
+      "title": "Exercises",
+      "text": "Every movement in the system, with its muscle group, modality, equipment, and a demo video where one has been attached. Search before you invent a name. A movement that already exists under a slightly different name is how a library turns to mush. And remember this library is shared with every trainer here. What you add, everyone can use.",
+      "words": 59
+    },
+    {
+      "id": "lib-videos",
+      "chapter": "library",
+      "title": "Exercise videos",
+      "text": "Videos get found and attached automatically. This screen is the review queue, newest first, and every row has a one tap undo. It works that way on purpose. Things go live and you take down the wrong ones, rather than four hundred videos sitting in a queue waiting for somebody to approve them one at a time.",
+      "words": 57
+    },
+    {
+      "id": "lib-workouts",
+      "chapter": "library",
+      "title": "Workouts and programs",
+      "text": "Workouts are single days. Programs are the structures those days sit inside. Phases, levels, blocks, whatever the structure calls for. The app does not force one shape of program on you. A three phase corrective track, a five day split, a single maintenance session, they all fit. One thing to know. The New Program button on the programs screen does nothing yet. Programs get created by assigning and building, not from that button.",
+      "words": 73
+    },
+    {
+      "id": "lib-recipes",
+      "chapter": "library",
+      "title": "Recipes",
+      "text": "Build a recipe from the food database so the macros are real, or just type it out when you are in a hurry. Set the servings and it does the per serving maths for you. Clients can submit their own recipes, and those wait for a trainer to approve them before anyone else sees them.",
+      "words": 55
+    },
+    {
+      "id": "nut-plans",
+      "chapter": "nutrition",
+      "title": "Meal plans",
+      "text": "Pick a client at the top of the Nutrition screen. Their plan is a set of meals, each with its items and macros, and it is versioned, so you can see what changed and when. Plans can be dated to start in the future, and one flips over to live on its start date without you having to remember.",
+      "words": 59
+    },
+    {
+      "id": "nut-logging",
+      "chapter": "nutrition",
+      "title": "What the client does",
+      "text": "They log each meal as eaten, partial, off plan, or skipped, and they can photograph anything off plan. The header of their app counts calories and macros against target as the day goes on. Off plan meals get estimated, so their numbers are not simply blank for the day.",
+      "words": 49
+    },
+    {
+      "id": "nut-print",
+      "chapter": "nutrition",
+      "title": "Printing it",
+      "text": "There is a print export on the nutrition screen that produces a real P D F of the plan. Some clients want paper on the fridge. Give them paper on the fridge.",
+      "words": 32
+    },
+    {
+      "id": "prog-charts",
+      "chapter": "progress",
+      "title": "Progress",
+      "text": "Pick a client and you get weight, body fat, lean mass, and fat mass over time. Plus goals, a consistency calendar, personal bests, and a then versus now comparison. Progress photos live here as well, and they are private to the client and to you.",
+      "words": 45
+    },
+    {
+      "id": "prog-bodyfat",
+      "chapter": "progress",
+      "title": "Body fat",
+      "text": "The body fat screen takes seven site or four site caliper readings and does the maths, with a diagram showing you each site. Use the same method every time on the same person. A number from a different protocol is not comparable, and a trend built out of two different protocols is worse than having no trend at all.",
+      "words": 59
+    },
+    {
+      "id": "prog-movement",
+      "chapter": "progress",
+      "title": "The movement screen",
+      "text": "This is a camera based movement capture, with a voice coach that talks the person into position. You can run it on yourself, or on a client from their page. Clients can only run it themselves if you switch it on for them, and you do that from Movement, then Testers.",
+      "words": 51
+    },
+    {
+      "id": "sched-gcal",
+      "chapter": "schedule",
+      "title": "Connecting Google Calendar",
+      "text": "Settings, Integrations, Connect. Once it is connected, your calendar events become appointments in the app, and events that look like payments become payment records. It syncs twice a day in full, with a narrower catch up every hour to pick up same day moves. Sync Now is there for when you cannot wait. And your calendar is yours. Another trainer's sync cannot see it, and yours cannot see theirs.",
+      "words": 69
+    },
+    {
+      "id": "sched-proposals",
+      "chapter": "schedule",
+      "title": "Proposals",
+      "text": "When the app notices that a session appears to have moved, been cancelled, or gone missing, it does not act on it. It writes a proposal and waits for you. Schedule, then Proposals. Approve or reject each one. Nothing moves without you. Check it weekly, because they pile up quietly, and a backlog of eighty proposals is not useful to anybody.",
+      "words": 61
+    },
+    {
+      "id": "sched-reset",
+      "chapter": "schedule",
+      "title": "When the calendar goes wrong",
+      "text": "There is a Reset and Re sync in Integrations. It deletes the app's calendar events and pulls them again from scratch. It is safe, but it is not gentle, so try Sync Now first. Disconnect revokes access at Google and deletes the stored token.",
+      "words": 44
+    },
+    {
+      "id": "money-screen",
+      "chapter": "money",
+      "title": "The payments screen",
+      "text": "One card per client. You can create a payment record with an amount, a due date, and a note. You can edit an amount by clicking it, and you can delete one. Send Payment Reminder emails them, and there is a preview first. Read it before you send it. If a client has no email on file, the button tells you, rather than failing quietly.",
+      "words": 65
+    },
+    {
+      "id": "money-auto",
+      "chapter": "money",
+      "title": "What happens on its own",
+      "text": "Reminders for what is due get generated once a day. Amounts are recalculated three times a day off the calendar, so a week where somebody trained four times instead of six is already correct by the time you look at it. But nothing is emailed automatically. Generating a reminder and sending it are two different things, and the second one is you.",
+      "words": 62
+    },
+    {
+      "id": "money-privacy",
+      "chapter": "money",
+      "title": "Money never crosses over",
+      "text": "Your payments, your reminders, and your billing adjustments are yours only. Another trainer opening this same screen sees their own, and nothing of yours. This one was checked directly against the database rather than assumed, because it is the thing that would matter most if it were wrong.",
+      "words": 48
+    },
+    {
+      "id": "msg-inbox",
+      "chapter": "messages",
+      "title": "Your inbox",
+      "text": "A thread per client, plus the group tab. Individual threads are private between you and that client. No other trainer sees them. This is where clients will ask you things, so answer here rather than by text message, and the context stays with the app.",
+      "words": 45
+    },
+    {
+      "id": "msg-group",
+      "chapter": "messages",
+      "title": "The group chat",
+      "text": "There is one group chat for the whole gym. Every trainer and every client. Whoever posts shows up as themselves, with their own name and their own face. The consistency board and the weekly challenge live alongside it.",
+      "words": 38
+    },
+    {
+      "id": "msg-announce",
+      "chapter": "messages",
+      "title": "Announcements",
+      "text": "An announcement reaches every client on the instance, not only yours, and clients cannot switch announcements off. That is correct, because announcements are gym wide news. It also means the bar for sending one is high. If it only applies to your clients, message them. Do not announce it.",
+      "words": 49
+    },
+    {
+      "id": "ai-drawer",
+      "chapter": "ai",
+      "title": "The assistant",
+      "text": "The A I button in the corner opens an assistant that can read your data and act on it. Ask it to write a workout, look up a client's history, or explain what it is seeing in somebody's numbers. It is scoped to you. It can find your clients and nobody else's, and if it is asked about a client who is not on your roster, it refuses rather than guessing.",
+      "words": 71
+    },
+    {
+      "id": "ai-where",
+      "chapter": "ai",
+      "title": "Where else it turns up",
+      "text": "It also turns up in the recommendation at the end of an assessment, the workout assist on a client's page, the meal plan builder, the Saturday focus lines, and the video matching in the library. Every one of them proposes. None of them publishes anything to a client on its own.",
+      "words": 51
+    },
+    {
+      "id": "ai-health",
+      "chapter": "ai",
+      "title": "AI health",
+      "text": "Settings, then A I. It shows every A I surface in the app. What has run, what has failed, what has never been used, and the spend against the monthly cap. There is a hard cap, and when it is reached, the A I features stop, rather than quietly running up a bill.",
+      "words": 53
+    },
+    {
+      "id": "ai-own-account",
+      "chapter": "ai",
+      "title": "Using your own Claude account",
+      "text": "The A I built into the app runs on the instance owner's account, against their cap, and that is fine for normal use. If you want to work the way the owner does, with a Claude conversation that can read and write your side of the app directly, you connect your own Claude account, and your usage is billed to you rather than to the instance. This part is designed and not yet built. It is mentioned here so you know it is coming and do not go looking for a button that is not there.",
+      "words": 96
+    },
+    {
+      "id": "ai-no-claude",
+      "chapter": "ai",
+      "title": "If you do not want a Claude account",
+      "text": "And you do not need one. Everything in this tutorial works without it. A connected account is a power tool, not a requirement. Trainers who skip it lose nothing on any screen. They just do their thinking inside the app instead of in a chat window.",
+      "words": 46
+    },
+    {
+      "id": "finish-checklist",
+      "chapter": "finish",
+      "title": "Your setup checklist",
+      "text": "The checklist on this screen is not a list of boxes you tick yourself. It reads your actual account and tells you what is genuinely done. Anything still open has a link straight to the screen that fixes it.",
+      "words": 39
+    },
+    {
+      "id": "finish-rough",
+      "chapter": "finish",
+      "title": "Known rough edges",
+      "text": "A few things are known to be rough. Calendar in the sidebar bounces you to Home. The New Program button does nothing. And two switches in Settings, the weekly digest and payment reminder notifications, show a state they do not actually save. None of these will hurt you. They are listed here so that when you hit one, you know it is the app and not you.",
+      "words": 67
+    },
+    {
+      "id": "finish-help",
+      "chapter": "finish",
+      "title": "Where to go next",
+      "text": "Settings has a searchable help centre with a short article for each feature. That is the reference. This was the walkthrough. And the star in the corner reports anything that is wrong. Use it liberally. A bug nobody reports is a bug nobody fixes.",
+      "words": 44
+    }
+  ]
+}
