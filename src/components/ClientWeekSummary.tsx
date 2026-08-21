@@ -78,18 +78,35 @@ export default function ClientWeekSummary() {
   // the canonical adherence hooks below).
   const today = useMemo(() => todayCT(), []);
   const thisWk = useMemo(() => weekStartOf(today), [today]);
-  // "Week in review" = the trailing 7 days ending today (rolling window), matching the
-  // nutrition "7d" tile — NOT the prior Sun–Sat calendar week. This also stops sessions
-  // that were never started (past rows still in "scheduled") from padding the total.
-  const lastWkStart = useMemo(() => addDays(today, -6), [today]);
-  const lastWkEnd = useMemo(() => today, [today]);
+  // ONE definition of "the week", 21 Aug. This card used a ROLLING trailing
+  // seven days for the review while the focus line printed directly underneath
+  // it was stamped for the Sun–Sat calendar week — so opening it on a Wednesday
+  // reviewed Thu–Wed and handed you a focus written for Sun–Sat, both labelled
+  // "week". That mismatch is the inconsistency Dustin kept seeing between the
+  // card and the AI copy next to it.
+  //
+  // The AI side was already right: lastWeekWindow/thisWeekWindow in
+  // src/lib/ai/weekly-numbers.ts are the previous full Sun–Sat and Sunday-
+  // through-today. The card now uses the same two windows, so the numbers under
+  // the coaching and the numbers inside it cannot disagree.
+  //
+  // The old comment claimed the rolling window also stopped never-started
+  // sessions padding the total. It did not — a trailing seven days contains
+  // exactly as many stale `scheduled` rows as a calendar week does. That is a
+  // real problem (1,043 rows point at programmes clients are no longer on) and
+  // it is a data cleanup, not a windowing trick.
+  const lastWkStart = useMemo(() => addDays(thisWk, -7), [thisWk]);
+  const lastWkEnd = useMemo(() => addDays(thisWk, -1), [thisWk]);
 
   // CANONICAL nutrition adherence — the EXACT same source + method the logger's
   // AveragesStrip uses (computeDayTotals + plan-meal proration). Reusing the
   // hook means the home tile can never diverge from "adherence · 7d" in the app.
   // "1w" = last 7 days ending today (America/Chicago). Last-week uses a custom
   // range so the weekly review tile is canonical too.
-  const weekAdh = useNutritionAverages(clientId || "", today, "1w", today, today, clientId);
+  // Calendar week to date, NOT a rolling 7 days. Every other number on this
+  // card is now Sunday-through-today; a nutrition figure quietly measuring
+  // Thu–Wed alongside them is the same mismatch in miniature.
+  const weekAdh = useNutritionAverages(clientId || "", today, "custom", thisWk, today, clientId);
   const lastWkAdh = useNutritionAverages(clientId || "", today, "custom", lastWkStart, lastWkEnd, clientId);
 
   const nutritionPctThis = weekAdh.result && weekAdh.result.adherence != null ? Math.round(weekAdh.result.adherence) : null;
@@ -131,7 +148,14 @@ export default function ClientWeekSummary() {
 
         const [swLast, swThis, metricsRows, wlogs] = await Promise.all([
           supabase.from("scheduled_workouts").select("status, scheduled_date").is("deleted_at", null).eq("client_id", cid).gte("scheduled_date", lastWkStart).lte("scheduled_date", lastWkEnd),
-          supabase.from("scheduled_workouts").select("status, scheduled_date").is("deleted_at", null).eq("client_id", cid).gte("scheduled_date", thisWk).lte("scheduled_date", thisWkEnd),
+          // THIS week counts only as far as TODAY. Dustin, 21 Aug: "how many
+          // workouts they logged out of how many are scheduled per that current
+          // day in the week... it should keep up with daily how many they have
+          // logged against how many were in the schedule to log so far that
+          // week." Bounding at thisWkEnd counted Thursday and Friday's sessions
+          // against them on Tuesday, so the number could only ever look bad
+          // until Saturday.
+          supabase.from("scheduled_workouts").select("status, scheduled_date").is("deleted_at", null).eq("client_id", cid).gte("scheduled_date", thisWk).lte("scheduled_date", today),
           supabase.from("metrics").select("metric_date, weight").eq("client_id", cid).gte("metric_date", metricWindow).order("metric_date", { ascending: true }),
           supabase.from("workout_logs").select("log_date, completed, status").eq("client_id", cid).gte("log_date", addDays(today, -60)).order("log_date", { ascending: false }),
         ]);
@@ -283,11 +307,11 @@ export default function ClientWeekSummary() {
         <div style={{ display: "flex", gap: 6, marginBottom: focusText || s.totalThis ? 10 : 0 }}>
           <div style={{ flex: 1, textAlign: "center", background: "var(--brand-card)", borderRadius: 11, padding: 7 }}>
             <div style={{ fontWeight: 800, color: "var(--brand-text)" }}>{s.doneThis}/{s.totalThis || 0}</div>
-            <div style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>workouts this wk</div>
+            <div style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>logged so far</div>
           </div>
           <div style={{ flex: 1, textAlign: "center", background: "var(--brand-card)", borderRadius: 11, padding: 7 }}>
             <div style={{ fontWeight: 800, color: "var(--brand-text)" }}>{nutritionPctThis != null ? nutritionPctThis + "%" : "—"}</div>
-            <div style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>nutrition · 7d</div>
+            <div style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>nutrition · wk</div>
           </div>
           <div style={{ flex: 1, textAlign: "center", background: "var(--brand-card)", borderRadius: 11, padding: 7 }}>
             <div style={{ fontWeight: 800, color: "var(--brand-text)" }}>{s.streak}🔥</div>
@@ -310,6 +334,7 @@ export default function ClientWeekSummary() {
         <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--brand-bg)", display: "flex", flexDirection: "column", overflowY: "auto" }}>
           <div style={{ background: "linear-gradient(135deg,#7c9cf5,#8b6ff0)", color: "#fff", padding: "20px 18px 18px" }}>
             <div style={{ fontSize: 12, opacity: 0.9, fontWeight: 600 }}>{fmtRange(s.lastWkStart, s.lastWkEnd).toUpperCase()}</div>
+            <div style={{ fontSize: 11, opacity: 0.75 }}>The week just finished</div>
             <div style={{ fontSize: 23, fontWeight: 800, marginTop: 2 }}>Your week in review 💪</div>
           </div>
           <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
