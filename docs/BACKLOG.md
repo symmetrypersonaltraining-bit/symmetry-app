@@ -113,6 +113,31 @@
 > filed as one of Dustin's, three dead components removed, and the db-schema
 > fixture regenerated — it was twelve columns behind production.
 >
+> **`b23a2d7` + `cec6bcb` — the tutorial is audible, findable, and dismissible.**
+> Reported off the first phone test: "there is no voice on tutorial and needs to
+> be easier to find for new trainers", then "give trainers the option to turn
+> this tutorial off once they're done with it." All three shipped 21 Aug.
+>   - **Voice.** All 51 recordings were on disk and served; `narrate()` built a
+>     `new Audio(url)` per line, and mobile refuses a never-unlocked element
+>     started from an effect. So the tap on "Voice on" played step one and every
+>     step after it was silent — the browser-TTS fallback included, because it
+>     needs the same gesture. One element for the life of the tab, unlocked in a
+>     real tap and reused by swapping `.src`. `go()` spends the Next/Back tap on
+>     that unlock before changing step.
+>   - **Findable.** The control is a play button at the top of the step card,
+>     shown whenever a recording OR browser TTS exists — it used to be gated on
+>     TTS alone, which hid 51 mp3s that need none. The guide itself now has three
+>     doors: a "Start here" card at the top of Home (with progress, gone once
+>     every step is seen), a Setup guide entry at the foot of the sidebar, and
+>     the original Settings card.
+>   - **Dismissible.** `trainer_settings.tutorial_dismissed_at`, per trainer,
+>     NOT the `app_flags` switch — the first trainer to finish must not take the
+>     guide away from the next one being onboarded. Reversible from the
+>     tutorial's last screen and from Settings; `/tutorial` keeps working either
+>     way. `useTutorialVisibility` owns both switches, and defaults the opposite
+>     way to `lib/flags.ts` on a failed read.
+>   - Copy no longer names the coach — a second and third trainer are coming.
+
 > **`318d559` — the new-trainer tutorial. BUILT, AND SWITCHED OFF.**
 > Thirteen chapters, forty-one steps, the whole app end to end. Narrated, and it
 > remembers where you stopped. `/tutorial` redirects to /home until
