@@ -47,12 +47,31 @@ export function mealLibraryForPrompt(): string {
     .join("\n\n");
 }
 
+/**
+ * What a recipe is called when it is offered to the model.
+ *
+ * Usually just its title. But "Turkey Chili" is BOTH a meal and a recipe, and
+ * they are not the same food: 502 kcal against 375 per serving, a third apart.
+ * The model was told to give a library item's name exactly as written, wrote
+ * "Turkey Chili" meaning the recipe, and the matcher — which searches meals
+ * first — handed back the meal. Neither the model nor the client had any way
+ * to see that the slot had gained 127 calories.
+ *
+ * Suffixing the colliding one is the fix that renames nothing. The library
+ * content is Dustin's and stays exactly as he wrote it; only the label the
+ * model is shown changes, and the matcher accepts that label back.
+ */
+export function promptNameForRecipe(title: string): string {
+  const clash = MEAL_LIBRARY.some((m) => m.name.trim().toLowerCase() === title.trim().toLowerCase());
+  return clash ? `${title} (recipe)` : title;
+}
+
 /** Recipes, with servings, because a recipe is portioned differently. */
 export function recipeLibraryForPrompt(): string {
   return RECIPE_LIBRARY.map((r) => {
     const ps = perServing(r);
     const mins = r.prepMinutes + r.cookMinutes;
-    return `- ${r.title} (serves ${r.servings}, ${mins} min) — per serving: ${ps.kcal} kcal, ${ps.protein}P / ${ps.carbs}C / ${ps.fats}F`;
+    return `- ${promptNameForRecipe(r.title)} (serves ${r.servings}, ${mins} min) — per serving: ${ps.kcal} kcal, ${ps.protein}P / ${ps.carbs}C / ${ps.fats}F`;
   }).join("\n");
 }
 

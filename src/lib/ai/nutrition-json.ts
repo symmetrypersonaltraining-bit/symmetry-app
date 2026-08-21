@@ -22,6 +22,8 @@ import { kcalOf } from "../nutrition/dailyTotals";
 // and then die at runtime with "Cannot find module", which is exactly the trap
 // that note exists to prevent.
 import { MEAL_LIBRARY, mealTotals } from "../nutrition/mealLibrary";
+import { RECIPE_LIBRARY, perServing } from "../nutrition/recipeLibrary";
+import { promptNameForRecipe } from "../nutrition/libraryForAi";
 import { sanitizeNutrients, addNutrients, roundNutrients, type NutrientMap } from "../nutrition/nutrients";
 
 /** Pull the first JSON object out of a model reply (tolerates ``` fences / stray prose). */
@@ -230,7 +232,7 @@ export interface PlanDraft {
 function libraryMeal(name: string, timing: string | null): PlanMeal | null {
   const key = name.trim().toLowerCase();
   const found = MEAL_LIBRARY.find((m) => m.name.trim().toLowerCase() === key);
-  if (!found) return null;
+  if (!found) return libraryRecipe(key, timing);
   const items: PlanMealItem[] = found.items.map((i) => ({
     food: i.n,
     amount: null,
@@ -246,6 +248,59 @@ function libraryMeal(name: string, timing: string | null): PlanMeal | null {
     timing,
     items,
     subtotal: { kcal: t.kcal, p: round1(t.protein), c: round1(t.carbs), f: round1(t.fats) },
+    fromLibrary: true,
+  };
+}
+
+/**
+ * The same substitution for a RECIPE, which for nineteen of the twenty was not
+ * happening at all.
+ *
+ * libraryPromptBlock() offers meals AND recipes and says "Use a library item by
+ * giving its name EXACTLY as written here". The matcher only ever searched
+ * MEAL_LIBRARY, so a model that did exactly as it was told with a recipe got
+ * its own invented per-serving macros carried straight through to the plan the
+ * client reads. Measured before this fix: 50 of 50 meals substituted, 1 of 20
+ * recipes — and that one only because "Turkey Chili" happens to be the name of
+ * a meal as well, so picking the RECIPE silently returned the MEAL.
+ *
+ * That is the precise failure the library exists to prevent, living in the half
+ * nobody had checked.
+ *
+ * A recipe becomes ONE item, not a list of ingredients. Ingredient amounts are
+ * measured for the whole recipe ("1.5 lb chicken breast") and there is no
+ * honest way to divide a string like that by four. The macros CAN be divided,
+ * and they are the part that has to be right, so the item is one serving of the
+ * recipe with per-serving macros. The ingredients stay in the recipe, which is
+ * where somebody cooking it will look anyway.
+ */
+function libraryRecipe(key: string, timing: string | null): PlanMeal | null {
+  // Matched on the name the model was SHOWN, not only the raw title, so a
+  // recipe whose title collides with a meal ("Turkey Chili (recipe)") comes
+  // back as the recipe rather than silently as the meal. Raw title still
+  // matches for the nineteen that do not collide.
+  const found = RECIPE_LIBRARY.find(
+    (r) =>
+      r.title.trim().toLowerCase() === key ||
+      promptNameForRecipe(r.title).trim().toLowerCase() === key,
+  );
+  if (!found) return null;
+  const ps = perServing(found);
+  return {
+    name: found.title,
+    timing,
+    items: [
+      {
+        food: found.title,
+        amount: 1,
+        unit: "serving",
+        p: round1(ps.protein),
+        c: round1(ps.carbs),
+        f: round1(ps.fats),
+        kcal: kcalFromMacros(ps.protein, ps.carbs, ps.fats),
+      },
+    ],
+    subtotal: { kcal: ps.kcal, p: round1(ps.protein), c: round1(ps.carbs), f: round1(ps.fats) },
     fromLibrary: true,
   };
 }
