@@ -104,11 +104,21 @@ export default function TodaysAdmin() {
         const clients = (cov.data || []) as { id: string; name: string; nutrition_only?: boolean }[];
         let short: string[] = [];
         if (clients.length) {
+          // Scoped to THESE clients and given an explicit high limit.
+          //
+          // Without both, PostgREST returns its default first 1,000 rows across
+          // the whole table, the "covered" set comes back partial, and clients
+          // who ARE programmed months out get reported as running out. That is
+          // exactly what shipped: nine names on screen when the real answer was
+          // one. A false alarm on this row is worse than no row, because it
+          // teaches him to ignore the block.
           const { data: sw } = await sb
             .from("scheduled_workouts")
-            .select("client_id, scheduled_date")
+            .select("client_id")
             .is("deleted_at", null)
-            .gte("scheduled_date", horizon);
+            .in("client_id", clients.map((c) => c.id))
+            .gte("scheduled_date", horizon)
+            .limit(20000);
           const covered = new Set(((sw || []) as { client_id: string }[]).map((r) => r.client_id));
           short = clients
             // Nutrition-only clients have no programming BY DESIGN and must not
