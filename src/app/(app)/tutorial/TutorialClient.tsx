@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { TUTORIAL, SETUP_CHECKS, allSteps, type SetupCheckKey } from "@/lib/tutorial/script";
 import { narrate, speechSupported, stopSpeaking, type Narration } from "@/lib/speech";
+import { resolveAudio } from "@/lib/tutorial/audio";
 
 /**
  * The player.
@@ -90,7 +91,11 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
     (s: typeof step) => {
       if (!s) return;
       stop();
-      const n = narrate(s.narration, s.audioUrl);
+      // resolveAudio, not s.audioUrl: recordings are matched to steps by id
+      // from what actually exists in public/tutorial-audio. An explicit
+      // audioUrl on the step still wins. Null falls back to the browser voice,
+      // which is what every unrecorded step does.
+      const n = narrate(s.narration, resolveAudio(s));
       active.current = n;
       setSpeaking(true);
       n.done.then(() => {
