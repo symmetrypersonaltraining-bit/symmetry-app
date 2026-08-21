@@ -33,10 +33,25 @@ import traceback
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
+_LOG_PATH = None
+
+
 def log(msg):
-    stamp = time.strftime("%H:%M:%S")
-    line = f"[{stamp}] {msg}"
+    """Print AND append to the log file.
+
+    Python owns the log rather than the .bat piping into a tee. The tee made
+    `errorlevel` reflect the tee's exit code instead of this script's, so a
+    crashed run printed "Finished. The wav files are in ..." underneath its own
+    traceback. Owning the file here means the batch file can test the real exit
+    code, and it removes the buffering that froze the log for twenty minutes."""
+    line = f"[{time.strftime('%H:%M:%S')}] {msg}"
     print(line, flush=True)
+    if _LOG_PATH:
+        try:
+            with open(_LOG_PATH, "a", encoding="utf-8", errors="replace") as f:
+                f.write(line + "\n")
+        except OSError:
+            pass
 
 
 
@@ -142,8 +157,13 @@ def main():
     ap.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     ap.add_argument("--model", default="auto", choices=["auto", "turbo", "base"],
                     help="auto = Turbo if it loads, otherwise base")
+    ap.add_argument("--log", default=None, help="also append everything to this file")
+    ap.add_argument("--allow-unwatermarked", action="store_true",
+                    help="generate without Resemble's watermark if it will not load")
     ap.add_argument("--only", default=None, help="regenerate a single step id")
     args = ap.parse_args()
+    global _LOG_PATH
+    _LOG_PATH = args.log
 
     # Accept whatever is actually sitting in the folder. He should not have to
     # know or care what Descript exported.
@@ -192,6 +212,42 @@ def main():
             return 2
 
     os.makedirs(args.out, exist_ok=True)
+
+    # PREFLIGHT: the watermarker, before anything expensive.
+    #
+    # chatterbox calls perth.PerthImplicitWatermarker() unguarded in __init__.
+    # perth sets that name to None when its own import fails, and its import
+    # DOES fail on a current toolchain: perth/perth_net/__init__.py line 1 is
+    # `from pkg_resources import resource_filename`, and setuptools removed
+    # pkg_resources in v81. A fresh venv installs setuptools 84, so the failure
+    # is the default, not the exception.
+    #
+    # The result was a TypeError: 'NoneType' object is not callable, thrown
+    # AFTER a 23-minute model download. Checking here costs nothing and fails in
+    # two seconds with the actual remedy.
+    try:
+        import perth
+        wm_ok = getattr(perth, "PerthImplicitWatermarker", None) is not None
+    except Exception as e:
+        perth, wm_ok = None, False
+        log(f"perth did not import at all: {e}")
+
+    if not wm_ok:
+        if args.allow_unwatermarked and perth is not None:
+            # perth ships its own no-op. Use THAT rather than a hand-rolled
+            # stub: same base class, same method signatures, so nothing
+            # downstream can tell the difference except the watermark.
+            log("Watermarker unavailable - continuing WITHOUT a watermark (--allow-unwatermarked).")
+            perth.PerthImplicitWatermarker = perth.DummyWatermarker
+        else:
+            log("STOP: the audio watermarker will not load, and chatterbox crashes on it.")
+            log("")
+            log("  Cause: perth imports pkg_resources, which setuptools removed in v81.")
+            log("  Fix:   venv\\Scripts\\python.exe -m pip install \"setuptools<81\"")
+            log("")
+            log("  (RECORD-TUTORIAL-VOICE.bat now does this for you - just run it again.)")
+            log("  Or pass --allow-unwatermarked to generate without a watermark.")
+            return 2
 
     log("Loading torch...")
     import torch  # noqa
@@ -275,5 +331,12 @@ if __name__ == "__main__":
     except Exception:
         # A crash must land in the log file, not vanish with the window.
         log("CRASHED:")
-        traceback.print_exc()
+        tb = traceback.format_exc()
+        print(tb, flush=True)
+        if _LOG_PATH:
+            try:
+                with open(_LOG_PATH, "a", encoding="utf-8", errors="replace") as f:
+                    f.write(tb + "\n")
+            except OSError:
+                pass
         sys.exit(1)

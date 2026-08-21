@@ -87,14 +87,52 @@ if not exist "%~dp0venv\Scripts\python.exe" (
   "%~dp0venv\Scripts\python.exe" -m pip install imageio-ffmpeg >> "%LOG%" 2>&1
 )
 
+REM ---------------------------------------------------------------
+REM  REPAIR STEP - runs every time, not just on first install.
+REM
+REM  perth (the watermarker chatterbox constructs unguarded) does
+REM  `from pkg_resources import resource_filename`, and setuptools
+REM  DELETED pkg_resources in v81. A fresh venv gets setuptools 84,
+REM  so perth.PerthImplicitWatermarker silently becomes None and
+REM  chatterbox dies with "'NoneType' object is not callable" - after
+REM  a 23-minute model download.
+REM
+REM  Pinning below 81 is the whole fix. It is out here rather than in
+REM  the first-run block because the venv that already exists on this
+REM  machine is the broken one.
+REM ---------------------------------------------------------------
+"%~dp0venv\Scripts\python.exe" -c "import perth,sys; sys.exit(0 if getattr(perth,'PerthImplicitWatermarker',None) else 1)" >nul 2>&1
+if errorlevel 1 (
+  echo Repairing the watermarker dependency ^(setuptools ^< 81^)...
+  echo repairing setuptools for perth >> "%LOG%"
+  "%~dp0venv\Scripts\python.exe" -m pip install "setuptools<81" >> "%LOG%" 2>&1
+)
+
 echo Generating. On a CPU this takes a while - it is about 21 minutes of
 echo speech. You can close the window and re-run; it resumes.
+echo The models are already downloaded, so this starts straight away.
 echo.
-"%~dp0venv\Scripts\python.exe" "%~dp0generate-narration.py" --ref "%REF%" --out "%~dp0narration" 2>&1 | "%~dp0venv\Scripts\python.exe" -c "import sys;f=open(r'%LOG%','a',encoding='utf-8',errors='replace');[ (sys.stdout.write(l), f.write(l), f.flush()) for l in sys.stdin ]"
+REM NO PIPE HERE, deliberately.
+REM
+REM This used to pipe into a tee so the log got a copy. In a cmd pipeline
+REM `errorlevel` is the LAST command's, i.e. the tee's - which is always 0. So
+REM when the run crashed, the check below passed and the window cheerfully
+REM printed "Finished. The wav files are in ..." directly underneath the
+REM traceback. The script said it worked when it had not.
+REM
+REM generate-narration.py writes the log itself now, so there is nothing to tee
+REM and this errorlevel is the real one.
+"%~dp0venv\Scripts\python.exe" -u "%~dp0generate-narration.py" --ref "%REF%" --out "%~dp0narration" --log "%LOG%"
 
 if errorlevel 1 goto failed
+for /f %%C in ('dir /b "%~dp0narration\*.wav" 2^>nul ^| find /c /v ""') do set MADE=%%C
 echo.
-echo Finished. The wav files are in: %~dp0narration
+if "%MADE%"=="0" (
+  echo It exited cleanly but produced no audio. Send Claude voice-log.txt.
+  pause
+  exit /b 1
+)
+echo Finished. %MADE% recordings are in: %~dp0narration
 echo Tell Claude it is done.
 pause
 exit /b 0

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { submitFeedback } from "@/lib/feedback";
+import { getPageContext } from "@/lib/pageContext";
 import { startDictation } from "@/lib/dictation";
 import { isTrainerEmail } from "@/lib/trainer";
 
@@ -85,7 +86,10 @@ export default function FloatingDock() {
       let source = "app";
       try { const m = localStorage.getItem("symmetry_view_mode"); if (m) source = m + "-app"; } catch {}
       const tag = sentiment === "like" ? "[LIKE] " : sentiment === "change" ? "[CHANGE] " : "";
-      await submitFeedback(sb, { source, transcript: tag + msg.trim() });
+      // context: whatever screen the user is on, if it published something
+      // more useful than its URL. The tutorial does — otherwise all 51 steps
+      // file identical reports that just say "/tutorial".
+      await submitFeedback(sb, { source, transcript: tag + msg.trim(), context: getPageContext() });
       setDone(true); setMsg(""); setSentiment(null);
       setTimeout(() => { setDone(false); setOpen(false); }, 1700);
     } catch {} finally { setSending(false); }

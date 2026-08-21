@@ -24,7 +24,21 @@ shopt -s nullglob
 n=0
 for w in "$SRC"/*.wav; do
   id="$(basename "$w" .wav)"
-  ffmpeg -y -loglevel error -i "$w" -ac 1 -b:a 64k "$OUT/$id.mp3"
+  # LOUDNESS-MATCH EVERY CLIP.
+  #
+  # Chatterbox Turbo does this itself (norm_loudness, -27 LUFS) but Turbo fails
+  # to instantiate on chatterbox-tts 0.1.7 - it calls S3Gen(meanflow=True) and
+  # the installed S3Gen has no such argument - so the base model is what
+  # actually generates these, and the base model does NOT level its output.
+  #
+  # Fifty-one separately generated clips then play back at fifty-one different
+  # volumes, and a tutorial whose narrator lurches quieter and louder between
+  # steps reads as broken. Doing it here is better than relying on the model
+  # anyway: one stated target, applied uniformly, and verifiable afterwards.
+  #
+  # -19 LUFS suits a phone speaker in a gym. TP -1.5dB leaves headroom so mp3
+  # encoding cannot clip the peaks it creates.
+  ffmpeg -y -loglevel error -i "$w" -ac 1 -af loudnorm=I=-19:TP=-1.5:LRA=11 -b:a 64k "$OUT/$id.mp3"
   n=$((n+1))
 done
 [ "$n" -gt 0 ] || { echo "no wavs in $SRC" >&2; exit 1; }

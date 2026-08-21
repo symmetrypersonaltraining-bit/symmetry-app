@@ -5,6 +5,7 @@ import Link from "next/link";
 import { TUTORIAL, SETUP_CHECKS, allSteps, type SetupCheckKey } from "@/lib/tutorial/script";
 import { narrate, speechSupported, stopSpeaking, type Narration } from "@/lib/speech";
 import { resolveAudio } from "@/lib/tutorial/audio";
+import { setPageContext } from "@/lib/pageContext";
 
 /**
  * The player.
@@ -19,6 +20,18 @@ import { resolveAudio } from "@/lib/tutorial/audio";
  * Voice is off until asked for. An app that starts talking the moment you open
  * a page is an app you close.
  */
+
+/**
+ * Wipe every trace of a run: what was seen, where they stopped, the voice
+ * choice. Dustin asked for "test, adjust, reset and test again" — without this
+ * a tester gets exactly one clean walkthrough, and every run after it starts
+ * part-way in with ticks already showing, which is the opposite of a test.
+ */
+function resetTutorialProgress(): void {
+  for (const k of [SEEN_KEY, POS_KEY, VOICE_KEY]) {
+    try { localStorage.removeItem(k); } catch { /* nothing to undo */ }
+  }
+}
 
 const SEEN_KEY = "symmetry_tutorial_seen_v1";
 const VOICE_KEY = "symmetry_tutorial_voice_v1";
@@ -79,6 +92,15 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
       /* as above */
     }
   }, [idx, ready, step]);
+
+  // Publish WHICH STEP, so a feedback report from here says more than
+  // "/tutorial". All 51 steps share one URL, so without this every report a
+  // testing trainer files is indistinguishable from every other.
+  useEffect(() => {
+    if (!step) return;
+    setPageContext(`tutorial: ${step.chapterId}/${step.id} — ${step.title}`);
+    return () => setPageContext(null);
+  }, [step]);
 
   const stop = useCallback(() => {
     active.current?.stop();
@@ -182,6 +204,27 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
               })}
             </div>
           ))}
+
+          {/* Start over. Lives inside the map rather than on the main screen so
+              nobody clears their place by fat-fingering the wrong button
+              mid-walkthrough — you have to open the contents to reach it. */}
+          <button
+            type="button"
+            onClick={() => {
+              if (!confirm("Start the tutorial from the beginning? This clears your progress.")) return;
+              resetTutorialProgress();
+              setSeen(new Set());
+              setShowMap(false);
+              go(0);
+            }}
+            className="mt-3 text-xs"
+            style={{
+              background: "none", border: "none", padding: 0, cursor: "pointer",
+              color: "var(--brand-text-secondary)", textDecoration: "underline",
+            }}
+          >
+            Start over from the beginning
+          </button>
         </div>
       ) : null}
 
