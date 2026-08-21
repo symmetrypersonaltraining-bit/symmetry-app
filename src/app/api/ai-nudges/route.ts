@@ -51,6 +51,7 @@ import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { isCronRequest } from "@/lib/cron-auth";
+import { readFlag } from "@/lib/flags";
 import {
   segment,
   isRehab,
@@ -151,6 +152,35 @@ export async function POST(req: NextRequest) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return NextResponse.json({ error: "Not configured" }, { status: 500 });
   const admin = createAdminClient(url, key, { auth: { persistSession: false } }) as unknown as Db;
+
+  // ── THE SWEEP IS OFF. `app_flags.nudges_live` is the switch. ────────────
+  //
+  // Dustin, 21 Aug: "stop that for now. keep engine for later if i decide to
+  // add it back."
+  //
+  // It was writing a message to every active client every night — thirty
+  // drafts, in his voice, that nothing in the app ever displayed. The Settings
+  // row called it a digest and sent to him; no such digest exists, and nothing
+  // reads ai_nudge_log. So the cost was real and the output reached nobody.
+  //
+  // Two switches were turned off, because either alone is a way back on by
+  // accident. The schedule is gone from vercel.json — that is what was firing
+  // it, nightly, despite the Monday cron string, and unscheduling is the thing
+  // that actually stops the spend. This is the second: a flag, so the engine is
+  // revived by flipping one row rather than by a deploy, and so a stray manual
+  // call cannot start a sweep in the meantime.
+  //
+  // `nudges_live` already existed and was read by nothing. Now it means
+  // something. Everything below it — the segmentation, the guardrails, the
+  // copy — is deliberately untouched and still tested.
+  const live = await readFlag(admin, "nudges_live");
+  if (!live) {
+    return NextResponse.json({
+      ok: true,
+      skipped: "nudges_live is off",
+      note: "The engine is intact. Set app_flags.nudges_live = true to run a sweep.",
+    });
+  }
 
   // Kill switch. This was the ONLY route in the app that never checked it at
   // all — a weekly sweep across the whole roster, unattended, able to spend
@@ -455,12 +485,10 @@ export async function POST(req: NextRequest) {
  * segments the roster, writes the drafts to ai_nudge_log with sent=false, and
  * digests them to the trainer. Nothing reaches a client.
  *
- * This used to end "and `nudges_live` still has to be on before send:true means
- * anything at all", which stopped being true and stayed written down. There is
- * no `send` parameter any more — see the note above the handler — so there is
- * nothing for a flag to gate, and `nudges_live` is read by nothing in src/.
- * A comment describing a safety mechanism that no longer exists is worse than
- * no comment: it is the one someone trusts while looking for the real gate.
+ * `nudges_live` gates the whole sweep as of 21 Aug. It had been dead — read by
+ * nothing — while a comment here still described it as a safety mechanism,
+ * which is worse than no comment: it is the one somebody trusts while looking
+ * for the real gate. It is now the real gate, and it is OFF.
  */
 export async function GET(req: NextRequest) {
   return POST(req);

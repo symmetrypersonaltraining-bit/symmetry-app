@@ -216,11 +216,23 @@ export default function ExperienceSettings({ isTrainer }: { isTrainer: boolean }
               the settings screen, and the first person to notice would be a
               client who never got the message it claimed to send.
               What the engine still does is described below, truthfully. */}
+
+          {/* And this row was the SECOND lie in the same place. It read
+              "sends the list to you", switched on and locked on, and no such
+              list has ever existed — nothing in the app reads ai_nudge_log.
+              Meanwhile the sweep ran nightly and wrote a message about every
+              client that nobody saw. Dustin, 21 Aug: "stop that for now. keep
+              engine for later if i decide to add it back."
+
+              Shown as OFF and locked, rather than deleted, because the engine
+              is deliberately still there. A toggle here would be the wrong
+              switch anyway: turning it back on is a decision about what the
+              drafts are FOR, and there is nowhere for them to go yet. */}
           <Row
             icon="ti-list-check"
-            title="Weekly re-engagement digest"
-            sub="Drafts what would be worth saying to anyone drifting and sends the list to you — nothing goes to a client. Send it in your own words, or don't."
-            on
+            title="Re-engagement drafts"
+            sub="Off. It used to write a message about every client every night that nothing ever showed you. The engine is kept — when there's somewhere for the drafts to land, it comes back."
+            on={false}
             disabled
             onToggle={() => {}}
           />
