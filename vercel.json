@@ -1,8 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/weekly-ai?draft=1",
-      "schedule": "0 11 * * 6"
+      "path": "/api/cron/weekly-ai",
+      "schedule": "0 3 * * 0"
     },
     {
       "path": "/api/cron/birthdays",

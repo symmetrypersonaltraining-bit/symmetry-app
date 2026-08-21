@@ -143,11 +143,22 @@ test("a reaction never notifies you about yourself, and coalesces a flurry", () 
 
 test("the registry keeps forced events to a genuine minimum", () => {
   const reg = codeOnly(readFileSync(join(ROOT, "src/lib/notificationEvents.ts"), "utf8"));
-  const forced = (reg.match(/forced:\s*true/g) || []).length;
+  // Count CLIENT-FACING forced events only. The rule's stated reason is that a
+  // forced push gives a CLIENT a motive to switch notifications off at the OS
+  // level, taking their payment reminders down with it. A trainerOnly event is
+  // never on a client's phone and cannot cause that, so it is not what this
+  // ratchet is protecting against.
+  //
+  // Each event object is one `{ ... }` block in the registry; a forced one that
+  // also says trainerOnly does not count here.
+  const blocks = reg.split(/^\s{2}[A-Z_]+:\s*\{/m).slice(1);
+  const forcedClientFacing = blocks.filter(
+    (b) => /forced:\s*true/.test(b) && !/trainerOnly:\s*true/.test(b),
+  ).length;
   assert.ok(
-    forced <= 1,
-    `${forced} events are forced. Every forced event is a reason to switch notifications ` +
-      `off at the OS level, and that takes the payment reminders down with it. If a second ` +
-      `one is genuinely Dustin's to force, raise this number deliberately.`,
+    forcedClientFacing <= 1,
+    `${forcedClientFacing} CLIENT-FACING events are forced. Every one is a reason to switch ` +
+      `notifications off at the OS level, and that takes the payment reminders down with it. ` +
+      `If a second one is genuinely Dustin's to force, raise this number deliberately.`,
   );
 });

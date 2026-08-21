@@ -46,11 +46,22 @@ describe("Week ahead is off the home screen", () => {
     );
   });
 
-  it("nothing else lost its way to approve a focus line", () => {
-    // The digest was one of two ways a focus line got set. If SaturdayReview
-    // ever leaves too, the Sunday fallback publishes AI text to clients that
-    // nobody has read.
-    assert.match(home, /<SaturdayReview\b/, "SaturdayReview is gone from home — focus drafts would then publish on Sunday unreviewed");
+  it("the focus line still has a writer, and a way to report that it didn't", () => {
+    // Rewritten 21 Aug. The old guarantee was "a human reviews before it
+    // publishes", which is why this asserted SaturdayReview was mounted.
+    // Dustin retired approval that day, so the guarantee is now the opposite
+    // shape: the sweep publishes on its own, and something OUTSIDE the sweep
+    // says so when it doesn't. That second half is the part that was missing
+    // when the sweep died on 15 Aug and nobody knew for six days.
+    assert.match(
+      home,
+      /<WeeklyFocusHealth\b/,
+      "WeeklyFocusHealth is gone from home — a sweep that fails would again look exactly like a quiet week",
+    );
+    assert.ok(
+      fs.existsSync(path.join(ROOT, "src/app/api/cron/focus-watchdog/route.ts")),
+      "the focus watchdog is gone — nothing would notice a sweep that never ran",
+    );
   });
 });
 

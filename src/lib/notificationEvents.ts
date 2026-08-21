@@ -36,7 +36,8 @@ type EventName =
   | "MESSAGE_FROM_CLIENT"
   | "ANNOUNCEMENT"
   | "GROUP_MESSAGE"
-  | "REACTION_ON_MY_MESSAGE";
+  | "REACTION_ON_MY_MESSAGE"
+  | "SYSTEM_ALERT";
 
 // Annotated rather than `as const`: with `as const` each value narrows to its
 // own literal shape, so an event that happens not to set `forced` loses the
@@ -69,6 +70,17 @@ export const NOTIFICATION_EVENTS: Record<EventName, NotificationEventDef> = {
     key: "group_message",
     label: "Group chat",
     description: "New messages in the group chat.",
+  },
+  SYSTEM_ALERT: {
+    key: "system_alert",
+    label: "App problems",
+    description: "When something the app does automatically has stopped working.",
+    // Trainer-only AND forced. The whole point is that it fires when an
+    // automation has gone quiet, and a preference that silences it recreates
+    // exactly the failure it exists to report — the weekly sweep died on
+    // 15 Aug and nobody knew for six days.
+    trainerOnly: true,
+    forced: true,
   },
   REACTION_ON_MY_MESSAGE: {
     key: "reaction_on_my_message",

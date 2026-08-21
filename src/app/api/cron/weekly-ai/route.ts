@@ -1,11 +1,19 @@
-// GET/POST /api/cron/weekly-ai — the Sunday sweep.
+// GET/POST /api/cron/weekly-ai — the weekly sweep.
 //
 // Dustin: "Ai needs to auto update weeky focus, coaches read weekly and food
 // logger weekly, food logger one base numbers on how they did last week and
 // what to work on this week. i dont want to have to check on these."
 //
-// So this runs itself. Every Sunday at 6 AM Central (vercel.json), for every
-// active client, it derives last week vs this week from real logs
+// And 21 Aug, retiring the approval step: "correct i dont need to approve if
+// the ai is set up to be accurate based on real numbers."
+//
+// So this runs itself, and what it writes goes straight to the client. Late
+// SATURDAY night (vercel.json, 03:00 UTC Sunday = 22:00 CT Saturday) — after
+// the Sun-Sat week has completely finished, so the model grades seven whole
+// days rather than the Sunday-to-Friday stub the old 6 AM Saturday slot gave
+// it, and the new focus is waiting when the client opens the app on Sunday.
+//
+// For every active client, it derives last week vs this week from real logs
 // (fetchWeeklyComparison — the same summariser the client's own screen uses),
 // hands those pre-computed numbers to one Sonnet call, and stores three pieces
 // of copy:
@@ -124,24 +132,25 @@ interface RunResult {
 async function runSweep(opts: {
   onlyClientId?: string | null;
   today?: string;
-  /**
-   * Saturday mode. The focus goes to weekly_focus_drafts for Dustin to approve
-   * instead of straight onto the client's week card. Everything else (coach's
-   * read, food focus, the fortnightly question) still publishes directly —
-   * those are not what he asked to gate, and holding them back would mean the
-   * whole week's copy waits on one approval.
-   *
-   * `week` is the SUNDAY the copy is for. On a Saturday run that is tomorrow,
-   * not today, or the drafts would target the week that is already ending.
-   */
-  draftFocus?: boolean;
 }): Promise<{
   week: string;
   today: string;
   results: RunResult[];
 }> {
   const today = opts.today || CT_TODAY();
-  const week = opts.draftFocus ? weekStartOf(nextDay(today)) : weekStartOf(today);
+  // `week` is the SUNDAY this copy is FOR — always the week containing
+  // tomorrow, never the one containing today.
+  //
+  // This used to be weekStartOf(today) outside draft mode, which was only ever
+  // right for a run that happened during the week it was describing. On the
+  // Saturday-night schedule it would have stamped every line with the Sunday
+  // of the week that had just ENDED, so a focus written for the coming week
+  // would have been filtered out as stale the moment it was published.
+  //
+  // Deriving it from tomorrow is correct for both a late-Saturday run (tomorrow
+  // is that Sunday) and an early-Sunday one (tomorrow is Monday, whose week
+  // starts on the same Sunday), so the schedule can move without this breaking.
+  const week = weekStartOf(nextDay(today));
   const db = createAdminClient();
 
   let q = db
@@ -216,45 +225,10 @@ async function runSweep(opts: {
         ai_food_focus: result.value.foodFocus,
         ai_food_focus_week: week,
       };
-      if (!trainerOwnsFocus && !opts.draftFocus) {
+      if (!trainerOwnsFocus) {
         update.weekly_focus = result.value.focus;
         update.weekly_focus_week = week;
         update.weekly_focus_source = "ai";
-      }
-
-      if (opts.draftFocus) {
-        // Replace an unapproved draft for the same week (a re-run should give
-        // him the newest copy) but never touch one he has already approved or
-        // edited — that is his work, and clobbering it is worse than a stale
-        // draft.
-        const { data: existing } = await db
-          .from("weekly_focus_drafts")
-          .select("id, approved_at, edited_at")
-          .eq("client_id", c.id)
-          .eq("week_start", week)
-          .maybeSingle();
-        const ex = existing as { id: string; approved_at: string | null; edited_at: string | null } | null;
-        // Both checked, and both throw into this client's catch below — which
-        // already records `status: "failed"` with a detail, so the run summary
-        // names exactly who has no draft.
-        //
-        // Unchecked, a client whose draft never landed was pushed into that
-        // same summary as "written". This is the single worst place in the app
-        // for that: the Saturday review screen renders NOTHING when there are
-        // no drafts, so a silent failure here looks identical to a quiet week,
-        // and the run report agreed with it.
-        if (!ex) {
-          const { error: insErr } = await db.from("weekly_focus_drafts").insert({
-            client_id: c.id, week_start: week,
-            focus: result.value.focus, focus_ai: result.value.focus,
-          });
-          if (insErr) throw new Error(`draft not written: ${insErr.message}`);
-        } else if (!ex.approved_at && !ex.edited_at) {
-          const { error: updErr } = await db.from("weekly_focus_drafts")
-            .update({ focus: result.value.focus, focus_ai: result.value.focus })
-            .eq("id", ex.id);
-          if (updErr) throw new Error(`draft not refreshed: ${updErr.message}`);
-        }
       }
 
       const { error: upErr } = await db.from("clients").update(update).eq("id", c.id);
@@ -303,17 +277,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    // ?draft=1 on Saturday: write focus DRAFTS for Dustin to approve rather
-    // than publishing 35 lines of coaching copy nobody has read.
     const sp = new URL(req.url).searchParams;
     // Kill switch. This route could spend after every client-facing feature had
     // already paused — the cap meant nothing here.
     const paused = await enforceMeter(null, "weekly_sweep");
     if (paused) return paused;
-    const out = await runSweep({
-      onlyClientId: sp.get("clientId"),
-      draftFocus: sp.get("draft") === "1",
-    });
+    const out = await runSweep({ onlyClientId: sp.get("clientId") });
     return NextResponse.json({ ok: true, ...out });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
@@ -324,7 +293,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * Manual run. Cron auth, OR a signed-in trainer — so Dustin can force a sweep
- * from the app without holding a secret or waiting for Sunday.
+ * from the app without holding a secret or waiting for Saturday night.
  */
 export async function POST(req: NextRequest) {
   if (!authorised(req)) {
@@ -343,7 +312,6 @@ export async function POST(req: NextRequest) {
     const out = await runSweep({
       onlyClientId: typeof body?.clientId === "string" ? body.clientId : null,
       today: typeof body?.today === "string" ? body.today : undefined,
-      draftFocus: body?.draft === true,
     });
     return NextResponse.json({ ok: true, ...out });
   } catch (e: unknown) {

@@ -282,11 +282,17 @@ test("a failed rejection is not reported as rejected", () => {
 const WEEKLY = read("src/app/api/cron/weekly-ai/route.ts");
 const NUDGES = read("src/app/api/ai-nudges/route.ts");
 
-test("a focus draft that did not save is not reported as written", () => {
-  assert.match(WEEKLY, /if \(insErr\) throw new Error\(`draft not written/);
-  assert.match(WEEKLY, /if \(updErr\) throw new Error\(`draft not refreshed/);
-  const bare = WEEKLY.match(/(?<!=\s)await\s+db\s*\n?\s*\.from\("weekly_focus_drafts"\)/g) || [];
-  assert.equal(bare.length, 0, "a draft write still discards its result");
+// Superseded 21 Aug. The approval step was retired -- "correct i dont need to
+// approve if the ai is set up to be accurate based on real numbers" -- so the
+// sweep writes no drafts at all and there is no draft write left to check.
+// The stronger property is that it stays that way: a draft written now would
+// go to a table nothing publishes and a review screen nothing mounts.
+test("the sweep writes no focus drafts, so none can be silently lost", () => {
+  assert.equal(
+    (WEEKLY.match(/weekly_focus_drafts/g) || []).length,
+    0,
+    "the sweep is writing drafts again. Nothing publishes that table any more, so those lines would reach nobody.",
+  );
 });
 
 test("the programming question can report a failure it could never report before", () => {

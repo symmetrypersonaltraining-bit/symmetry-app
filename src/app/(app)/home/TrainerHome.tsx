@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import CommunityPair from "@/components/CommunityPair";
-import SaturdayReview from "@/components/SaturdayReview";
+import WeeklyFocusHealth from "@/components/WeeklyFocusHealth";
 import LiveSessions from "@/components/LiveSessions";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
@@ -158,10 +158,14 @@ export default function TrainerHome({
 
   return (
     <>
-      {/* Saturday review of next week's focus. Full-screen and impossible to
-          miss when there is a batch waiting; renders nothing at all six days
-          out of seven. Dismissing it only silences it until noon, then 5pm. */}
-      <SaturdayReview />
+      {/* SaturdayReview (the full-screen focus-approval takeover) is gone from
+          here as of 21 Aug. Dustin: "correct i dont need to approve if the ai is
+          set up to be accurate based on real numbers." The sweep now publishes
+          straight to the client, so there is nothing to approve and a
+          full-screen interrupt for it would be pure noise.
+
+          Kept in the repo, not deleted — same treatment as TrainerWeekDigest
+          below, and pinned by tests/unit/weeklyFocusIsAutomatic.test.ts. */}
 
       {chooserSession && (
         <WorkoutChooserModal
@@ -175,6 +179,7 @@ export default function TrainerHome({
           (in HeaderAssist) is the app-wide notification entry point. */}
       {/* Payment notifications moved OFF the trainer home into the Payments section (Dustin 7/9). */}
       <SyncHealth />
+      <WeeklyFocusHealth />
       <GcalSyncButton />
 
         {/* Header */}
@@ -342,12 +347,13 @@ export default function TrainerHome({
             editor from nothing when that conversation happens. Do not re-mount
             it here, and do not delete it either.
 
-            Nothing is orphaned by its absence. SaturdayReview above owns the
-            focus-draft approval, publish_focus_drafts_sunday is the fallback,
-            and ClientWeekSummary only shows a focus stamped with the CURRENT
-            week — so a client sees no stale line, just no line. The only thing
-            that stops being written is digest_snoozed_until, which nothing
-            reads. */}
+            Nothing is orphaned by its absence. As of 21 Aug the weekly sweep
+            publishes the focus itself, late on Saturday, with no approval step
+            — so there is no draft queue to own. WeeklyFocusHealth above reports
+            whether it worked, and ClientWeekSummary only shows a focus stamped
+            with the CURRENT week, so a client sees no stale line, just no line.
+            The only thing that stops being written is digest_snoozed_until,
+            which nothing reads. */}
 
         {/* Stat Cards Row */}
         <div className="grid grid-cols-2 gap-3">
