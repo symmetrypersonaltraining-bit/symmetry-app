@@ -54,6 +54,24 @@ if not exist "%~dp0venv\Scripts\python.exe" (
   py -3 -m venv "%~dp0venv" >> "%LOG%" 2>&1
   if errorlevel 1 goto failed
   "%~dp0venv\Scripts\python.exe" -m pip install --upgrade pip >> "%LOG%" 2>&1
+
+  REM --- NVIDIA card? Install the CUDA build of torch FIRST, so the plain
+  REM --- CPU wheel never gets pulled in as a dependency. This is the single
+  REM --- biggest speed difference available: minutes instead of an hour.
+  where nvidia-smi >nul 2>&1
+  if errorlevel 1 (
+    echo No NVIDIA GPU detected - running on CPU. Expect roughly an hour.
+    echo no nvidia-smi, CPU path >> "%LOG%"
+  ) else (
+    echo NVIDIA GPU detected - installing the CUDA build of PyTorch.
+    echo nvidia-smi found, installing CUDA torch >> "%LOG%"
+    "%~dp0venv\Scripts\python.exe" -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124 >> "%LOG%" 2>&1
+    if errorlevel 1 (
+      echo CUDA build failed, carrying on with the CPU build. >> "%LOG%"
+      echo   CUDA build unavailable - falling back to CPU. Still works, just slower.
+    )
+  )
+
   "%~dp0venv\Scripts\python.exe" -m pip install chatterbox-tts >> "%LOG%" 2>&1
   if errorlevel 1 goto failed
 )

@@ -45,6 +45,8 @@ def main():
     ap.add_argument("--manifest", default=os.path.join(HERE, "narration-manifest.json"))
     ap.add_argument("--out", default=os.path.join(HERE, "narration"))
     ap.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    ap.add_argument("--model", default="auto", choices=["auto", "turbo", "base"],
+                    help="auto = Turbo if it loads, otherwise base")
     ap.add_argument("--only", default=None, help="regenerate a single step id")
     args = ap.parse_args()
 
@@ -77,8 +79,36 @@ def main():
         device = "cuda" if torch.cuda.is_available() else "cpu"
     log(f"Device: {device}" + ("  (this will take a while on CPU)" if device == "cpu" else ""))
 
-    log("Loading Chatterbox weights (first run downloads ~2GB from huggingface)...")
-    model = ChatterboxTTS.from_pretrained(device=device)
+    # TURBO FIRST, deliberately.
+    #
+    # Two reasons, and the second is the one that shows. It is the faster model,
+    # which matters when the job is 21 minutes of speech on a laptop CPU. And it
+    # normalises loudness per clip (norm_loudness, target -27 LUFS), so 51
+    # separately generated files play back at the same volume. Without that, a
+    # tutorial steps from one line to the next and the voice jumps — which reads
+    # as broken far more than a slightly slower model does.
+    #
+    # Turbo lives in a different HF repo that may require accepting terms, so a
+    # failure to load it is expected-and-handled, not an error: fall back to the
+    # base model and say so, rather than stopping a job that can still run.
+    model = None
+    if args.model in ("auto", "turbo"):
+        try:
+            log("Loading Chatterbox TURBO (first run downloads ~2GB from huggingface)...")
+            from chatterbox.tts_turbo import ChatterboxTurboTTS
+            model = ChatterboxTurboTTS.from_pretrained(device=device)
+            log("Using TURBO — faster, and loudness-matched across clips.")
+        except Exception as e:
+            if args.model == "turbo":
+                log(f"STOP: Turbo was requested and did not load: {e}")
+                return 2
+            log(f"Turbo unavailable ({type(e).__name__}), falling back to the base model.")
+            log("  (If it says 401/gated, accept the terms at huggingface.co/ResembleAI/chatterbox-turbo")
+            log("   and set HF_TOKEN, or just let it run on base — the voice is the same.)")
+    if model is None:
+        log("Loading Chatterbox base model (first run downloads ~2GB from huggingface)...")
+        model = ChatterboxTTS.from_pretrained(device=device)
+        log("Using BASE model.")
     log(f"Model ready. Sample rate {model.sr}.")
 
     todo = [l for l in lines if not os.path.isfile(os.path.join(args.out, l["id"] + ".wav"))]
