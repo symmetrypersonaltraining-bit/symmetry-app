@@ -89,8 +89,21 @@ test("scheduled_workouts is left alone — 'completed' is real there", () => {
   // The fix must not have swept up the table where that status genuinely
   // exists, or every done-count in the app goes to zero.
   const summary = strip(readFileSync(join(process.cwd(), "src/components/ClientWeekSummary.tsx"), "utf8"));
-  // BOTH of them — last week's count and this week's. Matching one would let
-  // the other be swept up unnoticed, which is how a done-count silently halves.
-  const kept = (summary.match(/r\.status === "completed"/g) || []).length;
-  assert.equal(kept, 2, `${kept} of the 2 scheduled_workouts checks survive`);
+  // Checks the two done-counts BY NAME rather than counting occurrences.
+  //
+  // It used to assert the string appeared exactly twice, which broke the moment
+  // a third legitimate reader arrived (21 Aug: the streak reads the same status
+  // so a session ticked off on the schedule counts even with no log row). A
+  // bare count also could not tell which two survived — one being swept up and
+  // a new one added elsewhere would still total two and pass. Naming them is
+  // both stricter and stable.
+  for (const which of ["doneLast", "doneThis"]) {
+    const at = summary.indexOf("const " + which + " =");
+    assert.ok(at > -1, which + " is gone from ClientWeekSummary");
+    assert.match(
+      summary.slice(at, at + 160),
+      /r\.status === "completed"/,
+      which + ' no longer counts scheduled_workouts by status === "completed" — that done-count would read zero',
+    );
+  }
 });

@@ -24,6 +24,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import GcalSyncButton from "@/components/GcalSyncButton";
 
 interface Run {
   queued_at: string;
@@ -108,6 +109,11 @@ export default function SyncHealth() {
             {r.window ? " · " + r.window : ""}
           </div>
         </div>
+        {/* The manual sync sits ON the status bar. Dustin, 21 Aug: "move the
+            actual manual sync button onto the cal in sync bar on the right side
+            as a button on top of it." Knowing the sync is behind and being able
+            to do something about it are one thought, not two controls. */}
+        <div style={{ flexShrink: 0 }}><GcalSyncButton compact /></div>
       </div>
 
       {skipped && r.reason && (

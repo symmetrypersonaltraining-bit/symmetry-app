@@ -146,7 +146,7 @@ export default function ClientWeekSummary() {
         const thisWkEnd = addDays(thisWk, 6);
         const metricWindow = addDays(today, -21);
 
-        const [swLast, swThis, metricsRows, wlogs] = await Promise.all([
+        const [swLast, swThis, metricsRows, wlogs, swStreak] = await Promise.all([
           supabase.from("scheduled_workouts").select("status, scheduled_date").is("deleted_at", null).eq("client_id", cid).gte("scheduled_date", lastWkStart).lte("scheduled_date", lastWkEnd),
           // THIS week counts only as far as TODAY. Dustin, 21 Aug: "how many
           // workouts they logged out of how many are scheduled per that current
@@ -158,6 +158,9 @@ export default function ClientWeekSummary() {
           supabase.from("scheduled_workouts").select("status, scheduled_date").is("deleted_at", null).eq("client_id", cid).gte("scheduled_date", thisWk).lte("scheduled_date", today),
           supabase.from("metrics").select("metric_date, weight").eq("client_id", cid).gte("metric_date", metricWindow).order("metric_date", { ascending: true }),
           supabase.from("workout_logs").select("log_date, completed, status").eq("client_id", cid).gte("log_date", addDays(today, -60)).order("log_date", { ascending: false }),
+          // Sixty days of SCHEDULING, so the streak can tell a rest day from a
+          // missed one. Without this it cannot, and it punishes rest.
+          supabase.from("scheduled_workouts").select("scheduled_date, status").is("deleted_at", null).eq("client_id", cid).gte("scheduled_date", addDays(today, -60)).lte("scheduled_date", today),
         ]);
 
         const lastRows = swLast.data || [];
@@ -179,10 +182,46 @@ export default function ClientWeekSummary() {
         // Dead rather than wrong here — the boolean already carried it — but a
         // dead clause with a false premise is how the MetricCards version of
         // this line ended up counting unfinished sessions.
-        const doneDates = new Set((wlogs.data || []).filter((w: any) => w.completed).map((w: any) => w.log_date));
+        // ── STREAK: days they did what was asked, not days they trained ──────
+        //
+        // Dustin, 21 Aug: "my streak shows 2 right now bc i had a rest day wed,
+        // that was programmed ive hit everything so far this week on programming
+        // so my streak should be 5 days right now not 2."
+        //
+        // The old version walked back while a COMPLETED log existed and stopped
+        // at the first day without one — so a programmed rest day ended the
+        // streak exactly like a skipped session. That punishes people for
+        // following the programme, and rest is part of the programme.
+        //
+        // Now: a day with nothing scheduled is passed over without breaking or
+        // incrementing. Only a day that ASKED for something and did not get it
+        // ends the run. Bounded to the 60 days of data fetched above.
+        const doneDates = new Set<string>(
+          (wlogs.data || []).filter((w: any) => w.completed).map((w: any) => w.log_date as string),
+        );
+        // A session ticked off on the schedule counts even if no log row exists.
+        for (const r of (swStreak.data || []) as any[]) {
+          if (r.status === "completed") doneDates.add(r.scheduled_date as string);
+        }
+        const askedDates = new Set<string>(
+          ((swStreak.data || []) as any[]).map((r) => r.scheduled_date as string),
+        );
+
+        // Scoped to THIS Sun-Sat week and reset with it, like every other
+        // number on this card. Dustin, 21 Aug: "this should be the week of so
+        // sun-sat correct? like the rest of everything we did, same week that
+        // we are on right now."
+        //
+        // A day is KEPT if they did what was asked, or if nothing was asked —
+        // a programmed rest day is the programme working, not a gap in it. Only
+        // a day that asked for something and did not get it ends the run.
         let streak = 0;
-        let cursor = doneDates.has(today) ? today : addDays(today, -1);
-        if (doneDates.has(cursor)) { while (doneDates.has(cursor)) { streak++; cursor = addDays(cursor, -1); } }
+        let cursor = !doneDates.has(today) && askedDates.has(today) ? addDays(today, -1) : today;
+        while (cursor >= thisWk) {
+          if (doneDates.has(cursor) || !askedDates.has(cursor)) streak++;
+          else break;
+          cursor = addDays(cursor, -1);
+        }
 
         const firstName = (clientName || "").split(" ")[0] || "there";
         if (!on) return;
@@ -315,7 +354,7 @@ export default function ClientWeekSummary() {
           </div>
           <div style={{ flex: 1, textAlign: "center", background: "var(--brand-card)", borderRadius: 11, padding: 7 }}>
             <div style={{ fontWeight: 800, color: "var(--brand-text)" }}>{s.streak}🔥</div>
-            <div style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>streak</div>
+            <div style={{ fontSize: 10, color: "var(--brand-text-secondary)" }}>days kept</div>
           </div>
         </div>
         {(focusText || s.totalThis > 0) && (
@@ -342,7 +381,7 @@ export default function ClientWeekSummary() {
               {stat(<span>{s.doneLast}<span style={{ fontSize: 14, color: "var(--brand-text-secondary)" }}>/{s.totalLast || 0}</span></span>, "workouts done")}
               {stat(nutritionPctLast != null ? nutritionPctLast + "%" : "—", "nutrition adherence")}
               {stat(s.weightDelta != null ? (s.weightDelta > 0 ? "+" : "") + s.weightDelta + " lb" : "—", "body weight", s.weightDelta != null && s.weightDelta < 0 ? "▼ trending down" : undefined)}
-              {stat(<span>{s.streak}🔥</span>, "day streak")}
+              {stat(<span>{s.streak}🔥</span>, "days kept")}
             </div>
             <div style={{ fontWeight: 800, fontSize: 14, color: "var(--brand-text)", marginTop: 2 }}>This week's focus</div>
             <div className="focus-panel" style={{ padding: 11 }}>

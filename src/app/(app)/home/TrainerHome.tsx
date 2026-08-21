@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import CommunityPair from "@/components/CommunityPair";
 import WeeklyFocusHealth from "@/components/WeeklyFocusHealth";
+import TodaysAdmin from "@/components/TodaysAdmin";
 import LiveSessions from "@/components/LiveSessions";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
@@ -178,11 +178,8 @@ export default function TrainerHome({
       {/* In-page message bell removed — the single header NotificationCenter bell
           (in HeaderAssist) is the app-wide notification entry point. */}
       {/* Payment notifications moved OFF the trainer home into the Payments section (Dustin 7/9). */}
-      <SyncHealth />
-      <WeeklyFocusHealth />
-      <GcalSyncButton />
-
-        {/* Header */}
+        {/* Greeting first. Dustin, 21 Aug: "move the good morning trainer name
+            to the very top above cal sync." */}
         <div className="pt-2">
           <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
             {"Good " + getGreeting() + ","}
@@ -192,6 +189,21 @@ export default function TrainerHome({
             {dateLabel}
           </p>
         </div>
+
+      {/* The manual sync button now lives ON the sync bar rather than as a
+          separate control underneath it — the status and the way to act on it
+          are one thing. GcalSyncButton is no longer mounted separately. */}
+      <SyncHealth />
+      {/* Renders NOTHING while the weekly sweep is healthy. Dustin, 21 Aug:
+          "now that daily focus is auto we can get rid of that block". Right —
+          there is nothing to action. But it is also what reports a FAILED
+          sweep, so instead of deleting it, it goes quiet when it worked and
+          Today's Admin carries a red row when it did not. */}
+      <WeeklyFocusHealth />
+
+      {/* Everything in the app that needs doing, derived live so that dealing
+          with anything at its source clears it here. */}
+      <TodaysAdmin />
 
         {/* Today's Sessions, first. It is the shape of the whole morning and
             the only block with a Start button on it — everything else on this
@@ -329,11 +341,11 @@ export default function TrainerHome({
             one row happening right now. */}
         <LiveSessions />
 
-        {/* Challenge board + group chat preview. Replaces the old Messages
-            card, which was a link with nothing on it — this shows the last two
-            group messages and the live board, so the group is visible from home
-            instead of being somewhere to navigate to. */}
-        <CommunityPair />
+        {/* CommunityPair (challenge board + group chat preview) came off on
+            21 Aug. Dustin: "get rid of the group message block as well".
+            102 group messages in seven days made it a scrolling feed rather
+            than a dashboard tile, and the group lives on /messages. Kept in the
+            repo, unmounted, like TrainerWeekDigest and SaturdayReview. */}
 
         {/* WEEK AHEAD IS NOT ON THIS SCREEN ANY MORE.
             Dustin, 21 Aug: "get rid of this table all together, this function
@@ -402,53 +414,10 @@ export default function TrainerHome({
             )}
           </div>
 
-          {/* Progress Card with Client Picker */}
-          <div
-            className="rounded-2xl p-4"
-            style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <i className="ti ti-chart-line text-base" style={{ color: "#a855f7" }} />
-              <span
-                className="text-xs font-semibold"
-                style={{ color: "var(--brand-text-secondary)" }}
-              >
-                Progress
-              </span>
-            </div>
-            <select
-              value={selectedClient}
-              onChange={(e) => setSelectedClient(e.target.value)}
-              className="w-full text-xs rounded-xl px-2 py-2 mb-2 font-medium"
-              style={{
-                background: "var(--brand-card)",
-                border: "1px solid var(--brand-border)",
-                color: "var(--brand-text)",
-                outline: "none",
-              }}
-            >
-              <option value="">Pick client...</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            {selectedClient ? (
-              <Link
-                href={"/clients/" + selectedClient}
-                className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold"
-                style={{ background: "#a855f720", color: "#a855f7" }}
-              >
-                <i className="ti ti-external-link text-xs" />
-                {"View " + progressClientFirst + "'s Profile"}
-              </Link>
-            ) : (
-              <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                Select to view progress
-              </p>
-            )}
-          </div>
+          {/* PROGRESS CARD REMOVED 21 Aug. Dustin: "we can get rid of the
+              progress card on my trainer dashboard, i have that in menu to get
+              to it and from client profiles". It was a picker plus a link to a
+              screen already reachable two other ways. */}
         </div>
 
       </div>

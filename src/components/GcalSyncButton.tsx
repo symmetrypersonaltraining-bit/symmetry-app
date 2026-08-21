@@ -5,8 +5,12 @@ import { useState } from "react";
  * GcalSyncButton — trainer-facing manual "sync now" for the Google Calendar → app
  * sync. Calls the read-only /api/gcal-sync endpoint and shows a transient result.
  * Isolated/additive; safe to drop anywhere in the trainer app.
+ *
+ * `compact` renders it as a small button that sits ON the SyncHealth bar rather
+ * than a full-width control beneath it — the status and the way to act on it
+ * are one thought. The full-width form is kept for anywhere else it is dropped.
  */
-export default function GcalSyncButton() {
+export default function GcalSyncButton({ compact = false }: { compact?: boolean } = {}) {
   const [status, setStatus] = useState<"idle" | "syncing" | "done" | "error">("idle");
   const [msg, setMsg] = useState("");
 
@@ -36,10 +40,10 @@ export default function GcalSyncButton() {
   }
 
   const label =
-    status === "syncing" ? "Syncing…" :
-    status === "done" ? "✓ " + msg :
-    status === "error" ? "⚠ " + msg :
-    "↻ Sync calendar now";
+    status === "syncing" ? (compact ? "…" : "Syncing…") :
+    status === "done" ? (compact ? "✓" : "✓ " + msg) :
+    status === "error" ? (compact ? "⚠" : "⚠ " + msg) :
+    compact ? "↻ Sync" : "↻ Sync calendar now";
 
   const color =
     status === "done" ? "#22c55e" :
@@ -50,15 +54,17 @@ export default function GcalSyncButton() {
     <button
       onClick={sync}
       disabled={status === "syncing"}
+      aria-label="Sync calendar now"
       style={{
-        width: "100%",
-        padding: "10px 14px",
-        borderRadius: 12,
+        width: compact ? "auto" : "100%",
+        padding: compact ? "6px 11px" : "10px 14px",
+        whiteSpace: "nowrap",
+        borderRadius: compact ? 9 : 12,
         border: "1px solid " + color,
         background: "var(--brand-surface)",
         color,
         fontWeight: 700,
-        fontSize: 13,
+        fontSize: compact ? 12 : 13,
         cursor: status === "syncing" ? "default" : "pointer",
         opacity: status === "syncing" ? 0.7 : 1,
         display: "flex",

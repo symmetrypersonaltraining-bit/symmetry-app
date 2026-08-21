@@ -85,6 +85,14 @@ export default function WeeklyFocusHealth() {
   // people are reading nothing.
   const bad = withFocus.length === 0;
   const partial = !bad && missing > 0;
+
+  // SILENT WHEN HEALTHY, as of 21 Aug. Dustin: "now that daily focus is auto we
+  // can get rid of that block on trainer dashboard correct?" — correct, there
+  // is nothing to action when it worked. But this is also the surface that
+  // reports a FAILED sweep, and deleting it would take the in-app half of the
+  // alarm with it. So it disappears on a good week and speaks on a bad one.
+  // Today's Admin carries the same failure as a red row.
+  if (!bad && !partial) return null;
   const tone = bad ? "#ef4444" : partial ? "#f59e0b" : "#22c55e";
 
   const headline = bad
