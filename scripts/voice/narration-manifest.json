@@ -89,9 +89,9 @@
     {
       "id": "home-focus",
       "chapter": "home",
-      "title": "Saturday's focus lines",
-      "text": "Each client can carry one focus line for the week, and their app shows it. Those lines are drafted for you on Saturday morning, and they are drafts. A review panel turns up on Home with them in it, and you approve or rewrite each one. Anything still sitting there on Sunday morning publishes as written, so if that makes you uncomfortable, handle them on Saturday. The panel only appears when there are drafts waiting, so no panel means nothing is waiting.",
-      "words": 82
+      "title": "The weekly focus line",
+      "text": "Each client carries one focus line for the week, and their app shows it. It is written late on Saturday night, after the week has finished, from that client's real numbers. It publishes straight to them, and there is nothing for you to approve. Write one yourself and the automatic one leaves it alone that week. The card on Home tells you whether it worked, with the lines one tap away so you can read what they were told. If it ever fails you get an email, and a client sees no focus rather than last week's, because a stale line presented as this week's is worse than none.",
+      "words": 109
     },
     {
       "id": "home-notes",

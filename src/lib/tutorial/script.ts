@@ -268,14 +268,14 @@ export const TUTORIAL: TutorialChapter[] = [
       },
       {
         id: "home-focus",
-        title: "Saturday's focus lines",
+        title: "The weekly focus line",
         body: [
-          "Each client can carry one focus line for the week, and their app shows it. They are drafted for you on Saturday morning, and they are drafts — a review panel appears on Home with them in it, and you approve or rewrite each one.",
-          "Anything you have not dealt with by Sunday morning publishes as written. If that makes you uncomfortable, deal with them on Saturday.",
-          "The panel only appears when there are drafts waiting. No drafts, no panel — that is not something being hidden from you.",
+          "Each client carries one focus line for the week, and their app shows it. It is written for you late on Saturday night, after the week has finished, from that client's real numbers — sessions done, how they logged, which way the scale went.",
+          "It publishes straight to them. There is nothing to approve. If you want to write one yourself, do it and the sweep will leave it alone for that week.",
+          "The card on Home tells you whether it worked and how many clients have one, and the lines are one tap away so you can read what they were told. If it ever fails you get an email — a client sees no focus at all rather than last week's, because a stale line presented as this week's is worse than none.",
         ],
         narration:
-          "Each client can carry one focus line for the week, and their app shows it. Those lines are drafted for you on Saturday morning, and they are drafts. A review panel turns up on Home with them in it, and you approve or rewrite each one. Anything still sitting there on Sunday morning publishes as written, so if that makes you uncomfortable, handle them on Saturday. The panel only appears when there are drafts waiting, so no panel means nothing is waiting.",
+          "Each client carries one focus line for the week, and their app shows it. It is written late on Saturday night, after the week has finished, from that client's real numbers. It publishes straight to them, and there is nothing for you to approve. Write one yourself and the automatic one leaves it alone that week. The card on Home tells you whether it worked, with the lines one tap away so you can read what they were told. If it ever fails you get an email, and a client sees no focus rather than last week's, because a stale line presented as this week's is worse than none.",
         route: "/home",
         routeLabel: "Open Home",
         audioUrl: null,
