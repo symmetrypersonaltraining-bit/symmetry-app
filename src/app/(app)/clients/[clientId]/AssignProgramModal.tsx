@@ -31,12 +31,23 @@ export default function AssignProgramModal({ clientId, clientName, programs, cur
     setSaving(true);
     setError(null);
     try {
-      // Deactivate any existing active assignments for this client
-      await supabase
+      // Deactivate any existing active assignments for this client.
+      //
+      // CHECKED, and it must stay checked: if this is refused and the insert
+      // below succeeds anyway, the client is left on TWO active programmes and
+      // every screen that reads "the active assignment" starts picking one of
+      // them arbitrarily. Zero rows is fine and expected — a client with no
+      // programme yet — so only a real error stops us.
+      const { error: deactivateErr } = await supabase
         .from("program_assignments")
         .update({ active: false })
         .eq("client_id", clientId)
         .eq("active", true);
+      if (deactivateErr) {
+        throw new Error(
+          `Could not close their current programme, so nothing was assigned: ${deactivateErr.message}`,
+        );
+      }
 
       // Create new assignment.
       // program_assignments has NO start_date column — the assignment date IS

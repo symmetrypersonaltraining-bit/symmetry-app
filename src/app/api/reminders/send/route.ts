@@ -159,17 +159,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
   }
 
-  // Update reminder status
-  await supabase
+  // The email has ALREADY gone out by this point, so this write is not
+  // bookkeeping — it is the only record that stops the same client being
+  // emailed about the same money again. Unchecked, a refused update leaves the
+  // reminder pending, the screen says sent, and the trainer sends it a second
+  // time tomorrow. Say plainly which half worked.
+  const { data: marked, error: markErr } = await supabase
     .from("payment_reminders")
     .update({
       notification_status: "sent",
       email_sent_at: new Date().toISOString(),
       reminder_sent_at: new Date().toISOString(),
     })
-    .eq("id", reminderId);
+    .eq("id", reminderId)
+    .select("id");
 
-  return NextResponse.json({ success: true });
+  if (markErr || !marked || marked.length === 0) {
+    return NextResponse.json(
+      {
+        success: true,
+        emailSent: true,
+        warning:
+          "The email was sent, but the reminder could not be marked as sent. Do not send it again — check the record before you do.",
+        detail: markErr?.message ?? "no matching reminder",
+      },
+      { status: 200 },
+    );
+  }
+
+  return NextResponse.json({ success: true, emailSent: true });
 }
 
 // THERE IS NO GET ANY MORE, AND NOTHING IS LOST.

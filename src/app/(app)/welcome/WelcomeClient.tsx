@@ -43,11 +43,22 @@ export default function WelcomeClient({ firstName, clientId, needsIntake }: { fi
       const { error: upErr } = await sb.auth.updateUser({ password: pw });
       if (upErr) { setError(upErr.message); return; }
       // The flags the rest of the app reads to decide whether someone is new.
+      //
+      // CHECKED, because middleware sends anyone whose first_login_completed
+      // is still false straight back to /welcome. Unchecked, a refused write
+      // here put a brand-new client in a loop on their very first minute in
+      // the app: set a password, get returned to the same screen, set it
+      // again. Their password HAS changed by this point, so say that plainly
+      // rather than implying nothing happened.
       if (clientId) {
-        await sb.from("client_app_settings").upsert(
+        const { error: flagErr } = await sb.from("client_app_settings").upsert(
           { client_id: clientId, password_is_temporary: false, first_login_completed: true },
           { onConflict: "client_id" },
-        );
+        ).select("client_id");
+        if (flagErr) {
+          setError("Your password is saved, but we couldn't finish setting up. Close the app and open it again — if this screen comes back, message your coach.");
+          return;
+        }
       }
       setStep(2);
     } catch {

@@ -94,12 +94,20 @@ async function run(req: NextRequest) {
         const goingDown = (goal.startValue ?? last) >= goal.targetValue;
         const there = goingDown ? last <= goal.targetValue : last >= goal.targetValue;
         if (there) {
-          reached.push(goal.id);
           if (!dry) {
-            await db.from("client_goals").update({
+            // Checked before it is reported. Unchecked, a refused write got
+            // counted in `reached` anyway — so the run said the goal was hit,
+            // the goal stayed open, and tomorrow's run said it again. A goal
+            // that is "reached" every day for a fortnight is not a report.
+            const { data: hit, error: hitErr } = await db.from("client_goals").update({
               status: "hit", achieved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-            }).eq("id", goal.id);
+            }).eq("id", goal.id).select("id");
+            if (hitErr || !hit || hit.length === 0) {
+              skipped.push({ goalId: goal.id, why: hitErr?.message || "could not mark hit" });
+              continue;
+            }
           }
+          reached.push(goal.id);
           continue;
         }
       }
@@ -142,7 +150,19 @@ async function run(req: NextRequest) {
         skipped.push({ goalId: goal.id, why: insErr?.message || "insert failed" });
         continue;
       }
-      await db.from("client_goals").update({ rolled_to_id: (created as { id: string }).id }).eq("id", goal.id);
+      // Checked. The successor exists by now; this is the link back to it. If
+      // it does not land the chain is broken, and the run must not report a
+      // clean roll-forward it cannot show.
+      const { data: linked, error: linkErr } = await db
+        .from("client_goals")
+        .update({ rolled_to_id: (created as { id: string }).id })
+        .eq("id", goal.id)
+        .select("id");
+      if (linkErr || !linked || linked.length === 0) {
+        console.error("cron/goals: successor created but not linked back", goal.id, linkErr?.message);
+        skipped.push({ goalId: goal.id, why: `successor ${(created as { id: string }).id} created but not linked: ${linkErr?.message || "no row"}` });
+        continue;
+      }
     }
 
     rolled.push({ goalId: goal.id, to: plan.targetDate, fromPace: plan.fromPace });

@@ -234,7 +234,22 @@ export default function ProgressPhotos({ clientId, clientName }: { clientId: str
 
   async function deletePhoto(p: Photo) {
     if (!confirm("Delete this photo? This can't be undone.")) return;
-    await supabase.from("progress_photos").delete().eq("id", p.id);
+    // Checked. The photo disappears from the grid on the next two lines
+    // regardless, so a refused delete told somebody their progress photo was
+    // gone while it was still sitting in the database.
+    const { data: gone, error: delErr } = await supabase
+      .from("progress_photos")
+      .delete()
+      .eq("id", p.id)
+      .select("id");
+    if (delErr || !gone || gone.length === 0) {
+      window.alert(
+        delErr
+          ? `Could not delete that photo: ${delErr.message}`
+          : "That photo could not be deleted. Refresh and try again.",
+      );
+      return;
+    }
     setLightbox(null);
     setPhotos((ps) => ps.filter((x) => x.id !== p.id));
   }

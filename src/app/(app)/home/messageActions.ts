@@ -179,7 +179,11 @@ export async function sendBroadcastMessage(body: string, imageUrl?: string | nul
     // Self-copy (client_id null) so the trainer can confirm the broadcast went
     // out. Only written if something actually did — a self-copy of a broadcast
     // that reached nobody is a receipt for a thing that did not happen.
-    await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, image_url: imageUrl || null, is_broadcast: true });
+    // Checked. `sent` is still the honest answer either way, but this row is
+    // the trainer's own copy of what went out, and a missing receipt is how
+    // somebody talks themselves into broadcasting the same thing twice.
+    const { error: copyErr } = await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, image_url: imageUrl || null, is_broadcast: true });
+    if (copyErr) console.error('broadcast reached ' + sent + ' clients but the self-copy failed:', copyErr.message);
   }
 
   // Push every recipient (deep-links to their trainer thread). Guarded per user.

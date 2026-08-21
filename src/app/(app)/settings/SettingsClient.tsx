@@ -69,7 +69,18 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
   async function toggleGcalSync(val: boolean) {
     setGcalSync(val);
     const supabase = createClient();
-    await supabase.from("trainer_settings").upsert({ user_id: userId, gcal_sync_enabled: val }, { onConflict: "user_id" });
+    // Checked. The switch moves on screen first, so an unchecked failure left
+    // a trainer believing they had turned calendar sync off — and it kept
+    // running, twice a day, overwriting the appointments they had just fixed
+    // by hand. Put the switch back rather than leave it lying.
+    const { error } = await supabase
+      .from("trainer_settings")
+      .upsert({ user_id: userId, gcal_sync_enabled: val }, { onConflict: "user_id" })
+      .select("user_id");
+    if (error) {
+      setGcalSync(!val);
+      window.alert(`Could not change calendar sync: ${error.message}`);
+    }
   }
 
   const ACCENT_MAP: Record<string, string> = {

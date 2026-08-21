@@ -46,11 +46,17 @@ export async function POST(req: NextRequest) {
 
   // A rotated subscription: retire the old endpoint so it stops being pushed to.
   if (typeof body?.replaces === "string" && body.replaces && body.replaces !== endpoint) {
-    await admin
+    // Checked. If retiring the old endpoint fails, the device ends up
+    // subscribed twice and the client gets every notification in duplicate —
+    // which reads as the app being broken, not as a stale row.
+    const { error: retireErr } = await admin
       .from("push_subscriptions")
       .update({ failed_at: new Date().toISOString(), last_error: "rotated" })
       .eq("endpoint", body.replaces)
       .eq("user_id", user.id);
+    if (retireErr) {
+      console.error("push rotate: old endpoint not retired, duplicates likely:", retireErr.message);
+    }
   }
 
   const { error } = await admin.from("push_subscriptions").upsert(

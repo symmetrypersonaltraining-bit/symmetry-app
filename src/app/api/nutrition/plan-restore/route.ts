@@ -78,11 +78,26 @@ export async function POST(req: NextRequest) {
     const displace = ((others as { id: string; day_group: number[] | null }[] | null) || [])
       .filter((o) => sameDayGroup(o.day_group, plan.day_group))
       .map((o) => o.id);
+    let displaced = 0;
     if (displace.length) {
-      await admin.from("meal_plans").update({ status: "archived" }).in("id", displace);
+      // Checked. The response reports `displaced` as a fact, and two live meal
+      // plans covering the same days is not a cosmetic problem — the client's
+      // app picks one of them and there is no rule saying which.
+      const { data: archived, error: arcErr } = await admin
+        .from("meal_plans")
+        .update({ status: "archived" })
+        .in("id", displace)
+        .select("id");
+      if (arcErr) {
+        return NextResponse.json(
+          { error: `Restored, but the plan it replaces is still live: ${arcErr.message}. Archive it by hand before the client opens the app.` },
+          { status: 500 },
+        );
+      }
+      displaced = (archived as { id: string }[] | null)?.length ?? 0;
     }
 
-    return NextResponse.json({ ok: true, planId: plan.id, displaced: displace.length });
+    return NextResponse.json({ ok: true, planId: plan.id, displaced });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message || "Failed" }, { status: 500 });
   }

@@ -129,7 +129,18 @@ export async function POST(req: NextRequest) {
     // Ingredients are replaced wholesale: the builder always sends the complete
     // list, and diffing rows by index is how you end up with someone else's
     // quantities on your ingredient.
-    await admin.from("recipe_ingredients").delete().eq("recipe_id", recipeId);
+    //
+    // CHECKED, because the insert of the new list follows unconditionally. A
+    // refused delete plus a successful insert does not lose the edit — it
+    // DOUBLES the recipe. Every ingredient twice, every macro twice, and the
+    // response says saved. Stop here instead.
+    const { error: clearErr } = await admin.from("recipe_ingredients").delete().eq("recipe_id", recipeId);
+    if (clearErr) {
+      return NextResponse.json(
+        { error: `Could not clear the old ingredients, so nothing was changed: ${clearErr.message}` },
+        { status: 500 },
+      );
+    }
   } else {
     const { data, error } = await admin.from("recipes").insert({
       ...row,

@@ -134,8 +134,15 @@ export default function LogBodyFatPage() {
       .select("weight").eq("client_id", clientId).not("weight", "is", null)
       .order("metric_date", { ascending: false }).limit(1).maybeSingle();
     if (__lastW?.weight != null) {
-      await supabase.from("metrics").update({ weight: __lastW.weight })
+      // Not fatal — the body fat reading itself is already saved and checked
+      // above. This only seeds a weight so the trigger can derive lean and fat
+      // mass. Worth saying out loud rather than swallowing, because the
+      // symptom otherwise is two columns that are mysteriously empty.
+      const { error: seedErr } = await supabase.from("metrics").update({ weight: __lastW.weight })
         .eq("client_id", clientId).eq("metric_date", today).is("weight", null);
+      if (seedErr) {
+        alert("Body fat saved. Lean and fat mass could not be worked out for today: " + seedErr.message);
+      }
     }
     setDone(true);
     setSaving(false);

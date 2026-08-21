@@ -87,8 +87,18 @@ function PaymentNotificationBanner({
   }
 
   async function handleDismiss(id: string) {
+    // Hidden straight away, put back if the write did not land. A notice that
+    // reappears on the next refresh with no explanation is worse than one that
+    // never went away, because the client stops trusting the button.
     setDismissed(prev => new Set([...prev, id]));
-    await dismissClientNotification(id);
+    const err = await dismissClientNotification(id);
+    if (err) {
+      setDismissed(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   }
 
   return (

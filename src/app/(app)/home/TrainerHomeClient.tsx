@@ -77,8 +77,19 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
 
   const handlePause = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    // Hide it immediately — a pause that waits for a round trip feels broken.
+    // But put it back if the write did not land, rather than leaving a payment
+    // hidden on Home that is still pending in the database.
     setDismissedIds(prev => new Set([...prev, id]));
-    await pausePaymentReminder(id);
+    const err = await pausePaymentReminder(id);
+    if (err) {
+      setDismissedIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      window.alert(err);
+    }
   };
 
   const visibleReminders = reminders.filter((r: Reminder) => !dismissedIds.has(r.id));

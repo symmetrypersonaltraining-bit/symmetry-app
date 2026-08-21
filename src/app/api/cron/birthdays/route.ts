@@ -156,7 +156,14 @@ export async function runBirthdays(
         sender_kind: "coachbot",
       });
       if (!error) {
-        await db.from("birthday_posts").insert({ client_id: p.id, year: Number(tomorrowIso.slice(0, 4)), kind: "heads_up" });
+        // birthday_posts IS the dedupe ledger — alreadyDone() reads it to
+        // decide whether this has been said. An unchecked failure here does
+        // not lose a log line, it makes tomorrow's run say the same thing
+        // again, and the day after that.
+        const { error: ledgerErr } = await db.from("birthday_posts").insert({ client_id: p.id, year: Number(tomorrowIso.slice(0, 4)), kind: "heads_up" });
+        if (ledgerErr) {
+          console.error(`birthdays: heads-up sent for ${p.id} but not recorded — it will repeat:`, ledgerErr.message);
+        }
       }
     }
   }
@@ -224,11 +231,26 @@ export async function runBirthdays(
   });
   if (error) return { posted: false, reason: `insert failed: ${error.message}`, headsUp };
 
+  // Same ledger, and this one is in the group chat where everybody sees it.
+  // The message has already posted, so this cannot be undone — but it must be
+  // reported, because the failure mode is wishing somebody a happy birthday in
+  // front of the whole gym on three consecutive mornings.
+  const unrecorded: string[] = [];
   for (const p of fresh) {
-    await db.from("birthday_posts").insert({ client_id: p.id, year, kind: "group" });
+    const { error: ledgerErr } = await db.from("birthday_posts").insert({ client_id: p.id, year, kind: "group" });
+    if (ledgerErr) unrecorded.push(p.firstName);
+  }
+  if (unrecorded.length) {
+    console.error("birthdays: posted but not recorded, will repeat tomorrow for", unrecorded.join(", "));
   }
 
-  return { posted: true, reason: `wished ${joinNames(fresh.map((p) => p.firstName))}`, message: body, headsUp };
+  return {
+    posted: true,
+    reason: `wished ${joinNames(fresh.map((p) => p.firstName))}`,
+    message: body,
+    headsUp,
+    ...(unrecorded.length ? { warning: `not recorded, will repeat: ${unrecorded.join(", ")}` } : {}),
+  };
 }
 
 async function handle(req: NextRequest) {

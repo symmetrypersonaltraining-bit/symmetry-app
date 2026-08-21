@@ -1345,10 +1345,23 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
     const [h, mi] = timeStr.split(":").map(Number);
     const newStart = new Date(y, mo - 1, d, h, mi);
     const newEnd = new Date(newStart.getTime() + durationMin * 60000);
-    await supabase.from("appointments").update({
+    // Checked, and .select() as well as the error: an update that matches no
+    // row — another trainer's appointment, or one deleted since this view
+    // loaded — is not an error in supabase-js. Unchecked, the block moves on
+    // screen, the refresh puts it straight back, and the trainer is left
+    // believing the calendar is haunted. This exact shape has bitten here once
+    // already; see the drag fix in 2c6776b.
+    const { data: moved, error: moveErr } = await supabase.from("appointments").update({
       scheduled_at: newStart.toISOString(),
       ends_at: newEnd.toISOString(),
-    }).eq("id", apptId);
+    }).eq("id", apptId).select("id");
+    if (moveErr || !moved || moved.length === 0) {
+      window.alert(
+        moveErr
+          ? `Could not move that session: ${moveErr.message}`
+          : "That session is not yours to move, or it is no longer there. Refresh and try again.",
+      );
+    }
     setRefreshKey(k => k + 1);
   }
 

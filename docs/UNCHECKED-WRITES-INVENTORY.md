@@ -104,12 +104,56 @@ device state: `group_reads`, `device_tokens`, `*_seen`,
 case is a missing row in a log. Checking them would add noise to paths where an
 error has nowhere useful to go.
 
-## Next — nothing, deliberately
+## 21 Aug — the "nothing left" claim was wrong, and now there is a ratchet
 
-The priority list that stood here is done. What remains needs either Dustin's
-permission (the logger files) or nothing at all (fire-and-forget). A future
-session should re-run the sweep and confirm the count has not grown rather than
-re-triaging what is already classified here.
+The section below used to end "Next — nothing, deliberately". Re-running the
+sweep found **fourteen more sites where somebody was being told a thing that
+had not happened**, and they were not exotic — they were the money screen, the
+calendar drag, a client's weigh-in, and a brand-new client's first minute in
+the app. The classification was right about the shape and wrong about the count,
+for the same reason the first draft was wrong: the remainder was declared
+harmless without being read.
+
+Fixed in this pass:
+
+| Where | What it was saying |
+|---|---|
+| `home/actions.ts` + `TrainerHomeClient` | Pausing a payment removed it from Home before the await, unchecked. A refused pause hid a payment that was still due. |
+| `PaymentsClient.confirmDelete` | The payment record vanished off the screen whatever the database did. |
+| `api/reminders/send` | The email had **already gone out**. An unchecked status update left the reminder pending, so the trainer sends it again tomorrow — a second email to a client about the same money. Now returns a warning saying which half worked. |
+| `MetricCards` | The card shows a tick and closes itself 800ms later regardless. A failed weigh-in was a hole in a trend line nobody knew about. |
+| `ProgressPhotos` | "Delete this photo? This can't be undone." — then the photo left the grid whether or not it left the database. |
+| `TrainerCalendar` | Dragging a session to a new time. Same shape as `2c6776b`, in a second place. |
+| `ScheduleBoard` | The compensating rollback in a swap. If IT failed, the catch still said "Couldn't swap. Try again." while one workout had moved and the other had not. |
+| `AssignProgramModal` | Deactivating the current programme was unchecked ahead of the insert — a client on **two** active programmes, which every "the active assignment" read then picks between arbitrarily. |
+| `notifActions` + `ClientDashboard` | A dismissed notice that came back at the next refresh with no explanation. |
+| `WelcomeClient` | The flags middleware reads to decide who is new. Unchecked, a refused write **loops a brand-new client on the welcome screen forever** — password set, returned to the same page, set it again. |
+| `SettingsClient` | The calendar sync switch. It moved on screen and could leave sync running against a trainer who believed they had stopped it. |
+| `api/recipes` | Ingredients are replaced wholesale. A refused delete plus a successful insert does not lose the edit — it **doubles the recipe**, every macro twice, and answers saved. |
+| `api/nutrition/plan-restore` | Archiving the plan a restore displaces. Two live meal plans on the same days, response reporting `displaced: 1`. |
+| `api/cron/goals` | A goal counted in `reached` before the write that closes it. It stays open, so tomorrow's run reaches it again, and the day after. |
+| `api/cron/birthdays` | `birthday_posts` **is** the dedupe ledger. Failure means the group chat wishes somebody happy birthday on three consecutive mornings. |
+
+Count: **67 → 33**, and the 33 are 11 in the off-limits loggers plus telemetry,
+seen-markers and three the regex cannot see through.
+
+**`tests/unit/uncheckedWrites.test.ts` now runs this sweep on every commit.** A
+new unchecked write in any file without an exemption fails the suite, an
+exempt file that grows one fails, and each of the fourteen fixes above is
+pinned individually so a refactor cannot quietly drop it. The allowlist
+requires a written reason per entry.
+
+Both halves were mutation-tested. Removing a `.select()` fails the suite;
+adding a stray unchecked write fails it. The first version of the pinning test
+did **not** fail, because the doc comment explaining `.select('id')` contains
+the string `.select('id')` and satisfied the regex. Comments are stripped
+before matching now. A guard a comment can satisfy is not a guard.
+
+## Next
+
+Re-run the suite, not the sweep. What remains needs either Dustin's permission
+(the logger files) or nothing at all (fire-and-forget), and the test now holds
+that line without anybody having to remember to look.
 
 
 ---

@@ -418,10 +418,22 @@ function ExpandedPanel({
     if (!logValue || !logDate) return;
     setSaving(true);
     const val = parseFloat(logValue);
-    await supabase.from('metrics').upsert(
+    // Checked. This card shows a tick and closes itself 800ms later whatever
+    // happened, so an unchecked failure here is a weigh-in the client believes
+    // they logged and a trend line that quietly has a hole in it.
+    const { data: saved, error: saveErr } = await supabase.from('metrics').upsert(
       { client_id: clientId, metric_date: logDate, [cfg.key]: val },
       { onConflict: 'client_id,metric_date' }
-    );
+    ).select('client_id');
+    if (saveErr || !saved || saved.length === 0) {
+      setSaving(false);
+      window.alert(
+        saveErr
+          ? `Could not save that: ${saveErr.message}`
+          : 'That did not save. Refresh and try again.',
+      );
+      return;
+    }
     setSaving(false);
     setSaveSuccess(true);
     setTimeout(() => { setSaveSuccess(false); setShowLog(false); setLogValue(''); onLogged(); }, 800);

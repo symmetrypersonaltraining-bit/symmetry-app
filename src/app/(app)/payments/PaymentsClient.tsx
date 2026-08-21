@@ -123,12 +123,16 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ reminderId: newReminder.id }),
         });
+        const body = await res.json().catch(() => ({} as { error?: string; warning?: string }));
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setError(data.error || "Failed to send reminder.");
+          setError(body.error || "Failed to send reminder.");
           setSending(false);
           return;
         }
+        // 200 with a warning means the email went out but the reminder could
+        // not be marked sent. The trainer has to know, or they will send it
+        // again tomorrow when it is still showing as pending.
+        if (body.warning) window.alert(body.warning);
       } else {
         // Checked, because the SEND that follows reads the reminder back from
         // the database. If this update fails, the trainer's edited amount and
@@ -152,12 +156,16 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ reminderId: client.reminderId }),
         });
+        const body = await res.json().catch(() => ({} as { error?: string; warning?: string }));
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setError(data.error || "Failed to send reminder.");
+          setError(body.error || "Failed to send reminder.");
           setSending(false);
           return;
         }
+        // 200 with a warning means the email went out but the reminder could
+        // not be marked sent. The trainer has to know, or they will send it
+        // again tomorrow when it is still showing as pending.
+        if (body.warning) window.alert(body.warning);
       }
       setSent(true);
       setTimeout(() => { onSent(client.clientId); onClose(); }, 1200);
@@ -372,12 +380,13 @@ function NewPaymentModal({ clients, onClose, onCreated }: NewPaymentModalProps) 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ reminderId: newReminder.id }),
         });
+        const body = await res.json().catch(() => ({} as { error?: string; warning?: string }));
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setError(data.error || "Failed to send reminder.");
+          setError(body.error || "Failed to send reminder.");
           setSaving(false);
           return;
         }
+        if (body.warning) window.alert(body.warning);
       }
 
       setDone(true);
@@ -706,7 +715,24 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
       return;
     }
     setDeletingId(c.clientId);
-    await supabase.from("payment_reminders").delete().eq("id", c.reminderId);
+    // Checked. A delete that matches no row is not an error in supabase-js, so
+    // without the .select() a reminder belonging to another trainer would
+    // vanish off this screen and still be sitting in the database, due.
+    const { data: gone, error: delErr } = await supabase
+      .from("payment_reminders")
+      .delete()
+      .eq("id", c.reminderId)
+      .select("id");
+    if (delErr || !gone || gone.length === 0) {
+      setDeleteConfirmId(null);
+      setDeletingId(null);
+      window.alert(
+        delErr
+          ? `Could not delete that payment record: ${delErr.message}`
+          : "That payment record is not yours to delete, or it is already gone. Refresh and try again.",
+      );
+      return;
+    }
     setLocalClients(prev => prev.map(p =>
       p.clientId === c.clientId
         ? { ...p, reminderId: null, dueDate: null, notificationStatus: "no_reminder", hasReminder: false, emailSentAt: null, notes: null }

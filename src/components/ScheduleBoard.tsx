@@ -257,6 +257,10 @@ export default function ScheduleBoard({
     if (!a || !b || a.id === b.id || a.date === b.date) return;
     if (isLockedDate(a.date) || isLockedDate(b.date)) { flash("Peak Week workouts are locked."); return; }
     const aDate = a.date, bDate = b.date;
+    // Set when the rollback below could not put `a` back. It changes what the
+    // catch is allowed to claim, and it stops the optimistic state being
+    // reverted to a position the database no longer agrees with.
+    let halfSwapped = false;
     setWorkouts((prev) => prev.map((x) => (x.id === a.id ? { ...x, date: bDate } : x.id === b.id ? { ...x, date: aDate } : x)));
     try {
       const supabase: any = createClient();
@@ -276,10 +280,25 @@ export default function ScheduleBoard({
       // did not happen would be a lie. The marker r1 already wrote is left in
       // place rather than blanked - it makes jobid 18 skip the row, which is
       // the safe direction to be wrong in.
-      if (r2.error) { await supabase.from("scheduled_workouts").update({ scheduled_date: aDate }).eq("id", a.id); throw r2.error; }
+      if (r2.error) {
+        // The rollback is checked too. If it fails, "Couldn't swap" is no
+        // longer true — `a` has moved and `b` has not — and the trainer needs
+        // to hear that rather than a message telling them to try again.
+        const back = await supabase.from("scheduled_workouts").update({ scheduled_date: aDate }).eq("id", a.id).select("id");
+        if (back.error || !back.data || back.data.length === 0) halfSwapped = true;
+        throw r2.error;
+      }
       flash("Swapped ✓");
       router.refresh();
     } catch {
+      if (halfSwapped) {
+        // Do NOT revert the display. `a` really did move and the rollback
+        // failed, so putting it back on screen would show a board that does
+        // not exist. Refreshing is the only honest thing left.
+        flash("Half-swapped — one moved, one did not. Refresh and check both days.");
+        router.refresh();
+        return;
+      }
       setWorkouts((prev) => prev.map((x) => (x.id === a.id ? { ...x, date: aDate } : x.id === b.id ? { ...x, date: bDate } : x)));
       flash("Couldn't swap. Try again.");
     }

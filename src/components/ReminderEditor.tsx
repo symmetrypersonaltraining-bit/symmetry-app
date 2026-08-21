@@ -415,9 +415,11 @@ export default function ReminderEditor() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ reminderId: r.id }),
           });
+          const j = await res.json().catch(() => ({} as any));
           if (!res.ok) {
-            const j = await res.json().catch(() => ({} as any));
             alert("Reminder approved and the in-app banner is showing, but the email didn't send: " + (j.error || ("HTTP " + res.status)));
+          } else if (j.warning) {
+            alert(j.warning);
           }
         } catch (sendErr: any) {
           alert("Reminder approved and the in-app banner is showing, but the email didn't send: " + (sendErr?.message || "network error"));
