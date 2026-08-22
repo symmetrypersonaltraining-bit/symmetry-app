@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import PayLinksRow from "./PayLinksRow";
 import type { PayDestination } from "@/lib/pay-links";
+import { payDestinationFor } from "@/lib/payDest";
 import { parseInvoiceDetail, explainAmount, shortDate, type InvoiceDetail } from "@/lib/invoiceDetail";
 
 interface Due {
@@ -34,21 +35,10 @@ export default function PaymentDueBanner() {
         // briefly pointed at the wrong trainer.
         const tid = me?.[0]?.trainer_id;
         if (tid) {
-          const { data: t } = await sup
-            .from("trainers")
-            .select("name, pay_display_name, venmo_username, zelle_email, cashapp_handle, pay_phone")
-            .eq("id", tid)
-            .limit(1);
-          const tr = t?.[0];
-          if (tr) {
-            setPayTo({
-              recipientName: tr.pay_display_name || tr.name || "",
-              venmoUsername: tr.venmo_username ?? null,
-              zelleEmail: tr.zelle_email ?? null,
-              zellePhone: tr.pay_phone ?? null,
-              cashtag: tr.cashapp_handle ?? null,
-            });
-          }
+          // Through trainer_pay_details(), not off the row: SELECT on the
+          // payment columns is revoked. See src/lib/payDest.ts.
+          const dest = await payDestinationFor(sup, tid);
+          if (dest) setPayTo(dest);
         }
         const { data: rems } = await sup
           .from("payment_reminders")

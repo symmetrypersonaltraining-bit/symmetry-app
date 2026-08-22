@@ -23,6 +23,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { payDestinationFor } from "@/lib/payDest";
 import Avatar from "@/components/Avatar";
 
 interface Profile {
@@ -88,22 +89,33 @@ export default function TrainerProfileCard() {
         const uid = auth?.user?.id;
         if (!uid) { if (on) setReady(true); return; }
         // Own row only — that is all RLS will return now, which is the point.
+        //
+        // Two reads, not one. The payment columns were revoked from SELECT
+        // outright (nobody but a trainer's own clients may see them), so even
+        // this trainer's own handles come back through trainer_pay_details(),
+        // which allows p_trainer = my_trainer_id(). Selecting them here would
+        // fail the whole query and blank the name and photo boxes too.
         const { data } = await sb
           .from("trainers")
-          .select("name, first_name, avatar_url, venmo_username, zelle_email, cashapp_handle, pay_phone, pay_display_name, email")
+          .select("id, name, first_name, avatar_url, email")
           .eq("auth_user_id", uid)
           .maybeSingle();
         if (!on) return;
-        const r = (data || {}) as Partial<Profile> & { email?: string };
+        const r = (data || {}) as Partial<Profile> & { id?: string; email?: string };
+        const pay = await payDestinationFor(sb, r.id);
+        if (!on) return;
         setP({
           name: r.name || "",
           first_name: r.first_name || "",
           avatar_url: r.avatar_url || null,
-          venmo_username: r.venmo_username || "",
-          zelle_email: r.zelle_email || "",
-          cashapp_handle: r.cashapp_handle || "",
-          pay_phone: r.pay_phone || "",
-          pay_display_name: r.pay_display_name || "",
+          venmo_username: pay?.venmoUsername || "",
+          zelle_email: pay?.zelleEmail || "",
+          cashapp_handle: pay?.cashtag || "",
+          pay_phone: pay?.zellePhone || "",
+          // The RPC coalesces a blank display name to the trainer's name; the
+          // box means "only if different", so it must not be pre-filled with a
+          // value the trainer never typed.
+          pay_display_name: (pay?.recipientName && pay.recipientName !== (r.name || "")) ? pay.recipientName : "",
         });
         setEmail(r.email || auth?.user?.email || "");
       } catch {

@@ -87,13 +87,52 @@ test("the pay row renders the destination it is handed, not module constants", (
   }
 });
 
+// This guard used to require that both pay surfaces read venmo_username off
+// `trainers` directly — that was the mechanism on 20 Aug, and asserting it was
+// how we knew the surfaces had stopped using module constants. On 21 Aug the
+// mechanism changed underneath it: SELECT on the five payment columns is
+// revoked from `authenticated`, so the read it demanded is now the read that
+// breaks. Dustin: "I do not want anyone but their own clients seeing their pmt
+// info." The INTENT is unchanged and still worth guarding — each surface must
+// resolve the CLIENT'S OWN trainer and hand that destination down — so the
+// assertions move to the mechanism that now carries it.
 test("both client-facing pay surfaces resolve the client's own trainer", () => {
   for (const f of ["src/components/PaymentDueBanner.tsx", "src/components/PaymentsSettingsCard.tsx"]) {
-    const c = read(f);
-    assert.match(c, /from\("trainers"\)/, f + " never looks up a trainer");
-    assert.match(c, /venmo_username/, f + " does not read the payment details");
+    const c = code(read(f));
+    assert.match(c, /trainer_id/, f + " never looks up which trainer the client belongs to");
+    assert.match(c, /payDestinationFor\(/, f + " does not resolve a pay destination");
     assert.match(c, /to=\{payTo\}/, f + " does not pass the destination to PayLinksRow");
   }
+});
+
+// The revocation is a DB grant, and a grant cannot stop anyone from WRITING a
+// query — it only makes that query fail at runtime, in a component, in
+// somebody's browser, after this is in a trainer's hands. This is the part
+// that fails here instead.
+test("nothing selects a payment column off the trainers table", () => {
+  const files = [
+    "src/components/PaymentDueBanner.tsx",
+    "src/components/PaymentsSettingsCard.tsx",
+    "src/components/TrainerProfileCard.tsx",
+    "src/lib/trainerResolve.ts",
+    "src/app/(app)/tutorial/page.tsx",
+  ];
+  const cols = ["venmo_username", "zelle_email", "cashapp_handle", "pay_phone", "pay_display_name"];
+  for (const f of files) {
+    const c = code(read(f));
+    // The RPC's own arguments are named for these columns, so only SELECT
+    // lists count — the string handed to .select().
+    for (const sel of c.match(/\.select\(\s*"[^"]*"/g) || []) {
+      for (const col of cols) {
+        assert.ok(!sel.includes(col), f + " selects " + col + ", which authenticated may not read");
+      }
+    }
+  }
+});
+
+test("the pay gate is the only way payment handles are read", () => {
+  const c = code(read("src/lib/payDest.ts"));
+  assert.match(c, /rpc\(\s*"trainer_pay_details"/, "payDest no longer calls the gate function");
 });
 
 // ─── a client's message reaches THEIR coach ─────────────────────────────────

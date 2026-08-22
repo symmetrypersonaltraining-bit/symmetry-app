@@ -24,12 +24,21 @@ export interface TrainerRecord {
   firstName: string;
   role: "owner" | "trainer";
   isOwner: boolean;
-  venmoUsername: string | null;
-  zelleEmail: string | null;
-  cashappHandle: string | null;
-  payPhone: string | null;
-  payDisplayName: string | null;
 }
+
+// NO PAYMENT FIELDS HERE, deliberately.
+//
+// This record used to carry venmoUsername/zelleEmail/cashappHandle/payPhone/
+// payDisplayName, and COLS selected them. From 21 Aug SELECT on those five
+// columns is revoked from the `authenticated` role — Dustin: "I do not want
+// anyone but their own clients seeing their pmt info" — so a session-scoped
+// caller asking for them gets an error for the WHOLE row, not a null column.
+// Two of this module's callers are session-scoped (the tutorial page and
+// invite-trainer), which would have taken the trainer's name and email down
+// with the Venmo tag.
+//
+// Pay details now come from payDestinationFor() in src/lib/payDest.ts, which
+// goes through the trainer_pay_details() gate.
 
 // PromiseLike, not Promise. supabase-js query builders are thenables that only
 // become real promises when awaited — they have no .catch/.finally — so a
@@ -68,8 +77,7 @@ interface Queryable {
   };
 }
 
-const COLS =
-  "id, auth_user_id, email, name, first_name, role, venmo_username, zelle_email, cashapp_handle, pay_phone, pay_display_name";
+const COLS = "id, auth_user_id, email, name, first_name, role";
 
 function shape(row: Record<string, unknown> | null): TrainerRecord | null {
   if (!row) return null;
@@ -85,11 +93,6 @@ function shape(row: Record<string, unknown> | null): TrainerRecord | null {
     firstName: String(row.first_name || name.split(/\s+/)[0] || ""),
     role,
     isOwner: role === "owner",
-    venmoUsername: (row.venmo_username as string) ?? null,
-    zelleEmail: (row.zelle_email as string) ?? null,
-    cashappHandle: (row.cashapp_handle as string) ?? null,
-    payPhone: (row.pay_phone as string) ?? null,
-    payDisplayName: ((row.pay_display_name as string) ?? null) || name || null,
   };
 }
 

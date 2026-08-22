@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import PayLinksRow from "./PayLinksRow";
 import type { PayDestination } from "@/lib/pay-links";
+import { payDestinationFor } from "@/lib/payDest";
 
 type DueReminder = { id: string; due_date: string; amount_due: number };
 
@@ -31,23 +32,12 @@ export default function PaymentsSettingsCard() {
           setLoaded(true);
           return;
         }
-        // Their trainer's payment details, not the business's.
+        // Their trainer's payment details, not the business's — and read
+        // through trainer_pay_details() because the columns themselves are no
+        // longer SELECTable. See src/lib/payDest.ts.
         if (client.trainer_id) {
-          const { data: t } = await supabase
-            .from("trainers")
-            .select("name, pay_display_name, venmo_username, zelle_email, cashapp_handle, pay_phone")
-            .eq("id", client.trainer_id)
-            .limit(1);
-          const tr = t?.[0];
-          if (tr) {
-            setPayTo({
-              recipientName: tr.pay_display_name || tr.name || "",
-              venmoUsername: tr.venmo_username ?? null,
-              zelleEmail: tr.zelle_email ?? null,
-              zellePhone: tr.pay_phone ?? null,
-              cashtag: tr.cashapp_handle ?? null,
-            });
-          }
+          const dest = await payDestinationFor(supabase, client.trainer_id);
+          if (dest) setPayTo(dest);
         }
         const { data } = await supabase
           .from("payment_reminders")

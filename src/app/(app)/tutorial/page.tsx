@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import { isTrainerEmail } from "@/lib/trainer";
-import { trainerForAuthUser } from "@/lib/trainerResolve";
+import { payDestinationFor, payDestinationIsSet } from "@/lib/payDest";
 import { readFlag } from "@/lib/flags";
 import type { SetupCheckKey } from "@/lib/tutorial/script";
 import TutorialClient from "./TutorialClient";
@@ -50,19 +50,20 @@ async function readSetup(
     client: false, program: false, message: false, push: false,
   };
 
-  const trainer = await trainerForAuthUser(supabase, authUserId);
-  if (trainer) {
-    done.pay = !!(trainer.venmoUsername || trainer.zelleEmail || trainer.cashappHandle);
-  }
   // avatar_url straight off the trainer row — the same column coachForViewer
   // hands to every screen that draws this trainer's face. Read here rather
   // than through that resolver only because trainerResolve does not select it.
   const { data: me } = await q(supabase)
     .from("trainers")
-    .select("avatar_url")
+    .select("id, avatar_url")
     .eq("auth_user_id", authUserId)
     .maybeSingle();
-  done.profile = !!(me as { avatar_url?: string | null } | null)?.avatar_url;
+  const meRow = me as { id?: string; avatar_url?: string | null } | null;
+  done.profile = !!meRow?.avatar_url;
+
+  // Through the gate, not off the row: SELECT on the payment columns is
+  // revoked, and trainer_pay_details() lets a trainer read their own.
+  done.pay = payDestinationIsSet(await payDestinationFor(supabase, meRow?.id));
 
   const { data: settings } = await q(supabase)
     .from("trainer_settings")

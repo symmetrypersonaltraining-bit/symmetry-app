@@ -57,10 +57,34 @@ const DIR = path.join(ROOT, "supabase/migrations");
 const ALL_SQL = fs.readdirSync(DIR).filter((f) => f.endsWith(".sql")).sort()
   .map((f) => fs.readFileSync(path.join(DIR, f), "utf8"));
 
-/** The last migration text that mentions `needle`. Later files win. */
+/**
+ * The last migration that DEFINES `needle` — creates the function or the policy
+ * of that name. Later files win.
+ *
+ * This used to be a plain substring match, and 22 Aug is what that costs: the
+ * payment-column revocation explains itself in a header comment that names
+ * update_my_trainer_profile() as where writes still go, and that comment made
+ * it the "latest" migration for the rule, so three assertions about a function
+ * it does not contain failed at once. A migration mentioning a thing is not a
+ * migration changing it.
+ *
+ * Definitions are matched first; the mention is kept as a fallback so a needle
+ * that names something other than a function or policy (a column, a constraint)
+ * still resolves.
+ */
 function latest(needle: string): string {
-  let out = "";
-  for (const sql of ALL_SQL) if (sql.includes(needle)) out = sql;
+  const defines = new RegExp(
+    "(create\\s+(or\\s+replace\\s+)?function\\s+(public\\.)?" + needle +
+    "\\b|create\\s+policy\\s+\"?" + needle + "\\b)",
+    "i",
+  );
+  let def = "";
+  let mention = "";
+  for (const sql of ALL_SQL) {
+    if (defines.test(sql)) def = sql;
+    if (sql.includes(needle)) mention = sql;
+  }
+  const out = def || mention;
   assert.ok(out, `no migration mentions ${needle} — the rule is not recorded anywhere`);
   return out;
 }
