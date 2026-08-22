@@ -319,7 +319,8 @@
     "source",
     "compensation_severity",
     "compensation_confidence",
-    "movement_assessment_id"
+    "movement_assessment_id",
+    "created_by_trainer_id"
   ],
   "client_goals": [
     "id",
@@ -535,6 +536,11 @@
     "source",
     "imported_at"
   ],
+  "exercise_hidden": [
+    "trainer_id",
+    "exercise_id",
+    "hidden_at"
+  ],
   "exercise_notes": [
     "id",
     "client_id",
@@ -582,7 +588,9 @@
     "video_status",
     "video_checked_at",
     "default_tracked_fields",
-    "load_is_assistance"
+    "load_is_assistance",
+    "owner_trainer_id",
+    "forked_from_id"
   ],
   "food_catalog": [
     "id",
@@ -664,7 +672,8 @@
     "next_pick_client_id",
     "announced_at",
     "scored_at",
-    "counts_external"
+    "counts_external",
+    "trainer_id"
   ],
   "group_reads": [
     "user_id",
@@ -829,7 +838,8 @@
     "is_group",
     "deleted_at",
     "image_url",
-    "sender_kind"
+    "sender_kind",
+    "group_trainer_id"
   ],
   "metrics": [
     "id",
@@ -1025,7 +1035,8 @@
     "description",
     "created_at",
     "updated_at",
-    "personal_for_client_id"
+    "personal_for_client_id",
+    "owner_trainer_id"
   ],
   "progress_photos": [
     "id",
@@ -1217,6 +1228,13 @@
     "age",
     "sex",
     "created_at"
+  ],
+  "trainer_features": [
+    "trainer_id",
+    "coachbot_enabled",
+    "birthdays_enabled",
+    "weekly_focus_enabled",
+    "updated_at"
   ],
   "trainer_notes": [
     "id",

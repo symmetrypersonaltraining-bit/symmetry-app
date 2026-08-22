@@ -33,6 +33,7 @@ import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { Db } from "@/lib/ai/scope";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { ownerAuthUid, ownerTrainer } from "@/lib/trainerResolve";
+import { trainerFeatureOn } from "@/lib/trainerFeatures";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -93,6 +94,24 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
   if (!opts.force) {
     const { data: flag } = await db.from("app_flags").select("enabled").eq("key", "coachbot_live").maybeSingle();
     if ((flag as { enabled: boolean } | null)?.enabled !== true) return { posted: false, reason: "coachbot_live is off" };
+  }
+
+  // AND the owner's own switch.
+  //
+  // Coach Bot posts into a group room, and since the rooms were split on
+  // 21 Aug there is one per trainer. This one still posts only into the
+  // OWNER's — which is correct and unchanged for his clients, and is why the
+  // gate reads the owner's preference rather than the caller's.
+  //
+  // Making Coach Bot run for EVERY trainer in their own room is the follow-up,
+  // and it is a bigger job than a flag: the leaderboard it teases is now
+  // per-trainer too, so it needs a challenge and a board per room before it has
+  // anything to say. Written down rather than half-done.
+  {
+    const owner = await ownerTrainer(db);
+    if (!(await trainerFeatureOn(db, owner?.id, "coachbot"))) {
+      return { posted: false, reason: "the owner has Coach Bot switched off" };
+    }
   }
 
   const { data: ch } = await db.from("v_active_challenge").select("*").maybeSingle();

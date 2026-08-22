@@ -38,10 +38,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { isCronRequest } from "@/lib/cron-auth";
+import { trainerFeatureOn } from "@/lib/trainerFeatures";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import { enforceMeter, resolveAiScope, type Db } from "@/lib/ai/scope";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
-import { ownerAuthUid, inboxAuthUidForClient, ownerTrainer } from "@/lib/trainerResolve";
+import { ownerAuthUid, inboxAuthUidForClient, ownerTrainer, trainerForClient } from "@/lib/trainerResolve";
 import {
   BIRTHDAY_SYSTEM, centralToday, effectiveMonthDay, fallbackLine, isPrintable,
   joinNames, monthDay, nextDay, type BirthdayPerson,
@@ -146,6 +147,11 @@ export async function runBirthdays(
       // see it. Checked against the live policy before writing this.
       const coachUid = await inboxAuthUidForClient(db, p.id);
       if (!coachUid) continue;
+      // That coach's own switch. The heads-up lands in THEIR inbox about THEIR
+      // client, so it is their call whether they want it — the app-wide flag
+      // above only says the feature exists at all.
+      const coachTrainer = await trainerForClient(db, p.id);
+      if (!(await trainerFeatureOn(db, coachTrainer?.id, "birthdays"))) continue;
       const { error } = await db.from("messages").insert({
         from_id: coachUid,
         to_id: coachUid,

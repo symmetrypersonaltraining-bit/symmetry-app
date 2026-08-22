@@ -41,6 +41,7 @@ import { isCronRequest } from "@/lib/cron-auth";
 import { WEEKLY_WRITER_RULES, weekStartOf } from "@/lib/ai/weekly-numbers";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { coachFirstNameForClient } from "@/lib/trainerResolve";
+import { trainerFeatureOn } from "@/lib/trainerFeatures";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -120,6 +121,7 @@ interface ClientRow {
   weekly_focus: string | null;
   weekly_focus_week: string | null;
   weekly_focus_source: string | null;
+  trainer_id: string | null;
 }
 
 interface RunResult {
@@ -155,7 +157,7 @@ async function runSweep(opts: {
 
   let q = db
     .from("clients")
-    .select("id, name, primary_goal, weekly_focus, weekly_focus_week, weekly_focus_source")
+    .select("id, name, primary_goal, weekly_focus, weekly_focus_week, weekly_focus_source, trainer_id")
     .is("archived_at", null);
   if (opts.onlyClientId) q = q.eq("id", opts.onlyClientId);
   const { data, error } = await q;
@@ -165,9 +167,27 @@ async function runSweep(opts: {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const results: RunResult[] = [];
 
+  // A trainer can decline the sweep for their own clients. Cached per trainer
+  // rather than asked per client: 34 clients across a handful of trainers is
+  // 34 round trips for the same few answers, and this runs inside a cron with
+  // a time budget.
+  const featureCache = new Map<string, boolean>();
+  async function sweepOnFor(trainerId: string | null | undefined): Promise<boolean> {
+    if (!trainerId) return true;   // unassigned client: behave as before
+    const hit = featureCache.get(trainerId);
+    if (hit !== undefined) return hit;
+    const on = await trainerFeatureOn(db, trainerId, "weekly_focus");
+    featureCache.set(trainerId, on);
+    return on;
+  }
+
   for (const c of clients) {
     const name = c.name || "(unnamed)";
     try {
+      if (!(await sweepOnFor(c.trainer_id))) {
+        results.push({ clientId: c.id, name, status: "skipped", detail: "their trainer has the weekly focus off" });
+        continue;
+      }
       if (!apiKey) {
         results.push({ clientId: c.id, name, status: "skipped", detail: "ANTHROPIC_API_KEY not set" });
         continue;

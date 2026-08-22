@@ -12,6 +12,8 @@ import NotificationSettings from "@/components/NotificationSettings";
 import HelpCenter from "@/components/HelpCenter";
 import { useTutorialVisibility } from "@/lib/useTutorialVisibility";
 import TrainerProfileCard from "@/components/TrainerProfileCard";
+import SettingsGroup from "@/components/SettingsGroup";
+import TrainerBotSettings from "@/components/TrainerBotSettings";
 
 interface Props {
   userEmail: string;
@@ -30,6 +32,23 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
   // Per-trainer, not the app-wide flag above it: one trainer finishing the
   // guide must not take it away from the next one being onboarded.
   const { dismissed: tutorialHidden, hide: hideTutorial, show: showTutorial } = useTutorialVisibility();
+
+  // The old flat layout, one tap away.
+  //
+  // Dustin, 22 Aug: "go ahead and reorganize... keep it revertable so i can
+  // revert in the morning if i dont like it". A git revert needs me; this does
+  // not. `classic` makes SettingsGroup render its children straight onto the
+  // page exactly as before — same markup, no second copy to drift — so the old
+  // Settings is a link at the bottom of the new one.
+  const [classic, setClassic] = useState(false);
+  useEffect(() => {
+    try { setClassic(localStorage.getItem("symmetry_settings_classic") === "1"); } catch { /* fine */ }
+  }, []);
+  function toggleClassic() {
+    const next = !classic;
+    setClassic(next);
+    try { localStorage.setItem("symmetry_settings_classic", next ? "1" : "0"); } catch { /* fine */ }
+  }
   const { theme, setTheme, depth, setDepth } = useTheme();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -104,6 +123,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
         </div>
       )}
 
+      <SettingsGroup id="you" title="You" sub="Your name, photo, password, and how clients pay you" icon="ti-user" defaultOpen classic={classic}>
       {/* A trainer gets an EDITOR; everyone else keeps the read-only card.
           This card showed a trainer their own name and email as plain text and
           offered no way to change either — and nothing anywhere in the app
@@ -130,18 +150,6 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
         <PaymentsSettingsCard />
         <BillingHistory />
 
-      {/* Switches for the 2026-07-25 polish features: sound, vibration,
-          leaderboard opt-in, check-in nudges, plus the trainer-only master
-          switch that takes AI nudges live. */}
-      <section>
-        <p className="section-header">Experience</p>
-        <ExperienceSettings isTrainer={isTrainer && !isInClientMode} />
-
-      {/* Per-event push preferences. Sits directly under Experience because
-          both answer "how does this app behave for me". */}
-      <NotificationSettings isTrainer={isTrainer && !isInClientMode} />
-      </section>
-
       <section>
         <p className="section-header">Security</p>
         <div className="card p-4">
@@ -160,6 +168,20 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
           )}
           {passwordSuccess && <p className="mt-3 text-xs font-semibold" style={{ color: "#22c55e" }}>Password updated successfully!</p>}
         </div>
+      </section>
+      </SettingsGroup>
+
+      <SettingsGroup id="app" title="How the app behaves" sub="Sounds, notifications and colour" icon="ti-adjustments" classic={classic}>
+      {/* Switches for the 2026-07-25 polish features: sound, vibration,
+          leaderboard opt-in, check-in nudges, plus the trainer-only master
+          switch that takes AI nudges live. */}
+      <section>
+        <p className="section-header">Experience</p>
+        <ExperienceSettings isTrainer={isTrainer && !isInClientMode} />
+
+      {/* Per-event push preferences. Sits directly under Experience because
+          both answer "how does this app behave for me". */}
+      <NotificationSettings isTrainer={isTrainer && !isInClientMode} />
       </section>
 
       <section>
@@ -236,7 +258,9 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
           </div>
         </div>
       </section>
+      </SettingsGroup>
 
+      <SettingsGroup id="connect" title="Calendar and clients" sub="Google Calendar, invites, the install QR" icon="ti-plug" classic={classic}>
       {isTrainer && !isInClientMode && (
         <section>
           <p className="section-header">Integrations</p>
@@ -335,7 +359,9 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
           </div>
         </section>
         )}
+      </SettingsGroup>
 
+      <SettingsGroup id="bots" title="Bots and AI" sub="The walkthrough, and whether the AI is working" icon="ti-wand" classic={classic}>
       {/* The end-to-end walkthrough. Only appears once trainer_tutorial_live
           is on, which is why the card and the toggle are in different places:
           the toggle (Experience, trainer only) is how you turn it on, this is
@@ -373,6 +399,8 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
         </section>
       )}
 
+      {isTrainer && !isInClientMode && <TrainerBotSettings />}
+
       {/* Is the AI actually working? Every AI surface in this app degrades
           quietly by design — a coach card that fails just does not appear — so
           the only way to find a dead one is to come and look. Trainer only.
@@ -392,7 +420,9 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
           </a>
         </section>
       )}
+      </SettingsGroup>
 
+      <SettingsGroup id="help" title="Help and about" sub="Getting clients started, help centre, app version" icon="ti-help" classic={classic}>
       {/* Where the install QR lives. Dustin asked "where do I find the qr code
           to have clients download this" — the per-client one only appears on a
           client who has never had a login, so this is the one that works for
@@ -428,6 +458,19 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
             <span className="text-sm font-medium" style={{ color: "var(--brand-text)" }}>Symmetry PT x Claude AI</span>
           </div>
         </div>
+      </section>
+      </SettingsGroup>
+
+      <section style={{ textAlign: "center" }}>
+        <button
+          type="button"
+          onClick={toggleClassic}
+          style={{ background: "none", border: "none", padding: 4, cursor: "pointer",
+                   font: "inherit", fontSize: 12, textDecoration: "underline",
+                   color: "var(--brand-text-secondary)" }}
+        >
+          {classic ? "Use the new grouped settings" : "Use the old settings layout"}
+        </button>
       </section>
 
       <section>
