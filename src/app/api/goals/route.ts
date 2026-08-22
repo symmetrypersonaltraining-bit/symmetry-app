@@ -28,7 +28,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import type { GoalMetric } from "@/lib/goals";
 
 export const runtime = "nodejs";
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     };
     try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
 
-    const isTrainer = isTrainerEmail(user.email);
+    const isTrainer = await viewerIsTrainer(sb, user);
 
     // Who the caller is as a client. Never taken from the body.
     let ownClientId: string | null = null;

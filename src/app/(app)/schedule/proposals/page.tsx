@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import ProposalsClient from "./ProposalsClient";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 // Trainer approval surface for schedule_change_proposals.
 //
@@ -17,7 +17,7 @@ export default async function ScheduleProposalsPage() {
   const supabase = await createClient();
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
-  if (!isTrainerEmail(user.email)) redirect("/home");
+  if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
 
   const { data: rows } = await supabase
     .from("schedule_change_proposals")

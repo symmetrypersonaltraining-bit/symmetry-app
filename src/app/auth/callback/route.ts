@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -12,7 +12,12 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user && !isTrainerEmail(user.email)) {
+      // A trainer must not be routed through the CLIENT temp-password flow.
+      // The check was isTrainerEmail() alone — a build-time list — so a trainer
+      // added from inside the app who also has a client row was sent to
+      // /set-password instead of into the app, on the very link their invite
+      // email told them to click.
+      if (user && !(await viewerIsTrainer(supabase, user))) {
         const { data: clientRec } = await supabase
           .from("clients")
           .select("id")

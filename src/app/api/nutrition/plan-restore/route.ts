@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         ownClientId = (c2 as { id: string } | null)?.id ?? null;
       }
     }
-    const isTrainer = isTrainerEmail(user.email);
+    const isTrainer = await viewerIsTrainer(sb, user);
 
     const admin = createAdminClient();
     const { data: p } = await admin

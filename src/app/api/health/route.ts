@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { configured as webPushConfigured } from "@/lib/webPush";
 import { probe } from "@/lib/health";
 
 /**
@@ -110,11 +111,29 @@ export async function GET() {
   // These do NOT affect `ok`. Mail being unconfigured is not an outage: every
   // invite screen shows the credentials on screen precisely so a missing key
   // costs a copy-and-paste rather than a blocked signup.
+  // CAPABILITIES, not environment variables. Two of these reported the wrong
+  // thing within hours of being added, both in the same direction — "off" for
+  // something that works:
+  //
+  //   push              tested only FCM, so it said false on an instance whose
+  //                     web push was configured and delivering. Web push is
+  //                     how every phone here actually gets notified; FCM is
+  //                     the native Android shell, a second channel.
+  //   android_apk_url   tested the override, which is unset because the
+  //                     default is correct: the APK falls back to this
+  //                     instance's own public bucket, where it has been since
+  //                     20 Jul. Reading "false" sent somebody looking for a
+  //                     missing build that was never missing.
+  //
+  // A flag nobody can act on is worse than no flag, so each one now names what
+  // is true. Still presence only — never a value, prefix, or length.
   const config = {
     email_sending: !!process.env.RESEND_API_KEY,
-    android_apk_url: !!process.env.NEXT_PUBLIC_ANDROID_APK_URL,
     ai: !!process.env.ANTHROPIC_API_KEY,
-    push: !!process.env.FIREBASE_SERVICE_ACCOUNT || !!process.env.FCM_SERVER_KEY,
+    push: { web: webPushConfigured(), native: !!process.env.FIREBASE_SERVICE_ACCOUNT || !!process.env.FCM_SERVER_KEY },
+    // Where the invite emails point for the Android build. "bucket" is the
+    // normal, working state.
+    android_apk: process.env.NEXT_PUBLIC_ANDROID_APK_URL ? "override" : "bucket",
   };
 
   return NextResponse.json(

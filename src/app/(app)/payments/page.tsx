@@ -3,13 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import PaymentsClient from "./PaymentsClient";
 import ReminderEditor from "@/components/ReminderEditor";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export default async function PaymentsPage() {
   const supabase = await createClient();
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
-  if (!isTrainerEmail(user.email)) redirect("/home");
+  if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
 
   // All clients with fee/frequency info
   const { data: clientRows } = await supabase

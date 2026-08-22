@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { validateBillingFields } from "@/lib/billingFields";
 
 export async function PATCH(
@@ -11,7 +11,7 @@ export async function PATCH(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user || !isTrainerEmail(user.email)) {
+  if (!user || !(await viewerIsTrainer(supabase, user))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

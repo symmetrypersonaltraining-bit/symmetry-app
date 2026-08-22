@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { adoptPlan, AdoptDb, AdoptMealInput } from "@/lib/nutrition/adoptPlan";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     const source = body?.source === "manual" ? "manual" : "ai";
 
     // Authorize: trainer, or the signed-in client acting on their own record.
-    const isTrainer = isTrainerEmail(user.email);
+    const isTrainer = await viewerIsTrainer(sb, user);
     if (!isTrainer) {
       const { data: c } = await sb.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
       if (!c || (c as { id: string }).id !== clientId) {

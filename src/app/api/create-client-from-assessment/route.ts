@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 import { buildInviteEmailHtml } from "@/lib/inviteEmail";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 // Full onboarding from the assessment flow: save the assessment, create the
 // client profile with ALL assessment info, create their login with a temporary
@@ -36,7 +36,7 @@ const nn = (v: any) => (v === "" || v === undefined ? null : v);
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !isTrainerEmail(user.email)) {
+  if (!user || !(await viewerIsTrainer(supabase, user))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

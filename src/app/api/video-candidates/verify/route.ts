@@ -43,7 +43,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isTrainerUser } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 
 export const dynamic = "force-dynamic";
@@ -231,7 +231,7 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   const authed =
-    isTrainerUser(user) ||
+    await viewerIsTrainer(supabase, user) ||
     req.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}` ||
     (await isDbSchedulerRequest(req));
   if (!authed) {

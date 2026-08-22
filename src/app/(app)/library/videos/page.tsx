@@ -15,7 +15,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
-import { isTrainerUser } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import VideoQueueClient, { type Candidate } from "./VideoQueueClient";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export default async function VideoQueuePage() {
   const supabase = await createClient();
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
-  if (!isTrainerUser(user)) redirect("/home");
+  if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
 
   const cols =
     "id, exercise_id, exercise_name, url, title, channel, duration_sec, confidence, note, status, applied_at";

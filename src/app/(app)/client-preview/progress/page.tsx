@@ -8,14 +8,15 @@ import AchievementCard from "@/components/AchievementCard";
 import PersonalBests from "@/components/PersonalBests";
 import ThenVsNow from "@/components/ThenVsNow";
 import ProgressPhotos from "@/components/ProgressPhotos";
-import {TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
+import { TRAINER_EMAIL } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { coachForViewer } from "@/lib/coachIdentity";
 
 export default async function ClientPreviewProgressPage() {
   const supabase = await createClient();
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
-  if (!isTrainerEmail(user.email)) redirect("/progress");
+  if (!(await viewerIsTrainer(supabase, user))) redirect("/progress");
 
   const { data: clientRecord } = await supabase
     .from("clients")

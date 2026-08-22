@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export const dynamic = "force-dynamic";
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
@@ -46,7 +46,7 @@ async function requireTrainer() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return isTrainerEmail(user?.email);
+  return viewerIsTrainer(supabase, user);
 }
 
 export async function GET() {

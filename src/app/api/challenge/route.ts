@@ -20,7 +20,7 @@ import { excludedClientIds } from "@/lib/demoClient";
 import { unrankedClientIds } from "@/lib/rankings";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -254,7 +254,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Create / end are trainer-only.
-  if (!isTrainerEmail(user.email)) {
+  if (!(await viewerIsTrainer(supabase, user))) {
     return NextResponse.json({ error: "Trainer only" }, { status: 403 });
   }
 

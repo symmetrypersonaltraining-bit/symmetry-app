@@ -21,7 +21,7 @@ import { analyze, type AnalyzeInput } from '@/lib/movement/analyze';
 import { buildProgram } from '@/lib/movement/program';
 import { doseForPain } from '@/lib/movement/dose';
 import { CHECKPOINT_LABELS, SURFACE_COPY, scrubSurfaceLanguage } from '@/lib/movement/ces-data';
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
         .insert({
           client_id: body.clientId,
           created_by: user.id,
-          captured_by: body.capturedBy ?? (isTrainerEmail(user.email) ? 'trainer' : 'client'),
+          captured_by: body.capturedBy ?? (await viewerIsTrainer(supabase, user) ? 'trainer' : 'client'),
           assessment_type: engine.assessment,
           captured_at: engine.capturedAt,
           views: body.input.views.map((v) => ({ view: v.view, wedge: v.wedge, reps: v.frames.length, quality: v.quality })),

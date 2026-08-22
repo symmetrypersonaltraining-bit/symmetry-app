@@ -22,7 +22,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isTrainerUser } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!isTrainerUser(user)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await viewerIsTrainer(supabase, user))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: { id?: string; action?: string };
   try {

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import LogClient from "./LogClient";
 import { isClientMode } from "@/lib/client-mode";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { fetchOwnClientRow } from "@/lib/ownClient";
 
 export default async function LogPage() {
@@ -11,7 +11,7 @@ export default async function LogPage() {
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
-  const isTrainer = isTrainerEmail(user.email);
+  const isTrainer = await viewerIsTrainer(supabase, user);
   let clientRecord: { id: string; name: string } | null = null;
 
   const clientMode = await isClientMode();

@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { extractJson } from '@/lib/ai/nutrition-json';
 import { logUsage, pausedBody, assertNotPaused, checkAndLog, AiPaused, CapExceeded, capBody } from '@/lib/ai/meter';
 import { nutrientPromptSpec, sanitizeNutrients, roundNutrients, LEGACY_NUTRIENT_KEYS } from "@/lib/nutrition/nutrients";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { SONNET_MODEL } from "@/lib/ai/anthropic";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     // ---- auth / client scoping (soft — legacy callers may not send clientId) ----
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    const isTrainer = !!user && isTrainerEmail(user.email);
+    const isTrainer = !!user && await viewerIsTrainer(supabase, user);
     let ownClientId: string | null = null;
     if (user) {
       const { data: byAuth } = await supabase.from('clients').select('id').eq('auth_user_id', user.id).maybeSingle();

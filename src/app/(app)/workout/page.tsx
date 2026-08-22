@@ -6,7 +6,7 @@ import Link from "next/link";
 import { type CalWorkout } from "@/components/RescheduleCalendar";
 import ScheduleWeekBar from "@/components/ScheduleWeekBar";
 import ScheduleBoard from "@/components/ScheduleBoard";
-import {isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { coachForViewer } from "@/lib/coachIdentity";
 import { fetchOwnClientRow } from "@/lib/ownClient";
 
@@ -27,7 +27,7 @@ export default async function WorkoutPage(props: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isTrainer = isTrainerEmail(user.email);
+  const isTrainer = await viewerIsTrainer(supabase, user);
   const inClientMode = isTrainer ? await isClientMode(searchParams.as) : false;
 
   // Central time today

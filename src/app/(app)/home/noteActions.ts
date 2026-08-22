@@ -14,7 +14,7 @@
 // nobody could tell.
 
 import { createClient } from "@/lib/supabase/server";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -28,7 +28,7 @@ import { revalidatePath } from "next/cache";
 export async function resolveExerciseNote(id: string): Promise<string | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !isTrainerEmail(user.email)) return "Trainer only.";
+  if (!user || !(await viewerIsTrainer(supabase, user))) return "Trainer only.";
 
   // `.select("id")` is the guard, not decoration. PostgREST returns its error
   // rather than throwing, and an update matching ZERO rows is not an error at
@@ -54,7 +54,7 @@ export async function resolveExerciseNote(id: string): Promise<string | null> {
 export async function unresolveExerciseNote(id: string): Promise<string | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !isTrainerEmail(user.email)) return "Trainer only.";
+  if (!user || !(await viewerIsTrainer(supabase, user))) return "Trainer only.";
 
   const { data, error } = await supabase
     .from("exercise_notes")

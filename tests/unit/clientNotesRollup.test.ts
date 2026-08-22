@@ -76,7 +76,12 @@ test("resolving a note proves a row actually changed", () => {
 
 test("only a trainer can close a note", () => {
   const c = code(read("src/app/(app)/home/noteActions.ts"));
-  assert.equal((c.match(/isTrainerEmail\(user\.email\)/g) || []).length, 2,
+  // Counted, not merely matched: there are two actions here (resolve and
+  // unresolve) and gating only one of them is the failure this guards. The
+  // mechanism moved from isTrainerEmail() — a build-time list — to the
+  // `trainers` table on 22 Aug, so a trainer added from inside the app is one
+  // too; the count is what actually carries the rule.
+  assert.equal((c.match(/viewerIsTrainer\(\w+, user\)/g) || []).length, 2,
     "both actions must gate on the caller being a trainer");
 });
 

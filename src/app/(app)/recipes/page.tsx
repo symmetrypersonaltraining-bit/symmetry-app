@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
 import RecipesClient from "./RecipesClient";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { CT_TODAY } from "@/lib/ai/coach-context";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export default async function RecipesPage() {
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
-  const isTrainer = isTrainerEmail(user.email);
+  const isTrainer = await viewerIsTrainer(supabase, user);
   let clientId: string | null = null;
   {
     const { data: c } = await supabase.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 // Scheduled in vercel.json. A route handler Next decides to render statically
 // is served from cache and never executes — the same shape of silence as the
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user || !isTrainerEmail(user.email)) {
+  if (!user || !(await viewerIsTrainer(supabase, user))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

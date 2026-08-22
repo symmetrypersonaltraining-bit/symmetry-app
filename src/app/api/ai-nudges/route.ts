@@ -47,7 +47,8 @@ import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter } from "@/lib/ai/scope";
 import { ownerAuthUid, coachFirstNameForClient } from "@/lib/trainerResolve";
-import { isTrainerEmail, COACH_FIRST_NAME } from "@/lib/trainer";
+import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { isCronRequest } from "@/lib/cron-auth";
@@ -143,7 +144,7 @@ export async function POST(req: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user || !isTrainerEmail(user.email)) {
+    if (!user || !(await viewerIsTrainer(supabase, user))) {
       return NextResponse.json({ error: "Trainer only" }, { status: 403 });
     }
   }

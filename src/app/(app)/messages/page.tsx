@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
 import MessagesClient from "./MessagesClient";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { initialsOf } from "@/lib/initials";
 // Never serve a cached/prefetched variant of this route — the trainer-vs-client
 // branch must be decided per request from the cookie + ?as marker.
@@ -23,7 +23,7 @@ export default async function MessagesPage(props: {
   // renders on the FIRST server render even if the cookie hasn't propagated yet
   // (it's set in a client effect) — fixing the intermittent trainer-inbox leak.
   const __isInClientMode = __cookieStore.get("symmetry_client_mode")?.value === "1" || searchParams.as === "client";
-  const isTrainer = isTrainerEmail(user.email) && !__isInClientMode;
+  const isTrainer = await viewerIsTrainer(supabase, user) && !__isInClientMode;
 
   if (searchParams.client === "group") {
     const { data: gmsgs } = await supabase.from("messages").select("*").eq("is_group", true).is("deleted_at", null).order("created_at", { ascending: true });

@@ -5,7 +5,8 @@ import TrainerCalendarPanel from "@/components/TrainerCalendarPanel";
 import ClientDashboard from "./ClientDashboard";
 import TrainerHome from "./TrainerHome";
 import PendingRemindersPanel from "@/components/PendingRemindersPanel";
-import { TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
+import { TRAINER_EMAIL } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { getServerUser } from "@/lib/auth/serverUser";
 
 async function isClientMode(asMarker?: string): Promise<boolean> {
@@ -27,7 +28,7 @@ export default async function HomePage(props: {
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
-  const isTrainer = isTrainerEmail((user?.email ?? ""));
+  const isTrainer = await viewerIsTrainer(supabase, user);
   const isInClientMode = isTrainer ? await isClientMode(searchParams.as) : false;
 
   // ── TRAINER VIEW ──────────────────────────────────────────────────────────

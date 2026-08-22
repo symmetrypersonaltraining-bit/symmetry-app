@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { fetchOwnClientRow } from "@/lib/ownClient";
 
 export default async function ClientPreviewWorkoutPage() {
@@ -11,7 +11,7 @@ export default async function ClientPreviewWorkoutPage() {
   // client-preview screens — have gated on it this way since 15 Aug.
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
-  if (!isTrainerEmail(user.email)) redirect("/workout");
+  if (!(await viewerIsTrainer(supabase, user))) redirect("/workout");
 
   // Preview means "show me my own client view", so this is the trainer's own
   // client row — found by their login, not by their name. src/lib/ownClient.ts.

@@ -96,7 +96,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       const { data: me } = await supabase
         .from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
       const myClientId = (me as { id: string } | null)?.id ?? null;
-      const isTrainer = isTrainerEmail(user.email) && !clientMode;
+      // coach.isSelf is the DATABASE answer to "is the viewer a trainer" — it
+      // is true exactly when a `trainers` row matches this auth user, and it is
+      // already resolved in the app layout and handed down through the
+      // provider. isTrainerEmail() alone is a build-time list of two addresses,
+      // so a trainer added from inside the app had their whole inbox collapse
+      // into a single "Trainer" row — the bug the note above says was fixed
+      // once already, returning by a different door.
+      const isTrainer = (isTrainerEmail(user.email) || (coach.isSelf && !!coach.trainerId)) && !clientMode;
 
       // ROWS, not a count. The banner needs to know WHICH messages are unread —
       // a HEAD count is why it could never route to the sender's thread.

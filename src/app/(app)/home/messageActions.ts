@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { sendPushToUser } from '@/lib/push';
 import { NOTIFICATION_EVENTS } from '@/lib/notificationEvents';
 import { buildTrainerMessageEmail } from '@/lib/messageEmail';
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://symmetry-app-omega.vercel.app';
 
@@ -142,7 +142,7 @@ export async function sendClientMessage(body: string, imageUrl?: string | null):
 export async function sendBroadcastMessage(body: string, imageUrl?: string | null): Promise<number> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !isTrainerEmail(user.email)) return 0;
+  if (!user || !(await viewerIsTrainer(supabase, user))) return 0;
   // Archived clients are off the roster — a broadcast never reaches them.
   //
   // AND IT ONLY REACHES YOUR OWN. This read the whole table, so from 20 Aug

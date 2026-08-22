@@ -9,7 +9,7 @@ import AchievementCard from "@/components/AchievementCard";
 import PersonalBests from "@/components/PersonalBests";
 import ThenVsNow from "@/components/ThenVsNow";
 import ProgressPhotos from "@/components/ProgressPhotos";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export default async function ProgressPage({
   searchParams,
@@ -20,7 +20,7 @@ export default async function ProgressPage({
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
-  const isTrainer = isTrainerEmail(user.email);
+  const isTrainer = await viewerIsTrainer(supabase, user);
   const params = await searchParams;
 
   let clientId: string | null = null;

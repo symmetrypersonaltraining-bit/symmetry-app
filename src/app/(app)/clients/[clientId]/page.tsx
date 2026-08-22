@@ -8,7 +8,7 @@ import ClientWorkoutAI from "@/components/ClientWorkoutAI";
 import InviteClientButton from "./InviteClientButton";
 import ResetCredentialsButton from "./ResetCredentialsButton";
 import ArchiveClientButton from "./ArchiveClientButton";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export default async function ClientProfilePage({
   params,
@@ -19,7 +19,7 @@ export default async function ClientProfilePage({
   const supabase = await createClient();
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
-  if (!isTrainerEmail(user.email)) redirect("/home");
+  if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
 
   const { data: client } = await supabase
     .from("clients")

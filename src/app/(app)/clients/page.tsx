@@ -3,13 +3,13 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import ClientsListClient from "./ClientsListClient";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export default async function ClientsPage() {
   const supabase = await createClient();
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
-  if (!isTrainerEmail(user.email)) redirect("/home");
+  if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
 
   // Fetch all clients with their active program
   const { data: clients } = await supabase

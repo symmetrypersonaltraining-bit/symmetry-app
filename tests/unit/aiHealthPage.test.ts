@@ -46,7 +46,11 @@ test("failing means RECENTLY failing", () => {
 });
 
 test("it is trainer-only and read-only", () => {
-  assert.match(PAGE, /isTrainerEmail\(user\.email\)/, "a client can open the trainer's spend page");
+  // Was isTrainerEmail(user.email) — a build-time list of two addresses. From
+  // 22 Aug a trainer can be added from inside the app, so the gate asks the
+  // `trainers` table instead. The rule is the same one: a client must not be
+  // able to open the trainer's spend page.
+  assert.match(PAGE, /viewerIsTrainer\(\w+, user\)/, "a client can open the trainer's spend page");
   assert.match(PAGE, /redirect\("\/home"\)/);
   for (const verb of [".insert(", ".update(", ".delete(", ".upsert("]) {
     assert.ok(!PAGE.includes(verb) && !TABLE.includes(verb), `AI health writes to the database (${verb}) — it must only read`);

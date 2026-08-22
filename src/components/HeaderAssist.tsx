@@ -4,7 +4,7 @@ import { startDictation, type DictationHandle } from "@/lib/dictation";
 import { createClient } from "@/lib/supabase/client";
 import { submitFeedback } from "@/lib/feedback";
 import NotificationCenter from "@/components/NotificationCenter";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { useCoach } from "@/lib/useCoach";
 /**
  * HeaderAssist — feedback (all users) + AI assistant (trainer only) buttons
@@ -58,7 +58,7 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
   const buzz = (m: number | number[]) => { try { (navigator as any).vibrate && (navigator as any).vibrate(m as any); } catch {} };
 
   useEffect(() => {
-    (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (isTrainerEmail(data?.user?.email)) setIsTrainer(true); } catch {} })();
+    (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (await viewerIsTrainer(sb, data?.user)) setIsTrainer(true); } catch {} })();
     const checkClientMode = () => {
       try {
         const cookieOn = document.cookie.includes("symmetry_client_mode=1");

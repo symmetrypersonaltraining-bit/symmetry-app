@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isTrainerEmail } from "@/lib/trainer";
+import { isTrainerEmail, noteTrainerEmail } from "@/lib/trainer";
 import { withAuthTimeout } from "@/lib/authTimeout";
 import { getUserFast } from "@/lib/auth/getUserFast";
 
@@ -131,10 +131,28 @@ export async function middleware(request: NextRequest) {
     return redirectKeepingSession(new URL("/login", request.url), supabaseResponse);
   }
 
-  // Trainer skips all client checks
-  if (isTrainerEmail(user.email)) {
-    return supabaseResponse;
-  }
+  // Trainer skips all client checks.
+  //
+  // Resolved against the `trainers` table, not only the build-time list. A
+  // trainer added from inside the app is real immediately, and falling past
+  // this line put them into the CLIENT onboarding chain below — so somebody
+  // invited as a trainer, who also has a client row (Dustin trains himself; it
+  // is the normal pattern), was redirected into the client intake wizard on
+  // every single navigation and never reached a page at all.
+  //
+  // Two addresses are on the build-time list and cost nothing to answer, so
+  // they short-circuit before any query. Everyone else needs the table asked —
+  // and rather than pay a second round trip in series, the trainers lookup is
+  // STARTED here and fires alongside the clients lookup further down, which
+  // this path was already paying for. Both are network-bound; in parallel the
+  // pair costs about what the clients query alone used to.
+  const bakedIn = isTrainerEmail(user.email);
+  const trainerLookup = bakedIn
+    ? null
+    : withAuthTimeout(
+        supabase.from("trainers").select("email, active").eq("auth_user_id", user.id).limit(1)
+      );
+  if (bakedIn) return supabaseResponse;
 
   // Skip onboarding check on these pages to prevent redirect loops / flow interruption.
   //
@@ -147,10 +165,20 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Now settle whether they are a trainer after all. Awaited here rather than
+  // where it was started so the query ran while the path checks above did.
+  const trainerRes = trainerLookup ? await trainerLookup : null;
+  if (trainerRes?.degraded) return supabaseResponse;
+  const trainerRow = (trainerRes?.value?.data as { email?: string; active?: boolean }[] | null)?.[0] ?? null;
+  if (trainerRow && trainerRow.active !== false) {
+    // Remembered for the rest of this isolate's life, so the synchronous
+    // isTrainerEmail() checks inside the pages themselves agree with what was
+    // just read from the table.
+    noteTrainerEmail(trainerRow.email || user.email);
+    return supabaseResponse;
+  }
+
   // For clients: first run, then the intake wizard, then the app.
-  //
-  // One query, not two — middleware runs on every navigation and this already
-  // cost a round trip.
   if (pathname.startsWith("/")) {
     // Capped for the same reason as the auth call above. This one is a
     // convenience — it routes a first-run client to /welcome — and a client who

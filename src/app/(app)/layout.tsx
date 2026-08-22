@@ -16,7 +16,8 @@ import MessageNotifier from "@/components/MessageNotifier";
 import { NotificationProvider } from "@/lib/useNotificationFeed";
 import RefreshHandle from "@/components/RefreshHandle";
 import GlobalCoach from "@/components/GlobalCoach";
-import { isTrainerEmail } from "@/lib/trainer";
+import { isTrainerEmail, noteTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { getServerUser } from "@/lib/auth/serverUser";
 import { coachForViewer } from "@/lib/coachIdentity";
 import { CoachProvider } from "@/lib/useCoach";
@@ -38,7 +39,6 @@ export default async function AppLayout({
   if (!user) redirect("/login");
 
   const email = user?.email ?? "";
-  const isTrainer = isTrainerEmail(email);
 
   // WHOSE COACH. Resolved once, here, and handed to every client component
   // through the provider — 66 files rendered a coach's name from a build-time
@@ -47,6 +47,21 @@ export default async function AppLayout({
   // name is a small wrong, another trainer's photograph is the thing this
   // exists to prevent.
   const coach = await coachForViewer(supabase as never, user?.id);
+
+  // WHICH SHELL. This used to be isTrainerEmail(email) alone — a build-time
+  // list of two addresses — while the line above already asked the database the
+  // same question and got a better answer. A trainer added from inside the app
+  // was therefore handed the CLIENT app on every page: no roster, no dock, no
+  // programme builder, over rows RLS would have given them.
+  //
+  // coach.isSelf is true exactly when a `trainers` row matches this auth user.
+  // viewerIsTrainer() covers the row whose auth_user_id was never stamped, and
+  // remembers the answer so the client components below — which cannot await
+  // anything — see the same thing.
+  const isTrainer = isTrainerEmail(email)
+    || (coach.isSelf && !!coach.trainerId)
+    || (await viewerIsTrainer(supabase, user));
+  if (isTrainer) noteTrainerEmail(email);
 
   if (isTrainer) {
     return (

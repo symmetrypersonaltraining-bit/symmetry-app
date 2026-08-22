@@ -85,10 +85,53 @@ export const TRAINER_EMAILS: string[] = (() => {
  */
 export const TRAINER_EMAIL: string = TRAINER_EMAILS[0];
 
+// ── Trainers this build did not know about ──────────────────────────────────
+//
+// The list above is fixed when the app is BUILT. From 22 Aug an owner can add a
+// trainer from inside the app — /api/invite-trainer writes a `trainers` row and
+// stamps auth_user_id — and that trainer exists the moment the request returns,
+// on a deployment that has never heard of them.
+//
+// The database was always fine: is_trainer() joins auth.users to `trainers` on
+// lower(email), so RLS lets them read and write everything a trainer may. It is
+// the APP layer that refuses to ask. Before this registry, a trainer invited at
+// 9am got: the client app shell, the client onboarding wizard on every
+// navigation, 403 on the roster, and no AI at all — while the database sat there
+// perfectly willing.
+//
+// So the answer becomes learnable. `noteTrainerEmail()` is called by the code
+// that has already resolved somebody against the `trainers` table (see
+// src/lib/auth/viewer.ts), and from then on every synchronous `isTrainerEmail`
+// in that process agrees with the database.
+//
+// This only ever ADDS, and only ever from a row that is really in `trainers`.
+// It grants nothing by itself — RLS is still the boundary, exactly as the
+// header of this file says. What it fixes is the app drawing and gating the
+// wrong interface over rows the database would have handed over anyway.
+const learned = new Set<string>();
+
+/** Record a confirmed trainer address. Source must be the `trainers` table. */
+export function noteTrainerEmail(email: string | null | undefined): void {
+  if (!email) return;
+  const e = email.trim().toLowerCase();
+  if (e) learned.add(e);
+}
+
+/** Every address known to be a trainer right now — configured plus learned. */
+export function knownTrainerEmails(): string[] {
+  return [...new Set([...TRAINER_EMAILS, ...learned])];
+}
+
+/** Test seam. Never called by application code. */
+export function __resetLearnedTrainers(): void {
+  learned.clear();
+}
+
 /** Is this address a trainer on this instance? Case-insensitive. */
 export function isTrainerEmail(email: string | null | undefined): boolean {
   if (!email) return false;
-  return TRAINER_EMAILS.includes(email.trim().toLowerCase());
+  const e = email.trim().toLowerCase();
+  return TRAINER_EMAILS.includes(e) || learned.has(e);
 }
 
 /** The same question about a Supabase user (or anything carrying an email). */

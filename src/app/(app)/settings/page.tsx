@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import SettingsClient from "./SettingsClient";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { readFlag } from "@/lib/flags";
 import { coachForViewer } from "@/lib/coachIdentity";
 
@@ -13,7 +13,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   if (!user) redirect("/login");
 
   const { data: profile } = await supabase.from("clients").select("name").eq("auth_user_id", user.id).maybeSingle();
-  const isTrainer = isTrainerEmail(user.email);
+  const isTrainer = await viewerIsTrainer(supabase, user);
   // The walkthrough is dark until somebody turns it on. Reading the flag here
   // rather than inside the card keeps the card a pure render.
   const tutorialLive = isTrainer ? await readFlag(supabase, "trainer_tutorial_live") : false;

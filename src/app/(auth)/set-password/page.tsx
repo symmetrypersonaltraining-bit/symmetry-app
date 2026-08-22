@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import KeyboardSafeArea from "@/components/KeyboardSafeArea";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export default function SetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -23,7 +23,10 @@ export default function SetPasswordPage() {
     async function check() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.replace("/login"); return; }
-      if (isTrainerEmail(user.email)) { router.replace("/home"); return; }
+      // The trainer escape hatch, asked of the database. Missing it left a
+      // newly invited trainer stuck on this screen whenever they also had a
+      // client row with onboarding still incomplete.
+      if (await viewerIsTrainer(supabase, user)) { router.replace("/home"); return; }
 
       const { data: clientRec } = await supabase
         .from("clients")

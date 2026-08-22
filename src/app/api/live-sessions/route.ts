@@ -22,7 +22,7 @@ import { NextResponse } from "next/server";
 import { TRAINER_EMAIL, Db } from "@/lib/ai/scope";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +43,7 @@ export interface LiveRow {
 export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !isTrainerEmail(user.email)) {
+  if (!user || !(await viewerIsTrainer(supabase, user))) {
     return NextResponse.json({ error: "Trainer only" }, { status: 403 });
   }
 

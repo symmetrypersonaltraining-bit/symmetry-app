@@ -10,7 +10,7 @@ import { assertNotPaused, capBody, checkAndLog, pausedBody } from "@/lib/ai/mete
 // Re-exported so the many routes that already import TRAINER_EMAIL from here
 // keep working. The single source of truth is @/lib/trainer.
 export { TRAINER_EMAIL, TRAINER_EMAILS, isTrainerEmail, isTrainerUser } from "@/lib/trainer";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { getServerUser } from "@/lib/auth/serverUser";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Db = SupabaseClient<any, any, any>;
@@ -58,7 +58,16 @@ export async function resolveAiScope(requestedClientId?: string | null): Promise
   if (!user) {
     return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
-  const isTrainer = isTrainerEmail(user.email);
+  // Against the `trainers` table, not only the build-time list. This one line
+  // gated EVERY AI route in the app: a trainer added from inside the app got
+  // 403 on any client but themselves, and — with no client row of their own —
+  // 403 on the coach, food parsing, photo analysis, the workout builder and the
+  // trainer agent alike. Nothing about AI worked for them at all.
+  //
+  // Like everything else in this function it fails closed on an unreachable
+  // auth service, but viewerIsTrainer() falls back to the build-time list
+  // rather than to false, so a database blip cannot demote the owner.
+  const isTrainer = await viewerIsTrainer(supabase, user);
 
   let ownClientId: string | null = null;
   const { data: byAuth } = await supabase

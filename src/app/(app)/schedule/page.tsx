@@ -3,7 +3,8 @@ import { getServerUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import ScheduleClient from "./ScheduleClient";
-import { TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
+import { TRAINER_EMAIL } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 function getCentralNow() {
   const now = new Date();
@@ -26,7 +27,7 @@ export default async function SchedulePage() {
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
-  const isTrainer = isTrainerEmail(user.email);
+  const isTrainer = await viewerIsTrainer(supabase, user);
 
   // Trainer in trainer-mode: the Schedule tab must show the trainer schedule
   // (the appointments calendar on /home), NOT the personal client program.

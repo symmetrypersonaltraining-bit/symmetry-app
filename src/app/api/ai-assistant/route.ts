@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveAiScope, enforceMeter } from "@/lib/ai/scope";
 import { logUsage } from "@/lib/ai/meter";
 import { SYMMETRY_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { coachForViewer } from "@/lib/coachIdentity";
 import { modelFor } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     }
 
     const anthropic = new Anthropic({ apiKey });
-    const isTrainer = isTrainerEmail(user.email);
+    const isTrainer = await viewerIsTrainer(supabase, user);
 
     // WHOSE app this is. The prompt used to be a module constant carrying the
     // owner's name, credentials and biography, and the line below told the

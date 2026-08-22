@@ -21,7 +21,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import { TRAINER_EMAIL } from '@/lib/ai/scope';
 import { revalidatePath } from 'next/cache';
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 const EDITABLE = [
   'current_injuries', 'prior_surgeries', 'chronic_conditions', 'medications',
@@ -40,7 +40,7 @@ export type AssessmentFields = Partial<Record<(typeof EDITABLE)[number], string 
 async function requireTrainer() {
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !isTrainerEmail(user.email)) throw new Error('Trainer only');
+  if (!user || !(await viewerIsTrainer(supabase, user))) throw new Error('Trainer only');
 }
 
 function service() {

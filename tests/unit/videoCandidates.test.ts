@@ -151,7 +151,11 @@ test("every URL shape the agents recorded still parses", () => {
 test("both routes are trainer-only, checked against the session", () => {
   for (const [name, src] of [["verify", VERIFY], ["decide", DECIDE]] as const) {
     const code = strip(src);
-    assert.match(code, /isTrainerUser\(user\)/, `${name} no longer checks the trainer`);
+    // isTrainerUser(user) until 22 Aug; now the `trainers` table, so a trainer
+    // added from inside the app can verify a clip too. What this test is really
+    // about is the two lines below it — that the identity comes from the
+    // SESSION and never from the request body.
+    assert.match(code, /viewerIsTrainer\(\w+, user\)/, `${name} no longer checks the trainer`);
     assert.match(code, /supabase\.auth\.getUser\(\)/, `${name} must resolve the user from the session`);
     assert.ok(
       !/body\.(email|isTrainer|role)/.test(code),

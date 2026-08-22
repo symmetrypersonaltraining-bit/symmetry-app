@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 import { buildInviteEmailHtml } from "@/lib/inviteEmail";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://symmetry-app-omega.vercel.app";
 // Falls back to THIS instance's own storage bucket, never a hardcoded project.
@@ -32,7 +32,7 @@ function generateTempPassword(): string {
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !isTrainerEmail(user.email)) {
+  if (!user || !(await viewerIsTrainer(supabase, user))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

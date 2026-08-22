@@ -7,7 +7,7 @@ import NutritionV3Client from "./v3/NutritionV3Client";
 import NutritionAverages from "@/components/NutritionAverages";
 import ClientSelector from "@/components/ClientSelector";
 import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 async function isClientMode(asMarker?: string): Promise<boolean> {
   // Explicit ?as=client marker OR the cookie (marker wins on first render even
@@ -27,7 +27,7 @@ export default async function NutritionPage({
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
-  const isTrainer = isTrainerEmail(user.email);
+  const isTrainer = await viewerIsTrainer(supabase, user);
   const sp = await searchParams;
   const inClientMode = await isClientMode(sp?.as);
 

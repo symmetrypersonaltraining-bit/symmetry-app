@@ -4,7 +4,7 @@ import MicButton from "@/components/MicButton";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import AiBadge from "@/components/AiBadge";
 
 interface Change { op: string }
@@ -61,15 +61,15 @@ function prettyDate(iso: string): string {
 // exactly what NutritionV3Client had done.
 
 export default function AIAssistant() {
-  const [_ok, _setOk] = useState(false);
-  useEffect(() => {
-    createClient().auth.getUser().then(({ data }) => {
-      _setOk(isTrainerEmail(data.user?.email));
-    });
-  }, []);
+  // One question, asked once. There were two states here computing the same
+  // thing from the same build-time list: `_ok`, which gates whether this
+  // component renders AT ALL (see the bottom of the file), and `isTrainer`,
+  // which picks /api/agent over /api/ai-assistant. Both are now the database's
+  // answer, so a trainer added from inside the app gets the assistant, and gets
+  // the TRAINER one.
   const [isTrainer, setIsTrainer] = useState(false);
   useEffect(() => {
-    (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (isTrainerEmail(data?.user?.email)) setIsTrainer(true); } catch {} })();
+    (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (await viewerIsTrainer(sb, data?.user)) setIsTrainer(true); } catch {} })();
   }, []);
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -246,7 +246,7 @@ export default function AIAssistant() {
   // Initial greeting
   const isEmpty = messages.length === 0;
 
-  if (!_ok) return null;
+  if (!isTrainer) return null;
 
   return (
     <>

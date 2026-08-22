@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import SignOutButton from "./SignOutButton";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { coachForViewer } from "@/lib/coachIdentity";
 
 export default async function ProfilePage() {
@@ -10,7 +10,7 @@ export default async function ProfilePage() {
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
 
-  const isTrainer = isTrainerEmail(user.email);
+  const isTrainer = await viewerIsTrainer(supabase, user);
 
   const { data: client } = await supabase
     .from("clients")

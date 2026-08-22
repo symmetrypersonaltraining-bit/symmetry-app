@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import KeyboardSafeArea from "@/components/KeyboardSafeArea";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -48,7 +48,10 @@ export default function LoginPage() {
       // Check if this is a client with a temporary password
       try {
         const { data: { user: loggedInUser } } = await supabase.auth.getUser();
-        if (loggedInUser && !isTrainerEmail(loggedInUser.email)) {
+        // Against the `trainers` table: a trainer added from inside the app is
+        // not on the build-time list, and would have been pushed into the
+        // client set-password flow the first time they signed in.
+        if (loggedInUser && !(await viewerIsTrainer(supabase, loggedInUser))) {
           const { data: clientRec } = await supabase
             .from("clients")
             .select("id")

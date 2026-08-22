@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PlanMeal } from "@/lib/nutrition/dailyTotals";
 import { buildPrintDocument, PrintKind, esc } from "@/lib/nutrition/printHtml";
 import { resolveLivePlanForDate } from "@/lib/nutrition/resolvePlan";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   const days = Math.max(1, Math.min(14, parseInt(sp.get("days") || "7", 10) || 7));
 
   // Access: trainer, or the signed-in client viewing their own plan.
-  const isTrainer = isTrainerEmail(user.email);
+  const isTrainer = await viewerIsTrainer(supabase, user);
   if (!isTrainer) {
     const { data: c } = await supabase.from("clients").select("id").eq("auth_user_id", user.id).maybeSingle();
     if (!c || (c as { id: string }).id !== clientId) {

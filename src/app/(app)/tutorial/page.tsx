@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { payDestinationFor, payDestinationIsSet } from "@/lib/payDest";
 import { readFlag } from "@/lib/flags";
 import type { SetupCheckKey } from "@/lib/tutorial/script";
@@ -112,7 +112,7 @@ export default async function TutorialPage() {
   const supabase = await createClient();
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
-  if (!isTrainerEmail(user.email)) redirect("/home");
+  if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
 
   const live = await readFlag(supabase, "trainer_tutorial_live");
   if (!live) redirect("/home");

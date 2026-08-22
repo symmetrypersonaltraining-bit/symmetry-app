@@ -7,12 +7,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isTrainerEmail } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 async function requireTrainer() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !isTrainerEmail(user.email)) return { supabase, ok: false as const };
+  if (!user || !(await viewerIsTrainer(supabase, user))) return { supabase, ok: false as const };
   return { supabase, ok: true as const };
 }
 

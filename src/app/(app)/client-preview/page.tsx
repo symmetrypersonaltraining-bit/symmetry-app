@@ -2,13 +2,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import ClientDashboard from "../home/ClientDashboard";
-import { TRAINER_EMAIL, isTrainerEmail } from "@/lib/trainer";
+import { TRAINER_EMAIL } from "@/lib/trainer";
+import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export default async function ClientPreviewPage() {
   const supabase = await createClient();
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
-  if (!isTrainerEmail(user.email)) redirect("/home");
+  if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
 
   const { data: clientRecord } = await supabase
     .from("clients")
