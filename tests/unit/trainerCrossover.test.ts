@@ -92,8 +92,13 @@ test("the route resolves a real trainer row before running any tool", () => {
   const c = code(read("src/app/api/agent/route.ts"));
   assert.match(c, /trainerForAuthUser\(admin, scope\.userId, scope\.email\)/,
     "identity is taken from the boolean scope rather than the trainers table");
-  assert.match(c, /if \(!me\) return NextResponse\.json\(\{ error: "Trainer only" \}, \{ status: 403 \}\)/,
-    "an unresolvable trainer still gets a service-role agent");
+  // Strengthened 22 Aug. It is no longer enough to resolve SOME trainer row —
+  // the row has to be the one trainerGate() authorized, matched on auth_user_id
+  // and active, and not in client mode. See tests/unit/trainerAgentGate.test.ts.
+  assert.match(c, /if \(!me \|\| me\.id !== verdict\.trainerId\)/,
+    "an unresolvable trainer, or one the gate did not approve, still gets a service-role agent");
+  assert.match(c, /trainerGate\(\{/,
+    "the authorization gate is gone from the agent route");
   assert.match(c, /execTrainerTool\(admin, block\.name, [^)]*\)\s*\|\| \{\}, caller\)|execTrainerTool\([\s\S]{0,120}?caller\)/,
     "the caller is not passed through to the tools");
 });

@@ -78,6 +78,8 @@ interface Props {
   clientId: string | null;
   clientName?: string | null;
   isTrainerSession?: boolean;
+  /** True only in the trainer app — never for a client, never in Client View. */
+  trainerApp?: boolean;
   existingLogId: string | null;
   existingSetLogs: any[];
   /** The scheduled_workouts row this session came from, when it was on the calendar. */
@@ -680,7 +682,7 @@ function VideoModal({ url, onClose }: { url: string; onClose: () => void }) {
 }
 
 export default function WorkoutLogger({
-  day, phase, program, sections, clientId, clientName, isTrainerSession,
+  day, phase, program, sections, clientId, clientName, isTrainerSession, trainerApp = false,
   existingLogId, existingSetLogs, scheduledWorkoutId, sessionDate,
 }: Props) {
   const supabase = createClient();
@@ -750,6 +752,34 @@ export default function WorkoutLogger({
   // The coach, opened from the exercise header. See the button for why it is
   // not the floating one used on every other screen.
   const [coachOpen, setCoachOpen] = useState(false);
+
+  /**
+   * WHICH AI THIS BUTTON OPENS.
+   *
+   * In the trainer app it is the trainer assistant — the one that can actually
+   * do the thing being asked. Dustin, 22 Aug, having asked his own app to swap
+   * every pushup in a programme and been told he needed "Dustin's approval":
+   * that was the CLIENT coach, which runs with canAct=false and cannot edit a
+   * programme at all, so the best it could ever have done was decline politely.
+   *
+   * Everywhere else — every client, and a trainer in Client View — it is the
+   * client coach, unchanged.
+   *
+   * This picks a button. It does not grant anything: /api/agent re-checks the
+   * caller against an active trainers row and refuses in client mode, so a
+   * client reaching this code path somehow still gets a 403 rather than a
+   * console. See src/lib/ai/trainerGate.ts.
+   */
+  function openAssistant() {
+    if (trainerApp) {
+      // The one trainer assistant, mounted in the root layout. Opening it by
+      // event rather than mounting a second copy here is deliberate: two
+      // instances of that drawer stacked on each other once already.
+      window.dispatchEvent(new CustomEvent("symmetry:open-ai"));
+      return;
+    }
+    setCoachOpen(true);
+  }
   // V6 consolidated logger: feedback sheet (both roles) → app_feedback; AI note sheet
   // (trainer only) → trainer_notes; cue collapsed behind an ⓘ toggle to shorten the header.
   //
@@ -2616,7 +2646,7 @@ export default function WorkoutLogger({
                 is still one tap away mid-set.
                 
                 It also opens knowing which movement you are on. */}
-            <button onClick={() => setCoachOpen(true)}
+            <button onClick={() => openAssistant()}
               className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }} title="Ask your coach">
               {/* The face, not a sparkle. This was one of the last two AI marks

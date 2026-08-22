@@ -18,6 +18,8 @@ import { resolveAiScope, enforceMeter, missingKeyResponse, Db } from "@/lib/ai/s
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TRAINER_TOOLS, execTrainerTool, type ToolCaller } from "@/lib/ai/agent-tools";
 import { trainerForAuthUser } from "@/lib/trainerResolve";
+import { activeTrainerRow, gateMessage, inClientModeFrom, trainerGate, CLIENT_MODE_COOKIE } from "@/lib/ai/trainerGate";
+import { cookies } from "next/headers";
 import { CONTEXT_TYPE, MAX_TURNS } from "./session/route";
 import { COACH_FIRST_NAME, BUSINESS_NAME } from "@/lib/trainer";
 
@@ -120,13 +122,42 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient() as unknown as Db;
   if (!admin) return NextResponse.json({ error: "Not configured" }, { status: 500 });
 
-  // WHICH trainer is asking. `scope.isTrainer` is a boolean and the tools run on
-  // the service role, which bypasses RLS entirely — so without this, either
-  // trainer could ask the agent for the other's payment_reminders and get them.
-  // It also decides whose Google Calendar `book_session` writes to.
+  // ─── THE GUARD ──────────────────────────────────────────────────────────
+  //
+  // This agent reads any client on the caller's roster, rewrites programmes,
+  // moves calendar sessions and messages real people — and its tools run on
+  // the SERVICE ROLE, which bypasses RLS entirely. RLS is not the backstop
+  // here the way it is elsewhere in this app. These lines are.
+  //
+  // scope.isTrainer above is an EMAIL ALLOWLIST and stays as a cheap first
+  // pass, but it is not what authorizes anybody. Three things do, all of them
+  // in trainerGate.ts and all of them fail-closed:
+  //
+  //   · an ACTIVE trainers row matched on auth_user_id — never on email, which
+  //     is a field on a row and not proof of who is holding the phone
+  //   · active, so deactivating a trainer actually revokes them; nothing
+  //     checked that column before and removal took away nothing
+  //   · not in client mode — a trainer in Client View is looking at the client
+  //     app, and the trainer console does not belong there
+  //
+  // Dustin, 22 Aug, adding three trainers the same day: "no clients can have
+  // this function. So there needs to be a very strong guard up for that."
+  const jar = await cookies();
+  const verdict = trainerGate({
+    trainerRow: await activeTrainerRow(admin, scope.userId),
+    inClientMode: inClientModeFrom(jar.get(CLIENT_MODE_COOKIE)?.value, null),
+  });
+  if (!verdict.allowed) {
+    return NextResponse.json({ error: gateMessage(verdict.reason) }, { status: 403 });
+  }
+
+  // WHICH trainer is asking — the record, for the name and the owner flag.
+  // Authorization is already settled above; this cannot widen it.
   const me = await trainerForAuthUser(admin, scope.userId, scope.email);
-  if (!me) return NextResponse.json({ error: "Trainer only" }, { status: 403 });
-  const caller: ToolCaller = { trainerId: me.id, authUserId: scope.userId, isOwner: me.isOwner };
+  if (!me || me.id !== verdict.trainerId) {
+    return NextResponse.json({ error: "Trainer only" }, { status: 403 });
+  }
+  const caller: ToolCaller = { trainerId: verdict.trainerId, authUserId: scope.userId, isOwner: me.isOwner };
 
   const ALLOWED_IMAGE = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
   // ~5MB of base64 is roughly 3.7MB of image. Beyond that the request is slow

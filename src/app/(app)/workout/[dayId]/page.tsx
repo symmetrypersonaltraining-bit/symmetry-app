@@ -2,6 +2,8 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import WorkoutLogger from "./WorkoutLogger";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
+import { CLIENT_MODE_COOKIE, inClientModeFrom } from "@/lib/ai/trainerGate";
+import { cookies } from "next/headers";
 
 
 export default async function WorkoutDayPage({
@@ -18,6 +20,16 @@ export default async function WorkoutDayPage({
   if (!user) redirect("/login");
 
   const isTrainer = await viewerIsTrainer(supabase, user);
+  // Which APP this is, not which person. A trainer in Client View is looking at
+  // the client app, and the trainer console does not belong there — same rule
+  // the server gate applies, so the button and the route cannot disagree about
+  // what "the trainer app" means. This only decides which button to draw;
+  // /api/agent authorizes independently and does not trust this.
+  const inClientMode = inClientModeFrom(
+    (await cookies()).get(CLIENT_MODE_COOKIE)?.value,
+    null,
+  );
+  const trainerApp = isTrainer && !inClientMode;
 
   let resolvedDayId = dayId;
   // The DATE this session belongs to, which is not always today.
@@ -172,6 +184,7 @@ export default async function WorkoutDayPage({
       clientId={clientId}
       clientName={clientName}
       isTrainerSession={isTrainer && !!forClient}
+      trainerApp={trainerApp}
       existingLogId={existingLog?.id || null}
       existingSetLogs={existingLog?.set_logs || []}
       scheduledWorkoutId={scheduledWorkoutId}

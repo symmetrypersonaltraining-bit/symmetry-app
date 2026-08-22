@@ -1,5 +1,6 @@
 "use client";
 import { createClient } from "@/lib/supabase/client";
+import { CLIENT_MODE_COOKIE } from "@/lib/ai/trainerGate";
 import MicButton from "@/components/MicButton";
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -62,14 +63,33 @@ function prettyDate(iso: string): string {
 
 export default function AIAssistant() {
   // One question, asked once. There were two states here computing the same
-  // thing from the same build-time list: `_ok`, which gates whether this
-  // component renders AT ALL (see the bottom of the file), and `isTrainer`,
-  // which picks /api/agent over /api/ai-assistant. Both are now the database's
-  // answer, so a trainer added from inside the app gets the assistant, and gets
-  // the TRAINER one.
+  // thing from the same build-time list: `_ok`, which gated whether this
+  // component renders AT ALL, and `isTrainer`, which picks /api/agent over
+  // /api/ai-assistant. Both are now the database's answer, so a trainer added
+  // from inside the app gets the assistant, and gets the TRAINER one.
+  //
+  // AND NOT IN CLIENT VIEW. This is mounted in the ROOT layout, so it exists on
+  // every screen a client ever sees, and "renders nothing for a client" has to
+  // include a trainer looking at the client app — that is what Client View is.
+  // Dustin, 22 Aug, adding three trainers the same day: "no clients can have
+  // this function. So there needs to be a very strong guard up for that."
+  //
+  // The cookie constant is shared with the server gate, so the drawer and
+  // /api/agent cannot drift about what "the trainer app" means. This is still
+  // only presentation: /api/agent authorizes on its own against an ACTIVE
+  // trainers row and refuses client mode. See src/lib/ai/trainerGate.ts.
   const [isTrainer, setIsTrainer] = useState(false);
   useEffect(() => {
-    (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (await viewerIsTrainer(sb, data?.user)) setIsTrainer(true); } catch {} })();
+    (async () => {
+      try {
+        const sb: any = createClient();
+        const { data } = await sb.auth.getUser();
+        const inClientMode =
+          typeof document !== "undefined" &&
+          document.cookie.split("; ").some((c) => c === CLIENT_MODE_COOKIE + "=1");
+        if (!inClientMode && (await viewerIsTrainer(sb, data?.user))) setIsTrainer(true);
+      } catch { /* stays false: this drawer opens for nobody it is unsure about */ }
+    })();
   }, []);
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -264,7 +284,11 @@ export default function AIAssistant() {
 
       {/* Chat drawer */}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-end pointer-events-none">
+        // z above the workout logger's own overlay (z-1000) and the sheets
+        // that sit on it (1200). The logger is full-screen, and its AI button
+        // opens THIS drawer for a trainer — at z-50 it opened underneath the
+        // screen you pressed it from, which reads as the button doing nothing.
+        <div className="fixed inset-0 flex items-end justify-end pointer-events-none" style={{ zIndex: 1300 }}>
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/30 pointer-events-auto"
