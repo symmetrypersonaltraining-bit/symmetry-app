@@ -20,7 +20,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { alarmPlan, alarmMode, ringRestAlarm, REST_VIBRATE } from "../../src/lib/restAlarm.ts";
+import { alarmPlan, alarmWavDataUri, REST_VIBRATE } from "../../src/lib/restAlarm.ts";
 
 const ROOT = process.cwd();
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
@@ -62,71 +62,113 @@ describe("the countdown is derived, never counted", () => {
   });
 });
 
-describe("how it rings depends on whether you are looking", () => {
-  it("hidden goes to a notification", () => {
-    // The whole point. Chrome ignores navigator.vibrate() from a hidden page
-    // and audio from a frozen one is unreliable; the OS is the only thing that
-    // can ring a locked phone.
-    assert.equal(alarmMode(true, true), "notify");
+describe("the alarm does not wear the UI's preferences", () => {
+  const alarm = strip(read("src/lib/restAlarm.ts"));
+  const logger = strip(read("src/app/(app)/workout/[dayId]/WorkoutLogger.tsx"));
+
+  // THE bug behind "1 tiny tiny chirp... its not vibrating either".
+  //
+  // The first version rang through fx(), the app's tap-feedback layer.
+  // soundEnabled() defaults to FALSE — it needs an explicit opt-in in Settings
+  // — so on any phone where nobody had turned Sounds on, the alarm played
+  // nothing at all. And hapticsEnabled(), a switch about whether BUTTONS buzz,
+  // could silence a rest timer.
+  it("the rest timer does not ring through fx()", () => {
+    assert.ok(
+      !/fx\("rest/.test(logger),
+      'the rest alarm is back on fx(). soundEnabled() defaults to false, so that makes it silent for anyone who has not opted in to button chirps.',
+    );
+    assert.ok(
+      !/soundEnabled|hapticsEnabled/.test(alarm),
+      "the alarm is reading the UI sound or haptics preference. Those govern tap feedback; an alarm the user started does not ask them for permission to ring.",
+    );
   });
 
-  it("visible stays in the app", () => {
-    // No notification for something already on screen — that just leaves a
-    // stale card in the shade after a set.
-    assert.equal(alarmMode(false, true), "inapp");
-  });
-
-  it("falls back to the in-app tone when notifications are not available", () => {
-    assert.equal(alarmMode(true, false), "inapp");
+  it("it plays at full volume, with no quiet setting of its own", () => {
+    assert.match(alarm, /el\.volume = 1;/, "the alarm no longer plays at full volume");
   });
 });
 
-describe("ringing does the right thing", () => {
-  function spy() {
-    const calls: string[] = [];
-    let notified: Record<string, unknown> | null = null;
-    let buzzed: number[] | null = null;
-    return {
-      calls,
-      get notified() { return notified; },
-      get buzzed() { return buzzed; },
-      ding: () => calls.push("ding"),
-      vibrate: (p: number[]) => { calls.push("vibrate"); buzzed = p; },
-      notify: (t: string, o: Record<string, unknown>) => { calls.push("notify"); notified = { title: t, ...o }; },
-    };
-  }
+describe("it is heard with the phone on vibrate", () => {
+  const alarm = strip(read("src/lib/restAlarm.ts"));
 
-  it("on screen: sound and buzz, no notification", () => {
-    const s = spy();
-    ringRestAlarm({ hidden: false, ding: s.ding, vibrate: s.vibrate, notify: s.notify });
-    assert.deepEqual(s.calls, ["ding", "vibrate"]);
-    assert.deepEqual(s.buzzed, REST_VIBRATE);
+  // "can it go by media volume so when my phone is on vibrate it still works?"
+  // An <audio> element rides Android's media stream, which is independent of
+  // the ringer. A notification's own sound follows the ringer, so on vibrate it
+  // makes no noise — which is why the audio fires whether or not the page is
+  // hidden, and the notification is additional rather than instead.
+  it("the sound is an audio element, not a notification sound", () => {
+    assert.match(alarm, /new Audio\(alarmSource\(\)\)/, "the alarm no longer plays its own audio");
   });
 
-  it("pocket: a notification carrying its own vibration", () => {
-    const s = spy();
-    ringRestAlarm({ hidden: true, ding: s.ding, vibrate: s.vibrate, notify: s.notify }, "Dumbbell Row");
-    assert.deepEqual(s.calls, ["notify"]);
-    assert.equal(s.notified?.silent, false, "a silent notification defeats the entire request");
-    assert.deepEqual(s.notified?.vibrate, REST_VIBRATE);
-    assert.equal(s.notified?.tag, "symmetry-rest", "without a tag every rest stacks another card in the shade");
-    assert.match(String(s.notified?.body), /Dumbbell Row/, "the notification does not say what is next");
+  it("the audio plays whether or not the page is hidden", () => {
+    const playAt = alarm.indexOf("el.play()");
+    const hiddenBranch = alarm.indexOf("if (hidden)");
+    assert.ok(playAt > -1, "nothing plays the alarm audio");
+    assert.ok(hiddenBranch > -1, "the hidden branch is gone — the notification will never fire");
+    assert.ok(
+      playAt < hiddenBranch,
+      "the audio moved inside the visibility branch. Off screen it would then rely on the notification sound, which follows the ringer and is silent on vibrate.",
+    );
   });
 
-  it("a failing vibrate never takes the sound down with it", () => {
-    const calls: string[] = [];
-    ringRestAlarm({
-      hidden: false,
-      ding: () => calls.push("ding"),
-      vibrate: () => { throw new Error("no vibration motor"); },
-    });
-    assert.deepEqual(calls, ["ding"]);
+  it("the notification is not silent either", () => {
+    assert.match(alarm, /silent: false/, "the notification went silent, so a locked phone gets nothing but a vibration");
+    assert.match(alarm, /vibrate: REST_VIBRATE/, "the notification carries no vibration pattern");
+  });
+});
+
+describe("the sound itself", () => {
+  it("is more than a chirp", () => {
+    // "that chirp is way too weak." Six beeps over about a second and a half,
+    // near full scale — not one 0.22s tone at a fifth of amplitude.
+    const uri = alarmWavDataUri();
+    assert.match(uri, /^data:audio\/wav;base64,/);
+    const bytes = Buffer.from(uri.split(",")[1], "base64");
+    assert.equal(bytes.subarray(0, 4).toString("ascii"), "RIFF", "not a valid WAV");
+    assert.equal(bytes.subarray(8, 12).toString("ascii"), "WAVE");
+    const rate = bytes.readUInt32LE(24);
+    const dataBytes = bytes.readUInt32LE(40);
+    const seconds = dataBytes / 2 / rate;
+    assert.ok(seconds > 1.2, `the alarm is only ${seconds.toFixed(2)}s long — that is a chirp again`);
   });
 
-  it("the notification is tagged so the click handler can tell it apart", () => {
-    const s = spy();
-    ringRestAlarm({ hidden: true, ding: s.ding, notify: s.notify });
-    assert.deepEqual((s.notified?.data as { kind?: string })?.kind, "rest");
+  it("peaks near full scale", () => {
+    const bytes = Buffer.from(alarmWavDataUri().split(",")[1], "base64");
+    let peak = 0;
+    for (let i = 44; i < bytes.length - 1; i += 2) peak = Math.max(peak, Math.abs(bytes.readInt16LE(i)));
+    assert.ok(peak > 28000, `peak sample is ${peak} of 32767 — the alarm is quiet by construction`);
+  });
+
+  it("fades its edges so it does not click", () => {
+    // A square wave starting at full amplitude clicks, and on a phone speaker a
+    // click reads as distortion rather than volume.
+    const bytes = Buffer.from(alarmWavDataUri().split(",")[1], "base64");
+    const first = Math.abs(bytes.readInt16LE(44));
+    assert.ok(first < 4000, `the waveform starts at ${first} — that is a click, not a fade`);
+  });
+});
+
+describe("arming happens while a gesture is in hand", () => {
+  const logger = strip(read("src/app/(app)/workout/[dayId]/WorkoutLogger.tsx"));
+  const alarm = strip(read("src/lib/restAlarm.ts"));
+
+  it("the element is created when the rest starts, not when it ends", () => {
+    // Autoplay policy: a fresh Audio created and played with no user gesture
+    // can be refused outright. Starting a rest IS a gesture — you tapped a set.
+    assert.match(logger, /alarm\.current = armRestAlarm\(\)/, "the alarm is not armed on mount any more");
+    assert.match(alarm, /export function armRestAlarm/, "arming is gone; the alarm will be created at ring time and may be blocked");
+  });
+
+  it("the overlay waits for the sound before closing", () => {
+    // Closing instantly releases the audio element mid-ring, which is its own
+    // way of producing a "tiny chirp".
+    assert.match(logger, /window\.setTimeout\(\(\) => onDone\(\), 1800\)/, "the rest overlay closes before the alarm has finished");
+  });
+
+  it("there is a way to hear it without doing a set", () => {
+    const settings = strip(read("src/app/(app)/settings/SettingsClient.tsx"));
+    assert.match(settings, /testRestAlarm\(\)/, "the test button is gone — the only way to check the alarm is to train and wait");
   });
 });
 
@@ -137,8 +179,10 @@ describe("the pieces that make it survive a locked screen", () => {
 
   it("the timer holds the page awake for the length of the rest", () => {
     // A tab making sound is not frozen. Without this the timer never reaches
-    // zero with the screen off, and none of the above matters.
-    assert.match(logger, /holdPageAwake\(\)/, "the keepalive is gone — a backgrounded rest will not reach zero");
+    // zero with the screen off, and none of the above matters. armRestAlarm()
+    // takes the hold, so arming and keeping awake cannot get separated.
+    assert.match(alarm, /const releaseAwake = holdPageAwake\(\);/, "arming no longer holds the page awake — a backgrounded rest will not reach zero");
+    assert.match(logger, /armRestAlarm\(\)/, "the timer never arms, so nothing holds it awake");
     assert.match(alarm, /loop = true/, "the keepalive track does not loop, so it stops holding after one pass");
   });
 

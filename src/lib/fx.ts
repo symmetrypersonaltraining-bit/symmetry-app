@@ -20,7 +20,7 @@
 
 export type Fx =
   | "tap" | "log" | "section" | "pr" | "complete"
-  | "rest" | "restdone" | "send" | "receive" | "meal" | "error" | "streak";
+  | "rest" | "send" | "receive" | "meal" | "error" | "streak";
 
 const HAPTICS: Record<Fx, number | number[]> = {
   tap: 8,
@@ -30,10 +30,6 @@ const HAPTICS: Record<Fx, number | number[]> = {
   pr: [12, 40, 20, 40, 34],
   complete: [16, 45, 16, 45, 30, 60, 70],
   rest: [26, 110, 26],
-  // Deliberately unlike everything else in this table. Every other haptic here
-  // is a confirmation you feel while holding the phone; this one has to be
-  // noticed from a pocket, across a gym, by somebody who is not looking.
-  restdone: [300, 120, 300, 120, 500],
   send: 8,
   receive: [14, 55, 14],
   error: [45, 45, 45, 45, 45],
@@ -178,15 +174,6 @@ const SOUNDS: Partial<Record<Fx, () => void>> = {
   pr: () => {
     [659, 784, 988, 1319].forEach((f, i) => tone(f, 0.32, "triangle", 0.1, i * 0.1));
     tone(1568, 0.7, "sine", 0.06, 0.4);
-  },
-  // The end of a rest, at volume. Three rising pairs rather than one chirp:
-  // a single tone at gym volume is indistinguishable from someone else's
-  // phone, and this has to be recognisable as YOURS from a rack away.
-  restdone: () => {
-    [880, 1109, 1319].forEach((f, i) => {
-      tone(f, 0.22, "square", 0.22, i * 0.18);
-      tone(f * 2, 0.18, "sine", 0.1, i * 0.18 + 0.02);
-    });
   },
   rest: () => {
     tone(1047, 0.42, "sine", 0.13);

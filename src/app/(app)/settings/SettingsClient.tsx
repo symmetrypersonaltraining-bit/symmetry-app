@@ -10,6 +10,7 @@ import BillingHistory from "@/components/BillingHistory";
 import ExperienceSettings from "@/components/ExperienceSettings";
 import NotificationSettings from "@/components/NotificationSettings";
 import HelpCenter from "@/components/HelpCenter";
+import { testRestAlarm } from "@/lib/restAlarm";
 import { useTutorialVisibility } from "@/lib/useTutorialVisibility";
 import TrainerProfileCard from "@/components/TrainerProfileCard";
 import SettingsGroup from "@/components/SettingsGroup";
@@ -364,6 +365,38 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
       </SettingsGroup>
 
       <SettingsGroup id="bots" title="Bots and AI" sub="The walkthrough, and whether the AI is working" icon="ti-wand" classic={classic}>
+      {/* TEST THE REST ALARM.
+          It exists because the first version of this shipped, was tried in a
+          real session, and did "1 tiny tiny chirp" — and finding that out cost
+          a set and ninety seconds of waiting. Five seconds and a button is a
+          better way to learn what a particular phone actually does with it.
+          Everyone gets it, not just trainers: a client whose alarm is silent
+          has the same problem and no way to describe it. */}
+      <section>
+        <p className="section-header">Rest timer</p>
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <i className="ti ti-bell-ringing text-2xl" style={{ color: "var(--brand-primary)" }} />
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-semibold" style={{ color: "var(--brand-text)" }}>Test the rest alarm</span>
+              <span className="block text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
+                Plays it exactly as it sounds between sets. It uses your media
+                volume, so it still rings with the phone on vibrate — turn media
+                volume up if you can&rsquo;t hear it.
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => testRestAlarm()}
+              className="btn btn-primary flex-shrink-0"
+              style={{ padding: "9px 16px", fontSize: 13 }}
+            >
+              Test
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* The end-to-end walkthrough. Only appears once trainer_tutorial_live
           is on, which is why the card and the toggle are in different places:
           the toggle (Experience, trainer only) is how you turn it on, this is

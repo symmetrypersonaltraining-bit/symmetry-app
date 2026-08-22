@@ -30,7 +30,7 @@ import {
   displaySecs, isExpired, isRunning, outcomeOnStop,
   type SetTimerState, type SetTimerMode,
 } from "@/lib/setTimer";
-import { alarmPlan, holdPageAwake, ringRestAlarm } from "@/lib/restAlarm";
+import { alarmPlan, armRestAlarm, type ArmedAlarm } from "@/lib/restAlarm";
 
 interface Exercise {
   id: string;
@@ -320,10 +320,16 @@ function ExerciseHistory({ exerciseId, exId, clientId, exerciseName, onClose, on
  *  · A silent looping track holds the tab awake for the length of the rest.
  *    A tab making sound does not get frozen; that is what lets it reach zero
  *    at all with the screen off.
- *  · At zero it picks by visibility. On screen → the loud in-app tone and a
- *    vibrate. Not on screen → a notification, because Chrome ignores
- *    navigator.vibrate() from a hidden page and the OS is the only thing that
- *    can ring a locked phone.
+ *  · At zero it plays a real WAV through an <audio> element at full volume,
+ *    ALWAYS — on screen or not. That rides Android's media stream, so it is
+ *    heard with the phone on vibrate, which a notification's own sound would
+ *    not be. Off screen it also fires a notification, because Chrome ignores
+ *    navigator.vibrate() from a hidden page and the OS has to do the buzzing.
+ *
+ * And it does not read the app's Sounds or Vibration settings. Those govern
+ * tap feedback; soundEnabled() defaults to false, so wiring the alarm through
+ * fx() meant it made no noise at all on any phone where nobody had gone and
+ * switched Sounds on. That is what "1 tiny tiny chirp" was.
  */
 function RestTimer({ seconds, onDone, exerciseName }: { seconds: number; onDone: () => void; exerciseName?: string | null }) {
   // Fixed the moment this mounts. Re-deriving it would restart the rest every
@@ -332,10 +338,15 @@ function RestTimer({ seconds, onDone, exerciseName }: { seconds: number; onDone:
   const [now, setNow] = useState(() => Date.now());
   const rang = useRef(false);
 
-  // Hold the page awake for the length of the rest, and let go on unmount even
-  // if it was skipped — a silent track left playing is a battery drain nobody
-  // can see or stop.
-  useEffect(() => holdPageAwake(), []);
+  // Armed on mount, which is inside the tap that logged the set — a user
+  // gesture. That is what makes the play() at zero legal; a fresh Audio
+  // created with no gesture in hand can be refused outright. It also holds the
+  // page awake for the length of the rest.
+  const alarm = useRef<ArmedAlarm | null>(null);
+  useEffect(() => {
+    alarm.current = armRestAlarm();
+    return () => { alarm.current?.release(); alarm.current = null; };
+  }, []);
 
   useEffect(() => {
     // A quarter second, so the number is never visibly stale, and so a page
@@ -353,24 +364,15 @@ function RestTimer({ seconds, onDone, exerciseName }: { seconds: number; onDone:
   useEffect(() => {
     if (!plan.fire) return;
     rang.current = true;
-    ringRestAlarm(
-      {
-        hidden: typeof document !== "undefined" && document.hidden,
-        ding: () => fx("restdone"),
-        vibrate: (pattern) => navigator.vibrate?.(pattern),
-        notify: async (title, options) => {
-          try {
-            if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
-            const reg = await navigator.serviceWorker?.ready;
-            await reg?.showNotification(title, options);
-          } catch {
-            /* the in-app path already ran for anyone watching */
-          }
-        },
-      },
+    alarm.current?.fire({
+      hidden: typeof document !== "undefined" && document.hidden,
       exerciseName,
-    );
-    onDone();
+    });
+    // Let the sound finish before the element is released by the unmount
+    // below. Closing the overlay instantly would cut the alarm off after a
+    // couple of hundred milliseconds, which is exactly the "tiny chirp".
+    const t = window.setTimeout(() => onDone(), 1800);
+    return () => window.clearTimeout(t);
   }, [plan.fire, onDone, exerciseName]);
 
   // Checked at render, not once at mount: permission can be granted from
