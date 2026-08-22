@@ -169,7 +169,11 @@ test("a swap that could not be scheduled does not skip the original", () => {
 test("a swap that left both workouts on the day says so", () => {
   const body = code(fnBody(BANNER, "async function doSwap"));
   assert.match(body, /error: skipErr/, "the skip discards its error again");
-  assert.match(body, /still on today as well/);
+  // The wording became date-aware on 22 Aug — a swap made while logging a past
+  // session must not report it against "today". What has to survive is that
+  // the half-swap is REPORTED, not the literal word.
+  assert.match(body, /still on " \+ dayWord \+ " as well/,
+    "the half-swap notice is gone, or has gone back to hardcoding today");
   // Stronger than it was. An update matching ZERO rows returns no error at all,
   // so checking skipErr alone still cannot tell a real replacement from a
   // no-op — which is exactly how Dustin's 17 Aug ended up with two cardio

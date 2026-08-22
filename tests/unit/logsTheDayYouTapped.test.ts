@@ -96,3 +96,63 @@ describe("the past is reachable when there is something in it", () => {
     );
   });
 });
+
+describe("the swap flow acts on the day being logged", () => {
+  const banner = strip(read("src/components/OffPlanBanner.tsx"));
+  const logger = strip(read("src/app/(app)/workout/[dayId]/WorkoutLogger.tsx"));
+
+  // Dustin's 22 Aug morning in one sentence: he opened a session he forgot on
+  // the Friday, swapped it, and the swap landed on today — replacement
+  // scheduled today, today's planned work skipped, Friday untouched.
+  it("the logger hands the banner its session date", () => {
+    assert.match(
+      logger,
+      /<OffPlanBanner[^>]*sessionDate=\{sessionDate\}/,
+      "OffPlanBanner is mounted without sessionDate again — every swap it makes will go to today",
+    );
+  });
+
+  it("the banner reads the clock exactly once, as a fallback", () => {
+    const calls = (banner.match(/CT_TODAY\(\)/g) || []).length;
+    assert.equal(
+      calls,
+      2,
+      `CT_TODAY() is called ${calls} times. It should appear twice and only twice: once as the fallback for logDate, once to decide whether that day IS today. Any other call is a write that ignores the day being logged.`,
+    );
+    assert.match(banner, /const logDate = sessionDate \|\| CT_TODAY\(\);/, "logDate is gone — there is no single answer for which day this is");
+  });
+
+  it("no write in the banner uses a date other than logDate", () => {
+    // Each of the three writes assigns `const today = logDate` first; a fresh
+    // clock read here is the exact regression.
+    assert.ok(
+      !/const today = CT_TODAY\(\)/.test(banner),
+      "a write in the banner is reading the clock again instead of the day being logged",
+    );
+  });
+
+  it("the copy does not say today when it is not", () => {
+    // Copy claiming "today" while writing to Friday is how somebody swaps the
+    // wrong session and only finds out when the week looks wrong.
+    assert.match(banner, /const isToday = logDate === CT_TODAY\(\);/, "nothing distinguishes today from a past session in the copy");
+    assert.match(banner, /dayWord/, "the date-aware wording is gone");
+
+    // The exact sentences that used to lie. Each is now built from dayWord.
+    const wereLies = [
+      "Swap today's workout for",
+      "this only affects today",
+      "still on today as well",
+      "Replace today\u2019s workout\"",
+      "basic workout for today",
+      "Swap today for:",
+      "this only changes today",
+      "logged for today",
+    ];
+    const survivors = wereLies.filter((t) => banner.includes(t));
+    assert.deepEqual(
+      survivors,
+      [],
+      `these still say "today" no matter which day is being logged:\n  ${survivors.join("\n  ")}`,
+    );
+  });
+});

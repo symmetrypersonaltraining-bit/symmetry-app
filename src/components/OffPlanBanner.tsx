@@ -15,7 +15,38 @@ interface GenResult { title: string; focus: string; rationale: string; duration_
 
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
-export default function OffPlanBanner({ clientId, dayId }: { clientId: string; dayId: string }) {
+/**
+ * `sessionDate` is the day being LOGGED, which is not always today.
+ *
+ * Every write in here used to read the clock. Open a session you forgot on
+ * Friday, swap it for something else, and the swap landed on today: the
+ * replacement scheduled today, today's planned workout skipped, and Friday
+ * left exactly as it was. Dustin hit precisely this on 22 Aug.
+ *
+ * Optional, defaulting to today, so the two other places that mount a logger
+ * keep working unchanged while this is threaded through.
+ */
+export default function OffPlanBanner({
+  clientId,
+  dayId,
+  sessionDate,
+}: {
+  clientId: string;
+  dayId: string;
+  sessionDate?: string;
+}) {
+  // ONE answer for "which day is this", used by every write below. Never call
+  // CT_TODAY() again in this component — that is the bug, not a shortcut.
+  const logDate = sessionDate || CT_TODAY();
+  // What to CALL that day on screen. Copy that says "today" while the write
+  // goes to Friday is how somebody swaps the wrong session and does not find
+  // out until the week looks wrong. "today" when it is, the weekday when it is
+  // not — short enough to drop into a sentence.
+  const isToday = logDate === CT_TODAY();
+  const dayWord = isToday
+    ? "today"
+    : new Date(logDate + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+  const dayWordCap = dayWord.charAt(0).toUpperCase() + dayWord.slice(1);
   const { firstName: coachFirstName } = useCoach();
   const supabase = createClient();
   const [aiOn, setAiOn] = useState<boolean | null>(null);
@@ -42,7 +73,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
     let on = true;
     (async () => {
       const [{ data: pend }, { data: flag }] = await Promise.all([
-        supabase.from("offplan_workout_logs").select("id, description, details, status").eq("client_id", clientId).eq("log_date", CT_TODAY()),
+        supabase.from("offplan_workout_logs").select("id, description, details, status").eq("client_id", clientId).eq("log_date", logDate),
         supabase.from("client_app_settings").select("workout_ai").eq("client_id", clientId).maybeSingle(),
       ]);
       if (!on) return;
@@ -51,7 +82,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
     })();
     return () => { on = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId]);
+  }, [clientId, logDate]);
 
   // "Swap for one I pick" could not reach the workout Dustin actually wanted.
   //
@@ -97,10 +128,10 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
   }
 
   async function doSwap(target: SwapDay) {
-    if (!window.confirm("Swap today's workout for \"" + target.label + "\"? Your program stays unchanged - this only affects today.")) return;
+    if (!window.confirm("Swap " + (isToday ? "today's" : dayWord + "'s") + " workout for \"" + target.label + "\"? Your program stays unchanged - this only affects " + dayWord + ".")) return;
     setBusy(true);
     try {
-      const today = CT_TODAY();
+      const today = logDate;
       const { data: origRows } = await (supabase as any).from("scheduled_workouts")
         .select("id, position, day_id, status, deleted_at, days(label)")
         .eq("client_id", clientId).eq("day_id", dayId)
@@ -137,7 +168,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
       // The new one IS scheduled by now, so neither case can undo the swap —
       // but a day with both on it is a confusing day and worth saying out loud.
       const verdict = skipErr
-        ? "Swapped in, but your original workout is still on today as well."
+        ? "Swapped in, but your original workout is still on " + dayWord + " as well."
         : skipVerdict(replacing, (((skipped as { id: string }[] | null) || []).map((s) => s.id)));
       if (verdict) window.alert(verdict);
       window.location.href = "/workout/" + target.id + window.location.search;
@@ -150,7 +181,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
     if (!typed.trim()) return;
     setBusy(true);
     try {
-      const today = CT_TODAY();
+      const today = logDate;
 
       // "I did something else" now lands on the calendar like every other way
       // of adding a workout. Dustin, 14 Aug: "if they add a workout through any
@@ -293,7 +324,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
         className="w-full flex items-center justify-between px-3.5 py-2.5"
         style={{ background: "rgba(124,156,245,0.06)", border: "1.5px dashed var(--brand-border)", borderRadius: 16 }}>
         <span className="text-xs font-bold" style={{ color: "var(--brand-text-secondary)" }}>
-          {aiOn ? "🏋️ Create / Replace Workout" : "🤔 Not doing this today?"}
+          {aiOn ? "🏋️ Create / Replace Workout" : isToday ? "🤔 Not doing this today?" : "🤔 Didn't do this on " + dayWordCap + "?"}
         </span>
         <i className={mode === "closed" ? "ti ti-chevron-down" : "ti ti-chevron-up"} style={{ color: "var(--brand-text-secondary)" }} />
       </button>
@@ -303,7 +334,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
         <div className="p-2 mt-2" style={box}>
           <button onClick={() => setMode("replace")} className="w-full flex items-center gap-3 p-2.5 text-left rounded-2xl">
             <span className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0" style={{ background: "#e8edfd" }}>🔄</span>
-            <span><span className="block text-sm font-bold" style={{ color: "var(--brand-text)" }}>Replace today’s workout</span>
+            <span><span className="block text-sm font-bold" style={{ color: "var(--brand-text)" }}>{isToday ? "Replace today\u2019s workout" : "Replace " + dayWordCap + "\u2019s workout"}</span>
             <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>Missed it or traveling — AI builds a substitute that fits your plan</span></span>
           </button>
           <button onClick={() => setMode("equipment")} className="w-full flex items-center gap-3 p-2.5 text-left rounded-2xl">
@@ -360,7 +391,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
         <div className="p-3 mt-2" style={box}>
           {!result && <>
             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>
-              {mode === "replace" ? "Replace today’s workout" : mode === "equipment" ? "What do you have?" : "What did you do?"}
+              {mode === "replace" ? (isToday ? "Replace today\u2019s workout" : "Replace " + dayWordCap + "\u2019s workout") : mode === "equipment" ? "What do you have?" : "What did you do?"}
             </p>
             {mode === "equipment" && (
               <div className="mb-2">
@@ -424,7 +455,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
           <button onClick={openSwap} className="w-full flex items-center gap-3 p-2.5 text-left rounded-2xl">
             <span className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0" style={{ background: "#e8edfd" }}>⇄</span>
             <span><span className="block text-sm font-bold" style={{ color: "var(--brand-text)" }}>Swap from library</span>
-            <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>Pick a different cardio or basic workout for today</span></span>
+            <span className="block text-xs" style={{ color: "var(--brand-text-secondary)" }}>{"Pick a different cardio or basic workout for " + dayWord}</span></span>
           </button>
           <button onClick={() => setMode("type")} className="w-full flex items-center gap-3 p-2.5 text-left rounded-2xl">
             <span className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0" style={{ background: "#fef3c7" }}>✍️</span>
@@ -441,7 +472,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
       )}
       {mode === "swap" && (
         <div className="p-3 mt-2" style={box}>
-          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Swap today for:</p>
+          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>{"Swap " + dayWord + " for:"}</p>
           {/* Dustin, 17 Aug: "I should be able to search library to pick what I
               switch it with." A flat unfiltered list is fine at eleven
               workouts and useless at a real library. */}
@@ -460,7 +491,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
               <i className="ti ti-arrows-exchange" style={{ color: "var(--brand-primary)" }} />
             </button>
           ))}
-          <p className="text-center mt-2" style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>Your programmed workout stays in your plan - this only changes today.</p>
+          <p className="text-center mt-2" style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>{"Your programmed workout stays in your plan - this only changes " + dayWord + "."}</p>
         </div>
       )}
       {mode === "type" && (
@@ -477,7 +508,7 @@ export default function OffPlanBanner({ clientId, dayId }: { clientId: string; d
             style={{ background: "var(--brand-primary)", opacity: typed.trim() ? 1 : 0.5 }}>
             {busy ? "Saving…" : "Log it - I'll take it from here 🌙"}
           </button>
-          <p className="text-center mt-2" style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>Saved instantly with a pending chip. Tonight it becomes a real library workout logged for today.</p>
+          <p className="text-center mt-2" style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>{"Saved instantly with a pending chip. Tonight it becomes a real library workout logged for " + dayWord + "."}</p>
         </div>
       )}
     </div>

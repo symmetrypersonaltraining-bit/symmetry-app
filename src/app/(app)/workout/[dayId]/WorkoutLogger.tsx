@@ -2967,7 +2967,13 @@ export default function WorkoutLogger({
         </div>
       </div>
 
-      {clientId && <OffPlanBanner clientId={clientId} dayId={day.id} />}
+      {/* sessionDate, not the clock. This banner swaps and replaces workouts,
+          and every one of its writes used CT_TODAY() — so swapping while
+          logging a past session put the replacement on TODAY and skipped
+          today's planned work instead of that day's. Same fault as the link
+          fixed in 7fef15d, one layer in. The logger already knows which day it
+          is logging; it just was not telling anybody. */}
+      {clientId && <OffPlanBanner clientId={clientId} dayId={day.id} sessionDate={sessionDate} />}
 
       <div className="px-4 -mt-2 pb-8">
         {/* Section tabs */}
