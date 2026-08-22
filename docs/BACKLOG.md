@@ -1,6 +1,94 @@
 # Backlog — the single work queue
 
-> ## 📋 QUEUED — "build a plan around the foods I actually eat"
+> ## 👉 22 Aug PM — THE PROGRAMME/CALENDAR SPLIT, AND THE WEEK THAT MOVED AT 7PM
+>
+> **`origin/main` = `7f588b7`.**
+>
+> **`64c2d50` — why the app kept saying he was on a programme he had finished.**
+> Not recurring drift. One missing rule: `scheduled_workouts.assignment_id` was
+> nullable with nothing enforcing it, so a programme could be scheduled out for
+> months with no assignment row at all. His calendar was RIGHT the whole time —
+> 128 bulk sessions from Monday — but nothing said which programme those days
+> belonged to, so the app fell back on whatever was flagged active: two
+> programmes with no future session between them.
+>   - Second half, and it is what made the first repair attempt wrong:
+>     `pa_enforce_program_isolation` makes programmes single-client by
+>     deep-copying on a second assignment. Dustin and Tyler were scheduled onto
+>     the SAME 21 bulk days; Dustin's assignment took the programme, Tyler's
+>     forked it, and Tyler's 88 sessions still pointed at Dustin's copy. The
+>     stamp follows the fork now, matching days by LABEL (position restarts per
+>     phase, so position pairs the wrong days).
+>   - **`active` is derived, not declared** — it means "has work from today
+>     onward". Nobody has to remember to unset it, so nobody can forget.
+>   - Result: he is on Hypertrophy Bulk, 128 sessions, next Monday 24 Aug. Zero
+>     future scheduled workouts anywhere lack an assignment.
+>
+> **`915348c` — the week moved every evening.** `new Date().getDay()` on the
+> home page is the UTC weekday on Vercel, so from 19:00 Central the week
+> boundaries slid forward a day — and on a Saturday evening the strip rolled
+> into next week entirely, taking adherence with it. ClientDashboard had the
+> same call in the browser, so a client outside Central had the ring
+> highlighting one day and naming another. Both derive from the Central date
+> now; the strip is pure string arithmetic with no Date object at all. Tests run
+> under `TZ=UTC` and cover both DST boundaries.
+>
+> **`7f588b7` — three controls that failed silently.** The New Program button
+> had no `onClick` at all (now opens the assistant, which is how programmes
+> actually get built). The challenge launch key was hardcoded to `2026-08`, so a
+> September challenge would have reached nobody with no error. The weigh-in
+> nudge used sessionStorage + the device's day, so dismissing it on a PWA bought
+> minutes.
+>
+> **Data, all backed up first** (`bak_clients_billing_20260822`,
+> `bak_program_assignments_20260822`, `bak_sw_assignment_20260822`):
+> Tyler flat $300 anchor day 3 — the calendar has a recurring "Tyler $300" on
+> the 3rd, and his row said `billing_type='flat'` with `flat_billing=false`,
+> which is the contradiction that made him read as $15/session. No other client
+> had it. Jerry marked `nutrition_only`. Lauren's and Sara's 8 open notes
+> cleared.
+>
+> **Still open after this pass:** the two Settings switches that never save;
+> the sidebar Calendar link (redundant rather than broken — Home IS the trainer
+> calendar, and which one goes is his call); nutrition screens running their own
+> maths; one demo video shared across several movements; Tim Yancey's two dip
+> mis-entries; historical wrong-date credits (his call, not rewritten).
+
+> ## ⛔ SETTLED — DO NOT RAISE THESE AGAIN
+>
+> Every line here has been explained by Dustin more than once, in some cases
+> many times. If a doc or an audit tells you otherwise, the doc is stale.
+>
+> - **His push notifications work.** He is on the Android APK, which uses FCM
+>   and `device_tokens` — his token has been there since 26 Jul. The near-empty
+>   table is `push_subscriptions`, which is WEB push and is a different channel.
+>   Do not tell him to turn notifications on.
+> - **Jerry Bourgeois is nutrition only.** Not a gap in his programming, not a
+>   client whose training was never set up. `clients.nutrition_only` is now true
+>   so it is a fact in the database rather than a thing he has to keep saying.
+> - **Nudges are gone.** "we are not using nudges anymore so slipping thing is
+>   irrelivant." Anything about the nudge engine, the slipping bucket or the
+>   unmetered sweep is dead scope, not a bug.
+> - **AI spend is nowhere near the cap.** Measured 22 Aug: $8.29 across 1,240
+>   calls for the month, 22 days in — about $11.50/month against $95. The
+>   testers do not need their own Claude accounts. Re-measure before ever
+>   claiming otherwise.
+> - **The 1,043 orphan scheduled workouts are parked.** He wants context on what
+>   they actually are before anyone touches them. Do not clear them.
+> - **Flat-rate clients stay flat.** "if they have no supervised days, their rate
+>   is flat, dont change it ever."
+> - **The food-logger tutorial is question marks on each feature**, explaining
+>   that piece when tapped — not a chapter, not a docked panel.
+
+> ## ✅ SHIPPED 22 Aug (2a96cd1) — "build a plan around the foods I actually eat"
+>
+> **Only one slice is still open:** matching the named foods against
+> `food_catalog` so the plan logs one-tap. The existing AI modes store items as
+> text plus macros too, so this is at parity — changing it affects how every
+> plan logs and belongs in its own pass.
+>
+> *(Original entry below, kept for the reasoning.)*
+>
+> ## 📋 the original ask
 >
 > Dustin, 22 Aug: *"from that menu you need an option for them to type/say what
 > foods they want ai to use to build a plan that fits their macros n calories."*
