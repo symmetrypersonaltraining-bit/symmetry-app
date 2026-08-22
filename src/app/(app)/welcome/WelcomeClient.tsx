@@ -15,7 +15,7 @@ import KeyboardSafeArea from "@/components/KeyboardSafeArea";
 
 import { useCoach } from "@/lib/useCoach";
 
-export default function WelcomeClient({ firstName, clientId, needsIntake }: { firstName: string; clientId: string | null; needsIntake?: boolean }) {
+export default function WelcomeClient({ firstName, clientId, needsIntake, isTrainer }: { firstName: string; clientId: string | null; needsIntake?: boolean; isTrainer?: boolean }) {
   const { firstName: coachFirstName } = useCoach();
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -161,7 +161,7 @@ export default function WelcomeClient({ firstName, clientId, needsIntake }: { fi
       {step === 3 && (
         <div style={card}>
           <h2 style={{ fontSize: 16, fontWeight: 800, color: "var(--brand-text)", margin: "0 0 6px" }}>
-            Want a nudge when {coachFirstName} messages you?
+            {isTrainer ? "Want a nudge when a client messages you?" : `Want a nudge when ${coachFirstName} messages you?`}
           </h2>
           <p style={{ fontSize: 13, color: "var(--brand-text-secondary)", lineHeight: 1.5, marginTop: 0 }}>
             Messages and schedule changes only — never marketing, and you can turn
@@ -177,15 +177,22 @@ export default function WelcomeClient({ firstName, clientId, needsIntake }: { fi
           ) : (
             <button onClick={askNotifications} style={{ ...primary, marginBottom: 8 }}>Turn on notifications</button>
           )}
-          <button onClick={() => router.push(needsIntake ? "/onboarding" : "/home")}
+          {/* A trainer lands on the walkthrough, not on a programme they do
+              not have. Same three steps to get here — the password is the
+              point of this screen and it applies to everybody. */}
+          <button onClick={() => router.push(isTrainer ? "/tutorial" : needsIntake ? "/onboarding" : "/home")}
             style={notifState === "granted" ? primary : ghost}>
-            {needsIntake ? `Next — a few questions from ${coachFirstName}` : "Take me to my programme"}
+            {isTrainer
+              ? "Start the walkthrough"
+              : needsIntake ? `Next — a few questions from ${coachFirstName}` : "Take me to my programme"}
           </button>
         </div>
       )}
 
       <p style={{ textAlign: "center", fontSize: 11.5, color: "var(--brand-text-secondary)", marginTop: 18 }}>
-        Stuck? Message {coachFirstName} from inside the app — he gets it straight away.
+        {isTrainer
+          ? "Stuck? Use the feedback button on any screen — it comes straight to us."
+          : `Stuck? Message ${coachFirstName} from inside the app — he gets it straight away.`}
       </p>
     </KeyboardSafeArea>
   );

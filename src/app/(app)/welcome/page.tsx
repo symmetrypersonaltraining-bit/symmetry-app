@@ -34,9 +34,29 @@ export default async function WelcomePage() {
     .maybeSingle();
   const client = c as { id: string; name: string | null; onboarding_complete: boolean | null } | null;
 
+  // A TRAINER arrives here too, and for the same reason a client does: they
+  // were invited with a temporary password that was emailed to them in plain
+  // text, and nothing else in the app would ever make them change it. Before
+  // this they were sent straight to the walkthrough and kept that password
+  // indefinitely.
+  //
+  // No client row does not prove they are a trainer — it might be a broken
+  // invite — so ask the trainers table rather than inferring from an absence.
+  let trainerFirst: string | null = null;
+  if (!client) {
+    const { data: t } = await supabase
+      .from("trainers")
+      .select("first_name, name")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+    const row = t as { first_name?: string | null; name?: string | null } | null;
+    if (row) trainerFirst = row.first_name || (row.name || "").split(" ")[0] || "there";
+  }
+
   return (
     <WelcomeClient
-      firstName={(client?.name || "").split(" ")[0] || "there"}
+      isTrainer={!!trainerFirst}
+      firstName={trainerFirst || (client?.name || "").split(" ")[0] || "there"}
       clientId={client?.id ?? null}
       // A brand-new client still owes Dustin the goals/history questionnaire.
       // This screen sets the APP up; that one collects the answers. Order

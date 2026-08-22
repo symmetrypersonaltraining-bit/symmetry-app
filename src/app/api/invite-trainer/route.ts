@@ -144,7 +144,10 @@ export async function POST(req: NextRequest) {
     const { data: link } = await admin.auth.admin.generateLink({
       type: "recovery",
       email,
-      options: { redirectTo: `${APP_URL}/auth/callback?next=/tutorial` },
+      // /welcome, not /tutorial: it is what makes them replace the temporary
+      // password that was just emailed to them in plain text. It hands off to
+      // the walkthrough at the end.
+      options: { redirectTo: `${APP_URL}/auth/callback?next=/welcome` },
     });
     oneTapUrl = link?.properties?.action_link ?? null;
   } catch { /* the temp password below still works */ }
