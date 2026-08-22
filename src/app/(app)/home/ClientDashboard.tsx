@@ -1,5 +1,6 @@
 "use client";
 import AddWorkoutButton from "@/components/AddWorkoutButton";
+import { centralDayOfWeek, shiftDate } from "@/lib/central-time";
 import OffPlanToday from "@/components/OffPlanToday";
 
 import { useState, useMemo } from "react";
@@ -450,9 +451,14 @@ function WeekRing({
   weekOffset: number; onPrev: () => void; onNext: () => void; basePath?: string;
 }) {
   const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-  const today = new Date();
-  const todayDow = today.getDay();
-  const todayStr = toCT(today);
+  // The weekday comes from the CENTRAL date, not from the handset.
+  //
+  // `new Date().getDay()` is the phone's local weekday while `toCT` below is
+  // Central, so a client out of the timezone had the ring highlight one day and
+  // label it another. Same rule as the server side: the calendar we are in
+  // decides, wherever the code happens to be running.
+  const todayStr = toCT(new Date());
+  const todayDow = centralDayOfWeek(todayStr);
 
   const [sheetDate, setSheetDate] = useState<string | null>(null);
   const [movedOverrides, setMovedOverrides] = useState<Record<string, string>>({});
@@ -460,18 +466,18 @@ function WeekRing({
     ? allScheduled.map((w) => (movedOverrides[w.id] ? { ...w, date: movedOverrides[w.id] } : w))
     : allScheduled;
 
-  const displayWeekStart = new Date(today);
-  displayWeekStart.setDate(today.getDate() - todayDow + weekOffset * 7);
+  // Pure string arithmetic from here: no Date object is constructed, so there
+  // is no zone for one to be interpreted in. Every day in the strip is the
+  // Central calendar date, and `dateStr` is the same shape the rows carry.
+  const displayWeekStart = shiftDate(todayStr, -todayDow + weekOffset * 7);
 
   const weekLabel = weekOffset === 0 ? "This Week" : weekOffset === -1 ? "Last Week" : weekOffset === 1 ? "Next Week" : weekOffset > 1 ? `In ${weekOffset} Weeks` : `${Math.abs(weekOffset)} Weeks Ago`;
 
   // FIX: use .filter() (not .find()) so days with both cardio + lifting return all workouts
   const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(displayWeekStart);
-    d.setDate(displayWeekStart.getDate() + i);
-    const dateStr = toCT(d);
+    const dateStr = shiftDate(displayWeekStart, i);
     const workouts = effectiveScheduled.filter(w => w.date === dateStr);
-    const dateNum = d.getDate();
+    const dateNum = Number(dateStr.slice(8, 10));
     return { dow: i, dateStr, workouts, isToday: dateStr === todayStr, dateNum };
   });
 

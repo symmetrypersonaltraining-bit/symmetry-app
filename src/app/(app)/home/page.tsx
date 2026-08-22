@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { centralWeekStart, shiftDate } from "@/lib/central-time";
 import TrainerCalendarPanel from "@/components/TrainerCalendarPanel";
 import ClientDashboard from "./ClientDashboard";
 import TrainerHome from "./TrainerHome";
@@ -417,14 +418,19 @@ export default async function HomePage(props: {
     }
   }
 
-  const todayDate = new Date();
-  const todayDow = todayDate.getDay();
-  const weekStart = new Date(todayDate);
-  weekStart.setDate(weekStart.getDate() - todayDow);
-  const weekStartStr = weekStart.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 6);
-  const weekEndStr = weekEnd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  // THIS WEEK, BY THE CENTRAL CALENDAR.
+  //
+  // This used to be `new Date().getDay()`, which on Vercel is the UTC weekday.
+  // From 19:00 Central the server's "now" is already tomorrow, so every evening
+  // the week boundaries slid forward a day — and on a Saturday evening the
+  // strip rolled into NEXT week entirely, taking the adherence figure with it.
+  // Converting back through toLocaleDateString afterwards hid it well enough
+  // that it read as the app being flaky after dinner.
+  //
+  // Dustin, 22 Aug: "everything in the entire app needs to go by the actual
+  // calendar in the timezone we are in and must be accurate."
+  const weekStartStr = centralWeekStart(today);
+  const weekEndStr = shiftDate(weekStartStr, 6);
   const weekWorkouts = (recentScheduled || [])
     .filter((w: any) => w.scheduled_date >= weekStartStr && w.scheduled_date <= weekEndStr)
     .map((w: any) => ({ date: w.scheduled_date, completed: w.status === "completed" }));

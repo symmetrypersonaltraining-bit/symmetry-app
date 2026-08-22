@@ -67,6 +67,28 @@ export function centralToday(): string {
 }
 
 /**
+ * The weekday (0 = Sunday) of a "YYYY-MM-DD" date, in Central.
+ *
+ * `new Date().getDay()` answers in whatever zone the CODE is running in — UTC
+ * on the server, the handset's zone in a browser. Both are wrong here. From
+ * 19:00 Central the server's "now" is already tomorrow, so a week that starts
+ * on Sunday started on Monday; and a client travelling out of Central had the
+ * ring highlight a different day than the date beneath it.
+ *
+ * Anchored through Date.UTC so the parts go in and come straight back out
+ * without a zone ever being consulted.
+ */
+export function centralDayOfWeek(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/** The Sunday that begins the week containing `dateStr`, in Central. */
+export function centralWeekStart(dateStr: string): string {
+  return shiftDate(dateStr, -centralDayOfWeek(dateStr));
+}
+
+/**
  * Calendar arithmetic on a "YYYY-MM-DD" string, in days, without ever touching
  * a timezone. Date.UTC + setUTCDate is exact; `setDate` on a local Date is not.
  */
