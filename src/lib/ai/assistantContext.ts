@@ -27,7 +27,7 @@
 // answers a bit more generally.
 
 import type { Db } from "@/lib/ai/scope";
-import { CT_TODAY, fetchClientProfile } from "@/lib/ai/coach-context";
+import { CT_TODAY, coachNameForClient, coachingThemselvesLine, fetchClientProfile } from "@/lib/ai/coach-context";
 import { goalContextBlock } from "@/lib/ai/goalContext";
 import { clearedPoolFor } from "@/lib/ai/workoutPool";
 import { trainingHistoryBlock } from "@/lib/ai/trainingHistory";
@@ -163,6 +163,15 @@ export async function assistantContext(db: Db, clientId: string | null): Promise
 
     const lines: string[] = [`Today's date: ${today}.`];
     if (profile?.line) lines.push(profile.line);
+    // BEFORE anything else about them. This is the path free-text questions take
+    // — the chat box, not the coach card — and it used to take profile.line and
+    // drop isCoachThemselves entirely. So the card knew Dustin was Dustin and
+    // the chat box told him to get Dustin's approval. See coachingThemselvesLine.
+    const selfCoaching = coachingThemselvesLine(
+      profile?.isCoachThemselves,
+      await coachNameForClient(db, clientId),
+    );
+    if (selfCoaching) lines.push(selfCoaching);
     if (todays) lines.push(todays);
     if (targets) lines.push(targets);
     // Before the goal block, because the goal block reads as commentary on

@@ -4,7 +4,7 @@ import { COACH_FIRST_NAME } from "../trainer";
 // to bake COACH_FIRST_NAME in at import time, so the nutrition coach told a
 // client of Stephanie's to run plan changes by Dustin and to "shoot Dustin a
 // message" — about a plan Dustin has never seen.
-async function coachNameFor(db: Db, clientId: string): Promise<string> {
+export async function coachNameForClient(db: Db, clientId: string): Promise<string> {
   try {
     const { data: cRow } = await db.from("clients").select("trainer_id").eq("id", clientId).maybeSingle();
     const tid = (cRow as { trainer_id?: string } | null)?.trainer_id;
@@ -258,6 +258,40 @@ export async function fetchMealPlanSummary(db: Db, clientId: string): Promise<st
 
 // Who the client is — name, goal, experience, cadence, injuries — so the coach
 // speaks to a real person with a real objective instead of a generic "client".
+/**
+ * THE LINE THAT STOPS THE APP TELLING SOMEBODY TO GO ASK THEMSELVES.
+ *
+ * Every instruction in the coach prompts assumes the reader is a client and the
+ * coach is somebody else — "run it by Dustin", "plan changes are his call". For
+ * a trainer's own client row that is nonsense, and it reads as the app not
+ * knowing who is using it.
+ *
+ * IT LIVES HERE, EXPORTED, BECAUSE IT WAS MISSED ONCE ALREADY. fetchClientProfile
+ * has always returned isCoachThemselves and assembleCoachContext has always
+ * used it — but assistantContext, which is what free-text questions actually go
+ * through, took `profile.line` and dropped the flag on the floor. So the coach
+ * card knew who he was and the chat box did not. Dustin, 22 Aug, having asked
+ * his own app to swap an exercise: the reply told him he needed "Dustin's
+ * approval" and referred to him in the third person twice.
+ *
+ * Any context builder that reads a client profile must call this. There is a
+ * test that fails if one of them stops.
+ */
+export function coachingThemselvesLine(
+  isCoachThemselves: boolean | undefined,
+  coachFirstName: string,
+): string | null {
+  if (!isCoachThemselves) return null;
+  return (
+    `WHO IS READING THIS — IMPORTANT: this client IS ${coachFirstName}, the trainer, coaching themselves. ` +
+    `They are not a client with a coach to defer to. NEVER tell them to message, ask, check with, or run anything by ${coachFirstName} — ` +
+    `they ARE ${coachFirstName}, and being told to contact themselves reads as the app not knowing who it is talking to. ` +
+    `Never refer to ${coachFirstName} in the third person. Never say a change needs approval or sign-off — theirs is the sign-off. ` +
+    `Where you would normally hand a decision to the coach, either make the call and say so plainly, or name the thing they should decide. ` +
+    `Address them directly as the person who sets the plan. Everything else — the numbers, the honesty, the specificity — is unchanged.`
+  );
+}
+
 // Returns both a context line and the first name for addressing them.
 export async function fetchClientProfile(
   db: Db,
@@ -419,7 +453,7 @@ When they ask "what do I eat to lose 2 lbs this week," give the exact number abo
 // trend, logging consistency) — the non-nutrition picture. Shared by the
 // client-facing "Coach's Read" card and the trainer's AI focus-option suggester.
 export async function assembleTrainingContext(db: Db, clientId: string): Promise<string> {
-  const coachFirstName = await coachNameFor(db, clientId);
+  const coachFirstName = await coachNameForClient(db, clientId);
   const today = CT_TODAY();
   const win30 = ctShiftDays(today, -29);
   const win7 = ctShiftDays(today, -6);
@@ -555,7 +589,7 @@ async function fetchTodayMealProgress(
 }
 
 export async function assembleCoachContext(db: Db, clientId: string): Promise<string> {
-  const coachFirstName = await coachNameFor(db, clientId);
+  const coachFirstName = await coachNameForClient(db, clientId);
   const today = CT_TODAY();
   const [dailyTotals, targetRes, metricsRes, planSummary, profile, weekBlock, goalBlock, mealProgress, trainingHistory] = await Promise.all([
     fetchDailyTotals(db, clientId, 14),
@@ -619,16 +653,8 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
   // the model that SHE was Dustin, in the masculine. It is now "is this client's
   // own client row the trainer who trains them", which is true for exactly the
   // person it is meant to be true for, and names whoever that is.
-  if (profile?.isCoachThemselves) {
-    lines.push(
-      `WHO IS READING THIS — IMPORTANT: this client IS ${coachFirstName}, the trainer, coaching themselves. ` +
-      `They are not a client with a coach to defer to. NEVER tell them to message, ask, check with, or run anything by ${coachFirstName} — ` +
-      `they ARE ${coachFirstName}, and being told to contact themselves reads as the app not knowing who it is talking to. ` +
-      `Never refer to ${coachFirstName} in the third person. Where you would normally hand a decision to the coach, ` +
-      `either make the call and say so plainly, or name the thing they should decide. Address them directly as the person who ` +
-      `sets the plan. Everything else — the numbers, the honesty, the specificity — is unchanged.`
-    );
-  }
+  const selfCoaching = coachingThemselvesLine(profile?.isCoachThemselves, coachFirstName);
+  if (selfCoaching) lines.push(selfCoaching);
   // High up, right under who they are: a goal is the frame everything else on
   // this screen is read through. A client with a target date does not want an
   // observation about their protein average that ignores it.

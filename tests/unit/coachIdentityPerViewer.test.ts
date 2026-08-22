@@ -168,7 +168,9 @@ test("the nutrition coach prompt is a function of the coach's name", () => {
     "a module constant names one trainer for every client in the business");
   assert.ok(!/\$\{COACH_FIRST_NAME\}/.test(c.slice(c.indexOf("COACH_SYSTEM_PROMPT"), c.indexOf("export interface DayTotal"))),
     "the prompt still interpolates the build-time constant");
-  assert.match(c, /async function coachNameFor\(db: Db, clientId: string\)/,
+  // Exported as coachNameForClient on 22 Aug so assistantContext can resolve the
+  // same name — it needed one to address a self-coaching trainer correctly.
+  assert.match(c, /async function coachNameForClient\(db: Db, clientId: string\)/,
     "there is no per-client resolution to feed it");
 });
 

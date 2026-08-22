@@ -40,7 +40,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fetchClientProfile } from "../../src/lib/ai/coach-context";
+import { coachingThemselvesLine, fetchClientProfile } from "../../src/lib/ai/coach-context";
 
 const SRC = readFileSync(join(process.cwd(), "src/lib/ai/coach-context.ts"), "utf8");
 
@@ -120,36 +120,32 @@ test("the profile query asks for the columns the check depends on", async () => 
 });
 
 test("the context tells the model, in terms, not to redirect him to himself", () => {
-  const i = SRC.indexOf("profile?.isCoachThemselves");
-  assert.ok(i > 0, "the coach-reading-their-own-record case is not handled at all");
-  const block = SRC.slice(i, i + 1400);
-  assert.match(block, /NEVER tell them to message, ask, check with, or run anything by/i,
+  // The wording moved into coachingThemselvesLine() on 22 Aug so that BOTH
+  // context builders share it — assistantContext, which is what free-text
+  // questions go through, had been dropping the flag and told him he needed
+  // "Dustin's approval". Assert the produced text, not where it is written.
+  const block = coachingThemselvesLine(true, "Dustin");
+  assert.ok(block, "the coach-reading-their-own-record case is not handled at all");
+  assert.match(block!, /NEVER tell them to message, ask, check with, or run anything by/i,
     "the instruction does not actually forbid the thing that went wrong");
-  assert.match(block, /third person/i, "nothing stops it talking about them as though they were absent");
+  assert.match(block!, /third person/i, "nothing stops it talking about them as though they were absent");
+  assert.match(block!, /approval or sign-off/i, "nothing stops it demanding the trainer's own sign-off");
   // Gender-neutral, because there are two coaches now and one of them is not a
   // "him". The old wording said "he/him" six times.
-  assert.doesNotMatch(block, /\bhimself\b|\bhe is\b/i, "the block still assumes the coach is a man");
+  assert.doesNotMatch(block!, /\bhimself\b|\bhe is\b/i, "the block still assumes the coach is a man");
 });
 
 test("the block is conditional — 29 other clients still have a coach to talk to", () => {
   // "Message Dustin" is exactly right for everybody else, and it is how he
   // hears that something is wrong. Making this unconditional would cost him
-  // that.
-  const guard = SRC.indexOf("if (profile?.isCoachThemselves) {");
-  assert.ok(guard > 0, "the block has no guard at all");
-  // The push must sit immediately INSIDE that guard. Matching the two
-  // separately would pass for a guarded block followed by an unguarded copy,
-  // which is the mistake worth catching.
-  const push = SRC.indexOf("`WHO IS READING THIS");
-  assert.ok(push > guard, "the block is emitted before the guard that is supposed to gate it");
-  assert.ok(
-    push - guard < 200,
-    "the block is not inside the guard — every client would be told they are the trainer",
-  );
+  // that. The guard is now the function's own first line, which is stronger
+  // than a guard at one call site: it cannot be forgotten by a second caller.
+  assert.equal(coachingThemselvesLine(false, "Dustin"), null, "an ordinary client would be told they are the trainer");
+  assert.equal(coachingThemselvesLine(undefined, "Dustin"), null, "an unknown profile falls open instead of closed");
   assert.equal(
     (SRC.match(/`WHO IS READING THIS/g) || []).length,
     1,
-    "there is more than one copy of the block; one of them is not guarded",
+    "the instruction exists in more than one place — they will drift",
   );
 });
 
