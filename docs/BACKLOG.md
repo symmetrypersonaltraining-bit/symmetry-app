@@ -1,5 +1,75 @@
 # Backlog — the single work queue
 
+> ## 👉 22 Aug — TRAINERS CAN ACTUALLY BE TRAINERS, AND PAY DETAILS ARE PRIVATE
+>
+> **`origin/main` = `37bbc0a`.** Live and verified on `/api/health`.
+>
+> **`37bbc0a` — a trainer added from inside the app was not a trainer anywhere.**
+> This was the blocker for putting testers on the app. `/api/invite-trainer`
+> shipped 21 Aug and does its half right: `trainers` row, `auth_user_id`
+> stamped. The database agreed too — `is_trainer()` joins `auth.users` to
+> `trainers` on `lower(email)`, so RLS would have let them do everything.
+> The APP asked `isTrainerEmail()`, which reads `TRAINER_EMAILS`, an array
+> fixed at BUILD time, in 136 places across 65 files. The first trainer invited
+> would have got: middleware dropping them into the CLIENT onboarding redirect
+> chain on every navigation (never reaching a page at all); the client app shell
+> from `(app)/layout`, which had the right answer in `coachForViewer` eight
+> lines below and discarded it; 403 from `ai/scope` on every AI route including
+> their own coach; 401/403/redirect on roster, payments, assessments, invites,
+> calendar sync; and `sendBroadcastMessage` returning `0` silently.
+>   - `src/lib/auth/viewer.ts` — `viewerIsTrainer(db, user)`, resolved from the
+>     table by `auth_user_id` then by address, the same two ways `my_trainer_id()`
+>     and `is_trainer()` do it. **Fails OPEN to the build-time list**, so an
+>     unreachable database cannot demote the owner in his own app.
+>   - The answer is remembered per process (`noteTrainerEmail`), because client
+>     components cannot await anything and were built around the synchronous
+>     check.
+>   - Two costs deliberately avoided: middleware short-circuits on the
+>     build-time list before spending a query, and where it must ask, the
+>     `trainers` lookup runs alongside the `clients` lookup that path already
+>     paid for.
+>   - `tests/unit/trainerAddedInApp.test.ts` fails if any route, page or action
+>     goes back to deciding trainer-ness from a build-time list.
+>
+> **`6cee23c` — a trainer's payment handles are for their own clients only.**
+> Dustin: *"I do not want anyone but their own clients seeing their pmt info."*
+> RLS is ROW-level and could not say it — once a row is visible every column on
+> it is, and clients legitimately need their coach's row. So SELECT on
+> `trainers` is revoked from `authenticated` and re-granted column by column,
+> skipping the five payment columns; `trainer_pay_details()` (SECURITY DEFINER)
+> hands them back to the trainer themself and to a client of that trainer.
+> **Including the owner** — Dustin cannot read another trainer's Venmo tag
+> either. That is the instruction, not an oversight. Migration
+> `20260822d_payment_handles_are_for_their_own_clients_only.sql`.
+>   - Every reader moved to `payDestinationFor()`: `PaymentDueBanner`,
+>     `PaymentsSettingsCard`, `TrainerProfileCard` (two reads now — selecting
+>     the handles alongside the name would have blanked the name too),
+>     `trainerResolve` (COLS dropped them outright), the tutorial's pay check.
+>   - A grant cannot stop anyone WRITING the old query, only make it fail in
+>     somebody's browser. A test fails instead: no `.select()` list in those
+>     files may name a payment column.
+>   - The trainer intake form's payment section was reworded — it used to say
+>     the other trainers could see these. That is now false.
+>
+> **`5ce3868` + correction in `37bbc0a` — `/api/health` reports capabilities.**
+> The config block added overnight reported two things as OFF that were ON:
+> `push` tested only FCM while web push was configured and delivering, and
+> `android_apk_url` tested an override that is unset because the default (this
+> instance's own public bucket, APK there since 20 Jul) is correct. Now
+> `push: {web, native}` and `android_apk: "bucket" | "override"`.
+> Currently: `email_sending: true`, `ai: true`, `push.web: true`,
+> `push.native: false`, `android_apk: "bucket"`.
+>
+> **Onboarding path checked end to end for a new trainer:** invite email →
+> one-tap link → `/auth/callback?next=/welcome` (no longer diverted to the
+> client `/set-password`) → `/welcome`, which already asks the `trainers` table
+> and runs the trainer variant → password replaced → walkthrough.
+>
+> **Still open:** Coach Bot per-room; the food-logger tutorial docking decision;
+> the `slipping` bucket rework; 300 future workouts on non-active assignments
+> (Dustin, Maddy, Tyler, Steph) — his call; 13 open client notes, Sara Prince
+> appearing 5× and possibly needing a reassessment.
+
 > ## 👉 21 Aug — THE WEEKLY FOCUS RUNS ITSELF, AND THE TAKEOVERS ARE CULLED
 >
 > **`origin/main` = `7469ef9`.** Five commits, all gated, all shipped.
