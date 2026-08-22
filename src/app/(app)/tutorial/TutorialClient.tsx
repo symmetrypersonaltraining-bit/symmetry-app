@@ -29,12 +29,21 @@ import { useTutorialVisibility } from "@/lib/useTutorialVisibility";
  * part-way in with ticks already showing, which is the opposite of a test.
  */
 function resetTutorialProgress(): void {
-  for (const k of [SEEN_KEY, POS_KEY, VOICE_KEY]) {
+  for (const k of [SEEN_KEY, POS_KEY, VOICE_KEY, AI_KEY]) {
     try { localStorage.removeItem(k); } catch { /* nothing to undo */ }
   }
 }
 
 const SEEN_KEY = "symmetry_tutorial_seen_v1";
+/**
+ * Whether this reader is using the app's AI.
+ *
+ * Dustin, 21 Aug: a trainer with no AI gets "every AI step branched to its
+ * manual equivalent" rather than a bolt-on chapter. This is which walkthrough
+ * they are reading, so it lives beside the other reading preferences rather
+ * than in the database — it is not a claim about their account.
+ */
+const AI_KEY = "symmetry_tutorial_uses_ai_v1";
 const VOICE_KEY = "symmetry_tutorial_voice_v1";
 const POS_KEY = "symmetry_tutorial_pos_v1";
 
@@ -50,7 +59,8 @@ function loadSeen(): Set<string> {
 }
 
 export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey, boolean> }) {
-  const steps = useMemo(() => allSteps(), []);
+  const [usesAi, setUsesAi] = useState(true);
+  const steps = useMemo(() => allSteps({ usesAi }), [usesAi]);
   const [idx, setIdx] = useState(0);
   const [seen, setSeen] = useState<Set<string>>(new Set());
   const [voice, setVoice] = useState(false);
@@ -71,6 +81,7 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
     setSeen(loadSeen());
     try {
       setVoice(localStorage.getItem(VOICE_KEY) === "1");
+      setUsesAi(localStorage.getItem(AI_KEY) !== "0");
       const p = Number(localStorage.getItem(POS_KEY));
       if (Number.isFinite(p) && p > 0 && p < steps.length) setIdx(p);
     } catch {
@@ -239,6 +250,41 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
           {/* Start over. Lives inside the map rather than on the main screen so
               nobody clears their place by fat-fingering the wrong button
               mid-walkthrough — you have to open the contents to reach it. */}
+          {/* Which walkthrough this is. Changing it re-reads the script, so it
+              sits with Start over rather than on the step itself — it changes
+              what the next forty steps say. */}
+          <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--brand-border)" }}>
+            <p className="text-xs font-semibold mb-1.5" style={{ color: "var(--brand-text)" }}>
+              Are you using the app&rsquo;s AI?
+            </p>
+            <div className="flex gap-2">
+              {[true, false].map((v) => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  onClick={() => {
+                    setUsesAi(v);
+                    try { localStorage.setItem(AI_KEY, v ? "1" : "0"); } catch { /* fine */ }
+                    setIdx(0);
+                  }}
+                  className="text-xs px-3 py-2 rounded-lg font-semibold"
+                  style={{
+                    background: usesAi === v ? "var(--brand-accent)" : "var(--brand-surface-2)",
+                    color: usesAi === v ? "#fff" : "var(--brand-text-secondary)",
+                    border: "none",
+                  }}
+                >
+                  {v ? "Yes" : "No — show me how to do it by hand"}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs mt-1.5" style={{ color: "var(--brand-text-secondary)" }}>
+              {usesAi
+                ? "Reading the full walkthrough."
+                : "The AI steps are replaced with how to do the same thing yourself."}
+            </p>
+          </div>
+
           <button
             type="button"
             onClick={() => {

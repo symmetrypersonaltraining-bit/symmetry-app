@@ -59,6 +59,22 @@ export interface TutorialStep {
   status?: StepStatus;
   /** A pre-recorded narration, when one exists. */
   audioUrl?: string | null;
+  /**
+   * What to do instead, for a trainer with no AI.
+   *
+   * Dustin, 21 Aug: a trainer who does not want AI must be shown "how to use
+   * the app manually to do all of this" — and he chose the branching version
+   * over a bolt-on chapter, so they read ONE coherent walkthrough rather than
+   * 51 steps about features they do not have followed by a correction.
+   *
+   * Replaces `body` when the reader has said they are not using AI. A step
+   * with no `manual` reads the same either way, which is most of them.
+   */
+  manual?: string[];
+  /** Spoken instead of `narration` when the reader is not using AI. */
+  manualNarration?: string;
+  /** True when the step only exists because of AI — hidden entirely without it. */
+  aiOnly?: boolean;
 }
 
 export interface TutorialChapter {
@@ -131,13 +147,14 @@ export const TUTORIAL: TutorialChapter[] = [
         id: "account-profile",
         title: "Your name and your face",
         body: [
-          "Open Profile from the bottom of the sidebar. Your name and photo here are what every client sees — on your messages, on their coach card, on the celebration screens when they hit a personal best.",
-          "If you have no photo, they get your initials in a circle. It works, but a face is the difference between an app and a person.",
+          "Settings, then the group called You. Your name, what clients call you, and your photo all live there, and you set them yourself.",
+          "This is what every client sees — on your messages, on their coach card, on the celebration screens when they hit a personal best. If you have no photo they get your initials in a circle. It works, but a face is the difference between an app and a person.",
+          "Your email is shown but locked, because it is your login. Ask the owner if it needs changing.",
         ],
         narration:
-          "Open Profile from the bottom of the sidebar. The name and photo here are what every client sees. On your messages, on their coach card, and on the celebration screens when they hit a personal best. Without a photo they get your initials in a circle. It works, but a face is the difference between an app and a person.",
-        route: "/profile",
-        routeLabel: "Open Profile",
+          "Settings, then the group called You. Your name, what clients call you, and your photo all live there, and you set them yourself. This is what every client sees. On your messages, on their coach card, and on the celebration screens when they hit a personal best. Without a photo they get your initials in a circle. It works, but a face is the difference between an app and a person. Your email is shown but locked, because it is your login.",
+        route: "/settings",
+        routeLabel: "Open Settings",
         check: "profile",
         audioUrl: null,
       },
@@ -158,14 +175,45 @@ export const TUTORIAL: TutorialChapter[] = [
         id: "account-pay",
         title: "How you get paid",
         body: [
-          "Still in Settings, find the payments card. Put in whichever of Venmo, Zelle or Cash App you actually use.",
-          "This is not decoration. When a client opens their payments screen and taps to pay, the button goes wherever this says. If it is empty, it goes nowhere, and you will hear about it on the first of the month.",
+          "Same group in Settings, under your photo. Put in whichever of Venmo, Zelle or Cash App you actually use.",
+          "This is only the handle a client sends money to — no bank details, no card numbers, no logins. The app never touches the payment; your clients pay you in their own app exactly as they do now.",
+          "It is not decoration, though. When a client taps to pay, the button goes wherever this says. If it is empty it goes nowhere, and you will hear about it on the first of the month.",
+          "Nobody else can see these. Not the other trainers, not the owner.",
         ],
         narration:
-          "Still in Settings, find the payments card, and put in whichever of Venmo, Zelle, or Cash App you actually use. This is not decoration. When a client taps to pay you, the button sends them wherever this says. If it is empty, it sends them nowhere, and you will hear about that on the first of the month.",
+          "Same group in Settings, under your photo. Put in whichever of Venmo, Zelle, or Cash App you actually use. This is only the handle a client sends money to. No bank details, no card numbers, no logins, and the app never touches the payment itself. It is not decoration though. When a client taps to pay you, the button sends them wherever this says, and if it is empty it sends them nowhere. Nobody else can see these. Not the other trainers, not the owner.",
         route: "/settings",
         routeLabel: "Open Settings",
         check: "pay",
+        audioUrl: null,
+      },
+      {
+        id: "account-avatar",
+        title: "Your own set of faces",
+        body: [
+          "The app has a cartoon of the coach that appears whenever it speaks — twenty of them, one per situation. Celebrating a personal best, checking in after a quiet week, explaining a screen.",
+          "You can have your own. Settings, Bots and AI, Your avatar set. Twenty slots, each one telling you what it is used for, and you upload a picture into each.",
+          "Ask the owner for the avatar script — you paste it into Gemini, upload some photos of yourself, and it draws the twenty. The slots are named to match, so they drop straight in.",
+          "You do not need all twenty to start. Anything you have not uploaded falls back to the standard set, so five tonight and the rest at the weekend is completely fine.",
+        ],
+        narration:
+          "The app has a cartoon of the coach that appears whenever it speaks. Twenty of them, one per situation. Celebrating a personal best, checking in after a quiet week, explaining a screen. You can have your own. Settings, Bots and AI, Your avatar set. Twenty slots, each one telling you what it is for, and you upload a picture into each. Ask the owner for the avatar script. You paste it into Gemini, upload some photos of yourself, and it draws the twenty. You do not need all of them to start. Anything you have not uploaded falls back to the standard set.",
+        route: "/settings",
+        routeLabel: "Open Settings",
+        audioUrl: null,
+      },
+      {
+        id: "account-bots",
+        title: "Which bots run in your app",
+        body: [
+          "Settings, Bots and AI, Your bots. Three switches, and they affect your clients only — every trainer sets their own.",
+          "Coach Bot posts light smack talk about the challenge in your group chat. Birthday messages go to your clients, and you get a quiet heads-up the evening before. The weekly focus writes each of your clients one line for the week ahead, late on Saturday.",
+          "All three start on. Turn any of them off and nothing about your clients changes except that.",
+        ],
+        narration:
+          "Settings, Bots and AI, Your bots. Three switches, and they affect your clients only. Every trainer sets their own. Coach Bot posts light smack talk about the challenge in your group chat. Birthday messages go to your clients, and you get a quiet heads-up the evening before. And the weekly focus writes each of your clients one line for the week ahead, late on Saturday. All three start on.",
+        route: "/settings",
+        routeLabel: "Open Settings",
         audioUrl: null,
       },
       {
@@ -278,6 +326,13 @@ export const TUTORIAL: TutorialChapter[] = [
           "Each client carries one focus line for the week, and their app shows it. It is written late on Saturday night, after the week has finished, from that client's real numbers. It publishes straight to them, and there is nothing for you to approve. Write one yourself and the automatic one leaves it alone that week. The card on Home tells you whether it worked, with the lines one tap away so you can read what they were told. If it ever fails you get an email, and a client sees no focus rather than last week's, because a stale line presented as this week's is worse than none.",
         route: "/home",
         routeLabel: "Open Home",
+        manual: [
+          "Each client carries one focus line for the week and their app shows it. Without AI, nobody writes it but you.",
+          "Open a client, write the line, and it stays until you change it. One sentence about the week ahead is enough — it is the first thing they read when they open the app.",
+          "The card on Home tells you which clients have one for this week and which do not, so you can see at a glance who is still waiting.",
+        ],
+        manualNarration:
+          "Each client carries one focus line for the week and their app shows it. Without the AI, nobody writes it but you. Open a client, write the line, and it stays until you change it. One sentence about the week ahead is enough. The card on Home tells you which clients have one for this week and which do not.",
         audioUrl: null,
       },
       {
@@ -377,6 +432,13 @@ export const TUTORIAL: TutorialChapter[] = [
         ],
         narration:
           "On the client's page there is a chat that already knows this client. Their assessment, their history, their limits. Ask it for a workout or a change, and it comes back with a proposed change that you tap Apply on. Nothing happens until you tap Apply. And when you do, it makes a copy of the library day just for this client, rather than editing the shared one, so you cannot accidentally change a workout for everybody at once.",
+        manual: [
+          "Adding a client without AI is the assessment form, filled in with them.",
+          "Work down it — the movement screen, their injuries, their goal, how many days they can train. It takes about fifteen minutes and it is the same information you would gather in a first session anyway.",
+          "At the end you pick their programme yourself from the library, rather than being handed a recommendation. Everything after that is identical.",
+        ],
+        manualNarration:
+          "Adding a client without the AI is the assessment form, filled in with them. Work down it. The movement screen, their injuries, their goal, how many days they can train. About fifteen minutes, and it is the same information you would gather in a first session anyway. At the end you pick their programme yourself from the library rather than being handed a recommendation. Everything after that is identical.",
         audioUrl: null,
       },
     ],
@@ -425,6 +487,21 @@ export const TUTORIAL: TutorialChapter[] = [
         audioUrl: null,
       },
       {
+        id: "prog-duplicate",
+        title: "Starting from one of the gym's programmes",
+        body: [
+          "There are ready-made programmes in the library — the corrective tracks, the splits, the solo plans. You can assign any of them as they are.",
+          "If you want to change one, duplicate it first. That gives you your own copy to edit however you like, and leaves the original alone for everyone else.",
+          "The copy arrives as a draft, not live, so nothing reaches a client until you say so.",
+          "You cannot edit the gym's originals directly, and that is deliberate: they are running on other trainers' clients right now.",
+        ],
+        narration:
+          "There are ready-made programmes in the library. The corrective tracks, the splits, the solo plans. You can assign any of them as they are. If you want to change one, duplicate it first. That gives you your own copy to edit however you like, and leaves the original alone for everybody else. The copy arrives as a draft, not live, so nothing reaches a client until you say so. You cannot edit the gym's originals directly, and that is deliberate. They are running on other trainers' clients right now.",
+        route: "/library/programs",
+        routeLabel: "Open Programs",
+        audioUrl: null,
+      },
+      {
         id: "prog-launch",
         title: "Running the session",
         body: [
@@ -454,6 +531,21 @@ export const TUTORIAL: TutorialChapter[] = [
           "Every movement in the system, with its muscle group, modality, equipment, and a demo video where one has been attached. Search before you invent a name. A movement that already exists under a slightly different name is how a library turns to mush. And remember this library is shared with every trainer here. What you add, everyone can use.",
         route: "/library/exercises",
         routeLabel: "Open Exercise Library",
+        audioUrl: null,
+      },
+      {
+        id: "lib-mine",
+        title: "This library is yours",
+        body: [
+          "You start with every movement the gym has built up — hundreds of them, with the videos already attached. Nothing is empty on your first day.",
+          "But it is your copy. Rename something, swap a video, change the equipment, delete one you never use: it changes for you and for nobody else. No other trainer sees it, and the original stays as it was for them.",
+          "That works the other way too. If the owner adds a movement or fixes a bad video, you get it — unless you have already changed that particular one yourself, in which case yours wins.",
+          "Add anything you are missing. Yours stay yours.",
+        ],
+        narration:
+          "You start with every movement the gym has built up. Hundreds of them, videos already attached, nothing empty on your first day. But it is your copy. Rename something, swap a video, change the equipment, delete one you never use, and it changes for you and nobody else. The original stays as it was for every other trainer. That works the other way too. If the owner adds a movement or fixes a bad video you get it, unless you have already changed that particular one yourself, in which case yours wins.",
+        route: "/library/exercises",
+        routeLabel: "Open the library",
         audioUrl: null,
       },
       {
@@ -515,6 +607,12 @@ export const TUTORIAL: TutorialChapter[] = [
           "Pick a client at the top of the Nutrition screen. Their plan is a set of meals, each with its items and macros, and it is versioned, so you can see what changed and when. Plans can be dated to start in the future, and one flips over to live on its start date without you having to remember.",
         route: "/nutrition",
         routeLabel: "Open Nutrition",
+        manual: [
+          "Build the plan by hand: add each meal, then the foods in it, and the macros total themselves as you go.",
+          "Save a meal you use often to the library and it drops into the next plan in one tap. After a few clients you will have most of what you need already saved.",
+        ],
+        manualNarration:
+          "Build the plan by hand. Add each meal, then the foods in it, and the macros total themselves as you go. Save a meal you use often to the library and it drops into the next plan in one tap. After a few clients you will have most of what you need already saved.",
         audioUrl: null,
       },
       {
@@ -738,6 +836,7 @@ export const TUTORIAL: TutorialChapter[] = [
         ],
         narration:
           "The A I button in the corner opens an assistant that can read your data and act on it. Ask it to write a workout, look up a client's history, or explain what it is seeing in somebody's numbers. It is scoped to you. It can find your clients and nobody else's, and if it is asked about a client who is not on your roster, it refuses rather than guessing.",
+        aiOnly: true,
         audioUrl: null,
       },
       {
@@ -749,6 +848,7 @@ export const TUTORIAL: TutorialChapter[] = [
         ],
         narration:
           "It also turns up in the recommendation at the end of an assessment, the workout assist on a client's page, the meal plan builder, the Saturday focus lines, and the video matching in the library. Every one of them proposes. None of them publishes anything to a client on its own.",
+        aiOnly: true,
         audioUrl: null,
       },
       {
@@ -762,6 +862,7 @@ export const TUTORIAL: TutorialChapter[] = [
           "Settings, then A I. It shows every A I surface in the app. What has run, what has failed, what has never been used, and the spend against the monthly cap. There is a hard cap, and when it is reached, the A I features stop, rather than quietly running up a bill.",
         route: "/settings/ai-health",
         routeLabel: "Open AI Health",
+        aiOnly: true,
         audioUrl: null,
       },
       {
@@ -836,9 +937,26 @@ export const TUTORIAL: TutorialChapter[] = [
 ];
 
 /** Every step, flattened, in the order a trainer walks them. */
-export function allSteps(): (TutorialStep & { chapterId: string; chapterTitle: string })[] {
+export function allSteps(
+  opts?: { usesAi?: boolean },
+): (TutorialStep & { chapterId: string; chapterTitle: string })[] {
+  // Default true. Somebody who has not answered yet reads the walkthrough the
+  // app actually ships with, rather than the stripped one.
+  const usesAi = opts?.usesAi !== false;
   return TUTORIAL.flatMap((c) =>
-    c.steps.map((s) => ({ ...s, chapterId: c.id, chapterTitle: c.title })),
+    c.steps
+      // A step that exists only because of AI is removed, not rewritten —
+      // there is no manual equivalent of "here is the AI drawer", and leaving
+      // it in with an apology attached is exactly the walkthrough-with-holes
+      // Dustin rejected.
+      .filter((s) => usesAi || !s.aiOnly)
+      .map((s) => {
+        const st = { ...s, chapterId: c.id, chapterTitle: c.title };
+        if (usesAi || !s.manual) return st;
+        // The manual twin takes over the step entirely, so the reader never
+        // sees a description of a feature they do not have.
+        return { ...st, body: s.manual, narration: s.manualNarration || s.narration };
+      }),
   );
 }
 

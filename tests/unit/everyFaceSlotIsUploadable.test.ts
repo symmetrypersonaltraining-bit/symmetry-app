@@ -71,3 +71,51 @@ describe("the upload screen and the app agree on the faces", () => {
     }
   });
 });
+
+// ── The no-AI branch ────────────────────────────────────────────────────────
+//
+// Dustin, 21 Aug: a trainer who does not want AI must be shown "how to use the
+// app manually to do all of this", and he chose BRANCHING over a bolt-on
+// chapter — one coherent walkthrough, not 51 steps about features they do not
+// have followed by a correction.
+
+describe("the tutorial reads properly without AI", () => {
+  it("a step that only exists because of AI is removed, not apologised for", async () => {
+    const { allSteps } = await import("../../src/lib/tutorial/script.ts");
+    const withAi = allSteps({ usesAi: true }).map((s) => s.id);
+    const without = allSteps({ usesAi: false }).map((s) => s.id);
+    assert.ok(without.length < withAi.length, "nothing was dropped for a no-AI reader");
+    for (const id of ["ai-drawer", "ai-where", "ai-health"]) {
+      assert.ok(withAi.includes(id), `${id} is missing from the full walkthrough`);
+      assert.ok(!without.includes(id), `${id} is still shown to somebody with no AI`);
+    }
+  });
+
+  it("a step with a manual twin swaps its body AND its narration", async () => {
+    const { allSteps } = await import("../../src/lib/tutorial/script.ts");
+    const on = new Map(allSteps({ usesAi: true }).map((s) => [s.id, s]));
+    const off = new Map(allSteps({ usesAi: false }).map((s) => [s.id, s]));
+    let swapped = 0;
+    for (const [id, s] of off) {
+      const orig = on.get(id);
+      if (!orig?.manual) continue;
+      swapped++;
+      assert.deepEqual(s.body, orig.manual, `${id} still shows the AI version on screen`);
+      assert.notEqual(
+        s.narration,
+        orig.narration,
+        `${id} reads the manual text but SPEAKS the AI one — the recording would contradict the screen`,
+      );
+    }
+    assert.ok(swapped >= 3, `only ${swapped} steps branch; the AI-heavy ones need manual twins`);
+  });
+
+  it("the full walkthrough is the default", async () => {
+    const { allSteps } = await import("../../src/lib/tutorial/script.ts");
+    assert.deepEqual(
+      allSteps().map((s) => s.id),
+      allSteps({ usesAi: true }).map((s) => s.id),
+      "somebody who has not answered the question yet must get the app as it actually ships",
+    );
+  });
+});

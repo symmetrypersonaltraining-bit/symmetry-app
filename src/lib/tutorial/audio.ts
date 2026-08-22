@@ -16,8 +16,6 @@ export const RECORDED_STEPS: ReadonlySet<string> = new Set<string>([
   "account-appearance",
   "account-notifications",
   "account-password",
-  "account-pay",
-  "account-profile",
   "ai-drawer",
   "ai-health",
   "ai-no-claude",

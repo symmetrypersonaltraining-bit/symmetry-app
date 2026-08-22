@@ -27,8 +27,8 @@
       "id": "account-profile",
       "chapter": "account",
       "title": "Your name and your face",
-      "text": "Open Profile from the bottom of the sidebar. The name and photo here are what every client sees. On your messages, on their coach card, and on the celebration screens when they hit a personal best. Without a photo they get your initials in a circle. It works, but a face is the difference between an app and a person.",
-      "words": 60
+      "text": "Settings, then the group called You. Your name, what clients call you, and your photo all live there, and you set them yourself. This is what every client sees. On your messages, on their coach card, and on the celebration screens when they hit a personal best. Without a photo they get your initials in a circle. It works, but a face is the difference between an app and a person. Your email is shown but locked, because it is your login.",
+      "words": 82
     },
     {
       "id": "account-password",
@@ -41,8 +41,22 @@
       "id": "account-pay",
       "chapter": "account",
       "title": "How you get paid",
-      "text": "Still in Settings, find the payments card, and put in whichever of Venmo, Zelle, or Cash App you actually use. This is not decoration. When a client taps to pay you, the button sends them wherever this says. If it is empty, it sends them nowhere, and you will hear about that on the first of the month.",
-      "words": 58
+      "text": "Same group in Settings, under your photo. Put in whichever of Venmo, Zelle, or Cash App you actually use. This is only the handle a client sends money to. No bank details, no card numbers, no logins, and the app never touches the payment itself. It is not decoration though. When a client taps to pay you, the button sends them wherever this says, and if it is empty it sends them nowhere. Nobody else can see these. Not the other trainers, not the owner.",
+      "words": 85
+    },
+    {
+      "id": "account-avatar",
+      "chapter": "account",
+      "title": "Your own set of faces",
+      "text": "The app has a cartoon of the coach that appears whenever it speaks. Twenty of them, one per situation. Celebrating a personal best, checking in after a quiet week, explaining a screen. You can have your own. Settings, Bots and AI, Your avatar set. Twenty slots, each one telling you what it is for, and you upload a picture into each. Ask the owner for the avatar script. You paste it into Gemini, upload some photos of yourself, and it draws the twenty. You do not need all of them to start. Anything you have not uploaded falls back to the standard set.",
+      "words": 103
+    },
+    {
+      "id": "account-bots",
+      "chapter": "account",
+      "title": "Which bots run in your app",
+      "text": "Settings, Bots and AI, Your bots. Three switches, and they affect your clients only. Every trainer sets their own. Coach Bot posts light smack talk about the challenge in your group chat. Birthday messages go to your clients, and you get a quiet heads-up the evening before. And the weekly focus writes each of your clients one line for the week ahead, late on Saturday. All three start on.",
+      "words": 69
     },
     {
       "id": "account-notifications",
@@ -164,6 +178,13 @@
       "words": 96
     },
     {
+      "id": "prog-duplicate",
+      "chapter": "programming",
+      "title": "Starting from one of the gym's programmes",
+      "text": "There are ready-made programmes in the library. The corrective tracks, the splits, the solo plans. You can assign any of them as they are. If you want to change one, duplicate it first. That gives you your own copy to edit however you like, and leaves the original alone for everybody else. The copy arrives as a draft, not live, so nothing reaches a client until you say so. You cannot edit the gym's originals directly, and that is deliberate. They are running on other trainers' clients right now.",
+      "words": 89
+    },
+    {
       "id": "prog-launch",
       "chapter": "programming",
       "title": "Running the session",
@@ -176,6 +197,13 @@
       "title": "Exercises",
       "text": "Every movement in the system, with its muscle group, modality, equipment, and a demo video where one has been attached. Search before you invent a name. A movement that already exists under a slightly different name is how a library turns to mush. And remember this library is shared with every trainer here. What you add, everyone can use.",
       "words": 59
+    },
+    {
+      "id": "lib-mine",
+      "chapter": "library",
+      "title": "This library is yours",
+      "text": "You start with every movement the gym has built up. Hundreds of them, videos already attached, nothing empty on your first day. But it is your copy. Rename something, swap a video, change the equipment, delete one you never use, and it changes for you and nobody else. The original stays as it was for every other trainer. That works the other way too. If the owner adds a movement or fixes a bad video you get it, unless you have already changed that particular one yourself, in which case yours wins.",
+      "words": 92
     },
     {
       "id": "lib-videos",
