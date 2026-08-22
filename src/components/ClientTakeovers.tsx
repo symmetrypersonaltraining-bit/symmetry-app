@@ -81,7 +81,15 @@ type Pick =
   | { kind: "lapse"; key: string; firstName: string; tier: LapseTier; daysSince: number; priorDays: number }
   | null;
 
-const LAUNCH_KEY = "challenge-launch-2026-08";
+// The announcement key names the CHALLENGE, not the month.
+//
+// It was "challenge-launch-2026-08", hardcoded. Every client who saw August's
+// challenge has that string marked seen, so a challenge launched in September
+// would have been silently announced to nobody — no error, no empty state, you
+// would just notice that nobody joined. Keyed to the row's own id, each new
+// challenge announces itself exactly once and nothing has to be edited to
+// launch the next one.
+const launchKey = (challengeId: string) => `challenge-launch-${challengeId}`;
 
 export default function ClientTakeovers({ basePath = "" }: { basePath?: string }) {
   const { firstName: coachFirstName } = useCoach();
@@ -192,10 +200,14 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
         }
 
         // ── 2. The live challenge, if they have never been told ──────────
-        if (!seen.has(LAUNCH_KEY)) {
+        //
+        // The challenge is fetched FIRST now, because the key is derived from
+        // it. One extra read on a screen that already makes several, in
+        // exchange for a launch that cannot be missed.
+        {
           const { data: c } = await supabase.from("v_active_challenge").select("*").maybeSingle();
           const ch = (c as Challenge | null) ?? null;
-          if (ch) {
+          if (ch && !seen.has(launchKey(ch.id))) {
             const [{ data: rows }, { data: tot }] = await Promise.all([
               supabase.rpc("challenge_leaderboard", { p_challenge_id: ch.id }),
               supabase.rpc("challenge_group_total", { p_challenge_id: ch.id }),
@@ -206,7 +218,7 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
               setMeId(cid);
               setPick({
                 kind: "challenge",
-                key: LAUNCH_KEY,
+                key: launchKey(ch.id),
                 challenge: ch,
                 // Falls back to the group-total RPC's my_score, which is the
                 // caller's own data and is returned even for someone who is not

@@ -22,6 +22,7 @@
 // standing in the app right now, which is the one moment a card is enough.
 
 import { useState } from "react";
+import { centralToday } from "@/lib/central-time";
 import Link from "next/link";
 import AiBadge from "@/components/AiBadge";
 
@@ -34,10 +35,20 @@ export default function WeighInNudge({
   daysSince: number | null;
   hasGoal: boolean;
 }) {
+  // DISMISSED MEANS DISMISSED FOR THE DAY.
+  //
+  // Two faults in one line. sessionStorage is emptied when the app is closed,
+  // so on a PWA — which is how every client runs this — dismissing it bought
+  // you until the next time you opened the app, sometimes minutes. And
+  // `toDateString()` is the DEVICE's day, not Central, so around midnight it
+  // disagreed with every date the rest of the app was using.
+  //
+  // localStorage keyed by the Central date: gone for the rest of today however
+  // many times the app is reopened, back tomorrow, which is what a nudge is.
   const [gone, setGone] = useState(() => {
     if (typeof window === "undefined") return false;
     try {
-      return sessionStorage.getItem(KEY) === new Date().toDateString();
+      return localStorage.getItem(KEY) === centralToday();
     } catch {
       return false;
     }
@@ -47,7 +58,7 @@ export default function WeighInNudge({
   function dismiss() {
     setGone(true);
     try {
-      sessionStorage.setItem(KEY, new Date().toDateString());
+      localStorage.setItem(KEY, centralToday());
     } catch { /* dismissing for this render is enough */ }
   }
 

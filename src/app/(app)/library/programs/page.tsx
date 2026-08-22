@@ -1,3 +1,4 @@
+import NewProgramButton from "@/components/NewProgramButton";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
@@ -67,13 +68,7 @@ export default async function ProgramsLibraryPage() {
             {list.length} programs
           </p>
         </div>
-        <button
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
-          style={{ background: "var(--brand-primary)" }}
-        >
-          <i className="ti ti-plus text-base" />
-          New Program
-        </button>
+        <NewProgramButton />
       </div>
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
