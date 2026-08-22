@@ -125,7 +125,13 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = (event.notification.data && event.notification.data.url) || "/messages";
+  const data = event.notification.data || {};
+  const target = data.url || "/messages";
+  // The rest timer's alarm is the one notification that must NOT navigate.
+  // It is fired while you are mid-workout with the phone in your pocket, and
+  // the default target is /messages — so tapping "rest is up" would focus the
+  // tab and then throw you out of the logger you are standing in. Focus only.
+  const focusOnly = data.kind === "rest";
 
   event.waitUntil(
     (async () => {
@@ -137,14 +143,17 @@ self.addEventListener("notificationclick", (event) => {
         if ("focus" in client) {
           try {
             await client.focus();
-            if ("navigate" in client) await client.navigate(target);
+            if (!focusOnly && "navigate" in client) await client.navigate(target);
             return;
           } catch {
             /* fall through to openWindow */
           }
         }
       }
-      if (self.clients.openWindow) await self.clients.openWindow(target);
+      // Nothing was open. A rest alarm with no tab to focus has nowhere useful
+      // to go — the workout is gone — so opening /messages would be worse than
+      // doing nothing.
+      if (!focusOnly && self.clients.openWindow) await self.clients.openWindow(target);
     })(),
   );
 });

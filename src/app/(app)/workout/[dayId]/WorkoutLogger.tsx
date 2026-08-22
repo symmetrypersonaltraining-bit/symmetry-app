@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import MicButton from "@/components/MicButton";
 import { createClient } from "@/lib/supabase/client";
 // Aliased: this file already has a local submitFeedback() handler, and the
@@ -30,6 +30,7 @@ import {
   displaySecs, isExpired, isRunning, outcomeOnStop,
   type SetTimerState, type SetTimerMode,
 } from "@/lib/setTimer";
+import { alarmPlan, holdPageAwake, ringRestAlarm } from "@/lib/restAlarm";
 
 interface Exercise {
   id: string;
@@ -301,13 +302,83 @@ function ExerciseHistory({ exerciseId, exId, clientId, exerciseName, onClose, on
 }
 
 // \u2500\u2500\u2500 REST TIMER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => void }) {
-  const [remaining, setRemaining] = useState(seconds);
+/**
+ * It has to go off with the phone in your pocket.
+ *
+ * Dustin, 22 Aug: "lets make the timer in workout logger buzz phone and ding
+ * loud even if phone is closed or not on workout screen."
+ *
+ * Three things changed and all three were needed. src/lib/restAlarm.ts carries
+ * the reasoning; the short version:
+ *
+ *  · It no longer counts ticks. It used to do setTimeout(() => r - 1, 1000),
+ *    which a phone throttles to about once a minute in the background and may
+ *    stop entirely with the screen off — so a 90 second rest came back reading
+ *    whatever it managed and rang late. `endsAt` is a wall-clock instant now
+ *    and the display is derived from it, so a page frozen past the end wakes up
+ *    knowing it is overdue and rings at once.
+ *  · A silent looping track holds the tab awake for the length of the rest.
+ *    A tab making sound does not get frozen; that is what lets it reach zero
+ *    at all with the screen off.
+ *  · At zero it picks by visibility. On screen → the loud in-app tone and a
+ *    vibrate. Not on screen → a notification, because Chrome ignores
+ *    navigator.vibrate() from a hidden page and the OS is the only thing that
+ *    can ring a locked phone.
+ */
+function RestTimer({ seconds, onDone, exerciseName }: { seconds: number; onDone: () => void; exerciseName?: string | null }) {
+  // Fixed the moment this mounts. Re-deriving it would restart the rest every
+  // repaint, which is the bug this shape exists to prevent.
+  const endsAt = useMemo(() => Date.now() + seconds * 1000, [seconds]);
+  const [now, setNow] = useState(() => Date.now());
+  const rang = useRef(false);
+
+  // Hold the page awake for the length of the rest, and let go on unmount even
+  // if it was skipped — a silent track left playing is a battery drain nobody
+  // can see or stop.
+  useEffect(() => holdPageAwake(), []);
+
   useEffect(() => {
-    if (remaining <= 0) { onDone(); return; }
-    const t = setTimeout(() => setRemaining(r => r - 1), 1000);
-    return () => clearTimeout(t);
-  }, [remaining, onDone]);
+    // A quarter second, so the number is never visibly stale, and so a page
+    // coming back from a freeze rings within a blink rather than a second.
+    const id = window.setInterval(() => setNow(Date.now()), 250);
+    // visibilitychange as well as the interval: on some phones the interval is
+    // exactly what was frozen, and this is the first thing that fires on wake.
+    const onWake = () => setNow(Date.now());
+    document.addEventListener("visibilitychange", onWake);
+    return () => { window.clearInterval(id); document.removeEventListener("visibilitychange", onWake); };
+  }, []);
+
+  const plan = alarmPlan(now, endsAt, rang.current);
+
+  useEffect(() => {
+    if (!plan.fire) return;
+    rang.current = true;
+    ringRestAlarm(
+      {
+        hidden: typeof document !== "undefined" && document.hidden,
+        ding: () => fx("restdone"),
+        vibrate: (pattern) => navigator.vibrate?.(pattern),
+        notify: async (title, options) => {
+          try {
+            if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+            const reg = await navigator.serviceWorker?.ready;
+            await reg?.showNotification(title, options);
+          } catch {
+            /* the in-app path already ran for anyone watching */
+          }
+        },
+      },
+      exerciseName,
+    );
+    onDone();
+  }, [plan.fire, onDone, exerciseName]);
+
+  // Checked at render, not once at mount: permission can be granted from
+  // another tab mid-rest and the line should stop nagging when it is.
+  const canRingLocked =
+    typeof Notification !== "undefined" && Notification.permission === "granted";
+
+  const remaining = plan.secondsLeft;
   const pct = ((seconds - remaining) / seconds) * 100;
   const m = Math.floor(remaining / 60);
   const s = remaining % 60;
@@ -333,6 +404,16 @@ function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => void })
         style={{ background: "rgba(255,255,255,0.1)" }}>
         Skip Rest
       </button>
+      {/* Say it, rather than let somebody put the phone down and miss it.
+          Without notification permission the alarm can only ring while this
+          screen is in front — the in-app tone is all there is, and a locked
+          phone will stay silent. Better they find out now than after a set. */}
+      {!canRingLocked && (
+        <p className="text-white/40 text-xs mt-5 px-8 text-center" style={{ maxWidth: 300 }}>
+          Turn on notifications in Settings and this will still go off with your
+          phone locked. Right now it can only ring on this screen.
+        </p>
+      )}
     </div>
   );
 }
@@ -630,6 +711,7 @@ export default function WorkoutLogger({
   // bottom instead. Unconditional, like every hook must be.
   const stableH = useStableViewportHeight();
   const [restTimer, setRestTimer] = useState<number | null>(null);
+  const [restForExercise, setRestForExercise] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [fieldCfg, setFieldCfg] = useState<Record<string, string[]>>({});
   const [historyExercise, setHistoryExercise] = useState<{ id: string; exId?: string | null; name: string } | null>(null);
@@ -1379,7 +1461,13 @@ export default function WorkoutLogger({
       const pe = allFlat.find(p => p.id === peId);
       if (pe?.rest && pe.rest !== "none" && pe.rest !== "0") {
         const match = pe.rest.match(/(\d+)/);
-        if (match) setRestTimer(parseInt(match[1]));
+        if (match) {
+          setRestTimer(parseInt(match[1]));
+          // Carried so the notification can say what is coming, which is the
+          // difference between an alarm you have to unlock the phone to
+          // understand and one you can act on from the lock screen.
+          setRestForExercise(pe.exercises?.name ?? null);
+        }
       }
     } catch (e) {
       // Say it. A failure the client cannot see is reported as flakiness and can
@@ -2262,7 +2350,7 @@ export default function WorkoutLogger({
         <SetFeedback sets={sets} prevByPe={prevByPe} />
         {/* Keep the phone screen awake during an active session. Isolated; no-ops where unsupported. Revert = remove this line. */}
         <WakeLock active={sessionMode} />
-        {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
+        {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} exerciseName={restForExercise} />}
         {videoUrl && <VideoModal url={videoUrl} onClose={() => setVideoUrl(null)} />}
         {historyExercise && (
           <ExerciseHistory exerciseId={historyExercise.id} exId={historyExercise.exId} clientId={clientId} exerciseName={historyExercise.name}
@@ -2922,7 +3010,7 @@ export default function WorkoutLogger({
           onClose={() => setHistoryExercise(null)}
           onPrefill={(w, r) => prefillSets(historyExercise.id, w, r)} />
       )}
-      {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} />}
+      {restTimer !== null && <RestTimer seconds={restTimer} onDone={() => setRestTimer(null)} exerciseName={restForExercise} />}
         {timePick && <TimePickerSheet initial={parseTimeToSecs(sets[timePick.peId]?.[timePick.si]?.time || "") || 0} onSet={(secs) => { updateSet(timePick.peId, timePick.si, "time", fmtSecs(secs)); setTimePick(null); }} onClose={() => setTimePick(null)} />}
       {swapTargetPe && <SwapModal pe={swapTargetPe} onClose={() => setSwapTargetPe(null)} onSwap={handleSwap} />}
 
