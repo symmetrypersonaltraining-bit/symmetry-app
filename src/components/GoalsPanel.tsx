@@ -135,10 +135,23 @@ export default function GoalsPanel({
           Same rule as the big invitation: only metrics with readings are
           offered. Asking somebody to pick a lean mass target when they have
           never had lean mass measured is asking them to guess. */}
-      {canSet && (active.length > 0 || proposed.length > 0) && (() => {
+      {/* AND WITH NO GOALS AT ALL, TOO.
+          Dustin, 22 Aug: "we need to be able to set bf goals."
+          He could not, and the reason was this gate. These chips were shown
+          only once at least one goal existed, and the big invitation below —
+          the ONLY control on the screen before that — hard-codes
+          metric: "weight". So the first goal anybody sets can only ever be a
+          weight goal, and body fat is reachable only as a second one. Somebody
+          who wants to track body fat and not weight had no way in at all.
+          Weight is left out of the chips while the invitation is showing, so
+          there is one way to do each thing rather than two. */}
+      {canSet && (() => {
         const taken = new Set(goals.map((g) => g.metric));
+        const invitationShowing =
+          !active.length && !proposed.length && (readingsByMetric.weight || []).length > 0;
         const free = (["weight", "body_fat_pct", "lean_mass"] as GoalMetric[])
-          .filter((m) => !taken.has(m) && (readingsByMetric[m] || []).length > 0);
+          .filter((m) => !taken.has(m) && (readingsByMetric[m] || []).length > 0)
+          .filter((m) => !(invitationShowing && m === "weight"));
         if (!free.length) return null;
         return (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

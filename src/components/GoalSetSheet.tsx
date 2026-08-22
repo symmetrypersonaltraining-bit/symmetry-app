@@ -43,8 +43,26 @@ export default function GoalSetSheet({
 
   // What this asks of them, said before they commit rather than after.
   const reality = useMemo(() => {
+    // AN EMPTY BOX IS NOT A TARGET OF ZERO.
+    //
+    // `value` starts as "" for a new goal, and Number("") is 0, which
+    // Number.isFinite happily accepts. So before the person had typed anything
+    // the sheet computed a goal of ZERO and told them, in a box on screen:
+    //
+    //   "That's 9.72 lb a week for 12 weeks — roughly 4850 kcal a day below
+    //    maintenance."
+    //
+    // 4850 under maintenance is not a diet, it is a number that should never
+    // have been printed. It came from |116.7 - 0| / 12 weeks. Dustin saw it on
+    // 22 Aug while setting a goal of 107.
+    //
+    // A blank box means "not yet", and a body weight, body fat percentage or
+    // lean mass of zero or less is not a goal anybody can hold, so neither says
+    // anything until there is a real number to say it about.
+    if (!value.trim()) return null;
     const tv = Number(value);
-    if (!Number.isFinite(tv) || now == null || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    if (!Number.isFinite(tv) || tv <= 0) return null;
+    if (now == null || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
     const weeks = (ms(date) - ms(today)) / (7 * DAY);
     if (weeks <= 0) return null;
     const remaining = Math.abs(now - tv);
@@ -68,6 +86,28 @@ export default function GoalSetSheet({
     const kcal = metric === "weight"
       ? ` — roughly ${kcalPerDayFor(need)} kcal a day ${goingDown ? "below" : "above"} maintenance`
       : "";
+
+    // A PACE NOBODY SHOULD BE ASKED TO HOLD.
+    //
+    // Separate from the stretch check below, which compares against what THEY
+    // have been doing — this is about what is sane for anyone. The old code had
+    // no ceiling at all, so a date close enough would cheerfully print a
+    // four-figure daily deficit as though it were a plan, and the only signal
+    // that something was wrong was the size of a number most people cannot
+    // judge.
+    //
+    // ~1% of bodyweight a week is the usual upper bound for weight, and about a
+    // point of body fat a week is already fast. Past that the honest answer is
+    // that the DATE is wrong, so that is what it says.
+    const ceiling = metric === "weight" ? Math.max(2, now * 0.01)
+      : metric === "body_fat_pct" ? 1
+      : 1;
+    if (need > ceiling) {
+      return {
+        line: `${needTxt}. That's faster than anyone should be asked to go${metric === "weight" ? ` — and it would mean roughly ${kcalPerDayFor(need)} kcal a day ${goingDown ? "below" : "above"} maintenance` : ""}. Give it more time, or pick a smaller change.`,
+        tone: "stretch" as const,
+      };
+    }
 
     if (holding === 0) {
       return { line: `${needTxt}${kcal}.`, tone: "ok" as const };
