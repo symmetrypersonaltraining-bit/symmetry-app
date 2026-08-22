@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { openTarget } from "./WorkoutDaySheet";
 import { extraConfirmFor, removalVerdict } from "@/lib/removeGuard";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -113,6 +114,8 @@ export default function ScheduleBoard({
     [forClient, ownerClientId],
   );
   const [showPast, setShowPast] = useState(false);
+  // Opened automatically below when this week has an unlogged past session —
+  // see the effect under `missed`.
   // Feedback 6e90c584: "ability to move past workouts forwards". A workout that
   // sits on a past date used to be frozen — no drag handle, no Move button — so
   // a session you missed on Tuesday was stuck on Tuesday forever. Only two
@@ -143,6 +146,31 @@ export default function ScheduleBoard({
       ),
     [workouts, weekStart, today, isLockedDate],
   );
+  /**
+   * Open the past section when this week has an unlogged session in it.
+   *
+   * The old auto-open was removed for good reason: it triggered on ANYTHING
+   * outstanding since the beginning of time, so it was on almost always and
+   * the board opened onto last week instead of today. The count is scoped to
+   * the current week now, which makes the same behaviour rare and useful
+   * rather than constant and annoying.
+   *
+   * Dustin, 22 Aug: "it doesn't let me view full week on a rest day." On a
+   * rest day there is nothing above the board to look at, and the one thing he
+   * wanted — the session he forgot on Friday — was folded away behind a muted
+   * toggle. If there is something back there worth doing, show it.
+   *
+   * It only forces it OPEN, and only once per mount. Collapsing it stays a
+   * decision the client can make and keep.
+   */
+  const autoOpenedPast = useRef(false);
+  useEffect(() => {
+    if (autoOpenedPast.current) return;
+    if (missed.length === 0) return;
+    autoOpenedPast.current = true;
+    setShowPast(true);
+  }, [missed.length]);
+
   // The past section used to auto-open whenever anything was missed, which meant
   // the board almost always opened onto last week rather than today — you had to
   // scroll down to find the day you were actually on. It stays collapsed now.
@@ -436,7 +464,11 @@ export default function ScheduleBoard({
   useEffect(() => () => cleanupDrag(), []); // safety on unmount
 
   function launchWorkout(w: BoardWorkout) {
-    router.push(`${basePath}/workout/${w.dayId}${forClient ? "?forClient=" + forClient : ""}`);
+    // w.id — the scheduled row — not w.dayId. openTarget() in WorkoutDaySheet
+    // carries the full explanation; the short version is that the logger reads
+    // the date off the scheduled row and has nothing to read from a bare day,
+    // so opening a past session by its day id logged it against today.
+    router.push(`${basePath}/workout/${openTarget(w)}${forClient ? "?forClient=" + forClient : ""}`);
   }
 
   function openMove(w: BoardWorkout) {

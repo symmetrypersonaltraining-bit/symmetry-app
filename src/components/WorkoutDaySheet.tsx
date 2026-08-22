@@ -45,6 +45,34 @@ function pretty(dateStr: string): string {
  * today..+8wks; past + Peak Week blocked). Move updates scheduled_workouts.
  * Additive/isolated; renders nothing when date is null.
  */
+
+/**
+ * WHICH ID THE LOGGER SHOULD BE OPENED WITH — and why it is not the day's.
+ *
+ * `/workout/[dayId]` accepts either a scheduled_workouts id or a days id, and
+ * it behaves differently for each. Given a SCHEDULED row it reads that row's
+ * `scheduled_date` and logs against it; given a bare DAY it has nothing to read
+ * and falls back to the clock.
+ *
+ * The date-aware branch shipped on 6 Aug. This link never reached it, because
+ * it passed the day. So every session opened from the week strip logged against
+ * TODAY no matter which square you tapped.
+ *
+ * Dustin, 22 Aug, having tapped yesterday to catch up a walk he forgot:
+ * "I logged the workout and it logged it on today. no good."
+ *
+ * He was right, and it was not only his. Any client tapping a past day to catch
+ * up got the same thing: the make-up credited to today, and the day they
+ * actually trained left outstanding.
+ *
+ * Falls back to the day id when there is no scheduled row — a library workout
+ * opened straight from the library has no date of its own, and today is then
+ * the correct answer.
+ */
+export function openTarget(w: { id?: string | null; dayId: string }): string {
+  return w.id || w.dayId;
+}
+
 export default function WorkoutDaySheet({
   date,
   workouts,
@@ -198,7 +226,10 @@ export default function WorkoutDaySheet({
                     </div>
                     <div style={{ display: "flex", gap: 7, marginTop: 10 }}>
                       <Link
-                        href={`${basePath}/workout/${w.dayId}${forClient ? "?forClient=" + forClient : ""}`}
+                        /* w.id, NOT w.dayId. See openTarget() at the top of
+                           this file — this link is where "log yesterday" was
+                           being turned into "log today". */
+                        href={`${basePath}/workout/${openTarget(w)}${forClient ? "?forClient=" + forClient : ""}`}
                         style={{
                           flex: 1, textAlign: "center", fontWeight: 700, fontSize: 12.5, padding: 9,
                           borderRadius: 10, textDecoration: "none",
