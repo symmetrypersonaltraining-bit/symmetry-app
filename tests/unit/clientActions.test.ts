@@ -49,7 +49,19 @@ test("the trainer's tools are not reachable from here", () => {
   // is pinned specifically to force that thought. If you are changing it,
   // confirm the new tool carries the same two barriers as swap_my_workout —
   // the cleared-pool filter AND the write-time re-check — before you do.
-  assert.equal(names.length, 6, `the client toolset grew to ${names.length}: ${names.join(", ")}`);
+  // Raised 6 -> 7 on 22 Aug for my_training_summary, and here is the thought the
+  // tripwire above is asking for: that tool carries NEITHER the cleared-pool
+  // filter NOR the write-time re-check, and does not need either, because it
+  // writes nothing. It is a read-only aggregate over the caller's own
+  // scheduled_workouts, scoped by .eq("client_id", clientId) like every other
+  // read here. It widens what the box can SAY, not what it can DO.
+  //
+  // It exists because the opposite was worse: asked for a three-week summary of
+  // a client who had completed 7 of 45 scheduled sessions, the coach answered
+  // "consistency is solid" — from a context that listed only completed sessions
+  // and no denominator. A read-only counter is the smallest thing that fixes
+  // that; the alternative was letting the model estimate.
+  assert.equal(names.length, 7, `the client toolset grew to ${names.length}: ${names.join(", ")}`);
 });
 
 test("every write re-checks ownership at the moment of writing", () => {

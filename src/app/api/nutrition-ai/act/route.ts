@@ -237,7 +237,14 @@ export async function POST(req: NextRequest) {
           `\n\nTODAY IS ${logDate}. Only reach for a tool when the client is asking about their ` +
           `TRAINING — their schedule, moving or swapping a session, what to do today, or logging a ` +
           `weigh-in. If they are asking about food, meals, macros or their plan, answer nothing here ` +
-          `and call no tool: a different part of the coach handles nutrition and will answer them properly.`;
+          `and call no tool: a different part of the coach handles nutrition and will answer them properly.` +
+          `\n\nANY QUESTION ABOUT A PERIOD OF TIME — "last 3 weeks", "this month", "since I started", ` +
+          `"how have I been doing", "am I being consistent", "progress lately" — MUST be answered from ` +
+          `my_training_summary, called with that exact period resolved to dates. Do not answer it from the ` +
+          `session list in your context and do not estimate. That list is only what they DID; it cannot ` +
+          `show what they missed, so reading consistency off it makes every client look good and the ` +
+          `worst attenders look best. Report the period you were asked for, not a different one, and if ` +
+          `attendance is poor say so plainly and kindly rather than describing only the sessions they made.`;
 
         // Hoisted rather than inlined into logUsage below: the aiFeatures guard
         // test scans metering calls for the retired catch-all labels, and

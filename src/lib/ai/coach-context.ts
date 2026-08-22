@@ -323,8 +323,25 @@ export async function fetchClientProfile(
   if (c.primary_goal) parts.push(`Primary goal: ${c.primary_goal}`);
   if (c.secondary_goals) parts.push(`Secondary goals: ${c.secondary_goals}`);
   if (c.experience_level) parts.push(`Experience: ${c.experience_level}`);
-  const freq = c.days_per_week ?? c.training_frequency;
-  if (freq) parts.push(`Trains ${freq}x/week`);
+  // PROGRAMMED, not observed — and it has to say so.
+  //
+  // This read `Trains 6x/week`, present tense, indicative, inside a block
+  // headed "CLIENT PROFILE". It is `days_per_week`, a TARGET somebody typed in
+  // at intake. On 22 Aug the coach told Dustin a client with 7 completed
+  // sessions out of 45 had "hit 6 days a week like you're supposed to" — it
+  // took this number and asserted attendance against it. Attendance comes from
+  // the my_training_summary tool and from the adherence line, never from here.
+  //
+  // The two columns also disagree — Hassan is 3 in one and 6 in the other —
+  // and picking one silently is how a plan number becomes a fact nobody
+  // questions. Say both when they differ, and let the reader see it is intent.
+  const planned = c.days_per_week;
+  const stated = c.training_frequency;
+  if (planned && stated && planned !== stated) {
+    parts.push(`Programmed ${planned}x/week (intake said ${stated}x — the two disagree; this is the PLAN, not attendance)`);
+  } else if (planned ?? stated) {
+    parts.push(`Programmed ${planned ?? stated}x/week (this is the PLAN, not what they have actually done)`);
+  }
   const inj = [c.injuries_limitations, c.injuries].filter(Boolean).join("; ");
   if (inj) parts.push(`Injuries/limitations: ${inj}`);
   if (c.start_date) parts.push(`Coaching since: ${c.start_date}`);

@@ -27,7 +27,7 @@
 // answers a bit more generally.
 
 import type { Db } from "@/lib/ai/scope";
-import { CT_TODAY, coachNameForClient, coachingThemselvesLine, fetchClientProfile } from "@/lib/ai/coach-context";
+import { CT_TODAY, ctShiftDays, coachNameForClient, coachingThemselvesLine, fetchClientProfile } from "@/lib/ai/coach-context";
 import { goalContextBlock } from "@/lib/ai/goalContext";
 import { clearedPoolFor } from "@/lib/ai/workoutPool";
 import { trainingHistoryBlock } from "@/lib/ai/trainingHistory";
@@ -143,12 +143,60 @@ async function metricsLine(db: Db, clientId: string): Promise<string | null> {
  * Never throws, and returns "" rather than null when there is nothing to say,
  * so the caller can concatenate unconditionally.
  */
+
+/**
+ * WHAT THEY DID NOT DO. The half the history block can never contain.
+ *
+ * trainingHistoryBlock is headed "what they actually did", and that is exactly
+ * what it is: completed sessions with their sets. It has no room for a miss —
+ * a missed session leaves no set_logs to list. So a context built only from it
+ * shows every client an unbroken run of successes, and the WORSE somebody's
+ * attendance is, the better that list looks, because the misses are the part
+ * that is absent.
+ *
+ * On 22 Aug that produced "Consistency is solid" about a client who had
+ * completed 7 of 45 scheduled sessions in thirty days. Nothing was invented;
+ * the model was shown six good sessions and no denominator.
+ *
+ * The number already existed in assembleTrainingContext and went only to the
+ * Coach's Read card and the trainer's tooling. This is the same computation for
+ * the surface people actually type into.
+ */
+async function adherenceLine(db: Db, clientId: string, today: string): Promise<string | null> {
+  try {
+    const from = ctShiftDays(today, -29);
+    const { data } = await db
+      .from("scheduled_workouts")
+      .select("scheduled_date, status")
+      .eq("client_id", clientId)
+      .is("deleted_at", null)
+      .gte("scheduled_date", from)
+      .lte("scheduled_date", today);
+    const rows = (data as { scheduled_date: string; status: string | null }[] | null) || [];
+    // Only days that have passed can be missed.
+    const past = rows.filter((r) => r.scheduled_date <= today);
+    if (!past.length) return null;
+    const done = past.filter((r) => r.status === "completed");
+    const week = past.filter((r) => r.scheduled_date >= ctShiftDays(today, -6));
+    const doneWeek = week.filter((r) => r.status === "completed");
+    const pct = Math.round((done.length / past.length) * 100);
+    return (
+      `ATTENDANCE (completed vs SCHEDULED, the only basis for judging consistency): ` +
+      `last 30 days ${done.length}/${past.length} (${pct}%); last 7 days ${doneWeek.length}/${week.length}. ` +
+      `The session list below is only what they completed — it cannot show a missed session, so never read ` +
+      `consistency off it. For any other period, call my_training_summary rather than estimating.`
+    );
+  } catch {
+    return null;
+  }
+}
+
 export async function assistantContext(db: Db, clientId: string | null): Promise<string> {
   if (!clientId) return "";
   const today = CT_TODAY();
 
   try {
-    const [profile, goals, todays, targets, metrics, history, pool] = await Promise.all([
+    const [profile, goals, todays, targets, metrics, history, pool, adherence] = await Promise.all([
       fetchClientProfile(db, clientId).catch(() => null),
       goalContextBlock(db, clientId, today).catch(() => null),
       todayLine(db, clientId, today),
@@ -159,6 +207,7 @@ export async function assistantContext(db: Db, clientId: string | null): Promise
       // ordinary question in a gym - had to be answered by Dustin.
       trainingHistoryBlock(db, clientId).catch(() => ""),
       clearedPoolFor(db, clientId).catch(() => null),
+      adherenceLine(db, clientId, today).catch(() => null),
     ]);
 
     const lines: string[] = [`Today's date: ${today}.`];
@@ -178,6 +227,10 @@ export async function assistantContext(db: Db, clientId: string | null): Promise
     // these numbers and it only appears when a goal exists at all.
     if (metrics) lines.push(metrics);
     if (goals) lines.push(goals);
+    // BEFORE the history, deliberately. Read after it, the denominator is a
+    // footnote to a list of wins; read before it, it is the frame the list is
+    // seen through.
+    if (adherence) lines.push(adherence);
     if (history) lines.push(history);
 
     // ── THE GATE ────────────────────────────────────────────────────────────

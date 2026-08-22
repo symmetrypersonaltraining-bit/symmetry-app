@@ -118,7 +118,16 @@ export function memoryBlock(mem: ClientMemory): string {
   }
   if (!parts.length) return "";
   return (
-    `WHAT YOU REMEMBER ABOUT THIS CLIENT FROM YOUR PAST CONVERSATIONS (trusted; they told you this themselves):\n` +
+    // NOT "they told you this themselves". The summary is prose folded out of a
+    // transcript that includes the coach's own replies, so labelling all of it
+    // as the client's own words turned an assistant's mistake into first-hand
+    // testimony it could not then be argued with. The dated facts below ARE
+    // things they said; the summary is a recollection, and it is now marked as
+    // one — and as something live data outranks.
+    `WHAT YOU REMEMBER ABOUT THIS CLIENT FROM YOUR PAST CONVERSATIONS.\n` +
+    `This is recollection, not measurement. Anything in your context that was computed from their logged ` +
+    `data — attendance, weights, macros, body weight — OUTRANKS this and replaces it silently. Never repeat ` +
+    `a claim from here about how consistent or reliable they have been.\n\n` +
     parts.join("\n\n") +
     `\n\nUse it the way a coach who has known them a while would: naturally, and only when it is relevant. Do not recite it back at them, and do not open by listing what you remember.`
   );
@@ -175,8 +184,13 @@ What belongs in memory:
 - Preferences about coaching: how blunt they want you, what motivates them, what they have asked you to stop doing.
 - Commitments either of you made, and anything left unresolved.
 
+THE COACH LINES ARE YOUR OWN PREVIOUS OUTPUT. They are not testimony and they are not evidence. If a COACH line asserts something about this client, that is a thing you once said, possibly from an incomplete picture, and it does NOT become true by being remembered. Only CLIENT lines are things the client told you. When a COACH line and the client's own words differ, the client's words win and the coach line is discarded.
+
+On 22 Aug this exact loop ran: the coach told a client with 7 completed sessions out of 45 that his "consistency is solid", and nine seconds later that claim was folded into memory as "training 6 days a week consistently, showing up reliably" — and then read back into every later conversation as established fact. A wrong answer became a permanent one.
+
 What does NOT belong:
-- Anything already in their logged data — weights, macros, adherence, body weight, session counts. The coach reads all of that live and fresher than you can summarise it. Memory is for what they SAID, not what they DID.
+- ANY judgement about attendance, consistency, adherence, streaks, showing up, or how often they train. Never, from either speaker. Those are computed live from the schedule and are frequently the opposite of what a conversation implies. Even if the client says "I have been really consistent", record it as something they SAID about themselves, never as a fact about their training.
+- Anything already in their logged data — weights, macros, adherence, body weight, session counts, loads lifted. The coach reads all of that live and fresher than you can summarise it. Memory is for what they SAID, not what they DID.
 - One-off passing detail with no future bearing ("what should I have for lunch today").
 - Anything you are inferring rather than being told. If they did not say it, it is not a fact.
 - Medical conclusions. "Said their left knee aches on stairs" is a fact. "Has patellar tendinopathy" is not.

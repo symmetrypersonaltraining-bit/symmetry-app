@@ -73,7 +73,11 @@ test("the nutrition path is untouched when no tool runs", () => {
 
 test("a failure in the tool loop cannot cost someone their nutrition answer", () => {
   const idx = ACT.indexOf("runClientAssistant(");
-  const around = ACT.slice(Math.max(0, idx - 1200), idx + 1200);
+  // Widened 1200 -> 3000 on 22 Aug. The system prompt built just above this call
+  // gained the rule that sends period questions to my_training_summary, which
+  // pushed the enclosing `try {` further back than the old window reached. The
+  // try/catch never moved; the window had simply become too small to see it.
+  const around = ACT.slice(Math.max(0, idx - 3000), idx + 1200);
   assert.match(
     around,
     /try\s*\{/,

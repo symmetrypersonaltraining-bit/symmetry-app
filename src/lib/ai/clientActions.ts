@@ -123,6 +123,26 @@ export const CLIENT_TOOLS = [
       },
     },
   },
+  {
+    name: "my_training_summary",
+    description:
+      "THE ONLY WAY TO ANSWER A QUESTION ABOUT A TIME PERIOD. Real counts for any date range: how many " +
+      "sessions were scheduled, how many were completed, how many were missed, the attendance percentage, " +
+      "the longest gap, and when they last trained. " +
+      "Call this for ANY question containing a period — 'last 3 weeks', 'this month', 'since I started', " +
+      "'how have I been doing', 'am I consistent', 'progress lately'. Resolve the period to `from` and `to` " +
+      "dates yourself and pass them; the numbers come back computed, not estimated. " +
+      "NEVER judge consistency, attendance or progress from a list of logged sessions: that list contains " +
+      "only what they DID and can never show what they missed, so it makes every client look consistent.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        from: { type: "string", description: "YYYY-MM-DD, first day of the period, inclusive." },
+        to: { type: "string", description: "YYYY-MM-DD, last day, inclusive. Defaults to today." },
+      },
+      required: ["from"],
+    },
+  },
 ];
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -192,6 +212,89 @@ export async function runClientTool(
   const num = (k: string) => (typeof input[k] === "number" ? (input[k] as number) : Number.NaN);
 
   try {
+    if (name === "my_training_summary") {
+      // ── ANSWER THE PERIOD THAT WAS ASKED, WITH REAL NUMBERS ─────────────
+      //
+      // Dustin, 22 Aug: "the ai needs to answer the time frame that we ask for
+      // period." He had asked for a three-week summary of a client who has
+      // completed 7 of 45 scheduled sessions in thirty days, and been told
+      // "Consistency is solid. You've hit 6 days a week like you're supposed
+      // to."
+      //
+      // Nothing in that reply was invented. The context gave the model the
+      // PROGRAMMED frequency and a list headed "what they actually did" — six
+      // real sessions, every one a success — and no denominator anywhere. A
+      // list of completed sessions cannot show what was missed, so it makes
+      // every client look consistent, and the more they miss the more
+      // flattering it gets: the misses simply are not in it.
+      //
+      // Fixed windows were the wrong fix. Pre-baking 7/21/30 answers "last 3
+      // weeks" and fails the next question — "since I started", "in August",
+      // "the last six weeks". So the range is an argument, and the arithmetic
+      // happens here rather than in the model's head.
+      const from = ISO.test(str("from")) ? str("from") : shift(today, -20);
+      const to = ISO.test(str("to")) ? str("to") : today;
+      if (from > to) return JSON.stringify({ error: "`from` is after `to`." });
+
+      const { data: schedRows } = await db
+        .from("scheduled_workouts")
+        .select("scheduled_date, status, days(label)")
+        .eq("client_id", clientId)
+        .is("deleted_at", null)
+        .gte("scheduled_date", from)
+        .lte("scheduled_date", to)
+        .order("scheduled_date", { ascending: true });
+
+      const rows = (schedRows as { scheduled_date: string; status: string | null; days: { label: string | null } | null }[] | null) || [];
+
+      // Only days that have HAPPENED can be missed. A session scheduled for
+      // Friday is not a miss on Wednesday, and counting it as one would make
+      // every client look worse the further ahead their coach programmes.
+      const past = rows.filter((r) => r.scheduled_date <= today);
+      const completed = past.filter((r) => r.status === "completed");
+      const missed = past.filter((r) => r.status !== "completed");
+      const upcoming = rows.filter((r) => r.scheduled_date > today);
+
+      const doneDates = [...new Set(completed.map((r) => r.scheduled_date))].sort();
+      const daysInRange = Math.round((Date.parse(to + "T12:00:00Z") - Date.parse(from + "T12:00:00Z")) / DAY) + 1;
+
+      // The longest run of days with nothing completed. This is the number that
+      // makes a gap visible; an average per week hides a fortnight off.
+      let longestGap = 0;
+      if (doneDates.length) {
+        const edges = [from, ...doneDates, to > today ? today : to];
+        for (let i = 1; i < edges.length; i++) {
+          const g = Math.round((Date.parse(edges[i] + "T12:00:00Z") - Date.parse(edges[i - 1] + "T12:00:00Z")) / DAY);
+          if (g > longestGap) longestGap = g;
+        }
+      } else {
+        longestGap = Math.min(daysInRange, Math.round((Date.parse((to > today ? today : to) + "T12:00:00Z") - Date.parse(from + "T12:00:00Z")) / DAY) + 1);
+      }
+
+      const last = doneDates.length ? doneDates[doneDates.length - 1] : null;
+
+      return JSON.stringify({
+        period: { from, to, days: daysInRange },
+        scheduled_in_period: past.length,
+        completed: completed.length,
+        missed: missed.length,
+        attendance_pct: past.length ? Math.round((completed.length / past.length) * 100) : null,
+        distinct_days_trained: doneDates.length,
+        dates_trained: doneDates,
+        longest_gap_days: longestGap,
+        last_completed: last,
+        days_since_last_completed: last
+          ? Math.round((Date.parse(today + "T12:00:00Z") - Date.parse(last + "T12:00:00Z")) / DAY)
+          : null,
+        still_upcoming_in_period: upcoming.length,
+        missed_sessions: missed.slice(0, 30).map((r) => ({ date: r.scheduled_date, workout: r.days?.label || "workout" })),
+        note:
+          past.length === 0
+            ? "Nothing was scheduled in this period, so there is no attendance to report."
+            : "attendance_pct counts only sessions whose date has passed. missed_sessions are real sessions they did not do — say so plainly rather than describing only what they completed.",
+      });
+    }
+
     if (name === "my_schedule") {
       // ── THE DEFAULT WINDOW LOOKS BACKWARDS TOO, AND THAT IS THE FIX ────
       //
