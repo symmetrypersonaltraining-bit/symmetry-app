@@ -1,5 +1,41 @@
 # Backlog — the single work queue
 
+> ## 📋 QUEUED — "build a plan around the foods I actually eat"
+>
+> Dustin, 22 Aug: *"from that menu you need an option for them to type/say what
+> foods they want ai to use to build a plan that fits their macros n calories."*
+>
+> **Where:** the "Build my own plan" sheet —
+> `src/app/(app)/nutrition/v3/NutritionV3Client.tsx` line ~2695. It offers three
+> routes today:
+>
+> | | mode | what it does |
+> |---|---|---|
+> | Recommend my targets | `aiplan / consult` | 3 questions → coach picks macros → builds 5 meals |
+> | Build from my targets | `aiplan / targets` | enter kcal/P/C/F → AI drafts 5 itemized meals |
+> | Build manually | — | open day, build from the DB, save as plan |
+>
+> **The gap:** every AI route picks the FOOD for you. Nobody can say "I eat
+> chicken, rice, eggs, Greek yoghurt and whatever's at Costco — work with that."
+> That is how most people actually think about their diet, and a plan built from
+> foods they already buy and can cook is the one they stick to.
+>
+> **Shape:** a fourth row, a new `aiplan` mode (`foods`), taking free text —
+> **typed or dictated** (MicButton already exists and is used elsewhere in this
+> file, so voice is a prop, not a build). Feed the list to the plan builder as a
+> constraint: prefer these foods, hit the macro targets, say plainly when the
+> targets cannot be met from that list alone and what it added to close the gap.
+> Worth accepting dislikes/allergies in the same box ("no fish, no dairy") since
+> people volunteer both in one breath.
+>
+> Match against `food_catalog` so the items become real rows with real macros
+> rather than free text the rest of the app cannot log against — otherwise the
+> plan looks right and one-tap logging does not work on it.
+>
+> ⚠️ **`NutritionV3Client.tsx` is the food logger — OFF LIMITS without per-item
+> permission.** Ask before starting, even though the ask above is where the work
+> goes.
+
 > ## 👉 22 Aug — TRAINERS CAN ACTUALLY BE TRAINERS, AND PAY DETAILS ARE PRIVATE
 >
 > **`origin/main` = `37bbc0a`.** Live and verified on `/api/health`.
