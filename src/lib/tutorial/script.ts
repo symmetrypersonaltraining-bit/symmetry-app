@@ -927,11 +927,11 @@ export const TUTORIAL: TutorialChapter[] = [
         id: "finish-rough",
         title: "Known rough edges",
         body: [
-          "Calendar in the sidebar bounces you to Home. The New Program button does nothing. Two switches in Settings — the weekly digest and payment reminder notifications — display state they do not save.",
+          "Calendar in the sidebar takes you to Home — that is where your calendar already is, so it is redundant rather than broken.",
           "None of these will hurt you. They are listed so that when you hit one you know it is the app and not you.",
         ],
         narration:
-          "A few things are known to be rough. Calendar in the sidebar bounces you to Home. The New Program button does nothing. And two switches in Settings, the weekly digest and payment reminder notifications, show a state they do not actually save. None of these will hurt you. They are listed here so that when you hit one, you know it is the app and not you.",
+          "One thing is known to be rough. Calendar in the sidebar takes you to Home, which is where your calendar already is, so it is redundant rather than broken. It will not hurt you. It is listed here so that when you hit it, you know it is the app and not you.",
         audioUrl: null,
       },
       {

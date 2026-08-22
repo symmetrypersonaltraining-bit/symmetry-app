@@ -175,14 +175,38 @@ describe("tutorial — honesty about what exists", () => {
     );
   });
 
-  it("warns about the known-broken controls rather than teaching them", () => {
+  it("warns about what is actually rough, and does not invent roughness", () => {
     const blob = allSteps().map((s) => [s.narration, ...s.body].join(" ")).join(" ").toLowerCase();
-    // Three controls in the app display state they do not save, or go nowhere.
-    // A tutorial that walks somebody into one of them and says nothing is
-    // worse than one that admits it.
-    assert.match(blob, /new program button/i, "the dead New Program button is not mentioned");
-    assert.match(blob, /bounces you to home|back to home/i, "the Calendar-to-Home redirect is not mentioned");
-    assert.match(blob, /do not (actually )?save|they do not save/i, "the two non-persisting settings toggles are not mentioned");
+
+    // This used to demand warnings about THREE broken controls. On 22 Aug two
+    // of them were fixed and the third turned out never to have existed, so
+    // the warnings themselves became the inaccuracy:
+    //
+    //   New Program button   had no onClick at all; now opens the assistant,
+    //                        which is how programmes actually get built
+    //   payment reminders    a toggle that saved nothing, for an automatic
+    //                        send that does not exist; replaced with copy
+    //                        saying reminders go out when you approve them
+    //   "the weekly digest"  no such switch is anywhere in the codebase
+    //
+    // The rule this test exists for is unchanged and is the one below: the
+    // tutorial must be honest about rough edges. What changed is that being
+    // honest now means saying LESS. A tutorial that tells a new trainer three
+    // things are broken when one is costs exactly what the original silence
+    // cost — they stop trusting it, and they stop reporting real faults
+    // because they assume it is another known one.
+    assert.match(blob, /back to home|bounces you to home/i,
+      "the Calendar-to-Home redirect is the one real rough edge left and is not mentioned");
+
+    for (const [claim, what] of [
+      [/new program button does nothing/i, "the New Program button, which now works"],
+      [/do not (actually )?save|they do not save/i, "settings toggles that no longer exist"],
+      [/weekly digest/i, "a weekly digest switch that is nowhere in the app"],
+    ] as [RegExp, string][]) {
+      assert.ok(!claim.test(blob),
+        `the tutorial still warns about ${what} — a warning that is no longer true ` +
+        `teaches a new trainer to distrust the tutorial`);
+    }
   });
 });
 

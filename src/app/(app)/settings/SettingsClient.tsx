@@ -56,7 +56,6 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
   const [gcalSync, setGcalSync] = useState(gcalSyncEnabled ?? false);
-  const [autoReminders, setAutoReminders] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -349,19 +348,30 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
 
             <div className="divider" />
 
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>
-                  <i className="ti ti-bell mr-1.5" style={{ color: "var(--brand-accent)" }} />
-                  Payment Reminder Notifications
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                  Notify clients in-app 1 week before payment due
-                </p>
-              </div>
-              <div className="w-11 h-6 rounded-full relative transition-colors" style={{ background: autoReminders ? "var(--brand-primary)" : "var(--brand-border)", cursor: "pointer" }} onClick={() => setAutoReminders(!autoReminders)}>
-                <div className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all" style={{ left: autoReminders ? "calc(100% - 20px)" : "4px" }} />
-              </div>
+            {/* THIS WAS A SWITCH THAT DID NOT SWITCH ANYTHING.
+                "Payment Reminder Notifications — notify clients in-app 1 week
+                before payment due", with a toggle whose only action was
+                setAutoReminders(!autoReminders): local React state, no write.
+                Flip it, navigate away, it was back. The tutorial had a line
+                warning new trainers about it, which is the wrong way round.
+
+                It was not removed by wiring it to a column, because there is no
+                automatic path behind it to switch on OR off — nothing sends a
+                payment reminder on a schedule. /api/reminders/send runs when
+                the trainer approves one, and that is the whole mechanism.
+                Persisting the toggle would have made a feature that does not
+                exist look configurable, which is worse than the dead switch.
+
+                So the screen says what is actually true instead. */}
+            <div>
+              <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>
+                <i className="ti ti-bell mr-1.5" style={{ color: "var(--brand-accent)" }} />
+                Payment reminders
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
+                Nothing goes out on its own. You review each reminder on the Payments
+                screen and send it — the client sees it in the app once you do.
+              </p>
             </div>
 
           </div>
