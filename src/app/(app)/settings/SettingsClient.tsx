@@ -264,6 +264,11 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
       </SettingsGroup>
 
       <SettingsGroup id="connect" title="Calendar and clients" sub="Google Calendar, invites, the install QR" icon="ti-plug" classic={classic}>
+      {/* Adding a trainer landed in "Help and about" when Settings was
+          regrouped on 22 Aug, purely because it sat next to the install QR in
+          the old flat list. Dustin went looking for it and it was not where
+          anybody would look. This group is the one about invites. */}
+      {isTrainer && !isInClientMode && <AddTrainerCard />}
       {isTrainer && !isInClientMode && (
         <section>
           <p className="section-header">Integrations</p>
@@ -460,7 +465,6 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
       </SettingsGroup>
 
       <SettingsGroup id="help" title="Help and about" sub="Getting clients started, help centre, app version" icon="ti-help" classic={classic}>
-      {isTrainer && !isInClientMode && <AddTrainerCard />}
 
       {/* Where the install QR lives. Dustin asked "where do I find the qr code
           to have clients download this" — the per-client one only appears on a
