@@ -1,6 +1,8 @@
 // POST /api/nutrition-ai/plan-build  (Sonnet — plan quality matters here)
 // Two modes:
 //   { targets: { kcal, p, c, f } }  → 5 itemized meals hitting those targets
+//   { foods: { text }, targets? }   → 5 meals built from the foods they name,
+//                                     to their targets or to ones it sets
 //   { consult: { answers } }        → recommends targets (with reasoning) from
 //                                     the client's metrics/goal, then the meals
 // Returns a strict-JSON plan DRAFT:
@@ -34,6 +36,7 @@ Rules:
 - The summed totals MUST land within 3% of the targets on kcal and within 5g on each macro. Check your math before answering.
 - When TARGETS are given: use them exactly as the "targets" and set "reasoning" to null.
 - When a CONSULT is given (client answers + metrics/goal): first decide appropriate daily targets (protein ~0.8-1.2g per lb bodyweight, sensible deficit/surplus for the goal), put a concise 2-4 sentence explanation in "reasoning", then build the meals to hit them.
+- When FOODS are given: build the plan out of THOSE foods. They are the point of the request — a plan made of things someone already buys and cooks is the one they keep to, and a "better" plan they will not eat is worth nothing. Honour every exclusion they name (dislikes, allergies, "no dairy") absolutely. You may add the smallest number of ordinary staples needed to make the macros work, and when you do you MUST say which ones and why in "reasoning" — one or two sentences, plainly, no hedging. If their list genuinely cannot reach the targets (no protein source, say), build the closest honest plan and lead "reasoning" with what is missing.
 - This is a DRAFT for the coach/client to review — do not mention databases or saving.
 
 ${nutrientPromptSpec()}
@@ -100,9 +103,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const targets = cleanTargets(body?.targets);
     const consult = body?.consult && typeof body.consult === "object" ? body.consult : null;
-    if (!targets && !consult) {
+    // FOODS MODE — "build it from what I actually eat".
+    // Free text, typed or dictated. Capped because it reaches a model prompt
+    // and a shopping list is not a novel; trimmed and length-checked so an
+    // empty box cannot spend a metered call.
+    const foodsText = typeof body?.foods?.text === "string" ? body.foods.text.trim().slice(0, 2000) : "";
+    const foods = foodsText.length >= 3 ? foodsText : null;
+    if (!targets && !consult && !foods) {
       return NextResponse.json(
-        { error: "Send either targets {kcal,p,c,f} or consult {answers}." },
+        { error: "Send targets {kcal,p,c,f}, consult {answers}, or foods {text}." },
         { status: 400 }
       );
     }
@@ -122,7 +131,17 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return missingKeyResponse();
 
     let userText: string;
-    if (targets) {
+    if (foods) {
+      // Targets are OPTIONAL here. Someone who says "build it round chicken and
+      // rice" usually has targets already; if they do not, the same client data
+      // the consult route uses is enough to set sensible ones, and asking them
+      // to type four numbers first would defeat the point of the mode.
+      const ctx = await consultContext(supabase, clientId);
+      const targetLine = targets
+        ? `Daily targets to hit exactly: ${targets.kcal} kcal, ${targets.p}g protein, ${targets.c}g carbs, ${targets.f}g fat. Set "reasoning" to explain any food you had to add that they did not list.`
+        : `They did not give targets. Decide sensible ones from the client data below (protein ~0.8-1.2g per lb bodyweight, deficit or surplus to suit the goal) and open "reasoning" by saying what you set them to and why.`;
+      userText = `FOODS MODE — build the plan out of the foods this client says they eat.\n\n${targetLine}\n\nClient data (server-assembled):\n${ctx}\n\nIn their own words, what they eat and what they will not eat:\n"""${foods}"""`;
+    } else if (targets) {
       userText = `Build a 5-meal plan for these exact daily targets: ${targets.kcal} kcal, ${targets.p}g protein, ${targets.c}g carbs, ${targets.f}g fat.`;
     } else {
       const answersStr = JSON.stringify(consult!.answers ?? consult).slice(0, 4000);

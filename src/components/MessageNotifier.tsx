@@ -23,10 +23,42 @@ export default function MessageNotifier() {
   const [tick, setTick] = useState(0);
   const queue = useRef<Banner[]>([]);
 
+  // GET IT OFF THE SCREEN. Dustin, 22 Aug: "this is the notification banner I
+  // was talking about. I need to be able to dismiss that quickly."
+  //
+  // It sits at z-index 3000 across the top of every screen for six seconds —
+  // twelve for a person's message — with the whole bar being one tap target
+  // that navigates. So there was no way to get rid of it except to wait, or to
+  // tap it and be taken somewhere you did not want to go. Mid-session, with a
+  // client in front of him, that is the top of the app gone.
+  //
+  // Dismissing silences THAT source for the session, not everything. Waving off
+  // the group chat must not also swallow a client messaging him twenty minutes
+  // later — that is the fault this banner exists to prevent, and the cure would
+  // be worse than the complaint. sessionStorage, so reopening the app brings it
+  // back, exactly as with the bell.
+  const dismissed = useRef<Set<string>>(new Set());
+  const QUIET_KEY = "symmetry_banner_quiet";
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(QUIET_KEY);
+      if (raw) dismissed.current = new Set(JSON.parse(raw) as string[]);
+    } catch { /* private mode, or nonsense in the key — start clean */ }
+  }, []);
+  function hush(b: Banner) {
+    dismissed.current.add(b.href);
+    // Anything already waiting from the same source goes too, or dismissing one
+    // just reveals its twin.
+    queue.current = queue.current.filter((q) => q.href !== b.href);
+    try { sessionStorage.setItem(QUIET_KEY, JSON.stringify([...dismissed.current])); } catch { /* fine */ }
+    setBanner(null);
+  }
+
   // Show the next queued banner as soon as the slot is free.
   useEffect(() => {
     if (banner) return;
-    const next = queue.current.shift();
+    let next = queue.current.shift();
+    while (next && dismissed.current.has(next.href)) next = queue.current.shift();
     if (next) setBanner(next);
   }, [banner, tick]);
 
@@ -102,23 +134,43 @@ export default function MessageNotifier() {
       href: i.href,
       fromPerson: i.fromPerson === true,
     }));
-    if (queued.length) {
+    const fresh = queued.filter((q) => !dismissed.current.has(q.href));
+    if (fresh.length) {
       // Cap the backlog. If the app sat in the background through several polls
       // we want the current state, not a parade of stale banners.
-      queue.current = [...queue.current, ...queued].slice(-2);
+      queue.current = [...queue.current, ...fresh].slice(-2);
       setTick((t) => t + 1);
     }
   }, [freshIds, items]);
 
   if (!banner) return null;
+  const b = banner;
   return (
+    // A ROW, not one big button. The whole bar used to be a single <button>, so
+    // there was nowhere to put a dismiss — a button cannot be nested inside a
+    // button. Same shape the notification bell uses: the tap target and the ×
+    // are siblings, and the styling that used to sit on the button now sits on
+    // the row around them, so it looks identical.
+    <div
+      style={{
+        position: "fixed", top: "calc(env(safe-area-inset-top) + 8px)", left: 12, right: 12, zIndex: 3000,
+        display: "flex", alignItems: "stretch",
+        background: banner.fromPerson ? "#E53935" : "var(--brand-primary)", color: "#fff",
+        borderRadius: 14,
+        boxShadow: banner.fromPerson ? "0 10px 34px rgba(229,57,53,0.45)" : "0 8px 28px rgba(0,0,0,0.28)",
+        animation: banner.fromPerson
+          ? "cw-slide-down 0.25s ease, cw-alert 1.6s ease-in-out 0.25s infinite"
+          : "cw-slide-down 0.25s ease",
+        maxWidth: 560, margin: "0 auto", overflow: "hidden",
+      }}
+    >
     <button
       onClick={() => {
         // Same hard-navigation fallback as the bell. In a WebView a client-side
         // push that silently does nothing looks identical to a dead button, and
         // the banner has already dismissed itself by then so there is no second
         // chance to tap it.
-        const to = banner.href;
+        const to = b.href;
         setBanner(null);
         router.push(to);
         window.setTimeout(() => {
@@ -147,24 +199,29 @@ export default function MessageNotifier() {
         }, 700);
       }}
       style={{
-        position: "fixed", top: "calc(env(safe-area-inset-top) + 8px)", left: 12, right: 12, zIndex: 3000,
+        flex: 1, minWidth: 0,
         display: "flex", alignItems: "center", gap: 12, textAlign: "left",
-        background: banner.fromPerson ? "#E53935" : "var(--brand-primary)", color: "#fff", border: "none",
-        borderRadius: 14, padding: banner.fromPerson ? "15px 16px" : "12px 16px", cursor: "pointer",
-        // A person's message gets the red treatment, a heavier shadow and a
-        // slow pulse that keeps going the whole time it is up. The brand blue
-        // banner is what every automated nudge already looks like, and after a
-        // fortnight of those it reads as furniture.
-        boxShadow: banner.fromPerson ? "0 10px 34px rgba(229,57,53,0.45)" : "0 8px 28px rgba(0,0,0,0.28)",
-        animation: banner.fromPerson
-          ? "cw-slide-down 0.25s ease, cw-alert 1.6s ease-in-out 0.25s infinite"
-          : "cw-slide-down 0.25s ease",
-        maxWidth: 560, margin: "0 auto",
+        background: "none", color: "#fff", border: "none",
+        padding: banner.fromPerson ? "15px 4px 15px 16px" : "12px 4px 12px 16px", cursor: "pointer",
       }}
     >
-      <i className={`ti ${banner.fromPerson ? "ti-message-circle-2-filled" : "ti-bell"}`} style={{ fontSize: banner.fromPerson ? 23 : 20 }} />
-      <span style={{ flex: 1, fontWeight: 800, fontSize: banner.fromPerson ? 15 : 14 }}>{banner.text} — tap to read</span>
-      <i className="ti ti-chevron-right" style={{ fontSize: 18 }} />
+      <i className={`ti ${banner.fromPerson ? "ti-message-circle-2-filled" : "ti-bell"}`} style={{ fontSize: banner.fromPerson ? 23 : 20, flexShrink: 0 }} />
+      <span style={{ flex: 1, minWidth: 0, fontWeight: 800, fontSize: banner.fromPerson ? 15 : 14 }}>{banner.text} — tap to read</span>
+      <i className="ti ti-chevron-right" style={{ fontSize: 18, flexShrink: 0, opacity: 0.85 }} />
     </button>
+    {/* Wide enough to hit without looking, and it does NOT navigate. */}
+    <button
+      aria-label={"Dismiss " + banner.text}
+      title="Dismiss until you next open the app"
+      onClick={(ev) => { ev.stopPropagation(); hush(b); }}
+      style={{
+        flexShrink: 0, width: 46, background: "none", border: "none", color: "#fff",
+        opacity: 0.85, fontSize: 21, lineHeight: 1, cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}
+    >
+      ×
+    </button>
+    </div>
   );
 }

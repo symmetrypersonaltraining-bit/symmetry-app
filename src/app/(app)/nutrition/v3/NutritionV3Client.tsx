@@ -83,7 +83,7 @@ type SheetState =
   | { kind: "forward" }
   | { kind: "extrapick" }
   | { kind: "saveplan" }
-  | { kind: "aiplan"; mode: "targets" | "consult" }
+  | { kind: "aiplan"; mode: "targets" | "consult" | "foods" }
   | { kind: "buildplan" }
   | null;
 
@@ -2700,6 +2700,7 @@ export default function NutritionV3Client(props: Props) {
         )}
         {rowBtn("✦", "Recommend my targets", "3 quick questions → coach picks your macros, then builds 5 meals", () => replaceSheet({ kind: "aiplan", mode: "consult" }), true)}
         {rowBtn("✦", "Build from my targets", "Enter kcal / P / C / F → AI drafts 5 itemized meals", () => replaceSheet({ kind: "aiplan", mode: "targets" }))}
+        {rowBtn("🗣️", "Build it from the foods I eat", "Type or say what you actually eat → AI fits it to your macros", () => replaceSheet({ kind: "aiplan", mode: "foods" }))}
         {openMode
           ? rowBtn("🛠", "Save the day I built", "Turn the slots you built today into your ongoing plan", () => replaceSheet({ kind: "saveplan" }))
           : rowBtn("🥗", "Build manually from the food database", "Start an open day, build each meal from the DB, then save it as your plan", () => { closeAllSheets(); toast("Manual build: log an open day, then use ‘Save the day I built’ ✦", { duration: 4000 }); })}
@@ -2980,7 +2981,7 @@ const CONSULT_QUESTIONS: { q: string; key: string; chips: string[] }[] = [
 function AiPlanSheet({
   mode, clientId, clientName, saving, onAccept, onClose, onBack,
 }: {
-  mode: "targets" | "consult";
+  mode: "targets" | "consult" | "foods";
   clientId: string;
   clientName: string;
   saving: boolean;
@@ -2990,11 +2991,17 @@ function AiPlanSheet({
 }) {
   const [tgIn, setTgIn] = useState({ kcal: "2200", p: "180", c: "230", f: "55" });
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  // FOODS MODE. Dustin, 22 Aug: "you need an option for them to type/say what
+  // foods they want ai to use to build a plan that fits their macros n
+  // calories." Every other route here picks the food FOR them, which is the
+  // opposite of how anyone thinks about their own diet — a plan built out of
+  // what someone already buys and cooks is the one they keep to.
+  const [foodsText, setFoodsText] = useState("");
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<PlanDraft | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const label = mode === "targets" ? "AI draft" : "coach consult";
+  const label = mode === "targets" ? "AI draft" : mode === "foods" ? "my foods" : "coach consult";
   const inputStyle: React.CSSProperties = { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 12, padding: "10px 12px", fontSize: 13, width: "100%", outline: "none", textAlign: "center" };
 
   async function run(body: Record<string, unknown>) {
@@ -3017,8 +3024,11 @@ function AiPlanSheet({
 
   return (
     <Sheet
-      title={mode === "targets" ? "✦ Build me a plan" : "✦ Coach consult"}
-      subtitle={draft ? "Draft — review, then make it your ongoing plan" : mode === "targets" ? "5 itemized meals drafted to your targets" : "3 quick questions → recommended targets + a plan"}
+      title={mode === "targets" ? "✦ Build me a plan" : mode === "foods" ? "✦ Build it from my foods" : "✦ Coach consult"}
+      subtitle={draft ? "Draft — review, then make it your ongoing plan"
+        : mode === "targets" ? "5 itemized meals drafted to your targets"
+        : mode === "foods" ? "Tell it what you eat — it builds the plan around that"
+        : "3 quick questions → recommended targets + a plan"}
       onClose={onClose}
       onBack={onBack}
     >
@@ -3063,11 +3073,50 @@ function AiPlanSheet({
         </>
       )}
 
+      {!draft && !busy && mode === "foods" && (
+        <>
+          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>What do you actually eat?</p>
+          <div style={{ position: "relative" }}>
+            <textarea
+              value={foodsText}
+              onChange={(e) => setFoodsText(e.target.value)}
+              rows={5}
+              placeholder="Chicken, 93/7 beef, eggs, jasmine rice, potatoes, Greek yoghurt, whatever's at Costco. No fish, no dairy."
+              style={{ ...inputStyle, textAlign: "left", resize: "vertical", lineHeight: 1.5, paddingRight: 46 }}
+            />
+            {/* Same mic the rest of the app uses — "type/say", and saying it is
+                far quicker than typing a shopping list on a phone. */}
+            <span style={{ position: "absolute", right: 8, bottom: 10 }}>
+              <MicButton size={30} onText={(t) => setFoodsText((p) => (p ? p.trim().replace(/,$/, "") + ", " + t : t))} />
+            </span>
+          </div>
+          <p className="text-xs mt-2 mb-3" style={{ color: "var(--brand-text-secondary)" }}>
+            List foods, brands, meals you like — and anything you won&apos;t eat. It builds around them and tells you if it had to add something to make the numbers work.
+          </p>
+          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Daily targets — leave blank to use your current ones</p>
+          <div className="grid grid-cols-4 gap-2 mb-3">
+            {(["kcal", "p", "c", "f"] as const).map((k) => (
+              <input key={k} value={tgIn[k]} inputMode="numeric" onChange={(e) => setTgIn({ ...tgIn, [k]: e.target.value.replace(/[^0-9]/g, "") })} placeholder={k.toUpperCase()} style={inputStyle} />
+            ))}
+          </div>
+          <button
+            onClick={() => run({
+              foods: { text: foodsText.trim() },
+              targets: (+tgIn.kcal > 0 && +tgIn.p > 0) ? { kcal: +tgIn.kcal, p: +tgIn.p, c: +tgIn.c, f: +tgIn.f } : undefined,
+            })}
+            disabled={foodsText.trim().length < 3}
+            className="w-full py-3 rounded-2xl text-sm font-bold text-white"
+            style={{ background: "var(--brand-primary)", opacity: foodsText.trim().length < 3 ? 0.5 : 1 }}>
+            ✦ Build 5 meals from these foods →
+          </button>
+        </>
+      )}
+
       {busy && (
         <div className="flex items-center gap-3 rounded-2xl p-4" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
           <span className="inline-block w-5 h-5 rounded-full animate-spin flex-shrink-0" style={{ border: "2.5px solid var(--brand-border)", borderTopColor: "var(--brand-primary)" }} />
           <span className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
-            ✦ {mode === "consult" ? "Crunching your trend + drafting 5 meals…" : "Drafting 5 meals against your targets…"}
+            ✦ {mode === "consult" ? "Crunching your trend + drafting 5 meals…" : mode === "foods" ? "Building 5 meals out of your foods…" : "Drafting 5 meals against your targets…"}
           </span>
         </div>
       )}
