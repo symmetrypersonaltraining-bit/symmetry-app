@@ -95,8 +95,30 @@ export async function GET() {
   ]);
 
   const ok = auth.ok && db.ok;
+
+  // ── Optional configuration, reported but never failed ────────────────────
+  //
+  // Dustin, 22 Aug, the night before four trainers get invited: "for api key
+  // give me direct links and exact step by step to quickly check". Opening a
+  // URL beats hunting through a dashboard, and a boolean here is the whole
+  // answer.
+  //
+  // PRESENCE ONLY. Never the value, never a prefix, never a length — this
+  // route is public (middleware allowlists all of /api/) and may end up on a
+  // status page.
+  //
+  // These do NOT affect `ok`. Mail being unconfigured is not an outage: every
+  // invite screen shows the credentials on screen precisely so a missing key
+  // costs a copy-and-paste rather than a blocked signup.
+  const config = {
+    email_sending: !!process.env.RESEND_API_KEY,
+    android_apk_url: !!process.env.NEXT_PUBLIC_ANDROID_APK_URL,
+    ai: !!process.env.ANTHROPIC_API_KEY,
+    push: !!process.env.FIREBASE_SERVICE_ACCOUNT || !!process.env.FCM_SERVER_KEY,
+  };
+
   return NextResponse.json(
-    { ok, sha, checks: { auth, db }, ts: new Date().toISOString() },
+    { ok, sha, checks: { auth, db }, config, ts: new Date().toISOString() },
     { status: ok ? 200 : 503, headers }
   );
 }
