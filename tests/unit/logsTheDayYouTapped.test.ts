@@ -156,3 +156,44 @@ describe("the swap flow acts on the day being logged", () => {
     );
   });
 });
+
+describe("every angle out of the swap keeps the day", () => {
+  const banner = strip(read("src/components/OffPlanBanner.tsx"));
+  const aiRoute = strip(read("src/app/api/workout-ai/route.ts"));
+
+  // Dustin, 22 Aug, after the first two fixes: "now its showing the one I just
+  // logged and the one I replaced. also there's a workout on today, my rest
+  // day... I was trying to replace yesterday's cardio w a walk thats all."
+  //
+  // Three separate places were still reading the clock after the swap itself
+  // had been fixed. Each one on its own reproduces the whole complaint.
+  it("nothing navigates to a bare day id any more", () => {
+    const bare = banner.match(/window\.location\.href = "\/workout\/" \+ (?!\(target \|\| openDayId\))/g) || [];
+    assert.deepEqual(
+      bare,
+      [],
+      "a navigation out of this component passes a day id. The logger then has no date to read and logs the workout you just swapped in against today.",
+    );
+    assert.match(banner, /async function goToWorkout/, "goToWorkout is gone — the three exits are back to guessing");
+  });
+
+  it("the swap navigates to the row it just created", () => {
+    // .select("id") here does double duty: proves the insert landed AND gives
+    // the scheduled row to open, so the client cannot be sent to a bare day.
+    assert.match(banner, /const addedId/, "the swap does not keep the id of the row it inserted");
+    assert.match(banner, /goToWorkout\(target\.id, addedId\)/, "the swap is not opening the row it just made");
+  });
+
+  it("the AI builder is told which day it is building for", () => {
+    assert.match(banner, /date: logDate,/, "the AI request no longer carries the session date — the route will fall back to its own clock");
+    assert.match(aiRoute, /const clockToday = CT_TODAY\(\);/, "the route lost its separation of 'the clock' from 'the day this is for'");
+    assert.match(aiRoute, /typeof body\.date === "string"/, "the route ignores the date it is given");
+  });
+
+  it("the route will not take any date it is handed", () => {
+    // It is a body field driving unsupervised writes, so: real ISO day, never
+    // in the future, never further back than the board itself shows.
+    assert.match(aiRoute, /raw > clockToday/, "a future date would be accepted and workouts would appear on days that have not happened");
+    assert.match(aiRoute, /30 \* 86400000/, "there is no floor on how far back a caller can reach");
+  });
+});

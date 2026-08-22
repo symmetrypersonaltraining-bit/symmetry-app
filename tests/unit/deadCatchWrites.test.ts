@@ -158,10 +158,17 @@ function skipStatement(body: string, what: string): string {
 
 test("a swap that could not be scheduled does not skip the original", () => {
   const body = code(fnBody(BANNER, "async function doSwap"));
-  assert.match(body, /const \{ error: addErr \}/, "the insert is unchecked again");
+  // It also destructures `data` since 22 Aug, to navigate to the row it just
+  // made rather than to a bare day id. What must not change is that the error
+  // is captured at all.
+  assert.match(body, /const \{ (data: added, )?error: addErr \}/, "the insert is unchecked again");
   const guard = at(body, "if (addErr)", "the insert's failure branch");
   const skip = at(body, 'status: "skipped"', "the skip of the original");
-  const navigate = at(body, "window.location.href", "the navigation to the new workout");
+  // The navigation moved into goToWorkout() on 22 Aug so it can resolve the
+  // scheduled row rather than opening a bare day id. The ORDERING is what this
+  // test exists for and it is unchanged: nothing sends the client onward until
+  // the insert is known to have landed.
+  const navigate = at(body, "goToWorkout(", "the navigation to the new workout");
   assert.ok(guard < skip, "the original is skipped before the replacement is known to exist");
   assert.ok(guard < navigate, "the client is sent to a workout that may not be scheduled");
 });

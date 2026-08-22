@@ -127,6 +127,42 @@ export default function OffPlanBanner({
     setMyLib((data as LibDay[]) || []);
   }
 
+  /**
+   * OPEN A WORKOUT WITHOUT LOSING THE DAY.
+   *
+   * /workout/[id] takes either a scheduled_workouts id or a days id, and only
+   * the first carries a date. Every navigation out of this component passed
+   * the DAY — so after swapping Friday's cardio for a walk you landed on the
+   * walk and logged it against today, which is the same fault the swap itself
+   * had, one step later. Dustin, 22 Aug: "I was trying to replace yesterday's
+   * cardio w a walk thats all."
+   *
+   * So resolve the scheduled row for THIS day on THIS date and open that. Falls
+   * back to the bare day id when there is no scheduled row, which is correct —
+   * an unscheduled workout has no date of its own and today is the right answer
+   * for it.
+   */
+  async function goToWorkout(openDayId: string, knownScheduledId?: string | null) {
+    let target = knownScheduledId || null;
+    if (!target) {
+      try {
+        const { data } = await (supabase as any)
+          .from("scheduled_workouts")
+          .select("id")
+          .eq("client_id", clientId)
+          .eq("day_id", openDayId)
+          .eq("scheduled_date", logDate)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        target = ((data as { id: string }[] | null) || [])[0]?.id ?? null;
+      } catch {
+        /* fall through to the day id — a wrong date beats a dead link */
+      }
+    }
+    window.location.href = "/workout/" + (target || openDayId) + window.location.search;
+  }
+
   async function doSwap(target: SwapDay) {
     if (!window.confirm("Swap " + (isToday ? "today's" : dayWord + "'s") + " workout for \"" + target.label + "\"? Your program stays unchanged - this only affects " + dayWord + ".")) return;
     setBusy(true);
@@ -147,10 +183,15 @@ export default function OffPlanBanner({
       // one_per_day can reject this insert outright when the target session is
       // already on today, which makes it a live possibility rather than a
       // theoretical one.
-      const { error: addErr } = await (supabase as any).from("scheduled_workouts").insert({
+      // .select("id") does double duty: it proves the insert landed, and it
+      // hands back the row to navigate to, so the client opens the replacement
+      // ON THE DAY IT WAS PUT ON rather than on a bare day id that resolves to
+      // today.
+      const { data: added, error: addErr } = await (supabase as any).from("scheduled_workouts").insert({
         client_id: clientId, day_id: target.id, scheduled_date: today,
         status: "scheduled", source: "client_self_assign", position: slotForReplacement(replacing),
-      });
+      }).select("id");
+      const addedId = (((added as { id: string }[] | null) || [])[0] || {}).id ?? null;
       if (addErr) {
         window.alert("Couldn't swap that in — your original workout is still there. " + addErr.message);
         return;
@@ -171,7 +212,7 @@ export default function OffPlanBanner({
         ? "Swapped in, but your original workout is still on " + dayWord + " as well."
         : skipVerdict(replacing, (((skipped as { id: string }[] | null) || []).map((s) => s.id)));
       if (verdict) window.alert(verdict);
-      window.location.href = "/workout/" + target.id + window.location.search;
+      await goToWorkout(target.id, addedId);
     } finally { setBusy(false); }
   }
 
@@ -256,7 +297,9 @@ export default function OffPlanBanner({
     try {
       const res = await fetch("/api/workout-ai", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, mode: m, dayId, prompt: aiPrompt.trim() || null, image: m === "equipment" && image ? { data: image.data, media_type: image.media_type } : null }),
+        // date: the session being logged, not the clock. Without it the route
+        // schedules the replacement on today and skips today's planned work.
+        body: JSON.stringify({ clientId, mode: m, dayId, date: logDate, prompt: aiPrompt.trim() || null, image: m === "equipment" && image ? { data: image.data, media_type: image.media_type } : null }),
       });
       const j = await res.json();
       if (!res.ok || j.error) { setAiError(j.error || "Something went wrong."); return; }
@@ -292,7 +335,7 @@ export default function OffPlanBanner({
       {result.logged ? (
         <p className="text-center mt-3 text-xs font-bold" style={{ color: "#22c55e" }}>✓ Logged — it counts toward your training.</p>
       ) : (
-        <button onClick={() => { window.location.href = "/workout/" + result.dayId + window.location.search; }}
+        <button onClick={() => { void goToWorkout(result.dayId); }}
           className="w-full mt-3 py-2.5 rounded-full text-xs font-bold text-white" style={{ background: "var(--brand-primary)" }}>
           ▶ Start this workout
         </button>
@@ -439,7 +482,7 @@ export default function OffPlanBanner({
           <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Your saved workouts</p>
           {myLib.length === 0 && <p className="text-xs py-2" style={{ color: "var(--brand-text-secondary)" }}>Nothing saved yet — create one above and it’ll show here.</p>}
           {myLib.map((d) => (
-            <button key={d.id} onClick={() => { window.location.href = "/workout/" + d.id + window.location.search; }}
+            <button key={d.id} onClick={() => { void goToWorkout(d.id); }}
               className="w-full flex items-center justify-between py-2.5 px-1 text-left" style={{ borderBottom: "1px solid var(--brand-border)" }}>
               <span className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>{d.label}</span>
               <i className="ti ti-player-play" style={{ color: "var(--brand-primary)" }} />

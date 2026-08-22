@@ -203,7 +203,9 @@ async function resolveExerciseId(db: Db, clientId: string, name: string): Promis
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) return missingKeyResponse();
 
-  let body: { clientId?: string | null; mode?: string; dayId?: string | null; prompt?: string; image?: { data: string; media_type: string } | null };
+  let body: { clientId?: string | null; mode?: string; dayId?: string | null;
+    /** The day this workout is FOR. Omitted means today. Validated below. */
+    date?: string | null; prompt?: string; image?: { data: string; media_type: string } | null };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
   const mode = body.mode === "equipment" || body.mode === "activity" ? body.mode : "replace";
 
@@ -262,7 +264,32 @@ export async function POST(req: NextRequest) {
   if (!workout) return NextResponse.json({ error: "The AI couldn't design a workout from that — try adding a bit more detail." }, { status: 502 });
 
   // ─── persist as a CLIENT-OWNED library day (+ sections + prescribed_exercises) ───
-  const today = CT_TODAY();
+  //
+  // `today` below is the day this workout is FOR, which is not always the day
+  // it is being built on. The client sends the session it is logging; when it
+  // sends nothing, today is right.
+  //
+  // Dustin, 22 Aug: "I was trying to replace yesterday's cardio w a walk thats
+  // all." Every write in this block read the clock, so replacing a past
+  // session scheduled the replacement on TODAY and skipped today's planned
+  // work instead of that day's. He ended up with the walk and the cardio both
+  // showing on the wrong days, plus a workout on his rest day.
+  //
+  // Bounded deliberately. A date is only honoured if it is a real ISO day, not
+  // in the future, and within the last 30 days — the window the client's own
+  // board shows. Anything else falls back to today rather than being trusted,
+  // because this is a body field and the writes below are unsupervised.
+  const clockToday = CT_TODAY();
+  const today = ((): string => {
+    const raw = typeof body.date === "string" ? body.date.trim() : "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return clockToday;
+    if (raw > clockToday) return clockToday;
+    const floor = new Date(Date.parse(clockToday + "T12:00:00Z") - 30 * 86400000)
+      .toISOString()
+      .slice(0, 10);
+    if (raw < floor) return clockToday;
+    return raw;
+  })();
   const originMap: Record<string, string> = { replace: "ai_replace", equipment: "ai_equipment", activity: "ai_activity" };
   /**
    * How long after logging an activity a second call still counts as fixing the
