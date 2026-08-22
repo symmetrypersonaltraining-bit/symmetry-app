@@ -169,7 +169,7 @@ async function buildContext(db: Db, clientId: string, coachFirstName: string, fo
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) return missingKeyResponse();
 
-  let body: { clientId?: string | null; message?: string; apply?: Proposal; applyScope?: "one" | "series"; focusWorkoutId?: string | null };
+  let body: { clientId?: string | null; message?: string; apply?: Proposal; applyScope?: "one" | "series"; focusWorkoutId?: string | null; focusDayId?: string | null };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
 
   const scoped = await resolveAiScope(body.clientId ?? null);
@@ -188,7 +188,22 @@ export async function POST(req: NextRequest) {
   // When the trainer is viewing a specific workout (header AI on /workout/<id>),
   // derive the client from that scheduled workout so no client picker is needed.
   let clientId = scope.clientId;
-  if (body.focusWorkoutId) {
+  // THE CLIENT COMES FROM THE URL, because the logger already knows it.
+  //
+  // A trainer opens a client's session as /workout/<dayId>?forClient=<clientId>.
+  // This used to derive the client by looking up `focusWorkoutId` in
+  // scheduled_workouts — but what the drawer sent was the id from the path, and
+  // that is a `days` id, a day TEMPLATE inside a programme. It never matched a
+  // scheduled_workouts row, so `fc` was always null and the trainer got
+  // "Pick a client first" while standing in that client's workout.
+  //
+  // clientId is checked first and trusted: scope.isTrainer is already enforced
+  // above, and applyProposal + every read below are scoped to it explicitly.
+  if (body.clientId) clientId = body.clientId;
+  // Kept as a fallback for any caller that really does hold a scheduled workout
+  // id — the id is looked up as what it claims to be, and simply misses if it
+  // is not one.
+  if (!body.clientId && body.focusWorkoutId) {
     const { data: fsw } = await admin.from("scheduled_workouts").select("client_id").eq("id", body.focusWorkoutId).maybeSingle();
     const fc = (fsw as { client_id?: string } | null)?.client_id;
     if (fc) clientId = fc;

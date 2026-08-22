@@ -110,9 +110,44 @@ export default function AIAssistant() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pathname = usePathname();
-  // On a workout page (/workout/<scheduled-workout-id>) the assistant becomes a
-  // workout-aware programming partner scoped to THAT workout + its client.
-  const focusWorkoutId = (() => { const m = (pathname || "").match(/^\/workout\/([^/?#]+)/); return m ? m[1] : null; })();
+
+  // WHAT THE ID IN THE URL ACTUALLY IS.
+  //
+  // /workout/<id> is a DAY id — a row in `days`, the template inside a
+  // programme. It is not a scheduled workout and it is not a client. The
+  // comment here used to say "scheduled-workout-id" and the context line below
+  // told the model exactly that, so asking "give me a summary on progress for
+  // the last 4 weeks" while logging a client's session got:
+  //
+  //   "The ID c35193c6… isn't matching any client or workout record… Can you
+  //    tell me which client this is for?"
+  //
+  // It was looking up a `days` row as a client, which it can never be — one day
+  // template is shared by every client on that programme. Dustin, 22 Aug, mid
+  // session: "trainer ai must recognize which client im in."
+  const focusDayId = (() => { const m = (pathname || "").match(/^\/workout\/([^/?#]+)/); return m ? m[1] : null; })();
+
+  // WHICH CLIENT. The logger already knows — a trainer opens a client's session
+  // as /workout/<dayId>?forClient=<clientId>, which is how the page itself
+  // resolves whose workout to show. The assistant simply never read it.
+  //
+  // Read off window.location rather than with useSearchParams(): this component
+  // is mounted in the app layout, on every page, and useSearchParams() opts the
+  // whole tree out of static rendering — it failed the build outright on /404
+  // ("should be wrapped in a suspense boundary"). The query string is right
+  // there and needs no hook.
+  const [focusClientId, setFocusClientId] = useState<string | null>(null);
+  useEffect(() => {
+    const read = () => {
+      try {
+        setFocusClientId(new URLSearchParams(window.location.search).get("forClient"));
+      } catch { setFocusClientId(null); }
+    };
+    read();
+    // Back/forward can change the query without changing the path.
+    window.addEventListener("popstate", read);
+    return () => window.removeEventListener("popstate", read);
+  }, [pathname]);
 
   useEffect(() => {
     if (open) {
@@ -189,7 +224,15 @@ export default function AIAssistant() {
       // anything (esp. programming) via tools. Passes what he's currently
       // viewing so it can act on the workout/page in front of him.
       const endpoint = isTrainer ? "/api/agent" : "/api/ai-assistant";
-      const pageContext = `Current page: ${pathname}.` + (focusWorkoutId ? ` Currently viewing scheduled workout id ${focusWorkoutId}.` : "");
+      // Named for what each id IS, so the model does not have to guess — and
+      // the client id comes first, because "who is this about" is the question
+      // every other answer depends on.
+      const pageContext = [
+        `Current page: ${pathname}.`,
+        focusClientId ? `This is client_id ${focusClientId} — every question on this screen is about THAT client unless they say otherwise. Use it directly; do not ask which client this is.` : "",
+        focusDayId ? `They are looking at the workout day whose days.id is ${focusDayId} (a day template inside a programme, NOT a client and NOT a scheduled_workouts row).` : "",
+        !focusClientId && focusDayId ? `No client is attached to this screen — it is the trainer's own logger, so questions are about them.` : "",
+      ].filter(Boolean).join(" ");
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -227,7 +270,7 @@ export default function AIAssistant() {
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, getContext, focusWorkoutId, isTrainer, pathname, pendingImage]);
+  }, [messages, loading, getContext, focusDayId, focusClientId, isTrainer, pathname, pendingImage]);
 
   const applyChange = useCallback(async (idx: number, proposal: Proposal, applyScope: "one" | "series") => {
     if (applyingIdx != null) return;
@@ -235,7 +278,7 @@ export default function AIAssistant() {
     try {
       const res = await fetch("/api/workout-assist", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apply: proposal, applyScope, focusWorkoutId }),
+        body: JSON.stringify({ apply: proposal, applyScope, clientId: focusClientId, focusDayId }),
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.ok) {
@@ -247,7 +290,7 @@ export default function AIAssistant() {
     } catch {
       setMessages(prev => [...prev, { role: "assistant", content: "Network error applying the change — try again." }]);
     } finally { setApplyingIdx(null); }
-  }, [applyingIdx, focusWorkoutId]);
+  }, [applyingIdx, focusClientId, focusDayId]);
 
   // Dictation lives in MicButton now, so this drawer gets the recording
   // animation with everything else. What is preserved DELIBERATELY is that this
@@ -472,7 +515,7 @@ export default function AIAssistant() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-                placeholder={focusWorkoutId ? "Ask or adjust this workout…" : "Ask anything about training…"}
+                placeholder={focusDayId ? "Ask or adjust this workout…" : "Ask anything about training…"}
                 className="flex-1 text-sm px-3.5 py-2.5 rounded-xl outline-none"
                 style={{
                   background: "var(--brand-bg)",
