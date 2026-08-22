@@ -93,11 +93,37 @@ export const FALLBACK_FACE = "/coachbot.png";
  * decision, Coach Bot is one voice in it, and two different bots posting the
  * same kind of message would read as two different bots.
  */
+/**
+ * A set a trainer uploaded, rather than one that ships in /public/bots.
+ *
+ * Dustin's and Stephanie's sets are folders in the repo. A trainer joining
+ * next week cannot commit to the repo, so theirs go to storage instead and
+ * their `bot_set` is stamped `u-<their id>`. The prefix is what tells these
+ * two cases apart — deliberately a prefix rather than a second column, so
+ * everything that already passes a set name around keeps working untouched.
+ */
+const UPLOADED_PREFIX = "u-";
+
+function setDir(set?: string | null): string {
+  if (!set) return "/bots/";
+  if (!set.startsWith(UPLOADED_PREFIX)) return `/bots/${set}/`;
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  // No Supabase URL at build time (a prerender, a test) — fall back to the
+  // stock set rather than emitting a broken host-relative path.
+  if (!base) return "/bots/";
+  return `${base}/storage/v1/object/public/assets/bots/${set}/`;
+}
+
 export function faceSrc(mood: Mood | null | undefined, set?: string | null): string {
-  const dir = set ? `/bots/${set}/` : "/bots/";
+  const dir = setDir(set);
   if (!mood) return `${dir}${ART.neutral}.webp`;
   const slug = ART[mood];
   return slug ? `${dir}${slug}.webp` : FALLBACK_FACE;
+}
+
+/** The storage folder name for a trainer's own uploaded set. */
+export function uploadedSetName(trainerId: string): string {
+  return UPLOADED_PREFIX + trainerId;
 }
 
 export const ALL_MOODS = Object.keys(ART) as Mood[];

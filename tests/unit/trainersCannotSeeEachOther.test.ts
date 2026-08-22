@@ -138,7 +138,12 @@ describe("programmes are private, the library is shared", () => {
     // COPY-ON-WRITE is what makes both halves of that sentence true at once —
     // their own copy to do anything with, AND 843 movements on day one. A hard
     // clone would satisfy the first half and break the second.
-    const lib = latest("fork_exercise_for_me");
+    // Anchored on the DEFINITION, not the name. A later migration mentions
+    // fork_exercise_for_me in a comment explaining why it does not call it,
+    // and latest() takes the last file that matches — so a looser anchor reads
+    // the wrong migration and fails for a reason that has nothing to do with
+    // the rule.
+    const lib = latest("create or replace function public.fork_exercise_for_me");
     assert.match(lib, /alter table public\.exercises[\s\S]{0,200}owner_trainer_id/i,
       "a movement has to know whose library it is in");
     assert.match(lib, /forked_from_id/,

@@ -14,6 +14,7 @@ import { useTutorialVisibility } from "@/lib/useTutorialVisibility";
 import TrainerProfileCard from "@/components/TrainerProfileCard";
 import SettingsGroup from "@/components/SettingsGroup";
 import TrainerBotSettings from "@/components/TrainerBotSettings";
+import TrainerFaceSetCard from "@/components/TrainerFaceSetCard";
 
 interface Props {
   userEmail: string;
@@ -400,6 +401,8 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
       )}
 
       {isTrainer && !isInClientMode && <TrainerBotSettings />}
+
+      {isTrainer && !isInClientMode && <TrainerFaceSetCard />}
 
       {/* Is the AI actually working? Every AI surface in this app degrades
           quietly by design — a coach card that fails just does not appear — so
