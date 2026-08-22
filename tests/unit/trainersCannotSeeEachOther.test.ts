@@ -126,12 +126,42 @@ describe("programmes are private, the library is shared", () => {
     }
   });
 
-  it("the shared library is left alone on purpose", () => {
-    // exercises / equipment / foods keep USING (is_trainer()). Dustin chose
-    // "shared library, private programmes" so a new trainer inherits ~843
-    // movements and the video work rather than starting on an empty screen.
-    const anyDrop = ALL_SQL.some((s) => /drop policy[^\n]*trainer_all_exercises/i.test(s));
-    assert.equal(anyDrop, false, "the shared exercise library was split — that was not the decision");
+  it("the library is per trainer, but nobody starts empty", () => {
+    // ── This assertion was INVERTED the same evening ────────────────────────
+    //
+    // It first said the library must stay shared, because that was the choice
+    // at 8pm: "shared library, private programmes". An hour later Dustin
+    // changed it: "they need to have their own copy of the library where they
+    // can do what they want with it but it should not effect any other
+    // trainers." So the rule this guards is the newer one.
+    //
+    // COPY-ON-WRITE is what makes both halves of that sentence true at once —
+    // their own copy to do anything with, AND 843 movements on day one. A hard
+    // clone would satisfy the first half and break the second.
+    const lib = latest("fork_exercise_for_me");
+    assert.match(lib, /alter table public\.exercises[\s\S]{0,200}owner_trainer_id/i,
+      "a movement has to know whose library it is in");
+    assert.match(lib, /forked_from_id/,
+      "a private copy has to remember the house movement it overrides, or the library shows both");
+    assert.match(lib, /create table if not exists public\.exercise_hidden/i,
+      "removing a movement must be recorded, not deleted — another trainer's programmes point at that row");
+
+    // The fork must repoint ONLY the forking trainer's own programmes.
+    const fork = lib.slice(lib.indexOf("function public.fork_exercise_for_me"));
+    assert.match(fork, /pr\.owner_trainer_id = v_me/,
+      "the fork repoints prescriptions without checking who owns the programme — it would rewrite " +
+      "a house template, or another trainer's work, to point at this trainer's private copy");
+  });
+
+  it("the name constraint allows two trainers the same movement", () => {
+    // The bug that would have hit every trainer on their first edit: a global
+    // UNIQUE(name) means forking "Barbell Back Squat" collides with the house
+    // row of the same name.
+    const lib = latest("exercises_name_per_owner");
+    assert.match(lib, /drop constraint if exists exercises_name_key/i);
+    assert.match(lib, /\(name, owner_trainer_id\) nulls not distinct/i,
+      "NULLS NOT DISTINCT is required — the house library is owner NULL, and without it the " +
+      "house library loses its own uniqueness");
   });
 });
 
@@ -216,5 +246,44 @@ describe("a trainer can edit their own profile, and only their own", () => {
     assert.ok(fs.existsSync(card), "no editor — the RPC is unreachable and nothing changed for a trainer");
     const settings = fs.readFileSync(path.join(ROOT, "src/app/(app)/settings/SettingsClient.tsx"), "utf8");
     assert.match(settings, /<TrainerProfileCard \/>/, "the editor is not mounted in Settings");
+  });
+});
+
+describe("each trainer's clients get their own room", () => {
+  const sql = latest("my_group_trainer_id");
+
+  it("nothing is moved out of the owner's room", () => {
+    // Dustin, 21 Aug: "my clients should not be effected by splitting the group
+    // chat. my clients continue to see my app's group chat." All 168 existing
+    // messages and 4 challenges are stamped to him — his clients see the same
+    // room tomorrow. A migration that reassigned any of them would be wrong.
+    assert.match(
+      sql,
+      /update public\.messages[\s\S]{0,200}where role = 'owner'[\s\S]{0,120}where is_group and group_trainer_id is null/i,
+      "existing group history must be stamped to the owner and to nobody else",
+    );
+  });
+
+  it("the room is closed to everyone outside it", () => {
+    assert.match(
+      sql,
+      /drop policy if exists "Anyone reads group messages"/i,
+      "USING (is_group = true) let ANY signed-in person read the room, including another " +
+        "trainer's client",
+    );
+    assert.match(sql, /group_trainer_id = public\.my_group_trainer_id\(\)/);
+  });
+
+  it("a client is placed in their trainer's room, not their own", () => {
+    assert.match(
+      sql,
+      /coalesce\(\s*public\.my_trainer_id\(\),[\s\S]{0,160}c\.trainer_id/,
+      "a client has no trainer id of their own — they belong to their trainer's room",
+    );
+  });
+
+  it("a post cannot be aimed at somebody else's room", () => {
+    assert.match(sql, /create trigger trg_stamp_group_message/i,
+      "without the stamp, a client of one trainer could post into another trainer's chat");
   });
 });
