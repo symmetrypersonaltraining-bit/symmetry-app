@@ -15,6 +15,21 @@ async function isClientMode(asMarker?: string): Promise<boolean> {
   // client effect) hasn't propagated yet — fixes the intermittent trainer-UI
   // leak in Client View.
   if (asMarker === "client") return true;
+  // ?as=trainer is the mirror of ?as=client, and it BEATS the cookie.
+  //
+  // Entering client view was deterministic — the marker forced the client
+  // branch on the first server render whatever the cookie said. LEAVING it had
+  // no marker at all: the toggle pushed a bare /home and relied entirely on
+  // `document.cookie = "symmetry_client_mode=; max-age=0"` having propagated
+  // before the RSC request went out. When it had not, the server read the
+  // cookie as still set and rendered the CLIENT dashboard for a trainer who had
+  // just asked for the trainer one.
+  //
+  // Dustin, 22 Aug: "my app is currently opening to client view when i hit
+  // trainer toggle" — and again, the other way, as a hang: the wrong branch
+  // renders the trainer's all-clients schedule query, which takes ~1.8s, so the
+  // mistake shows up as a freeze rather than as a wrong screen.
+  if (asMarker === "trainer") return false;
   const cookieStore = await cookies();
   return cookieStore.get("symmetry_client_mode")?.value === "1";
 }
@@ -304,10 +319,24 @@ export default async function HomePage(props: {
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
   const sixtyStr = sixtyDaysAgo.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  // `skipped` is left out on purpose, everywhere this feeds.
+  //
+  // Every replace path in the app marks the original skipped and inserts the
+  // replacement next to it. Nothing filtered on that, so a replaced session
+  // kept its circle in the week strip — an outstanding-looking workout sitting
+  // beside the thing that replaced it — AND stayed in the adherence
+  // denominator, so swapping a walk in for a cardio day quietly LOWERED the
+  // week's percentage. Dustin, 22 Aug: "im still showing an extra workout for
+  // yesterday that should not be there."
+  //
+  // A skipped row means "this was replaced or the person did something else".
+  // Either way it is not outstanding and it is not a session they failed to
+  // do, so it counts neither as a circle nor against them.
   const { data: recentScheduled } = await supabase
     .from("scheduled_workouts")
     .select("id, scheduled_date, status, days(label)")
     .is("deleted_at", null)
+    .neq("status", "skipped")
     .eq("client_id", clientRecord.id)
     .gte("scheduled_date", sixtyStr)
     .lte("scheduled_date", thirtyAheadStr)
@@ -320,28 +349,71 @@ export default async function HomePage(props: {
   const totalScheduled = recent30.length;
   const completedCount = recent30.filter((w: any) => w.status === "completed").length;
 
-  const sorted = [...(recentScheduled || [])].sort((a: any, b: any) =>
-    b.scheduled_date.localeCompare(a.scheduled_date)
-  );
-  const seenDates = new Set<string>();
-  for (const w of sorted as any[]) {
-    if (w.status === "completed") seenDates.add(w.scheduled_date);
+  // A REST DAY DOES NOT BREAK A STREAK.
+  //
+  // Dustin, 22 Aug: "a rest day is considered completed... if i logged
+  // everything that was scheduled this week, which i did, my streak should be 5
+  // days. rest days count towards streak. only thing that stops a streak is if
+  // something programmed is not logged."
+  //
+  // The old rule counted only days that HAD a completed workout and required
+  // them to be consecutive calendar days, so Wednesday — programmed as a rest
+  // day, nothing scheduled, nothing missed — ended the streak. He had done
+  // every single thing on his programme and the app told him 2.
+  //
+  // The rule is about COMPLIANCE, not about training every day:
+  //   nothing programmed        the day counts (a rest day is part of the plan)
+  //   everything programmed done the day counts, and ANCHORS the streak
+  //   something programmed left  the streak ends there
+  //
+  // Two details that are easy to get wrong:
+  //
+  // TODAY IS NEVER A BREAK. The day is not over, so an unfinished today must
+  // not end a streak. It only ADDS once its scheduled work is actually done —
+  // otherwise it is skipped over silently. Counting today as a rest day at
+  // 9am, before anything could have been logged, would hand out credit for a
+  // day that has not happened.
+  //
+  // TRAILING REST DAYS DO NOT PAD IT. The count returned is the count as of the
+  // last day that ANCHORED — a day with programmed work, all done. Without
+  // that, a client with nothing programmed for a fortnight would accumulate a
+  // fourteen-day "streak" having trained zero times.
+  //
+  // `recentScheduled` already excludes `skipped`, which is what makes
+  // "programmed but not logged" mean the right thing: a session that was
+  // REPLACED was not missed, and must not end a streak.
+  const byDate = new Map<string, { sched: number; done: number }>();
+  for (const w of (recentScheduled || []) as any[]) {
+    const d = w.scheduled_date as string;
+    const e = byDate.get(d) || { sched: 0, done: 0 };
+    e.sched++;
+    if (w.status === "completed") e.done++;
+    byDate.set(d, e);
   }
-  const completedDates = Array.from(seenDates).sort().reverse();
   let streakDays = 0;
-  if (completedDates.length > 0) {
-    const firstCompleted = completedDates[0];
-    const daysDiff = Math.floor(
-      (new Date(today).getTime() - new Date(firstCompleted).getTime()) / 86400000
-    );
-    if (daysDiff <= 1) {
-      for (let i = 0; i < completedDates.length; i++) {
-        if (i === 0) { streakDays++; continue; }
-        const prev = new Date(completedDates[i - 1] + "T00:00:00");
-        const curr = new Date(completedDates[i] + "T00:00:00");
-        const diff = Math.round((prev.getTime() - curr.getTime()) / 86400000);
-        if (diff === 1) { streakDays++; } else { break; }
+  {
+    let run = 0;
+    const cursor = new Date(today + "T12:00:00"); // midday: no DST edge
+    // 60 days is the window `recentScheduled` covers; beyond it every day would
+    // look like a rest day because the rows simply were not fetched.
+    for (let i = 0; i < 60; i++) {
+      const key = cursor.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+      const e = byDate.get(key);
+      const isToday = i === 0;
+      if (!e) {
+        // Nothing programmed. A rest day bridges — but today has not finished,
+        // so it is not yet a rest day worth counting.
+        if (!isToday) run++;
+      } else if (e.done >= e.sched) {
+        run++;
+        streakDays = run;
+      } else if (isToday) {
+        // Programmed work still outstanding, and the day is still going.
+        // Neither counts nor breaks.
+      } else {
+        break;
       }
+      cursor.setDate(cursor.getDate() - 1);
     }
   }
 

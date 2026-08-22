@@ -15,6 +15,21 @@ async function isClientMode(asMarker?: string): Promise<boolean> {
   // before the client-mode cookie propagates) — fixes intermittent trainer-UI
   // leak in Client View.
   if (asMarker === "client") return true;
+  // ?as=trainer is the mirror of ?as=client, and it BEATS the cookie.
+  //
+  // Entering client view was deterministic — the marker forced the client
+  // branch on the first server render whatever the cookie said. LEAVING it had
+  // no marker at all: the toggle pushed a bare /home and relied entirely on
+  // `document.cookie = "symmetry_client_mode=; max-age=0"` having propagated
+  // before the RSC request went out. When it had not, the server read the
+  // cookie as still set and rendered the CLIENT dashboard for a trainer who had
+  // just asked for the trainer one.
+  //
+  // Dustin, 22 Aug: "my app is currently opening to client view when i hit
+  // trainer toggle" — and again, the other way, as a hang: the wrong branch
+  // renders the trainer's all-clients schedule query, which takes ~1.8s, so the
+  // mistake shows up as a freeze rather than as a wrong screen.
+  if (asMarker === "trainer") return false;
   const cookieStore = await cookies();
   return cookieStore.get("symmetry_client_mode")?.value === "1";
 }
@@ -63,13 +78,29 @@ export default async function WorkoutPage(props: {
     // fell through to the "no program" card — which is also the branch that does
     // not render the schedule board, so those clients had no way to move a
     // workout at all on any day they had none scheduled. Newest assignment wins.
-    const { data: assignments } = await supabase
+    // `assigned_at`, NOT `created_at`. There is no created_at column on
+    // program_assignments — the columns are id, client_id, program_id,
+    // current_phase_id, current_day_in_rotation, combination_group, active,
+    // assigned_at. PostgREST rejects the whole request for naming a column
+    // that does not exist, supabase-js hands back data: null, the `|| []`
+    // below swallows it, and allPhases stays empty.
+    //
+    // Which sent EVERY client to the "no program assigned" card on any day
+    // with nothing scheduled — the exact branch the comment above was written
+    // to stop them reaching. The fix for maybeSingle introduced it and nothing
+    // caught it, because a silently-null query and a client with no programme
+    // render identically. Dustin found it on a rest day: "on a rest day I
+    // should still be able to view full schedule but it goes here instead."
+    const { data: assignments, error: assignErr } = await supabase
       .from("program_assignments")
-      .select("program_id, created_at, programs(name, phases(id, label, position, days(id, label, position)))")
+      .select("program_id, assigned_at, programs(name, phases(id, label, position, days(id, label, position)))")
       .eq("client_id", clientId)
       .eq("active", true)
-      .order("created_at", { ascending: false })
+      .order("assigned_at", { ascending: false })
       .limit(1);
+    // Not swallowed. A failed lookup here is indistinguishable on screen from
+    // having no programme, so it must at least be findable in the logs.
+    if (assignErr) console.error("workout page: active assignment lookup failed", assignErr.message);
     const assignment = (assignments || [])[0] ?? null;
     if (assignment) {
       const prog = (assignment as any).programs;
@@ -94,7 +125,18 @@ export default async function WorkoutPage(props: {
       .eq("client_id", clientId)
       .eq("scheduled_date", todayDate)
       .order("id");
-    todayScheduledList = (swList || []).map((sw: any) => {
+    // SKIPPED IS NOT OUTSTANDING.
+    //
+    // Every "replace this with something else" path in the app marks the
+    // original `skipped` and inserts the replacement beside it — that is the
+    // deliberate contract ("nothing is deleted, and your programme is
+    // unchanged"). But no read anywhere filtered on it, so the replaced
+    // session kept rendering as a live card with a working Start button next
+    // to the thing that replaced it. Dustin, 22 Aug: "I replaced it with a
+    // walk and it did not replace it just created another."
+    //
+    // The swap was right. The screen never learned what skipped means.
+    todayScheduledList = (swList || []).filter((sw: any) => sw.status !== "skipped").map((sw: any) => {
       const d = sw.days;
       const ph = d?.phases;
       const prog = ph?.programs;
@@ -123,10 +165,19 @@ export default async function WorkoutPage(props: {
   if (clientId) {
     const back = new Date(); back.setDate(back.getDate() - 30);
     const backStr = back.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+    // Skipped left out here too, so the board and the week bar agree with the
+    // card above them. Showing a replaced session in one of the three and not
+    // the others is worse than either answer on its own — and ScheduleWeekBar
+    // marks a whole day unfinished if any workout on it is not completed, so
+    // one replaced session made every day it touched look outstanding.
+    //
+    // The row is not gone: it keeps its status, and the trainer schedule still
+    // lists it. This is the CLIENT's view of what is left to do.
     const { data: calRows } = await (supabase as any)
       .from("scheduled_workouts")
       .select("id, day_id, scheduled_date, status, days(label)")
       .is("deleted_at", null)
+      .neq("status", "skipped")
       .eq("client_id", clientId)
       .gte("scheduled_date", backStr)
       .order("scheduled_date");
@@ -213,11 +264,34 @@ export default async function WorkoutPage(props: {
             </div>
           </>
         ) : (
-          <div className="card text-center py-10">
-            <i className="ti ti-barbell text-4xl block mb-3" style={{ color: "var(--brand-border)" }} />
-            <p className="font-medium mb-1">No program assigned</p>
-            <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>Contact your trainer to get started.</p>
-          </div>
+          // The schedule stays, whatever else is true.
+          //
+          // This branch used to be a bare card, so the one state where
+          // something had gone wrong was also the only state with no way to
+          // reach your own schedule — no week strip, no board, nothing to tap.
+          // A client who landed here could not move a workout or even see that
+          // next week existed. If there are scheduled workouts to show, this is
+          // not "no programme", whatever the assignment lookup said.
+          <>
+            <div className="card mb-4 text-center py-8">
+              <i className="ti ti-barbell text-3xl block mb-2" style={{ color: "var(--brand-border)" }} />
+              <p className="font-medium mb-1" style={{ color: "var(--brand-text)" }}>
+                {calWorkouts.length > 0 ? "Nothing scheduled today" : "No program assigned"}
+              </p>
+              <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
+                {calWorkouts.length > 0
+                  ? "Your schedule is below."
+                  : "Contact your trainer to get started."}
+              </p>
+            </div>
+            {calWorkouts.length > 0 && (
+              <div style={{ marginTop: "1rem" }}>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
+                <ScheduleWeekBar workouts={calWorkouts} />
+                <ScheduleBoard workouts={calWorkouts} ownerClientId={clientId || ""} />
+              </div>
+            )}
+          </>
         )}
       </div>
     </>

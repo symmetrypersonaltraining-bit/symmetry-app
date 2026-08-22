@@ -30,7 +30,12 @@ function slowFetch(ms: number, status = 200) {
 }
 
 test("a fast healthy dependency passes, and is not marked slow", async () => {
-  const r = await probe(slowFetch(0), Date.now, 200, 100);
+  // A FIXED clock, not Date.now. This test measured real wall-clock against a
+  // 100ms "slow" threshold, so it failed whenever the machine was busy — it
+  // went red on 22 Aug purely because a production build was running in
+  // parallel, which says nothing at all about probe(). Every other test in this
+  // file already injects its clock; this one was the exception.
+  const r = await probe(slowFetch(0), () => 0, 200, 100);
   assert.equal(r.ok, true);
   assert.equal(r.slow, undefined);
 });

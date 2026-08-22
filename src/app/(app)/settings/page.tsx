@@ -22,7 +22,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   // Explicit ?as=client marker OR the cookie (marker wins on first render even
   // before the client-mode cookie propagates) — fixes intermittent trainer-UI
   // leak in Client View (settings hides trainer-only sections in client mode).
-  const isInClientMode = isTrainer && (sp?.as === "client" || cookieStore.get("symmetry_client_mode")?.value === "1");
+  // ?as=trainer beats the cookie — see the note in home/page.tsx.
+  const isInClientMode = isTrainer && sp?.as !== "trainer"
+    && (sp?.as === "client" || cookieStore.get("symmetry_client_mode")?.value === "1");
   // The SIGNED-IN trainer's own name. `COACH_NAME` is one build-time env var,
   // so Stephanie's own profile said "Dustin Gautreaux".
   const me = isTrainer ? await coachForViewer(supabase as never, user.id) : null;

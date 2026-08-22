@@ -27,6 +27,59 @@ function fmtWhen(ts: string) {
 export default function NotificationCenter({ solid = false }: { solid?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  // QUIET, NOT READ. Two different things, and only one of them existed.
+  //
+  // Dustin, 22 Aug: "i need to be able to dismiss those quickly if im trying to
+  // get to something and come back to the notifications later. they can come
+  // back up each time i open the app to remind me to check them but i need to
+  // be able to get them off my screen quickly."
+  //
+  // Everything here already marked things READ — the row ×, "Mark all read".
+  // That clears the bell by throwing away the reminder, which is the opposite
+  // of what he asked for: he wants the nagging to stop for the next ten
+  // minutes and to be nagged again tomorrow.
+  //
+  // sessionStorage, deliberately, not localStorage. It is emptied when the app
+  // is closed and reopened, which is exactly "they can come back up each time i
+  // open the app" — no expiry to pick, no timer to get wrong. Unread state is
+  // never touched, so nothing is lost and the count is right the moment it
+  // comes back.
+  const [quiet, setQuiet] = useState(false);
+  useEffect(() => {
+    try { setQuiet(sessionStorage.getItem("symmetry_notif_quiet") === "1"); } catch { /* private mode */ }
+  }, []);
+  // HOLD THE BELL TO QUIET IT. One gesture, no panel.
+  //
+  // "Later" inside the panel still costs a tap to open and a tap to leave, and
+  // the whole complaint is about being mid-task and wanting the top bar back.
+  // Press and hold is the fast path: nothing to aim at, and it cannot be hit by
+  // accident on the way to somewhere else.
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heldRef = useRef(false);
+  const startHold = useCallback(() => {
+    heldRef.current = false;
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => {
+      heldRef.current = true;
+      // The tap that ends the hold must not then open the panel — the whole
+      // point was to get it OFF the screen.
+      setQuiet(true);
+      setOpen(false);
+      try { sessionStorage.setItem("symmetry_notif_quiet", "1"); } catch { /* private mode */ }
+      try { navigator.vibrate?.(18); } catch { /* not everywhere */ }
+    }, 450);
+  }, []);
+  const endHold = useCallback(() => {
+    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
+  }, []);
+  useEffect(() => () => { if (holdTimer.current) clearTimeout(holdTimer.current); }, []);
+
+  const goQuiet = useCallback(() => {
+    setQuiet(true);
+    setOpen(false);
+    try { sessionStorage.setItem("symmetry_notif_quiet", "1"); } catch { /* private mode */ }
+  }, []);
   const ctx = useRef<{ isTrainer: boolean; myUserId: string; myClientId: string | null }>({ isTrainer: false, myUserId: "", myClientId: null });
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -100,23 +153,38 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
   }
 
   const total = totalUnread(rows);
+  // Quieted, the bell stops shouting but stays exactly where it was — same
+  // position, same size, nothing reflows — so it is still one tap away and the
+  // top bar is clear. Hiding the button outright would move the two controls
+  // beside it, which is its own kind of in-the-way.
+  const alerting = total > 0 && !quiet;
   const hBtn: React.CSSProperties = {
     position: "relative", width: 34, height: 34, borderRadius: "50%",
-    border: total > 0 ? "1px solid rgba(239,68,68,0.9)" : "1px solid rgba(255,255,255,0.3)",
+    border: alerting ? "1px solid rgba(239,68,68,0.9)" : "1px solid rgba(255,255,255,0.3)",
     background: solid ? "var(--brand-primary)" : "rgba(255,255,255,0.12)",
     boxShadow: solid ? "0 4px 14px rgba(20,30,55,.3)" : "none",
     color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
     // The single app-wide bell ALERTS whenever there are unread notifications.
     // cw-alert rather than cw-pulse: a 5% scale change on a 34px button is easy
     // to look straight past, and being missed is the entire problem here.
-    animation: total > 0 ? "cw-alert 1.35s ease-in-out infinite" : "none",
+    animation: alerting ? "cw-alert 1.35s ease-in-out infinite" : "none",
   };
 
   return (
     <>
-      <button aria-label={`Notifications${total ? ` (${total} unread)` : ""}` } style={hBtn} onClick={() => setOpen((o) => !o)}>
-        <i className="ti ti-bell" style={{ fontSize: 16, animation: total > 0 ? "cw-bell-swing 0.9s ease-in-out infinite" : "none" }} />
-        {total > 0 && (
+      <button
+        aria-label={`Notifications${total ? ` (${total} unread)` : ""}${total > 0 ? " — hold to quiet until you next open the app" : ""}`}
+        title={total > 0 && !quiet ? "Hold to quiet these until you next open the app" : undefined}
+        style={hBtn}
+        onPointerDown={startHold}
+        onPointerUp={endHold}
+        onPointerLeave={endHold}
+        onPointerCancel={endHold}
+        onContextMenu={(e) => e.preventDefault()}
+        onClick={() => { if (heldRef.current) { heldRef.current = false; return; } setOpen((o) => !o); }}
+      >
+        <i className={total > 0 && quiet ? "ti ti-bell-z" : "ti ti-bell"} style={{ fontSize: 16, animation: alerting ? "cw-bell-swing 0.9s ease-in-out infinite" : "none" }} />
+        {alerting && (
           <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999, background: "#ef4444", color: "#fff", fontSize: 9.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 0 2px var(--brand-bg)", animation: "cw-alert-badge 1.35s ease-in-out infinite" }}>
             {total > 9 ? "9+" : total}
           </span>
@@ -128,7 +196,14 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid var(--brand-border)" }}>
             <span style={{ fontWeight: 800, fontSize: 15 }}>Notifications</span>
             {rows.length > 0 && (
-              <button onClick={markAll} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brand-primary)", fontSize: 12, fontWeight: 700 }}>Mark all read</button>
+              <span style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                {/* Ordered the way they are reached for: "Later" is the one he
+                    wants mid-task and the safe one, so it comes first and is
+                    plain; "Mark all read" throws the list away and stays the
+                    deliberate second choice. */}
+                <button onClick={goQuiet} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brand-text-secondary)", fontSize: 12, fontWeight: 700 }}>Later</button>
+                <button onClick={markAll} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brand-primary)", fontSize: 12, fontWeight: 700 }}>Mark all read</button>
+              </span>
             )}
           </div>
           <div style={{ overflowY: "auto", flex: 1 }}>

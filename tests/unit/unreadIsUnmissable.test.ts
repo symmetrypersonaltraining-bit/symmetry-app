@@ -46,9 +46,38 @@ test("it does not flash fast enough to look broken", () => {
 
 test("the bell and its badge use the loud animation", () => {
   const s = src("src/components/NotificationCenter.tsx");
-  assert.match(s, /animation: total > 0 \? "cw-alert /, "the bell itself");
+  // The condition moved from `total > 0` to `alerting` on 22 Aug, when the bell
+  // gained a way to be QUIETED for the session — Dustin: "i need to be able to
+  // get them off my screen quickly... they can come back up each time i open
+  // the app". The rule this test exists for is unchanged: unread must be loud.
+  // So it now checks both halves — that the loud animation is what unread
+  // drives, and that `alerting` still means "there is unread".
+  assert.match(s, /animation: alerting \? "cw-alert /, "the bell itself");
+  assert.match(s, /const alerting = total > 0 && !quiet;/,
+    "alerting must still mean unread — if it can be true with nothing unread, or " +
+    "false with unread and nothing asking for quiet, the bell has gone soft");
   assert.match(s, /cw-alert-badge/, "the count badge");
   assert.doesNotMatch(s, /cw-pulse/, "the near-invisible pulse must be gone from the bell");
+});
+
+test("quiet is a deliberate act, and it does not survive the app closing", () => {
+  const s = src("src/components/NotificationCenter.tsx");
+  // sessionStorage, never localStorage. The ask was explicitly "they can come
+  // back up each time i open the app" — a localStorage flag would silence the
+  // bell until somebody thought to turn it back on, which is how a notification
+  // gets missed for a week.
+  assert.match(s, /sessionStorage\.setItem\("symmetry_notif_quiet"/,
+    "quiet must be per-session, so reopening the app brings the reminder back");
+  assert.doesNotMatch(s, /localStorage\.(get|set)Item\("symmetry_notif_quiet"/,
+    "a persisted quiet flag silences the bell indefinitely");
+  // And it must not touch what is READ — the whole point is to keep the
+  // reminder while getting it off the screen.
+  // Bounded at the end of the callback, not by a character count — a fixed
+  // window ran past it into unrelated code that legitimately marks things read.
+  const from = s.indexOf("const goQuiet");
+  const quietBlock = s.slice(from, s.indexOf("}, []);", from));
+  assert.doesNotMatch(quietBlock, /read_at|markRead|markAll/,
+    "quieting marks things read, which throws the reminder away");
 });
 
 test("the messages tab flashes too — icon, label and badge", () => {

@@ -22,7 +22,10 @@ export default async function MessagesPage(props: {
   // marker on the Client-View nav link. The marker guarantees the client branch
   // renders on the FIRST server render even if the cookie hasn't propagated yet
   // (it's set in a client effect) — fixing the intermittent trainer-inbox leak.
-  const __isInClientMode = __cookieStore.get("symmetry_client_mode")?.value === "1" || searchParams.as === "client";
+  // ?as=trainer beats the cookie — see the note in home/page.tsx.
+  const __isInClientMode = searchParams.as === "trainer"
+    ? false
+    : (__cookieStore.get("symmetry_client_mode")?.value === "1" || searchParams.as === "client");
   const isTrainer = await viewerIsTrainer(supabase, user) && !__isInClientMode;
 
   if (searchParams.client === "group") {

@@ -14,6 +14,21 @@ async function isClientMode(asMarker?: string): Promise<boolean> {
   // before the client-mode cookie propagates) — fixes intermittent trainer-UI
   // leak in Client View.
   if (asMarker === "client") return true;
+  // ?as=trainer is the mirror of ?as=client, and it BEATS the cookie.
+  //
+  // Entering client view was deterministic — the marker forced the client
+  // branch on the first server render whatever the cookie said. LEAVING it had
+  // no marker at all: the toggle pushed a bare /home and relied entirely on
+  // `document.cookie = "symmetry_client_mode=; max-age=0"` having propagated
+  // before the RSC request went out. When it had not, the server read the
+  // cookie as still set and rendered the CLIENT dashboard for a trainer who had
+  // just asked for the trainer one.
+  //
+  // Dustin, 22 Aug: "my app is currently opening to client view when i hit
+  // trainer toggle" — and again, the other way, as a hang: the wrong branch
+  // renders the trainer's all-clients schedule query, which takes ~1.8s, so the
+  // mistake shows up as a freeze rather than as a wrong screen.
+  if (asMarker === "trainer") return false;
   const cookieStore = await cookies();
   return cookieStore.get("symmetry_client_mode")?.value === "1";
 }

@@ -70,7 +70,10 @@ export default function TrainerLayoutWrapper({ children }: Props) {
     // server render is deterministically the client dashboard (belt-and-
     // suspenders with the cookie). router.refresh() invalidates the router
     // cache so a page prefetched in the OTHER mode can't be served stale.
-    router.push(next ? "/home?as=client" : "/home");
+    // BOTH directions carry a marker now. A bare /home let a stale cookie —
+    // or a payload prefetched while in the other mode — decide, which is how
+    // "hit trainer toggle, get client view" happened.
+    router.push(next ? "/home?as=client" : "/home?as=trainer");
     router.refresh();
   }
 

@@ -27,8 +27,13 @@ export default async function WorkoutDayEditPage({
 
   const { data: day } = await supabase
     .from("days")
+    // `notes` is not a column on `days` and never has been — and asking for it
+    // failed the WHOLE select, so `day` came back null and every workout day a
+    // trainer opened from a client's Training tab rendered the "Program Not in
+    // App Yet / hasn't been migrated from Everfit" screen below. A one-word
+    // typo that read as a data-migration problem. Nothing ever displayed it.
     .select(`
-      id, label, notes,
+      id, label,
       phases(id, label, programs(id, name)),
       sections(
         id, internal_name, client_facing_name, position,
