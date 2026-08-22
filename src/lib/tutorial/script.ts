@@ -75,6 +75,17 @@ export interface TutorialStep {
   manualNarration?: string;
   /** True when the step only exists because of AI — hidden entirely without it. */
   aiOnly?: boolean;
+  /**
+   * A block the trainer copies out of the app — the Gemini prompt for their
+   * avatar set.
+   *
+   * In the step body rather than a link, because the alternative is "ask the
+   * owner for the script", which means Dustin relaying a wall of text to four
+   * people and one of them getting the old version. The prompt names the exact
+   * twenty slots the app looks for, so it has to travel WITH the app.
+   */
+  copyText?: string;
+  copyLabel?: string;
 }
 
 export interface TutorialChapter {
@@ -193,13 +204,17 @@ export const TUTORIAL: TutorialChapter[] = [
         body: [
           "The app has a cartoon of the coach that appears whenever it speaks — twenty of them, one per situation. Celebrating a personal best, checking in after a quiet week, explaining a screen.",
           "You can have your own. Settings, Bots and AI, Your avatar set. Twenty slots, each one telling you what it is used for, and you upload a picture into each.",
-          "Ask the owner for the avatar script — you paste it into Gemini, upload some photos of yourself, and it draws the twenty. The slots are named to match, so they drop straight in.",
+          "Copy the script below and paste it into Gemini. It names all twenty poses in the order the app expects, so the pictures come back matching the slots.",
+          "Then upload a few photos of yourself — face, build, your usual hair — and tell it you are done. It draws the set. Upload each one into the matching slot here.",
           "You do not need all twenty to start. Anything you have not uploaded falls back to the standard set, so five tonight and the rest at the weekend is completely fine.",
         ],
         narration:
           "The app has a cartoon of the coach that appears whenever it speaks. Twenty of them, one per situation. Celebrating a personal best, checking in after a quiet week, explaining a screen. You can have your own. Settings, Bots and AI, Your avatar set. Twenty slots, each one telling you what it is for, and you upload a picture into each. Ask the owner for the avatar script. You paste it into Gemini, upload some photos of yourself, and it draws the twenty. You do not need all of them to start. Anything you have not uploaded falls back to the standard set.",
         route: "/settings",
         routeLabel: "Open Settings",
+        copyLabel: "Copy the Gemini script",
+        copyText:
+          "I'm a trainer onboarding onto the Symmetry Personal Training app and I need a set of 20 AI bot personas of myself. Do not generate anything yet.\n\nART STYLE\n- High-resolution, stylised, bold-line comic-book illustration. Clean sticker style, transparent or plain background.\n- Functional athletic gym wear.\n- The \"Symmetry Personal Training\" circular logo on the chest of every outfit \u2014 white logo on dark clothing, dark navy or gold on light clothing so it reads.\n- Colour-match each panel's outfit differently (charcoal and crimson, teal and silver, and so on).\n- Same face, same build, same hairstyle in all twenty. Consistency across the set matters more than any single panel.\n\nTHE 20 PANELS, IN THIS EXACT ORDER. Number each one. These map to specific slots in the app, so all twenty are needed and the order matters:\n1. neutral \u2014 relaxed, approachable, resting expression. Head and shoulders. This is the default and gets used most.\n2. thinking \u2014 hand on chin, analysing, looking slightly off-camera.\n3. explaining \u2014 mid-sentence, gesturing with one open hand, teaching.\n4. plan \u2014 holding a clipboard or tablet, reviewing a programme.\n5. happy \u2014 genuine warm smile, arms relaxed.\n6. hype \u2014 celebrating, both arms raised, big energy.\n7. pr \u2014 fists clenched, triumphant, just hit a personal record.\n8. flex \u2014 flexing a bicep, confident and playful.\n9. cool \u2014 arms crossed, calm, slight smirk. Understated.\n10. streak \u2014 pointing at the viewer approvingly, \"you're on a roll\".\n11. concerned \u2014 brow slightly furrowed, checking on someone. Caring, not angry.\n12. stern \u2014 serious, arms crossed, no smile. Firm but not hostile.\n13. callout \u2014 one hand cupped beside the mouth, calling across the gym.\n14. nutrition \u2014 holding or gesturing at food, or a shaker.\n15. hydrate \u2014 holding a water bottle, mid-drink or offering it.\n16. lifting \u2014 actively lifting: a dumbbell curl or a kettlebell.\n17. rest \u2014 hands on knees catching breath, or sitting on a bench.\n18. tips \u2014 index finger raised, \"here's a tip\".\n19. messages \u2014 looking at a phone, replying to someone.\n20. confident \u2014 hands on hips, standing tall, chest open.\n\nNEXT: I'm going to upload reference photos of my face, physique and usual hairstyle, possibly in several batches. Generate nothing until I say \"I'm done uploading.\" Then produce the 20 panels in the numbered order above, named 1-neutral through 20-confident.\n\nDo you understand?",
         audioUrl: null,
       },
       {

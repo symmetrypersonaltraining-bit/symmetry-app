@@ -34,6 +34,20 @@ function resetTutorialProgress(): void {
   }
 }
 
+/** Older iOS Safari, and any page without clipboard permission. */
+function fallbackCopy(text: string, onOk: () => void): void {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.top = "-1000px";
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0, text.length);
+  try { document.execCommand("copy"); onOk(); } catch { /* they can select it by hand */ }
+  document.body.removeChild(ta);
+}
+
 const SEEN_KEY = "symmetry_tutorial_seen_v1";
 /**
  * Whether this reader is using the app's AI.
@@ -67,6 +81,7 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
   const [speaking, setSpeaking] = useState(false);
   const [ready, setReady] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [copied, setCopied] = useState(false);
   const active = useRef<Narration | null>(null);
   // Which step's line has already been started. go() starts the next step's
   // narration inside the tap; without this the arrival effect would then start
@@ -383,6 +398,35 @@ export default function TutorialClient({ setup }: { setup: Record<SetupCheckKey,
             {p}
           </p>
         ))}
+
+        {/* A block to copy out of the app. The avatar script has to travel WITH
+            the tutorial: the alternative is the owner relaying a wall of text
+            to four people and one of them getting the old version, which is
+            exactly the version that produces seven empty slots. */}
+        {step.copyText ? (
+          <div className="mt-4 rounded-xl p-3" style={{ background: "var(--brand-surface-2)", border: "1px solid var(--brand-border)" }}>
+            <pre style={{
+              whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0,
+              maxHeight: 190, overflow: "auto", fontSize: 11.5, lineHeight: 1.5,
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+              color: "var(--brand-text-secondary)",
+            }}>{step.copyText}</pre>
+            <button
+              type="button"
+              onClick={() => {
+                const text = step.copyText || "";
+                const ok = () => { setCopied(true); setTimeout(() => setCopied(false), 2600); };
+                if (navigator.clipboard?.writeText) {
+                  navigator.clipboard.writeText(text).then(ok, () => fallbackCopy(text, ok));
+                } else fallbackCopy(text, ok);
+              }}
+              className="w-full mt-2.5 py-2.5 rounded-lg text-sm font-bold"
+              style={{ background: "var(--brand-accent)", color: "#fff", border: "none" }}
+            >
+              {copied ? "Copied — paste it into Gemini" : (step.copyLabel || "Copy")}
+            </button>
+          </div>
+        ) : null}
 
         {step.route ? (
           <div className="flex flex-wrap gap-2 mt-4">

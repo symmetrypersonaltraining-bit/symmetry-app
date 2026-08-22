@@ -221,17 +221,86 @@ const CLIENT_SCOPED_TABLES = new Set([
   "messages", "ai_usage_daily", "ai_action_log",
 ]);
 
-// Tables with no client dimension at all: the shared exercise library, the
-// programme skeleton, the food catalogue, the group challenges. Shared on
-// purpose — Dustin, 20 Aug, on the library: "yes same library".
+// Genuinely shared, still: the food catalogue (574k public foods) and the
+// spend rollup.
+//
+// EVERYTHING ELSE MOVED OUT ON 21 AUG, and this is the trap worth naming. The
+// agent runs on the ADMIN client, which bypasses RLS completely and scopes by
+// hand right here. So the walls built that night — programmes owned by a
+// trainer, a per-trainer movement library, one group room each — did not apply
+// on this path at all. A trainer asking their own Claude "list every
+// programme" would have been handed the whole business, straight past policies
+// that were working perfectly two feet away.
+//
+// The rule that prevents the next one: a table is only SHARED if it would be
+// safe to hand a stranger. Anything owned by somebody gets a scope below.
 const SHARED_TABLES = new Set([
-  "programs", "phases", "days", "exercises", "prescribed_exercises", "sections",
-  "group_challenges", "food_catalog", "ai_usage_monthly",
+  "food_catalog", "ai_usage_monthly",
 ]);
+
+/** Tables scoped by which trainer owns the row itself. */
+const TRAINER_OWNED_TABLES = new Set(["programs", "exercises"]);
+
+/**
+ * Tables that inherit their scope from a programme, and the column that gets
+ * them there. Each one is resolved by walking down from the programmes this
+ * trainer may see — see programmeScopedIds().
+ */
+const PROGRAM_DESCENDANT_TABLES: Record<string, "program_id" | "phase_id" | "day_id" | "section_id"> = {
+  phases: "program_id",
+  days: "phase_id",
+  sections: "day_id",
+  prescribed_exercises: "section_id",
+};
 
 export async function execTrainerTool(db: Db, name: string, input: Record<string, unknown>, caller: ToolCaller): Promise<string> {
   const str = (k: string): string => (typeof input[k] === "string" ? (input[k] as string).trim() : "");
   const num = (k: string): number | null => (input[k] == null || input[k] === "" ? null : Number(input[k]));
+
+  /**
+   * The programmes this trainer may see: their own, plus the house templates
+   * (owner_trainer_id null) that everyone may use. Resolved once per call.
+   */
+  let programIds: string[] | null = null;
+  async function myProgramIds(): Promise<string[]> {
+    if (programIds) return programIds;
+    const { data } = await db.from("programs").select("id, owner_trainer_id").limit(5000);
+    const rows = (data || []) as { id: string; owner_trainer_id: string | null }[];
+    programIds = rows
+      .filter((r) => r.owner_trainer_id === null || r.owner_trainer_id === caller.trainerId)
+      .map((r) => r.id);
+    return programIds;
+  }
+
+  /**
+   * The ids of a programme's descendants, walked down one level at a time.
+   *
+   * phases → days → sections → prescribed_exercises. Each level is filtered by
+   * the level above, so a row can never be more visible than the programme it
+   * belongs to — the same rule the RLS policies enforce, restated here because
+   * the admin client does not consult them.
+   */
+  const descendantCache = new Map<string, string[]>();
+  async function programmeScopedIds(level: "phases" | "days" | "sections"): Promise<string[]> {
+    const hit = descendantCache.get(level);
+    if (hit) return hit;
+    let ids: string[];
+    if (level === "phases") {
+      const { data } = await db.from("phases").select("id, program_id")
+        .in("program_id", await myProgramIds()).limit(20000);
+      ids = ((data || []) as { id: string }[]).map((r) => r.id);
+    } else if (level === "days") {
+      const { data } = await db.from("days").select("id, phase_id")
+        .in("phase_id", await programmeScopedIds("phases")).limit(20000);
+      ids = ((data || []) as { id: string }[]).map((r) => r.id);
+    } else {
+      const { data } = await db.from("sections").select("id, day_id")
+        .in("day_id", await programmeScopedIds("days")).limit(20000);
+      ids = ((data || []) as { id: string }[]).map((r) => r.id);
+    }
+    descendantCache.set(level, ids);
+    return ids;
+  }
 
   // The caller's own roster, fetched at most once per tool call.
   let rosterIds: string[] | null = null;
@@ -274,6 +343,21 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
           q = q.eq("trainer_id", caller.trainerId);
         } else if (CLIENT_SCOPED_TABLES.has(table)) {
           q = q.in("client_id", await myClientIds());
+        } else if (table === "group_challenges") {
+          // One room each since 21 Aug.
+          q = q.eq("trainer_id", caller.trainerId);
+        } else if (TRAINER_OWNED_TABLES.has(table)) {
+          // Their own rows plus the house set, which is what `null` means for
+          // both programmes and movements.
+          q = q.or(`owner_trainer_id.is.null,owner_trainer_id.eq.${caller.trainerId}`);
+        } else if (PROGRAM_DESCENDANT_TABLES[table]) {
+          const col = PROGRAM_DESCENDANT_TABLES[table];
+          const ids =
+            col === "program_id" ? await myProgramIds()
+            : col === "phase_id" ? await programmeScopedIds("phases")
+            : col === "day_id"   ? await programmeScopedIds("days")
+            :                      await programmeScopedIds("sections");
+          q = q.in(col, ids);
         } else if (!SHARED_TABLES.has(table)) {
           return `Error: "${table}" is not readable from your account.`;
         }
@@ -296,8 +380,12 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
       const lim = Math.min(100, Math.max(1, Number(input.limit) || 25));
 
       if (scope === "group") {
-        const { data } = await db.from("messages").select("id, from_id, body, created_at, is_broadcast")
-          .eq("is_group", true).is("deleted_at", null).order("created_at", { ascending: false }).limit(lim);
+        // Their own room. Before the rooms were split there was only one, and
+        // this read every message in it regardless of who was asking.
+        let gq = db.from("messages").select("id, from_id, body, created_at, is_broadcast")
+          .eq("is_group", true).is("deleted_at", null);
+        if (!caller.isOwner) gq = gq.eq("group_trainer_id", caller.trainerId);
+        const { data } = await gq.order("created_at", { ascending: false }).limit(lim);
         return JSON.stringify(data || []);
       }
       if (scope === "client") {
@@ -388,8 +476,15 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
 
     if (name === "list_programs") {
       const q = str("query");
-      let sel = db.from("programs").select("id, name, category, status, phases(id, label, position)").order("name").limit(60);
-      if (q) sel = db.from("programs").select("id, name, category, status, phases(id, label, position)").ilike("name", `%${q}%`).order("name").limit(60);
+      // Their own programmes plus the house templates. This listed every
+      // programme in the business, which since 21 Aug means another trainer's
+      // client programming by name.
+      const cols = "id, name, category, status, owner_trainer_id, phases(id, label, position)";
+      let sel = db.from("programs").select(cols).order("name").limit(60);
+      if (q) sel = db.from("programs").select(cols).ilike("name", `%${q}%`).order("name").limit(60);
+      if (!caller.isOwner) {
+        sel = sel.or(`owner_trainer_id.is.null,owner_trainer_id.eq.${caller.trainerId}`);
+      }
       const { data } = await sel;
       return JSON.stringify(data || []);
     }

@@ -15,6 +15,7 @@ import TrainerProfileCard from "@/components/TrainerProfileCard";
 import SettingsGroup from "@/components/SettingsGroup";
 import TrainerBotSettings from "@/components/TrainerBotSettings";
 import TrainerFaceSetCard from "@/components/TrainerFaceSetCard";
+import AddTrainerCard from "@/components/AddTrainerCard";
 
 interface Props {
   userEmail: string;
@@ -426,6 +427,8 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
       </SettingsGroup>
 
       <SettingsGroup id="help" title="Help and about" sub="Getting clients started, help centre, app version" icon="ti-help" classic={classic}>
+      {isTrainer && !isInClientMode && <AddTrainerCard />}
+
       {/* Where the install QR lives. Dustin asked "where do I find the qr code
           to have clients download this" — the per-client one only appears on a
           client who has never had a login, so this is the one that works for
