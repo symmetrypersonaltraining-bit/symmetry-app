@@ -1,5 +1,65 @@
 # Backlog — the single work queue
 
+> ## 👉 22 Aug NIGHT — THE MEAL PLAN IS THE AUTHOR'S, AND THE APP CANNOT TOUCH IT
+>
+> **`origin/main` = `d5a7ab4`.**
+>
+> Dustin: *"i plan it, I schedule it, i change it all from that project period...
+> the app does not design my mesl plan, I do. fix it!"*
+>
+> **`441df75` — `clients.plan_locked`, on for Dustin and Steph.** A trigger on
+> `meal_plans`, `meals`, `meal_items` and `macro_targets` refuses every
+> PostgREST-originated write for a locked client and lets a direct session
+> through, so the Command Center chat is the only hand on the plan. Reads are
+> untouched — the app still displays it, and food logging (`meal_adherence_logs`)
+> is unaffected.
+>   - **Steph was my call, not his.** He authors her plan too. One line to undo:
+>     `update public.clients set plan_locked = false where name = 'Steph Gautreaux';`
+>   - Two bugs in the first version, both found by testing it rather than
+>     trusting `{"success":true}`. It tested `current_user` — inside SECURITY
+>     DEFINER that is the function's OWNER, always `postgres`, never the caller,
+>     so it let **every** app write through while looking like it worked. And it
+>     read `new.<column>` inside a CASE over `tg_table_name`, which plpgsql
+>     compiles for every branch, so `new.meal_plan_id` in a `meal_plans` trigger
+>     aborted the write for **every** client, locked or not. Both are pinned by
+>     `tests/unit/lockedPlanIsTheAuthorsAlone.test.ts`.
+>
+> **`880c649` — one live plan per client per start date.** `plan-restore`
+> already said in a comment that two live plans covering the same days is not
+> cosmetic. It happened that night: a retried insert left Dustin and Steph each
+> holding two plans marked live from 31 Aug, one of each pair with six meals and
+> **zero food in them**. `resolvePlan`'s `created_at` tiebreak happened to pick
+> the good one; nothing guaranteed it. Now a partial unique index, `nulls not
+> distinct`. Empties removed, backed up to `bak_*_20260822_dupe_aug31`.
+>
+> **`d5a7ab4` — `clone_meal_plan()`.** Hand-written CTE copies inserted **zero**
+> item rows three separate times during BULK v2, silently. One call now, and it
+> raises rather than leaving a plan with no food in it.
+>
+> **The week-scoped rule, which is the actual answer to "why does this keep
+> happening".** A plan runs from its `effective_date` until the next plan starts.
+> There is no end date. So a one-week change is **two rows** — the change on that
+> Monday, and a copy of the standing plan on the following Monday. Written as one
+> row it runs forever. Dustin's ladder is now correct:
+>
+> | | Aug 17 | Aug 24 | Aug 31 |
+> |---|---|---|---|
+> | Dustin | v4 · 4213/254/381/186 | v5 · **4148/244/377/185** | v6 · 4213/254/381/186 |
+> | Steph  | v3 · 1127/121/87/33   | v4 · **1105/119/87/31**   | v5 · 1127/121/87/33 |
+>
+> Full authoring procedure: `docs/COMMAND-CENTER-MEAL-PLANS.md`.
+>
+> **Checked, not assumed:** the nightly `flip_due_meal_plans` and
+> `generate_rotation_plans` (pg_cron, jobs 20 and 14) still run clean under the
+> new index — dry-run to 2026-12-31 and rolled back. They run as `postgres`, so
+> the lock does not touch them either.
+>
+> **Connector note.** `RefreshMcpTools` does **not** exist in claude.ai web chat,
+> and "tool not found" is returned both for a dropped connector and for a tool
+> that never existed. No in-chat repair on that surface. Fix: start a new chat
+> (the registry is per-conversation), else run the SQL in the Supabase editor,
+> which connects as `postgres` and is allowed by the lock.
+
 > ## 👉 22 Aug PM — THE PROGRAMME/CALENDAR SPLIT, AND THE WEEK THAT MOVED AT 7PM
 >
 > **`origin/main` = `7f588b7`.**
