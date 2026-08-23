@@ -50,3 +50,92 @@ export const FACE_SLOTS: FaceSlot[] = [
 ];
 
 export const FACE_SLUGS: string[] = FACE_SLOTS.map((s) => s.slug);
+
+/**
+ * The slots grouped by WHERE THEY APPEAR, because that is the question a
+ * trainer is actually asking when they sit down to make these.
+ *
+ * Dustin, 23 Aug: "a section for each type: group msg bot, ai cards,
+ * celebrations, etc."
+ *
+ * A flat list of twenty is a chore with no shape — it does not tell you that
+ * four of them are the whole emotional range of a nudge, or that the first
+ * five are 60% of everything the app renders. Sections give the work an order:
+ * do the ones that show up constantly, then the ones that show up at a moment
+ * that matters.
+ *
+ * `priority` is what the upload screen sorts by and what the copy leans on.
+ * "Do these first" is a real answer to "which five tonight?".
+ */
+export interface FaceSection {
+  id: string;
+  title: string;
+  blurb: string;
+  slugs: string[];
+  /** 1 = do these first. */
+  priority: 1 | 2 | 3;
+}
+
+export const FACE_SECTIONS: FaceSection[] = [
+  {
+    id: "everyday",
+    title: "Everyday AI cards",
+    blurb:
+      "The faces on ordinary app cards — the assistant, the weekly plan, anything being explained or generated. Between them these are most of what anyone sees, so they are the ones worth doing first.",
+    slugs: ["neutral", "thinking", "explaining", "plan", "tips"],
+    priority: 1,
+  },
+  {
+    id: "celebrations",
+    title: "Celebrations and wins",
+    blurb:
+      "The full-screen moment after a session, a personal record, a streak. These are the ones people screenshot, so they are worth more effort than their frequency suggests.",
+    slugs: ["happy", "hype", "pr", "flex", "cool", "streak", "confident"],
+    priority: 1,
+  },
+  {
+    id: "checkins",
+    title: "Check-ins and nudges",
+    blurb:
+      "When somebody has gone quiet. The app climbs this ladder gently — caring, then firm — and the face has to climb with it. Nothing here should look angry.",
+    slugs: ["concerned", "stern", "callout", "quiet_note"],
+    priority: 2,
+  },
+  {
+    id: "group",
+    title: "Group chat bot",
+    blurb:
+      "The face on Coach Bot's posts in your group chat, and on message and inbox cards.",
+    slugs: ["messages"],
+    priority: 2,
+  },
+  {
+    id: "topics",
+    title: "Topics",
+    blurb: "Nutrition, training, water, rest days. Used on the screen that matches.",
+    slugs: ["nutrition", "hydrate", "lifting", "rest"],
+    priority: 3,
+  },
+];
+
+/**
+ * `quiet_note` is a SECTION-ONLY entry, not a slot. The check-in ladder has a
+ * third rung — a client who has been silent three weeks and was never a regular
+ * logger — and it deliberately reuses `thinking` rather than a disappointed
+ * face (see faces.ts). Naming it here keeps the ladder legible on the upload
+ * screen; it is filtered out before anything asks for a file.
+ */
+const NOT_A_SLOT = new Set(["quiet_note"]);
+
+/** The sections with only real, uploadable slugs in them. */
+export const UPLOADABLE_SECTIONS: FaceSection[] = FACE_SECTIONS.map((s) => ({
+  ...s,
+  slugs: s.slugs.filter((x) => !NOT_A_SLOT.has(x)),
+}));
+
+const BY_SLUG = new Map(FACE_SLOTS.map((s) => [s.slug, s]));
+
+/** The slot record for a slug, or null if it is not one. */
+export function faceSlot(slug: string): FaceSlot | null {
+  return BY_SLUG.get(slug) ?? null;
+}

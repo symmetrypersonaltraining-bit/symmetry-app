@@ -89,9 +89,11 @@ export const FALLBACK_FACE = "/coachbot.png";
  * Empty or missing means the original set, so the owner is unchanged and a
  * trainer added tomorrow degrades to it rather than to a broken image.
  *
- * The group chat deliberately does NOT pass one: that room is shared by
- * decision, Coach Bot is one voice in it, and two different bots posting the
- * same kind of message would read as two different bots.
+ * The group chat used to be the one exception — it did not pass a set, because
+ * the room was shared and two different bots posting the same kind of message
+ * would read as two different bots. The rooms were split per trainer on
+ * 21 Aug, so the reason is gone: a group room now has exactly one coach, and
+ * their bot is the one that belongs in it.
  */
 /**
  * A set a trainer uploaded, rather than one that ships in /public/bots.
@@ -114,11 +116,74 @@ function setDir(set?: string | null): string {
   return `${base}/storage/v1/object/public/assets/bots/${set}/`;
 }
 
-export function faceSrc(mood: Mood | null | undefined, set?: string | null): string {
+/**
+ * A trainer's uploaded library: slug -> the public URLs they have put there.
+ *
+ * Empty or missing for a trainer who has uploaded nothing, which is every
+ * trainer on their first day.
+ */
+export type FaceLibrary = Record<string, string[]>;
+
+/**
+ * THE FALLBACK THAT WAS PROMISED AND NEVER EXISTED.
+ *
+ * The upload screen says "Anything you have not uploaded falls back to the
+ * standard set" and the walkthrough says "five tonight and the rest at the
+ * weekend is completely fine". Neither was true: `setDir` picked ONE directory
+ * for the whole set, so an uploaded set missing `hydrate.webp` did not fall
+ * back to anything — it emitted a URL for a file that is not there and rendered
+ * a broken image. A trainer following the advice in the app would have seen
+ * exactly that, on their own clients' screens, with nothing to explain it.
+ *
+ * Resolving per SLUG rather than per set is what makes the promise true. A slug
+ * the trainer has uploaded comes from their library; one they have not comes
+ * from the stock set.
+ */
+function stockDir(set?: string | null): string {
+  // A `u-` set has no stock files of its own — its fallback is the original.
+  if (set && !set.startsWith(UPLOADED_PREFIX)) return `/bots/${set}/`;
+  return "/bots/";
+}
+
+/**
+ * Pick one of N. Stable for a given seed, so a face does not flicker between
+ * renders of the same card, and different across seeds, so a trainer who
+ * uploads five neutrals sees all five rather than always the first.
+ *
+ * Deliberately not Math.random(): a face that changes on every re-render is
+ * distracting, and on a server-rendered card it would also mismatch hydration.
+ */
+function pick(list: string[], seed?: string | number | null): string {
+  if (list.length === 1) return list[0];
+  const s = String(seed ?? "");
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return list[Math.abs(h) % list.length];
+}
+
+export function faceSrc(
+  mood: Mood | null | undefined,
+  set?: string | null,
+  lib?: FaceLibrary | null,
+  seed?: string | number | null,
+): string {
+  const slug = mood ? ART[mood] : ART.neutral;
+  if (!slug) return FALLBACK_FACE;
+
+  // The trainer's own library first, when it has something for THIS slug.
+  const mine = lib?.[slug];
+  if (mine && mine.length) return pick(mine, `${slug}:${seed ?? ""}`);
+
+  // Then the set folder, then the stock set. Per slug, not per set.
   const dir = setDir(set);
-  if (!mood) return `${dir}${ART.neutral}.webp`;
-  const slug = ART[mood];
-  return slug ? `${dir}${slug}.webp` : FALLBACK_FACE;
+  const stock = stockDir(set);
+  // An uploaded set with no library row for this slug has nothing at that path
+  // — fall through to the stock file rather than emitting a 404.
+  if (set && set.startsWith(UPLOADED_PREFIX)) return `${stock}${slug}.webp`;
+  return `${dir}${slug}.webp`;
 }
 
 /** The storage folder name for a trainer's own uploaded set. */

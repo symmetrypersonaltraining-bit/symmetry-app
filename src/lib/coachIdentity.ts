@@ -12,6 +12,7 @@
 // This module resolves the answer once, server-side, from the database. The
 // client half lives in useCoach.tsx and is seeded from here in the app layout.
 
+import type { FaceLibrary } from "@/lib/ai/faces";
 import { COACH_NAME, COACH_FIRST_NAME } from "@/lib/trainer";
 
 export interface CoachIdentity {
@@ -37,6 +38,14 @@ export interface CoachIdentity {
   isOwner: boolean;
   /** True when the viewer IS this coach — a trainer in their own client view. */
   isSelf: boolean;
+  /**
+   * This coach's uploaded face library: slug -> public URLs, several per slug.
+   *
+   * Empty for a coach who has uploaded nothing, which is every coach on day
+   * one. Resolved per SLUG at render time (see faceSrc), so a half-finished
+   * library is a normal state rather than a broken one.
+   */
+  faces: FaceLibrary;
 }
 
 /**
@@ -56,6 +65,7 @@ export const DEFAULT_COACH: CoachIdentity = {
   trainerId: null,
   isOwner: false,
   isSelf: false,
+  faces: {},
 };
 
 interface MinimalDb {
@@ -63,18 +73,50 @@ interface MinimalDb {
     select: (c: string) => {
       eq: (col: string, v: unknown) => {
         limit: (n: number) => PromiseLike<{ data: unknown; error?: unknown }>;
+        order?: (c: string, o: { ascending: boolean }) => PromiseLike<{ data: unknown; error?: unknown }>;
       };
     };
   };
 }
 
+/**
+ * A coach's uploaded face library, as slug -> URLs.
+ *
+ * Read alongside the trainer row rather than lazily at render time: this ends
+ * up in the app-layout provider, and a face that arrives one paint after the
+ * card it belongs on is a visible flicker on every screen in the app.
+ *
+ * Failure is silent and empty. A library that cannot be read means the stock
+ * faces are used, which is exactly the day-one state and looks like nothing is
+ * wrong — the correct behaviour for decoration.
+ */
+async function libraryFor(db: MinimalDb, trainerId: string | null): Promise<FaceLibrary> {
+  if (!trainerId) return {};
+  try {
+    const q = db.from("trainer_face_variants").select("slug, storage_path, ord").eq("trainer_id", trainerId);
+    const { data } = await (q.order ? q.order("ord", { ascending: true }) : q.limit(400));
+    const rows = (data as { slug: string; storage_path: string; ord: number }[] | null) || [];
+    const base = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    if (!base) return {};
+    const out: FaceLibrary = {};
+    for (const r of rows) {
+      if (!r?.slug || !r?.storage_path) continue;
+      (out[r.slug] ||= []).push(`${base}/storage/v1/object/public/assets/${r.storage_path}`);
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 const first = (d: unknown): Record<string, unknown> | null =>
   Array.isArray(d) ? ((d[0] as Record<string, unknown>) ?? null) : null;
 
-function shape(row: Record<string, unknown> | null, isSelf: boolean): CoachIdentity | null {
+function shape(row: Record<string, unknown> | null, isSelf: boolean, faces: FaceLibrary = {}): CoachIdentity | null {
   if (!row) return null;
   const name = String(row.name || "");
   return {
+    faces,
     firstName: String(row.first_name || name.split(/\s+/)[0] || COACH_FIRST_NAME),
     name: name || COACH_NAME,
     avatarUrl: (row.avatar_url as string) || null,
@@ -103,7 +145,7 @@ export async function coachForClientId(
     const tid = first(cRows)?.trainer_id as string | undefined;
     if (!tid) return DEFAULT_COACH;
     const { data } = await db.from("trainers").select(COLS).eq("id", tid).limit(1);
-    return shape(first(data), !!viewerTrainerId && viewerTrainerId === tid) ?? DEFAULT_COACH;
+    return shape(first(data), !!viewerTrainerId && viewerTrainerId === tid, await libraryFor(db, tid)) ?? DEFAULT_COACH;
   } catch {
     return DEFAULT_COACH;
   }
@@ -127,14 +169,15 @@ export async function coachForViewer(
     // A trainer first: they are their own coach, and a trainer who also has a
     // client row must not resolve through it to whoever trains THEM.
     const { data: tRows } = await db.from("trainers").select(COLS).eq("auth_user_id", authUserId).limit(1);
-    const self = shape(first(tRows), true);
+    const selfRow = first(tRows);
+    const self = shape(selfRow, true, selfRow ? await libraryFor(db, String(selfRow.id)) : {});
     if (self) return self;
 
     const { data: cRows } = await db.from("clients").select("id, trainer_id").eq("auth_user_id", authUserId).limit(1);
     const tid = first(cRows)?.trainer_id as string | undefined;
     if (!tid) return DEFAULT_COACH;
     const { data } = await db.from("trainers").select(COLS).eq("id", tid).limit(1);
-    return shape(first(data), false) ?? DEFAULT_COACH;
+    return shape(first(data), false, await libraryFor(db, tid)) ?? DEFAULT_COACH;
   } catch {
     return DEFAULT_COACH;
   }

@@ -267,18 +267,22 @@ test("every mood has artwork in every set that exists", async () => {
   assert.deepEqual(missing, [], "moods with no artwork:\n  " + missing.join("\n  "));
 });
 
-test("the client's own AI surfaces wear their coach's set; the group chat does not", () => {
+test("every AI surface wears the viewer's coach's faces — the group chat included", () => {
   for (const f of ["src/components/AiBadge.tsx", "src/components/CoachFab.tsx",
                    "src/components/BigCoachBar.tsx"]) {
     const c = code(read(f));
     assert.match(c, /useCoach\(\)/, f + " does not resolve the viewer's coach");
-    assert.match(c, /faceSrc\([^)]*botSet\)/, f + " draws a fixed set for everybody");
+    assert.match(c, /faceSrc\([^)]*botSet[^)]*\)/, f + " draws a fixed set for everybody");
+    assert.match(c, /faceSrc\([^)]*faces[^)]*\)/, f + " ignores the coach's uploaded library");
   }
-  // The group chat is shared by decision, so Coach Bot is ONE voice in it. Two
+  // REVERSED, deliberately, on 23 Aug. This used to assert the group chat did
+  // NOT pass a set: the room was shared, Coach Bot was one voice in it, and two
   // different bots posting the same kind of message would read as two bots.
+  // The rooms were split per trainer on 21 Aug, so a group room has exactly one
+  // coach now and their bot is the one that belongs in it.
   const msgs = code(read("src/app/(app)/messages/MessagesClient.tsx"));
-  assert.match(msgs, /faceSrc\("messages"\)/,
-    "the group-chat bot became per-coach — the shared room should keep one bot");
+  assert.match(msgs, /faceSrc\("messages", botSet, faces, m\.id\)/,
+    "the group-chat bot is wearing a stranger's face again");
 });
 
 test("the coach identity carries the set, and defaults to no set", async () => {

@@ -38,7 +38,7 @@ export default function CoachFab({
   liftPx?: number;
 }) {
   // The viewer's own coach's face set — see faceSrc().
-  const { botSet } = useCoach();
+  const { botSet, faces } = useCoach();
   const kb = useKeyboardInset();
   // Not "moved up" — gone. There is no position on a phone where a floating
   // button and an open keyboard both fit without one covering something.
@@ -69,7 +69,7 @@ export default function CoachFab({
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={faceSrc(mood, botSet)}
+        src={faceSrc(mood, botSet, faces)}
         alt=""
         width={SIZE}
         height={SIZE}

@@ -89,7 +89,7 @@ async function compressImage(file: File, max = 1280): Promise<Blob> {
 }
 
 export default function MessagesClient({ isTrainer, clients, selectedClientId, thread, currentUserId, unreadByClient, senderNames = {}, senderAvatars = {}, lastByClient = {} }: Props) {
-  const { firstName: coachFirstName } = useCoach();
+  const { firstName: coachFirstName, botSet, faces } = useCoach();
   const router = useRouter();
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -318,13 +318,17 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
                       <p className="text-[11px] font-bold mb-0.5 flex items-center gap-1.5" style={{ color: isMe ? "rgba(255,255,255,0.85)" : isBot ? "#a78bfa" : "var(--brand-primary)" }}>
                         {isBot ? (
                           <>
-                            {/* Was a hard-coded /coachbot.png — the last place in
-                                the app still wearing the pre-sticker-set cartoon,
-                                so the bot in the group chat did not look like the
-                                same bot as everywhere else. Through the registry
-                                now, like every other AI face. */}
+                            {/* Was a hard-coded /coachbot.png, then the STOCK
+                                face with no set — deliberately, because the room
+                                was shared and two bots posting the same kind of
+                                message would read as two different bots.
+                                The rooms were split per trainer on 21 Aug, so a
+                                group room has exactly one coach now and their
+                                bot is the one that belongs in it. Passing the
+                                set is what makes Coach Bot look like the same
+                                bot as the rest of that coach's app. */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={faceSrc("messages")} alt="" width={18} height={18} style={{ borderRadius: "50%", objectFit: "cover" }} />
+                            <img src={faceSrc("messages", botSet, faces, m.id)} alt="" width={18} height={18} style={{ borderRadius: "50%", objectFit: "cover" }} />
                             Coach Bot
                           </>
                         ) : (

@@ -25,6 +25,7 @@
 // One face across the app, but not one EXPRESSION. Which sticker gets used is
 // decided by mood in src/lib/ai/faces.ts — read the header there for why the
 // expression is carrying part of the message rather than decorating it.
+import { centralToday } from "@/lib/central-time";
 import { faceSrc, type Mood } from "@/lib/ai/faces";
 import { useCoach } from "@/lib/useCoach";
 
@@ -33,6 +34,7 @@ export default function AiBadge({
   ring = true,
   title = "Written by the app",
   mood = "neutral",
+  seed,
 }: {
   size?: number;
   /** Purple ring — the same tint bot messages get in the group chat. */
@@ -44,15 +46,27 @@ export default function AiBadge({
    * register of what they are showing pass their own.
    */
   mood?: Mood;
+  /**
+   * WHICH of the coach's faces, when they have uploaded several for this mood.
+   *
+   * Stable for a given seed, so a card does not change face between renders and
+   * a server-rendered one does not mismatch on hydration. Pass something that
+   * identifies the THING being shown — a message id, a date, a client id — and
+   * the face varies across those while staying put within one.
+   *
+   * Left unset it rotates by the day: a trainer who uploads five neutrals sees
+   * all five over a week rather than the same one forever.
+   */
+  seed?: string | number | null;
 }) {
   // The VIEWER's coach's set. Same rule as CoachBadge: this art is a cartoon of
   // a specific person, so a client of Stephanie's must not be shown a cartoon
   // of Dustin telling them how their week went.
-  const { botSet } = useCoach();
+  const { botSet, faces } = useCoach();
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={faceSrc(mood, botSet)}
+      src={faceSrc(mood, botSet, faces, seed ?? centralToday())}
       alt=""
       title={title}
       width={size}

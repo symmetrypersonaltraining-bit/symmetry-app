@@ -1231,6 +1231,14 @@
     "sex",
     "created_at"
   ],
+  "trainer_face_variants": [
+    "id",
+    "trainer_id",
+    "slug",
+    "storage_path",
+    "ord",
+    "created_at"
+  ],
   "trainer_features": [
     "trainer_id",
     "coachbot_enabled",

@@ -109,7 +109,7 @@ test("Coach Bot keeps its own face and is not given a client avatar", () => {
   // The bot posts from the trainer's auth user id, so a lookup by from_id would
   // hand it Dustin's photo and it would look like him posting.
   const src = code(CLIENT);
-  const botIdx = src.indexOf('faceSrc("messages")');
+  const botIdx = src.indexOf('faceSrc("messages"');
   const avatarIdx = src.indexOf("senderAvatars[m.from_id]");
   assert.ok(botIdx > 0 && avatarIdx > 0);
   assert.ok(botIdx < avatarIdx, "the isBot branch must come first and short-circuit");
