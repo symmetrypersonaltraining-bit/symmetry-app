@@ -49,6 +49,10 @@ export async function GET() {
     .from("ai_chat_sessions")
     .select("id, messages, updated_at")
     .eq("context_type", CONTEXT_TYPE)
+    // WHOSE thread. Without this the newest 'trainer_agent' row on the whole
+    // instance came back, so a second trainer opened the first one's
+    // conversation — client names, injuries, money — and then overwrote it.
+    .eq("owner_user_id", scoped.scope.userId)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -71,6 +75,11 @@ export async function DELETE() {
   if (!scoped.scope.isTrainer) return NextResponse.json({ error: "Trainer only" }, { status: 403 });
 
   const db = createAdminClient();
-  await db.from("ai_chat_sessions").delete().eq("context_type", CONTEXT_TYPE);
+  // Clear MY thread. This used to delete every trainer_agent row there was.
+  await db
+    .from("ai_chat_sessions")
+    .delete()
+    .eq("context_type", CONTEXT_TYPE)
+    .eq("owner_user_id", scoped.scope.userId);
   return NextResponse.json({ ok: true });
 }

@@ -16,7 +16,7 @@
     "context_type",
     "messages",
     "created_at",
-    "updated_at"
+    "updated_at", "owner_user_id"
   ],
   "ai_chat_turns": [
     "id",

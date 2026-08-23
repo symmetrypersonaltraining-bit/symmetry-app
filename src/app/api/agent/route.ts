@@ -69,7 +69,7 @@ ${APP_GUIDE_TRAINER}
  * Never throws. A failure to remember must not fail the answer that was already
  * produced.
  */
-async function saveSession(db: Db, incoming: { role: string; content: unknown }[], reply: string): Promise<void> {
+async function saveSession(db: Db, ownerUserId: string, incoming: { role: string; content: unknown }[], reply: string): Promise<void> {
   try {
     const flat = [...incoming, { role: "assistant", content: reply }]
       .filter((m) => m.role === "user" || m.role === "assistant")
@@ -84,15 +84,21 @@ async function saveSession(db: Db, incoming: { role: string; content: unknown }[
       .filter(Boolean)
       .slice(-MAX_TURNS);
 
+    // WHOSE thread. There is one row per trainer, not one row per instance —
+    // without the owner filter a second trainer's first question overwrote the
+    // first trainer's conversation, and the drawer showed each of them the
+    // other's.
     const { data: existing } = await db
-      .from("ai_chat_sessions").select("id").eq("context_type", CONTEXT_TYPE)
+      .from("ai_chat_sessions").select("id")
+      .eq("context_type", CONTEXT_TYPE)
+      .eq("owner_user_id", ownerUserId)
       .order("updated_at", { ascending: false }).limit(1).maybeSingle();
     const id = (existing as { id: string } | null)?.id;
 
     if (id) {
       await db.from("ai_chat_sessions").update({ messages: flat, updated_at: new Date().toISOString() }).eq("id", id);
     } else {
-      await db.from("ai_chat_sessions").insert({ context_type: CONTEXT_TYPE, messages: flat });
+      await db.from("ai_chat_sessions").insert({ context_type: CONTEXT_TYPE, owner_user_id: ownerUserId, messages: flat });
     }
   } catch (e) {
     console.error("agent: session save failed", e);
@@ -243,7 +249,7 @@ const client = new Anthropic({ apiKey });
       }
 
       const text = resp.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
-      await saveSession(admin, incoming, text);
+      await saveSession(admin, scope.userId, incoming, text);
       // Unconditional. This used to be gated on `scope.clientId`, so if the
       // trainer had no clients row the entire agent's SONNET spend went
       // unlogged — invisible to the $95 monthly kill switch, which is the one
@@ -274,7 +280,7 @@ const client = new Anthropic({ apiKey });
       `I got a long way into that but ran out of steps before finishing.\n\n` +
       (used.length ? `What I did: ${used.join(", ")}.\n\n` : "") +
       `Ask me to carry on and I'll pick up where this left off — I've kept the thread.`;
-    await saveSession(admin, incoming, ranOut);
+    await saveSession(admin, scope.userId, incoming, ranOut);
     await logUsage(scope.clientId ?? null, "trainer_agent", tokensIn, tokensOut, SONNET_MODEL, {
       latencyMs: Date.now() - t0,
       startedAt,
@@ -289,6 +295,7 @@ const client = new Anthropic({ apiKey });
     // against the kill switch rather than vanishing.
     await saveSession(
       admin,
+      scope.userId,
       incoming,
       `Something went wrong on my side partway through that. The conversation is still here — ask me to try again.`
     );
