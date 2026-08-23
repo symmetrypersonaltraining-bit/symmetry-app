@@ -178,16 +178,31 @@
 > - **Nudges are gone.** "we are not using nudges anymore so slipping thing is
 >   irrelivant." Anything about the nudge engine, the slipping bucket or the
 >   unmetered sweep is dead scope, not a bug.
-> - **AI spend is nowhere near the cap.** Measured 22 Aug: $8.29 across 1,240
->   calls for the month, 22 days in — about $11.50/month against $95. The
->   testers do not need their own Claude accounts. Re-measure before ever
->   claiming otherwise.
+> - **AI spend is nowhere near the cap.** Re-measured 22 Aug night: **$8.34
+>   across 1,246 calls**, 23 days in — about **$11.20/month against $95**, under
+>   12% of it. July was $0.13. The testers do not need their own Claude
+>   accounts. Re-measure before ever claiming otherwise.
 > - **The 1,043 orphan scheduled workouts are parked.** He wants context on what
 >   they actually are before anyone touches them. Do not clear them.
 > - **Flat-rate clients stay flat.** "if they have no supervised days, their rate
 >   is flat, dont change it ever."
 > - **The food-logger tutorial is question marks on each feature**, explaining
 >   that piece when tapped — not a chapter, not a docked panel.
+> - **`client_training_patterns.supervised` is NOT where supervision lives.**
+>   That table is empty for 20 of 22 active clients, so a query that counts
+>   supervised days from it reports **zero for almost everybody** — including
+>   clients with 35 supervised sessions booked. Supervision is
+>   `scheduled_workouts.supervised`. Checked 22 Aug against the real column:
+>   **every `monthly_adjusted` client has supervised sessions, and every `flat`
+>   client is meant to be flat. There is no billing anomaly.** This trap looks
+>   exactly like "half the roster is billed wrong" and it is not.
+> - **Exercise videos are done.** `docs/EXERCISE-VIDEOS-THE-REAL-NUMBERS.md`
+>   says 252 are missing; that is stale. Measured 22 Aug: 43 of 843 library
+>   exercises have no video, and **not one of those 43 is prescribed to
+>   anybody** — zero `prescribed_exercises` rows across all of them. All **636**
+>   exercises that ARE programmed have a video and none is flagged bad. The only
+>   live thread is **10 candidates sitting in `exercise_video_candidates` waiting
+>   for Dustin to approve or reject**.
 
 > ## ✅ SHIPPED 22 Aug (2a96cd1) — "build a plan around the foods I actually eat"
 >
