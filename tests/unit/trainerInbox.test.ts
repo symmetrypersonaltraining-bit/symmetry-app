@@ -133,11 +133,13 @@ const PER_CLIENT = [
   ["src/app/api/workout-ai/route.ts", "inboxAuthUidForClient(admin, clientId)"],
 ] as const;
 
+// Both bots came OFF this list on 23 Aug. They run once per room now and post
+// as the coach who runs it, so "resolve the owner" is exactly the thing they
+// must no longer do — see everyTrainerGetsAChallengeAndABot.test.ts.
+//
+// The nudge digest stays: the SCHEDULED sweep covers the whole business and is
+// the owner's. A trainer running it by hand gets her own, addressed to her.
 const OWNER_WIDE = [
-  ["src/app/api/cron/birthdays/route.ts", "ownerAuthUid(db)"],
-  ["src/app/api/cron/coachbot/route.ts", "ownerAuthUid(db)"],
-  // The nightly nudge digest covers the whole roster, so it goes to the owner.
-  // Splitting it per trainer is Dustin's call, not a default to slide in.
   ["src/app/api/ai-nudges/route.ts", "ownerAuthUid(admin)"],
 ] as const;
 
@@ -159,7 +161,7 @@ test("client-facing messages go to that client's coach", () => {
   }
 });
 
-test("the shared surfaces post as the owner, deliberately", () => {
+test("the whole-business sweep is still addressed to the owner", () => {
   for (const [f, call] of OWNER_WIDE) {
     assert.ok(code(read(f)).includes(call),
       f + " does not resolve the owner (" + call + ") — it would post from whichever trainer sorted first");

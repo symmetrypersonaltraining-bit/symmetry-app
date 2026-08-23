@@ -65,7 +65,12 @@ export default function CommunityPair({ basePath = "" }: { basePath?: string }) 
 
   const load = useCallback(async () => {
     try {
-      const { data: ch } = await supabase.from("v_active_challenge").select("*").maybeSingle();
+      const { data: ch } = await supabase.from("v_active_challenge").select("*")
+            // The view no longer stops at one row — it cannot, now that two
+            // rooms can each have a live challenge. RLS still gives THIS reader
+            // at most their own room's, so maybeSingle() is safe; the explicit
+            // limit is what keeps it safe if a policy ever widens.
+            .order("starts_on", { ascending: false }).limit(1).maybeSingle();
       const challengeRow = (ch as Challenge | null) ?? null;
       setChallenge(challengeRow);
 

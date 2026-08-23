@@ -66,21 +66,23 @@ test("the migration exists and narrows by role", () => {
 
 // ── 2. The bots post as the owner ───────────────────────────────────────────
 //
-// Correct — the group chat is shared by decision. What was wrong is that any
-// trainer could FIRE them, putting a message signed by Dustin in his group on
-// somebody else's tap. Preview stays open; posting does not.
+// I answered this one WRONG and it is worth leaving the record.
+//
+// I said the group chat was shared by decision and so the bots correctly spoke
+// as the owner; the only fault was that any trainer could fire them. Dustin:
+// "the group was split for per trainer" — and then, when the fix was still an
+// owner-only gate: "if I have a group chat with challenges and ai bots, and
+// other trainers do not, thats not exactly like mine is it?"
+//
+// The real answer was that every trainer gets the bots in their own room. The
+// owner-only gate lived for one day and is gone. What replaced it is asserted
+// in everyTrainerGetsAChallengeAndABot.test.ts; this only checks it stays gone.
 
 for (const f of ["src/app/api/cron/coachbot/route.ts", "src/app/api/cron/birthdays/route.ts"]) {
-  test(`${f}: a real post is the owner's, a preview is anyone's`, () => {
+  test(`${f}: the interim owner-only gate is not back`, () => {
     const src = read(f);
-    assert.match(src, /if \(!dry\) \{/, "a non-owner can still fire a real post");
-    assert.match(src, /if \(!me\.isOwner\) \{/);
-    assert.match(src, /\?dry=1 to preview/, "the refusal does not say what they CAN do");
-    // The dry flag must be read before the gate, or the gate cannot use it.
-    assert.ok(
-      src.indexOf('const dry = sp.get("dry") === "1";') < src.indexOf("if (!me.isOwner)"),
-      "dry is resolved after the gate that depends on it",
-    );
+    assert.ok(!/isOwner/.test(src), "a trainer is being refused her own room's bot again");
+    assert.match(src, /onlyTrainer = scoped\.scope\.userId;/, "a hand fire does not scope to the caller");
   });
 }
 

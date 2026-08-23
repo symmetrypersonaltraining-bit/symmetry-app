@@ -94,7 +94,12 @@ export default function GroupChallenge({ isTrainer }: { isTrainer: boolean }) {
 
   const load = useCallback(async () => {
     try {
-      const { data: c } = await supabase.from("v_active_challenge").select("*").maybeSingle();
+      const { data: c } = await supabase.from("v_active_challenge").select("*")
+            // The view no longer stops at one row — it cannot, now that two
+            // rooms can each have a live challenge. RLS still gives THIS reader
+            // at most their own room's, so maybeSingle() is safe; the explicit
+            // limit is what keeps it safe if a policy ever widens.
+            .order("starts_on", { ascending: false }).limit(1).maybeSingle();
       const chRow = (c as Challenge | null) ?? null;
       setCh(chRow);
 

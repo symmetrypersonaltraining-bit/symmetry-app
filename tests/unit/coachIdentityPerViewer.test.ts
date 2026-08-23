@@ -366,9 +366,12 @@ test("the group bots are handed their room's coach explicitly", () => {
     assert.match(c, new RegExp(`(?:export )?const ${sym} = \\(coachFirstName: string\\)`),
       f + " builds the group prompt from a module constant again");
   }
+  // Was `ownerTrainer(db)?.firstName`. Since 23 Aug both bots run once per
+  // room and are HANDED the room they are posting in, so the coach's name comes
+  // off that room rather than being looked up as "the owner" every time.
   for (const f of ["src/app/api/cron/coachbot/route.ts", "src/app/api/cron/birthdays/route.ts"]) {
-    assert.match(code(read(f)), /ownerTrainer\(db\)\)\?\.firstName|roomTrainer\?\.firstName/,
-      f + " does not resolve a real coach for the room it posts in");
+    assert.match(code(read(f)), /room\.firstName \|\| COACH_FIRST_NAME/,
+      f + " does not name the coach whose room it is posting in");
   }
 });
 

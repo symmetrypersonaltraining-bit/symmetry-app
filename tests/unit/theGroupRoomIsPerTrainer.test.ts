@@ -78,21 +78,25 @@ test("the agent posts to the CALLER's room, as the caller", () => {
 
 test("Coach Bot only names people who are in the room it posts to", () => {
   const src = read("src/app/api/cron/coachbot/route.ts");
-  assert.match(src, /const roomTrainer = await ownerTrainer\(db\);/);
-  assert.match(src, /\.eq\("trainer_id", roomTrainer\.id\)/,
-    "the leaderboard is still instance-wide while the post goes to one room");
-  assert.match(src, /const rows = allRows\.filter\(\(r\) => inThisRoom\.has\(r\.client_id\)\)/);
-  // Ranks must NOT be renumbered after the filter — that invents a standing.
+  // The post-hoc filter this used to assert is gone because it is no longer
+  // needed: challenge_leaderboard() itself is scoped to the challenge's room
+  // (20260823c), so what comes back is already this coach's clients. The
+  // requirement is unchanged — it is enforced one layer down.
+  assert.match(src, /\.eq\("trainer_id", room\.trainerId\)/,
+    "Coach Bot would tease whichever room's challenge sorted first");
+  assert.match(src, /already scoped to the challenge's own room/,
+    "nothing records WHY the filter is no longer here — the next reader re-adds it or removes the scoping");
+  // Ranks must NOT be renumbered — that invents a standing.
   assert.ok(
     !/rnk:\s*i\s*\+\s*1|rnk:\s*idx/.test(src),
-    "ranks are being recomputed after filtering, which tells someone they are winning a challenge they are not",
+    "ranks are being recomputed, which tells someone they are winning a challenge they are not",
   );
 });
 
 test("the birthday GROUP post is narrowed but the private heads-up is not", () => {
   const src = read("src/app/api/cron/birthdays/route.ts");
-  assert.match(src, /whoseBirthday\(db, today, roomTrainer\.id\)/, "the group post still names every trainer's clients");
-  assert.match(src, /const tomorrowPeople = await whoseBirthday\(db, tomorrowIso\);/,
+  assert.match(src, /whoseBirthday\(db, today, room\.trainerId\)/, "the group post still names every trainer's clients");
+  assert.match(src, /await whoseBirthday\(db, tomorrowIso\)/,
     "the heads-up was narrowed too — it is routed to each client's OWN coach and is correct roster-wide");
   assert.match(src, /if \(onlyTrainer\) q = q\.eq\("trainer_id", onlyTrainer\);/);
 });

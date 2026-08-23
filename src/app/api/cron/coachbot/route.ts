@@ -27,13 +27,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
-import { rosterScopeFor } from "@/lib/auth/roster";
 import { isCronRequest } from "@/lib/cron-auth";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { Db } from "@/lib/ai/scope";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
-import { ownerAuthUid, ownerTrainer } from "@/lib/trainerResolve";
+
 import { trainerFeatureOn } from "@/lib/trainerFeatures";
 
 export const dynamic = "force-dynamic";
@@ -91,58 +90,50 @@ interface Row { rnk: number; client_id: string; client_name: string; score: numb
  * thirty-five people. "Trust me, it'll be funny" is not a reasonable thing to
  * ask of someone about their own clients.
  */
-export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean } = {}): Promise<{ posted: boolean; reason: string; message?: string }> {
+/** A coach and the room they run. */
+export interface Room { trainerId: string; authUserId: string; firstName: string }
+
+/**
+ * Coach Bot, in ONE room.
+ *
+ * Every trainer has a group room and a challenge of their own, so every trainer
+ * gets this. It used to run once, for the owner, because that was the only room
+ * there was; the caller now loops.
+ */
+export async function runCoachBotForRoom(
+  db: Db,
+  room: Room,
+  opts: { force?: boolean; dry?: boolean } = {},
+): Promise<{ posted: boolean; reason: string; message?: string }> {
   if (!opts.force) {
     const { data: flag } = await db.from("app_flags").select("enabled").eq("key", "coachbot_live").maybeSingle();
     if ((flag as { enabled: boolean } | null)?.enabled !== true) return { posted: false, reason: "coachbot_live is off" };
   }
 
-  // AND the owner's own switch.
-  //
-  // Coach Bot posts into a group room, and since the rooms were split on
-  // 21 Aug there is one per trainer. This one still posts only into the
-  // OWNER's — which is correct and unchanged for his clients, and is why the
-  // gate reads the owner's preference rather than the caller's. The board it
-  // teases is filtered to that room below, for the same reason.
-  //
-  // Making Coach Bot run for EVERY trainer in their own room is the follow-up,
-  // and it is a bigger job than a flag: the leaderboard it teases is now
-  // per-trainer too, so it needs a challenge and a board per room before it has
-  // anything to say. Written down rather than half-done.
-  {
-    const owner = await ownerTrainer(db);
-    if (!(await trainerFeatureOn(db, owner?.id, "coachbot"))) {
-      return { posted: false, reason: "the owner has Coach Bot switched off" };
-    }
+  // AND this coach's own switch, not the owner's. It is their room.
+  if (!(await trainerFeatureOn(db, room.trainerId, "coachbot"))) {
+    return { posted: false, reason: `${room.firstName} has Coach Bot switched off` };
   }
 
-  const { data: ch } = await db.from("v_active_challenge").select("*").maybeSingle();
-  const challenge = ch as { id: string; title: string; metric: string; ends_on: string; days_left: number | null } | null;
-  if (!challenge) return { posted: false, reason: "no live challenge" };
+  // THIS ROOM'S challenge. `v_active_challenge` no longer stops at one row —
+  // it is security_invoker, and this is the service role, so without the
+  // trainer filter it would hand back whichever room sorted first and tease
+  // another gym's challenge in this one.
+  const { data: chs } = await db
+    .from("v_active_challenge")
+    .select("*")
+    .eq("trainer_id", room.trainerId)
+    .order("starts_on", { ascending: false })
+    .limit(1);
+  const challenge = ((chs as { id: string; title: string; metric: string; ends_on: string; days_left: number | null }[]) || [])[0] || null;
+  if (!challenge) return { posted: false, reason: `no live challenge in ${room.firstName}'s room` };
 
+  // challenge_leaderboard() is already scoped to the challenge's own room
+  // (20260823c), so what comes back is this coach's clients and nobody else's.
+  // The ranks are left exactly as it computed them.
   const { data: board } = await db.rpc("challenge_leaderboard", { p_challenge_id: challenge.id });
-  const allRows = ((board as Row[]) || []).map((r) => ({ ...r, score: Number(r.score) }));
-
-  // ONLY THE CLIENTS OF THE ROOM THIS IS POSTED IN.
-  //
-  // The challenge is still one instance-wide object — anyone may join it — but
-  // since 21 Aug the group rooms are per trainer and this post goes into the
-  // OWNER's. Unfiltered, a client of Brooke's who joined the challenge could be
-  // named, by first name and rank, in a room full of people who are not her
-  // clients and have never met them.
-  //
-  // The ranks are left exactly as the board computed them. Renumbering 1..n
-  // after the filter would invent a standing that does not exist and tell
-  // somebody they are winning a challenge they are not.
-  const roomTrainer = await ownerTrainer(db);
-  if (!roomTrainer?.id) return { posted: false, reason: "no owner trainer row" };
-  const ids = allRows.map((r) => r.client_id);
-  const { data: mine } = ids.length
-    ? await db.from("clients").select("id").in("id", ids).eq("trainer_id", roomTrainer.id)
-    : { data: [] as { id: string }[] };
-  const inThisRoom = new Set(((mine as { id: string }[]) || []).map((c) => c.id));
-  const rows = allRows.filter((r) => inThisRoom.has(r.client_id));
-  if (!rows.length) return { posted: false, reason: "nobody from this room is on the board" };
+  const rows = ((board as Row[]) || []).map((r) => ({ ...r, score: Number(r.score) }));
+  if (!rows.length) return { posted: false, reason: `nobody is on ${room.firstName}'s board` };
 
   const unit = challenge.metric === "logging" ? "days logged" : "days trained";
   const first = (n: string) => (n || "").trim().split(/\s+/)[0] || "Someone";
@@ -180,10 +171,8 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { posted: false, reason: "no api key" };
 
-  // The OWNER's name, because this bot posts in the OWNER's room and is the one
-  // voice in it. Resolved rather than read off a constant so the choice stays
-  // visible at the call site — and so it follows when the bot runs per room.
-  const ownerName = (await ownerTrainer(db))?.firstName || COACH_FIRST_NAME;
+  // THIS room's coach. The bot speaks as whoever runs the room it is posting in.
+  const ownerName = room.firstName || COACH_FIRST_NAME;
 
   const { value, tokensIn, tokensOut } = await callClaudeJson<Reply>({
     meter: { clientId: null, feature: "coachbot_post" },
@@ -221,70 +210,46 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
 
   if (opts.dry) return { posted: false, reason: "dry run — nothing posted", message: body };
 
-  // The OWNER's account, explicitly. This was
-  // `trainer_settings.select("user_id").limit(1)` — unambiguous while that
-  // table held one row, arbitrary the moment Stephanie connects her Google
-  // Calendar and it holds two. The rooms were split per trainer on 21 Aug and
-  // this bot posts in exactly one of them, the owner's, so his is the account
-  // that speaks. Running it per room is the follow-up; the board and the
-  // roster below are already filtered to this room so it says nothing about
-  // people who are not in it.
-  const trainerUid = await ownerAuthUid(db);
-  if (!trainerUid) return { posted: false, reason: "no trainer account" };
-
-  // group_trainer_id EXPLICITLY, and the OWNER's room by name.
+  // group_trainer_id EXPLICITLY, and THIS room by name.
   //
   // The stamp_group_message trigger fills this from my_group_trainer_id(),
   // which reads auth.uid() — and this runs on the SERVICE ROLE, where
   // auth.uid() is null. The trigger therefore stamps NULL, and RLS
-  // (read_own_group_messages) requires it to be NOT NULL. So since the rooms
-  // were split on 21 Aug this post has been landing in the table and being
-  // invisible to every client: no error, no bounce, nothing on screen.
-  // Verified against the live database rather than reasoned about.
-  const ownerTrainerRow = await ownerTrainer(db);
-  if (!ownerTrainerRow?.id) return { posted: false, reason: "no owner trainer row" };
+  // (read_own_group_messages) requires it to be NOT NULL, so the post lands in
+  // the table and is invisible to every client. Verified against the live
+  // database rather than reasoned about.
   const { error } = await db.from("messages").insert({
-    from_id: trainerUid,
-    to_id: trainerUid,
+    from_id: room.authUserId,
+    to_id: room.authUserId,
     client_id: null,
     body,
     is_group: true,
     is_broadcast: false,
     sender_kind: "coachbot",
-    group_trainer_id: ownerTrainerRow.id,
+    group_trainer_id: room.trainerId,
   });
   if (error) return { posted: false, reason: `insert failed: ${error.message}` };
 
   return { posted: true, reason: "posted", message: body };
 }
 
+interface TrainerRow { id: string; auth_user_id: string | null; name: string | null; first_name: string | null; active: boolean }
+
 async function handle(req: NextRequest) {
   const sp = new URL(req.url).searchParams;
   const dry = sp.get("dry") === "1";
+  // Set when a signed-in trainer fires it: their auth id, so the sweep below
+  // runs their room only.
+  let onlyTrainer: string | null = null;
   // Scheduler, or a trainer firing it by hand to see what it would say.
   if (!isCronRequest(req) && !(await isDbSchedulerRequest(req))) {
     const scoped = await resolveAiScope(null);
     if (!scoped.ok) return scoped.response;
     if (!scoped.scope.isTrainer) return NextResponse.json({ error: "Trainer only" }, { status: 403 });
-    // A REAL POST GOES INTO THE OWNER'S ROOM, SO IT IS THE OWNER'S TO FIRE.
-    //
-    // The rooms were split per trainer on 21 Aug. This bot has not caught up —
-    // it still posts into exactly one room, the owner's — so a second trainer
-    // firing it put a message signed by Dustin into Dustin's room on her tap,
-    // and her own clients still saw nothing. Preview stays open to every
-    // trainer; posting does not, until the bot runs per room.
-    if (!dry) {
-      const me = await rosterScopeFor(
-        createAdminClient() as never,
-        { id: scoped.scope.userId, email: scoped.scope.email },
-      );
-      if (!me.isOwner) {
-        return NextResponse.json(
-          { posted: false, reason: "Coach Bot posts as the owner in the shared group. Add ?dry=1 to preview it." },
-          { status: 403 },
-        );
-      }
-    }
+    // A trainer firing this by hand runs it in THEIR OWN room. The owner-only
+    // gate that used to be here was a symptom of the bot only knowing one room;
+    // it now knows every room, so there is nothing to refuse.
+    onlyTrainer = scoped.scope.userId;
   }
   const db = createAdminClient() as unknown as Db;
   // Kill switch. Unattended jobs were the ONE place it did not apply, which is
@@ -294,8 +259,40 @@ async function handle(req: NextRequest) {
   const paused = await enforceMeter(null, "coachbot_post");
   if (paused) return paused;
   try {
-    const out = await runCoachBot(db, { force: sp.get("force") === "1", dry });
-    return NextResponse.json(out);
+    // EVERY ROOM. The scheduler sweeps them all; a trainer tapping it by hand
+    // gets their own and nobody else's.
+    const { data: trainerRows } = await db
+      .from("trainers")
+      .select("id, auth_user_id, name, first_name, active")
+      .eq("active", true)
+      .not("auth_user_id", "is", null);
+    let rooms = ((trainerRows as TrainerRow[]) || []).map((t) => ({
+      trainerId: t.id,
+      authUserId: t.auth_user_id as string,
+      firstName: (t.first_name || String(t.name || "").split(/\s+/)[0] || COACH_FIRST_NAME),
+    }));
+    if (onlyTrainer) rooms = rooms.filter((r) => r.authUserId === onlyTrainer);
+    if (!rooms.length) return NextResponse.json({ posted: false, reason: "no room to post in" });
+
+    const force = sp.get("force") === "1";
+    const results: { room: string; posted: boolean; reason: string; message?: string }[] = [];
+    for (const room of rooms) {
+      // Sequential, not Promise.all: each pass is a model call, and the meter
+      // above is a spend ceiling that a burst would sail straight past.
+      const out = await runCoachBotForRoom(db, room, { force, dry });
+      results.push({ room: room.firstName, ...out });
+    }
+    // Kept shaped like the single-room reply it used to be so existing callers
+    // and the /dry preview still read the same, with the per-room detail added.
+    const posted = results.filter((r) => r.posted);
+    return NextResponse.json({
+      posted: posted.length > 0,
+      reason: posted.length
+        ? `posted in ${posted.map((r) => r.room).join(", ")}`
+        : results.map((r) => `${r.room}: ${r.reason}`).join(" | ") || "nothing to say",
+      message: results.find((r) => r.message)?.message,
+      rooms: results,
+    });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

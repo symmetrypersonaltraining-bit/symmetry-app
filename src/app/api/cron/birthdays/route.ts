@@ -37,13 +37,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
-import { rosterScopeFor } from "@/lib/auth/roster";
 import { isCronRequest } from "@/lib/cron-auth";
 import { trainerFeatureOn } from "@/lib/trainerFeatures";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import { enforceMeter, resolveAiScope, type Db } from "@/lib/ai/scope";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
-import { ownerAuthUid, inboxAuthUidForClient, ownerTrainer, trainerForClient } from "@/lib/trainerResolve";
+import { inboxAuthUidForClient, trainerForClient } from "@/lib/trainerResolve";
 import {
   BIRTHDAY_SYSTEM, centralToday, effectiveMonthDay, fallbackLine, isPrintable,
   joinNames, monthDay, nextDay, type BirthdayPerson,
@@ -106,9 +105,20 @@ export interface BirthdayRun {
  * @param today override the date, so a run can be rehearsed against a real
  *              birthday months away instead of waiting for one
  */
-export async function runBirthdays(
+/** A coach and the room they run. */
+export interface Room { trainerId: string; authUserId: string; firstName: string }
+
+/**
+ * The birthday bot, in ONE room.
+ *
+ * Every trainer has a group room, so every trainer's clients get wished a happy
+ * birthday in it. This used to run once, for the owner, because that was the
+ * only room there was; the caller now loops.
+ */
+export async function runBirthdaysForRoom(
   db: Db,
-  opts: { force?: boolean; dry?: boolean; today?: string } = {},
+  room: Room,
+  opts: { force?: boolean; dry?: boolean; today?: string; headsUpDone?: boolean } = {},
 ): Promise<BirthdayRun> {
   if (!opts.force) {
     const { data: flag } = await db.from("app_flags").select("enabled").eq("key", "birthday_bot_live").maybeSingle();
@@ -120,21 +130,12 @@ export async function runBirthdays(
   const today = opts.today || centralToday();
   const year = Number(today.slice(0, 4));
 
-  // The OWNER's account and the OWNER's room, for the GROUP POST only.
-  //
-  // The rooms were split per trainer on 21 Aug. This bot still posts in one of
-  // them — the owner's — which is correct and unchanged for his clients, and is
-  // why both the account and the roster below are his. Running it for every
-  // trainer in their own room is the follow-up, tracked in the backlog.
+  // THIS room's coach, for the GROUP POST. The bot speaks as whoever runs the
+  // room it is posting in.
   //
   // The private heads-up below is a DIFFERENT question and gets a different
   // answer — see there.
-  const roomTrainer = await ownerTrainer(db);
-  const trainerUid = await ownerAuthUid(db);
-  // The OWNER's name, because this bot is the one voice in his room. Resolved
-  // rather than read off a constant so the choice stays visible.
-  const ownerName = roomTrainer?.firstName || COACH_FIRST_NAME;
-  if (!trainerUid || !roomTrainer?.id) return { posted: false, reason: "no trainer account" };
+  const ownerName = room.firstName || COACH_FIRST_NAME;
 
   // ── Tomorrow: the quiet nudge to THAT CLIENT'S COACH ─────────────────────
   //
@@ -146,7 +147,9 @@ export async function runBirthdays(
   // is not running and tells her nothing.
   const headsUp: string[] = [];
   const tomorrowIso = nextDay(today);
-  const tomorrowPeople = await whoseBirthday(db, tomorrowIso);
+  // NOT narrowed: routed to each client's own coach below, so it is correct
+  // roster-wide, and running it once per room would send it N times.
+  const tomorrowPeople = opts.headsUpDone ? [] : await whoseBirthday(db, tomorrowIso);
   if (tomorrowPeople.length) {
     const done = await alreadyDone(db, tomorrowPeople.map((p) => p.id), Number(tomorrowIso.slice(0, 4)), "heads_up");
     for (const p of tomorrowPeople) {
@@ -188,7 +191,7 @@ export async function runBirthdays(
 
   // ── Today: the group chat ────────────────────────────────────────────────
   // Narrowed to the room. See whoseBirthday().
-  const people = await whoseBirthday(db, today, roomTrainer.id);
+  const people = await whoseBirthday(db, today, room.trainerId);
   if (!people.length) {
     return { posted: false, reason: "no birthdays today", headsUp };
   }
@@ -249,14 +252,14 @@ export async function runBirthdays(
   // invisible to every client: no error, no bounce, nothing on screen.
   // Verified against the live database rather than reasoned about.
   const { error } = await db.from("messages").insert({
-    from_id: trainerUid,
-    to_id: trainerUid,
+    from_id: room.authUserId,
+    to_id: room.authUserId,
     client_id: null,
     body,
     is_group: true,
     is_broadcast: false,
     sender_kind: "coachbot",
-    group_trainer_id: roomTrainer.id,
+    group_trainer_id: room.trainerId,
   });
   if (error) return { posted: false, reason: `insert failed: ${error.message}`, headsUp };
 
@@ -282,29 +285,22 @@ export async function runBirthdays(
   };
 }
 
+interface TrainerRow { id: string; auth_user_id: string | null; name: string | null; first_name: string | null }
+
 async function handle(req: NextRequest) {
   const sp = new URL(req.url).searchParams;
   const dry = sp.get("dry") === "1";
+  // Set when a signed-in trainer fires it: their auth id, so the sweep below
+  // runs their room only.
+  let onlyTrainer: string | null = null;
   // The scheduler, or a trainer looking at what it would say.
   if (!isCronRequest(req) && !(await isDbSchedulerRequest(req))) {
     const scoped = await resolveAiScope(null);
     if (!scoped.ok) return scoped.response;
     if (!scoped.scope.isTrainer) return NextResponse.json({ error: "Trainer only" }, { status: 403 });
-    // Same rule as Coach Bot: the wish goes into the OWNER's room, authored as
-    // him, because this bot does not yet run per room. So a real fire is the
-    // owner's; preview is open to every trainer.
-    if (!dry) {
-      const me = await rosterScopeFor(
-        createAdminClient() as never,
-        { id: scoped.scope.userId, email: scoped.scope.email },
-      );
-      if (!me.isOwner) {
-        return NextResponse.json(
-          { posted: false, reason: "The birthday wish posts as the owner in the shared group. Add ?dry=1 to preview it." },
-          { status: 403 },
-        );
-      }
-    }
+    // A trainer firing this by hand runs it in THEIR OWN room. The owner-only
+    // gate that used to be here was a symptom of the bot only knowing one room.
+    onlyTrainer = scoped.scope.userId;
   }
   const db = createAdminClient() as unknown as Db;
   // Kill switch. Unattended jobs were the ONE place it did not apply, which is
@@ -314,12 +310,41 @@ async function handle(req: NextRequest) {
   const paused = await enforceMeter(null, "birthday_post");
   if (paused) return paused;
   try {
-    const out = await runBirthdays(db, {
-      force: sp.get("force") === "1",
-      dry,
-      today: sp.get("today") || undefined,
+    const { data: trainerRows } = await db
+      .from("trainers")
+      .select("id, auth_user_id, name, first_name")
+      .eq("active", true)
+      .not("auth_user_id", "is", null);
+    let rooms = ((trainerRows as TrainerRow[]) || []).map((t) => ({
+      trainerId: t.id,
+      authUserId: t.auth_user_id as string,
+      firstName: (t.first_name || String(t.name || "").split(/\s+/)[0] || COACH_FIRST_NAME),
+    }));
+    if (onlyTrainer) rooms = rooms.filter((r) => r.authUserId === onlyTrainer);
+    if (!rooms.length) return NextResponse.json({ posted: false, reason: "no room to post in" });
+
+    const force = sp.get("force") === "1";
+    const today = sp.get("today") || undefined;
+    const results: (BirthdayRun & { room: string })[] = [];
+    // headsUpDone: the private tomorrow-nudge is routed to each client's OWN
+    // coach and is already correct roster-wide, so it runs on the first pass
+    // only. Repeating it per room would send N copies of the same nudge.
+    let headsUpDone = false;
+    for (const room of rooms) {
+      const out = await runBirthdaysForRoom(db, room, { force, dry, today, headsUpDone });
+      headsUpDone = true;
+      results.push({ room: room.firstName, ...out });
+    }
+    const posted = results.filter((r) => r.posted);
+    return NextResponse.json({
+      posted: posted.length > 0,
+      reason: posted.length
+        ? `wished in ${posted.map((r) => r.room).join(", ")}`
+        : results.map((r) => `${r.room}: ${r.reason}`).join(" | ") || "no birthdays",
+      message: results.find((r) => r.message)?.message,
+      headsUp: results.flatMap((r) => r.headsUp || []),
+      rooms: results,
     });
-    return NextResponse.json(out);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

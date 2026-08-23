@@ -70,26 +70,36 @@ test("the trainer still counts toward the anonymous group total", () => {
   // /api/challenge keeps BOTH sets on purpose: demo-only for the totals,
   // demo+trainer for the named standings. If this collapses to one set again,
   // the group number silently drops by his days.
+  //
+  // `roomIds` joined the rankIds filter on 23 Aug — the board is one room's,
+  // not the building's — and is an ADDITIONAL narrowing, not a replacement for
+  // the unranked rule.
   const src = read("src/app/api/challenge/route.ts");
   assert.match(src, /const excluded = excludedClientIds\(/);
   assert.match(src, /const unranked = unrankedClientIds\(/);
-  assert.match(src, /rankIds = ids\.filter\(\(id\) => !unranked\.has\(id\)\)/);
+  assert.match(src, /rankIds = ids\.filter\(\(id\) => roomIds\.has\(id\) && !unranked\.has\(id\)\)/);
   // The day counter — which feeds groupTotal — must still use `excluded`.
   assert.match(src, /if \(excluded\.has\(cid\)\) return;/);
 });
 
 test("the SQL board filters before it ranks, from one roster definition", () => {
-  const sql = read("supabase/migrations/20260803_trainer_out_of_rankings.sql");
-  assert.match(sql, /create or replace view v_challenge_roster/);
-  // Both functions read the view rather than re-stating the roster.
+  // 20260803 introduced the roster and the two functions; 20260823c is where
+  // they live now, rewritten to take the challenge's ROOM into account. The
+  // rules this test protects are unchanged — the roster is still one
+  // definition, the ranked filter is still inside the CTE, and the total's
+  // roster is still deliberately unranked-inclusive.
+  assert.match(read("supabase/migrations/20260803_trainer_out_of_rankings.sql"),
+    /exclude_from_rankings boolean not null default false/);
+
+  const sql = read("supabase/migrations/20260823c_a_challenge_belongs_to_a_room.sql");
+  assert.match(sql, /create or replace view public\.v_challenge_roster/);
   const fromView = sql.match(/from v_challenge_roster/g) || [];
   assert.ok(fromView.length >= 2, "both challenge functions must read v_challenge_roster");
   // Ranked filter inside the leaderboard's roster CTE. Filtering AFTER rank()
   // would leave a hole where the coach was — #1 missing, everyone still #2.
-  assert.match(sql, /from v_challenge_roster r where r\.ranked/);
-  // The total's roster is deliberately unfiltered.
-  assert.match(sql, /select r\.cid from v_challenge_roster r\n/);
-  assert.match(sql, /exclude_from_rankings boolean not null default false/);
+  assert.match(sql, /from v_challenge_roster r\s*\n\s*where r\.ranked and r\.tid = v_trainer/);
+  // The total's roster is deliberately unfiltered BY RANK — but still one room.
+  assert.match(sql, /select r\.cid from v_challenge_roster r where r\.tid = v_trainer/);
 });
 
 test("Coach Bot cannot report a rank the coach does not have", () => {

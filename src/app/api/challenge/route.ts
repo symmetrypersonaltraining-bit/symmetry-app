@@ -50,11 +50,20 @@ export async function GET() {
 
   const today = CT_TODAY();
 
+  // WHICH ROOM. Everything below is read on the service role, so RLS does not
+  // apply — and there is one challenge, one board and one roster per trainer
+  // since 21 Aug. Without this the handler answered with whichever challenge
+  // sorted first and ranked every client in the business against each other.
+  const { data: roomRow } = await db.rpc("my_group_trainer_id_for", { p_user: scoped.scope.userId });
+  const roomId = (roomRow as string | null) ?? null;
+  if (!roomId) return NextResponse.json({ challenge: null, standings: [], optedIn: false });
+
   try {
-    // The live one: started, not past its end date, not manually ended.
+    // The live one IN THIS ROOM: started, not past its end date, not manually ended.
     const { data: chRows } = await db
       .from("group_challenges")
       .select("id, title, metric, starts_on, ends_on, ended_at")
+      .eq("trainer_id", roomId)
       .lte("starts_on", today)
       .gte("ends_on", today)
       .is("ended_at", null)
@@ -92,25 +101,33 @@ export async function GET() {
     // still feed the anonymous group total, but he is never named or placed —
     // the board is the clients'. Same rule the SQL board enforces via
     // clients.exclude_from_rankings; see src/lib/rankings.ts.
+    // THIS ROOM's clients. Instance-wide, the board ranked a trainer's clients
+    // against strangers they have never met and the "group total" was the whole
+    // business's activity presented as their group's.
     const { data: allClients } = await db
       .from("clients")
       .select("id, name, email, exclude_from_rankings")
+      .eq("trainer_id", roomId)
       .is("archived_at", null);
     const roster =
       (allClients as { id: string; name: string | null; email: string | null; exclude_from_rankings: boolean | null }[] | null) || [];
+    const roomIds = new Set(roster.map((c) => c.id));
     const excluded = excludedClientIds(roster);
     // Trainers come from the TABLE, not the build-time list — a trainer added
     // from inside the app is otherwise ranked among the clients she coaches.
     const trainerEmails = await trainerEmailSet(db as never);
     const unranked = unrankedClientIds(roster, trainerEmails);
-    const rankIds = ids.filter((id) => !unranked.has(id));
+    const rankIds = ids.filter((id) => roomIds.has(id) && !unranked.has(id));
 
     const [namesRes, woRes, mlRes] = await Promise.all([
       db.from("clients").select("id, name").in("id", rankIds.length ? rankIds : ["00000000-0000-0000-0000-000000000000"]),
+      // .in(client_id, this room) — otherwise the anonymous group total counts
+      // every session logged in the business and reads as this group's.
       db
         .from("workout_logs")
         .select("client_id, log_date")
         .eq("completed", true)
+        .in("client_id", roster.length ? roster.map((c) => c.id) : ["00000000-0000-0000-0000-000000000000"])
         .gte("log_date", ch.starts_on)
         .lte("log_date", today),
       ch.metric === "logging"
@@ -118,6 +135,7 @@ export async function GET() {
             .from("meal_adherence_logs")
             .select("client_id, log_date")
             .not("adherence", "is", null)
+            .in("client_id", roster.length ? roster.map((c) => c.id) : ["00000000-0000-0000-0000-000000000000"])
             .gte("log_date", ch.starts_on)
             .lte("log_date", today)
         : Promise.resolve({ data: [] as { client_id: string; log_date: string }[] }),
@@ -197,6 +215,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Bad request" }, { status: 400 });
   }
 
+  // WHICH ROOM. Every write below is on the service role, so RLS is not the
+  // boundary here — and since 21 Aug there is one challenge per trainer, not
+  // one for the building. `my_group_trainer_id()` is the same answer the
+  // database gives: a trainer's own id, or a client's coach's.
+  const { data: roomRow } = await db.rpc("my_group_trainer_id_for", { p_user: user.id });
+  const roomId = (roomRow as string | null) ?? null;
+  if (!roomId) return NextResponse.json({ error: "No group to act on" }, { status: 400 });
+
   // "join" and "leave" are client-accessible. (Everything else is trainer-only.)
   //
   // Join used to set client_app_settings.leaderboard_opt_in — a DIFFERENT flag
@@ -222,6 +248,7 @@ export async function POST(req: NextRequest) {
       .from("group_challenges")
       .select("id")
       .eq("status", "live")
+      .eq("trainer_id", roomId)
       .lte("starts_on", CT_TODAY())
       .gte("ends_on", CT_TODAY())
       .order("starts_on", { ascending: false })
@@ -269,12 +296,21 @@ export async function POST(req: NextRequest) {
     // an "ended" challenge still showing as live everywhere else.
     if (body.action === "end") {
       if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-      const { error } = await db
+      // .eq("trainer_id", roomId) — this is a service-role update by id, so
+      // without it one trainer could end another trainer's challenge.
+      const { data: ended, error } = await db
         .from("group_challenges")
         .update({ ended_at: new Date().toISOString(), status: "complete" })
-        .eq("id", body.id);
+        .eq("id", body.id)
+        .eq("trainer_id", roomId)
+        .select("id");
       if (error) {
         return NextResponse.json({ error: `Not ended — ${error.message}` }, { status: 500 });
+      }
+      // A no-op update is not an error in PostgREST, so without this an
+      // attempt on somebody else's challenge would report success.
+      if (!ended || (ended as { id: string }[]).length === 0) {
+        return NextResponse.json({ error: "That challenge is not in your group." }, { status: 403 });
       }
       return NextResponse.json({ ok: true });
     }
@@ -289,15 +325,18 @@ export async function POST(req: NextRequest) {
     end.setUTCDate(end.getUTCDate() + (days - 1));
     const ends_on = end.toISOString().slice(0, 10);
 
-    // Only one challenge runs at a time — end whatever is live before starting.
-    // Two overlapping boards would make "who's winning" ambiguous.
+    // Only one challenge runs at a time IN THIS ROOM — end whatever is live
+    // there before starting. Two overlapping boards would make "who's winning"
+    // ambiguous. Without the trainer filter this closed EVERY trainer's live
+    // challenge: Brooke starting one in her group silently completed Dustin's.
     //
-    // So a failure here must STOP the create rather than fall through it.
+    // A failure here must STOP the create rather than fall through it.
     // Unchecked, the one thing this write exists to prevent was exactly what
     // happened next: the new challenge was inserted anyway and both ran.
     const { error: endErr } = await db
       .from("group_challenges")
       .update({ ended_at: new Date().toISOString(), status: "complete" })
+      .eq("trainer_id", roomId)
       .is("ended_at", null)
       .gte("ends_on", today);
     if (endErr) {
@@ -309,7 +348,13 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await db
       .from("group_challenges")
-      .insert({ title, metric, starts_on: today, ends_on, created_by: user.id, status: "live" })
+      // trainer_id EXPLICITLY. stamp_group_challenge fills it from
+      // my_trainer_id(), which reads auth.uid() — and this is the SERVICE ROLE,
+      // where auth.uid() is null. So it stamped NULL, and
+      // read_own_group_challenges requires trainer_id = my_group_trainer_id():
+      // the trainer pressed Start, got {ok:true}, and nobody — including them —
+      // could see the challenge afterwards.
+      .insert({ title, metric, starts_on: today, ends_on, created_by: user.id, status: "live", trainer_id: roomId })
       .select("id, title, metric, starts_on, ends_on")
       .single();
 

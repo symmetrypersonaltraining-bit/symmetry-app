@@ -161,12 +161,15 @@ test("the heads-up goes to that client's own coach, and only to them", () => {
   assert.match(block, /kind: "heads_up"/);
 });
 
-test("the GROUP post still comes from the owner", () => {
-  // Shared room, one voice. Dustin, 20 Aug: "let's keep the group chat the
-  // same. All clients can go in there."
+test("the GROUP post comes from the coach whose room it is", () => {
+  // Was "still comes from the owner", from when there was one shared room.
+  // Dustin, 23 Aug: "group chat is for trainer n their clients only not
+  // shared" — so the wish is posted by whoever runs the room it lands in, and
+  // stamped with that room or RLS shows it to nobody.
   const block = ROUTE.slice(ROUTE.indexOf("Today: the group chat"));
-  assert.match(block, /from_id: trainerUid,\s*to_id: trainerUid,/);
+  assert.match(block, /from_id: room\.authUserId,\s*to_id: room\.authUserId,/);
   assert.match(block, /is_group: true,/);
+  assert.match(block, /group_trainer_id: room\.trainerId,/);
 });
 
 test("the model is never told the date of birth", () => {
