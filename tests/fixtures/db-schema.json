@@ -444,7 +444,9 @@
     "billing_anchor_weekday",
     "paid_by_client_id",
     "trainer_id",
-    "nutrition_only"
+    "nutrition_only",
+    "online_only",
+    "plan_locked"
   ],
   "daily_logs": [
     "id",

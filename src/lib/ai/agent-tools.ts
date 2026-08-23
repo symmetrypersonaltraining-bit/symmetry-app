@@ -29,6 +29,7 @@ import { applyProposal, loadDayTree, CT_TODAY, Proposal, type WorkoutUndoStep } 
 import { assembleCoachContext, assembleTrainingContext } from "@/lib/ai/coach-context";
 import { getValidAccessToken, gcalFetch } from "@/lib/gcal";
 import { ownerAuthUid, inboxAuthUidForClient } from "@/lib/trainerResolve";
+import { planIsLocked, lockedPlanMessage } from "@/lib/nutrition/planLock";
 
 // ── Read-only surface for the general query tool ────────────────────────────
 //
@@ -519,6 +520,10 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
 
     if (name === "set_macro_targets") {
       if (!clientId) return "Error: client_id required.";
+      // Some clients' nutrition is written outside the app entirely. The
+      // database rejects the insert either way -- say so in words the agent
+      // can repeat instead of surfacing a trigger's error text.
+      if (await planIsLocked(db, clientId)) return `Error: ${lockedPlanMessage()}`;
       const today = CT_TODAY();
       const { data: prev } = await db.from("macro_targets").select("id, calories, protein, carbs, fats, effective_date")
         .eq("client_id", clientId).order("effective_date", { ascending: false }).limit(1).maybeSingle();

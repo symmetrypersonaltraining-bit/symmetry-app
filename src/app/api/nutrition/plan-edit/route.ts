@@ -32,6 +32,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveEditedItems, PlanItemLike } from "@/lib/nutrition/planEdit";
+import { planIsLocked, lockedPlanMessage } from "@/lib/nutrition/planLock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,6 +63,12 @@ export async function POST(req: NextRequest) {
     if (!clientId) return NextResponse.json({ error: "No client profile" }, { status: 400 });
 
     const admin = createAdminClient();
+
+    // Some plans are authored outside the app entirely. The database refuses
+    // the write either way; this is so the client reads a sentence, not a 500.
+    if (await planIsLocked(admin, clientId)) {
+      return NextResponse.json({ error: lockedPlanMessage() }, { status: 409 });
+    }
 
     // The meal, its plan, and the check that the plan is actually theirs.
     const { data: mealRow } = await admin

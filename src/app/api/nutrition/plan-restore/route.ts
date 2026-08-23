@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
+import { planIsLocked, lockedPlanMessage } from "@/lib/nutrition/planLock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +59,9 @@ export async function POST(req: NextRequest) {
     const plan = p as { id: string; client_id: string; status: string; day_group: number[] | null; version_number: number | null } | null;
     if (!plan) return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     if (!isTrainer && plan.client_id !== ownClientId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (await planIsLocked(admin, plan.client_id)) {
+      return NextResponse.json({ error: lockedPlanMessage() }, { status: 409 });
+    }
     if (plan.status === "live") return NextResponse.json({ ok: true, alreadyLive: true });
 
     // Archive first would be wrong for the same reason it is wrong in

@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { adoptPlan, AdoptDb, AdoptMealInput } from "@/lib/nutrition/adoptPlan";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
+import { planIsLocked, lockedPlanMessage } from "@/lib/nutrition/planLock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,6 +93,12 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = createAdminClient();
+
+    // A plan authored outside the app cannot be adopted over. The database
+    // refuses it regardless; this turns the refusal into a readable answer.
+    if (await planIsLocked(admin, clientId)) {
+      return NextResponse.json({ error: lockedPlanMessage() }, { status: 409 });
+    }
     const planId = await adoptPlan(makeDb(admin), {
       clientId, title, effectiveDate,
       targets: {

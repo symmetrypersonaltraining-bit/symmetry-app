@@ -21,6 +21,7 @@ import { Db, enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/s
 import { coachForViewer } from "@/lib/coachIdentity";
 import { nutrientPromptSpec } from "@/lib/nutrition/nutrients";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { planIsLocked, lockedPlanMessage } from "@/lib/nutrition/planLock";
 
 // A function of the trainer using it, not a module constant. This is
 // trainer-facing, so no client ever saw the wrong name — but it addressed
@@ -119,6 +120,12 @@ export async function POST(req: NextRequest) {
     const scoped = await resolveAiScope(typeof body?.clientId === "string" ? body.clientId : null);
     if (!scoped.ok) return scoped.response;
     const { supabase, clientId } = scoped.scope;
+
+    // Refuse before spending a token. Whoever this plan is for writes it
+    // somewhere else, and nothing built here could ever be saved.
+    if (await planIsLocked(supabase, clientId)) {
+      return NextResponse.json({ error: lockedPlanMessage() }, { status: 409 });
+    }
     // WHICH trainer is reading this. The prompt used to be built from a
     // build-time constant and therefore always said Dustin, including on
     // Stephanie's own screen.
