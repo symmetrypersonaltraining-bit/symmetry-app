@@ -327,9 +327,16 @@
     {
       "id": "msg-group",
       "chapter": "messages",
-      "title": "The group chat",
-      "text": "There is one group chat for the whole gym. Every trainer and every client. Whoever posts shows up as themselves, with their own name and their own face. The consistency board and the weekly challenge live alongside it.",
-      "words": 38
+      "title": "Your group chat",
+      "text": "You have a group chat of your own. You and your clients, nobody else's. Another trainer's clients are not in it and cannot see it. Whoever posts shows up as themselves, with their own name and their own face. Your weekly challenge and its board live alongside it.",
+      "words": 48
+    },
+    {
+      "id": "msg-challenge",
+      "chapter": "messages",
+      "title": "The weekly challenge",
+      "text": "A new challenge starts in your group every Monday and scores through Sunday. It rotates through four kinds, and your rotation is your own. Everyone in your group is on the board whether they tap join or not. Joining is how a client says they want to be named on it. There is an anonymous group total as well, so it looks alive from day one. On Sunday evening it scores itself, announces the winner in your chat, and starts next week's. You can also start one by hand, or end the running one early, and that only ever touches your group. You are never ranked on it. It is your clients' board.",
+      "words": 113
     },
     {
       "id": "msg-announce",

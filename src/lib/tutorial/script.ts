@@ -839,13 +839,26 @@ export const TUTORIAL: TutorialChapter[] = [
       },
       {
         id: "msg-group",
-        title: "The group chat",
+        title: "Your group chat",
         body: [
-          "One group for the whole gym, every trainer and every client. Whoever posts shows up as themselves, with their own name and face.",
-          "The consistency board and the weekly challenge live alongside it.",
+          "You have a group chat of your own — you and your clients, nobody else's. Another trainer's clients are not in it and cannot see it.",
+          "Whoever posts shows up as themselves, with their own name and face. Your weekly challenge and its board live alongside it.",
         ],
         narration:
-          "There is one group chat for the whole gym. Every trainer and every client. Whoever posts shows up as themselves, with their own name and their own face. The consistency board and the weekly challenge live alongside it.",
+          "You have a group chat of your own. You and your clients, nobody else's. Another trainer's clients are not in it and cannot see it. Whoever posts shows up as themselves, with their own name and their own face. Your weekly challenge and its board live alongside it.",
+        audioUrl: null,
+      },
+      {
+        id: "msg-challenge",
+        title: "The weekly challenge",
+        body: [
+          "A new one starts in your group every Monday and scores through Sunday. It rotates through four kinds — most days trained, log every day, and so on — and your rotation is yours, so two coaches are not stuck running the same one.",
+          "Everyone in your group is on the board whether they tap Join or not; joining is how a client says they want to be in it, and the board only names the people who opted in. There is an anonymous group total so it looks alive on day one.",
+          "Sunday evening it scores itself, announces the winner in your chat, and starts next week's. You can also start one by hand from the group thread, or end the running one early — that only ever touches your group.",
+          "You are on your own board's roster for the group total but never ranked. It is your clients' board.",
+        ],
+        narration:
+          "A new challenge starts in your group every Monday and scores through Sunday. It rotates through four kinds, and your rotation is your own. Everyone in your group is on the board whether they tap join or not. Joining is how a client says they want to be named on it. There is an anonymous group total as well, so it looks alive from day one. On Sunday evening it scores itself, announces the winner in your chat, and starts next week's. You can also start one by hand, or end the running one early, and that only ever touches your group. You are never ranked on it. It is your clients' board.",
         audioUrl: null,
       },
       {

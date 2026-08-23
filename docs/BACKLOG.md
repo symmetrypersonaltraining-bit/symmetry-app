@@ -23,6 +23,60 @@
 > | `3e5c6c7` | **"Is a trainer" is not "is this client's trainer".** Service-role routes that never re-imposed `trainer_can_see_client()`: plateaus, live-sessions, attention-drafts, focus-drafts (including *approve all*, which published), weekly-ai POST. |
 > | `c8b9102` | Tutorial: a **Setting the numbers** step (her actual first question), the AI target check, and the remove-a-row control. |
 >
+> ## 👉 23 Aug — EVERY TRAINER GETS WHAT DUSTIN HAS (`4fb1da9`)
+>
+> Dustin: *"if I have a group chat with challenges and ai bots, and other
+> trainers do not, thats not exactly like mine is it? ... if I have it on my
+> trainer app, build it exactly the same on theirs."*
+>
+> **The rule from here: if he has it, they have it.** Owner-only is for things
+> he is asked about first — billing, inviting trainers, instance-wide switches,
+> whole-business cost. Nothing else.
+>
+> Two answers before this one were wrong in the same way: an audit that produced
+> owner-only gates instead of the feature. Those gates are gone.
+>
+> ### What was actually broken (not just unfinished)
+>
+> `20260821g` split the rooms and added `group_challenges.trainer_id`, then
+> stopped. Every reader and writer was still single-room, and four were live
+> faults:
+>
+> - `generate_next_challenge()` and the `/api/challenge` create **inserted with
+>   no `trainer_id`**, from pg_cron and the service role where `auth.uid()` is
+>   NULL. The trigger stamped NULL; the read policy requires NOT NULL. A trainer
+>   pressed Start, got `{ok:true}`, and **nobody including them could see it**.
+> - *"Never two live at once"* was global — once any trainer had one, no other
+>   trainer would ever get an auto-generated challenge again.
+> - `announce_challenge_winner()` posted with no `group_trainer_id` → the winner
+>   announcement was shown to nobody.
+> - `challenge_leaderboard()` ranked **every client in the business**, so one
+>   coach's clients appeared by name on another's board.
+> - Starting a challenge **completed every other trainer's**; ending took an id
+>   with no ownership check; `challenge_participants` was `using (true)`.
+>
+> ### Now
+>
+> One challenge, one board, one rotation, one Coach Bot and one birthday bot
+> **per room**. `close_due` scores every due room instead of one per hour. The
+> hourly tick generates for every active trainer. A trainer firing a bot by hand
+> runs her own room. `my_group_trainer_id_for(user)` lets the service-role routes
+> ask the same question the database asks.
+>
+> **Tonight at 7:05pm CT the tick gives all seven rooms their first challenge.**
+> Dustin's just scored at 18:05 (Lauren, 7 days) and announces at 19:05 — the
+> first announcement that will actually be visible.
+>
+> Also fixed: **Oliver Gergelj had no self-client row** — he was added after the
+> 22 Aug backfill and missed it. `ensure_trainer_self_client` run; all seven
+> trainers now have a client view, settings and bots.
+>
+> All six non-owner trainers messaged in-app. Tutorial and help updated
+> (`msg-group` rewritten, new `msg-challenge` step, new `group-challenge`
+> article).
+
+---
+
 > ### 23 Aug, later — THE GROUP ROOMS (`0bd3545`)
 >
 > I got this backwards earlier and wrote the wrong reason into a comment.
