@@ -208,6 +208,50 @@ export interface PlanDraft {
   reasoning: string | null;
   meals: PlanMeal[];
   totals: { kcal: number; p: number; c: number; f: number };
+  /**
+   * Whether the meals actually add up to the targets printed above them.
+   *
+   * Brooke Orton, 23 Aug: "AI told me 160g of protein but is giving me 198g
+   * protein total meal plans."
+   *
+   * The system prompt has always said the totals "MUST land within 3% of the
+   * targets on kcal and within 5g on each macro. Check your math before
+   * answering." Nothing ever checked. validatePlanDraft recomputed the totals
+   * from the items and returned them alongside the targets without once
+   * comparing the two, so a drifting plan came back looking authoritative.
+   *
+   * There is a second source of drift the model cannot be blamed for: naming a
+   * library meal swaps in the LIBRARY'S items and macros wholesale, which can
+   * move a meal by a hundred calories after the model did its arithmetic
+   * correctly.
+   *
+   * Absent means "checked and fine".
+   */
+  targetsMet?: false;
+  /** Signed difference, plan minus target, when targetsMet is false. */
+  drift?: { kcal: number; p: number; c: number; f: number };
+}
+
+/**
+ * What the prompt already demands: 3% on calories, 5g on each macro.
+ *
+ * Deliberately the same numbers as the prompt rather than looser ones. A
+ * tolerance a validator invents for itself is how "within 3%" becomes 24%.
+ */
+export function planTargetDrift(draft: PlanDraft): { ok: boolean; drift: { kcal: number; p: number; c: number; f: number } } {
+  const drift = {
+    kcal: Math.round(draft.totals.kcal - draft.targets.kcal),
+    p: round1(draft.totals.p - draft.targets.p),
+    c: round1(draft.totals.c - draft.targets.c),
+    f: round1(draft.totals.f - draft.targets.f),
+  };
+  const kcalTol = Math.max(30, draft.targets.kcal * 0.03);
+  const ok =
+    Math.abs(drift.kcal) <= kcalTol &&
+    Math.abs(drift.p) <= 5 &&
+    Math.abs(drift.c) <= 5 &&
+    Math.abs(drift.f) <= 5;
+  return { ok, drift };
 }
 
 /**
@@ -374,6 +418,34 @@ export function validatePlanDraft(raw: unknown): PlanDraft | null {
     meals,
     totals: { kcal: Math.round(totals.kcal), p: round1(totals.p), c: round1(totals.c), f: round1(totals.f) },
   };
+}
+
+/**
+ * Well-formed AND lands on its targets — what /plan-build asks callClaudeJson
+ * for, so a drifting reply is shown back to the model and asked again.
+ *
+ * Deliberately NOT folded into validatePlanDraft. "Is this the right shape" and
+ * "does it hit the target" are two questions, and eleven tests correctly build
+ * drafts with arbitrary numbers to check library substitution and micros — they
+ * would all start failing for a reason that has nothing to do with what they
+ * test.
+ */
+export function validatePlanOnTarget(raw: unknown): PlanDraft | null {
+  const draft = validatePlanDraft(raw);
+  if (!draft) return null;
+  return planTargetDrift(draft).ok ? draft : null;
+}
+
+/** The same parse, with the miss recorded so nothing downstream can hide it. */
+export function validatePlanAcceptingDrift(raw: unknown): PlanDraft | null {
+  const draft = validatePlanDraft(raw);
+  if (!draft) return null;
+  const { ok, drift } = planTargetDrift(draft);
+  if (!ok) {
+    draft.targetsMet = false;
+    draft.drift = drift;
+  }
+  return draft;
 }
 
 // ---------------------------------------------------------------------------

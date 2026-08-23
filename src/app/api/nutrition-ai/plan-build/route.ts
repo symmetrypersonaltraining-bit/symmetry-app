@@ -15,7 +15,7 @@ import { libraryPromptBlock } from "@/lib/nutrition/libraryForAi";
 import { CT_TODAY } from "@/lib/ai/coach-context";
 import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
-import { validatePlanDraft } from "@/lib/ai/nutrition-json";
+import { validatePlanOnTarget, validatePlanAcceptingDrift, extractJson } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { coachForViewer } from "@/lib/coachIdentity";
@@ -166,19 +166,32 @@ export async function POST(req: NextRequest) {
       system: SYSTEM_PROMPT(me.firstName),
       maxTokens: 8000,
       messages: [{ role: "user", content: userText }],
-      validate: validatePlanDraft,
+      validate: validatePlanOnTarget,
     });
 
     await logUsage(clientId, "plan_build", result.tokensIn, result.tokensOut, planModel, { latencyMs: result.latencyMs, startedAt: result.startedAt });
 
-    if (!result.value) {
-      return NextResponse.json(
-        { error: "Couldn't produce a clean plan draft \u2014 please try again, or ask your coach to build it manually." },
-        { status: 502 }
-      );
+    // A draft is rejected by the validator for two different reasons and they
+    // deserve different endings: unparseable JSON is nothing to show, but a
+    // plan whose macros drifted is still a usable starting point — provided
+    // nobody is told it hits a target it misses.
+    //
+    // Brooke Orton, 23 Aug: "AI told me 160g of protein but is giving me 198g
+    // protein total meal plans." Both attempts had drifted and the mismatch was
+    // simply printed as though it were fine.
+    let plan = result.value;
+    if (!plan) {
+      const salvaged = validatePlanAcceptingDrift(extractJson(result.rawText));
+      if (!salvaged) {
+        return NextResponse.json(
+          { error: "Couldn't produce a clean plan draft \u2014 please try again, or ask your coach to build it manually." },
+          { status: 502 }
+        );
+      }
+      plan = salvaged;
     }
     // Draft only — the UI shows it for confirmation and performs the insert.
-    return NextResponse.json({ draft: true, plan: result.value });
+    return NextResponse.json({ draft: true, plan });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("nutrition-ai/plan-build failed:", msg);

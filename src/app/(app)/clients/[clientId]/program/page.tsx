@@ -96,6 +96,9 @@ function getWeekDates(weekOffset: number): Date[] {
   });
 }
 
+// Five fields plus a narrow column for the remove button.
+const ROW_COLS = "repeat(5, minmax(0, 1fr)) 24px";
+
 function dateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
@@ -336,9 +339,28 @@ function WorkoutEditor({
       // assignDay above names this: "a rejection would look like the button
       // doing nothing at all — the single worst way for a constraint to
       // surface." It was true three more times in this one function.
+      // `days.position` is a 32-bit integer. This used to insert Date.now() —
+      // 1,787,510,016,343 — which Postgres rejects outright:
+      //
+      //   value "1787510016343" is out of range for type integer
+      //
+      // So creating a workout from the programming engine failed for everybody,
+      // every time, with an error that reads like a database fault rather than
+      // "put it last". Brooke Orton hit it within an hour of being given a
+      // login. A timestamp was standing in for "highest so far"; ask for the
+      // highest so far.
+      const { data: lastDay } = await supabase
+        .from("days")
+        .select("position")
+        .eq("phase_id", phaseId)
+        .order("position", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextPosition = Number((lastDay as { position?: number } | null)?.position ?? -1) + 1;
+
       const { data: newDay, error: dayErr } = await supabase
         .from("days")
-        .insert({ phase_id: phaseId, label: workoutName, position: Date.now() })
+        .insert({ phase_id: phaseId, label: workoutName, position: nextPosition })
         .select("id")
         .single();
 
@@ -444,6 +466,17 @@ function WorkoutEditor({
   function addExercise(si: number) {
     setNewSections(s => s.map((sec, i) => i === si
       ? { ...sec, exercises: [...sec.exercises, { name: "", sets: "3", reps: "10", weight: "", rest: "60s" }] }
+      : sec));
+  }
+
+  // Brooke Orton: "There's also not a way (that I can see) to delete the empty
+  // row." There was not. Add Exercise had no opposite, so a row added by
+  // mistake — or the blank one every new section starts with — stayed on screen
+  // for good. The save loop skips nameless rows, so it did no harm in the data;
+  // it just could not be got rid of, which reads as broken.
+  function removeExercise(si: number, ei: number) {
+    setNewSections(s => s.map((sec, i) => i === si
+      ? { ...sec, exercises: sec.exercises.filter((_, j) => j !== ei) }
       : sec));
   }
 
@@ -557,15 +590,16 @@ function WorkoutEditor({
                   </select>
                 </div>
 
-                <div className="grid grid-cols-5 gap-1 px-3 pt-2 pb-1">
+                <div className="grid gap-1 px-3 pt-2 pb-1" style={{ gridTemplateColumns: ROW_COLS }}>
                   {["Exercise","Sets","Reps","Weight","Rest"].map(h => (
                     <div key={h} className="text-[10px] font-semibold text-center"
                       style={{ color: "var(--brand-text-secondary)" }}>{h}</div>
                   ))}
+                  <div aria-hidden="true" />
                 </div>
 
                 {sec.exercises.map((ex, ei) => (
-                  <div key={ei} className="grid grid-cols-5 gap-1 px-3 py-1">
+                  <div key={ei} className="grid gap-1 px-3 py-1 items-center" style={{ gridTemplateColumns: ROW_COLS }}>
                     <input
                       list="exercise-list"
                       value={ex.name}
@@ -587,6 +621,15 @@ function WorkoutEditor({
                         style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)", color: "var(--brand-text)" }}
                       />
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => removeExercise(si, ei)}
+                      aria-label={ex.name.trim() ? `Remove ${ex.name.trim()}` : "Remove this row"}
+                      title="Remove this row"
+                      className="flex items-center justify-center rounded hover:opacity-100 opacity-60"
+                      style={{ color: "var(--brand-text-secondary)", background: "transparent", border: 0, height: 26, cursor: "pointer" }}>
+                      <i className="ti ti-x text-xs" />
+                    </button>
                   </div>
                 ))}
 

@@ -2966,6 +2966,9 @@ interface PlanDraft {
   // meal_items, or "full micronutrients" stops at the draft screen.
   meals: { name: string; timing: string | null; items: { food: string; amount: number | null; unit: string | null; p: number; c: number; f: number; kcal: number; micros?: Record<string, number | null> | null }[] }[];
   totals: { kcal: number; p: number; c: number; f: number };
+  /** Set by the server when the meals do not add up to the targets above them. */
+  targetsMet?: false;
+  drift?: { kcal: number; p: number; c: number; f: number };
 }
 
 const CONSULT_QUESTIONS: { q: string; key: string; chips: string[] }[] = [
@@ -2986,6 +2989,23 @@ function AiPlanSheet({
   onBack: () => void;
 }) {
   const [tgIn, setTgIn] = useState({ kcal: "2200", p: "180", c: "230", f: "55" });
+
+  // Brooke Orton, 23 Aug: "Would be cool if when you're putting in macros it
+  // auto calculated calories."
+  //
+  // It is the same 4/4/9 the rest of the app computes with, and typing it by
+  // hand is both a chore and a way to send the model a target whose calories
+  // and macros disagree — which it then cannot hit, because nothing can.
+  // Editing kcal directly still works: that is the one field this leaves alone.
+  function setTarget(field: "kcal" | "p" | "c" | "f", raw: string) {
+    const v = raw.replace(/[^0-9]/g, "");
+    setTgIn((prev) => {
+      const next = { ...prev, [field]: v };
+      if (field === "kcal") return next;
+      const kcal = kcalOf(Number(next.p) || 0, Number(next.c) || 0, Number(next.f) || 0);
+      return { ...next, kcal: kcal > 0 ? String(Math.round(kcal)) : "" };
+    });
+  }
   const [answers, setAnswers] = useState<Record<string, string>>({});
   // FOODS MODE. Dustin, 22 Aug: "you need an option for them to type/say what
   // foods they want ai to use to build a plan that fits their macros n
@@ -3031,9 +3051,11 @@ function AiPlanSheet({
       {!draft && !busy && mode === "targets" && (
         <>
           <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Daily targets — kcal · P · C · F (g)</p>
+          <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>Type the macros and the calories fill themselves in.</p>
           <div className="grid grid-cols-4 gap-2 mb-3">
             {(["kcal", "p", "c", "f"] as const).map((k) => (
-              <input key={k} value={tgIn[k]} inputMode="numeric" onChange={(e) => setTgIn({ ...tgIn, [k]: e.target.value.replace(/[^0-9]/g, "") })} placeholder={k.toUpperCase()} style={inputStyle} />
+              <input key={k} value={tgIn[k]} inputMode="numeric" onChange={(e) => setTarget(k, e.target.value)} placeholder={k.toUpperCase()} style={inputStyle}
+                aria-label={k === "kcal" ? "Calories — fills in from the macros" : k === "p" ? "Protein (g)" : k === "c" ? "Carbs (g)" : "Fat (g)"} />
             ))}
           </div>
           <button onClick={() => run({ targets: { kcal: +tgIn.kcal, p: +tgIn.p, c: +tgIn.c, f: +tgIn.f } })}
@@ -3092,7 +3114,8 @@ function AiPlanSheet({
           <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Daily targets — leave blank to use your current ones</p>
           <div className="grid grid-cols-4 gap-2 mb-3">
             {(["kcal", "p", "c", "f"] as const).map((k) => (
-              <input key={k} value={tgIn[k]} inputMode="numeric" onChange={(e) => setTgIn({ ...tgIn, [k]: e.target.value.replace(/[^0-9]/g, "") })} placeholder={k.toUpperCase()} style={inputStyle} />
+              <input key={k} value={tgIn[k]} inputMode="numeric" onChange={(e) => setTarget(k, e.target.value)} placeholder={k.toUpperCase()} style={inputStyle}
+                aria-label={k === "kcal" ? "Calories — fills in from the macros" : k === "p" ? "Protein (g)" : k === "c" ? "Carbs (g)" : "Fat (g)"} />
             ))}
           </div>
           <button
@@ -3126,6 +3149,26 @@ function AiPlanSheet({
               <b>Recommended: {draft.targets.kcal.toLocaleString()} kcal · {draft.targets.p}P / {draft.targets.c}C / {draft.targets.f}F.</b> {draft.reasoning}
             </div>
           )}
+
+          {/* What the plan BELOW actually comes to. It was never shown, so a
+              target could sit above meals that missed it and nothing said so —
+              Brooke Orton was told 160g of protein and handed 198g. Always
+              printed, and called out when it does not match. */}
+          <div className="rounded-xl p-2.5 mb-2 text-xs leading-relaxed"
+            style={draft.targetsMet === false
+              ? { background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.5)", color: "var(--brand-text)" }
+              : { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}>
+            <b style={{ color: "var(--brand-text)" }}>
+              This plan comes to {Math.round(draft.totals.kcal).toLocaleString()} kcal · {Math.round(draft.totals.p)}P / {Math.round(draft.totals.c)}C / {Math.round(draft.totals.f)}F
+            </b>
+            {draft.targetsMet === false && draft.drift ? (
+              <> — that misses the target by {draft.drift.kcal > 0 ? "+" : ""}{Math.round(draft.drift.kcal)} kcal
+                and {draft.drift.p > 0 ? "+" : ""}{Math.round(draft.drift.p)}g protein.
+                Adjust the amounts before you save it, or build it again.</>
+            ) : (
+              <> — matching the target.</>
+            )}
+          </div>
           {draft.meals.map((dm, i) => {
             const sub = dm.items.reduce((a, it) => ({ k: a.k + (it.kcal || 0), p: a.p + (it.p || 0) }), { k: 0, p: 0 });
             return (
