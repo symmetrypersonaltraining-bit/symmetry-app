@@ -1,5 +1,41 @@
 # Backlog — the single work queue
 
+> ## 🚨 22 Aug NIGHT (3) — THIRTEEN CLIENTS ARE EATING TO A NUMBER NOBODY CHOSE
+>
+> **`origin/main` = `d8101a2`.** ⚠️ **`20260822l` is NOT APPLIED** — the Supabase
+> connector's token expired mid-session. Apply it from the SQL editor.
+>
+> On 23 Jul something auto-seeded a macro target of **1,800 kcal / 150P / 165C /
+> 60F**, with its own rationale reading *"no bodyweight on file. Refine after
+> weigh-in."* **It was never refined.** For **thirteen active clients** that
+> placeholder is still their only macro target.
+>
+> **Six are logging food against it:**
+>
+> | Client | Days logged | Last |
+> |---|---|---|
+> | Robby Burns | **141** | today |
+> | Martha Montgomery | **110** | today |
+> | Krysta Ruiz-Schnitzler | 61 | 11 Aug |
+> | Todd Prine | 30 | 19 Aug |
+> | Hassan Kareem | 6 | 8 Aug |
+> | Troy Schnitzler | 1 | 16 Jul |
+>
+> Seven more hold the placeholder with no logs yet: Celeste, Christine, Grant,
+> Greg, Laurie, Stacie, Tim. Four archived clients also have it and are excluded.
+>
+> **The numbers are Dustin's to set. Nothing was changed.** What changed is the
+> check: `placeholder_macro_targets` had been reporting a bare count of `17` as
+> **info with no detail** since 23 Jul, which is exactly why it went unread for a
+> month. It now names the clients, counts their food logs, drops archived
+> clients, skips anyone whose placeholder was later superseded, and is a `warn`.
+>
+> **None of these clients has a `current_weight` on file**, which is what the
+> placeholder was waiting for. Four of them do have weigh-ins in `metrics`
+> (Robby 5, Martha 3, Todd 3, Hassan 1) — so the weight exists, it just never
+> made it onto `clients.current_weight`. That is probably the same gap the
+> `client_weight_drift_from_metrics` warn is pointing at from the other side.
+
 > ## 👉 22 Aug NIGHT (2) — EVERY DATE IN THE APP IS A CENTRAL DATE NOW
 >
 > **`origin/main` = `9643951`.**
