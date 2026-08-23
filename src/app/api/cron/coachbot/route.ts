@@ -102,7 +102,8 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
   // Coach Bot posts into a group room, and since the rooms were split on
   // 21 Aug there is one per trainer. This one still posts only into the
   // OWNER's — which is correct and unchanged for his clients, and is why the
-  // gate reads the owner's preference rather than the caller's.
+  // gate reads the owner's preference rather than the caller's. The board it
+  // teases is filtered to that room below, for the same reason.
   //
   // Making Coach Bot run for EVERY trainer in their own room is the follow-up,
   // and it is a bigger job than a flag: the leaderboard it teases is now
@@ -120,8 +121,28 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
   if (!challenge) return { posted: false, reason: "no live challenge" };
 
   const { data: board } = await db.rpc("challenge_leaderboard", { p_challenge_id: challenge.id });
-  const rows = ((board as Row[]) || []).map((r) => ({ ...r, score: Number(r.score) }));
-  if (!rows.length) return { posted: false, reason: "empty board" };
+  const allRows = ((board as Row[]) || []).map((r) => ({ ...r, score: Number(r.score) }));
+
+  // ONLY THE CLIENTS OF THE ROOM THIS IS POSTED IN.
+  //
+  // The challenge is still one instance-wide object — anyone may join it — but
+  // since 21 Aug the group rooms are per trainer and this post goes into the
+  // OWNER's. Unfiltered, a client of Brooke's who joined the challenge could be
+  // named, by first name and rank, in a room full of people who are not her
+  // clients and have never met them.
+  //
+  // The ranks are left exactly as the board computed them. Renumbering 1..n
+  // after the filter would invent a standing that does not exist and tell
+  // somebody they are winning a challenge they are not.
+  const roomTrainer = await ownerTrainer(db);
+  if (!roomTrainer?.id) return { posted: false, reason: "no owner trainer row" };
+  const ids = allRows.map((r) => r.client_id);
+  const { data: mine } = ids.length
+    ? await db.from("clients").select("id").in("id", ids).eq("trainer_id", roomTrainer.id)
+    : { data: [] as { id: string }[] };
+  const inThisRoom = new Set(((mine as { id: string }[]) || []).map((c) => c.id));
+  const rows = allRows.filter((r) => inThisRoom.has(r.client_id));
+  if (!rows.length) return { posted: false, reason: "nobody from this room is on the board" };
 
   const unit = challenge.metric === "logging" ? "days logged" : "days trained";
   const first = (n: string) => (n || "").trim().split(/\s+/)[0] || "Someone";
@@ -159,9 +180,9 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { posted: false, reason: "no api key" };
 
-  // The OWNER's name, because the group chat is shared and this bot is the one
+  // The OWNER's name, because this bot posts in the OWNER's room and is the one
   // voice in it. Resolved rather than read off a constant so the choice stays
-  // visible at the call site.
+  // visible at the call site — and so it follows when the bot runs per room.
   const ownerName = (await ownerTrainer(db))?.firstName || COACH_FIRST_NAME;
 
   const { value, tokensIn, tokensOut } = await callClaudeJson<Reply>({
@@ -203,12 +224,25 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
   // The OWNER's account, explicitly. This was
   // `trainer_settings.select("user_id").limit(1)` — unambiguous while that
   // table held one row, arbitrary the moment Stephanie connects her Google
-  // Calendar and it holds two. The group chat is shared by decision (Dustin,
-  // 20 Aug: "All clients can go in there since they're all going to train with
-  // Symmetry Personal Training"), so the business owner is who posts in it.
+  // Calendar and it holds two. The rooms were split per trainer on 21 Aug and
+  // this bot posts in exactly one of them, the owner's, so his is the account
+  // that speaks. Running it per room is the follow-up; the board and the
+  // roster below are already filtered to this room so it says nothing about
+  // people who are not in it.
   const trainerUid = await ownerAuthUid(db);
   if (!trainerUid) return { posted: false, reason: "no trainer account" };
 
+  // group_trainer_id EXPLICITLY, and the OWNER's room by name.
+  //
+  // The stamp_group_message trigger fills this from my_group_trainer_id(),
+  // which reads auth.uid() — and this runs on the SERVICE ROLE, where
+  // auth.uid() is null. The trigger therefore stamps NULL, and RLS
+  // (read_own_group_messages) requires it to be NOT NULL. So since the rooms
+  // were split on 21 Aug this post has been landing in the table and being
+  // invisible to every client: no error, no bounce, nothing on screen.
+  // Verified against the live database rather than reasoned about.
+  const ownerTrainerRow = await ownerTrainer(db);
+  if (!ownerTrainerRow?.id) return { posted: false, reason: "no owner trainer row" };
   const { error } = await db.from("messages").insert({
     from_id: trainerUid,
     to_id: trainerUid,
@@ -217,6 +251,7 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
     is_group: true,
     is_broadcast: false,
     sender_kind: "coachbot",
+    group_trainer_id: ownerTrainerRow.id,
   });
   if (error) return { posted: false, reason: `insert failed: ${error.message}` };
 
@@ -231,14 +266,13 @@ async function handle(req: NextRequest) {
     const scoped = await resolveAiScope(null);
     if (!scoped.ok) return scoped.response;
     if (!scoped.scope.isTrainer) return NextResponse.json({ error: "Trainer only" }, { status: 403 });
-    // A REAL POST IS AUTHORED AS THE OWNER.
+    // A REAL POST GOES INTO THE OWNER'S ROOM, SO IT IS THE OWNER'S TO FIRE.
     //
-    // The group chat is shared on purpose (Dustin, 20 Aug: "All clients can go
-    // in there since they're all going to train with Symmetry Personal
-    // Training"), so the business owner is who speaks in it — that part is
-    // right. What was wrong is that any trainer could fire it, which put a
-    // message signed by Dustin into his group chat on somebody else's tap.
-    // Preview stays open to every trainer; posting does not.
+    // The rooms were split per trainer on 21 Aug. This bot has not caught up —
+    // it still posts into exactly one room, the owner's — so a second trainer
+    // firing it put a message signed by Dustin into Dustin's room on her tap,
+    // and her own clients still saw nothing. Preview stays open to every
+    // trainer; posting does not, until the bot runs per room.
     if (!dry) {
       const me = await rosterScopeFor(
         createAdminClient() as never,

@@ -212,10 +212,19 @@ export async function sendGroupMessage(body: string, imageUrl?: string | null, s
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return 'You are signed out — sign in and try again.';
-  const { error } = await supabase.from("messages").insert({ from_id: user.id, to_id: user.id, client_id: null, body, image_url: imageUrl || null, is_group: true });
+  // The row comes back so the fan-out below can read WHICH ROOM it landed in.
+  // The stamp_group_message trigger fills group_trainer_id from
+  // my_group_trainer_id() — this is the session client, so auth.uid() is real
+  // and the stamp is correct.
+  const { data: posted, error } = await supabase
+    .from("messages")
+    .insert({ from_id: user.id, to_id: user.id, client_id: null, body, image_url: imageUrl || null, is_group: true })
+    .select("group_trainer_id")
+    .maybeSingle();
   // Before the fan-out: buzzing thirty-five phones about a message that was
   // never written is the loudest possible way to be wrong.
   if (error) return `Message not posted to the group: ${error.message}`;
+  const roomTrainerId = (posted as { group_trainer_id: string | null } | null)?.group_trainer_id ?? null;
   revalidatePath("/messages");
 
   if (silent) return null;
@@ -224,18 +233,23 @@ export async function sendGroupMessage(body: string, imageUrl?: string | null, s
   // Uses the admin client so the recipient list isn't limited by the sender's RLS.
   try {
     const admin: any = createAdminClient();
-    // EVERY active trainer, not "the" trainer. This asked `trainer_user_id()`,
-    // whose body is `trainer_settings ... LIMIT 1` with no ORDER BY and a
-    // hardcoded fallback to Dustin's address — it can only ever return one
-    // person, so the second coach was never on the list. It happens not to bite
-    // today only because both trainers also have a client row of their own and
-    // therefore fall out of the member sweep; archive either row, or add a
-    // trainer who is not also a client, and that coach silently stops hearing
-    // the group chat. The group itself is shared by decision, so both coaches
-    // belong on it.
+    // THE ROOM, NOT THE BUILDING.
+    //
+    // This swept EVERY client with an account and EVERY active trainer. It was
+    // right while there was one shared group; the rooms were split per trainer
+    // on 21 Aug and this did not follow. So Brooke posting in her room buzzed
+    // every one of Dustin's clients with her opening words in the notification
+    // body — a message RLS then refuses to show them when they tap it.
+    //
+    // Scoped to the room the message actually landed in: that trainer, and the
+    // clients whose trainer_id is theirs. A null room (a group row that predates
+    // the stamp) falls back to the old sweep rather than silently notifying
+    // nobody — better one wrong buzz than a group chat that stops ringing.
+    const memberQ = admin.from('clients').select('auth_user_id').not('auth_user_id', 'is', null).is('archived_at', null);
+    const coachQ = admin.from('trainers').select('auth_user_id').eq('active', true).not('auth_user_id', 'is', null);
     const [{ data: members }, { data: coaches }] = await Promise.all([
-      admin.from('clients').select('auth_user_id').not('auth_user_id', 'is', null).is('archived_at', null),
-      admin.from('trainers').select('auth_user_id').eq('active', true).not('auth_user_id', 'is', null),
+      roomTrainerId ? memberQ.eq('trainer_id', roomTrainerId) : memberQ,
+      roomTrainerId ? coachQ.eq('id', roomTrainerId) : coachQ,
     ]);
     const targets = new Set<string>();
     (members || []).forEach((m: any) => { if (m.auth_user_id) targets.add(m.auth_user_id as string); });

@@ -58,12 +58,23 @@ function firstName(name: string | null): string {
   return (name || "").trim().split(/\s+/)[0] || "Someone";
 }
 
-async function whoseBirthday(db: Db, targetIso: string): Promise<BirthdayPerson[]> {
-  const { data } = await db
+/**
+ * Whose birthday falls on this date.
+ *
+ * `onlyTrainer` narrows it to one coach's clients. The GROUP post needs that —
+ * since 21 Aug the rooms are per trainer and this bot posts in the owner's, so
+ * naming another trainer's client there announces them, by first name, to a
+ * room full of strangers. The private heads-up does NOT narrow: it is routed to
+ * each client's own coach further down and is correct roster-wide.
+ */
+async function whoseBirthday(db: Db, targetIso: string, onlyTrainer?: string | null): Promise<BirthdayPerson[]> {
+  let q = db
     .from("clients")
     .select("id, name, date_of_birth")
     .is("archived_at", null)
     .not("date_of_birth", "is", null);
+  if (onlyTrainer) q = q.eq("trainer_id", onlyTrainer);
+  const { data } = await q;
   const rows = (data as ClientRow[] | null) ?? [];
   const target = monthDay(targetIso);
   return rows
@@ -109,21 +120,21 @@ export async function runBirthdays(
   const today = opts.today || centralToday();
   const year = Number(today.slice(0, 4));
 
-  // The OWNER's account, for the GROUP POST only. This was
-  // `trainer_settings.select("user_id").limit(1)` — unambiguous while that
-  // table held one row, arbitrary the moment Stephanie connects her Google
-  // Calendar and it holds two. The group chat is shared by decision (Dustin,
-  // 20 Aug: "All clients can go in there since they're all going to train with
-  // Symmetry Personal Training"), so the business owner is who posts in it.
+  // The OWNER's account and the OWNER's room, for the GROUP POST only.
+  //
+  // The rooms were split per trainer on 21 Aug. This bot still posts in one of
+  // them — the owner's — which is correct and unchanged for his clients, and is
+  // why both the account and the roster below are his. Running it for every
+  // trainer in their own room is the follow-up, tracked in the backlog.
   //
   // The private heads-up below is a DIFFERENT question and gets a different
   // answer — see there.
+  const roomTrainer = await ownerTrainer(db);
   const trainerUid = await ownerAuthUid(db);
-  // The OWNER's name, because the group chat is shared and this bot is the
-  // one voice in it. Resolved rather than read off a constant so the choice
-  // stays visible.
-  const ownerName = (await ownerTrainer(db))?.firstName || COACH_FIRST_NAME;
-  if (!trainerUid) return { posted: false, reason: "no trainer account" };
+  // The OWNER's name, because this bot is the one voice in his room. Resolved
+  // rather than read off a constant so the choice stays visible.
+  const ownerName = roomTrainer?.firstName || COACH_FIRST_NAME;
+  if (!trainerUid || !roomTrainer?.id) return { posted: false, reason: "no trainer account" };
 
   // ── Tomorrow: the quiet nudge to THAT CLIENT'S COACH ─────────────────────
   //
@@ -176,7 +187,8 @@ export async function runBirthdays(
   }
 
   // ── Today: the group chat ────────────────────────────────────────────────
-  const people = await whoseBirthday(db, today);
+  // Narrowed to the room. See whoseBirthday().
+  const people = await whoseBirthday(db, today, roomTrainer.id);
   if (!people.length) {
     return { posted: false, reason: "no birthdays today", headsUp };
   }
@@ -227,6 +239,15 @@ export async function runBirthdays(
     return { posted: false, reason: `dry run — nothing posted (${usedAi ? "ai" : "fallback"})`, message: body, headsUp };
   }
 
+  // group_trainer_id EXPLICITLY, and the OWNER's room by name.
+  //
+  // The stamp_group_message trigger fills this from my_group_trainer_id(),
+  // which reads auth.uid() — and this runs on the SERVICE ROLE, where
+  // auth.uid() is null. The trigger therefore stamps NULL, and RLS
+  // (read_own_group_messages) requires it to be NOT NULL. So since the rooms
+  // were split on 21 Aug this post has been landing in the table and being
+  // invisible to every client: no error, no bounce, nothing on screen.
+  // Verified against the live database rather than reasoned about.
   const { error } = await db.from("messages").insert({
     from_id: trainerUid,
     to_id: trainerUid,
@@ -235,6 +256,7 @@ export async function runBirthdays(
     is_group: true,
     is_broadcast: false,
     sender_kind: "coachbot",
+    group_trainer_id: roomTrainer.id,
   });
   if (error) return { posted: false, reason: `insert failed: ${error.message}`, headsUp };
 
@@ -268,8 +290,9 @@ async function handle(req: NextRequest) {
     const scoped = await resolveAiScope(null);
     if (!scoped.ok) return scoped.response;
     if (!scoped.scope.isTrainer) return NextResponse.json({ error: "Trainer only" }, { status: 403 });
-    // Same rule as Coach Bot: the birthday wish goes into the shared group
-    // authored as the owner, so a real fire is the owner's. Preview is open.
+    // Same rule as Coach Bot: the wish goes into the OWNER's room, authored as
+    // him, because this bot does not yet run per room. So a real fire is the
+    // owner's; preview is open to every trainer.
     if (!dry) {
       const me = await rosterScopeFor(
         createAdminClient() as never,

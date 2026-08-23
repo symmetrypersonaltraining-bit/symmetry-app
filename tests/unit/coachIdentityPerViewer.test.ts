@@ -350,10 +350,16 @@ test("an owner announcement reaching every client is recorded as a decision", ()
     "the deliberate breadth of a broadcast is undocumented and reads as a bug");
 });
 
-test("the shared group bots are handed the owner explicitly", () => {
+test("the group bots are handed their room's coach explicitly", () => {
   // One room, one voice. Passing the name in rather than reading a constant is
   // what makes that a decision rather than a coincidence that survives only
-  // while the constant happens to hold the right value.
+  // while the constant happens to hold the right value — and it is what lets
+  // these bots run per room later without touching the prompt files.
+  //
+  // The rooms were split per trainer on 21 Aug. Both bots still post in the
+  // OWNER's room, so the coach they resolve is still the owner; birthdays now
+  // reads it off the same `roomTrainer` row it stamps group_trainer_id from,
+  // which is the same fact under a name that will survive the follow-up.
   for (const [f, sym] of [["src/app/api/cron/coachbot/route.ts", "SYSTEM"],
                           ["src/lib/birthdays.ts", "BIRTHDAY_SYSTEM"]] as const) {
     const c = code(read(f));
@@ -361,8 +367,8 @@ test("the shared group bots are handed the owner explicitly", () => {
       f + " builds the group prompt from a module constant again");
   }
   for (const f of ["src/app/api/cron/coachbot/route.ts", "src/app/api/cron/birthdays/route.ts"]) {
-    assert.match(code(read(f)), /ownerTrainer\(db\)\)\?\.firstName/,
-      f + " does not resolve the owner for the shared room");
+    assert.match(code(read(f)), /ownerTrainer\(db\)\)\?\.firstName|roomTrainer\?\.firstName/,
+      f + " does not resolve a real coach for the room it posts in");
   }
 });
 

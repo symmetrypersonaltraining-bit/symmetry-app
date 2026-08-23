@@ -181,10 +181,16 @@ test("nobody finds a trainer by guessing at the owner's email or name", () => {
   }
 });
 
-test("the agent sends a group post as the owner and a DM as the client's coach", () => {
+test("the agent sends a group post as the caller and a DM as the client's coach", () => {
   const c = code(read("src/lib/ai/agent-tools.ts"));
-  assert.match(c, /if \(isGroup\) trainerUid = await ownerAuthUid\(db\);/,
-    "a group post no longer resolves the owner");
+  // Was `ownerAuthUid(db)`, written when there was one shared room. The rooms
+  // were split per trainer on 21 Aug, so that line signed Brooke's post with
+  // Dustin's account and filed it in Dustin's room: her clients never saw it
+  // and his got a message from her.
+  assert.match(c, /if \(isGroup\) trainerUid = caller\.authUserId;/,
+    "a group post is signed with somebody else's account again");
+  assert.match(c, /group_trainer_id: caller\.trainerId/,
+    "a group post does not name its room — the trigger stamps NULL on the service role and nobody can read it");
   assert.match(c, /else trainerUid = await inboxAuthUidForClient\(db, clientId\);/,
     "a DM is not sent from the client's own coach — it would carry a stranger's name and land in the wrong thread");
 });

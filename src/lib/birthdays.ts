@@ -104,12 +104,13 @@ export function isPrintable(message: string, people: BirthdayPerson[]): boolean 
   return people.some((p) => m.toLowerCase().includes(p.firstName.toLowerCase()));
 }
 
-// A function taking the OWNER's name, which the caller resolves from the
-// trainers table. The group chat is shared by decision — Dustin, 20 Aug: "let's
-// keep the group chat the same. All clients can go in there" — so one bot, one
-// voice, and the business owner is whose gym it describes. That is a DECISION,
-// and it should read like one: a module constant here would give the same
-// answer today by accident and the wrong one the moment the constant changes.
+// A function taking the name of the coach whose ROOM this is posted in, which
+// the caller resolves from the trainers table. The rooms were split per trainer
+// on 21 Aug; this bot still posts in the owner's, so one bot, one voice, and the
+// business owner is whose gym it describes — for now. Taking the name as an
+// argument is what lets that change without touching this file: a module
+// constant would give the same answer today by accident and the wrong one the
+// moment the bot runs per room.
 export const BIRTHDAY_SYSTEM = (coachFirstName: string) => `You are "Coach Bot" in the group chat of Symmetry Personal Training — a small gym run by ${coachFirstName}, about thirty-five clients who mostly know each other and train together.
 
 Today is someone's birthday. Write the group chat message.

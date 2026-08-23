@@ -553,10 +553,11 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
       // `trainer_settings.select("user_id").limit(1)` for both branches, which
       // is one row only while one trainer has a calendar connected.
       //
-      // The two branches want different answers. The group chat is shared by
-      // decision, so it posts as the OWNER. A direct message is from that
-      // client's own coach — sending it from the other trainer's account puts a
-      // stranger's name on it and files the thread in the wrong inbox.
+      // The two branches want different answers, and both are about WHOSE name
+      // ends up on it. A group post goes to the CALLER's own room since the
+      // rooms were split. A direct message is from that client's own coach —
+      // sending it from another trainer's account puts a stranger's name on it
+      // and files the thread in the wrong inbox.
       //
       // Written as an if/else rather than a ternary: the conditional form made
       // tsc give up with "type instantiation is excessively deep", because both
@@ -566,14 +567,31 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
       // tsc give up with "type instantiation is excessively deep", because both
       // arms carry the full generic supabase client type through inference.
       let trainerUid: string | null;
-      if (isGroup) trainerUid = await ownerAuthUid(db);
+      // THE GROUP IS THE CALLER'S OWN ROOM.
+      //
+      // This was ownerAuthUid() for the group branch, written when there was
+      // one shared room. The rooms were split per trainer on 21 Aug, so that
+      // line now signs Brooke's post with Dustin's account and files it in
+      // Dustin's room — her clients never see it and his get a message from her.
+      if (isGroup) trainerUid = caller.authUserId;
       else trainerUid = await inboxAuthUidForClient(db, clientId);
       if (!trainerUid) return "Error: trainer account not found.";
 
       if (isGroup) {
         const announcement = input.announcement === true;
+        // group_trainer_id EXPLICITLY. The stamp_group_message trigger fills it
+        // from my_group_trainer_id(), which reads auth.uid() — and this runs on
+        // the SERVICE ROLE, where auth.uid() is null. So the trigger stamps
+        // NULL, and read_own_group_messages requires it to be NOT NULL: the
+        // message posts successfully and is invisible to every single client.
+        // Verified against the live database before writing this.
+        if (!caller.trainerId) return "Error: only a trainer has a group to post in.";
         const { data: m, error } = await db.from("messages")
-          .insert({ from_id: trainerUid, to_id: trainerUid, client_id: null, body, is_group: true, is_broadcast: announcement })
+          .insert({
+            from_id: trainerUid, to_id: trainerUid, client_id: null, body,
+            is_group: true, is_broadcast: announcement,
+            group_trainer_id: caller.trainerId,
+          })
           .select("id").maybeSingle();
         if (error) return `Error sending: ${error.message}`;
         await logAction(db, "send_message", null, `Group${announcement ? " announcement" : ""}: ${body.slice(0, 80)}`,

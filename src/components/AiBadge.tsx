@@ -19,8 +19,8 @@
 //
 // Same artwork as Coach Bot in the group chat, deliberately — one AI face
 // across the whole app, so clients learn it once. "One face" means one face
-// PER COACH: the group chat is shared and keeps the owner's bot, but a client's
-// own screens wear their own coach's set.
+// PER COACH: the group room keeps the bot of the coach who runs it, and a
+// client's own screens wear their own coach's set.
 
 // One face across the app, but not one EXPRESSION. Which sticker gets used is
 // decided by mood in src/lib/ai/faces.ts — read the header there for why the
