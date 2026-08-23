@@ -23,6 +23,37 @@
 > | `3e5c6c7` | **"Is a trainer" is not "is this client's trainer".** Service-role routes that never re-imposed `trainer_can_see_client()`: plateaus, live-sessions, attention-drafts, focus-drafts (including *approve all*, which published), weekly-ai POST. |
 > | `c8b9102` | Tutorial: a **Setting the numbers** step (her actual first question), the AI target check, and the remove-a-row control. |
 >
+> ### 23 Aug, later — THE GROUP ROOMS (`0bd3545`)
+>
+> I got this backwards earlier and wrote the wrong reason into a comment.
+> **The rooms were split per trainer on 21 Aug** — a group chat is one trainer
+> and their clients, never shared. Dustin: *"group chat is for trainer n their
+> clients only not shared."*
+>
+> Reading was always correct: `messages.group_trainer_id`, the
+> `stamp_group_message` trigger and the `read_own_group_messages` policy do the
+> right thing. **Writing was wrong in three ways.**
+>
+> 1. `my_group_trainer_id()` resolves through `auth.uid()`. Every bot and the
+>    trainer agent insert on the **service role**, where `auth.uid()` is NULL —
+>    so the trigger stamped NULL, and the read policy requires NOT NULL. Probed
+>    the live database to confirm. **Coach Bot's next post would have been the
+>    first invisible one: the cron fires 5pm CT Mon/Wed/Fri, the split shipped
+>    Friday, and this was caught on the Sunday.**
+> 2. The agent's group branch posted as `ownerAuthUid()` — Brooke's post signed
+>    as Dustin, filed in his room, her clients never seeing it.
+> 3. Coach Bot's leaderboard, the birthday sweep and the push fan-out all read
+>    the whole instance while posting into one room.
+>
+> ### Still to do here
+>
+> **Run the bots per room.** Both still post only in the owner's. That needs a
+> **challenge and a leaderboard per trainer** — `group_challenges` is one
+> instance-wide row and `v_active_challenge` is `limit 1` — so Brooke's room has
+> nothing to tease yet. Until then a non-owner can preview (`?dry=1`) but not
+> fire. The board and both rosters are already filtered to the room, so nothing
+> leaks in the meantime.
+
 > ### The seven — all answered and shipped (`a28ff10`)
 >
 > | | answer |
