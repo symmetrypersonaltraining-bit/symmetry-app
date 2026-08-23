@@ -3,7 +3,7 @@
 import { useState, useMemo, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { updateGCalEvent, deleteGCalEvent } from "./scheduleActions";
-import { centralIso } from "@/lib/central-time";
+import { centralIso, centralFormatDate } from "@/lib/central-time";
 import { logCardioSession, logStrengthSession } from "./actions";
 import ManualWorkoutBuilder from "@/components/ManualWorkoutBuilder";
 
@@ -87,8 +87,7 @@ function addDays(dateStr: string, days: number): string {
 }
 
 function formatDateLabel(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return centralFormatDate(dateStr, { month: "short", day: "numeric" });
 }
 
 // ─── Edit Drawer ──────────────────────────────────────────────────────────────

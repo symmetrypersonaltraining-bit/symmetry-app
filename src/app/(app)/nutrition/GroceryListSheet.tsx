@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { centralFormatDate } from "@/lib/central-time";
 
 interface GItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; position: number; basis?: string | null; }
 interface GMeal { id: string; name: string; timing: string | null; position: number; meal_items: GItem[]; }
@@ -17,8 +18,7 @@ function toISO(d: Date) {
   return d.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 }
 function fmtShort(iso: string) {
-  const d = new Date(iso + "T12:00:00");
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return centralFormatDate(iso, { month: "short", day: "numeric" });
 }
 
 export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClose: () => void }) {

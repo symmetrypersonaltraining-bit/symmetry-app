@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { markClientPaid, setPaymentStatus, updateAmountDue } from "./paymentActions";
+import { centralToday, centralFormatDate, shiftDate } from "@/lib/central-time";
 
 interface ReminderSummary {
   id: string;
@@ -59,12 +60,25 @@ function statusSortWeight(status: string): number {
   return 3;
 }
 
-function localDateStr(d: Date = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+// What counts as overdue and what falls inside the next 30 days. This was the
+// DEVICE's date -- and it also runs during SSR on the UTC server, so the first
+// paint after 19:00 Central marked a reminder due tomorrow as due today.
+function localDateStr(): string {
+  return centralToday();
+}
+
+/** "2026-08-23" + n months, clamped to the last day of the target month. */
+function addMonthsToDate(dateStr: string, n: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const total = y * 12 + (m - 1) + n;
+  const yy = Math.floor(total / 12);
+  const mm = (total % 12) + 1;
+  const lastDay = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+  return `${yy}-${String(mm).padStart(2, "0")}-${String(Math.min(d, lastDay)).padStart(2, "0")}`;
 }
 
 function fmtDate(d: string) {
-  return new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return centralFormatDate(d, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function daysUntil(d: string, today: string) {
@@ -99,13 +113,12 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
     setError(null);
     try {
       if (!client.reminderId) {
-        const nextMonth = new Date();
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        const nextMonth = addMonthsToDate(centralToday(), 1);
         const { data: newReminder, error: createErr } = await supabase
           .from("payment_reminders")
           .insert({
             client_id: client.clientId,
-            due_date: localDateStr(nextMonth),
+            due_date: nextMonth,
             amount_due: parseFloat(amount) || 0,
             billing_credits: 0,
             notification_status: "pending",
@@ -324,11 +337,7 @@ function NewPaymentModal({ clients, onClose, onCreated }: NewPaymentModalProps) 
     const c = clients[0];
     return String(c?.currentFees || "");
   });
-  const [dueDate, setDueDate] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() + 1);
-    return localDateStr(d);
-  });
+  const [dueDate, setDueDate] = useState(() => addMonthsToDate(centralToday(), 1));
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [sendAfter, setSendAfter] = useState(false);
@@ -564,9 +573,7 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
   }, [editingAmountId]);
 
   const today = localDateStr();
-  const thirtyDaysDate = new Date();
-  thirtyDaysDate.setDate(thirtyDaysDate.getDate() + 30);
-  const thirtyStr = localDateStr(thirtyDaysDate);
+  const thirtyStr = shiftDate(today, 30);
 
   const filtered = localClients
     .filter(c => {

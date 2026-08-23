@@ -17,6 +17,8 @@
 // and the invoice drift apart — which is the exact failure that produced
 // "8 sessions × $80 = $640" beside an amount of $450.
 
+import { centralFormatDate } from "@/lib/central-time";
+
 export interface InvoiceDetail {
   /** "monthly_less_cancellations" | "flat" | "sessions_trained" */
   basis: string;
@@ -64,11 +66,10 @@ export function parseInvoiceDetail(credit_details: unknown, halfPriceSessions?: 
   };
 }
 
-/** "Aug 13" from "2026-08-13". Midday so a date-only string cannot slip a day. */
+/** "Aug 13" from "2026-08-13". */
 export function shortDate(iso: string): string {
-  const d = new Date(iso + "T12:00:00");
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (!/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso;
+  return centralFormatDate(iso.slice(0, 10), { month: "short", day: "numeric" });
 }
 
 /**

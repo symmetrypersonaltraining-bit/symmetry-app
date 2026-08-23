@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { computeDayTotals, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
+import { centralToday, shiftDate } from "@/lib/central-time";
 
 type Daily = { date: string; calories: number; protein: number; carbs: number; fats: number };
 const RANGES = ["1wk", "2wk", "4wk", "8wk", "Custom"];
@@ -12,7 +13,6 @@ const METRICS = [
   { key: "fats", label: "Fat", color: "#D85A30", unit: "g" },
 ] as const;
 
-function ymd(d: Date) { const m = String(d.getMonth()+1).padStart(2,"0"); const day = String(d.getDate()).padStart(2,"0"); return d.getFullYear()+"-"+m+"-"+day; }
 
 export default function MacrosProgressChart({ clientId }: { clientId: string | null }) {
   const supabase = createClient();
@@ -78,7 +78,9 @@ export default function MacrosProgressChart({ clientId }: { clientId: string | n
       return daily.filter(d => (!customStart || d.date >= customStart) && (!customEnd || d.date <= customEnd));
     }
     const days = range === "1wk" ? 7 : range === "2wk" ? 14 : range === "4wk" ? 28 : 56;
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days); const cs = ymd(cutoff);
+    // The window edge. A device-local date here included or dropped one day
+    // relative to the Central calendar the logs were actually filed under.
+    const cs = shiftDate(centralToday(), -days);
     return daily.filter(d => d.date >= cs);
   }, [daily, range, customStart, customEnd]);
 

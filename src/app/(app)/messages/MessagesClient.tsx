@@ -11,6 +11,7 @@ import GroupChallenge from "@/components/GroupChallenge";
 import { useCoach } from "@/lib/useCoach";
 import { faceSrc } from "@/lib/ai/faces";
 import toast from "react-hot-toast";
+import { centralFormat, centralFormatDate, centralDateOf, centralToday, shiftDate } from "@/lib/central-time";
 
 interface Message {
   id: string;
@@ -45,20 +46,22 @@ interface Props {
   lastByClient?: Record<string, { body: string; from_id: string; created_at: string }>;
 }
 
+// Both of these read a timestamptz. Formatted without a timeZone they render
+// in whoever is holding the phone's zone, so a trainer and a client could see
+// different send times on the same message, and an 8pm Central message said
+// "Today" in Texas and "Yesterday" one zone east.
 function fmtTime(ts: string | null) {
   if (!ts) return "";
-  return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  return centralFormat(ts, { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
 function fmtDay(ts: string | null) {
   if (!ts) return "";
-  const d = new Date(ts);
-  const today = new Date();
-  if (d.toDateString() === today.toDateString()) return "Today";
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const day = centralDateOf(ts);
+  const today = centralToday();
+  if (day === today) return "Today";
+  if (day === shiftDate(today, -1)) return "Yesterday";
+  return centralFormatDate(day, { month: "short", day: "numeric" });
 }
 
 function getInitials(name: string) {

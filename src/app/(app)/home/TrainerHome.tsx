@@ -11,6 +11,7 @@ import GcalSyncButton from "@/components/GcalSyncButton";
 import SyncHealth from "@/components/SyncHealth";
 import TutorialCard from "@/components/TutorialCard";
 import { useCoach } from "@/lib/useCoach";
+import { centralHour } from "@/lib/central-time";
 
 interface TodaySession {
   id: string;
@@ -38,7 +39,7 @@ interface Props {
 }
 
 function getGreeting(): string {
-  const h = new Date().getHours();
+  const h = centralHour();
   if (h < 12) return "morning";
   if (h < 17) return "afternoon";
   return "evening";

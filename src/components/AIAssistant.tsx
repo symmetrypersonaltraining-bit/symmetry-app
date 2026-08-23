@@ -7,6 +7,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import AiBadge from "@/components/AiBadge";
+import { centralToday, centralFormat, centralFormatDate } from "@/lib/central-time";
 
 interface Change { op: string }
 interface Proposal { scheduled_workout_id: string; reason: string; summary: string; changes: Change[] }
@@ -199,7 +200,13 @@ export default function AIAssistant() {
   }, []);
 
   const getContext = useCallback(() => {
-    return `Current page: ${pathname}. Trainer mode: ${isTrainer}. Time: ${new Date().toLocaleTimeString()}.`;
+    // What the model is told the time is. Left as the browser's wall clock it
+    // would reason about "today" and "this evening" from the wrong zone for
+    // anyone outside Central -- and give a different answer to two people
+    // asking the same question at the same moment.
+    return `Current page: ${pathname}. Trainer mode: ${isTrainer}. `
+      + `Date: ${centralFormatDate(centralToday(), { weekday: "long", month: "long", day: "numeric", year: "numeric" })}. `
+      + `Time: ${centralFormat(new Date(), { hour: "numeric", minute: "2-digit", hour12: true })} Central.`;
   }, [pathname, isTrainer]);
 
   const sendMessage = useCallback(async (text: string) => {

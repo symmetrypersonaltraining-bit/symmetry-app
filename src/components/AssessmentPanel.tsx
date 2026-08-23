@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import AiBadge from "@/components/AiBadge";
+import { centralFormat } from "@/lib/central-time";
 
 type Assessment = Record<string, unknown> & {
   assessed_at?: string | null;
@@ -81,7 +82,7 @@ export default function AssessmentPanel({ clientId }: { clientId: string }) {
           <span className="font-semibold text-sm" style={{ color: "var(--brand-text)" }}>Assessment</span>
           {a.assessed_at ? (
             <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-              {new Date(String(a.assessed_at)).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              {centralFormat(String(a.assessed_at), { month: "short", day: "numeric", year: "numeric" })}
             </span>
           ) : null}
         </div>

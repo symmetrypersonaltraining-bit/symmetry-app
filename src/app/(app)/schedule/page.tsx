@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import ScheduleClient from "./ScheduleClient";
 import { TRAINER_EMAIL } from "@/lib/trainer";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
+import { centralFormatDate } from "@/lib/central-time";
 
 function getCentralNow() {
   const now = new Date();
@@ -61,7 +62,7 @@ export default async function SchedulePage() {
   const today = day;
   const firstDay = new Date(year_val, month, 1).getDay();
   const daysInMonth = new Date(year_val, month + 1, 0).getDate();
-  const monthName = new Date(year_val, month, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthName = centralFormatDate(`${year_val}-${String(month + 1).padStart(2, "0")}-01`, { month: "long", year: "numeric" });
   const pad = (n: number) => String(n).padStart(2, "0");
   const monthStart = `${year_val}-${pad(month + 1)}-01`;
   const monthEnd = `${year_val}-${pad(month + 1)}-${pad(daysInMonth)}`;

@@ -13,6 +13,7 @@ import AssessmentPanel from "@/components/AssessmentPanel";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
 import ScheduleBoard from "@/components/ScheduleBoard";
 import AddWorkoutButton from "@/components/AddWorkoutButton";
+import { centralToday, centralWeekStart, centralDayOfWeek, centralFormat, centralFormatDate, shiftDate } from "@/lib/central-time";
 
 interface MetricPoint {
   metric_date: string;
@@ -331,24 +332,33 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
   );
 }
 
+/** "2026-08-01" + n months, still the first of a month. Pure string maths. */
+function addMonths(firstOfMonth: string, n: number): string {
+  const [y, m] = firstOfMonth.split("-").map(Number);
+  const total = y * 12 + (m - 1) + n;
+  const yy = Math.floor(total / 12);
+  const mm = (total % 12) + 1;
+  return `${yy}-${String(mm).padStart(2, "0")}-01`;
+}
+
 // ---- Training Calendar with 1W / 2W / 4W toggle ----
 type ViewMode = "1w" | "2w" | "4w";
 
 function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; clientId: string }) {
-  const today = new Date();
-  const todayStr = today.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  // Every date in this calendar is a "YYYY-MM-DD" STRING, and no Date object is
+  // ever built for a grid cell. It used to keep `today` as a local Date and
+  // derive the cells from it, so the cell keys were the UTC day of a local
+  // midnight: correct in Central and on the UTC server, one square off for any
+  // viewer at a positive offset -- every workout chip slid left and the red
+  // today-ring, which WAS compared against a correct Central date, vanished
+  // entirely. The week anchor had the same problem one level up: `getDay()` on
+  // a Saturday evening off-Central jumped the whole view a week forward.
+  const todayStr = centralToday();
   const [sheetDate, setSheetDate] = useState<string | null>(null);
   const [movedMap, setMovedMap] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("1w");
-  const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [weekAnchor, setWeekAnchor] = useState(() => {
-    const d = new Date(today);
-    const dow = d.getDay();
-    const monday = new Date(d);
-    monday.setDate(d.getDate() - dow);
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-  });
+  const [viewMonth, setViewMonth] = useState(() => todayStr.slice(0, 7) + "-01");
+  const [weekAnchor, setWeekAnchor] = useState(() => centralWeekStart(todayStr));
 
   const workoutMap = useMemo(() => {
     const map: Record<string, WorkoutEntry[]> = {};
@@ -363,41 +373,26 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
   const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   function prev() {
-    if (viewMode === "4w") {
-      setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
-    } else {
-      const weeks = viewMode === "1w" ? 1 : 2;
-      setWeekAnchor(d => { const n = new Date(d); n.setDate(n.getDate() - weeks * 7); return n; });
-    }
+    if (viewMode === "4w") setViewMonth(m => addMonths(m, -1));
+    else setWeekAnchor(a => shiftDate(a, (viewMode === "1w" ? 1 : 2) * -7));
   }
   function next() {
-    if (viewMode === "4w") {
-      setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
-    } else {
-      const weeks = viewMode === "1w" ? 1 : 2;
-      setWeekAnchor(d => { const n = new Date(d); n.setDate(n.getDate() + weeks * 7); return n; });
-    }
+    if (viewMode === "4w") setViewMonth(m => addMonths(m, 1));
+    else setWeekAnchor(a => shiftDate(a, (viewMode === "1w" ? 1 : 2) * 7));
   }
   function goToday() {
-    setViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
-    const d = new Date(today);
-    const dow = d.getDay();
-    const monday = new Date(d);
-    monday.setDate(d.getDate() - dow);
-    monday.setHours(0, 0, 0, 0);
-    setWeekAnchor(monday);
+    setViewMonth(todayStr.slice(0, 7) + "-01");
+    setWeekAnchor(centralWeekStart(todayStr));
   }
 
   let headerLabel = "";
   if (viewMode === "4w") {
-    headerLabel = viewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    headerLabel = centralFormatDate(viewMonth, { month: "long", year: "numeric" });
   } else {
     const weeks = viewMode === "1w" ? 1 : 2;
-    const endDate = new Date(weekAnchor);
-    endDate.setDate(weekAnchor.getDate() + weeks * 7 - 1);
-    const startLabel = weekAnchor.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    const endLabel = endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    headerLabel = `${startLabel} \u2013 ${endLabel}`;
+    const endStr = shiftDate(weekAnchor, weeks * 7 - 1);
+    const opts = { month: "short", day: "numeric" } as const;
+    headerLabel = `${centralFormatDate(weekAnchor, opts)} \u2013 ${centralFormatDate(endStr, opts)}`;
   }
 
   function WorkoutChip({ w, compact }: { w: WorkoutEntry; compact: boolean }) {
@@ -437,15 +432,14 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
   );
 
   if (viewMode === "4w") {
-    const year = viewDate.getFullYear();
-    const month = viewDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    let startDow = firstDay.getDay();
-    startDow = startDow === 0 ? 6 : startDow - 1;
-    const days: (Date | null)[] = [];
+    // startDow used to be shifted to Monday-first (`dow === 0 ? 6 : dow - 1`)
+    // while DOW_LABELS above are Sunday-first, so the whole month sat one
+    // column left of its own weekday headings.
+    const startDow = centralDayOfWeek(viewMonth);
+    const daysInMonth = Number(shiftDate(addMonths(viewMonth, 1), -1).slice(8));
+    const days: (string | null)[] = [];
     for (let i = 0; i < startDow; i++) days.push(null);
-    for (let d = 1; d <= lastDay.getDate(); d++) days.push(new Date(year, month, d));
+    for (let d = 0; d < daysInMonth; d++) days.push(shiftDate(viewMonth, d));
     while (days.length % 7 !== 0) days.push(null);
 
     return (
@@ -462,7 +456,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
         <div className="grid grid-cols-7 gap-px" style={{ background: "var(--brand-border)" }}>
           {days.map((day, i) => {
             if (!day) return <div key={`e${i}`} style={{ background: "var(--brand-bg)", minHeight: 72 }} />;
-            const ds = day.toISOString().split("T")[0];
+            const ds = day;
             const isToday = ds === todayStr;
             const dws = workoutMap[ds] || [];
             return (
@@ -470,7 +464,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
                 <div className="flex justify-center mb-1">
                   <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold"
                     style={{ background: isToday ? "#E53935" : "transparent", color: isToday ? "white" : "var(--brand-text-secondary)" }}>
-                    {day.getDate()}
+                    {Number(ds.slice(8))}
                   </span>
                 </div>
                 <div className="space-y-0.5">
@@ -500,13 +494,9 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
   }
 
   const numWeeks = viewMode === "1w" ? 1 : 2;
-  const weekDays: Date[] = [];
+  const weekDays: string[] = [];
   for (let w = 0; w < numWeeks; w++) {
-    for (let d = 0; d < 7; d++) {
-      const day = new Date(weekAnchor);
-      day.setDate(weekAnchor.getDate() + w * 7 + d);
-      weekDays.push(day);
-    }
+    for (let d = 0; d < 7; d++) weekDays.push(shiftDate(weekAnchor, w * 7 + d));
   }
 
   return (
@@ -526,7 +516,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
             </div>
             <div className="grid grid-cols-7 gap-px" style={{ background: "var(--brand-border)" }}>
               {weekSlice.map(day => {
-                const ds = day.toISOString().split("T")[0];
+                const ds = day;
                 const isToday = ds === todayStr;
                 const dws = workoutMap[ds] || [];
                 const minH = viewMode === "1w" ? 140 : 100;
@@ -535,7 +525,7 @@ function TrainingCalendar({ workouts, clientId }: { workouts: WorkoutEntry[]; cl
                     <div className="flex justify-center mb-2">
                       <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
                         style={{ background: isToday ? "#E53935" : "transparent", color: isToday ? "white" : "var(--brand-text)" }}>
-                        {day.getDate()}
+                        {Number(ds.slice(8))}
                       </span>
                     </div>
                     <div className="space-y-1">
@@ -908,7 +898,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
         <div className="flex items-center gap-3 px-4 py-3" style={{ borderColor: "var(--brand-border)" }}>
           <span className="text-xs font-medium w-28 flex-shrink-0" style={{ color: "var(--brand-text-secondary)" }}>Client Since</span>
           <span className="text-sm" style={{ color: "var(--brand-text)" }}>
-            {client.created_at ? new Date(client.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "\u2014"}
+            {client.created_at ? centralFormat(client.created_at, { month: "short", year: "numeric" }) : "\u2014"}
           </span>
         </div>
       </div>

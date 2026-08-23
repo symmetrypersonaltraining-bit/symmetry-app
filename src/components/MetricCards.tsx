@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { computeDayTotals, LogRow, PlanMeal } from '@/lib/nutrition/dailyTotals';
+import { centralFormatDate } from "@/lib/central-time";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -342,8 +343,7 @@ function ExpandedPanel({
       if (chartData.length === 0) return;
 
       const labels = chartData.map(d => {
-        const dt = new Date(d.date + 'T00:00:00');
-        return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return centralFormatDate(d.date, { month: 'short', day: 'numeric' });
       });
 
       chartRef.current = new Chart(canvasRef.current!, {

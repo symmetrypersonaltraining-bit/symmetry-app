@@ -22,11 +22,17 @@ import {
   analyseGoal, UNITS, METRIC_LABEL, STALL_DAYS,
   type Goal, type Reading,
 } from "@/lib/goals";
+import { centralFormatDate } from "@/lib/central-time";
 
 const DAY = 86_400_000;
-const ms = (iso: string) => new Date(`${iso}T12:00:00`).getTime();
-const fmtD = (t: number) =>
-  new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+// Anchored at UTC noon, not local noon, and read back as a date string. Local
+// noon plus a local render is self-consistent rather than correct: it survives
+// only because noon is far enough from midnight that no viewer's offset can
+// push it over. fmtD also takes interpolated chart x-values, not just real
+// dates, so it needs an anchor that is exact rather than merely lucky.
+const ms = (iso: string) => Date.parse(`${iso}T12:00:00Z`);
+const isoOf = (t: number) => new Date(t).toISOString().slice(0, 10);
+const fmtD = (t: number) => centralFormatDate(isoOf(t), { month: "short", day: "numeric" });
 
 /** Green under target, amber behind, grey when there is not enough to say. */
 const TONE = {
@@ -141,7 +147,7 @@ export default function GoalCard({
         </span>
       </div>
       <div style={{ fontSize: 11, color: "var(--brand-text-secondary)", marginBottom: 9 }}>
-        goal {goal.targetValue} {unit} by {new Date(ms(goal.targetDate)).toLocaleDateString("en-US", { month: "long", day: "numeric" })}
+        goal {goal.targetValue} {unit} by {centralFormatDate(goal.targetDate, { month: "long", day: "numeric" })}
       </div>
 
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 800, padding: "5px 10px", borderRadius: 999, background: `color-mix(in srgb, ${tone} 12%, transparent)`, color: tone }}>
@@ -220,7 +226,7 @@ export default function GoalCard({
             boxShadow: "0 4px 14px rgba(0,0,0,.28)", zIndex: 5,
           }}>
             <b style={{ fontSize: 12 }}>{hover.r.value} {unit}</b><br />
-            {new Date(ms(hover.r.date)).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+            {centralFormatDate(hover.r.date, { weekday: "short", month: "short", day: "numeric" })}
             {hover.delta != null && <><br />{hover.delta > 0 ? "+" : ""}{hover.delta} since last</>}
           </div>
         )}

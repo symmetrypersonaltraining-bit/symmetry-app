@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { centralToday, centralFormatDate } from "@/lib/central-time";
 
 interface Reminder {
   id: string;
@@ -22,15 +23,16 @@ export default function PendingRemindersPanel({ reminders }: Props) {
   const [expanded, setExpanded] = useState(false);
   const display = expanded ? reminders : reminders.slice(0, 4);
 
+  // due_date is a Central calendar date. Comparing it against DEVICE midnight
+  // put the red "≤2 days" flag and the "in N days" copy each a day out.
   function daysUntil(dateStr: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const due = new Date(dateStr + "T00:00:00");
-    return Math.round((due.getTime() - today.getTime()) / 86400000);
+    const a = Date.parse(centralToday() + "T00:00:00Z");
+    const b = Date.parse(dateStr + "T00:00:00Z");
+    return Math.round((b - a) / 86400000);
   }
 
   function fmtDate(d: string) {
-    return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return centralFormatDate(d, { month: "short", day: "numeric" });
   }
 
   function urgencyColor(days: number) {

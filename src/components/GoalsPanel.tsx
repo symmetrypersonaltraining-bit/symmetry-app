@@ -20,6 +20,7 @@ import GoalCard from "@/components/GoalCard";
 import GoalSetSheet from "@/components/GoalSetSheet";
 import AiBadge from "@/components/AiBadge";
 import { UNITS, METRIC_LABEL, type Goal, type GoalMetric, type Reading } from "@/lib/goals";
+import { centralFormatDate } from "@/lib/central-time";
 
 export default function GoalsPanel({
   clientId, goals, readingsByMetric, today, canSet, canAnswer,
@@ -80,7 +81,7 @@ export default function GoalsPanel({
               </div>
               <div style={{ fontSize: 15, fontWeight: 800, color: "var(--brand-text)", marginTop: 3 }}>
                 {METRIC_LABEL[g.metric]} {g.targetValue} {UNITS[g.metric]} by{" "}
-                {new Date(`${g.targetDate}T12:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric" })}
+                {centralFormatDate(g.targetDate, { month: "long", day: "numeric" })}
               </div>
               <p style={{ margin: "6px 0 0", fontSize: 12, lineHeight: 1.55, color: "var(--brand-text-secondary)" }}>
                 Nothing starts tracking until you say yes — and no is a real answer. If it&rsquo;s not the right

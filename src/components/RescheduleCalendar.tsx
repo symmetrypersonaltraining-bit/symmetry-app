@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState, type CSSProperties } from "react";
 import WorkoutDaySheet from "./WorkoutDaySheet";
+import { centralFormatDate } from "@/lib/central-time";
 
 export interface CalWorkout {
   id: string;
@@ -45,7 +46,7 @@ export default function RescheduleCalendar({
     return m;
   }, [workouts]);
 
-  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthLabel = centralFormatDate(`${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-01`, { month: "long", year: "numeric" });
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const firstDow = new Date(viewYear, viewMonth, 1).getDay();
   const fmt = (d: number) => `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;

@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useNotificationFeed } from "@/lib/useNotificationFeed";
 import { aggregateNotifications, totalUnread, NotifRow, RawUnread } from "@/lib/notifications";
 import { fetchGroupUnread, groupUnreadAsRows, markGroupRead } from "@/lib/groupUnread";
+import { centralFormat, centralDateOf, centralToday } from "@/lib/central-time";
 
 function fmtWhen(ts: string) {
   if (!ts) return "";
@@ -20,8 +21,10 @@ function fmtWhen(ts: string) {
   const diff = (now.getTime() - d.getTime()) / 1000;
   if (diff < 60) return "now";
   if (diff < 3600) return Math.floor(diff / 60) + "m";
-  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  // Central, not the device. An evening notification used to show tomorrow's
+  // date instead of a clock time the moment the handset's day rolled over.
+  if (centralDateOf(ts) === centralToday()) return centralFormat(ts, { hour: "numeric", minute: "2-digit" });
+  return centralFormat(ts, { month: "short", day: "numeric" });
 }
 
 export default function NotificationCenter({ solid = false }: { solid?: boolean }) {

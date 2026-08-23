@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { submitFeedback } from '@/lib/feedback';
 import { useCoach } from "@/lib/useCoach";
 import AiBadge from "@/components/AiBadge";
+import { centralHour, centralToday, centralFormatDate } from "@/lib/central-time";
 
 type TodaySession = { id: string; clientId: string; clientName: string; workoutLabel: string; dayId: string; status: string; };
 type Client = { id: string; name: string };
@@ -31,10 +32,13 @@ export default function TrainerHomeClient({ clients, todaySessions, loggedTodayC
   const drag = useRef({ on: false, sx: 0, sy: 0, or: 0, ob: 0 });
 
   useEffect(() => {
-    const now = new Date();
-    const h = now.getHours();
+    // Both the greeting bucket and the big date line came off the handset.
+    // home/page.tsx computes a correct Central date label right above this and
+    // this component ignored it, so the header could name a different day than
+    // everything under it.
+    const h = centralHour();
     setGreeting(h < 12 ? 'Good morning,' : h < 17 ? 'Good afternoon,' : 'Good evening,');
-    setDateStr(now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }));
+    setDateStr(centralFormatDate(centralToday(), { weekday: 'long', month: 'long', day: 'numeric' }));
   }, []);
 
   useEffect(() => {

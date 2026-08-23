@@ -27,6 +27,7 @@ import {
   resolveDailyLimit,
 } from "@/lib/ai/meter-core";
 import { TRAINER_EMAIL } from "@/lib/trainer";
+import { centralToday } from "@/lib/central-time";
 
 export { AiPaused, CapExceeded } from "@/lib/ai/meter-core";
 export type { AiFeature } from "@/lib/ai/meter-core";
@@ -179,10 +180,12 @@ async function notifyTrainerApproaching(db: Db, monthToDateUsd: number): Promise
 
   if (!process.env.RESEND_API_KEY) return;
 
-  const now = new Date();
-  const chicago = new Date(now.toLocaleString("en-US", { timeZone: "America/Chicago" }));
-  const dayOfMonth = chicago.getDate();
-  const daysInMonth = new Date(chicago.getFullYear(), chicago.getMonth() + 1, 0).getDate();
+  // Central, without the parse-a-formatted-string round trip this used to do.
+  // The projection divides spend by the day of the month, so being a day out on
+  // the 1st of a month swings it hard.
+  const [cy, cm, cd] = centralToday().split("-").map(Number);
+  const dayOfMonth = cd;
+  const daysInMonth = new Date(Date.UTC(cy, cm, 0)).getUTCDate();
   const projected = projectedMonthEndUsd(monthToDateUsd, dayOfMonth, daysInMonth);
   const willTrip = projected >= MONTHLY_COST_CAP_USD;
 

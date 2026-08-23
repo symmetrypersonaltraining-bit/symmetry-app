@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { fx } from "@/lib/fx";
 import AiBadge from "@/components/AiBadge";
+import { centralHour } from "@/lib/central-time";
 
 interface Draft {
   id: string;
@@ -38,10 +39,10 @@ interface Draft {
 // batch. Stored per batch week so a new Saturday always starts fresh.
 const GATES = [12, 17];
 
-function ctNow() {
-  const s = new Date().toLocaleString("en-US", { timeZone: "America/Chicago" });
-  return new Date(s);
-}
+// Was `new Date(new Date().toLocaleString("en-US", { timeZone: ... }))`. That
+// yields the right hour by accident: the Date it builds has the WRONG instant,
+// by exactly the offset, and it relies on Date parsing a non-ISO en-US locale
+// string, which is implementation-defined. Ask for the hour directly.
 
 export default function SaturdayReview() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -63,7 +64,7 @@ export default function SaturdayReview() {
 
       // Which escalation are we past? Dismissing records the gate it was
       // dismissed at, so the next gate re-opens it on its own.
-      const hour = ctNow().getHours();
+      const hour = centralHour();
       const gate = GATES.filter((g) => hour >= g).length; // 0, 1 or 2
       let dismissedAt = -1;
       try {
@@ -84,7 +85,7 @@ export default function SaturdayReview() {
 
   function dismiss() {
     try {
-      const hour = ctNow().getHours();
+      const hour = centralHour();
       const gate = GATES.filter((g) => hour >= g).length;
       localStorage.setItem("symmetry_focus_review_" + week, String(gate));
     } catch {

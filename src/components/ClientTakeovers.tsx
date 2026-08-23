@@ -37,6 +37,7 @@ import AiBadge from "@/components/AiBadge";
 import { lapseMood, type LapseTier } from "@/lib/ai/faces";
 import { useTakeoverSlot } from "@/lib/useTakeoverSlot";
 import { TAKEOVER_PRIORITY } from "@/lib/takeoverSlot";
+import { centralFormat, centralToday } from "@/lib/central-time";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function pretty(iso: string): string {
@@ -380,7 +381,7 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
     // year somebody typed with a digit missing.
     const y = Number((dob || "").slice(0, 4));
     if (!dob || !y) { setDobErr("Pick a date first."); return; }
-    if (dob > new Date().toISOString().slice(0, 10)) { setDobErr("That's in the future."); return; }
+    if (dob > centralToday()) { setDobErr("That's in the future."); return; }
     if (y < 1900) { setDobErr("Check the year on that one."); return; }
     setBusy(true); setDobErr(null);
     try {
@@ -505,7 +506,7 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
             type="date"
             value={dob}
             onChange={(e) => setDob(e.target.value)}
-            max={new Date().toISOString().slice(0, 10)}
+            max={centralToday()}
             style={{
               width: "100%", boxSizing: "border-box", padding: "13px 12px", borderRadius: 12,
               border: "1px solid var(--brand-border)", background: "var(--brand-card, var(--brand-surface))",
@@ -586,7 +587,7 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
         <div style={{ background: "var(--grad-hero, var(--brand-primary))", color: "#fff", padding: "calc(28px + env(safe-area-inset-top)) 20px 24px" }}>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, opacity: 0.85 }}>📣 FROM {coachFirstName.toUpperCase()}</div>
           <div style={{ fontSize: 12.5, opacity: 0.9, marginTop: 6 }}>
-            {new Date(a.created_at).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+            {centralFormat(a.created_at, { weekday: "long", month: "short", day: "numeric" })}
           </div>
         </div>
 

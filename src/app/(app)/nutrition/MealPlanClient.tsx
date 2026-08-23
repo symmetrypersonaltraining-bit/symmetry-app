@@ -8,6 +8,7 @@ import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 import { useKeyboardInset, scrollFocusedIntoView } from "@/lib/useKeyboardInset";
 import { adherencePct, kcalOf } from "@/lib/nutrition/dailyTotals";
 import AiBadge from "@/components/AiBadge";
+import { centralFormatDate } from "@/lib/central-time";
 
 interface MealItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number; }
 interface Meal { id: string; name: string; timing: string | null; position: number; swaps: string | null; meal_items: MealItem[]; }
@@ -683,7 +684,7 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
   // the top macro-range selector drives the graphs; a second range picker here was redundant.)
   const planRange = "day" as "day" | "1w" | "4w" | "8w" | "custom";
   function shiftDate(s: string, delta: number) { const [y,m,d]=s.split("-").map(Number); const dt=new Date(y, m-1, d); dt.setDate(dt.getDate()+delta); const mm=String(dt.getMonth()+1).padStart(2,"0"); const dd=String(dt.getDate()).padStart(2,"0"); return dt.getFullYear()+"-"+mm+"-"+dd; }
-  function formatNutritionDate(s: string) { const [y,m,d]=s.split("-").map(Number); const dt=new Date(y, m-1, d); return dt.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}); }
+  function formatNutritionDate(s: string) { const [y,m,d]=s.split("-").map(Number); return centralFormatDate(`${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`, {weekday:"long",month:"long",day:"numeric"}); }
   useEffect(() => {
     let active = true;
     try {

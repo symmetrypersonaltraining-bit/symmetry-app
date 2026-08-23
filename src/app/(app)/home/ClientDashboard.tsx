@@ -1,6 +1,6 @@
 "use client";
 import AddWorkoutButton from "@/components/AddWorkoutButton";
-import { centralDayOfWeek, shiftDate } from "@/lib/central-time";
+import { centralDayOfWeek, shiftDate, centralHour, centralFormatDate } from "@/lib/central-time";
 import OffPlanToday from "@/components/OffPlanToday";
 
 import { useState, useMemo } from "react";
@@ -81,8 +81,7 @@ function PaymentNotificationBanner({
   if (visible.length === 0) return null;
 
   function fmtDate(d: string) {
-    const dt = new Date(d + "T00:00:00");
-    return dt.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+    return centralFormatDate(d, { month: "long", day: "numeric" });
   }
 
   async function handleDismiss(id: string) {
@@ -231,8 +230,7 @@ function FullChart({
   const xTicks = [0, Math.floor(pts.length / 2), pts.length - 1].map(i => pts[i]);
 
   function fmtDate(d: string) {
-    const dt = new Date(d + "T00:00:00");
-    return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return centralFormatDate(d, { month: "short", day: "numeric" });
   }
 
   const gradId = `grad-${label.replace(/\s/g, "")}`;
@@ -621,7 +619,7 @@ export default function ClientDashboard({
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
 
-  const hour = new Date().getHours();
+  const hour = centralHour();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   const metricValues = useMemo(() => ({
@@ -646,8 +644,7 @@ export default function ClientDashboard({
     : weekWorkouts.map(w => ({ id: "", date: w.date, completed: w.completed }));
 
   function fmtDate(d: string) {
-    const dt = new Date(d + "T00:00:00");
-    return dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    return centralFormatDate(d, { weekday: "short", month: "short", day: "numeric" });
   }
 
   const activeMetricConfig = activeMetric ? METRIC_CONFIG.find(m => m.key === activeMetric) : null;

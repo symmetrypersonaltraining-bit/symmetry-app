@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { kcalOf } from "@/lib/nutrition/dailyTotals";
+import { centralFormatDate } from "@/lib/central-time";
 
 type RVItem = { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; protein: number | null; carbs: number | null; fats: number | null; position: number };
 type RVMeal = { id: string; name: string; position: number; meal_items: RVItem[] };
@@ -20,7 +21,7 @@ function addDaysStr(s: string, n: number) {
 }
 function fmtDay(s: string) {
   const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return centralFormatDate(`${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`, { weekday: "short", month: "short", day: "numeric" });
 }
 function planTotals(p: RVPlan | null) {
   let protein = 0, carbs = 0, fats = 0, meals = 0;

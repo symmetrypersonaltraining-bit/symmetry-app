@@ -7,6 +7,7 @@ import MicButton from "@/components/MicButton";
 import { dedupeInsertRows, type ExistingSlot } from "@/lib/scheduleDedupe";
 import { scheduleWriteError } from "@/lib/scheduleConflict";
 import Link from "next/link";
+import { centralToday, centralWeekStart, shiftDate, centralFormatDate } from "@/lib/central-time";
 
 // ---- Types ----
 interface ClientRow {
@@ -82,16 +83,16 @@ const EXERCISE_LIST = [
 ];
 
 // ---- Helpers ----
+// The builder's week strip. `new Date().getDay()` here was the DEVICE's
+// weekday, so if the handset was a day ahead of Central the trainer dragged a
+// workout onto a column labelled Monday and it wrote Tuesday's scheduled_date.
+// The Sunday is picked in Central; the Dates returned are synthetic local
+// midnights, which is what the grid wants.
 function getWeekDates(weekOffset: number): Date[] {
-  const today = new Date();
-  const dow = today.getDay();
-  const sunday = new Date(today);
-  sunday.setDate(today.getDate() - dow + weekOffset * 7);
-  sunday.setHours(0, 0, 0, 0);
+  const sundayStr = shiftDate(centralWeekStart(centralToday()), weekOffset * 7);
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(sunday);
-    d.setDate(sunday.getDate() + i);
-    return d;
+    const [y, m, d] = shiftDate(sundayStr, i).split("-").map(Number);
+    return new Date(y, m - 1, d);
   });
 }
 
@@ -100,7 +101,7 @@ function dateStr(d: Date) {
 }
 
 function todayStr() {
-  return dateStr(new Date());
+  return centralToday();
 }
 
 function nameInitials(name: string) {
@@ -1012,12 +1013,8 @@ export default function ProgramPage() {
   const today = todayStr();
 
   const baseSunday = (() => {
-    const t = new Date();
-    const dow = t.getDay();
-    const m = new Date(t);
-    m.setDate(t.getDate() - dow);
-    m.setHours(0, 0, 0, 0);
-    return m;
+    const [y, m, d] = centralWeekStart(today).split("-").map(Number);
+    return new Date(y, m - 1, d);
   })();
 
   useEffect(() => {
@@ -1170,7 +1167,7 @@ export default function ProgramPage() {
   for (let w = 0; w < weeks; w++) getWeekDates(weekOffset + w).forEach(d => allDays.push(d));
 
   const rangeLabel = (() => {
-    const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const fmt = (d: Date) => centralFormatDate(dateStr(d), { month: "short", day: "numeric" });
     return `${fmt(allDays[0])} \u2013 ${fmt(allDays[allDays.length - 1])}`;
   })();
 

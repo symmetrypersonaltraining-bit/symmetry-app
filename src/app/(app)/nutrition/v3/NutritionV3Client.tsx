@@ -35,6 +35,7 @@ import PlanRangeView from "../PlanRangeView";
 import { useNutritionAverages, RangeKey as AvgRangeKey, shiftDate } from "@/components/nutrition/useNutritionAverages";
 
 import { useCoach } from "@/lib/useCoach";
+import { centralFormatDate } from "@/lib/central-time";
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -117,7 +118,7 @@ function shiftDateStr(s: string, delta: number) {
 }
 function fmtDateLong(s: string) {
   const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  return centralFormatDate(`${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`, { weekday: "long", month: "long", day: "numeric" });
 }
 function r(x: number) { return Math.round(x); }
 

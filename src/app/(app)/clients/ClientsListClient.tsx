@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import ClientStatusDot from "@/components/ClientStatusDot";
 import ClientSparkline from "@/components/ClientSparkline";
 import Avatar from "@/components/Avatar";
+import { centralWeekStart, shiftDate } from "@/lib/central-time";
 
 const AVATAR_COLORS = [
   { bg: "#DDEEFF", text: "var(--brand-primary)" },
@@ -71,22 +72,23 @@ export default function ClientsListClient({ clients }: Props) {
       try {
         const supabase = createClient();
         const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-        const today = new Date(todayStr + "T00:00:00");
         // Bucket 7 is the current week; bucket 0 is seven weeks before it.
-        const start = new Date(today);
-        start.setDate(start.getDate() - (today.getDay() + 7 * 7));
-        const startStr = start.toLocaleDateString("en-CA");
+        // String arithmetic, so the round trip through a local Date -- which
+        // was self-consistent but only by luck -- cannot drift.
+        const startStr = shiftDate(centralWeekStart(todayStr), -7 * 7);
         const { data } = await supabase
           .from("workout_logs")
           .select("client_id, log_date")
           .eq("completed", true)
           .gte("log_date", startStr);
-        const startMs = start.getTime();
+        // Both sides parsed as UTC midnight, so the week index is exact
+        // arithmetic with no zone in it at all.
+        const startMs = Date.parse(startStr + "T00:00:00Z");
         const map: Record<string, number[]> = {};
         const seen: Record<string, Set<string>> = {};
         for (const r of ((data || []) as { client_id: string; log_date: string }[])) {
           if (!r || !r.client_id || !r.log_date) continue;
-          const idx = Math.floor((new Date(r.log_date + "T00:00:00").getTime() - startMs) / (7 * 86400000));
+          const idx = Math.floor((Date.parse(r.log_date + "T00:00:00Z") - startMs) / (7 * 86400000));
           if (idx < 0 || idx > 7) continue;
           // Distinct DAYS per week, so two sessions in one day count once —
           // same rule the consistency board and challenges use.
@@ -111,9 +113,7 @@ export default function ClientsListClient({ clients }: Props) {
       try {
         const supabase = createClient();
         const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-        const since = new Date(todayStr + "T00:00:00");
-        since.setDate(since.getDate() - 21);
-        const sinceStr = since.toLocaleDateString("en-CA");
+        const sinceStr = shiftDate(todayStr, -21);
         const [w, m] = await Promise.all([
           supabase.from("workout_logs").select("client_id, log_date").gte("log_date", sinceStr),
           supabase.from("meal_adherence_logs").select("client_id, log_date").gte("log_date", sinceStr),
