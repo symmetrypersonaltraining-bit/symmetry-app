@@ -1,5 +1,65 @@
 # Backlog — the single work queue
 
+> ## 👉 23 Aug — A SECOND TRAINER, AND WHAT SHE COULD SEE
+>
+> **`origin/main` = `c8b9102`.**
+>
+> Brooke Orton got a login and found three bugs before lunch. Chasing them
+> turned into a feature-by-feature sweep of a non-owner trainer's app against
+> Dustin's, because his standard is: *"I want every single feature to function
+> like my literal app. The only thing that changes is I have certain owner
+> rights that they do not."*
+>
+> ### Shipped
+>
+> | | |
+> |---|---|
+> | `c5dcbc6` | Her three: `days.position` was `Date.now()` (a 32-bit int column — workout creation failed for **every** trainer, always); exercise rows could be added but never removed; the AI plan builder promised 3%/5g tolerance and checked nothing (told 160g protein, handed 198g). Plus her idea: typing macros auto-fills calories. |
+> | `5c08f3e` | Inviting a trainer created an auth user and a `trainers` row and stopped. No self-client row, no client view, no nutrition toggle. `ensure_trainer_self_client()` now runs on invite; Justin, Ian, Alan and Brooke backfilled. |
+> | `1c5be71` | **`ai_chat_sessions` had no trainer column.** One rolling `trainer_agent` row for the whole instance, read with the service role. Brooke opening the AI drawer would have read Dustin's thread verbatim, overwritten it with her first question, and deleted it with Clear. |
+> | `75eaf92` | Four surviving `/dustin/i` name matches deciding "which of these clients is the coach". Adds `src/lib/auth/roster.ts`. |
+> | `9276b31` | Prompts that named the owner in text every trainer's requests pass through (`DUSTIN'S VOICE`, `DUSTIN'S REQUEST`). |
+> | `d047444` | Controls drawn to a trainer that she cannot operate: two `app_flags` switches that flip and silently revert, `/settings/ai-health` (whole-business AI spend, gated as "trainer"), `{reset:true}` on gcal-sync (empties every trainer's appointments). Plus: rankings read the `trainers` table, and Schedule → Calendar no longer links to a page that redirects. |
+> | `3e5c6c7` | **"Is a trainer" is not "is this client's trainer".** Service-role routes that never re-imposed `trainer_can_see_client()`: plateaus, live-sessions, attention-drafts, focus-drafts (including *approve all*, which published), weekly-ai POST. |
+> | `c8b9102` | Tutorial: a **Setting the numbers** step (her actual first question), the AI target check, and the remove-a-row control. |
+>
+> ### Needs Dustin — not done
+>
+> 1. **`gcal_sync_runs` has no `trainer_id`.** That is why it was made owner-only,
+>    which means a second trainer can never see whether her own calendar sync is
+>    working — the exact silent failure the SyncHealth card exists to surface.
+>    Fix is to scope the log, not hide the card. **Schema change: needs a yes.**
+> 2. **Coach Bot and the birthday bot post as the OWNER** (`ownerAuthUid`).
+>    Correct while the group chat is one shared room. Wrong the moment a trainer
+>    has her own group. **Which is it?**
+> 3. **`/api/ai-nudges` files its digest in Dustin's inbox** whoever ran it —
+>    documented as deliberate pending this decision. Should a trainer's sweep
+>    reach her own inbox?
+> 4. **`/assessment` and `/library/*` have no trainer gate** (login only). RLS
+>    covers the data; the pages are reachable. Cosmetic leak or real?
+> 5. **`/api/auth/google/callback` accepts an unsigned `state`** (the target
+>    `user_id`) and writes Google refresh tokens for it with the service role.
+>    Not a trainer-role bug. Separate, and worth its own pass.
+> 6. **`viewer.ts` accepts `active !== false`; `trainerGate.ts` requires
+>    `active === true`.** A hand-inserted `trainers` row with a NULL `active`
+>    gets the full trainer shell everywhere and a 403 from the AI. Only bites
+>    rows created in SQL — `/api/invite-trainer` writes `true`.
+> 7. **`middleware.ts` resolves trainers only by `auth_user_id`**, with no email
+>    fallback (unlike `viewer.ts`). A trainer whose auth link was never stamped
+>    falls into the client onboarding chain.
+>
+> ### Still open from before
+>
+> - Steph's `plan_locked` was Claude's judgement call — one line to undo.
+> - 10 exercise-video candidates awaiting approve/reject.
+> - The 1,043 orphan scheduled workouts stay **parked**.
+> - 4 `macro_target_stale_against_plan` flags: Tyler, Hassan, Robert, Gerard.
+> - Hassan's plan covers day groups [1,4,6] and [2,5] — **Wednesday and Sunday
+>   have no menu** and fall through to his 1800 placeholder. Dustin: leave as is.
+> - Claudine's options-plan target; Madeleine's incomplete plan.
+
+---
+
 > ## 👉 23 Aug — THE FOOD LOGGER READS THE PLAN, AND SEVEN PLANS DO NOT ADD UP
 >
 > **`origin/main` = `a528124`.**
