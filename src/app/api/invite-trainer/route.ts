@@ -138,6 +138,33 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── Their own client view ────────────────────────────────────────────────
+  //
+  // Dustin: "when I add a new trainer, they should already have that toggle,
+  // and they should already have a client view for themselves. It needs to be
+  // set up that way to begin with."
+  //
+  // He and Steph are each a trainer AND a client on the SAME auth user, and
+  // that second row is what the Client View toggle reads. Four trainers were
+  // created without one: the toggle still appeared, and flipping it showed an
+  // empty app — no coach avatar, no week summary, no macros card. It does not
+  // error, it is just blank.
+  //
+  // The work is a database function so that every path that ever creates a
+  // trainer gets it, and so it could be run against the four already in.
+  if (trainerId) {
+    const { error: selfErr } = await admin.rpc("ensure_trainer_self_client", { p_trainer: trainerId });
+    if (selfErr) {
+      // Checked, and loudly: a trainer whose client view is missing looks like
+      // a broken app rather than a missing row, and they will report it as
+      // "the client side doesn't work".
+      return NextResponse.json({
+        error: `${name} was created, but their own client view could not be set up: ${selfErr.message}. `
+             + `Do not re-send the invite — the login already exists. This needs the client row adding first.`,
+      }, { status: 500 });
+    }
+  }
+
   // ── The one-tap link ─────────────────────────────────────────────────────
   let oneTapUrl: string | null = null;
   try {
