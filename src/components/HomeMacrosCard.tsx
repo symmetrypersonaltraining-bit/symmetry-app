@@ -42,7 +42,7 @@ export default function HomeMacrosCard() {
       // canonical calc). Fetch the same inputs and — when the v3 flag is on —
       // run the same function so the numbers never diverge. Non-v3 clients keep
       // the legacy inline proration below.
-      const [logsRes, mtRes, livePlans, settingsRes, lockRes] = await Promise.all([
+      const [logsRes, mtRes, livePlans, settingsRes] = await Promise.all([
         supabase.from("meal_adherence_logs").select("*").eq("client_id", clientId).eq("log_date", today),
         supabase.from("macro_targets").select("*").eq("client_id", clientId).lte("effective_date", today).order("effective_date", { ascending: false }).limit(1),
         // DAY-GROUP: resolve today's governing menu. One null-day_group plan →
@@ -52,9 +52,6 @@ export default function HomeMacrosCard() {
         fetchLivePlans(supabase, clientId, today, undefined, 0),
         // Tolerates the column not existing yet (flag stays off → legacy calc).
         supabase.from("client_app_settings").select("nutrition_v3").eq("client_id", clientId).maybeSingle(),
-        // Whether the plan is authored outside the app, and therefore whether
-        // it is the whole prescription. Decides where the target comes from.
-        supabase.from("clients").select("plan_locked").eq("id", clientId).maybeSingle(),
       ]);
       if (!on) return;
       const mt = (mtRes.data || [])[0] as TargetState | undefined;
@@ -120,17 +117,10 @@ export default function HomeMacrosCard() {
         }
         setConsumed({ kcal: k, protein: p, carbs: c, fats: f });
       }
-      // Where the target comes from — the same rule as the Nutrition screen,
-      // and it has to STAY the same rule: these two are required to agree and
-      // the only way to guarantee that is one condition, written twice, both
-      // pointing at planDayTarget.
-      //
-      // A LOCKED plan is authored outside the app and is the whole
-      // prescription, so it is the target. Everyone else keeps macro_targets,
-      // because for eleven clients the plan and their targets disagree today by
-      // as much as 960 kcal — incomplete plans, not wrong targets.
-      const planIsAuthoritative = (lockRes.data as { plan_locked?: boolean } | null)?.plan_locked === true;
-      const pt = planIsAuthoritative ? planDayTarget(planMeals) : null;
+      // The same rule as the Nutrition screen, and it stays the same rule
+      // because both go through planDayTarget — which refuses a plan it cannot
+      // read as one day rather than leaving each caller to decide.
+      const pt = planDayTarget(planMeals);
       if (pt) setTarget({ calories: pt.kcal, protein: pt.protein, carbs: pt.carbs, fats: pt.fats });
       else if (mt) setTarget({ calories: mt.calories || 0, protein: mt.protein || 0, carbs: mt.carbs || 0, fats: mt.fats || 0 });
     })();

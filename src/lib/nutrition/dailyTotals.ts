@@ -216,41 +216,67 @@ export function isExtraLog(log: LogRow, planPositions: Set<number>): boolean {
 /**
  * THE DAY'S PRESCRIBED TARGET — the sum of the plan governing that date.
  *
- * Dustin, 23 Aug: "whatever I set for the meal plan, the macros on the day
- * chart in the food logger read what the actual plan is for that day... If I
- * change my meal plan each day, it needs to pick up what I'm actually at."
+ * Dustin, 23 Aug: "If they have an actual plan in the app, an actual meal plan
+ * that I set, the macros and the calories on their chart needs to match what
+ * that plan is. That's the whole point... what they're trying to hit is the
+ * numbers that I set based off of their meal plan."
  *
  * The target used to come from `macro_targets` — a separate hand-kept row —
- * which meant the bar at the top of the food logger and the food listed
- * underneath it were two independent numbers that had to be kept in step by
- * hand. Change a week's plan and the bar still measured against the old row;
- * page forward to next week and the bar still showed today's.
- *
- * Now it is derived. The plan IS the target, so they cannot disagree, and a
- * plan scheduled for a future Monday brings its own numbers with it.
+ * so the bar at the top of the food logger and the food listed underneath it
+ * were two independent numbers. They had drifted badly, and the cause was not
+ * the plans: on 23 Jul something auto-seeded macro_targets from bodyweight for
+ * a batch of clients, straight over plans that already existed. Cheyenne's plan
+ * was built on 20 Jul to about 1,500 kcal; three days later a robot wrote 2,440
+ * on top of it. Tyler's imported plan sums to 2,135 against an auto-seeded
+ * 3,040. Reading the plan fixes those, because the plan is the part a human
+ * wrote.
  *
  * NO OVERRIDES are applied, deliberately: this is the PRESCRIPTION. What the
  * client actually ate — adjusted portions, added foods, off-plan meals — is
  * computeDayTotals' job, and it is the other side of the same bar.
  *
- * One meal per position (the first option at that slot), matching
- * computeDayTotals' own fallback, so a rotation plan's target and its totals
- * count the same meal.
+ * Returns null when the plan cannot be read as ONE DAY, and the caller falls
+ * back to macro_targets. Three ways that happens, and each is a real plan in
+ * the database right now:
  *
- * Returns null when there is no plan to read — an open-plan client, or a date
- * before any plan started. The caller falls back to macro_targets there, which
- * is the only thing those clients have.
+ *   no plan at all          — an open-plan client logging freely.
+ *   a core slot with no food — Madeleine's M2, M4 and M5 are empty, so her plan
+ *                             sums to 973 against the 1,550 Dustin set her. The
+ *                             plan is half-entered, not her target wrong.
+ *   more than one meal at a
+ *   slot (options)          — Claudine has three options at each of five slots,
+ *                             and they are not interchangeable: her M1 runs
+ *                             328-463 kcal and her M5 185-396. Summing
+ *                             "whichever option sorts first" would invent a
+ *                             number she never agreed to. Until the day's
+ *                             chosen option drives it, her dialled target
+ *                             stands.
+ *
+ * Slots 1-5 are the spine every plan has and are the ones required to carry
+ * food; an empty extras slot is not a broken plan.
  */
 export function planDayTarget(planMeals: PlanMeal[] | null | undefined): Macros | null {
   const meals = planMeals || [];
   if (!meals.length) return null;
-  const byPos = new Map<number, PlanMeal>();
-  for (const m of [...meals].sort((a, b) => a.position - b.position)) {
-    if (!byPos.has(m.position)) byPos.set(m.position, m);
+
+  const atPosition = new Map<number, PlanMeal[]>();
+  for (const m of meals) {
+    const list = atPosition.get(m.position) || [];
+    list.push(m);
+    atPosition.set(m.position, list);
   }
+
+  for (const [position, list] of atPosition) {
+    // Options at a slot: the day has no single total.
+    if (list.length > 1) return null;
+    // A core slot with nothing in it: the plan is not finished.
+    const isCore = position >= 1 && position <= 5;
+    if (isCore && !(list[0].meal_items || []).length) return null;
+  }
+
   let kcal = 0, protein = 0, carbs = 0, fats = 0;
-  for (const m of byPos.values()) {
-    const mm = planMealMacros(m);
+  for (const [, list] of atPosition) {
+    const mm = planMealMacros(list[0]);
     kcal += mm.kcal; protein += mm.protein; carbs += mm.carbs; fats += mm.fats;
   }
   // A plan whose items carry no macros at all is not a target of zero — it is

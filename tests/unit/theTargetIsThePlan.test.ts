@@ -84,14 +84,6 @@ test("a day with no plan has no target, rather than a target of zero", () => {
   assert.equal(planDayTarget([meal("z", 1, 0, 0, 0)]), null);
 });
 
-test("one meal per position — a rotation's options are not all counted", () => {
-  // Jerry has five options at each of five slots. Counting every option would
-  // report a target five times the size of the day.
-  const rotation = [meal("o1", 1, 30, 40, 10), meal("o2", 1, 35, 30, 12), meal("o3", 2, 20, 20, 5)];
-  const t = planDayTarget(rotation)!;
-  assert.equal(t.protein, 30 + 20, "the first option at each position, once");
-});
-
 test("the target ignores what was actually eaten", () => {
   // The bar has two sides. This is the prescription; computeDayTotals is the
   // other half. If overrides leaked into the target they would move together
@@ -125,24 +117,44 @@ test("range averages are what was logged, and a plan change cannot move them", (
   assert.ok(underOldPlan.loggedDays === 2, "both days counted");
 });
 
-test("the plan drives the target only where the plan IS the prescription", () => {
-  // Measured against the live database before this shipped: for ELEVEN clients
-  // the plan's own total and the macro_targets row they see today disagree,
-  // several of them enormously — Cheyenne 2,440 → 1,480, Tyler 3,040 → 2,135,
-  // Madeleine 1,550 → 973. Those plans are incomplete, not those targets wrong,
-  // and switching everybody over would have put a number several hundred
-  // calories under their trainer's on a client's phone.
-  //
-  // clients.plan_locked is the honest condition: a locked plan is authored
-  // outside the app, in the Command Center, and is the whole prescription by
-  // construction. Both surfaces must gate on it and on nothing else.
-  for (const f of [
-    "src/app/(app)/nutrition/v3/NutritionV3Client.tsx",
-    "src/components/HomeMacrosCard.tsx",
-  ]) {
-    const src = readFileSync(join(ROOT, f), "utf8");
-    assert.match(src, /plan_locked|planLocked|planIsAuthoritative/, `${f} applies the plan target to every client`);
-  }
+test("a plan with an empty core slot is not a target", () => {
+  // Madeleine Coker's M2, M4 and M5 hold no food, so her plan sums to 973
+  // against the 1,550 Dustin set her. That is a half-entered plan, not a wrong
+  // target, and showing her 973 would be the app inventing a cut.
+  const halfEntered = [
+    meal("m1", 1, 39, 21, 17),
+    { id: "m2", name: "M2", timing: null, position: 2, swaps: null, meal_items: [] },
+    meal("m3", 3, 39, 34, 32),
+    { id: "m4", name: "M4", timing: null, position: 4, swaps: null, meal_items: [] },
+    { id: "m5", name: "M5", timing: null, position: 5, swaps: null, meal_items: [] },
+  ] as PlanMeal[];
+  assert.equal(planDayTarget(halfEntered), null);
+});
+
+test("an empty EXTRAS slot does not disqualify a finished plan", () => {
+  // Slots 1-5 are the spine. An extras slot with nothing in it is normal.
+  const withEmptyExtra = [
+    ...[1, 2, 3, 4, 5].map((i) => meal(`m${i}`, i, 20, 20, 5)),
+    { id: "x", name: "Extra", timing: null, position: 6, swaps: null, meal_items: [] },
+  ] as PlanMeal[];
+  const t = planDayTarget(withEmptyExtra);
+  assert.ok(t, "a plan with all five core slots filled is still a target");
+  assert.equal(t!.protein, 100);
+});
+
+test("options at a slot mean the day has no single total", () => {
+  // Claudine Ocon has three options at each of five slots and they are NOT
+  // interchangeable — her M1 runs 328-463 kcal, her M5 185-396. Summing
+  // "whichever option sorts first" invents a number she never agreed to.
+  const options = [
+    meal("a", 1, 20, 30, 8),
+    meal("b", 1, 35, 45, 12), // same slot, different option
+    meal("c", 2, 20, 20, 5),
+    meal("d", 3, 20, 20, 5),
+    meal("e", 4, 20, 20, 5),
+    meal("f", 5, 20, 20, 5),
+  ];
+  assert.equal(planDayTarget(options), null, "an options plan falls back to the dialled target");
 });
 
 test("both surfaces read the target from the one helper", () => {
@@ -157,10 +169,12 @@ test("both surfaces read the target from the one helper", () => {
   }
 });
 
-test("the day-group gate is gone", () => {
+test("no client-level gate stands between a plan and its target", () => {
+  // Both the day_group gate and the later plan_locked gate were wrong for the
+  // same reason: they decided WHOSE plan counts, when the only real question is
+  // whether THIS plan can be read as one day. That question is answered once,
+  // inside planDayTarget.
   const src = readFileSync(join(ROOT, "src/app/(app)/nutrition/v3/NutritionV3Client.tsx"), "utf8");
-  assert.ok(
-    !/const\s+isDayGroup\s*=/.test(src),
-    "the target is gated on day_group again — ordinary plans will fall back to macro_targets",
-  );
+  assert.ok(!/const\s+isDayGroup\s*=/.test(src), "gated on day_group again");
+  assert.ok(!/planLocked\s*\?/.test(src), "gated on plan_locked again");
 });

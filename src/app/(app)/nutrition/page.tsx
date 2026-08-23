@@ -106,7 +106,6 @@ export default async function NutritionPage({
   let livePlans: any[] = [];
   let todayLogs: any[] = [];
   let macroTarget: any = null;
-  let planLocked = false;
   let weekLogs: any[] = [];
   let nutritionV3 = false;
   let incomingPlan: any = null;
@@ -123,7 +122,7 @@ export default async function NutritionPage({
       nutritionV3 = (settings as any)?.nutrition_v3 === true;
     } catch { nutritionV3 = false; }
 
-    const [lpRows, tlRes, mtRes, wlRes, lockRes] = await Promise.all([
+    const [lpRows, tlRes, mtRes, wlRes] = await Promise.all([
       // Full live-plan SET (day-group tagged + everyday). resolveLivePlanForDate
       // logic: pickPlanForDate returns the right menu for a given date. For a
       // client with one null-day_group plan this is exactly today's behavior.
@@ -147,17 +146,12 @@ export default async function NutritionPage({
         .eq("client_id", clientId)
         .gte("log_date", weekFloor)
         .order("log_date", { ascending: false }),
-      // Whether this client's plan is authored outside the app. It decides
-      // whether the day's macro target is READ OFF THE PLAN or taken from the
-      // macro_targets row — see the comment on dailyTarget in NutritionV3Client.
-      supabase.from("clients").select("plan_locked").eq("id", clientId).maybeSingle(),
     ]);
 
     livePlans = lpRows || [];
     mealPlan = pickPlanForDate(livePlans, today); // today's governing menu
     todayLogs = tlRes.data || [];
     macroTarget = mtRes.data;
-    planLocked = (lockRes.data as { plan_locked?: boolean } | null)?.plan_locked === true;
     weekLogs = wlRes.data || [];
 
     if (nutritionV3) {
@@ -213,7 +207,6 @@ export default async function NutritionPage({
           incomingPlan={incomingPlan as any}
           todayLogs={todayLogs}
           macroTarget={macroTarget as any}
-          planLocked={planLocked}
           today={today}
           isTrainer={isTrainer}
         />
