@@ -125,6 +125,26 @@ test("range averages are what was logged, and a plan change cannot move them", (
   assert.ok(underOldPlan.loggedDays === 2, "both days counted");
 });
 
+test("the plan drives the target only where the plan IS the prescription", () => {
+  // Measured against the live database before this shipped: for ELEVEN clients
+  // the plan's own total and the macro_targets row they see today disagree,
+  // several of them enormously — Cheyenne 2,440 → 1,480, Tyler 3,040 → 2,135,
+  // Madeleine 1,550 → 973. Those plans are incomplete, not those targets wrong,
+  // and switching everybody over would have put a number several hundred
+  // calories under their trainer's on a client's phone.
+  //
+  // clients.plan_locked is the honest condition: a locked plan is authored
+  // outside the app, in the Command Center, and is the whole prescription by
+  // construction. Both surfaces must gate on it and on nothing else.
+  for (const f of [
+    "src/app/(app)/nutrition/v3/NutritionV3Client.tsx",
+    "src/components/HomeMacrosCard.tsx",
+  ]) {
+    const src = readFileSync(join(ROOT, f), "utf8");
+    assert.match(src, /plan_locked|planLocked|planIsAuthoritative/, `${f} applies the plan target to every client`);
+  }
+});
+
 test("both surfaces read the target from the one helper", () => {
   // The home ring and the Nutrition screen must not compute this twice. They
   // did once, and the two answers were allowed to differ.

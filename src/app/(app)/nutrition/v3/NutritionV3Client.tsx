@@ -64,6 +64,12 @@ interface Props {
   incomingPlan: { id: string; version_number: number | null; effective_date: string | null; change_reason?: string | null; title?: string | null } | null;
   todayLogs: DbLog[];
   macroTarget: MacroTarget | null;
+  /**
+   * clients.plan_locked — this client's plan is authored outside the app, in
+   * the Command Center, and is therefore the WHOLE prescription. Only then is
+   * the plan's own total safe to use as the day's target. See dailyTarget.
+   */
+  planLocked?: boolean;
   today: string; // America/Chicago logical date
   isTrainer?: boolean;
 }
@@ -170,7 +176,7 @@ async function compressPhoto(file: File): Promise<{ base64: string; blob: Blob }
 
 export default function NutritionV3Client(props: Props) {
   const { firstName: coachFirstName } = useCoach();
-  const { clientId, clientName, mealPlan, livePlans, incomingPlan, todayLogs, macroTarget, today } = props;
+  const { clientId, clientName, mealPlan, livePlans, incomingPlan, todayLogs, macroTarget, planLocked, today } = props;
   const supabase = useMemo(() => createClient(), []);
 
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -298,7 +304,24 @@ export default function NutritionV3Client(props: Props) {
     const t = planDayTarget(planMeals);
     return t ? { calories: t.kcal, protein: t.protein, carbs: t.carbs, fats: t.fats } : null;
   }, [planMeals]);
-  const dailyTarget = planTarget ?? macroTarget;
+
+  // ⚠️ HELD BACK — the switch is one line below and it is deliberately not
+  // flipped for everybody yet. Checked against the live database before
+  // enabling it: for ELEVEN clients the plan's own total and the macro_targets
+  // row they are shown today DISAGREE, several of them enormously — Cheyenne
+  // 2,440 → 1,480, Tyler 3,040 → 2,135, Madeleine 1,550 → 973. Those plans are
+  // incomplete, not those targets wrong, and deriving from them would have
+  // shown a client several hundred calories less than their trainer set, on
+  // their phone, tomorrow morning.
+  //
+  // Dustin's own plan and Steph's match theirs to the gram, which is why this
+  // read as safe until it was measured.
+  //
+  // `plan_locked` is the honest gate: a locked plan is authored outside the app
+  // in the Command Center and is the whole prescription by construction, which
+  // is exactly the client for whom the plan IS the target. Everyone else keeps
+  // macro_targets until their plan and their targets agree.
+  const dailyTarget = (planLocked ? planTarget : null) ?? macroTarget;
 
   // ---- data loading -------------------------------------------------------
   useEffect(() => {
