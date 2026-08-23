@@ -105,6 +105,34 @@ export function isViewersOwnClient(
   return !!row?.id && !!scope.ownClientId && row.id === scope.ownClientId;
 }
 
+/**
+ * May this viewer touch this one client?
+ *
+ * The question every trainer-gated route that takes a `clientId` should have
+ * been asking and none of them were: `viewerIsTrainer()` answers "is a
+ * trainer", so passing another trainer's client id simply worked.
+ */
+export async function trainerMaySeeClient(
+  db: AnyDb,
+  user: { id: string; email?: string | null } | null | undefined,
+  clientId: string | null | undefined,
+): Promise<boolean> {
+  if (!clientId) return false;
+  const scope = await rosterScopeFor(db, user);
+  if (scope.isOwner) return true;
+  if (!scope.trainerId) return false;
+  try {
+    const { data } = await (db as unknown as MinimalDb)
+      .from("clients")
+      .select("trainer_id")
+      .eq("id", clientId)
+      .maybeSingle();
+    return (data as { trainer_id?: string | null } | null)?.trainer_id === scope.trainerId;
+  } catch {
+    return false;
+  }
+}
+
 /** The rows of a service-role `clients` read that this viewer may actually have. */
 export function scopeRoster<T extends { id: string; trainer_id?: string | null }>(
   rows: T[] | null | undefined,

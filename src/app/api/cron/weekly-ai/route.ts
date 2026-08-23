@@ -42,6 +42,7 @@ import { WEEKLY_WRITER_RULES, weekStartOf } from "@/lib/ai/weekly-numbers";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { coachFirstNameForClient } from "@/lib/trainerResolve";
 import { trainerFeatureOn } from "@/lib/trainerFeatures";
+import * as roster from "@/lib/auth/roster";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -316,13 +317,35 @@ export async function GET(req: NextRequest) {
  * from the app without holding a secret or waiting for Saturday night.
  */
 export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  const onlyClientId = typeof body?.clientId === "string" ? body.clientId : null;
   if (!authorised(req)) {
     const scope = await resolveAiScope(null);
     if (!scope.ok || !scope.scope.isTrainer) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    // A MANUAL SWEEP IS ONE MODEL CALL PER CLIENT, AND IT WRITES THEIR WEEK.
+    //
+    // Unscoped, a second trainer tapping this ran the sweep over every client
+    // in the business and rewrote the owner's weekly focus copy for all of
+    // them. The whole-roster form stays with cron and the owner; anyone else
+    // sweeps one client at a time, and only their own.
+    const me = await roster.rosterScopeFor(
+      createAdminClient() as never,
+      { id: scope.scope.userId, email: scope.scope.email },
+    );
+    if (!me.isOwner) {
+      if (!onlyClientId) {
+        return NextResponse.json(
+          { error: "Run this one client at a time — open the client and sweep from there." },
+          { status: 403 },
+        );
+      }
+      if (!(await roster.trainerMaySeeClient(createAdminClient() as never, { id: scope.scope.userId, email: scope.scope.email }, onlyClientId))) {
+        return NextResponse.json({ error: "Not your client" }, { status: 403 });
+      }
+    }
   }
-  const body = await req.json().catch(() => ({}));
   // Same gate as the scheduled GET. A manual sweep is one model call per client
   // — the most expensive single action in the app — so it respects the cap for
   // exactly the same reason the cron does.
@@ -330,7 +353,7 @@ export async function POST(req: NextRequest) {
   if (paused) return paused;
   try {
     const out = await runSweep({
-      onlyClientId: typeof body?.clientId === "string" ? body.clientId : null,
+      onlyClientId,
       today: typeof body?.today === "string" ? body.today : undefined,
     });
     return NextResponse.json({ ok: true, ...out });

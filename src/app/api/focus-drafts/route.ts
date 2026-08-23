@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
+import { rosterScopeFor, onRoster, trainerMaySeeClient, NO_ROSTER, type RosterScope } from "@/lib/auth/roster";
 
 export const dynamic = "force-dynamic";
 const CT_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
@@ -41,16 +42,35 @@ function targetWeek(today: string): string {
   return weekStartOf(today);
 }
 
-async function requireTrainer() {
+/**
+ * The signed-in trainer AND their roster, in one call.
+ *
+ * Every handler below reads and writes with the SERVICE ROLE, so RLS is not the
+ * boundary here. Without this, `requireTrainer()` alone let a second trainer
+ * read, rewrite and approve the weekly coaching copy for every client on the
+ * instance — and "approve all" published it.
+ */
+async function trainerScope(): Promise<{ ok: boolean; scope: RosterScope }> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return viewerIsTrainer(supabase, user);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !(await viewerIsTrainer(supabase, user))) return { ok: false, scope: NO_ROSTER };
+  const db = createAdminClient();
+  return { ok: true, scope: await rosterScopeFor(db as never, user) };
+}
+
+/** Is this draft about a client on the caller's roster? */
+async function draftIsMine(db: ReturnType<typeof createAdminClient>, draftId: string, scope: RosterScope): Promise<boolean> {
+  if (scope.isOwner) return true;
+  const { data } = await db.from("weekly_focus_drafts").select("client_id").eq("id", draftId).maybeSingle();
+  const clientId = (data as { client_id?: string } | null)?.client_id;
+  if (!clientId) return false;
+  const { data: c } = await db.from("clients").select("trainer_id").eq("id", clientId).maybeSingle();
+  return onRoster(c as { trainer_id?: string | null } | null, scope);
 }
 
 export async function GET() {
-  if (!(await requireTrainer())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { ok, scope } = await trainerScope();
+  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = createAdminClient();
   const week = targetWeek(CT_TODAY());
@@ -75,26 +95,34 @@ export async function GET() {
 
   const { data: cs } = await db
     .from("clients")
-    .select("id, name")
+    .select("id, name, trainer_id")
     .in("id", rows.map((r) => r.client_id));
-  const names = new Map(((cs as { id: string; name: string | null }[]) || []).map((c) => [c.id, c.name || "Client"]));
+  const clientRows = ((cs as { id: string; name: string | null; trainer_id: string | null }[]) || []);
+  const names = new Map(clientRows.map((c) => [c.id, c.name || "Client"]));
+  // WHOSE drafts. Service-role read, so this filter is the only one there is.
+  const mine = new Set(clientRows.filter((c) => onRoster(c, scope)).map((c) => c.id));
 
   return NextResponse.json({
     week,
     drafts: rows
+      .filter((r) => mine.has(r.client_id))
       .map((r) => ({ ...r, name: names.get(r.client_id) || "Client" }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   });
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!(await requireTrainer())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { ok, scope } = await trainerScope();
+  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await req.json().catch(() => ({}))) as { id?: string; focus?: string };
   const focus = (body.focus || "").trim().slice(0, 200);
   if (!body.id || !focus) return NextResponse.json({ error: "Bad request" }, { status: 400 });
 
   const db = createAdminClient();
+  if (!(await draftIsMine(db, body.id, scope))) {
+    return NextResponse.json({ error: "Not your client" }, { status: 403 });
+  }
   // focus_ai is left alone on purpose — it is the record of what the model
   // wrote, and it is the only way to answer "is the AI getting these right"
   // from data rather than memory.
@@ -115,7 +143,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await requireTrainer())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { ok, scope } = await trainerScope();
+  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await req.json().catch(() => ({}))) as { id?: string; all?: boolean };
   const db = createAdminClient();
@@ -129,13 +158,28 @@ export async function POST(req: NextRequest) {
   // this whole review screen exists to prevent.
   let approveErr: string | null = null;
   if (body.all) {
-    const { error } = await db
+    // "Approve all" means all of MINE. Unscoped, a second trainer approving her
+    // three drafts published coaching copy to every client in the business.
+    let q = db
       .from("weekly_focus_drafts")
       .update({ approved_at: now })
       .eq("week_start", week)
       .is("published_at", null);
+    if (!scope.isOwner) {
+      const { data: mine } = await db
+        .from("clients")
+        .select("id")
+        .eq("trainer_id", scope.trainerId ?? "00000000-0000-0000-0000-000000000000");
+      const ids = ((mine as { id: string }[]) || []).map((c) => c.id);
+      if (!ids.length) return NextResponse.json({ ok: true, approved: 0, published: 0 });
+      q = q.in("client_id", ids);
+    }
+    const { error } = await q;
     approveErr = error?.message ?? null;
   } else if (body.id) {
+    if (!(await draftIsMine(db, body.id, scope))) {
+      return NextResponse.json({ error: "Not your client" }, { status: 403 });
+    }
     const { error } = await db.from("weekly_focus_drafts").update({ approved_at: now }).eq("id", body.id);
     approveErr = error?.message ?? null;
   } else {

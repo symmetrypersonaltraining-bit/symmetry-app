@@ -52,6 +52,7 @@ import { TRAINER_EMAIL, Db, enforceMeter } from "@/lib/ai/scope";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { trainerMaySeeClient } from "@/lib/auth/roster";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { coachFirstNameForClient } from "@/lib/trainerResolve";
 
@@ -251,6 +252,12 @@ export async function POST(req: NextRequest) {
   }
   const clientId = body.clientId;
   if (!clientId) return NextResponse.json({ error: "Missing clientId" }, { status: 400 });
+  // WHOSE client. Everything below reads with the service role, and the check
+  // above only asks whether the caller is a trainer — so any clientId was
+  // enough to draft a message about anybody's client, in their coach's voice.
+  if (!(await trainerMaySeeClient(supabase as never, user, clientId))) {
+    return NextResponse.json({ error: "Not your client" }, { status: 403 });
+  }
   const tag: Tag = (TAGS as readonly string[]).includes(body.tag || "") ? (body.tag as Tag) : "quiet";
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isBetterLoad, looksLikeAssistance } from "@/lib/loadDirection";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
+import { trainerMaySeeClient } from "@/lib/auth/roster";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,14 @@ export async function GET(req: NextRequest) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return NextResponse.json({ rows: [] });
   const admin = createAdminClient(url, key, { auth: { persistSession: false } }) as unknown as Db;
+
+  // WHOSE client. The check above asks whether the caller is a trainer, never
+  // whether they are THIS client's trainer — and everything below reads with
+  // the service role, so a clientId in the query string was enough to pull any
+  // client's whole lifting history.
+  if (!(await trainerMaySeeClient(admin as never, user, clientId))) {
+    return NextResponse.json({ error: "Not your client" }, { status: 403 });
+  }
 
   const today = ctToday();
   const since = shiftDays(today, -WINDOW_DAYS);

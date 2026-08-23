@@ -23,6 +23,7 @@ import { TRAINER_EMAIL, Db } from "@/lib/ai/scope";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
+import { rosterScopeFor, onRoster } from "@/lib/auth/roster";
 
 export const dynamic = "force-dynamic";
 
@@ -58,14 +59,21 @@ export async function GET() {
   try {
     const { data: open } = await admin
       .from("workout_logs")
-      .select("id, client_id, started_at, day_id, days(label), clients(name)")
+      .select("id, client_id, started_at, day_id, days(label), clients(name, trainer_id)")
       .eq("completed", false)
       .not("started_at", "is", null)
       .gte("started_at", cutoff)
       .order("started_at", { ascending: false })
       .limit(30);
 
-    const logs = ((open as Record<string, unknown>[]) || []);
+    // WHOSE clients are training. This board is read with the service role, so
+    // without the roster filter every trainer watched every other trainer's
+    // clients lift in real time.
+    const scope = await rosterScopeFor(admin as never, user);
+    const logs = ((open as Record<string, unknown>[]) || []).filter((l) => {
+      const c = l.clients as { trainer_id?: string | null } | null;
+      return onRoster(c, scope);
+    });
     if (!logs.length) return NextResponse.json({ rows: [] });
 
     const ids = logs.map((l) => l.id as string);
