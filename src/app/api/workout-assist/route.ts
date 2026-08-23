@@ -249,7 +249,7 @@ export async function POST(req: NextRequest) {
     model: HAIKU_MODEL,
     system: SYSTEM_PROMPT(me.firstName),
     maxTokens: 1100,
-    messages: [{ role: "user", content: `CLIENT'S SCHEDULED WORKOUTS (server-assembled, trusted):\n${context}\n\nDUSTIN'S REQUEST:\n${message}` }],
+    messages: [{ role: "user", content: `CLIENT'S SCHEDULED WORKOUTS (server-assembled, trusted):\n${context}\n\nTRAINER'S REQUEST:\n${message}` }],
     validate: validateReply,
   });
   await logUsage(clientId, "workout_assist", result.tokensIn, result.tokensOut, HAIKU_MODEL, { latencyMs: result.latencyMs, startedAt: result.startedAt });
