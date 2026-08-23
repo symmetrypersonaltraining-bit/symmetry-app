@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { setGCalEventColor } from "@/app/(app)/schedule/scheduleActions";
-import { centralIso } from "@/lib/central-time";
+import { centralIso, centralToday, centralFormat, centralFormatDate, centralDateOf, centralMinutes } from "@/lib/central-time";
 
 // ---- Types ----
 type ViewMode = "week" | "month" | "day" | "agenda";
@@ -79,16 +79,46 @@ function parseAppt(str: string): Date {
   return new Date(str.replace(" ", "T").replace(/\+00:00$/, "Z").replace(/\+00$/, "Z"));
 }
 
+// The trainer's day is a Central day. This file used to answer every date and
+// time question with the DEVICE's clock, so a 9:00 AM Central session read
+// "10:00 AM" on a laptop one zone east, an evening session was filed on the
+// next day's square, and its block was drawn in the wrong row of the grid --
+// while home/page.tsx, the other trainer surface, formatted the same
+// appointment correctly. The two disagreed with each other.
 function fmtTime(d: Date) {
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  return centralFormat(d, { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
+/**
+ * The day key of a SYNTHETIC anchor Date -- a grid cell, a week anchor, the
+ * first of a month. These are constructed at local midnight and carry no zone
+ * meaning, so their local parts ARE the intended date and reading them in
+ * Central would shift them.
+ *
+ * For a real appointment instant use apptDayStr instead. Getting these two
+ * mixed up is the whole bug this file had.
+ */
 function dayStr(d: Date) {
-  // Use LOCAL date parts to avoid UTC-offset shifting the day key
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+/** The Central day an appointment INSTANT falls on. */
+function apptDayStr(instant: string | Date): string {
+  return centralDateOf(instant);
+}
+
+/** Format a synthetic anchor Date. Its local parts ARE the intended date. */
+function fmtAnchor(d: Date, opts: Intl.DateTimeFormatOptions): string {
+  return centralFormatDate(dayStr(d), opts);
+}
+
+/** A synthetic local-midnight anchor for a "YYYY-MM-DD" Central date. */
+function anchorFor(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
 function layoutEvents(events: AE[]): Array<AE & { lane: number; laneCount: number }> {
@@ -119,8 +149,8 @@ function EventBlock({ ev, clients, onClick, isDraggable }: {
 }) {
   const start = parseAppt(ev.scheduledAt);
   const end = ev.endsAt ? parseAppt(ev.endsAt) : new Date(start.getTime() + 3600000);
-  const startMin = start.getHours() * 60 + start.getMinutes();
-  const endMin = end.getHours() * 60 + end.getMinutes();
+  const startMin = centralMinutes(start);
+  const endMin = centralMinutes(end);
   const dayStartMin = DAY_START * 60;
   const top = Math.max((startMin - dayStartMin) / 60 * HOUR_PX, 0);
   const height = Math.max((endMin - startMin) / 60 * HOUR_PX, 22);
@@ -172,7 +202,7 @@ function MiniMonthCal({ year, month, selectedDate, onDateClick }: {
   year: number; month: number; selectedDate: Date; onDateClick: (d: Date) => void;
 }) {
   const [m, setM] = useState({ year, month });
-  const todayStr = dayStr(new Date());
+  const todayStr = centralToday();
   const selStr = dayStr(selectedDate);
 
   const firstDay = new Date(m.year, m.month, 1);
@@ -183,7 +213,7 @@ function MiniMonthCal({ year, month, selectedDate, onDateClick }: {
   for (let d = 1; d <= lastDay.getDate(); d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const label = new Date(m.year, m.month).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const label = fmtAnchor(new Date(m.year, m.month, 1), { month: "long", year: "numeric" });
 
   return (
     <div className="p-3">
@@ -317,7 +347,7 @@ function AddSessionModal({ date, timeStr, clients, onClose, onSaved }: {
           </button>
         </div>
         <div className="text-sm font-medium" style={{ color: "var(--brand-text-secondary)" }}>
-          {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+          {fmtAnchor(date, { weekday: "long", month: "long", day: "numeric" })}
         </div>
 
         <div>
@@ -381,8 +411,8 @@ function SessionDetailPopup({ ev, clients, workoutMap, onClose, onSaved }: {
   const color = chipColor(ev.status);
   const start = parseAppt(ev.scheduledAt);
   const end = ev.endsAt ? parseAppt(ev.endsAt) : new Date(start.getTime() + 3600000);
-  const todayStr = dayStr(new Date());
-  const evDateStr = dayStr(start);
+  const todayStr = centralToday();
+  const evDateStr = apptDayStr(start);
   const isToday = evDateStr === todayStr;
   const [updating, setUpdating] = useState(false);
 
@@ -462,7 +492,7 @@ function SessionDetailPopup({ ev, clients, workoutMap, onClose, onSaved }: {
               <div>
                 <h3 className="text-base font-bold leading-tight" style={{ color: "var(--brand-text)" }}>{ev.clientName && ev.clientName !== "Unknown" ? ev.clientName : (ev.title || ev.assessmentName || "Assessment")}</h3>
                 <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
-                  {start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                  {centralFormat(start, { weekday: "short", month: "short", day: "numeric" })}
                 </p>
               </div>
             </div>
@@ -506,7 +536,7 @@ function SessionDetailPopup({ ev, clients, workoutMap, onClose, onSaved }: {
         {/* Action buttons */}
         <div className="px-5 pb-5 space-y-2">
           {ev.clientId && (() => {
-            const evDateStr = dayStr(parseAppt(ev.scheduledAt));
+            const evDateStr = apptDayStr(parseAppt(ev.scheduledAt));
             const clientWorkouts = (workoutMap[evDateStr] || []).filter(w => w.clientId === ev.clientId);
             if (clientWorkouts.length === 0) return null;
             const workout = clientWorkouts[0];
@@ -608,8 +638,8 @@ function DayDetailDrawer({ date, appointments, workouts, clients, onClose, onAdd
     parseAppt(a.scheduledAt).getTime() - parseAppt(b.scheduledAt).getTime()
   );
 
-  const dateLabel = date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-  const isToday = dayStr(date) === dayStr(new Date());
+  const dateLabel = fmtAnchor(date, { weekday: "long", month: "long", day: "numeric" });
+  const isToday = dayStr(date) === centralToday();
 
   return (
     <>
@@ -1123,8 +1153,11 @@ function ClientWorkoutWeekView({ days, todayStr, workouts, loading, clientId, cl
 // ---- Main Component ----
 export default function TrainerCalendar({ clients, appointmentMap: appointmentMapProp, allAppointments, workoutMap }: Props) {
   const router = useRouter();
-  const today = new Date();
-  const todayStr = dayStr(today);
+  const todayStr = centralToday();
+  // A local-midnight anchor for the Central today. `new Date()` here was the
+  // device's now, so getSunday() below picked the week from the device's
+  // weekday -- on a Saturday evening off Central the whole view jumped a week.
+  const today = anchorFor(todayStr);
 
   // Build appointmentMap keyed by LOCAL date so timezone offsets don't shift chips to wrong column
   const appointmentMap = useMemo<Record<string, AE[]>>(() => {
@@ -1132,7 +1165,7 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
       const map: Record<string, AE[]> = {};
       for (const apt of allAppointments) {
         // parseAppt converts UTC string to local Date; dayStr extracts local YYYY-MM-DD
-        const localKey = dayStr(parseAppt(apt.scheduledAt));
+        const localKey = apptDayStr(parseAppt(apt.scheduledAt));
         if (!map[localKey]) map[localKey] = [];
         map[localKey].push(apt);
       }
@@ -1341,9 +1374,12 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
 
   async function handleRescheduleAppt(apptId: string, newDate: string, timeStr: string, durationMin: number) {
     const supabase = createClient();
-    const [y, mo, d] = newDate.split("-").map(Number);
-    const [h, mi] = timeStr.split(":").map(Number);
-    const newStart = new Date(y, mo - 1, d, h, mi);
+    // centralIso, not `new Date(y, mo-1, d, h, mi)`. That built the instant in
+    // the BROWSER's zone, so dragging a session to 9:00 AM from a non-Central
+    // device stored a different instant than typing 9:00 AM into the AddSession
+    // modal, which has used centralIso for exactly this reason all along. The
+    // drag path was simply missed.
+    const newStart = new Date(centralIso(newDate, timeStr));
     const newEnd = new Date(newStart.getTime() + durationMin * 60000);
     // Checked, and .select() as well as the error: an update that matches no
     // row — another trainer's appointment, or one deleted since this view
@@ -1377,16 +1413,16 @@ export default function TrainerCalendar({ clients, appointmentMap: appointmentMa
   // Header label
   let headerLabel = "";
   if (viewMode === "month" || viewMode === "agenda") {
-    headerLabel = monthView.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    headerLabel = fmtAnchor(monthView, { month: "long", year: "numeric" });
   } else if (viewMode === "week") {
     const days = getWeekDays(weekAnchor);
     const first = days[0], last = days[days.length - 1];
     const sameMonth = first.getMonth() === last.getMonth();
     headerLabel = sameMonth
-      ? `${first.toLocaleDateString("en-US", { month: "long" })} ${first.getDate()}\u2013${last.getDate()}, ${first.getFullYear()}`
-      : `${first.toLocaleDateString("en-US", { month: "short", day: "numeric" })} \u2013 ${last.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+      ? `${fmtAnchor(first, { month: "long" })} ${first.getDate()}\u2013${last.getDate()}, ${first.getFullYear()}`
+      : `${fmtAnchor(first, { month: "short", day: "numeric" })} \u2013 ${fmtAnchor(last, { month: "short", day: "numeric", year: "numeric" })}`;
   } else if (viewMode === "day") {
-    headerLabel = dayAnchor.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    headerLabel = fmtAnchor(dayAnchor, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   }
 
   const weekDays = viewMode === "week" ? getWeekDays(weekAnchor) : [];

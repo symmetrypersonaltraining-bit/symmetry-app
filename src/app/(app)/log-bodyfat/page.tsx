@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { centralToday } from "@/lib/central-time";
 
 const SITES_7 = ["Chest", "Midaxillary", "Triceps", "Subscapular", "Abdominal", "Suprailiac", "Thigh"];
 const SITES_4 = ["Biceps", "Triceps", "Subscapular", "Suprailiac"];
@@ -113,7 +114,11 @@ export default function LogBodyFatPage() {
   async function save() {
     if (!clientId || !effValid || saving) return;
     setSaving(true);
-    const __d = new Date(); const today = __d.getFullYear() + "-" + String(__d.getMonth()+1).padStart(2,"0") + "-" + String(__d.getDate()).padStart(2,"0");
+    // The date this reading is FILED under. Was the device's date, so a
+    // caliper reading taken by a client who happens to be travelling landed on
+    // the wrong calendar day and sat out of order on the body-fat trend. Every
+    // other logging surface in the app already asks Central.
+    const today = centralToday();
     const bfNum = Number(effBf.toFixed(1));
     if (entryMode === "caliper") {
       const __r1 = await supabase.from("skinfold_logs").insert({
