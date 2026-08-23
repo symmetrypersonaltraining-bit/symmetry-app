@@ -213,6 +213,52 @@ export function isExtraLog(log: LogRow, planPositions: Set<number>): boolean {
 }
 
 // Macros for a plan meal with optional per-day item overrides + added foods.
+/**
+ * THE DAY'S PRESCRIBED TARGET — the sum of the plan governing that date.
+ *
+ * Dustin, 23 Aug: "whatever I set for the meal plan, the macros on the day
+ * chart in the food logger read what the actual plan is for that day... If I
+ * change my meal plan each day, it needs to pick up what I'm actually at."
+ *
+ * The target used to come from `macro_targets` — a separate hand-kept row —
+ * which meant the bar at the top of the food logger and the food listed
+ * underneath it were two independent numbers that had to be kept in step by
+ * hand. Change a week's plan and the bar still measured against the old row;
+ * page forward to next week and the bar still showed today's.
+ *
+ * Now it is derived. The plan IS the target, so they cannot disagree, and a
+ * plan scheduled for a future Monday brings its own numbers with it.
+ *
+ * NO OVERRIDES are applied, deliberately: this is the PRESCRIPTION. What the
+ * client actually ate — adjusted portions, added foods, off-plan meals — is
+ * computeDayTotals' job, and it is the other side of the same bar.
+ *
+ * One meal per position (the first option at that slot), matching
+ * computeDayTotals' own fallback, so a rotation plan's target and its totals
+ * count the same meal.
+ *
+ * Returns null when there is no plan to read — an open-plan client, or a date
+ * before any plan started. The caller falls back to macro_targets there, which
+ * is the only thing those clients have.
+ */
+export function planDayTarget(planMeals: PlanMeal[] | null | undefined): Macros | null {
+  const meals = planMeals || [];
+  if (!meals.length) return null;
+  const byPos = new Map<number, PlanMeal>();
+  for (const m of [...meals].sort((a, b) => a.position - b.position)) {
+    if (!byPos.has(m.position)) byPos.set(m.position, m);
+  }
+  let kcal = 0, protein = 0, carbs = 0, fats = 0;
+  for (const m of byPos.values()) {
+    const mm = planMealMacros(m);
+    kcal += mm.kcal; protein += mm.protein; carbs += mm.carbs; fats += mm.fats;
+  }
+  // A plan whose items carry no macros at all is not a target of zero — it is
+  // no target. Zero would draw a full red bar over the first bite of food.
+  if (kcal === 0 && protein === 0 && carbs === 0 && fats === 0) return null;
+  return { kcal, protein, carbs, fats };
+}
+
 export function planMealMacros(meal: PlanMeal, overrides?: ItemOverrides | null): Macros {
   let p = 0, c = 0, f = 0;
   const ov = overrides || null;

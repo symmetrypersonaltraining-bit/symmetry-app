@@ -17,7 +17,7 @@ import MicButton from "@/components/MicButton";
 import { startDictation } from "@/lib/dictation";
 import {
   PlanMeal, LogRow, CustomMeta, CustomItem, ItemOverrides, Macros,
-  computeDayTotals, planMealMacros, customMealMacros, adherencePct,
+  computeDayTotals, planMealMacros, planDayTarget, customMealMacros, adherencePct,
   customMealNutrientMap,
   kcalOf, EXTRA_POSITIONS, INSERT_POSITION_MIN, INSERT_POSITION_MAX,
 } from "@/lib/nutrition/dailyTotals";
@@ -271,31 +271,34 @@ export default function NutritionV3Client(props: Props) {
   const planPositions = useMemo(() => new Set(planMeals.map((m) => m.position)), [planMeals]);
 
   // ---- daily macro TARGET -------------------------------------------------
-  // DAY-GROUP: when the plan governing the VIEWED date is a day-group menu
-  // (non-empty day_group), the day's TARGET is that menu's own totals — the
-  // menus intentionally sum to different macros per day-type (training vs rest).
-  // Sum the prescribed menu using the SAME per-meal summation as the "515 kcal"
-  // figures (planMealMacros → 4/4/9 kcal), one meal per position (the first
-  // option, matching computeDayTotals' position fallback). Recomputes with the
-  // date because planMeals derives from activePlan (pickPlanForDate per date).
-  // For a NORMAL client (null/empty day_group) this is null → we keep using the
-  // passed macroTarget prop exactly as today (byte-for-byte unchanged).
-  const dayGroupTarget = useMemo<MacroTarget | null>(() => {
-    const dg = activePlan?.day_group;
-    const isDayGroup = Array.isArray(dg) && dg.length > 0;
-    if (!isDayGroup || !planMeals.length) return null;
-    const byPos = new Map<number, PlanMeal>();
-    for (const m of planMeals) if (!byPos.has(m.position)) byPos.set(m.position, m);
-    let calories = 0, protein = 0, carbs = 0, fats = 0;
-    for (const m of byPos.values()) {
-      const mm = planMealMacros(m);
-      calories += mm.kcal; protein += mm.protein; carbs += mm.carbs; fats += mm.fats;
-    }
-    return { calories, protein, carbs, fats };
-  }, [activePlan, planMeals]);
-  // The effective daily target for the viewed date: day-group menu total when
-  // this is a day-group plan, else the client's macro_targets (unchanged).
-  const dailyTarget = dayGroupTarget ?? macroTarget;
+  // THE PLAN IS THE TARGET. The bar at the top of this screen and the food
+  // listed underneath it are now the same number read twice, so they cannot
+  // drift apart.
+  //
+  // Dustin, 23 Aug: "whatever I set for the meal plan, the macros on the day
+  // chart in the food logger read what the actual plan is for that day... If I
+  // change my meal plan each day, it needs to pick up what I'm actually at."
+  //
+  // This used to be gated on the plan being a DAY-GROUP menu, and every other
+  // client fell through to the `macroTarget` prop — a single macro_targets row
+  // the server resolved for TODAY and never re-resolved. Two consequences, both
+  // of them exactly what Dustin hit: change next week's plan and the bar still
+  // measured against the old row, because macro_targets is kept by hand
+  // separately; and page forward to next Monday and the bar showed TODAY's
+  // numbers over next Monday's food.
+  //
+  // planMeals derives from activePlan, which is pickPlanForDate(selectedDate),
+  // so this recomputes for whatever date is being viewed. A plan scheduled for
+  // a future Monday brings its own macros with it, and the Monday after that
+  // goes back to whatever the standing plan says, with nothing to remember.
+  //
+  // macroTarget remains the fallback for a client with no plan at all — an
+  // open-plan client logging freely, where there is no menu to read.
+  const planTarget = useMemo<MacroTarget | null>(() => {
+    const t = planDayTarget(planMeals);
+    return t ? { calories: t.kcal, protein: t.protein, carbs: t.carbs, fats: t.fats } : null;
+  }, [planMeals]);
+  const dailyTarget = planTarget ?? macroTarget;
 
   // ---- data loading -------------------------------------------------------
   useEffect(() => {
@@ -1446,7 +1449,8 @@ export default function NutritionV3Client(props: Props) {
         const pVal = showAvg ? (avgResult ? avgResult.p : 0) : totals.protein;
         const cVal = showAvg ? (avgResult ? avgResult.c : 0) : totals.carbs;
         const fVal = showAvg ? (avgResult ? avgResult.f : 0) : totals.fats;
-        // Target: live macroTarget for today; the range's effective target for averages.
+        // Target: the viewed day's PLAN total for "Today"; the range's own
+        // reference target for an average. The average itself is logged food.
         const tgt = showAvg ? (avgResult?.target ?? null) : (tg ? { kcal: tg.calories, p: tg.protein, c: tg.carbs, f: tg.fats } : null);
         const isOverK = tgt ? kcalVal > tgt.kcal : false;
         const barPct = tgt && tgt.kcal > 0 ? Math.min(100, (kcalVal / tgt.kcal) * 100) : 0;
@@ -1826,7 +1830,9 @@ export default function NutritionV3Client(props: Props) {
           clientName={clientName}
           planLabel={`plan v${activePlan.version_number}`}
           meals={planMeals}
-          target={macroTarget ? { calories: macroTarget.calories, protein: macroTarget.protein, carbs: macroTarget.carbs, fats: macroTarget.fats } : null}
+          // The prep sheet is built FROM this plan, so its header totals are the
+          // plan's own, not a macro_targets row that may say otherwise.
+          target={dailyTarget ? { calories: dailyTarget.calories, protein: dailyTarget.protein, carbs: dailyTarget.carbs, fats: dailyTarget.fats } : null}
           onClose={() => setShowGrocery(false)}
         />
       )}
