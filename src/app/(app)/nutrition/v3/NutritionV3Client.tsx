@@ -17,7 +17,7 @@ import MicButton from "@/components/MicButton";
 import { startDictation } from "@/lib/dictation";
 import {
   PlanMeal, LogRow, CustomMeta, CustomItem, ItemOverrides, Macros,
-  computeDayTotals, planMealMacros, customMealMacros, adherencePct,
+  computeDayTotals, planMealMacros, dayGroupMenuTarget, customMealMacros, adherencePct,
   customMealNutrientMap,
   kcalOf, EXTRA_POSITIONS, INSERT_POSITION_MIN, INSERT_POSITION_MAX,
 } from "@/lib/nutrition/dailyTotals";
@@ -281,17 +281,12 @@ export default function NutritionV3Client(props: Props) {
   // For a NORMAL client (null/empty day_group) this is null → we keep using the
   // passed macroTarget prop exactly as today (byte-for-byte unchanged).
   const dayGroupTarget = useMemo<MacroTarget | null>(() => {
-    const dg = activePlan?.day_group;
-    const isDayGroup = Array.isArray(dg) && dg.length > 0;
-    if (!isDayGroup || !planMeals.length) return null;
-    const byPos = new Map<number, PlanMeal>();
-    for (const m of planMeals) if (!byPos.has(m.position)) byPos.set(m.position, m);
-    let calories = 0, protein = 0, carbs = 0, fats = 0;
-    for (const m of byPos.values()) {
-      const mm = planMealMacros(m);
-      calories += mm.kcal; protein += mm.protein; carbs += mm.carbs; fats += mm.fats;
-    }
-    return { calories, protein, carbs, fats };
+    // The day_group check lives inside dayGroupMenuTarget, so this cannot be
+    // pointed at an ordinary client's plan by accident. Same summation the
+    // averages strip uses, so a day scored for adherence and the same day shown
+    // on the bar cannot disagree.
+    const t = dayGroupMenuTarget({ day_group: activePlan?.day_group, meals: planMeals });
+    return t ? { calories: t.kcal, protein: t.protein, carbs: t.carbs, fats: t.fats } : null;
   }, [activePlan, planMeals]);
   // The effective daily target for the viewed date: day-group menu total when
   // this is a day-group plan, else the client's macro_targets (unchanged).

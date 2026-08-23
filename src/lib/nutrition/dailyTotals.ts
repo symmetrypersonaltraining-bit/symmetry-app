@@ -213,6 +213,52 @@ export function isExtraLog(log: LogRow, planPositions: Set<number>): boolean {
 }
 
 // Macros for a plan meal with optional per-day item overrides + added foods.
+/**
+ * THE TARGET FOR A DAY-GROUP MENU — and ONLY for a day-group menu.
+ *
+ * Dustin sets the macro targets and then builds the plan to hit them, so the
+ * numbers are upstream of the food and the app never computes a target from a
+ * plan. Exactly one case runs the other way, and it is not an exception to that
+ * rule so much as a different situation:
+ *
+ *   "For Tyler and Hassan, someone else does their meal plan and I imported it
+ *    into there so their macro numbers need to match what that plan says each
+ *    day even if it changes."
+ *
+ * Their plans come from another coach and carry a `day_group` — a set of ISO
+ * weekdays — with a different menu per day type. Tyler's Week 23 runs 2,100
+ * Mon/Thu/Sat, 2,197 Tue/Fri, 2,135 Wed/Sun. There is no single number Dustin
+ * could have set for them, so the menu for that weekday IS the target.
+ *
+ * The day_group check is INSIDE this function on purpose. A caller cannot
+ * accidentally point it at an ordinary client's plan and start overwriting
+ * numbers Dustin set — it returns null for anything untagged, which is every
+ * plan he writes.
+ *
+ * No overrides: this is the prescription. One meal per position (the first
+ * option at that slot), matching computeDayTotals' own fallback.
+ */
+export function dayGroupMenuTarget(
+  plan: { day_group?: number[] | null; meals?: PlanMeal[] | null } | null | undefined,
+): Macros | null {
+  const dg = plan?.day_group;
+  if (!Array.isArray(dg) || dg.length === 0) return null;
+  const meals = plan?.meals || [];
+  if (!meals.length) return null;
+
+  const byPos = new Map<number, PlanMeal>();
+  for (const m of [...meals].sort((a, b) => a.position - b.position)) {
+    if (!byPos.has(m.position)) byPos.set(m.position, m);
+  }
+  let kcal = 0, protein = 0, carbs = 0, fats = 0;
+  for (const m of byPos.values()) {
+    const mm = planMealMacros(m);
+    kcal += mm.kcal; protein += mm.protein; carbs += mm.carbs; fats += mm.fats;
+  }
+  if (kcal === 0 && protein === 0 && carbs === 0 && fats === 0) return null;
+  return { kcal, protein, carbs, fats };
+}
+
 export function planMealMacros(meal: PlanMeal, overrides?: ItemOverrides | null): Macros {
   let p = 0, c = 0, f = 0;
   const ov = overrides || null;

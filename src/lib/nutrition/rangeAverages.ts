@@ -124,6 +124,26 @@ export interface SummariseOpts {
   /** The macro target in force for this window. Without it, accuracy can't be scored. */
   target?: MacroTargetLike | null;
   /**
+   * The target in force on a SPECIFIC date, when it varies across the window.
+   *
+   * Dustin, 23 Aug: "adherance needs to be % of each day averaged over the
+   * week." Every day used to be scored against ONE target — the newest in the
+   * range — which is wrong in two ways that both bite:
+   *
+   *   Tyler and Hassan's imported plans carry a different menu per weekday
+   *   (Tyler: 2,100 Mon/Thu/Sat, 2,197 Tue/Fri, 2,135 Wed/Sun). Grading all
+   *   seven days against one number scores most of the week against a target
+   *   that was never theirs that day.
+   *
+   *   And any week where the targets change mid-range — Dustin's own, the
+   *   moment a scheduled plan starts on a Monday — retro-graded the earlier
+   *   days against the new numbers.
+   *
+   * Returns null for a date with nothing on file, and that day simply does not
+   * contribute to accuracy. Falls back to `target` when not supplied.
+   */
+  targetForDate?: (date: string) => MacroTargetLike | null;
+  /**
    * Calendar days in the window — the denominator for consistency. Without it
    * there is no honest "of how many days", so consistency stays null and
    * adherence falls back to the meal-status average.
@@ -179,8 +199,11 @@ export function summariseLogRange(
     const t = totalsByDate[d];
     kcal += t.kcal; p += t.protein; c += t.carbs; f += t.fats;
 
-    // Accuracy half of adherence: how close this day landed to target.
-    const hit = dayHitScore(t, opts.target);
+    // Accuracy half of adherence: how close this day landed to THAT DAY's
+    // target. Each day is scored on its own terms and the week is the average
+    // of those daily scores.
+    const dayTarget = opts.targetForDate ? opts.targetForDate(d) ?? opts.target : opts.target;
+    const hit = dayHitScore(t, dayTarget);
     if (hit != null) { hitSum += hit; hitDays++; }
 
     // Adherence: average proration across the day's PLAN meals only.

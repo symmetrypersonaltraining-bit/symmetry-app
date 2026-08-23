@@ -8,7 +8,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
+import { LogRow, PlanMeal, dayGroupMenuTarget } from "@/lib/nutrition/dailyTotals";
+import { fetchLivePlans, pickPlanForDate, type DayGroupPlan } from "@/lib/nutrition/resolvePlan";
+
+interface TargetRow { effective_date?: string | null; calories: number; protein: number; carbs: number; fats: number }
 import { summariseLogRange } from "@/lib/nutrition/rangeAverages";
 
 export type RangeKey = "wtd" | "1w" | "2w" | "4w" | "8w" | "custom";
@@ -104,9 +107,17 @@ export function useNutritionAverages(
       start = shiftDate(today, -(rg.days - 1));
     }
     const supabase = createClient();
-    const [logsRes, targetRes] = await Promise.all([
+    const [logsRes, targetRes, planRows] = await Promise.all([
       supabase.from("meal_adherence_logs").select("*").eq("client_id", clientId).gte("log_date", start).lte("log_date", end),
-      supabase.from("macro_targets").select("calories, protein, carbs, fats").eq("client_id", clientId).lte("effective_date", end).order("effective_date", { ascending: false }).limit(1).maybeSingle(),
+      // EVERY target in force across the window, newest first — not just the
+      // newest overall. A week that spans a target change used to be graded
+      // end-to-end against the new numbers.
+      supabase.from("macro_targets").select("effective_date, calories, protein, carbs, fats").eq("client_id", clientId).lte("effective_date", end).order("effective_date", { ascending: false }).limit(24),
+      // The plans covering the window, so a DAY-GROUP client is scored against
+      // the menu for that weekday. Only Tyler and Hassan have those; for
+      // everyone else pickPlanForDate's menu is untagged and contributes
+      // nothing here, because dayGroupMenuTarget refuses an untagged plan.
+      fetchLivePlans(supabase, clientId, end, undefined, 0),
     ]);
     const logs = ((logsRes.data as (LogRow & { log_date: string })[]) || []);
     // Historical logs can reference archived plan versions — fetch their items
@@ -134,17 +145,25 @@ export function useNutritionAverages(
     // this strip, the week card and the weekly AI context can never disagree.
     // The target and the window length go in because adherence is now
     // consistency × accuracy, not a meal-status average.
-    const tRow = targetRes.data as { calories: number; protein: number; carbs: number; fats: number } | null;
+    const targetRows = ((targetRes.data as TargetRow[] | null) || []);
+    const tRow = targetRows[0] ?? null;
+    const asMacro = (r: TargetRow | null) =>
+      r ? { calories: Number(r.calories) || 0, protein: Number(r.protein) || 0, carbs: Number(r.carbs) || 0, fats: Number(r.fats) || 0 } : null;
+
+    // What was in force on a given day. The day-group menu first — that is the
+    // only case where a plan sets the numbers — then the macro_targets row that
+    // had actually started by that date.
+    const plans = (planRows || []) as DayGroupPlan[];
+    const targetForDate = (d: string) => {
+      const menu = dayGroupMenuTarget(pickPlanForDate(plans, d) as never);
+      if (menu) return { calories: menu.kcal, protein: menu.protein, carbs: menu.carbs, fats: menu.fats };
+      return asMacro(targetRows.find((r) => !r.effective_date || r.effective_date <= d) ?? null);
+    };
+
     const totalDays = diffDays(start, end) + 1;
     const sum = summariseLogRange(logs, pseudoMeals, {
-      target: tRow
-        ? {
-            calories: Number(tRow.calories) || 0,
-            protein: Number(tRow.protein) || 0,
-            carbs: Number(tRow.carbs) || 0,
-            fats: Number(tRow.fats) || 0,
-          }
-        : null,
+      target: asMacro(tRow),
+      targetForDate,
       windowDays: totalDays,
     });
     setResult({
@@ -155,6 +174,8 @@ export function useNutritionAverages(
       consistency: sum.consistency,
       accuracy: sum.accuracy,
       adherenceBasis: sum.adherenceBasis,
+      // The reference line the strip prints. The END of the range, because
+      // that is the target in force now; each DAY was scored on its own.
       target: tRow ? { kcal: Number(tRow.calories) || 0, p: Number(tRow.protein) || 0, c: Number(tRow.carbs) || 0, f: Number(tRow.fats) || 0 } : null,
     });
     setLoading(false);
