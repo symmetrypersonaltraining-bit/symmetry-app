@@ -1,5 +1,70 @@
 # Backlog — the single work queue
 
+> ## 👉 23 Aug — THE FOOD LOGGER READS THE PLAN, AND SEVEN PLANS DO NOT ADD UP
+>
+> **`origin/main` = `a528124`.**
+>
+> Dustin: *"whatever I set for the meal plan, the macros on the day chart in the
+> food logger read what the actual plan is for that day... If I change my meal
+> plan each day, it needs to pick up what I'm actually at."*
+>
+> **It did not.** The MENU was resolved per viewed date correctly. The NUMBERS
+> above it came from a `macro_targets` row, resolved once on the server for
+> TODAY and passed down as a prop that never re-resolved. So the bar and the
+> food under it were two independent numbers, and paging to next Monday showed
+> today's target over next Monday's food. The plan-summing code already existed
+> — gated on the plan being a DAY-GROUP menu, with a comment saying every
+> ordinary client keeps the old path.
+>
+> `planDayTarget()` now lives in `dailyTotals.ts` and both surfaces read it (the
+> Nutrition screen and the home ring, which are required to agree).
+>
+> ### ⚠️ And then the measurement, which is the real story
+>
+> I shipped it for everyone, THEN checked what it did to every client rather
+> than only to Dustin. It moved **eleven** targets:
+>
+> | | shown | would become | |
+> |---|---|---|---|
+> | Cheyenne Martin | 2,440 | **1,480** | −960 |
+> | Tyler Dorsett | 3,040 | **2,135** | −905 |
+> | Madeleine Coker | 1,550 | **973** | −577 |
+> | Hassan Kareem | 1,800 | 2,501 | +701 |
+> | Claudine Ocon | 1,920 | 1,550 | −370 |
+> | Gerard · Robert · Lauren · Sharon · Jerry · Jenn | | | +311 … −75 |
+>
+> **Dustin and Steph were unchanged to the gram** — which is exactly why it read
+> as safe. Theirs were the only two verified.
+>
+> Those gaps are **incomplete plans, not wrong targets**. Cheyenne's plan sums
+> to 1,480 against a 2,440 prescription. Deriving from it would have shown a
+> client several hundred calories under what their trainer set, on their phone,
+> in the morning.
+>
+> **Gated on `clients.plan_locked`** — a locked plan is authored outside the app
+> and is the whole prescription by construction, which is precisely the client
+> for whom the plan IS the target. Everyone else keeps `macro_targets` untouched.
+> Both surfaces gate on the same condition and a test pins that they do.
+>
+> **New nightly check `plan_total_disagrees_with_macro_target`** (cron 17), 10%
+> tolerance with a 100 kcal floor. Seven clients flag today. Nothing had ever
+> compared those two rows.
+>
+> ### NOT changed, deliberately
+>
+> - **Range averages** already read logged rows only — a plan change cannot move
+>   an 8-week average. Now pinned by a test. *"it needs to give me my actual
+>   averages that were logged. It does not need to worry about the changes."*
+> - **Adherence %** still grades every day in a range against ONE target (the
+>   newest). Over a range spanning a plan change, older days are scored against
+>   newer numbers. More accurate would be per-day; not moved without Dustin,
+>   since it is a number he watches.
+>
+> ### Open for Dustin
+>
+> 1. **The seven plan/target gaps** — a real data problem in their own right.
+> 2. Say the word and the gate widens past `plan_locked` once they line up.
+
 > ## 🚨 22 Aug NIGHT (3) — THIRTEEN CLIENTS ARE EATING TO A NUMBER NOBODY CHOSE
 >
 > **`origin/main` = `d8101a2`.** ⚠️ **`20260822l` is NOT APPLIED** — the Supabase
