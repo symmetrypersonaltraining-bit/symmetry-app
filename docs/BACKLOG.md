@@ -1,8 +1,58 @@
 # Backlog — the single work queue
 
+> ## 👉 22 Aug NIGHT (2) — EVERY DATE IN THE APP IS A CENTRAL DATE NOW
+>
+> **`origin/main` = `9643951`.**
+>
+> Dustin: *"the wrong workout date is an issue. this must be fixed to be
+> accurate. everything in th eentire app needs to go by the actual calendar in
+> the timezone we are in and must be accurate."*
+>
+> An audit of all **425 files in `src/`** found **31 real faults**. Three shapes
+> caused every one, and none of the three is catchable by reading a diff — they
+> are all correct in Central during the day, on a developer's machine, and under
+> a suite that does not pin `TZ`. They surface at 7pm, or on a client who
+> travelled:
+>
+> | shape | what it actually is |
+> |---|---|
+> | `new Date().toISOString().slice(0,10)` | the **UTC** date — right for 19 hours a day |
+> | `new Date().getDay()` / `.getHours()` | the **device's** weekday and hour |
+> | `.toLocaleDateString()` with no `timeZone` | the **reader's** zone |
+>
+> **Two of the 31 wrote bad data, not just displayed it** (`2ec65a5`):
+>   - **Dragging a session** built the instant in the browser's zone. The
+>     AddSession modal 1,080 lines above in the same file uses `centralIso` and
+>     explains why; the drag path was missed. Dragging to 9:00 AM and typing
+>     9:00 AM stored different instants.
+>   - **The caliper body-fat log** filed `skinfold_logs.log_date` from the
+>     device's date, so a reading taken while travelling landed on the wrong day
+>     and sat out of order on the trend.
+>
+> **The helpers** (`786e29d`), so the zone is not something anyone has to
+> remember: `centralFormat` (an instant), `centralFormatDate` (a calendar date),
+> `centralDateOf`, `centralHour`, `centralMinutes`, `centralTimeHHmm`. Tested
+> under UTC, Asia/Tokyo, America/New_York and Pacific/Auckland, and across both
+> DST boundaries.
+>
+> **The sweep** (`29edeba`): the client profile's training calendar rewritten
+> onto date strings with no Date built for a grid cell at all — and its 4W grid
+> was offsetting the month Monday-first under Sunday-first headings, so the whole
+> month sat one column left of its own labels. The programming builder picked
+> its week from the device weekday, so a workout dragged onto a column labelled
+> Monday could write Tuesday. Plus message timestamps, notification ages, the
+> assessment date, the announcement dateline, "Client Since", the DOB picker's
+> upper bound, the payments board's notion of overdue, reminder urgency, the
+> macro chart window, the AI cost-cap projection, and the trainer home greeting.
+>
+> **The guard** (`9643951`): `tests/unit/everyDateIsACentralDate.test.ts` fails
+> the build on any of the three shapes. Allowlist is three entries, each stating
+> why, with an assertion that it stays short — if it grows, the helper is missing
+> a case. Money formatting (`(1234.5).toLocaleString`) is not dragged in.
+
 > ## 👉 22 Aug NIGHT — THE MEAL PLAN IS THE AUTHOR'S, AND THE APP CANNOT TOUCH IT
 >
-> **`origin/main` = `d5a7ab4`.**
+> **`origin/main` = `4d2aeb4`.**
 >
 > Dustin: *"i plan it, I schedule it, i change it all from that project period...
 > the app does not design my mesl plan, I do. fix it!"*
