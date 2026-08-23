@@ -496,9 +496,10 @@ export const TUTORIAL: TutorialChapter[] = [
           "The editor has three tabs. Program assigns an existing library day. Create builds one from scratch — name it, add sections, add exercises, and you can dictate instead of typing. Edit changes the one already assigned.",
           "Per exercise you set sets, volume, volume type, rest and a cue. Volume type is what lets one field hold twelve reps, twelve to fifteen, thirty seconds, or three sets of twenty second holds, without lying about any of them.",
           "Sets, reps and load edit inline and save when you click away. There is no separate save button on those.",
+          "Added a row you did not want? Each exercise row has a small × on the right. Tap it and the row is gone.",
         ],
         narration:
-          "The editor has three tabs. Program assigns an existing library day. Create builds one from scratch. Name it, add sections, add exercises, and you can dictate instead of typing. Edit changes the one already assigned. For each exercise you set sets, volume, volume type, rest, and a cue. Volume type is what lets a single field hold twelve reps, or twelve to fifteen, or thirty seconds, or three sets of twenty second holds, without lying about any of them. Sets, reps, and load save when you click away. There is no separate save button on those.",
+          "The editor has three tabs. Program assigns an existing library day. Create builds one from scratch. Edit changes the one already assigned. For each exercise you set sets, volume, volume type, rest, and a cue. Volume type is what lets a single field hold twelve reps, or twelve to fifteen, or thirty seconds, or three sets of twenty second holds, without lying about any of them. Sets, reps, and load save when you click away. And if you add a row you did not want, each row has a small cross on the right. Tap it and it is gone.",
         audioUrl: null,
       },
       {
@@ -612,14 +613,38 @@ export const TUTORIAL: TutorialChapter[] = [
     blurb: "Plans, targets, logging, and the printable version.",
     steps: [
       {
+        // Brooke Orton's first question, 23 Aug: "How do I set nutrition" /
+        // "Macros and cals". The walkthrough went straight to meal plans and
+        // never said where the numbers themselves come from — which is the step
+        // before, and the one everything else is measured against.
+        id: "nut-targets",
+        title: "Setting the numbers",
+        body: [
+          "Open the client, then Nutrition, then Set targets. Protein, carbs and fat are the numbers you decide; type them and the calories fill themselves in at 4, 4 and 9. You can still type calories directly if you want to override it.",
+          "These targets are yours. Nothing in the app changes a number you set — not the AI, not a new plan, not a weigh-in. Everything else measures against them.",
+          "Change them whenever you like. The old set is kept with its date, so you can see what the numbers were when a stretch of results happened.",
+        ],
+        narration:
+          "Open the client, then Nutrition, then Set targets. Protein, carbs and fat are the numbers you decide. Type them and the calories fill themselves in, at four, four and nine. You can still type calories directly if you want to override that. These targets are yours: nothing in the app changes a number you set, not the A I, not a new plan, not a weigh in. Everything else is measured against them. Change them whenever you like. The old set is kept with its date, so you can see what the numbers were when a stretch of results happened.",
+        route: "/nutrition",
+        routeLabel: "Open Nutrition",
+        manual: [
+          "Same screen either way — Set targets is a plain form. The calories still calculate themselves from the macros.",
+        ],
+        manualNarration:
+          "Same screen either way. Set targets is a plain form, and the calories still calculate themselves from the macros.",
+        audioUrl: null,
+      },
+      {
         id: "nut-plans",
         title: "Meal plans",
         body: [
           "Pick a client at the top of the Nutrition screen. Their plan is a set of meals, each with items and macros, and it is versioned — you can see what changed and when.",
           "Plans can be dated to start in the future. One flips to live on its start date without you doing anything.",
+          "If you have the AI build the plan, it has to land on the targets you set — within about 3% on calories and 5g on each macro. The draft screen prints what the plan actually comes to next to the target, and if it could not hit them it says so in orange rather than handing you a plan that quietly disagrees with itself.",
         ],
         narration:
-          "Pick a client at the top of the Nutrition screen. Their plan is a set of meals, each with its items and macros, and it is versioned, so you can see what changed and when. Plans can be dated to start in the future, and one flips over to live on its start date without you having to remember.",
+          "Pick a client at the top of the Nutrition screen. Their plan is a set of meals, each with its items and macros, and it is versioned, so you can see what changed and when. Plans can be dated to start in the future, and one flips over to live on its start date. If you have the A I build the plan, it has to land on the targets you set, within about three percent on calories and five grams on each macro. The draft prints what the plan comes to next to the target, and says so in orange if it could not hit them.",
         route: "/nutrition",
         routeLabel: "Open Nutrition",
         manual: [
