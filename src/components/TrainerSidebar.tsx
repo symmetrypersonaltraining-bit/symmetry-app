@@ -21,7 +21,10 @@ const TRAINER_NAV: SidebarItem[] = [
     label: "Schedule",
     icon: "ti-calendar",
     children: [
-      { href: "/schedule", label: "Calendar", icon: "ti-calendar" },
+      // /home, not /schedule. The trainer calendar lives on the home page;
+      // /schedule redirects any trainer not in client mode straight back to it,
+      // so this item was a link that bounced you to where you already were.
+      { href: "/home#calendar", label: "Calendar", icon: "ti-calendar" },
       // The detector has been filing proposals every 12h with no way to read
       // them outside a SQL query. 80 had accumulated unseen.
       { href: "/schedule/proposals", label: "Proposals", icon: "ti-git-pull-request" },

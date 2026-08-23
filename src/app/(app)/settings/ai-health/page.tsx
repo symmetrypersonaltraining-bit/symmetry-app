@@ -25,6 +25,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/auth/serverUser";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { trainerForAuthUser } from "@/lib/trainerResolve";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { AI_FEATURES, AI_FEATURE_KEYS, MONTHLY_COST_CAP_USD, type AiFeature } from "@/lib/ai/meter-core";
 import AiHealthTable, { type FeatureHealth } from "./AiHealthTable";
@@ -46,6 +47,14 @@ export default async function AiHealthPage() {
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
   if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
+  // OWNER ONLY. Everything below this line is read with the SERVICE ROLE and is
+  // instance-wide: month-to-date AI spend for the whole business, and 5,000
+  // rows of failures across every trainer's clients. Gated as "trainer", a
+  // coach hired on Monday could read the company's costs on Tuesday. The
+  // analogous logs (gcal_sync_runs, integrity_checks) were moved to owner-only
+  // in 20260821d; this page was missed.
+  const me = await trainerForAuthUser(supabase as never, user.id, user.email ?? null);
+  if (!me?.isOwner) redirect("/settings");
 
   const db = createAdminClient();
 

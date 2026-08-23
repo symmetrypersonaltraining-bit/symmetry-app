@@ -6,6 +6,7 @@ import { isCronRequest } from '@/lib/cron-auth';
 import { isDbSchedulerRequest } from '@/lib/scheduler-key';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { TRAINER_EMAIL } from '@/lib/ai/scope';
+import { trainerForAuthUser } from '@/lib/trainerResolve';
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export const dynamic = 'force-dynamic';
@@ -352,16 +353,25 @@ export async function POST(req: NextRequest) {
   // x-vercel-cron), the pg_cron scheduler (database-held key — see
   // scheduler-key.ts for why the 15-minute sync moved there), or a signed-in
   // trainer tapping Sync Now.
+  let callerIsOwner = true; // cron and the db scheduler are the owner's own automation
   if (!isCronRequest(req) && !(await isDbSchedulerRequest(req))) {
     const authClient = await createServerClient();
     const { data: { user } } = await authClient.auth.getUser();
     if (!user || !(await viewerIsTrainer(authClient, user))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const me = await trainerForAuthUser(authClient as never, user.id, user.email ?? null);
+    callerIsOwner = !!me?.isOwner;
   }
 
   const body = await req.json().catch(() => ({}));
-  const resetFirst = body.reset === true;
+  // RESET IS OWNER-ONLY. gcal_clear_appointments() empties the whole table —
+  // every trainer's appointments, not the caller's — and the auth check above
+  // only asks whether the caller is A trainer. Any second trainer POSTing
+  // { reset: true } would have deleted the owner's calendar out from under him.
+  // A non-owner asking for it gets an ordinary sync, not an error, because the
+  // reset is an optimisation and refusing the whole request would break Sync Now.
+  const resetFirst = body.reset === true && callerIsOwner;
   const narrow = body.window === "narrow";
 
   try {

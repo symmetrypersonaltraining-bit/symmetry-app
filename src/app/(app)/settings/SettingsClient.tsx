@@ -28,10 +28,12 @@ interface Props {
   gcalConnected?: boolean;
   gcalStatus?: string | null;
   tutorialLive?: boolean;
+  /** Owner-only controls are not drawn for a trainer who cannot use them. */
+  isOwner?: boolean;
 }
 
 export default function SettingsClient({ userEmail, userName, isTrainer,
-  isInClientMode, userId, gcalSyncEnabled, gcalConnected, gcalStatus, tutorialLive }: Props) {
+  isInClientMode, userId, gcalSyncEnabled, gcalConnected, gcalStatus, tutorialLive, isOwner }: Props) {
   // Per-trainer, not the app-wide flag above it: one trainer finishing the
   // guide must not take it away from the next one being onboarded.
   const { dismissed: tutorialHidden, hide: hideTutorial, show: showTutorial } = useTutorialVisibility();
@@ -179,7 +181,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
           switch that takes AI nudges live. */}
       <section>
         <p className="section-header">Experience</p>
-        <ExperienceSettings isTrainer={isTrainer && !isInClientMode} />
+        <ExperienceSettings isTrainer={isTrainer && !isInClientMode} isOwner={!!isOwner} />
 
       {/* Per-event push preferences. Sits directly under Experience because
           both answer "how does this app behave for me". */}

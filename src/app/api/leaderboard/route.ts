@@ -16,7 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { resolveAiScope, Db } from "@/lib/ai/scope";
-import { unrankedClientIds } from "@/lib/rankings";
+import { unrankedClientIds, trainerEmailSet } from "@/lib/rankings";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -67,7 +67,10 @@ export async function GET(req: NextRequest) {
     // trainer — this board is the clients'.
     const nameRows =
       (namesRes.data as { id: string; name: string | null; email: string | null; exclude_from_rankings: boolean | null }[]) || [];
-    const unranked = unrankedClientIds(nameRows);
+    // Trainers come from the TABLE, not the build-time list — a trainer added
+    // from inside the app is otherwise ranked among the clients she coaches.
+    const trainerEmails = await trainerEmailSet(admin as never);
+    const unranked = unrankedClientIds(nameRows, trainerEmails);
     const names = new Map(
       nameRows.filter((c) => !unranked.has(c.id)).map((c) => [c.id, (c.name || "").split(" ")[0] || "Member"]),
     );

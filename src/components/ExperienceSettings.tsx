@@ -73,7 +73,7 @@ function Row({
   );
 }
 
-export default function ExperienceSettings({ isTrainer }: { isTrainer: boolean }) {
+export default function ExperienceSettings({ isTrainer, isOwner = false }: { isTrainer: boolean; isOwner?: boolean }) {
   const supabase = createClient();
 
   const [sound, setSound] = useState(false);
@@ -203,11 +203,19 @@ export default function ExperienceSettings({ isTrainer }: { isTrainer: boolean }
         }}
       />
 
-      {isTrainer ? (
+      {/* OWNER, not trainer. Every switch in this block writes `app_flags`,
+          and 20260821d_global_switches_owner_only.sql restricts that table to
+          is_owner(). So for a second trainer these rows flipped, the update
+          matched nothing, and the optimistic state snapped back with no
+          message — the app appearing to lose her setting. They are also the
+          wrong switches for her to hold: Coach Bot and the walkthrough are
+          instance-wide, one shared group chat and one shared flag, not
+          per-trainer preferences. */}
+      {isTrainer && isOwner ? (
         <>
           <div style={{ borderTop: "1px solid var(--brand-border)", margin: "10px 0 2px" }} />
           <p className="text-xs font-bold mb-1 mt-2" style={{ color: "var(--brand-text-secondary)", letterSpacing: 1 }}>
-            AUTOMATION · TRAINER ONLY
+            AUTOMATION · OWNER ONLY
           </p>
           {/* The "send AI check-ins to clients" switch is GONE, not defaulted
               off — /api/ai-nudges cannot message a client any more whatever

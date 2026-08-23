@@ -263,6 +263,11 @@ export default async function HomePage(props: {
 
             ClientNotesPanel stays in the repo, unmounted. */}
         <PendingRemindersPanel reminders={reminders} />
+        {/* The sidebar's Schedule -> Calendar link lands here. The trainer
+            calendar has never had a route of its own — /schedule redirects
+            every trainer straight back to /home — so the nav item pointed at a
+            page that bounced, for the owner as much as for anyone else. */}
+        <div id="calendar" style={{ scrollMarginTop: 72 }} />
         <TrainerCalendarPanel
           clients={clients || []}
           appointmentMap={appointmentMap}

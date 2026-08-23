@@ -6,6 +6,7 @@ import SettingsClient from "./SettingsClient";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { readFlag } from "@/lib/flags";
 import { coachForViewer } from "@/lib/coachIdentity";
+import { trainerForAuthUser } from "@/lib/trainerResolve";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ gcal?: string; as?: string }> }) {
   const supabase = await createClient();
@@ -28,6 +29,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   // The SIGNED-IN trainer's own name. `COACH_NAME` is one build-time env var,
   // so Stephanie's own profile said "Dustin Gautreaux".
   const me = isTrainer ? await coachForViewer(supabase as never, user.id) : null;
+  // OWNER, not just trainer. The AUTOMATION block below writes `app_flags`,
+  // which RLS restricts to the owner — so for any other trainer those switches
+  // flipped on screen, failed silently, and snapped back with no explanation.
+  // A control that cannot work is worse than one that is not drawn.
+  const isOwner = isTrainer
+    ? !!(await trainerForAuthUser(supabase as never, user.id, user.email ?? null))?.isOwner
+    : false;
   const userName = isTrainer ? me!.name : (profile?.name ?? user.email ?? "");
 
   const { data: trainerSettings } = isTrainer
@@ -49,6 +57,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         gcalStatus={gcalStatus}
         isInClientMode={isInClientMode}
         tutorialLive={tutorialLive}
+        isOwner={isOwner}
       />
     </div>
   );

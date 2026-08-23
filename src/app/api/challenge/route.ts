@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TRAINER_EMAIL, resolveAiScope, Db } from "@/lib/ai/scope";
 import { excludedClientIds } from "@/lib/demoClient";
-import { unrankedClientIds } from "@/lib/rankings";
+import { unrankedClientIds, trainerEmailSet } from "@/lib/rankings";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
@@ -99,7 +99,10 @@ export async function GET() {
     const roster =
       (allClients as { id: string; name: string | null; email: string | null; exclude_from_rankings: boolean | null }[] | null) || [];
     const excluded = excludedClientIds(roster);
-    const unranked = unrankedClientIds(roster);
+    // Trainers come from the TABLE, not the build-time list — a trainer added
+    // from inside the app is otherwise ranked among the clients she coaches.
+    const trainerEmails = await trainerEmailSet(db as never);
+    const unranked = unrankedClientIds(roster, trainerEmails);
     const rankIds = ids.filter((id) => !unranked.has(id));
 
     const [namesRes, woRes, mlRes] = await Promise.all([
