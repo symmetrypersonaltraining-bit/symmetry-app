@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createServerClient } from '@/lib/supabase/server';
+import { verifyState } from '@/lib/auth/oauthState';
 
 // Per instance: an OAuth callback pinned to one deployment sends another
 // instance's trainer to that deployment when they connect their calendar.
@@ -9,12 +11,40 @@ const APP_URL = APP_ORIGIN;
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code');
-  const userId = req.nextUrl.searchParams.get('state');
+  const rawState = req.nextUrl.searchParams.get('state');
   const error = req.nextUrl.searchParams.get('error');
 
-  console.log('[gcal-cb] start code:', !!code, 'userId:', userId, 'error:', error);
-  if (error || !code || !userId) {
+  console.log('[gcal-cb] start code:', !!code, 'state:', !!rawState, 'error:', error);
+  if (error || !code || !rawState) {
     return NextResponse.redirect(APP_URL + '/settings?gcal=error&reason=missing_params');
+  }
+
+  // WHO THIS IS FOR, PROVEN. The id below is written straight into
+  // save_google_tokens on the service role, so an unsigned `state` let anyone
+  // who completed Google's consent screen replace ANY trainer's stored
+  // credentials — pointing their calendar sync at an attacker's calendar, which
+  // invents sessions and payments on a roster they bill from.
+  const checked = verifyState(rawState);
+  if (!checked.ok) {
+    console.warn('[gcal-cb] refused state:', checked.reason);
+    return NextResponse.redirect(APP_URL + '/settings?gcal=error&reason=bad_state');
+  }
+  const userId = checked.userId;
+
+  // Belt as well as braces. This is a top-level redirect, so the browser sends
+  // its cookies: when there IS a session it must be the same person the state
+  // was issued to. A missing session is not a failure — Safari's ITP and a
+  // cross-site return can both drop it — so absence is allowed and only a
+  // MISMATCH is refused.
+  try {
+    const sessionClient = await createServerClient();
+    const { data: { user: signedIn } } = await sessionClient.auth.getUser();
+    if (signedIn && signedIn.id !== userId) {
+      console.warn('[gcal-cb] state/session mismatch');
+      return NextResponse.redirect(APP_URL + '/settings?gcal=error&reason=bad_state');
+    }
+  } catch {
+    /* no readable session — the signature above is the check that matters */
   }
 
   // Exchange code for tokens

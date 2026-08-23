@@ -47,6 +47,13 @@ const first = (d: unknown): Record<string, unknown> | null =>
  * True when this user has an ACTIVE row in `trainers`, or is on the build-time
  * list. Safe to call repeatedly; the second call in a request is a cache hit on
  * the learned set rather than a query.
+ *
+ * `active === true`, not `!== false`. `trainers.active` is NOT NULL DEFAULT
+ * true, so the two agree on every row that exists — but trainerGate.ts has
+ * always required `=== true` and this required `!== false`, and a disagreement
+ * between the app's front door and the AI's gate is the kind of thing that
+ * hands somebody the full trainer interface and a 403 from the assistant in the
+ * same session. One reading, everywhere.
  */
 export async function viewerIsTrainer(
   db: unknown,
@@ -65,7 +72,7 @@ export async function viewerIsTrainer(
     if (user.id) {
       const { data } = await q.from("trainers").select("email, active").eq("auth_user_id", user.id).limit(1);
       const row = first(data);
-      if (row && row.active !== false) {
+      if (row && row.active === true) {
         noteTrainerEmail((row.email as string) || user.email);
         return true;
       }
@@ -77,7 +84,7 @@ export async function viewerIsTrainer(
     if (user.email) {
       const { data } = await q.from("trainers").select("email, active").ilike("email", user.email).limit(1);
       const row = first(data);
-      if (row && row.active !== false) {
+      if (row && row.active === true) {
         noteTrainerEmail((row.email as string) || user.email);
         return true;
       }

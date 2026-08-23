@@ -81,6 +81,8 @@ type ConnectedTrainer = {
 
 type TrainerSyncResult = {
   trainer: string;
+  /** The auth user this pass belongs to, so a trainer can find their own row. */
+  user_id: string;
   synced: number;
   payments: number;
   reconciled: number;
@@ -94,9 +96,9 @@ type TrainerSyncResult = {
   skipped?: string;
 };
 
-function emptyResult(name: string, skipped: string): TrainerSyncResult {
+function emptyResult(name: string, skipped: string, userId = ""): TrainerSyncResult {
   return {
-    trainer: name, synced: 0, payments: 0, reconciled: 0, reconciled_payments: 0,
+    trainer: name, user_id: userId, synced: 0, payments: 0, reconciled: 0, reconciled_payments: 0,
     unmatched: 0, unmatched_samples: [], total: 0, dollar_events: 0,
     client_dollar: 0, errors: [], skipped,
   };
@@ -118,7 +120,7 @@ async function syncOneCalendar(
   // No clients is not an error for a trainer who has not been given any yet —
   // it is Stephanie's state on day one. Skipping her leaves Dustin's run alone;
   // failing the request would have taken his sync down with her.
-  if (!clients?.length) return emptyResult(who, 'no clients assigned');
+  if (!clients?.length) return emptyResult(who, 'no clients assigned', trainer.user_id);
 
   const clientMap = clients.map((c: { id: string; name: string }) => {
     const parts = (c.name || '').toLowerCase().split(/\s+/).filter(Boolean);
@@ -330,6 +332,7 @@ async function syncOneCalendar(
 
   return {
     trainer: who,
+    user_id: trainer.user_id,
     synced,
     payments,
     reconciled,
@@ -402,7 +405,7 @@ export async function POST(req: NextRequest) {
         // One trainer's dead credential must not take the other's sync down —
         // that was the single-tenant behaviour and it is the wrong one now.
         const msg = e?.message || String(e);
-        results.push(emptyResult(t.trainer_name || t.user_id, msg));
+        results.push(emptyResult(t.trainer_name || t.user_id, msg, t.user_id));
       }
     }
 
@@ -467,10 +470,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       window: narrow ? 'narrow' : 'full',
+      // PER-TRAINER, and carrying enough to BE a health card on its own.
+      // my_gcal_sync_health() hands a trainer their own entry out of this
+      // array; without user_id there is nothing to match on, and without
+      // errors/unmatched_samples their slice cannot say what went wrong or what
+      // was dropped — which is the whole point of the card.
       trainers: results.map(r => ({
-        trainer: r.trainer, synced: r.synced, payments: r.payments,
+        trainer: r.trainer, user_id: r.user_id, synced: r.synced, payments: r.payments,
         reconciled: r.reconciled, reconciled_payments: r.reconciled_payments,
-        unmatched: r.unmatched, total: r.total, skipped: r.skipped,
+        unmatched: r.unmatched, unmatched_samples: r.unmatched_samples.slice(0, 20),
+        total: r.total, skipped: r.skipped, errors: r.errors.slice(0, 10),
       })),
       // Top-level totals stay exactly where they were: GcalSyncButton reads
       // `synced`, the Settings buttons read `synced` and `payments`.

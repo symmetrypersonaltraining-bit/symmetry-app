@@ -76,8 +76,18 @@ test("a refused reconcile is surfaced as an error", () => {
 
 // ─── the panel ──────────────────────────────────────────────────────────────
 
-test("something finally reads gcal_sync_runs", () => {
-  assert.match(code(PANEL), /\.from\("gcal_sync_runs"\)/);
+test("something finally reads the sync log", () => {
+  // This used to require `.from("gcal_sync_runs")`. That table went owner-only
+  // in 20260821d — a run row covers every trainer at once — so the direct read
+  // returned nothing for anyone else and the card rendered as empty space: the
+  // exact silent failure it exists to end, still present for a second trainer.
+  // my_gcal_sync_health() gives the owner the whole run and every other trainer
+  // only their own entry, so the requirement is now the RPC, not the table.
+  assert.match(code(PANEL), /rpc\("my_gcal_sync_health"\)/);
+  assert.ok(
+    !/\.from\("gcal_sync_runs"\)/.test(code(PANEL)),
+    "reading the owner-only table directly again — this is blank for every other trainer",
+  );
   assert.match(code(HOME), /<SyncHealth \/>/, "the panel is not on the trainer's home screen");
 });
 

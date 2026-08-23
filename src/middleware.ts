@@ -147,10 +147,25 @@ export async function middleware(request: NextRequest) {
   // this path was already paying for. Both are network-bound; in parallel the
   // pair costs about what the clients query alone used to.
   const bakedIn = isTrainerEmail(user.email);
+  // BY AUTH ID *OR* EMAIL. viewer.ts has always resolved a trainer both ways;
+  // this only ever asked for auth_user_id. A trainers row whose auth link was
+  // never stamped — one written in SQL rather than through /api/invite-trainer —
+  // therefore fell straight through into the CLIENT onboarding chain below and
+  // was pushed to /welcome and the intake questionnaire, on every navigation,
+  // while every page it eventually reached treated them as a trainer. Two
+  // components of the same app disagreeing about who someone is.
   const trainerLookup = bakedIn
     ? null
     : withAuthTimeout(
-        supabase.from("trainers").select("email, active").eq("auth_user_id", user.id).limit(1)
+        supabase
+          .from("trainers")
+          .select("email, active")
+          .or(
+            user.email
+              ? `auth_user_id.eq.${user.id},email.ilike.${user.email.replace(/[,()]/g, "")}`
+              : `auth_user_id.eq.${user.id}`,
+          )
+          .limit(1)
       );
   if (bakedIn) return supabaseResponse;
 
@@ -170,7 +185,12 @@ export async function middleware(request: NextRequest) {
   const trainerRes = trainerLookup ? await trainerLookup : null;
   if (trainerRes?.degraded) return supabaseResponse;
   const trainerRow = (trainerRes?.value?.data as { email?: string; active?: boolean }[] | null)?.[0] ?? null;
-  if (trainerRow && trainerRow.active !== false) {
+  // active === true, not !== false. `trainers.active` is NOT NULL DEFAULT true
+  // so the two agree today, but trainerGate.ts requires === true and this said
+  // !== false — a disagreement waiting for the first nullable column change to
+  // hand somebody the full trainer shell and a 403 from the AI at the same
+  // time. One reading, everywhere.
+  if (trainerRow && trainerRow.active === true) {
     // Remembered for the rest of this isolate's life, so the synchronous
     // isTrainerEmail() checks inside the pages themselves agree with what was
     // just read from the table.

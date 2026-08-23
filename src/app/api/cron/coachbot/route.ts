@@ -27,6 +27,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
+import { rosterScopeFor } from "@/lib/auth/roster";
 import { isCronRequest } from "@/lib/cron-auth";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
 import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
@@ -223,14 +224,35 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
 }
 
 async function handle(req: NextRequest) {
-  // Scheduler, or ${COACH_FIRST_NAME} firing it by hand to see what it would say.
+  const sp = new URL(req.url).searchParams;
+  const dry = sp.get("dry") === "1";
+  // Scheduler, or a trainer firing it by hand to see what it would say.
   if (!isCronRequest(req) && !(await isDbSchedulerRequest(req))) {
     const scoped = await resolveAiScope(null);
     if (!scoped.ok) return scoped.response;
     if (!scoped.scope.isTrainer) return NextResponse.json({ error: "Trainer only" }, { status: 403 });
+    // A REAL POST IS AUTHORED AS THE OWNER.
+    //
+    // The group chat is shared on purpose (Dustin, 20 Aug: "All clients can go
+    // in there since they're all going to train with Symmetry Personal
+    // Training"), so the business owner is who speaks in it — that part is
+    // right. What was wrong is that any trainer could fire it, which put a
+    // message signed by Dustin into his group chat on somebody else's tap.
+    // Preview stays open to every trainer; posting does not.
+    if (!dry) {
+      const me = await rosterScopeFor(
+        createAdminClient() as never,
+        { id: scoped.scope.userId, email: scoped.scope.email },
+      );
+      if (!me.isOwner) {
+        return NextResponse.json(
+          { posted: false, reason: "Coach Bot posts as the owner in the shared group. Add ?dry=1 to preview it." },
+          { status: 403 },
+        );
+      }
+    }
   }
   const db = createAdminClient() as unknown as Db;
-  const sp = new URL(req.url).searchParams;
   // Kill switch. Unattended jobs were the ONE place it did not apply, which is
   // the worst possible exemption: they run on a schedule with nobody watching,
   // so an overspend is discovered on the invoice. No per-client cap — there is
@@ -238,7 +260,7 @@ async function handle(req: NextRequest) {
   const paused = await enforceMeter(null, "coachbot_post");
   if (paused) return paused;
   try {
-    const out = await runCoachBot(db, { force: sp.get("force") === "1", dry: sp.get("dry") === "1" });
+    const out = await runCoachBot(db, { force: sp.get("force") === "1", dry });
     return NextResponse.json(out);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

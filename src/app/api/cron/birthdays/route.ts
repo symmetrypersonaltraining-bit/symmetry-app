@@ -37,6 +37,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
+import { rosterScopeFor } from "@/lib/auth/roster";
 import { isCronRequest } from "@/lib/cron-auth";
 import { trainerFeatureOn } from "@/lib/trainerFeatures";
 import { isDbSchedulerRequest } from "@/lib/scheduler-key";
@@ -260,14 +261,29 @@ export async function runBirthdays(
 }
 
 async function handle(req: NextRequest) {
-  // The scheduler, or {COACH_FIRST_NAME} looking at what it would say.
+  const sp = new URL(req.url).searchParams;
+  const dry = sp.get("dry") === "1";
+  // The scheduler, or a trainer looking at what it would say.
   if (!isCronRequest(req) && !(await isDbSchedulerRequest(req))) {
     const scoped = await resolveAiScope(null);
     if (!scoped.ok) return scoped.response;
     if (!scoped.scope.isTrainer) return NextResponse.json({ error: "Trainer only" }, { status: 403 });
+    // Same rule as Coach Bot: the birthday wish goes into the shared group
+    // authored as the owner, so a real fire is the owner's. Preview is open.
+    if (!dry) {
+      const me = await rosterScopeFor(
+        createAdminClient() as never,
+        { id: scoped.scope.userId, email: scoped.scope.email },
+      );
+      if (!me.isOwner) {
+        return NextResponse.json(
+          { posted: false, reason: "The birthday wish posts as the owner in the shared group. Add ?dry=1 to preview it." },
+          { status: 403 },
+        );
+      }
+    }
   }
   const db = createAdminClient() as unknown as Db;
-  const sp = new URL(req.url).searchParams;
   // Kill switch. Unattended jobs were the ONE place it did not apply, which is
   // the worst possible exemption: they run on a schedule with nobody watching,
   // so an overspend is discovered on the invoice. No per-client cap — there is
@@ -277,7 +293,7 @@ async function handle(req: NextRequest) {
   try {
     const out = await runBirthdays(db, {
       force: sp.get("force") === "1",
-      dry: sp.get("dry") === "1",
+      dry,
       today: sp.get("today") || undefined,
     });
     return NextResponse.json(out);

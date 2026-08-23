@@ -105,7 +105,12 @@ test("the resolver fails OPEN to the build-time list, never closed", () => {
   // A trainers query that throws must not demote Dustin in his own app.
   assert.match(c, /catch\s*\{[\s\S]{0,200}\}\s*return isTrainerEmail\(user\.email\)/,
     "an unreachable trainers table returns false instead of the configured answer");
-  assert.match(c, /active !== false/,
+  // Was `active !== false`. The point of the assertion is that DEACTIVATION IS
+  // HONOURED, and `=== true` honours it strictly more — it also refuses a NULL,
+  // which is what trainerGate.ts has always required. The two disagreeing was a
+  // trap waiting to hand somebody the full trainer shell and a 403 from the AI
+  // in the same session, so all three readers now say the same thing.
+  assert.match(c, /active === true/,
     "a deactivated trainer is still treated as one — trainers.active is how one is switched off");
   assert.match(c, /ilike\("email"/,
     "no address fallback: a trainers row whose auth_user_id was never stamped resolves to 'not a trainer', " +

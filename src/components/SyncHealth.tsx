@@ -32,6 +32,8 @@ interface Run {
   status_code: number | null;
   response: Record<string, unknown> | null;
   error: string | null;
+  /** "instance" for the owner, "mine" for anyone else. */
+  scope?: string | null;
 }
 
 function ago(iso: string): string {
@@ -58,11 +60,15 @@ export default function SyncHealth() {
     (async () => {
       try {
         const sup = createClient() as any;
-        const { data } = await sup
-          .from("gcal_sync_runs")
-          .select("queued_at, ok, status_code, response, error")
-          .order("queued_at", { ascending: false })
-          .limit(1);
+        // WHOSE SYNC. `gcal_sync_runs` is owner-only (20260821d) because a run
+        // row covers every trainer at once, so this card - the one thing that
+        // says whether a trainer's calendar is working - rendered as `null` for
+        // everyone but Dustin. That is the exact silent failure it was written
+        // to end, still fully present for anyone else.
+        //
+        // my_gcal_sync_health() hands the owner the whole run and every other
+        // trainer only their own entry out of it. The table stays shut.
+        const { data } = await sup.rpc("my_gcal_sync_health");
         setRun((data || [])[0] ?? null);
       } catch {
         /* never break the home screen over a status widget */

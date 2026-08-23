@@ -48,6 +48,7 @@ import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter } from "@/lib/ai/scope";
 import { ownerAuthUid, coachFirstNameForClient } from "@/lib/trainerResolve";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
+import { rosterScopeFor, scopeRoster } from "@/lib/auth/roster";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
@@ -139,6 +140,8 @@ export async function POST(req: NextRequest) {
   // This one was already correct (it failed closed on an unset secret); it now
   // shares the definition so there is one answer to "is this the scheduler?"
   // and it also recognises Vercel's own x-vercel-cron header.
+  // WHO ASKED. Null for the scheduler, which runs as the business.
+  let caller: { id: string; email: string | null } | null = null;
   if (!isCronRequest(req)) {
     const supabase = await createClient();
     const {
@@ -147,12 +150,22 @@ export async function POST(req: NextRequest) {
     if (!user || !(await viewerIsTrainer(supabase, user))) {
       return NextResponse.json({ error: "Trainer only" }, { status: 403 });
     }
+    caller = { id: user.id, email: user.email ?? null };
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return NextResponse.json({ error: "Not configured" }, { status: 500 });
   const admin = createAdminClient(url, key, { auth: { persistSession: false } }) as unknown as Db;
+
+  // A TRAINER'S SWEEP IS OVER HER OWN CLIENTS, AND THE DIGEST IS HERS.
+  //
+  // Before this, both halves belonged to the owner regardless of who tapped it:
+  // the roster read was unscoped, so a second trainer's sweep ran over every
+  // client in the business, and the digest was addressed with ownerAuthUid(),
+  // so the result landed in Dustin's private inbox and she saw nothing at all.
+  // She could not tell it had worked.
+  const callerScope = caller ? await rosterScopeFor(admin as never, caller) : null;
 
   // ── THE SWEEP IS OFF. `app_flags.nudges_live` is the switch. ────────────
   //
@@ -198,7 +211,7 @@ export async function POST(req: NextRequest) {
     const [clientsRes, wlRes, mealRes, settingsRes, recentRes] = await Promise.all([
       // Test accounts are excluded outright. A dry run of the segmentation on
       // 11 Aug had "Test Client" queued for a real message in ${COACH_FIRST_NAME}'s name.
-      admin.from("clients").select("id, name, primary_goal, auth_user_id").not("auth_user_id", "is", null).is("archived_at", null).not("name", "ilike", "%test%"),
+      admin.from("clients").select("id, name, primary_goal, auth_user_id, trainer_id").not("auth_user_id", "is", null).is("archived_at", null).not("name", "ilike", "%test%"),
       admin.from("workout_logs").select("client_id, log_date").eq("completed", true).gte("log_date", since30),
       admin.from("meal_adherence_logs").select("client_id, log_date").gte("log_date", since30),
       admin.from("client_app_settings").select("client_id, nudges_enabled"),
@@ -208,7 +221,11 @@ export async function POST(req: NextRequest) {
       admin.from("ai_nudge_log").select("client_id, created_at, sent, segment").gte("created_at", shiftDays(today, -59)),
     ]);
 
-    const clients = (clientsRes.data as { id: string; name: string | null; primary_goal: string | null; auth_user_id: string }[]) || [];
+    type NudgeClient = { id: string; name: string | null; primary_goal: string | null; auth_user_id: string; trainer_id: string | null };
+    const allClients = (clientsRes.data as NudgeClient[]) || [];
+    // Service-role read, so this filter is the only one there is. The scheduler
+    // (callerScope null) keeps the whole-roster sweep it has always run.
+    const clients = callerScope ? scopeRoster(allClients, callerScope, { includeOwn: true }) : allClients;
     const nudgesOff = new Set(
       ((settingsRes.data as { client_id: string; nudges_enabled: boolean }[]) || [])
         .filter((s) => s.nudges_enabled === false)
@@ -277,11 +294,13 @@ export async function POST(req: NextRequest) {
     // private note to that account and RLS shows it to nobody else).
     //
     // This used to find the trainer by looking up TRAINER_EMAIL in the CLIENTS
-    // table, which works only because Dustin also trains himself. It reads the
-    // trainers table now. The OWNER is deliberate: the digest covers the whole
-    // roster, and splitting it per trainer is a decision for Dustin, not a
-    // default to slide in — noted in the backlog.
-    const trainerAuth = await ownerAuthUid(admin);
+    // table, which works only because Dustin also trains himself, then read the
+    // trainers table and addressed the OWNER whoever had run it.
+    //
+    // The nightly scheduler still files with the owner — it sweeps the whole
+    // business. A trainer running it by hand gets her own digest about her own
+    // clients, which is the only version of it she can act on.
+    const trainerAuth = caller ? caller.id : await ownerAuthUid(admin);
 
     const previews: { name: string; segment: string; tone: string; body: string; sent: boolean }[] = [];
 
