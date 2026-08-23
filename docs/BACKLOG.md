@@ -23,31 +23,18 @@
 > | `3e5c6c7` | **"Is a trainer" is not "is this client's trainer".** Service-role routes that never re-imposed `trainer_can_see_client()`: plateaus, live-sessions, attention-drafts, focus-drafts (including *approve all*, which published), weekly-ai POST. |
 > | `c8b9102` | Tutorial: a **Setting the numbers** step (her actual first question), the AI target check, and the remove-a-row control. |
 >
-> ### Needs Dustin — not done
+> ### The seven — all answered and shipped (`a28ff10`)
 >
-> 1. **`gcal_sync_runs` has no `trainer_id`.** That is why it was made owner-only,
->    which means a second trainer can never see whether her own calendar sync is
->    working — the exact silent failure the SyncHealth card exists to surface.
->    Fix is to scope the log, not hide the card. **Schema change: needs a yes.**
-> 2. **Coach Bot and the birthday bot post as the OWNER** (`ownerAuthUid`).
->    Correct while the group chat is one shared room. Wrong the moment a trainer
->    has her own group. **Which is it?**
-> 3. **`/api/ai-nudges` files its digest in Dustin's inbox** whoever ran it —
->    documented as deliberate pending this decision. Should a trainer's sweep
->    reach her own inbox?
-> 4. **`/assessment` and `/library/*` have no trainer gate** (login only). RLS
->    covers the data; the pages are reachable. Cosmetic leak or real?
-> 5. **`/api/auth/google/callback` accepts an unsigned `state`** (the target
->    `user_id`) and writes Google refresh tokens for it with the service role.
->    Not a trainer-role bug. Separate, and worth its own pass.
-> 6. **`viewer.ts` accepts `active !== false`; `trainerGate.ts` requires
->    `active === true`.** A hand-inserted `trainers` row with a NULL `active`
->    gets the full trainer shell everywhere and a 403 from the AI. Only bites
->    rows created in SQL — `/api/invite-trainer` writes `true`.
-> 7. **`middleware.ts` resolves trainers only by `auth_user_id`**, with no email
->    fallback (unlike `viewer.ts`). A trainer whose auth link was never stamped
->    falls into the client onboarding chain.
->
+> | | answer |
+> |---|---|
+> | `gcal_sync_runs` has no `trainer_id` | **Scope the read, not the table.** The per-trainer outcome was already inside `response -> 'trainers'` — it just had no `user_id` to match on and had been trimmed of `errors`/`unmatched_samples`. `my_gcal_sync_health()` gives the owner the whole run and every other trainer only their own slice. Table stays owner-only. |
+> | The bots post as the OWNER | **Correct, and left alone** — the group chat is shared by decision. What was wrong is that any trainer could *fire* them. A real post is the owner's; `?dry=1` preview is open to everyone. |
+> | `ai-nudges` files in Dustin's inbox | Scoped to the caller's roster and addressed to the caller. The scheduler keeps the whole-business sweep. **Note: the engine is switched off — it cannot message a client (`didSend = false`) and has no cron. This is tidying a thing nobody is running.** |
+> | `/assessment` and `/library/*` ungated | **Real.** Server gates as layouts, so the next page under either path inherits them. |
+> | Unsigned OAuth `state` | **Real, and the worst of the seven.** HMAC-signed and time-boxed, plus a session cross-check. See `src/lib/auth/oauthState.ts` for what it bought an attacker. |
+> | `active !== false` vs `=== true` | One reading, all three readers. |
+> | `middleware.ts` auth-id only | Resolves by auth id **or** email, like `viewer.ts`. |
+
 > ### Still open from before
 >
 > - Steph's `plan_locked` was Claude's judgement call — one line to undo.
