@@ -535,6 +535,23 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    id: "trainer-face-library",
+    title: "Your avatar library",
+    category: "Trainer Tools",
+    audience: "trainer",
+    icon: "mood-smile",
+    keywords: ["avatar", "faces", "bot", "persona", "gemini", "cartoon", "library", "sticker", "coach bot"],
+    intro: "The faces the app wears when it talks to your clients.",
+    steps: [
+      "Settings → Bots and AI → Your avatar library. Twenty slots, grouped by where they appear: everyday cards, celebrations, check-ins, your group bot, topics.",
+      "Do the two marked \"start here\" first — between them they are most of what anyone sees.",
+      "The walkthrough (Settings → Set up your app) has a Gemini script that draws all twenty in the order the slots expect. Copy it, paste it, upload a few photos of yourself, and it produces the set.",
+      "Put several images in one slot and the app rotates through them, so your clients are not looking at the same picture all week.",
+      "Any slot you leave empty uses the standard face for that one slot. A part-finished library is fine — nothing breaks.",
+      "Your first upload switches your library on automatically. There is a link at the bottom to go back to the standard set.",
+    ],
+  },
+  {
     id: "trainer-walkthrough",
     title: "The end-to-end walkthrough",
     category: "Trainer Tools",

@@ -200,16 +200,17 @@ export const TUTORIAL: TutorialChapter[] = [
       },
       {
         id: "account-avatar",
-        title: "Your own set of faces",
+        title: "Your own face library",
         body: [
-          "The app has a cartoon of the coach that appears whenever it speaks — twenty of them, one per situation. Celebrating a personal best, checking in after a quiet week, explaining a screen.",
-          "You can have your own. Settings, Bots and AI, Your avatar set. Twenty slots, each one telling you what it is used for, and you upload a picture into each.",
+          "The app has a cartoon of the coach that appears whenever it speaks — twenty of them, one per situation. Celebrating a personal best, checking in after a quiet week, explaining a screen. Right now your clients see the standard set.",
+          "You can have your own. Settings, Bots and AI, Your avatar library. It is grouped by where the faces appear — everyday cards, celebrations, check-ins, your group bot, topics — and the two marked start here are most of what anyone actually sees.",
           "Copy the script below and paste it into Gemini. It names all twenty poses in the order the app expects, so the pictures come back matching the slots.",
-          "Then upload a few photos of yourself — face, build, your usual hair — and tell it you are done. It draws the set. Upload each one into the matching slot here.",
-          "You do not need all twenty to start. Anything you have not uploaded falls back to the standard set, so five tonight and the rest at the weekend is completely fine.",
+          "Then upload a few photos of yourself — face, build, your usual hair — and tell it you are done. It draws the set. Upload each one into the matching slot.",
+          "Put more than one in a slot if you have them. The app rotates through what is there, so five different neutrals means your clients are not looking at the same picture all week.",
+          "You do not need all twenty to start. Any slot you leave empty uses the standard face for that one slot, so five tonight and the rest at the weekend is completely fine.",
         ],
         narration:
-          "The app has a cartoon of the coach that appears whenever it speaks. Twenty of them, one per situation. Celebrating a personal best, checking in after a quiet week, explaining a screen. You can have your own. Settings, Bots and AI, Your avatar set. Twenty slots, each one telling you what it is for, and you upload a picture into each. Ask the owner for the avatar script. You paste it into Gemini, upload some photos of yourself, and it draws the twenty. You do not need all of them to start. Anything you have not uploaded falls back to the standard set.",
+          "The app has a cartoon of the coach that appears whenever it speaks. Twenty of them, one per situation. A personal best, a quiet week, explaining a screen. You can have your own. Settings, Bots and AI, Your avatar library. It is grouped by where the faces appear, and the two sections marked start here are most of what anyone sees. Copy the script below into Gemini, upload some photos of yourself, and it draws the twenty. Put more than one in a slot and the app rotates through them. Any slot you leave empty uses the standard face for that slot.",
         route: "/settings",
         routeLabel: "Open Settings",
         copyLabel: "Copy the Gemini script",
