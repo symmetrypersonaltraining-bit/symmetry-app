@@ -160,3 +160,26 @@ test("the allowlist is short, and every entry says why", () => {
   for (const a of ALLOW) assert.ok(a.why.length > 20, `${a.file} needs a real reason`);
   for (const k of Object.keys(EXEMPT)) assert.ok(fs.existsSync(path.join(ROOT, k)), `${k} no longer exists`);
 });
+
+test("the Central-today idiom does not spread any further", () => {
+  // `new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" })`
+  // is copied verbatim into 73 files. Every copy is CORRECT — that is the
+  // point, and it is why they are not being rewritten: converting 99 correct
+  // call sites unreviewed is how a bug gets introduced where none existed.
+  //
+  // What the copying cost is elsewhere: the pattern spread by being copied
+  // rather than imported, so the handful of places that did NOT copy it had no
+  // anchor to copy FROM, and those were most of the 31 faults. A ceiling stops
+  // it spreading further without touching a line that already works. New code
+  // imports centralToday(); if this number goes UP, somebody copied again.
+  const CEILING = 99;
+  let n = 0;
+  for (const { rel, code } of FILES) {
+    if (rel === "src/lib/central-time.ts") continue;
+    n += (code.match(/toLocaleDateString\(\s*["']en-CA["']\s*,\s*\{\s*timeZone:\s*["']America\/Chicago["']\s*\}\s*\)/g) || []).length;
+  }
+  assert.ok(
+    n <= CEILING,
+    `${n} hand-rolled copies of centralToday(), ceiling is ${CEILING}. Import centralToday() from @/lib/central-time instead of copying the idiom again.`,
+  );
+});
