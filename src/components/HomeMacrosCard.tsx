@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { computeDayTotals, planDayTarget, adherencePct, kcalOf, PlanMeal, PlanItem, LogRow } from "@/lib/nutrition/dailyTotals";
+import { computeDayTotals, adherencePct, kcalOf, PlanMeal, PlanItem, LogRow } from "@/lib/nutrition/dailyTotals";
 import { fetchLivePlans, pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 import { fetchOwnClientRow } from "@/lib/ownClient";
 
@@ -61,31 +61,27 @@ export default function HomeMacrosCard() {
       } | undefined;
       const nutritionV3 = (settingsRes.data as { nutrition_v3?: boolean } | null)?.nutrition_v3 === true;
 
-      // Today's plan, in the shape the canonical calc wants. Hoisted out of the
-      // v3 branch because the TARGET now comes from it too, on both paths — the
-      // ring and the number under it have to be read off the same menu.
-      const planMeals: PlanMeal[] = (plan?.meals || []).map((m) => ({
-        id: String(m.id),
-        name: String(m.name ?? ""),
-        timing: (m.timing ?? null) as string | null,
-        position: Number(m.position) || 0,
-        swaps: (m.swaps ?? null) as string | null,
-        meal_items: ((m.meal_items || []) as Array<Record<string, unknown>>).map((it): PlanItem => ({
-          id: String(it.id),
-          food: String(it.food || ""),
-          amount: (it.amount ?? null) as number | null,
-          unit: (it.unit ?? null) as string | null,
-          is_unlimited: !!it.is_unlimited,
-          basis: (it.basis ?? null) as string | null,
-          protein: (it.protein ?? null) as number | null,
-          carbs: (it.carbs ?? null) as number | null,
-          fats: (it.fats ?? null) as number | null,
-          position: Number(it.position) || 0,
-        })),
-      }));
-
       if (nutritionV3) {
         // Canonical path — identical to NutritionV3Client's `totals`.
+        const planMeals: PlanMeal[] = (plan?.meals || []).map((m) => ({
+          id: String(m.id),
+          name: String(m.name ?? ""),
+          timing: (m.timing ?? null) as string | null,
+          position: Number(m.position) || 0,
+          swaps: (m.swaps ?? null) as string | null,
+          meal_items: ((m.meal_items || []) as Array<Record<string, unknown>>).map((it): PlanItem => ({
+            id: String(it.id),
+            food: String(it.food || ""),
+            amount: (it.amount ?? null) as number | null,
+            unit: (it.unit ?? null) as string | null,
+            is_unlimited: !!it.is_unlimited,
+            basis: (it.basis ?? null) as string | null,
+            protein: (it.protein ?? null) as number | null,
+            carbs: (it.carbs ?? null) as number | null,
+            fats: (it.fats ?? null) as number | null,
+            position: Number(it.position) || 0,
+          })),
+        }));
         const t = computeDayTotals((logsRes.data || []) as LogRow[], planMeals);
         setConsumed({ kcal: t.kcal, protein: t.protein, carbs: t.carbs, fats: t.fats });
       } else {
@@ -117,12 +113,7 @@ export default function HomeMacrosCard() {
         }
         setConsumed({ kcal: k, protein: p, carbs: c, fats: f });
       }
-      // The same rule as the Nutrition screen, and it stays the same rule
-      // because both go through planDayTarget — which refuses a plan it cannot
-      // read as one day rather than leaving each caller to decide.
-      const pt = planDayTarget(planMeals);
-      if (pt) setTarget({ calories: pt.kcal, protein: pt.protein, carbs: pt.carbs, fats: pt.fats });
-      else if (mt) setTarget({ calories: mt.calories || 0, protein: mt.protein || 0, carbs: mt.carbs || 0, fats: mt.fats || 0 });
+      if (mt) setTarget({ calories: mt.calories || 0, protein: mt.protein || 0, carbs: mt.carbs || 0, fats: mt.fats || 0 });
     })();
     return () => { on = false; };
   }, []);

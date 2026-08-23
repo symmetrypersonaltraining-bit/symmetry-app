@@ -111,27 +111,33 @@ values
   ((select id from public.clients where name = 'Dustin Gautreaux'), '2026-09-14', 4213, 254, 381, 186, 'Resume standing bulk');
 ```
 
-### 4b. What the app actually reads — and why step 4 still matters
+### 4b. Which number the app shows — and why step 4 is not optional
 
-**The day chart in the food logger reads the PLAN, not `macro_targets`.** As of
-23 Aug the daily target is the sum of the plan governing that date, for any
-client whose plan is locked — which is Dustin and Steph. So the plan's ITEMS are
-the numbers he sees. Get the food right and the chart is right; there is no
-second place to keep in step.
+**The app shows the `macro_targets` row. It does not compute a target from the
+plan.** Dustin sets the numbers; the plan is built to hit them. The direction
+runs one way:
 
-Write the `macro_targets` rows anyway, in step 4. They are not decoration:
+> *"if i set the numbers they stay. if i build the mealplan its based on the
+> numbers I set, they stay the app doesn't change numbers."*
 
-- they are the **historical record** of what was prescribed, per date;
-- **adherence** grades logged days against them;
-- the weekly AI context, the coach context and the printed plan read them;
-- they are the fallback for anyone whose plan is not locked.
+So step 4 is not bookkeeping — **the `macro_targets` row IS what the client
+sees** on the day chart and the home ring, and what adherence is scored against.
+Miss it and the week's plan changes underneath a target that did not move.
 
-They must therefore **agree with the plan's own total**. A nightly check —
-`plan_total_disagrees_with_macro_target` — flags any client where they differ by
-more than 10%, because seven clients had drifted apart without anyone noticing,
-by as much as 960 kcal.
+The one exception is a **day-group plan** (`day_group` tagged with weekdays),
+where the day's target is that day's menu total. Only Tyler and Hassan have
+those, because their plans come from another coach and vary by weekday. Nobody
+whose plan Dustin writes should be day-group tagged.
 
-**Do not type the targets.** Sum them from the plan you just wrote:
+**The plan should still sum to the targets**, since that is what it was built
+to do. A nightly check, `macro_target_stale_against_plan`, reports where they
+have drifted apart by more than 10%. A gap there means **the plan needs fixing,
+not the target** — unless the target itself was never set by Dustin, which is
+its own problem: on 23 Jul a batch of `macro_targets` rows were auto-seeded from
+bodyweight over plans that already existed, and those rows are still in place
+for several clients.
+
+To check a plan you have just written against the targets it was built for:
 
 ```sql
 select round((sum(mi.protein)*4 + sum(mi.carbs)*4 + sum(mi.fats)*9)::numeric) as kcal,
@@ -139,7 +145,7 @@ select round((sum(mi.protein)*4 + sum(mi.carbs)*4 + sum(mi.fats)*9)::numeric) as
 from public.meals m
 join public.meal_items mi on mi.meal_id = m.id
 where m.meal_plan_id = '<new plan id>'
-  -- One meal per position, matching how the app counts a day.
+  -- One meal per slot, so an options plan is counted as one day.
   and m.id = (select min(m2.id) from public.meals m2
                where m2.meal_plan_id = m.meal_plan_id and m2.position = m.position);
 ```
@@ -151,8 +157,9 @@ Re-run the ladder query from step 1 and check all three:
 - the dates run **Monday → Monday** with no gap and no overlap
 - **every** row shows `items > 0` — a plan with meals and zero items is the
   failure mode that has bitten this project three times
-- the `macro_targets` row for each date **matches that plan's own total**, since
-  the food logger reads the plan and adherence reads the targets
+- the `macro_targets` row for each date is written — **it is what the client
+  actually sees**, and what adherence is scored against
+- the plan's own total **matches that row**, since the plan was built to hit it
 - there is exactly **one** `live` row per start date
 
 The database now refuses a second live plan on the same start date, and
