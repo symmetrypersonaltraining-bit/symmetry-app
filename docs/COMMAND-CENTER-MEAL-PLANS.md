@@ -111,6 +111,39 @@ values
   ((select id from public.clients where name = 'Dustin Gautreaux'), '2026-09-14', 4213, 254, 381, 186, 'Resume standing bulk');
 ```
 
+### 4b. What the app actually reads — and why step 4 still matters
+
+**The day chart in the food logger reads the PLAN, not `macro_targets`.** As of
+23 Aug the daily target is the sum of the plan governing that date, for any
+client whose plan is locked — which is Dustin and Steph. So the plan's ITEMS are
+the numbers he sees. Get the food right and the chart is right; there is no
+second place to keep in step.
+
+Write the `macro_targets` rows anyway, in step 4. They are not decoration:
+
+- they are the **historical record** of what was prescribed, per date;
+- **adherence** grades logged days against them;
+- the weekly AI context, the coach context and the printed plan read them;
+- they are the fallback for anyone whose plan is not locked.
+
+They must therefore **agree with the plan's own total**. A nightly check —
+`plan_total_disagrees_with_macro_target` — flags any client where they differ by
+more than 10%, because seven clients had drifted apart without anyone noticing,
+by as much as 960 kcal.
+
+**Do not type the targets.** Sum them from the plan you just wrote:
+
+```sql
+select round((sum(mi.protein)*4 + sum(mi.carbs)*4 + sum(mi.fats)*9)::numeric) as kcal,
+       round(sum(mi.protein)) as protein, round(sum(mi.carbs)) as carbs, round(sum(mi.fats)) as fats
+from public.meals m
+join public.meal_items mi on mi.meal_id = m.id
+where m.meal_plan_id = '<new plan id>'
+  -- One meal per position, matching how the app counts a day.
+  and m.id = (select min(m2.id) from public.meals m2
+               where m2.meal_plan_id = m.meal_plan_id and m2.position = m.position);
+```
+
 ### 5. VERIFY — before telling Dustin it is done
 
 Re-run the ladder query from step 1 and check all three:
@@ -118,6 +151,8 @@ Re-run the ladder query from step 1 and check all three:
 - the dates run **Monday → Monday** with no gap and no overlap
 - **every** row shows `items > 0` — a plan with meals and zero items is the
   failure mode that has bitten this project three times
+- the `macro_targets` row for each date **matches that plan's own total**, since
+  the food logger reads the plan and adherence reads the targets
 - there is exactly **one** `live` row per start date
 
 The database now refuses a second live plan on the same start date, and
