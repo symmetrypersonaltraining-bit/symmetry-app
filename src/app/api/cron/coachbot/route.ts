@@ -186,8 +186,13 @@ export async function runCoachBot(db: Db, opts: { force?: boolean; dry?: boolean
   if (named.length) {
     return { posted: false, reason: `refused: named someone outside the top half (${named.join(", ")})` };
   }
+  // The coach may always be named — the bot is speaking on their behalf in
+  // their own group. Written out as the literal "dustin" until now, which on
+  // any other coach's instance refuses a perfectly ordinary mention of them and
+  // permits a stranger's.
+  const coachHandle = ownerName.trim().toLowerCase();
   for (const m of value.mentions) {
-    if (m && !allowed.has(m.trim().toLowerCase()) && m.trim().toLowerCase() !== "dustin") {
+    if (m && !allowed.has(m.trim().toLowerCase()) && m.trim().toLowerCase() !== coachHandle) {
       return { posted: false, reason: `refused: mentioned ${m}, who is not on the visible list` };
     }
   }

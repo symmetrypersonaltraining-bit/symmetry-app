@@ -25,12 +25,12 @@ export default async function ProgressPage({
 
   let clientId: string | null = null;
   let clientName = "You";
-  let allClients: { id: string; name: string }[] = [];
+  let allClients: { id: string; name: string; auth_user_id?: string | null }[] = [];
 
   if (isTrainer) {
     const { data: clientList } = await supabase
       .from("clients")
-      .select("id, name")
+      .select("id, name, auth_user_id")
       .is("archived_at", null)
       .order("name");
     allClients = clientList || [];
@@ -40,9 +40,14 @@ export default async function ProgressPage({
       clientId = params.clientId;
       clientName = found?.name || "Client";
     } else {
-      const dustin = allClients.find((c) => c.name.toLowerCase().includes("dustin"));
-      clientId = dustin?.id || null;
-      clientName = dustin?.name || "Select a client";
+      // Default to the VIEWER'S OWN client row, not to whoever is called
+      // "Dustin". Identity by literal string is the mistake src/lib/ownClient.ts
+      // exists to delete: on any other trainer's account the find() returns
+      // nothing and the page renders "Select a client" over an empty chart,
+      // which reads as broken rather than as unselected.
+      const mine = allClients.find((c) => c.auth_user_id === user.id);
+      clientId = mine?.id || null;
+      clientName = mine?.name || "Select a client";
     }
   } else {
     const { data } = await supabase

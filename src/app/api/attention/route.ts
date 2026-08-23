@@ -39,6 +39,7 @@ import { TRAINER_EMAIL, Db } from "@/lib/ai/scope";
 import { isExcludedFromRoster } from "@/lib/demoClient";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { rosterScopeFor, scopeRoster } from "@/lib/auth/roster";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export const dynamic = "force-dynamic";
@@ -89,6 +90,10 @@ export async function GET() {
   if (!url || !key) return NextResponse.json({ rows: [] });
   const admin = createAdminClient(url, key, { auth: { persistSession: false } }) as unknown as Db;
 
+  // Resolved through the SAME client the roster read uses, so the scope cannot
+  // come back narrower than the query it is meant to narrow.
+  const scope = await rosterScopeFor(admin as unknown as Parameters<typeof rosterScopeFor>[0], user);
+
   const today = CT_TODAY();
   const since30 = shiftDays(today, -29);
   const since7 = shiftDays(today, -6);
@@ -97,12 +102,24 @@ export async function GET() {
     // Full history, not a window. Both tables are small (hundreds of rows), and
     // a window is exactly what makes "never trained" lie about a lapsed client.
     const [clientsRes, wlRes, mealRes] = await Promise.all([
-      admin.from("clients").select("id, name, email, primary_goal, created_at").not("auth_user_id", "is", null).is("archived_at", null),
+      admin.from("clients").select("id, name, email, primary_goal, created_at, trainer_id, auth_user_id").not("auth_user_id", "is", null).is("archived_at", null),
       admin.from("workout_logs").select("client_id, log_date").eq("completed", true),
       admin.from("meal_adherence_logs").select("client_id, log_date").not("adherence", "is", null),
     ]);
 
-    const clients = (clientsRes.data as { id: string; name: string | null; email: string | null; primary_goal: string | null; created_at: string | null }[]) || [];
+    type RosterRow = {
+      id: string; name: string | null; email: string | null;
+      primary_goal: string | null; created_at: string | null;
+      trainer_id: string | null; auth_user_id: string | null;
+    };
+    // WHOSE ROSTER. This read is on the service role, so RLS is not applied and
+    // the query above returns every client on the instance. Before this, a
+    // second trainer's "needs attention" feed was the owner's whole book:
+    // names, goals, join dates, and the adherence history underneath them.
+    // scopeRoster() also drops the viewer's OWN client row, which is what the
+    // /dustin/i test below used to do — by name, so it only ever worked for one
+    // human and would have hidden a real client called Dustin.
+    const clients = scopeRoster((clientsRes.data as RosterRow[]) || [], scope);
 
     const wo = new Map<string, string[]>();
     for (const r of ((wlRes.data as { client_id: string; log_date: string }[]) || [])) {
@@ -122,7 +139,6 @@ export async function GET() {
     for (const c of clients) {
       // Demo and test accounts never appear in the trainer's real workload.
       if (isExcludedFromRoster(c)) continue;
-      if (/dustin/i.test(c.name || "")) continue; // the trainer's own client row
 
       const w = wo.get(c.id) || [];
       const m = ml.get(c.id) || [];
