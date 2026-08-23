@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { centralOffsetForDate, centralIso, shiftDate } from "../../src/lib/central-time";
+import { centralOffsetForDate, centralIso, shiftDate, centralDayOfWeek, centralFormat, centralFormatDate, centralHour } from "../../src/lib/central-time";
 
 // The bug this pins shut: a hardcoded -05:00 offset, which is CDT. For roughly
 // four months a year Central is CST (-06:00), and every appointment the trainer
@@ -62,4 +62,60 @@ test("shiftDate does not drift across a DST transition", () => {
   assert.equal(shiftDate("2026-03-08", 1), "2026-03-09");
   assert.equal(shiftDate("2026-10-31", 1), "2026-11-01");
   assert.equal(shiftDate("2026-11-01", 1), "2026-11-02");
+});
+
+// ---------------------------------------------------------------------------
+// Display helpers. Added 22 Aug after an audit found 31 places where a date
+// shown to somebody could be a day out. Dustin: "everything in th eentire app
+// needs to go by the actual calendar in the timezone we are in and must be
+// accurate."
+// ---------------------------------------------------------------------------
+
+test("centralFormat renders an instant in Central, not the reader's zone", () => {
+  // 2026-08-24T01:30:00Z is 8:30pm Central on the 23rd. A reader in UTC (which
+  // is what the server is) formatting this without a timeZone gets the 24th.
+  assert.equal(
+    centralFormat("2026-08-24T01:30:00Z", { weekday: "long", month: "short", day: "numeric" }),
+    "Sunday, Aug 23",
+  );
+  assert.equal(
+    centralFormat("2026-08-24T01:30:00Z", { hour: "numeric", minute: "2-digit", hour12: true }),
+    "8:30 PM",
+  );
+});
+
+test("centralFormat holds across the DST boundary", () => {
+  // CST side: 2026-11-15T01:30:00Z is 7:30pm on the 14th at -06:00.
+  assert.equal(centralFormat("2026-11-15T01:30:00Z", { month: "short", day: "numeric" }), "Nov 14");
+  // CDT side: 2026-06-15T01:30:00Z is 8:30pm on the 14th at -05:00.
+  assert.equal(centralFormat("2026-06-15T01:30:00Z", { month: "short", day: "numeric" }), "Jun 14");
+});
+
+test("centralFormatDate never moves a calendar date", () => {
+  assert.equal(
+    centralFormatDate("2026-08-24", { weekday: "long", month: "long", day: "numeric" }),
+    "Monday, August 24",
+  );
+  // The first of a month is where an off-by-one is most visible.
+  assert.equal(centralFormatDate("2026-01-01", { month: "short", day: "numeric", year: "numeric" }), "Jan 1, 2026");
+  assert.equal(centralFormatDate("2026-12-31", { month: "short", day: "numeric" }), "Dec 31");
+});
+
+test("centralFormatDate agrees with centralDayOfWeek", () => {
+  const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  for (const d of ["2026-08-22", "2026-08-23", "2026-03-08", "2026-11-01", "2027-02-28"]) {
+    assert.equal(centralFormatDate(d, { weekday: "long" }), names[centralDayOfWeek(d)], d);
+  }
+});
+
+test("centralHour is a Central wall-clock hour", () => {
+  const h = centralHour();
+  assert.ok(Number.isInteger(h) && h >= 0 && h <= 23, `got ${h}`);
+  // Midnight must be 0, not 24 -- the hour12:false formatter emits "24" for
+  // midnight in some ICU versions, which would break every "is it evening" gate.
+  const midnightUtcHour = Number(
+    new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", hour12: false })
+      .format(new Date("2026-08-24T05:00:00Z")).replace(/\D/g, ""),
+  ) % 24;
+  assert.equal(midnightUtcHour, 0);
 });

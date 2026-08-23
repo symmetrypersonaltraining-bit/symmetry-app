@@ -98,3 +98,99 @@ export function shiftDate(dateStr: string, days: number): string {
   dt.setUTCDate(dt.getUTCDate() + days);
   return dt.toISOString().slice(0, 10);
 }
+
+/** The one timezone this business runs in. Never inline the string. */
+export const CENTRAL = "America/Chicago";
+
+/**
+ * Format an INSTANT — a `timestamptz`, a `created_at`, a Date — in Central.
+ *
+ * `new Date(created_at).toLocaleDateString("en-US", { month: "short", day:
+ * "numeric" })` renders in whatever zone the reader is sitting in. An
+ * announcement Dustin posted at 8pm Central was captioned with tomorrow's
+ * weekday on a phone one zone east, and the same assessment printed a different
+ * date on two different tabs of the same client profile — `AssessmentTab` had
+ * remembered the timeZone option, `AssessmentPanel` had not.
+ *
+ * `timeZone` is baked in here rather than left as a caller option, so it cannot
+ * be the thing somebody forgets.
+ */
+export function centralFormat(
+  instant: string | number | Date,
+  opts: Intl.DateTimeFormatOptions,
+  locale: string = "en-US",
+): string {
+  return new Intl.DateTimeFormat(locale, { ...opts, timeZone: CENTRAL }).format(new Date(instant));
+}
+
+/**
+ * Format a CALENDAR DATE — "YYYY-MM-DD", no instant involved.
+ *
+ * Anchored through Date.UTC and read back as UTC, so the parts go in and come
+ * straight out. That is provably right, where `new Date(d + "T12:00:00")` — the
+ * trick used in about twenty places here — is only accidentally right: it
+ * happens to survive because noon is far enough from midnight that no viewer's
+ * offset can push it across a date boundary. True today, and true only while
+ * nobody changes the noon.
+ */
+export function centralFormatDate(
+  dateStr: string,
+  opts: Intl.DateTimeFormatOptions,
+  locale: string = "en-US",
+): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Intl.DateTimeFormat(locale, { ...opts, timeZone: "UTC" })
+    .format(new Date(Date.UTC(y, m - 1, d)));
+}
+
+/**
+ * The Central wall-clock hour right now, 0-23.
+ *
+ * For greeting buckets and "is it evening yet" gates. Replaces the
+ * parse-a-formatted-string round trip (`new Date(new Date().toLocaleString(...))`)
+ * which yields the right hour by accident, produces a Date whose instant is
+ * wrong by the offset, and relies on Date parsing a non-ISO en-US string, which
+ * is implementation-defined.
+ */
+export function centralHour(): number {
+  return Number(
+    new Intl.DateTimeFormat("en-US", { timeZone: CENTRAL, hour: "numeric", hour12: false })
+      .format(new Date())
+      .replace(/\D/g, ""),
+  ) % 24;
+}
+
+/**
+ * The Central calendar date of an INSTANT, as "YYYY-MM-DD".
+ *
+ * The half of `centralToday()` that was missing. "Is this message from today"
+ * was being asked as `d.toDateString() === new Date().toDateString()`, which
+ * compares two device-local days: a message sent at 8pm Central read "Today"
+ * in Texas and "Yesterday" one zone east, on the same message.
+ */
+export function centralDateOf(instant: string | number | Date): string {
+  return new Date(instant).toLocaleDateString("en-CA", { timeZone: CENTRAL });
+}
+
+/**
+ * Minutes past Central midnight for an INSTANT, 0-1439.
+ *
+ * The trainer calendar positions each session block with
+ * `start.getHours() * 60 + start.getMinutes()`, which is the hour on the
+ * DEVICE. Off Central the block was drawn in the wrong row of the day, visually
+ * contradicting the time printed on it.
+ */
+export function centralMinutes(instant: string | number | Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CENTRAL, hour: "numeric", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date(instant));
+  const h = Number(parts.find((p) => p.type === "hour")?.value ?? "0") % 24;
+  const m = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  return h * 60 + m;
+}
+
+/** "HH:mm" in Central for an INSTANT — what a time input expects. */
+export function centralTimeHHmm(instant: string | number | Date): string {
+  const t = centralMinutes(instant);
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+}
