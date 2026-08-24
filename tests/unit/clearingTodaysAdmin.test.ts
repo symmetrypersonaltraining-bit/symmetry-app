@@ -25,8 +25,22 @@ const SQL_PATH = "supabase/migrations/20260824a_clearing_todays_admin.sql";
 // ── the structural fix ─────────────────────────────────────────────────────
 
 test("a coach's own roster excludes the people who coach themselves", () => {
-  assert.match(ADMIN, /select\("id, name, nutrition_only, is_self_coached"\)/);
-  assert.match(ADMIN, /\.filter\(\(c\) => !c\.is_self_coached\)/, "trainers are in the coverage count again");
+  // Moved into programming_coverage() on 24 Aug, when the coverage check
+  // stopped fetching scheduled_workouts (PostgREST truncated the read at 1,000
+  // rows and nine programmed clients were reported as running out).
+  assert.match(ADMIN, /sb\.rpc\("programming_coverage"\)/, "the browser is counting rows again");
+  const sql = read("supabase/migrations/20260824b_a_read_that_cannot_truncate.sql");
+  assert.match(sql, /coalesce\(c\.is_self_coached, false\) = false/, "trainers are in the coverage count again");
+  assert.match(sql, /coalesce\(c\.nutrition_only, false\) = false/);
+});
+
+test("coverage is one row per client, so it cannot truncate", () => {
+  const sql = read("supabase/migrations/20260824b_a_read_that_cannot_truncate.sql");
+  assert.match(sql, /max\(sw\.scheduled_date\) filter \(where sw\.deleted_at is null\)/);
+  assert.match(sql, /group by c\.id, c\.name/);
+  // A client with nothing scheduled must sort to the TOP, not look healthiest.
+  assert.match(sql, /-1\s*\n\s*\)::int as days_left/);
+  assert.ok(!/\.limit\(20000\)/.test(ADMIN), "the limit that the server ignores is back");
 });
 
 test("the weekly-focus row is filtered the same way", () => {

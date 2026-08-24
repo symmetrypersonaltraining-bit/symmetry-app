@@ -52,11 +52,12 @@ test("AI health is every trainer's page, showing them their own", () => {
   const src = read("src/app/(app)/settings/ai-health/page.tsx");
   assert.ok(!/redirect\("\/settings"\)/.test(src), "a trainer is being turned away from her own health page");
   assert.match(src, /const isOwner = !!me\?\.isOwner;/);
-  assert.match(src, /if \(!isOwner\) q = q\.eq\("trainer_id",/, "a non-owner would read every trainer's rows");
+  // The scoping moved into the RPC argument on 24 Aug, when the page stopped
+  // fetching 5,000 log lines it could only receive 1,000 of.
+  assert.match(src, /p_trainer: isOwner \? null :/, "a non-owner would read every trainer's rows");
   assert.match(src, /monthUsd=\{isOwner \? /, "spend is not owner-gated");
   // Fail closed: an unresolvable trainer must match nothing, not everything.
-  const i = src.indexOf('if (!isOwner) q = q.eq("trainer_id",');
-  assert.match(src.slice(i, i + 200), /me\?\.id \?\? "00000000-0000-0000-0000-000000000000"/);
+  assert.match(src, /me\?\.id \?\? "00000000-0000-0000-0000-000000000000"/);
 });
 
 test("the spend card is not rendered at all without a number", () => {

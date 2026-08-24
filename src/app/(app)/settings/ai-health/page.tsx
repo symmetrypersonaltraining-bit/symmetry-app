@@ -68,66 +68,50 @@ export default async function AiHealthPage() {
 
   // 60 days is enough to tell "nobody has used this in a while" from "this has
   // never worked", without pulling the whole table onto a phone.
+  //
+  // AGGREGATED IN THE DATABASE, not here. This used to select 5,000 log lines
+  // and group them in JS — but PostgREST caps a read at 1,000 rows whatever
+  // .limit() asks for, and the 60-day window held 1,365 on 24 Aug. So the page
+  // whose entire job is to tell a working surface from a dead one was itself
+  // computing "never used" and "last worked" from a truncated log. Same fault
+  // that made the dashboard claim nine clients had lost their programming.
   const since = new Date(Date.now() - 60 * 86_400_000).toISOString();
-  let q = db
-    .from("ai_usage_log")
-    .select("feature, status, cost_usd, created_at, model, latency_ms, error")
-    .gte("created_at", since);
-  // A non-owner sees rows attributed to their own clients. Rows with no client
-  // at all — the trainer agent, a roster sweep — are attributed to nobody and
-  // stay with the owner, which is also where the cost for them lands.
-  if (!isOwner) q = q.eq("trainer_id", me?.id ?? "00000000-0000-0000-0000-000000000000");
-  const { data } = await q
-    .order("created_at", { ascending: false })
-    .limit(5000);
+  const { data } = await db.rpc("ai_feature_health", {
+    p_since: since,
+    p_trainer: isOwner ? null : (me?.id ?? "00000000-0000-0000-0000-000000000000"),
+  });
 
-  const rows = (data as LogRow[] | null) ?? [];
-
-  // Month to date, in the same terms the kill switch uses.
-  const monthStart = new Date();
-  monthStart.setUTCDate(1);
-  monthStart.setUTCHours(0, 0, 0, 0);
+  interface HealthRow {
+    feature: string; calls: number; failures: number; recent_failed: number;
+    last_ok: string | null; last_error_at: string | null; last_error_text: string | null;
+    model: string | null; usd: number | string | null; median_ms: number | null;
+    month_usd: number | string | null;
+  }
+  const byFeature = new Map<string, HealthRow>();
   let monthUsd = 0;
-
-  const byFeature = new Map<string, LogRow[]>();
-  for (const r of rows) {
-    const list = byFeature.get(r.feature);
-    if (list) list.push(r);
-    else byFeature.set(r.feature, [r]);
-    if (Date.parse(r.created_at) >= monthStart.getTime()) monthUsd += Number(r.cost_usd) || 0;
+  for (const r of ((data as HealthRow[] | null) ?? [])) {
+    byFeature.set(r.feature, r);
+    monthUsd += Number(r.month_usd) || 0;
   }
 
   const health: FeatureHealth[] = AI_FEATURE_KEYS.map((key: AiFeature) => {
     const spec = AI_FEATURES[key];
-    const mine = byFeature.get(key) ?? [];
-    const ok = mine.filter((r) => r.status !== "error");
-    const failed = mine.filter((r) => r.status === "error");
-    // "Recently" = the last ten calls. A surface that failed twice in March and
-    // has worked every day since is not failing; one that has failed its last
-    // three is, even if its lifetime count looks healthy.
-    const recent = mine.slice(0, 10);
-    const recentFailed = recent.filter((r) => r.status === "error").length;
-    const lastOk = ok[0]?.created_at ?? null;
-    const lastError = failed[0] ?? null;
-    const usd = mine.reduce((n, r) => n + (Number(r.cost_usd) || 0), 0);
-    const latencies = ok.map((r) => r.latency_ms).filter((n): n is number => typeof n === "number");
+    const r = byFeature.get(key);
     return {
       key,
       label: spec.label,
       surface: spec.surface,
       dailyLimit: spec.defaultLimit,
       dormant: "dormant" in spec && spec.dormant === true,
-      calls: mine.length,
-      failures: failed.length,
-      recentFailed,
-      lastOk,
-      lastErrorAt: lastError?.created_at ?? null,
-      lastErrorText: lastError?.error ?? null,
-      model: ok[0]?.model ?? mine[0]?.model ?? null,
-      usd: Math.round(usd * 100) / 100,
-      medianMs: latencies.length
-        ? latencies.slice().sort((a, b) => a - b)[Math.floor(latencies.length / 2)]
-        : null,
+      calls: Number(r?.calls ?? 0),
+      failures: Number(r?.failures ?? 0),
+      recentFailed: Number(r?.recent_failed ?? 0),
+      lastOk: r?.last_ok ?? null,
+      lastErrorAt: r?.last_error_at ?? null,
+      lastErrorText: r?.last_error_text ?? null,
+      model: r?.model ?? null,
+      usd: Math.round((Number(r?.usd) || 0) * 100) / 100,
+      medianMs: r?.median_ms ?? null,
     };
   });
 

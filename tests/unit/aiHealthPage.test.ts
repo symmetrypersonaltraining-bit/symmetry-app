@@ -42,7 +42,14 @@ test("failing means RECENTLY failing", () => {
     /recentFailed/,
     "the failing bucket is computed from lifetime failures, so anything with an old error is permanently red"
   );
-  assert.match(PAGE, /mine\.slice\(0, 10\)/, "the recent window is gone; failures are being judged over all time");
+  // The ten-call window moved into SQL on 24 Aug: the page was grouping 5,000
+  // log lines in JS, PostgREST caps a read at 1,000 whatever .limit() asks
+  // for, and the window held 1,365 — so the page whose job is to tell a
+  // working surface from a dead one was reading a truncated log.
+  const sql = fs.readFileSync(path.join(ROOT, "supabase/migrations/20260824b_a_read_that_cannot_truncate.sql"), "utf8");
+  assert.match(sql, /r\.rn <= 10 and r\.status = 'error'/,
+    "the recent window is gone; failures are being judged over all time");
+  assert.match(PAGE, /recent_failed/, "the page no longer reads the recent-failure count");
 });
 
 test("it is trainer-only and read-only", () => {

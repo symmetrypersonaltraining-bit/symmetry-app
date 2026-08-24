@@ -114,8 +114,16 @@ export default function TrainerWeekDigest() {
           supabase.from("workout_logs").select("client_id, log_date, completed, status").gte("log_date", recent),
           supabase.from("meal_adherence_logs").select("client_id, adherence, log_date, item_overrides").gte("log_date", thisWk).lte("log_date", today),
           // "ever logs food": null-adherence rows are v3 ordering/edit stubs and
-          // Skipped-only history isn't real food logging — filter server-side.
-          supabase.from("meal_adherence_logs").select("client_id").gte("log_date", foodWindow).not("adherence", "is", null).neq("adherence", "Skipped").limit(10000),
+          // Skipped-only history isn't real food logging.
+          //
+          // An RPC returning DISTINCT clients, not the rows themselves.
+          // PostgREST caps a read at 1,000 rows whatever .limit() asks for, and
+          // this window held 1,829 on 24 Aug — so the set came back truncated
+          // and clients who log every day were being treated as never-loggers,
+          // which silently changes the focus suggestions they get. Same fault
+          // that made the dashboard claim nine clients had lost their
+          // programming; found by looking for the shape of it elsewhere.
+          supabase.rpc("clients_logging_food", { p_since: foodWindow }),
         ]);
 
         const clients = clientsRes.data || [];

@@ -136,7 +136,6 @@ export default function TodaysAdmin() {
     (async () => {
       const sb = createClient() as any;
       const today = todayCT();
-      const horizon = addDays(today, 14);
 
       // Whose admin list this is — the dismissals are per trainer.
       try {
@@ -158,8 +157,23 @@ export default function TodaysAdmin() {
           sb.from("payment_reminders").select("due_date, reminder_sent_at, client_ack_at, paid_confirmed_at"),
           // Notes, minus the classes that close themselves.
           sb.from("exercise_notes").select("note").not("resolved", "is", true),
-          // Programming coverage. RLS scopes this to his own clients.
-          sb.from("clients").select("id, name, nutrition_only, is_self_coached").is("archived_at", null),
+          // Programming coverage — ONE ROW PER CLIENT, computed in the database.
+          //
+          // This used to read scheduled_workouts and work the answer out here.
+          // PostgREST caps a read at 1,000 rows no matter what .limit() asks
+          // for, and on 24 Aug there were 1,611 rows past the horizon — so the
+          // "covered" set came back truncated and NINE clients who are
+          // programmed into October were reported as running out. Dustin, that
+          // morning: "major issue here. we just programmed through i think
+          // sept, maybe firther?? where the hell did that progrsmking go!?"
+          //
+          // Nothing had gone anywhere. But a dashboard that cries wolf about
+          // lost programming is worse than one that says nothing, and the
+          // previous fix for this exact fault was to raise the limit — which
+          // works right up until the roster grows past the server's ceiling
+          // again. Asking the database the actual question cannot truncate:
+          // one row per client, however many workouts each of them has.
+          sb.rpc("programming_coverage"),
           sb.from("clients").select("weekly_focus_week, is_self_coached").is("archived_at", null),
           // The integrity checker's latest verdict.
           //
@@ -182,39 +196,17 @@ export default function TodaysAdmin() {
         const hidden = new Set(((dism.data || []) as { row_key: string }[]).map((d) => d.row_key));
 
         // ── coverage: who runs out inside two weeks ──────────────────────────
-        const clients = ((cov.data || []) as { id: string; name: string; nutrition_only?: boolean; is_self_coached?: boolean }[])
-          // NOT HIS TO PROGRAMME. Dustin: "I dont program for trainers so they
-          // shoukd not be on here. steph is exception I do hers." Every trainer
-          // carries a self-coached client row of their own, and five of them
-          // were sitting in this count as though he had forgotten to programme
-          // them. `is_self_coached` already existed and already meant exactly
-          // this; nothing read it. Steph's flag was wrong and is now false,
-          // because he does write hers.
-          .filter((c) => !c.is_self_coached);
-        let short: { id: string; name: string }[] = [];
-        if (clients.length) {
-          // Scoped to THESE clients and given an explicit high limit.
-          //
-          // Without both, PostgREST returns its default first 1,000 rows across
-          // the whole table, the "covered" set comes back partial, and clients
-          // who ARE programmed months out get reported as running out. That is
-          // exactly what shipped: nine names on screen when the real answer was
-          // one. A false alarm on this row is worse than no row, because it
-          // teaches him to ignore the block.
-          const { data: sw } = await sb
-            .from("scheduled_workouts")
-            .select("client_id")
-            .is("deleted_at", null)
-            .in("client_id", clients.map((c) => c.id))
-            .gte("scheduled_date", horizon)
-            .limit(20000);
-          const covered = new Set(((sw || []) as { client_id: string }[]).map((r) => r.client_id));
-          short = clients
-            // Nutrition-only clients have no programming BY DESIGN and must not
-            // be reported as a gap. Flagging them is a recurring false alarm.
-            .filter((c) => !c.nutrition_only && !covered.has(c.id))
-            .map((c) => ({ id: c.id, name: c.name }));
-        }
+        //
+        // programming_coverage() already excludes archived, nutrition-only (no
+        // programming BY DESIGN) and self-coached clients — the trainers'
+        // own rows, which were five of the fourteen before 24 Aug.
+        //
+        // days_left is -1 for a client with no scheduled workouts at all, which
+        // sorts them to the top where they belong.
+        const short = ((cov.data || []) as { client_id: string; client_name: string; days_left: number }[])
+          .filter((r) => r.days_left < 14)
+          .sort((a, b) => a.days_left - b.days_left)
+          .map((r) => ({ id: r.client_id, name: r.client_name }));
 
         // ── money ────────────────────────────────────────────────────────────
         const pr = (pays.data || []) as {
