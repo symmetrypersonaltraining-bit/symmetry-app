@@ -24,7 +24,8 @@
     "context_type",
     "messages",
     "created_at",
-    "updated_at", "owner_user_id"
+    "updated_at",
+    "owner_user_id"
   ],
   "ai_chat_turns": [
     "id",
@@ -1296,7 +1297,10 @@
     "pay_phone",
     "pay_display_name",
     "avatar_url",
-    "bot_set"
+    "bot_set",
+    "session_feed_token",
+    "session_feed_enabled",
+    "session_feed_name_style"
   ],
   "usda_nutrient_map": [
     "usda_id",

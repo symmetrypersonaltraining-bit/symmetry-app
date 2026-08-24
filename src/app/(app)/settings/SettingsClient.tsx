@@ -17,6 +17,7 @@ import SettingsGroup from "@/components/SettingsGroup";
 import TrainerBotSettings from "@/components/TrainerBotSettings";
 import TrainerFaceSetCard from "@/components/TrainerFaceSetCard";
 import AddTrainerCard from "@/components/AddTrainerCard";
+import SessionFeedCard from "@/components/SessionFeedCard";
 
 interface Props {
   userEmail: string;
@@ -347,6 +348,13 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
                 </div>
               )}
             </div>
+
+            <div className="divider" />
+
+            {/* Publishing his booked sessions so the other trainers at Sevens
+                can see them. Sits under Google Calendar because that is where
+                the sessions come from. */}
+            <SessionFeedCard />
 
             <div className="divider" />
 

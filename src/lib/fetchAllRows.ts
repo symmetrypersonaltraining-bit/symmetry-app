@@ -66,6 +66,12 @@ export type FetchAllOptions = {
   pageSize?: number;
   /** Refuse rather than page forever. */
   max?: number;
+  /**
+   * Only for a query whose ordering is not visible at the call site — an RPC
+   * with its own ORDER BY, say. Say where the order comes from; the CI guard
+   * accepts this in place of a `.order()` it can see, and accepts nothing else.
+   */
+  orderedBy?: string;
 };
 
 /**

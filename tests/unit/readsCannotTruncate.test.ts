@@ -189,7 +189,12 @@ test("every fetchAllRows call site orders its query", () => {
         bad.push(`${relative(ROOT, file)} (no label)`);
         continue;
       }
-      if (!/\.order\(/.test(query)) bad.push(relative(ROOT, file));
+      if (/\.order\(/.test(query)) continue;
+      // The one accepted alternative: an RPC that orders inside the function,
+      // where there is no `.order()` for a scanner to see. It has to SAY so.
+      const options = chunk.slice(query.length).split(")")[0];
+      if (/orderedBy\s*:/.test(options)) continue;
+      bad.push(relative(ROOT, file));
     }
   }
   assert.deepEqual(bad, [], `paged reads with no .order() — pages can overlap and skip: ${bad.join(", ")}`);
