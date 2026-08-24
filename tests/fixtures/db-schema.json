@@ -164,7 +164,8 @@
     "gcal_cancelled_at",
     "title",
     "assessment_name",
-    "gcal_recurring_id"
+    "gcal_recurring_id",
+    "gcal_color_id"
   ],
   "billing_adjustments": [
     "id",

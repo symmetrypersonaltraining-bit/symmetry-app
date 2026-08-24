@@ -254,6 +254,14 @@ async function syncOneCalendar(
       scheduled_at: event.start.dateTime,
       ends_at: event.end?.dateTime || '',
       status: colorId === COLOR_CANCELLED ? 'cancelled_client' : (colorId === COLOR_HALF ? 'cancelled_half' : 'scheduled'),
+      // KEPT, not just read. Dustin's calendar is colour-coded - red is a bill,
+      // green is income, blue with a client's name is a session - and the
+      // colour was being consulted for cancelled/payment and then discarded,
+      // so nothing downstream could ask which of these are the blue ones.
+      // Empty string means the event carries no explicit colour (the calendar
+      // default), which is NOT the same as a colour he chose; the RPC stores
+      // that as NULL.
+      gcal_color_id: colorId || '',
       gcal_event_id: event.id,
       gcal_recurring_id: event.recurringEventId || '',
       title: summary,
