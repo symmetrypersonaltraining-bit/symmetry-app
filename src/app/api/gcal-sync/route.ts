@@ -8,6 +8,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { TRAINER_EMAIL } from '@/lib/ai/scope';
 import { trainerForAuthUser } from '@/lib/trainerResolve';
 import { viewerIsTrainer } from "@/lib/auth/viewer";
+import { runSessionMirror, MirrorTrainer, MIRROR_TRAINER_COLS } from '@/lib/runSessionMirror';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -466,6 +467,40 @@ export async function POST(req: NextRequest) {
 
     await supabase.rpc('gcal_generate_payment_notifications');
 
+    // ── PUBLISH THE SESSION MIRROR ───────────────────────────────────────────
+    //
+    // Last, and only for a trainer who switched it on. The appointment rows are
+    // now current, so this is the moment the gym's copy can be made current
+    // too — a cron of its own would only have added its own wait, and could
+    // have run while this pass was mid-write.
+    //
+    // Wrapped per trainer and never allowed to throw. A Google write failing is
+    // not a reason to fail a sync that has already landed thousands of rows,
+    // and the reason is recorded on the trainer either way.
+    const mirrors: any[] = [];
+    {
+      const { data: mirrorRows } = await supabase
+        .from('trainers')
+        .select(MIRROR_TRAINER_COLS)
+        .eq('session_mirror_enabled', true);
+      for (const t of (mirrorRows || []) as unknown as MirrorTrainer[]) {
+        try {
+          const out = await runSessionMirror(supabase, t);
+          if ('skipped' in out) continue;
+          mirrors.push({
+            trainer_id: t.id, published: out.written, unchanged: out.unchanged,
+            removed: out.removed, capped: out.cappedAt, errors: out.errors.slice(0, 3),
+          });
+          if (out.cappedAt) {
+            errors.push(`mirror: stopped after ${out.cappedAt} events — finishing next run`);
+          }
+          out.errors.slice(0, 3).forEach(x => errors.push('mirror: ' + x));
+        } catch (e: any) {
+          errors.push('mirror: ' + (e?.message || String(e)));
+        }
+      }
+    }
+
     const sum = (pick: (r: TrainerSyncResult) => number) => results.reduce((a, r) => a + pick(r), 0);
     return NextResponse.json({
       ok: true,
@@ -495,6 +530,7 @@ export async function POST(req: NextRequest) {
       workouts_followed: workoutsFollowed,
       reminders_recalculated: remindersRecalculated,
       reminders_changed: remindersChanged,
+      mirrors,
       errors: errors.slice(0, 10),
     });
   } catch (e: any) {

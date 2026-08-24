@@ -47,6 +47,12 @@ export type MirrorSession = {
   ends_at: string;
   cancelled: boolean;
   display_name: string;
+  /**
+   * When the appointment last changed. Drives the incremental pass — an event
+   * already on the calendar and untouched since the last clean publish is
+   * skipped rather than rewritten.
+   */
+  updated_at?: string | null;
 };
 
 /** Google's palette. 9 = Blueberry (his blue), 6 = Tangerine (his orange). */
@@ -154,6 +160,10 @@ export type MirrorResult = {
   createdCalendar: boolean;
   written: number;
   removed: number;
+  /** Already correct, so not rewritten. The normal case on a routine run. */
+  unchanged: number;
+  /** True when maxWrites stopped the pass early — the next run finishes it. */
+  cappedAt: number | null;
   errors: string[];
 };
 
@@ -164,6 +174,20 @@ export type MirrorResult = {
  * here does not under-publish, it DELETES, because anything of ours not in the
  * list is treated as a session that no longer exists. The caller pages its read
  * for that reason.
+ *
+ * ── WHY IT IS INCREMENTAL ────────────────────────────────────────────────────
+ *
+ * Dustin has 721 sessions in the window. Rewriting all of them is 721 Google
+ * calls — well over a minute, and this has to finish inside the sync's budget
+ * if a cancellation is going to reach the gym without anyone pressing a button.
+ *
+ * So: LISTING is one request per 2,500 events and always happens, because that
+ * is what makes a deletion detectable. WRITING is skipped for any event that
+ * already exists and whose appointment has not been touched since the last
+ * successful pass. A routine run writes the handful that actually moved.
+ *
+ * `since` must be the last SUCCESSFUL publish. Pass null to rewrite everything
+ * — first run, or when something has been edited on the mirror by hand.
  */
 export async function mirrorSessions(opts: {
   token: string;
@@ -171,11 +195,18 @@ export async function mirrorSessions(opts: {
   sessions: MirrorSession[];
   windowStart: Date;
   windowEnd: Date;
+  /** Skip events unchanged since this. null = rewrite the lot. */
+  since?: Date | null;
+  /** Stop after this many writes so a big first run cannot blow the budget. */
+  maxWrites?: number;
 }): Promise<MirrorResult> {
   const { calendarId, created } = await ensureMirrorCalendar(opts.token, opts.calendarId);
   const errors: string[] = [];
+  const maxWrites = opts.maxWrites ?? Number.POSITIVE_INFINITY;
   let written = 0;
+  let unchanged = 0;
   let removed = 0;
+  let cappedAt: number | null = null;
 
   const wanted = new Map<string, MirrorSession>();
   for (const s of opts.sessions) {
@@ -196,16 +227,30 @@ export async function mirrorSessions(opts: {
       );
 
   for (const [eventId, session] of wanted) {
+    // Skipped only when the event is ALREADY THERE and untouched. A session
+    // that has never been published is written however old it is — otherwise a
+    // `since` in the future would quietly publish nothing at all.
+    if (
+      opts.since &&
+      existing.has(eventId) &&
+      new Date(session.updated_at || 0) <= opts.since
+    ) {
+      unchanged += 1;
+      continue;
+    }
+    if (written >= maxWrites) {
+      // Named, not silent. A capped run that reported success would look
+      // identical to a complete one, and the gym would be missing sessions
+      // nobody knew were missing.
+      cappedAt = maxWrites;
+      break;
+    }
     const body = JSON.stringify(mirrorEventBody(session));
     const path = `/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`;
     try {
-      if (existing.has(eventId)) {
-        await gcalFetch(opts.token, path, { method: "PUT", body });
-      } else {
-        // Insert with our own id. `import` rather than `insert` would need an
-        // iCalUID and organizer; a PUT to a not-yet-existing id creates it.
-        await gcalFetch(opts.token, path, { method: "PUT", body });
-      }
+      // A PUT to an id that does not exist yet creates it, so insert and update
+      // are the same call. `import` would need an iCalUID and an organizer.
+      await gcalFetch(opts.token, path, { method: "PUT", body });
       written += 1;
     } catch (e) {
       errors.push(`${session.display_name} ${session.starts_at}: ${(e as Error).message}`);
@@ -215,6 +260,9 @@ export async function mirrorSessions(opts: {
   // Anything of OURS in the window that is no longer a session. A cancelled
   // session is still a session and is still in `wanted` — this is for the ones
   // deleted from his calendar outright, which must not linger on the gym's.
+  //
+  // Runs even when the write pass was capped: a deletion is one call and it is
+  // the change people most need to see, so it is never the thing that waits.
   for (const [eventId, row] of existing) {
     if (wanted.has(eventId)) continue;
     if (!row.mine) continue; // never touch an event we did not write
@@ -228,5 +276,5 @@ export async function mirrorSessions(opts: {
     }
   }
 
-  return { calendarId, createdCalendar: created, written, removed, errors };
+  return { calendarId, createdCalendar: created, written, unchanged, removed, cappedAt, errors };
 }

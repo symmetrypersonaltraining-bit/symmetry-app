@@ -223,9 +223,13 @@ export default function SessionFeedCard() {
                     else if (j.skipped) setPublishNote(j.reason);
                     else
                       setPublishNote(
-                        `${j.published} session${j.published === 1 ? "" : "s"} published` +
+                        `${j.published} published` +
+                          (j.unchanged ? `, ${j.unchanged} already current` : "") +
                           (j.removed ? `, ${j.removed} removed` : "") +
                           (j.createdCalendar ? " — calendar created" : "") +
+                          (j.capped
+                            ? ` — stopped at ${j.capped}, the rest goes out on the next calendar sync`
+                            : "") +
                           (j.errors?.length ? ` — ${j.errors.length} problem(s)` : ""),
                       );
                     // Pick up the stored calendar id and the run's error state.
@@ -267,8 +271,10 @@ export default function SessionFeedCard() {
             )}
 
             <p className="text-[11px]" style={{ color: "var(--brand-text-secondary)" }}>
-              Don&apos;t edit that calendar by hand — it gets rewritten. Change the session in your
-              own calendar and it follows.
+              This keeps itself up to date — it republishes at the end of every Google Calendar
+              sync, so a session you move or cancel follows on its own. The button is only for
+              when you don&apos;t want to wait. Don&apos;t edit the published calendar by hand;
+              change the session in your own calendar instead.
             </p>
           </div>
         )}

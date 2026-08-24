@@ -24,6 +24,7 @@ import { mirrorEventId, mirrorEventBody, MIRROR_CALENDAR_SUMMARY } from "../../s
 
 const SRC = readFileSync(join(process.cwd(), "src/lib/sessionMirror.ts"), "utf8");
 const ROUTE = readFileSync(join(process.cwd(), "src/app/api/calendar/mirror/route.ts"), "utf8");
+const RUNNER = readFileSync(join(process.cwd(), "src/lib/runSessionMirror.ts"), "utf8");
 
 /** Comments out. Half of this file's own prose names the things it forbids. */
 const code = (s: string) =>
@@ -43,6 +44,24 @@ test("nothing in the mirror ever addresses the primary calendar", () => {
   // what every appointment, and therefore every invoice, comes from.
   assert.doesNotMatch(code(SRC), /primary/, "sessionMirror names the primary calendar");
   assert.doesNotMatch(code(ROUTE), /primary/, "the mirror route names the primary calendar");
+  assert.doesNotMatch(code(RUNNER), /primary/, "the mirror runner names the primary calendar");
+});
+
+test("the watermark only moves after a clean, complete pass", () => {
+  // The one that would rot quietly. Stamping session_mirror_synced_at after a
+  // capped or partly-failed run marks the events it never wrote as already
+  // published, so the incremental pass skips them FOREVER — the gym is left
+  // permanently missing a block of his week and nothing reports a fault.
+  assert.match(
+    code(RUNNER),
+    /const clean = result\.cappedAt === null && result\.errors\.length === 0/,
+    "the clean-pass test is gone",
+  );
+  assert.match(
+    code(RUNNER),
+    /clean \? \{ session_mirror_synced_at/,
+    "the watermark is being stamped unconditionally",
+  );
 });
 
 test("an appointment maps to one Google event id, forever", () => {
