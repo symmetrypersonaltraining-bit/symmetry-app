@@ -23,6 +23,68 @@
 > | `3e5c6c7` | **"Is a trainer" is not "is this client's trainer".** Service-role routes that never re-imposed `trainer_can_see_client()`: plateaus, live-sessions, attention-drafts, focus-drafts (including *approve all*, which published), weekly-ai POST. |
 > | `c8b9102` | Tutorial: a **Setting the numbers** step (her actual first question), the AI target check, and the remove-a-row control. |
 >
+> ## 👉 24 Aug — THE FACE LIBRARY, AND AI HEALTH FOR EVERYONE
+>
+> **Local HEAD `38e029f`. `origin/main` is still `76dba34` — the ship bridge has
+> been offline since ~6:30pm and eight commits are waiting.** See
+> `claude/PENDING-SHIP-2026-08-23-PER-ROOM.md`.
+>
+> ### The avatar library (`e720a01`, `cd25788`)
+>
+> Dustin: *"a library in all trainer apps to upload avatars to be cycled
+> through... a section for each type... coded so that you use those avatars in
+> appropriate places w proper emotions."*
+>
+> Most of it existed — `trainers.bot_set`, twenty named slots, and `faceSrc()`
+> already asking for a face by emotional register. Three things did not:
+>
+> 1. **One image per slot.** The upload wrote `<slug>.webp` with `upsert:true`,
+>    so a second upload replaced the first. `trainer_face_variants` holds many;
+>    `faceSrc` picks one by a stable seed (day by default, or the thing being
+>    shown) so it does not flicker or mismatch on hydration.
+> 2. **No sections.** Now grouped by where they appear, with the two the app
+>    draws constantly marked *start here*.
+> 3. **THE FALLBACK WAS A LIE.** The upload screen and the walkthrough both said
+>    anything not uploaded falls back to the standard set. `setDir()` picked ONE
+>    directory for the whole set, so a half-finished set rendered **broken
+>    images on the client's screen**. A trainer following the app's own advice
+>    would have hit it immediately. `faceSrc` resolves per slug now.
+>
+> Also reversed: the group-chat bot wears the room coach's face. It didn't,
+> because the room used to be shared.
+>
+> ### AI health (`38e029f`) — and a wrong call corrected
+>
+> On the 23rd I found `/settings/ai-health` gated on "is a trainer" and then
+> reading the whole business's costs with the service role, and I made it
+> **owner-only**. Wrong fix. The page's own header says why: *silence is the
+> failure mode*. A trainer with no health page cannot tell "nobody uses this"
+> from "this has been broken for my clients all week" — the exact blindness the
+> page exists to end.
+>
+> Health is now per-trainer; the month-to-date spend stays owner-only (one key,
+> one cap). `ai_usage_log` gained `trainer_id`, stamped by a **trigger** rather
+> than a `logUsage()` argument — an argument is one chance to forget at every
+> call site. 1,327 of 1,342 rows backfilled.
+>
+> ### Verified live overnight
+>
+> - **All seven rooms have a live challenge** as of the 7:05pm tick. Dustin's
+>   rotated to *No Zero Days*; the six new rooms started at template 0.
+> - **The winner announcement posted and was stamped** — Lauren, 7 days, in
+>   Dustin's room. The first one that will actually be visible to anyone.
+> - All six non-owner trainers messaged twice: the per-room features, then the
+>   avatar library and the Gemini script.
+>
+> ### 👉 Eight owner-only calls left for Dustin
+>
+> `claude/QUESTIONS-2026-08-24-OWNER-ONLY.md`. Each has a defensible default in
+> place; none are blocking. The sharpest one: **the owner currently cannot read
+> another trainer's group chat** — that may be right or exactly wrong, and I did
+> not change it either way.
+
+---
+
 > ## 👉 23 Aug — EVERY TRAINER GETS WHAT DUSTIN HAS (`4fb1da9`)
 >
 > Dustin: *"if I have a group chat with challenges and ai bots, and other
