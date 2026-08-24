@@ -1,5 +1,108 @@
 # Backlog — the single work queue
 
+> ## 👉 24 Aug — GETTING HIS SESSIONS ONTO THE GYM'S CALENDAR
+>
+> **`origin/main` = `ce364c2`.** Dustin: *"the gym uses pushpress calendar for
+> the trainers. I use gcal for mine. I just need my gcal to sync to a cal in
+> pushpress so they are able to see my schedule."*
+>
+> ### The finding, and the correction
+>
+> I read every operation in the official PushPress SDK
+> (`@pushpress/pushpress` 1.15.0, `api.pushpress.com/v3`) before writing
+> anything. The whole Appointments surface is **`GET /appts/{id}`**. Classes,
+> events, reservations and check-ins are reads too. The only writes in the
+> entire public API are create-a-customer, create-an-invitation,
+> create-an-API-key, register-a-webhook and send-a-message.
+>
+> So **Zapier is out** — its PushPress connector runs on that same API.
+>
+> I then told him it could not be done, and **that was wrong.** PushPress
+> **Grow** reads a Google calendar INTO PushPress: One-way is PushPress→Google
+> and useless, but **Two-Way** and **Smart Sync** pull Google events in, where
+> they appear on the gym's calendar (Smart Sync greys out anyone it does not
+> recognise and still blocks the time). That is the door.
+>
+> ### Why a separate Google calendar, and not his
+>
+> That sync connects to a Google **account**. His primary calendar is his life.
+> Pointing PushPress at it puts the dentist and the school run on a calendar six
+> other trainers read. He asked for *only* client sessions.
+>
+> `appointments` is already exactly the right set — it IS his Google Calendar
+> after the sync kept only client-matched events, stripped payments and mapped
+> orange to `cancelled_client`. So the app publishes that set two ways:
+>
+> | | |
+> |---|---|
+> | `3e64a16` | **`/api/calendar/sessions?token=…`** — an .ics anyone can subscribe to (Google *Other calendars → From URL*, Apple, Outlook) |
+> | `ce364c2` | **"Symmetry — Client Sessions"** — a secondary Google calendar the app maintains. This is the one PushPress gets pointed at. |
+>
+> Booked = client's name, blue, busy. Cancelled = `CANCELLED — name`, orange,
+> **free** — deliberately not `STATUS:CANCELLED`, which is what makes Google and
+> Apple hide the event: correct in the file, feature deleted on screen.
+>
+> **The primary calendar is never written to.** Not as a fallback, not if the
+> secondary is missing. A test fails if the word `primary` appears in either
+> mirror file, because getting that wrong writes rows into the calendar the
+> entire billing system reads.
+>
+> Settings → Calendar and clients. Two separate switches, both off by default,
+> both per trainer. Turning on a subscribe link must not start creating
+> calendars in somebody's Google account.
+>
+> ### 👉 BLOCKED — two questions for the gym owner
+>
+> Paste script written (`claude/PUSHPRESS-CALENDAR-2026-08-24.md` and
+> `PASTE-SCRIPTS.md`). Neither is answerable from the docs:
+>
+> 1. **Does Sevens have PushPress Grow, or only Core?** The read-in sync is a
+>    Grow feature; Core's Google sync only goes PushPress→Google.
+> 2. **In Grow → Calendars, can a calendar be set to Two-Way or Smart Sync — and
+>    can you choose WHICH calendar in the Google account it reads?** If it only
+>    reads the account's primary, the sessions calendar goes under a separate
+>    Google login instead. Solvable either way; it changes the setup.
+>
+> Fallback if Grow is absent: the trainers subscribe to the .ics link directly
+> and PushPress is not involved.
+
+---
+
+> ## 👉 24 Aug — THE REST OF THE TRUNCATION SWEEP (`86a0418`)
+>
+> The coverage row was the third silent truncation in a week, and the fix that
+> preceded it raised `.limit()` from 5,000 to 20,000 — a number PostgREST has
+> never honoured. `fetchAllRows()` pages with `.range()` and **throws** at its
+> ceiling; a test now bans a literal `.limit(n>1000)` anywhere in `src/`, with
+> comments and string literals stripped so it cannot flag its own documentation,
+> and every paged call site must `.order()` or say where its order comes from.
+>
+> Measured against the live database rather than assumed:
+>
+> - **ReminderEditor was still truncating.** Scoping to reminder clients did not
+>   leave "a couple of hundred" rows as its comment claimed — it leaves **3,977**,
+>   because the window has a floor and no ceiling and drags in every future
+>   booking out to Aug 2028. The read stopped dead at 19 Dec 2026. Today's
+>   billing cycles sort before that cut, which is the only reason nobody has been
+>   under-billed a second time. Not bounded at `now` even though only 427 rows
+>   sit in the past: a cycle can close seven days out, and dropping those rows
+>   would change what a client is billed.
+> - **agent-tools** scopes a trainer to her own programmes with an id list that
+>   ends in `.in(col, ids)`. A short list there does not fail, it **narrows** —
+>   her own rows stop existing as far as her assistant is concerned, in a
+>   completely ordinary voice. Dustin is at 1,153 days / 3,338 sections and only
+>   escapes because the owner skips scoping; every other trainer is at ~755
+>   sections, three quarters of the way there.
+> - **exerciseLookup** sat exactly ON the cap. The 1,001st aliased movement would
+>   not error, it would stop answering to its alternate names — and the symptom
+>   is a duplicate library row, not a stack trace.
+> - MacrosProgressChart (564) and MessageReactions (45) are under it, paged.
+>
+> `WorkoutLogger:1151` also reads 1,000 rows to prefill weights. **Left alone** —
+> both loggers are off limits without asking first. Worth a decision.
+
+---
+
 > ## 👉 23 Aug — A SECOND TRAINER, AND WHAT SHE COULD SEE
 >
 > **`origin/main` = `c8b9102`.**
