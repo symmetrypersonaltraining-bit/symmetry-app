@@ -1,5 +1,34 @@
 # Backlog — the single work queue
 
+> ## 👉 24 Aug — "6 OZ" HAD NOWHERE TO GO (`137a079`)
+>
+> From the Adjust / edit sheet: *"swap chicken thigh w 6 oz of chicken breast"*.
+> Back came Chicken Thigh at 0 g, Chicken Breast added as **"1 serving"** with no
+> control to change it, and the line *"Replaced chicken thigh with chicken
+> breast, keeping same weight"* — which it had not.
+>
+> He named the food, the amount **and** the unit. The structural fault explains
+> the rest: **`AddedFood` had no field for an amount or a unit**, only
+> `servings`. "6 oz" could not be represented anywhere in the chain, so it was
+> discarded on the way through — and the row had no stepper because there was no
+> number to step.
+>
+> - `AddedFood` gains `amount` / `unit` / `base_amount`; `addedScale()` is the
+>   one definition, used by all four call sites. Legacy rows fall back to
+>   `servings` and total exactly what they did — `base_amount` exists precisely
+>   because MealPlanClient already writes an `amount` whose macros are folded
+>   into `servings`, and scaling by that would double-count every one.
+> - A real **`swap`** op. No measure named → the client carries the outgoing
+>   item's own amount across. 170 g out, 170 g in. A swap with no id is refused
+>   (it would be an add wearing the wrong name, leaving the old food on the
+>   plate); an amount with no unit is refused (a bare number is not a measure).
+> - Added rows get **−/+ steppers**, in their own unit.
+> - **The confirmation line is no longer the model's prose.** It is built from
+>   the ops actually applied, so it cannot claim something the rows do not show.
+>   Prose from the thing being checked is not a check.
+
+---
+
 > ## 👉 24 Aug — GETTING HIS SESSIONS ONTO THE GYM'S CALENDAR
 >
 > **`origin/main` = `ce364c2`.** Dustin: *"the gym uses pushpress calendar for
