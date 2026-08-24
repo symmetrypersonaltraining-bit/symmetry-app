@@ -54,11 +54,21 @@ export default function AiHealthTable({
   monthUsd,
   capUsd,
   windowDays,
+  scope = "instance",
 }: {
   features: FeatureHealth[];
-  monthUsd: number;
+  /**
+   * Month-to-date spend, or null for a coach who is not the owner.
+   *
+   * There is one API key and one cap, so the number is the business's, not a
+   * per-coach one — showing a trainer a slice of it against the whole cap would
+   * be a figure that means nothing.
+   */
+  monthUsd: number | null;
   capUsd: number;
   windowDays: number;
+  /** "mine" = this coach's own clients. "instance" = everything, owner only. */
+  scope?: "mine" | "instance";
 }) {
   const [open, setOpen] = useState<string | null>(null);
 
@@ -72,7 +82,7 @@ export default function AiHealthTable({
     .filter((f) => rank(f) === 2)
     .sort((a, b) => Date.parse(b.lastOk || "0") - Date.parse(a.lastOk || "0"));
 
-  const pct = Math.min(100, Math.round((monthUsd / capUsd) * 100));
+  const pct = monthUsd == null ? 0 : Math.min(100, Math.round((monthUsd / capUsd) * 100));
 
   return (
     <div style={{ maxWidth: 760, margin: "0 auto" }}>
@@ -82,20 +92,23 @@ export default function AiHealthTable({
           <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}>AI health</h1>
           <p style={{ fontSize: 12.5, color: "var(--brand-text-secondary)" }}>
             {features.length} surfaces · last {windowDays} days
+            {scope === "mine" ? " · your clients" : ""}
           </p>
         </div>
       </div>
 
       {/* Spend against the kill switch. Not the headline — the kill switch has
           never been close — but it is the number that silently turns everything
-          off if it is ever reached, so it belongs above the fold. */}
+          off if it is ever reached, so it belongs above the fold.
+          Owner only: one key, one cap, one number. */}
+      {monthUsd != null ? (
       <div style={CARD}>
         <div className="flex items-baseline justify-between" style={{ marginBottom: 8 }}>
           <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.6, color: "var(--brand-text-secondary)" }}>
             THIS MONTH
           </span>
           <span style={{ fontSize: 13, color: "var(--brand-text-secondary)" }}>
-            <strong style={{ color: "var(--brand-text)", fontSize: 17 }}>${monthUsd.toFixed(2)}</strong> of ${capUsd}
+            <strong style={{ color: "var(--brand-text)", fontSize: 17 }}>${(monthUsd ?? 0).toFixed(2)}</strong> of ${capUsd}
           </span>
         </div>
         <div style={{ height: 8, background: "var(--brand-bg)", borderRadius: 6, overflow: "hidden" }}>
@@ -105,6 +118,7 @@ export default function AiHealthTable({
           Everything AI switches off on its own at ${capUsd}. Nothing you log stops working if it does.
         </p>
       </div>
+      ) : null}
 
       {never.length > 0 && (
         <Section

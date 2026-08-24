@@ -39,13 +39,39 @@ test("the owner-only automation switches are drawn only for the owner", () => {
   assert.match(read("src/app/(app)/settings/page.tsx"), /const isOwner = isTrainer/);
 });
 
-test("instance-wide AI spend is owner-only", () => {
+test("AI health is every trainer's page, showing them their own", () => {
+  // This used to assert the page REDIRECTED a non-owner. That was my fix for a
+  // real leak — the page read the whole business's costs with the service role
+  // behind a mere "is a trainer" check — and it was the wrong fix. Silence is
+  // the failure mode for every AI surface in this app, so a trainer with no
+  // health page cannot tell "nobody uses this" from "this has been broken for
+  // my clients all week": exactly the blindness the page exists to end.
+  //
+  // Health is now per-trainer; the month-to-date SPEND stays owner-only,
+  // because there is one key, one cap, and the number is the business's.
   const src = read("src/app/(app)/settings/ai-health/page.tsx");
-  const gate = src.indexOf("createAdminClient()");
-  const owner = src.indexOf("me?.isOwner");
-  assert.ok(owner > 0, "no owner check at all");
-  assert.ok(owner < gate, "the service-role read happens before the owner check");
-  assert.match(src, /if \(!me\?\.isOwner\) redirect\(/);
+  assert.ok(!/redirect\("\/settings"\)/.test(src), "a trainer is being turned away from her own health page");
+  assert.match(src, /const isOwner = !!me\?\.isOwner;/);
+  assert.match(src, /if \(!isOwner\) q = q\.eq\("trainer_id",/, "a non-owner would read every trainer's rows");
+  assert.match(src, /monthUsd=\{isOwner \? /, "spend is not owner-gated");
+  // Fail closed: an unresolvable trainer must match nothing, not everything.
+  const i = src.indexOf('if (!isOwner) q = q.eq("trainer_id",');
+  assert.match(src.slice(i, i + 200), /me\?\.id \?\? "00000000-0000-0000-0000-000000000000"/);
+});
+
+test("the spend card is not rendered at all without a number", () => {
+  const ui = read("src/app/(app)/settings/ai-health/AiHealthTable.tsx");
+  assert.match(ui, /monthUsd: number \| null;/);
+  assert.match(ui, /\{monthUsd != null \? \(/, "a trainer would see a $0.00 of $95 bar that means nothing");
+});
+
+test("every usage row is stamped with the coach it belongs to", () => {
+  const sql = read("supabase/migrations/20260823e_ai_health_is_every_trainers.sql");
+  assert.match(sql, /add column if not exists trainer_id uuid references public\.trainers/);
+  // A trigger, not an argument: logUsage has many call sites and an argument
+  // is one chance to forget at each of them.
+  assert.match(sql, /create trigger trg_stamp_ai_usage_trainer\s*\n\s*before insert on public\.ai_usage_log/);
+  assert.match(sql, /update public\.ai_usage_log l/, "existing rows are left unattributed");
 });
 
 test("a calendar reset that empties every trainer's appointments is owner-only", () => {

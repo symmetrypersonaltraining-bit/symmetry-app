@@ -83,7 +83,8 @@
     "status",
     "error",
     "latency_ms",
-    "started_at"
+    "started_at",
+    "trainer_id"
   ],
   "ai_usage_monthly": [
     "month",

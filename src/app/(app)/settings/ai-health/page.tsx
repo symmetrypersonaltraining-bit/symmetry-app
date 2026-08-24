@@ -47,24 +47,37 @@ export default async function AiHealthPage() {
   const { data: { user } } = await getServerUser(supabase);
   if (!user) redirect("/login");
   if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
-  // OWNER ONLY. Everything below this line is read with the SERVICE ROLE and is
-  // instance-wide: month-to-date AI spend for the whole business, and 5,000
-  // rows of failures across every trainer's clients. Gated as "trainer", a
-  // coach hired on Monday could read the company's costs on Tuesday. The
-  // analogous logs (gcal_sync_runs, integrity_checks) were moved to owner-only
-  // in 20260821d; this page was missed.
+
+  // EVERY TRAINER GETS THIS PAGE. IT SHOWS THEM THEIR OWN.
+  //
+  // It was gated as "trainer" and then read with the SERVICE ROLE, so a coach
+  // hired on Monday could read the whole business's AI costs on Tuesday. The
+  // fix for that was owner-only, which was the wrong fix: silence IS the
+  // failure mode for every AI surface in this app, so a trainer with no health
+  // page cannot tell a feature nobody uses from a feature that is broken for
+  // their clients — the exact blindness this page was built to end.
+  //
+  // So: the HEALTH of every surface, scoped to the viewer's own clients. The
+  // month-to-date SPEND against the kill switch stays owner-only, because
+  // there is one API key and one cap and it is the business's number, not a
+  // per-coach one.
   const me = await trainerForAuthUser(supabase as never, user.id, user.email ?? null);
-  if (!me?.isOwner) redirect("/settings");
+  const isOwner = !!me?.isOwner;
 
   const db = createAdminClient();
 
   // 60 days is enough to tell "nobody has used this in a while" from "this has
   // never worked", without pulling the whole table onto a phone.
   const since = new Date(Date.now() - 60 * 86_400_000).toISOString();
-  const { data } = await db
+  let q = db
     .from("ai_usage_log")
     .select("feature, status, cost_usd, created_at, model, latency_ms, error")
-    .gte("created_at", since)
+    .gte("created_at", since);
+  // A non-owner sees rows attributed to their own clients. Rows with no client
+  // at all — the trainer agent, a roster sweep — are attributed to nobody and
+  // stay with the owner, which is also where the cost for them lands.
+  if (!isOwner) q = q.eq("trainer_id", me?.id ?? "00000000-0000-0000-0000-000000000000");
+  const { data } = await q
     .order("created_at", { ascending: false })
     .limit(5000);
 
@@ -122,9 +135,10 @@ export default async function AiHealthPage() {
     <div className="p-4 lg:p-6">
       <AiHealthTable
         features={health}
-        monthUsd={Math.round(monthUsd * 100) / 100}
+        monthUsd={isOwner ? Math.round(monthUsd * 100) / 100 : null}
         capUsd={MONTHLY_COST_CAP_USD}
         windowDays={60}
+        scope={isOwner ? "instance" : "mine"}
       />
     </div>
   );
