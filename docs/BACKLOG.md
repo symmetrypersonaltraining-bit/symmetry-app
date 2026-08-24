@@ -23,11 +23,35 @@
 > | `3e5c6c7` | **"Is a trainer" is not "is this client's trainer".** Service-role routes that never re-imposed `trainer_can_see_client()`: plateaus, live-sessions, attention-drafts, focus-drafts (including *approve all*, which published), weekly-ai POST. |
 > | `c8b9102` | Tutorial: a **Setting the numbers** step (her actual first question), the AI target check, and the remove-a-row control. |
 >
+> ## 👉 24 Aug — THE FOOD SHEET (`7b72a7c`)
+>
+> **Barcode.** The code Dustin sent — `048121959449` — is a **valid UPC-A**; the
+> check digit verifies, so the scan worked and the fault was what came after it:
+> *"Not in our database yet — want us to look it up?"* A routine cache miss,
+> phrased as a failure, standing in front of a lookup that always runs. It runs
+> on its own now; the only screen left is the genuine dead end where Open Food
+> Facts has not heard of it either.
+>
+> The other half of his report was real. The detect loop took the **first**
+> result of the **first** frame that decoded anything, at ~60fps — a verdict
+> before the phone was level. A code now has to pass its check digit and be read
+> identically **three frames running**, and an empty frame resets the run.
+>
+> **Say what changed.** `/api/nutrition-ai/meal-edit` — handed the meal's
+> *current* items with their ids, which is what lets it answer with `remove` and
+> `set` rather than only `add`. (The existing `parse` route has never been told
+> what is already on the plate.) Dictation included. **Nothing is saved**: the
+> reply lands in the same pending state the steppers write to and Save is still a
+> deliberate press, with a line on screen saying so. Its own feature name,
+> sharing `food_parse`'s daily allowance.
+
+---
+
 > ## 👉 24 Aug — THE FACE LIBRARY, AND AI HEALTH FOR EVERYONE
 >
-> **Local HEAD `38e029f`. `origin/main` is still `76dba34` — the ship bridge has
-> been offline since ~6:30pm and eight commits are waiting.** See
-> `claude/PENDING-SHIP-2026-08-23-PER-ROOM.md`.
+> **SHIPPED. `origin/main` = `7b72a7c`, live on Vercel (verified via
+> /api/version at 07:20 CT on the 24th).** The bridge was offline from ~6:30pm
+> to ~7:15am, so nine commits went out in one batch.
 >
 > ### The avatar library (`e720a01`, `cd25788`)
 >
