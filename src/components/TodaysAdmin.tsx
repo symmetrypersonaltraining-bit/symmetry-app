@@ -45,7 +45,29 @@ interface Row {
   tone: Tone;
   href: string;
   cta: string;
+  /**
+   * The people this row is actually about, each with somewhere to go.
+   *
+   * Dustin, 24 Aug: "same for programming run out, I need a way to click on
+   * each to get there." A row that names four clients and then offers one
+   * button to a list is the same fault as the notes row that opened the
+   * roster — it tells you who, and then makes you go and find them.
+   */
+  subjects?: { id: string; name: string; href: string }[];
 }
+
+/**
+ * HOW LONG A DISMISSAL LASTS.
+ *
+ * Dustin: "once I dismiss it doesn't come back up... no big deal if it comes up
+ * once a month but I need to be able to clear the list."
+ *
+ * So: not forever. A row that can be silenced permanently is a row that will
+ * eventually hide something that matters, and neither of us would remember it
+ * was hidden. A month is long enough to be genuinely out of the way and short
+ * enough that anything still true resurfaces on its own.
+ */
+const DISMISS_DAYS = 30;
 
 const TONE: Record<Tone, { bar: string; chip: string; text: string }> = {
   crit: { bar: "#dc2626", chip: "#dc262618", text: "#dc2626" },
@@ -77,6 +99,37 @@ const ROUTINE = /^\s*\d+\s*#?\s*(assist|second set|s3)?\s*$|at pf|pf chin|assist
 
 export default function TodaysAdmin() {
   const [rows, setRows] = useState<Row[] | null>(null);
+  const [me, setMe] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  /**
+   * Mark a row as dealt with.
+   *
+   * Optimistic, then written. If the write fails the row comes STRAIGHT BACK —
+   * a dismissal that quietly did not save is how something he thought he had
+   * cleared turns up again with no explanation, which is worse than the row
+   * itself.
+   */
+  async function dismiss(key: string) {
+    if (!me || busy) return;
+    setBusy(key);
+    const keep = rows;
+    setRows((prev) => (prev ? prev.filter((r) => r.key !== key) : prev));
+    try {
+      const sb = createClient() as any;
+      const until = addDays(todayCT(), DISMISS_DAYS);
+      const { error } = await sb
+        .from("admin_dismissals")
+        .upsert({ trainer_id: me, row_key: key, subject_id: null, until, dismissed_at: new Date().toISOString() },
+                { onConflict: "trainer_id,row_key,subject_id" });
+      if (error) throw error;
+    } catch {
+      setRows(keep ?? null);
+      if (typeof window !== "undefined") window.alert("That didn't clear — it's still there.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   useEffect(() => {
     let on = true;
@@ -85,8 +138,18 @@ export default function TodaysAdmin() {
       const today = todayCT();
       const horizon = addDays(today, 14);
 
+      // Whose admin list this is — the dismissals are per trainer.
       try {
-        const [props, pays, notes, cov, focus, integ] = await Promise.all([
+        const { data: auth } = await sb.auth.getUser();
+        const uid = auth?.user?.id;
+        if (uid) {
+          const { data: t } = await sb.from("trainers").select("id").eq("auth_user_id", uid).maybeSingle();
+          if (on && t?.id) setMe(t.id as string);
+        }
+      } catch { /* no dismiss button, rather than no admin block */ }
+
+      try {
+        const [props, pays, notes, cov, focus, integ, dism] = await Promise.all([
           // Proposals the app is holding until he says so.
           sb.from("schedule_change_proposals").select("id", { count: "exact", head: true }).is("resolved_at", null),
           // Money: sent-but-unconfirmed AND ready-to-send. Dustin, 21 Aug:
@@ -96,8 +159,8 @@ export default function TodaysAdmin() {
           // Notes, minus the classes that close themselves.
           sb.from("exercise_notes").select("note").not("resolved", "is", true),
           // Programming coverage. RLS scopes this to his own clients.
-          sb.from("clients").select("id, name, nutrition_only").is("archived_at", null),
-          sb.from("clients").select("weekly_focus_week").is("archived_at", null),
+          sb.from("clients").select("id, name, nutrition_only, is_self_coached").is("archived_at", null),
+          sb.from("clients").select("weekly_focus_week, is_self_coached").is("archived_at", null),
           // The integrity checker's latest verdict.
           //
           // run_integrity_checks() has been running twice a day since 16 Aug
@@ -113,11 +176,22 @@ export default function TodaysAdmin() {
           // fixes them.
           sb.from("integrity_checks").select("check_name, severity, count, detail, ran_at")
             .order("ran_at", { ascending: false }).limit(60),
+          // What he has already dealt with. RLS scopes it to him.
+          sb.from("admin_dismissals").select("row_key").gte("until", today),
         ]);
+        const hidden = new Set(((dism.data || []) as { row_key: string }[]).map((d) => d.row_key));
 
         // ── coverage: who runs out inside two weeks ──────────────────────────
-        const clients = (cov.data || []) as { id: string; name: string; nutrition_only?: boolean }[];
-        let short: string[] = [];
+        const clients = ((cov.data || []) as { id: string; name: string; nutrition_only?: boolean; is_self_coached?: boolean }[])
+          // NOT HIS TO PROGRAMME. Dustin: "I dont program for trainers so they
+          // shoukd not be on here. steph is exception I do hers." Every trainer
+          // carries a self-coached client row of their own, and five of them
+          // were sitting in this count as though he had forgotten to programme
+          // them. `is_self_coached` already existed and already meant exactly
+          // this; nothing read it. Steph's flag was wrong and is now false,
+          // because he does write hers.
+          .filter((c) => !c.is_self_coached);
+        let short: { id: string; name: string }[] = [];
         if (clients.length) {
           // Scoped to THESE clients and given an explicit high limit.
           //
@@ -139,7 +213,7 @@ export default function TodaysAdmin() {
             // Nutrition-only clients have no programming BY DESIGN and must not
             // be reported as a gap. Flagging them is a recurring false alarm.
             .filter((c) => !c.nutrition_only && !covered.has(c.id))
-            .map((c) => c.name);
+            .map((c) => ({ id: c.id, name: c.name }));
         }
 
         // ── money ────────────────────────────────────────────────────────────
@@ -157,7 +231,8 @@ export default function TodaysAdmin() {
         const questions = realNotes.filter((n) => n.note.includes("?")).length;
 
         // ── the weekly sweep, only when it did NOT run ───────────────────────
-        const fRows = (focus.data || []) as { weekly_focus_week: string | null }[];
+        const fRows = ((focus.data || []) as { weekly_focus_week: string | null; is_self_coached?: boolean }[])
+          .filter((c) => !c.is_self_coached);
         const thisWeek = (() => {
           const [y, m, d] = today.split("-").map(Number);
           const dt = new Date(Date.UTC(y, m - 1, d));
@@ -207,8 +282,11 @@ export default function TodaysAdmin() {
             ? {
                 key: "coverage", tone: "warn",
                 title: "Programming running out", count: String(short.length),
-                sub: short.slice(0, 4).join(", ") + (short.length > 4 ? " and " + (short.length - 4) + " more" : "") + " — under two weeks left.",
-                href: "/clients", cta: "Programme",
+                sub: "Under two weeks left.",
+                // Each name goes straight to that client's programme. The names
+                // used to be a sentence with one button to /clients underneath.
+                subjects: short.map((c) => ({ id: c.id, name: c.name, href: `/clients/${c.id}/program` })),
+                href: "/clients", cta: "All",
               }
             : {
                 key: "coverage", tone: "good",
@@ -257,7 +335,8 @@ export default function TodaysAdmin() {
           href: "/settings", cta: "Check",
         });
 
-        if (on) setRows(out);
+        // Anything he has already dealt with is simply not drawn.
+        if (on) setRows(out.filter((r) => !hidden.has(r.key)));
       } catch {
         // A dashboard block must never take the screen down with it.
         if (on) setRows([]);
@@ -282,26 +361,76 @@ export default function TodaysAdmin() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "var(--brand-border)", borderRadius: 12, overflow: "hidden", border: "1px solid var(--brand-border)" }}>
         {rows.map((r) => (
-          <Link
+          // A DIV, not a Link, around the whole row.
+          //
+          // It was one big <Link>, which is why there was nowhere to put a
+          // dismiss button or a per-client link: a button inside an anchor is a
+          // nested interactive control, and tapping either one navigated. The
+          // row now holds several targets and the title itself is the one that
+          // opens the list.
+          <div
             key={r.key}
-            href={r.href}
-            style={{ background: "var(--brand-surface)", display: "flex", gap: 10, alignItems: "flex-start", padding: "11px 12px", textDecoration: "none" }}
+            style={{ background: "var(--brand-surface)", display: "flex", gap: 10, alignItems: "flex-start", padding: "11px 12px" }}
           >
             <span style={{ width: 3, borderRadius: 3, alignSelf: "stretch", flex: "0 0 3px", background: TONE[r.tone].bar }} />
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "flex", gap: 7, alignItems: "baseline", flexWrap: "wrap" }}>
-                <span className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>{r.title}</span>
-                <span
-                  className="text-xs font-bold"
-                  style={{ padding: "1px 6px", borderRadius: 6, background: TONE[r.tone].chip, color: TONE[r.tone].text, fontVariantNumeric: "tabular-nums" }}
-                >{r.count}</span>
-              </span>
-              <span className="text-xs block mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{r.sub}</span>
+              <Link href={r.href} style={{ textDecoration: "none", display: "block" }}>
+                <span style={{ display: "flex", gap: 7, alignItems: "baseline", flexWrap: "wrap" }}>
+                  <span className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>{r.title}</span>
+                  <span
+                    className="text-xs font-bold"
+                    style={{ padding: "1px 6px", borderRadius: 6, background: TONE[r.tone].chip, color: TONE[r.tone].text, fontVariantNumeric: "tabular-nums" }}
+                  >{r.count}</span>
+                </span>
+                <span className="text-xs block mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>{r.sub}</span>
+              </Link>
+
+              {/* Each person, straight to their own screen. */}
+              {r.subjects?.length ? (
+                <span style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 6 }}>
+                  {r.subjects.map((sj) => (
+                    <Link
+                      key={sj.id}
+                      href={sj.href}
+                      className="text-xs font-semibold"
+                      style={{
+                        padding: "3px 8px", borderRadius: 999, textDecoration: "none",
+                        background: TONE[r.tone].chip, color: TONE[r.tone].text,
+                        border: "1px solid " + TONE[r.tone].chip,
+                      }}
+                    >
+                      {sj.name} ›
+                    </Link>
+                  ))}
+                </span>
+              ) : null}
             </span>
-            <span className="text-xs font-semibold" style={{ color: "var(--brand-primary)", whiteSpace: "nowrap", alignSelf: "center" }}>
-              {r.cta} →
+
+            <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, alignSelf: "center" }}>
+              <Link href={r.href} className="text-xs font-semibold"
+                    style={{ color: "var(--brand-primary)", whiteSpace: "nowrap", textDecoration: "none" }}>
+                {r.cta} →
+              </Link>
+              {/* Dealt with. Comes back in a month if it is still true. */}
+              {me ? (
+                <button
+                  type="button"
+                  onClick={() => void dismiss(r.key)}
+                  disabled={busy === r.key}
+                  aria-label={`Dismiss ${r.title} for ${DISMISS_DAYS} days`}
+                  title={`Dealt with — hide for ${DISMISS_DAYS} days`}
+                  style={{
+                    width: 22, height: 22, borderRadius: 999, padding: 0, lineHeight: "20px",
+                    fontSize: 12, cursor: busy === r.key ? "default" : "pointer",
+                    background: "transparent", border: "1px solid var(--brand-border)",
+                    color: "var(--brand-text-secondary)", opacity: busy === r.key ? 0.4 : 1,
+                  }}
+                >
+                  ✕
+                </button>
+              ) : null}
             </span>
-          </Link>
+          </div>
         ))}
       </div>
     </div>

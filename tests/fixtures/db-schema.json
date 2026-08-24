@@ -1,4 +1,12 @@
 {
+  "admin_dismissals": [
+    "id",
+    "trainer_id",
+    "row_key",
+    "subject_id",
+    "dismissed_at",
+    "until"
+  ],
   "ai_action_log": [
     "id",
     "created_at",
