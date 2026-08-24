@@ -101,6 +101,12 @@ export const AI_FEATURES = {
   coach_workout_tools:{ label: "Coach chat (workout tools)", surface: "client", limitColumn: "ai_daily_chat_limit", defaultLimit: 60 },
   celebration:     { label: "Session celebration",     surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
   food_parse:      { label: "Food parse",              surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 60 },
+  // Its own name, sharing food_parse's daily allowance. Same kind of ask and
+  // two separate caps for "describe your food" would be two numbers nobody can
+  // hold in their head — but a shared LABEL would make its spend and its
+  // failures indistinguishable from plain parsing on the AI health page, which
+  // is the exact fault this registry exists to prevent.
+  meal_edit:       { label: "Adjust a meal by voice",  surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 60 },
   food_photo:      { label: "Meal photo",              surface: "client",    limitColumn: "ai_daily_photo_limit",      defaultLimit: 20 },
   plan_build:      { label: "Meal plan builder",       surface: "client",    limitColumn: "ai_daily_plan_build_limit", defaultLimit: 1  },
   // Audited 2026-08-13: the route works and is metered, but NOTHING calls it —

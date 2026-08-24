@@ -18,6 +18,43 @@ type BarcodeDetectorCtor = new (opts?: { formats?: string[] }) => BarcodeDetecto
 
 const FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
 
+/**
+ * HOW MANY TIMES THE SAME CODE HAS TO BE READ BEFORE WE BELIEVE IT.
+ *
+ * Dustin, 24 Aug: "barcode scan not working, goes straight to this screen
+ * instead of giving a second to scan."
+ *
+ * The loop accepted the FIRST result of the FIRST frame that decoded anything.
+ * requestAnimationFrame fires ~60 times a second, so the camera had a verdict
+ * before he had the phone level — from whatever happened to be in shot at that
+ * instant, at whatever angle. A partial or skewed read that still passes as a
+ * number closes the scanner and sends you to "not in our database" for a
+ * product you never scanned.
+ *
+ * Three agreeing frames is fast when the barcode is actually in the reticle
+ * (about a twentieth of a second) and effectively never happens by accident.
+ */
+const CONFIRMATIONS = 3;
+
+/**
+ * UPC-A and EAN-13 carry a check digit. A misread almost always fails it, so
+ * this is the cheapest possible way to throw one out — cheaper and far more
+ * reliable than any amount of image tuning.
+ *
+ * EAN-8 and CODE_128 are let through unchecked: EAN-8 uses the same scheme but
+ * is rare on food, and CODE_128 has no fixed length to validate against.
+ */
+function checkDigitOk(code: string): boolean {
+  if (code.length !== 12 && code.length !== 13) return true;
+  const digits = code.split("").map(Number);
+  const check = digits.pop() as number;
+  // Weights alternate 3,1 from the RIGHT of the data portion, which handles
+  // 12- and 13-digit codes with one rule instead of two.
+  let sum = 0;
+  for (let i = digits.length - 1, w = 3; i >= 0; i--, w = w === 3 ? 1 : 3) sum += digits[i] * w;
+  return (10 - (sum % 10)) % 10 === check;
+}
+
 function detectorCtor(): BarcodeDetectorCtor | null {
   if (typeof window === "undefined") return null;
   const w = window as unknown as { BarcodeDetector?: BarcodeDetectorCtor };
@@ -45,6 +82,8 @@ export default function BarcodeScanner({
   const rafRef = useRef<number | null>(null);
   const detectorRef = useRef<BarcodeDetectorLike | null>(null);
   const doneRef = useRef(false);
+  // The code seen on the last frame, and how many frames in a row have agreed.
+  const seenRef = useRef<{ code: string; n: number }>({ code: "", n: 0 });
 
   const supported = typeof window !== "undefined" && detectorCtor() != null;
   const [status, setStatus] = useState<Status>(supported ? "starting" : "error");
@@ -72,12 +111,29 @@ export default function BarcodeScanner({
     }
   }
 
+  /** Accept a code. Used by the manual entry box, which needs no confirming. */
   function finish(code: string) {
     const raw = code.replace(/\D/g, "");
     if (doneRef.current || raw.length < 6) return;
     doneRef.current = true;
     stopCamera();
     onDetected(raw);
+  }
+
+  /**
+   * A code off the camera. Accepted only once it has survived a check digit and
+   * been read identically CONFIRMATIONS times running.
+   */
+  function sawFromCamera(code: string) {
+    const raw = code.replace(/\D/g, "");
+    if (raw.length < 6 || !checkDigitOk(raw)) {
+      seenRef.current = { code: "", n: 0 };
+      return;
+    }
+    const prev = seenRef.current;
+    const n = prev.code === raw ? prev.n + 1 : 1;
+    seenRef.current = { code: raw, n };
+    if (n >= CONFIRMATIONS) finish(raw);
   }
 
   useEffect(() => {
@@ -118,8 +174,13 @@ export default function BarcodeScanner({
             try {
               const codes = await det.detect(vid);
               if (codes && codes.length && codes[0]?.rawValue) {
-                finish(String(codes[0].rawValue));
-                return;
+                sawFromCamera(String(codes[0].rawValue));
+                if (doneRef.current) return;
+              } else {
+                // Nothing in frame — a run of agreeing reads has to be
+                // uninterrupted, or two glances at different products a second
+                // apart could add up to a "confirmation".
+                seenRef.current = { code: "", n: 0 };
               }
             } catch {
               /* transient per-frame detect error — keep looping */

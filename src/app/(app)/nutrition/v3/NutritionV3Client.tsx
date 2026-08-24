@@ -2322,6 +2322,7 @@ export default function NutritionV3Client(props: Props) {
         meal={row.chosen}
         existingOv={existingOv}
         loggedNow={loggedNow}
+        clientId={clientId}
         onOpenFoodSearch={() => openSheet({ kind: "foodsearch", target: "adjust", rowKey })}
         onClose={closeAllSheets}
         onBack={backSheet}
@@ -2759,9 +2760,10 @@ export default function NutritionV3Client(props: Props) {
 // ---------------------------------------------------------------------------
 
 function PlanAdjustSheet({
-  meal, existingOv, loggedNow, onOpenFoodSearch, onSave, onSaveToPlan, onClose, onBack,
+  meal, existingOv, loggedNow, clientId, onOpenFoodSearch, onSave, onSaveToPlan, onClose, onBack,
 }: {
   meal: PlanMeal;
+  clientId: string;
   existingOv: ItemOverrides;
   loggedNow: boolean;
   onOpenFoodSearch: () => void;
@@ -2782,6 +2784,80 @@ function PlanAdjustSheet({
   });
   const [adds, setAdds] = useState(existingOv.__added || []);
   const [saving, setSaving] = useState(false);
+  // ── SAY THE CHANGE INSTEAD OF TAPPING IT ─────────────────────────────────
+  //
+  // Dustin, 24 Aug: "need to ai parse as well from here to add/edit items."
+  //
+  // The steppers are fine for "one more scoop" and hopeless for "no bread, four
+  // eggs, and add a banana" — that is three controls, one of which does not
+  // exist, and the banana needs macros from somewhere.
+  //
+  // NOTHING IS SAVED HERE. The reply lands in the same pending state the
+  // steppers write to, the totals line recalculates, and Save is still a
+  // deliberate press. A model that could commit a change to a logged meal on
+  // its own is a model that will eventually do it when nobody meant it to.
+  const [aiText, setAiText] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiNote, setAiNote] = useState<string | null>(null);
+  const [aiErr, setAiErr] = useState<string | null>(null);
+
+  async function runAiEdit() {
+    const text = aiText.trim();
+    if (!text || aiBusy) return;
+    setAiBusy(true);
+    setAiErr(null);
+    setAiNote(null);
+    try {
+      const res = await fetch("/api/nutrition-ai/meal-edit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          clientId,
+          items: (meal.meal_items || []).map((it) => ({
+            id: it.id,
+            food: it.food,
+            // The amount it currently shows, not the plan's — "double it" has
+            // to mean double what is on screen.
+            amount: amounts[it.id] ?? (it.amount != null ? Number(it.amount) : null),
+            unit: it.unit,
+          })),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setAiErr(String(json?.error || "That didn't work.")); return; }
+      const ops = (json?.ops || []) as { op: string; id?: string; amount?: number; name?: string; servings?: number; p?: number; c?: number; f?: number }[];
+      if (!ops.length) { setAiErr("I couldn't tell what to change — name the food and the amount."); return; }
+
+      const removed = new Set<string>();
+      setAmounts((prev) => {
+        const next = { ...prev };
+        for (const op of ops) {
+          if (op.op === "set" && op.id) next[op.id] = Math.max(0, Number(op.amount) || 0);
+          // Removal IS an amount of zero here: item_overrides has no "gone"
+          // for a planned item, and the steppers already treat 0 as removed.
+          if (op.op === "remove" && op.id) { next[op.id] = 0; removed.add(op.id); }
+        }
+        return next;
+      });
+      const newAdds = ops.filter((op) => op.op === "add").map((op) => ({
+        food_id: null,
+        name: String(op.name),
+        servings: Number(op.servings) || 1,
+        p: Number(op.p) || 0,
+        c: Number(op.c) || 0,
+        f: Number(op.f) || 0,
+      }));
+      if (newAdds.length) setAdds((prev) => [...prev, ...newAdds]);
+      setAiNote(String(json?.note || "Done — check it and save."));
+      setAiText("");
+    } catch {
+      setAiErr("Couldn't reach the app's AI just then.");
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   const stepFor = (unit: string | null) => {
     const u = (unit || "").toLowerCase();
     if (u === "g" || u.includes("gram")) return 10;
@@ -2824,6 +2900,39 @@ function PlanAdjustSheet({
           <button onClick={() => setAdds((p) => p.filter((_, j) => j !== i))} aria-label="remove" style={{ color: "var(--brand-text-secondary)", padding: 6 }}>✕</button>
         </div>
       ))}
+      {/* Say it, rather than tapping four controls. */}
+      <div className="rounded-2xl p-2.5 mt-1 mb-2" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <AiBadge size={18} mood="nutrition" title="" />
+          <span className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>Just say what changed</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <input
+            value={aiText}
+            onChange={(e) => setAiText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void runAiEdit(); }}
+            placeholder="no bread, 4 eggs, add a banana"
+            disabled={aiBusy}
+            style={{ flex: 1, minWidth: 0, background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 10, padding: "9px 11px", fontSize: 13, outline: "none" }}
+          />
+          <MicButton size={30} onText={(t) => setAiText((p) => (p ? p.trim().replace(/,$/, "") + ", " + t : t))} onNotice={(m) => setAiErr(m)} />
+          <button
+            onClick={() => void runAiEdit()}
+            disabled={aiBusy || !aiText.trim()}
+            className="px-3 py-2 rounded-lg text-xs font-bold text-white flex-shrink-0"
+            style={{ background: "var(--brand-primary)", opacity: aiBusy || !aiText.trim() ? 0.45 : 1 }}
+          >
+            {aiBusy ? "…" : "Apply"}
+          </button>
+        </div>
+        {aiNote && (
+          <p className="text-[11px] mt-1.5" style={{ color: "var(--brand-text-secondary)" }}>
+            {aiNote} <span style={{ color: BLUE, fontWeight: 700 }}>Nothing is saved until you press Save.</span>
+          </p>
+        )}
+        {aiErr && <p className="text-[11px] mt-1.5" style={{ color: "#dc2626" }}>{aiErr}</p>}
+      </div>
+
       <button onClick={onOpenFoodSearch} className="w-full flex items-center gap-3 rounded-2xl p-3 mt-1 mb-2 text-left" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
         <span style={{ fontSize: 15 }}>🗄</span>
         <span className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>Add from the food database<span className="block font-normal" style={{ color: "var(--brand-text-secondary)", fontSize: 10.5 }}>Search · serving picker · verified badges</span></span>

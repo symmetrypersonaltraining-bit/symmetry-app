@@ -151,7 +151,7 @@ export default function FoodSearchSheet({
   // Barcode scanning: scanner overlay, in-flight lookup, and the miss panel.
   const [scanning, setScanning] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
-  const [scanStage, setScanStage] = useState<{ barcode: string; stage: "catalog-miss" | "off-miss" } | null>(null);
+  const [scanStage, setScanStage] = useState<{ barcode: string; stage: "off-miss" } | null>(null);
   const [pendingBarcode, setPendingBarcode] = useState<string | null>(null);
   const [saveWarning, setSaveWarning] = useState<string | null>(null);
 
@@ -341,14 +341,26 @@ export default function FoodSearchSheet({
         setScanBusy(false);
         return;
       }
-    } catch { /* fall through to the OFF-lookup offer */ }
-    setScanBusy(false);
-    setScanStage({ barcode, stage: "catalog-miss" });
+    } catch { /* fall through to the OFF lookup */ }
+    // NOT IN OUR CATALOG → JUST GO AND LOOK IT UP.
+    //
+    // This used to stop here and ask "Not in our database yet — want us to look
+    // it up?" with a button. Dustin, 24 Aug, having scanned a real product and
+    // been shown that screen: "barcode scan not working."
+    //
+    // He is right that it reads as a failure. Somebody who has just held a
+    // phone up to a packet has already said what they want; the question adds a
+    // tap, and phrases a routine cache miss as though something went wrong.
+    // The lookup is a second and costs nothing, so it just runs. The only
+    // screen left is the one for a barcode Open Food Facts has never heard of
+    // either, which is a real dead end and does need a decision.
+    await lookUpBarcode(barcode);
   }
 
   // Server-side Open Food Facts lookup (the route has open egress + inserts the
   // hit into food_catalog). Found → serving picker; missed → offer custom food.
   async function lookUpBarcode(barcode: string) {
+    setScanStage(null);
     setScanBusy(true);
     try {
       const res = await fetch("/api/nutrition-ai/barcode-lookup", {
@@ -552,25 +564,19 @@ export default function FoodSearchSheet({
       {scanStage && !scanBusy && (
         <div>
           <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>Barcode {scanStage.barcode}</p>
-          {scanStage.stage === "catalog-miss" ? (
-            <>
-              <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
-                Not in our database yet — want us to look it up?
-              </p>
-              <button onClick={() => lookUpBarcode(scanStage.barcode)} className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>
-                Look it up
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
-                We couldn&apos;t find this product anywhere. Add it as a custom food?
-              </p>
-              <button onClick={() => startCustomFromBarcode(scanStage.barcode)} className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>
-                Add it as a custom food
-              </button>
-            </>
-          )}
+          {/* Only ONE dead end is left. The catalog-miss branch used to sit here
+              too, asking "want us to look it up?" — a tap in front of something
+              that always happens and always works, phrased as a fault. It runs
+              on its own now, and this screen is reached only when Open Food
+              Facts has never heard of the barcode either, which is a real
+              decision: type the numbers off the packet, or give up. */}
+          <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
+            We couldn&apos;t find this product anywhere — not in ours and not in Open Food
+            Facts. Add it once and it is yours from then on.
+          </p>
+          <button onClick={() => startCustomFromBarcode(scanStage.barcode)} className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>
+            Add it as a custom food
+          </button>
           <button onClick={() => setScanning(true)} className="w-full mt-2 py-2.5 rounded-2xl text-sm font-semibold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)", background: "transparent" }}>
             Scan again
           </button>
