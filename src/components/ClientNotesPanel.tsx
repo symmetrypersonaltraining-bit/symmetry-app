@@ -48,10 +48,23 @@ function ago(iso: string | null): string {
 /** How many show before you ask for more. */
 const PREVIEW = 3;
 
-export default function ClientNotesPanel({ notes }: { notes: ClientNote[] }) {
+export default function ClientNotesPanel({
+  notes,
+  showAllByDefault = false,
+}: {
+  notes: ClientNote[];
+  /**
+   * On a page that IS this list, start expanded.
+   *
+   * The three-at-a-time preview is right when the panel is one block among ten
+   * on Home. On /clients/notes it would put the thing you came for behind
+   * another tap — the same dead end as the row that used to open the roster.
+   */
+  showAllByDefault?: boolean;
+}) {
   const [done, setDone] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(showAllByDefault);
 
   const open = notes.filter((n) => !done.has(n.id));
   // Three, not six. With 58 open notes the panel was taller than the phone and

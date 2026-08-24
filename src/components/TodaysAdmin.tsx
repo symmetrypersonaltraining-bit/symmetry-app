@@ -193,7 +193,13 @@ export default function TodaysAdmin() {
           sub:
             (symptom ? symptom + " mention pain or fear" : "none mention pain") +
             (questions ? " · " + questions + " unanswered question" + (questions === 1 ? "" : "s") : ""),
-          href: "/clients", cta: "Open",
+          // /clients/notes, NOT /clients. This row counted six notes and then
+          // dropped him on the roster with no way to reach any of them. When
+          // "Needs your eyes" came off Home on 21 Aug the plan was "one counted
+          // row in Today's Admin that links to it" — the row shipped, the thing
+          // it links to did not, and the href was left pointing at the list of
+          // clients.
+          href: "/clients/notes", cta: "Open",
         });
 
         out.push(

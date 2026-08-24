@@ -663,7 +663,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<"" | "saved" | "error">("");
+  const [saveMsg, setSaveMsg] = useState<string>("");
   const [form, setForm] = useState({ name: client.name || "", email: client.email || "", date_of_birth: client.date_of_birth || "", start_date: client.start_date || "", 
     phone: client.phone || "",
     primary_goal: client.primary_goal || "",
@@ -699,10 +699,64 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
       is_self_coached: form.is_self_coached,
     };
     const { error } = await (supabase as any).from("clients").update(payload).eq("id", clientId);
+
+    // TYPING A WEIGHT HERE IS A WEIGH-IN.
+    //
+    // Dustin, 24 Aug: "i weight in and logged it at 196.2, that should show on
+    // the chart but it does not."
+    //
+    // It did not because this field and the chart are two different things.
+    // `clients.current_weight` is a profile column; the chart, every trend, the
+    // celebration screen and the AI all read `metrics`. He typed 196.2 into the
+    // box labelled "Weight (lbs)", it saved, and nothing moved — because
+    // nothing here has ever written a metrics row.
+    //
+    // That gap is not his to know about. The integrity checker already treats
+    // the two disagreeing as a FAULT (client_weight_drift_from_metrics, twelve
+    // clients flagged), which is the app admitting the invariant it never
+    // enforced. So a changed weight or body fat is recorded as today's weigh-in
+    // as well.
+    //
+    // Only on CHANGE, and only forward: re-saving an unrelated field (a phone
+    // number, a fee) must not stamp today with a months-old number and flatten
+    // the chart. upsert on (client_id, metric_date) so twice in one day is one
+    // entry, not two.
+    let metricMsg: string | null = null;
+    if (!error) {
+      const w = form.current_weight ? Number(form.current_weight) : null;
+      const bf = form.current_body_fat_pct ? Number(form.current_body_fat_pct) : null;
+      const changedW = w != null && Number.isFinite(w) && w > 0 && w !== (client.current_weight ?? null);
+      const changedBf = bf != null && Number.isFinite(bf) && bf > 0 && bf !== (client.current_body_fat_pct ?? null);
+      if (changedW || changedBf) {
+        const weight = w ?? (client.current_weight ?? null);
+        const pct = bf ?? (client.current_body_fat_pct ?? null);
+        const today = centralToday();
+        const { error: mErr } = await (supabase as any).from("metrics").upsert({
+          client_id: clientId,
+          metric_date: today,
+          weight,
+          body_fat_pct: pct,
+          // Derived here so the chart's lean/fat lines move with the weigh-in
+          // rather than staying on whatever the last full entry said.
+          lean_mass: weight != null && pct != null ? weight * (1 - pct / 100) : null,
+          fat_mass: weight != null && pct != null ? weight * (pct / 100) : null,
+          // 'trainer' is not in the source vocabulary the column has ever held
+          // (caliper / claude / client / migration / trainer_backfill), and a
+          // value the check constraint rejects is how the client weigh-in form
+          // silently failed for weeks. 'trainer_backfill' is the one that means
+          // "a coach entered this by hand".
+          source: "trainer_backfill",
+        }, { onConflict: "client_id,metric_date" });
+        // Said out loud either way. A weigh-in that silently did not record is
+        // the exact fault this is fixing.
+        metricMsg = mErr ? "profile saved, but the weigh-in did not record" : "saved + logged today's weigh-in";
+      }
+    }
+
     setSaving(false);
-    if (error) { setSaveMsg("error"); } else { setSaveMsg("saved"); setEditing(false); }
-    setTimeout(() => setSaveMsg(""), 3000);
-  }, [form, clientId]);
+    if (error) { setSaveMsg("error"); } else { setSaveMsg(metricMsg || "saved"); setEditing(false); }
+    setTimeout(() => setSaveMsg(""), 4000);
+  }, [form, clientId, client.current_weight, client.current_body_fat_pct]);
 
   function Row({ label, field, type = "text", placeholder = "" }: {
     label: string; field: keyof typeof form; type?: string; placeholder?: string;
@@ -786,12 +840,25 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
     <div className="space-y-4">
       {/* Latest movement assessment (read-only, self-contained) */}
       <AssessmentPanel clientId={clientId} />
-      {saveMsg && (
-        <div className="rounded-xl px-4 py-2.5 text-sm font-medium"
-          style={{ background: saveMsg === "saved" ? "#22c55e20" : "#ef444420", color: saveMsg === "saved" ? "#16a34a" : "#dc2626", border: `1px solid ${saveMsg === "saved" ? "#22c55e40" : "#ef444440"}` }}>
-          {saveMsg === "saved" ? "\u2713 Changes saved" : "\u2717 Save failed \u2014 try again"}
-        </div>
-      )}
+      {/* Three outcomes now, not two: saved, saved AND recorded as a weigh-in,
+          and saved but the weigh-in did not record. That last one used to be
+          indistinguishable from plain success, which is how a weight can go in
+          and never reach the chart. */}
+      {saveMsg && (() => {
+        const bad = saveMsg === "error" || saveMsg.includes("did not record");
+        return (
+          <div className="rounded-xl px-4 py-2.5 text-sm font-medium"
+            style={{ background: bad ? "#ef444420" : "#22c55e20", color: bad ? "#dc2626" : "#16a34a", border: `1px solid ${bad ? "#ef444440" : "#22c55e40"}` }}>
+            {saveMsg === "error"
+              ? "\u2717 Save failed \u2014 try again"
+              : saveMsg === "saved"
+                ? "\u2713 Changes saved"
+                : saveMsg.includes("did not record")
+                  ? "\u2717 Profile saved, but the weigh-in did not record \u2014 log it on the weigh-in screen"
+                  : "\u2713 Saved \u2014 and logged as today's weigh-in"}
+          </div>
+        );
+      })()}
       <div className="flex items-center justify-between px-4 py-3 rounded-xl"
         style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
         <div className="flex items-center gap-3">
@@ -862,7 +929,7 @@ function InfoTab({ client, programs, currentProgramId, clientId }: {
         <div className="px-4 py-2 border-b" style={{ background: "var(--brand-bg)", borderColor: "var(--brand-border)" }}>
           <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>Body Metrics</p>
         </div>
-        {Row({label:"Weight (lbs)", field:"current_weight", type:"number", placeholder:"0.0"})}
+        {Row({label:"Weight (lbs) \u2014 logs a weigh-in", field:"current_weight", type:"number", placeholder:"0.0"})}
         {Row({label:"Body Fat %", field:"current_body_fat_pct", type:"number", placeholder:"0.0"})}
       </div>
       <div className="rounded-xl overflow-hidden" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
