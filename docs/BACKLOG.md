@@ -23,6 +23,61 @@
 > | `3e5c6c7` | **"Is a trainer" is not "is this client's trainer".** Service-role routes that never re-imposed `trainer_can_see_client()`: plateaus, live-sessions, attention-drafts, focus-drafts (including *approve all*, which published), weekly-ai POST. |
 > | `c8b9102` | Tutorial: a **Setting the numbers** step (her actual first question), the AI target check, and the remove-a-row control. |
 >
+> ## 👉 24 Aug — NOTHING WAS LOST (`3d851a8`)
+>
+> 8:04am: *"major issue here. we just programmed through i think sept, maybe
+> firther?? where the hell did that progrsmking go!?"*
+>
+> **Nothing had gone anywhere.** Every one of the nine had 20–112 scheduled
+> workouts past the horizon. Steph is programmed to 28 Nov.
+>
+> **PostgREST caps every read at 1,000 rows no matter what `.limit()` asks
+> for.** The coverage check fetched all scheduled workouts past the horizon and
+> computed the answer in the browser — 1,611 rows, so 611 never arrived.
+> Proven: the first 1,000 rows of that exact query drop out **exactly the nine
+> names on his screen**. Real answer: one demo client.
+>
+> This had happened on the same line before and the fix was to raise `.limit()`
+> to 20,000 — a number the server ignores. `programming_coverage()` now returns
+> one row per client.
+>
+> Then the same SHAPE, found elsewhere and already over the line:
+> **TrainerWeekDigest's "ever logs food"** (1,829 rows — daily loggers treated
+> as never-loggers, silently changing their weekly focus) and
+> **/settings/ai-health** (1,365 rows — the page whose job is telling a working
+> surface from a dead one, reading a truncated log). Both aggregate in SQL now.
+>
+> ### 👉 Still to sweep
+>
+> Under the ceiling TODAY, same shape, breaks silently the day they cross it:
+> `ReminderEditor:146` (5000) · `MacrosProgressChart:49` (2000) ·
+> `MessageReactions:62` (5000) · `agent-tools:291/295/299` (20000).
+> **And a test that fails when a client-side read asks for >1,000 rows to
+> compute an aggregate** — so the next one is caught by CI, not by Dustin at
+> 8am thinking he lost a month of programming.
+>
+> ### Also 24 Aug
+>
+> - `/clients/notes` exists — the counted row finally opens what it counted.
+> - Typing a weight on the profile records a real weigh-in.
+> - Dismiss on every admin row, 30-day expiry.
+> - `is_self_coached` filters trainers out of coverage and weekly focus; Steph's
+>   flag corrected.
+> - Dumbbell Rear Delt Row video swapped — the old one was a nine-exercise
+>   listicle, not a demo.
+>
+> ### 👉 Duplicate exercise names (new)
+>
+> The Everfit name-matching problem, still live: **Dumbbell Step Up / Dumbbell
+> Step Ups / Step Up with Dumbbell** are three library rows for one movement,
+> and so are Lat Pulldown ×3 and Cable Curl ×3. Splits a client's history, so
+> progression and PRs are wrong. Needs a merge that MOVES `set_logs` and
+> `prescribed_exercises`, not a delete. Separately, three rows pair genuinely
+> DIFFERENT movements on one video (Foam Roll Glute Max vs Medius; the three
+> Balance Disc holds) — those need their own videos.
+
+---
+
 > ## 👉 24 Aug — THE FOOD SHEET (`7b72a7c`)
 >
 > **Barcode.** The code Dustin sent — `048121959449` — is a **valid UPC-A**; the
