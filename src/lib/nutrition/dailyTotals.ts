@@ -122,10 +122,43 @@ export interface CustomMeta {
 export interface AddedFood {
   food_id?: string | null;
   name: string;
+  /**
+   * The legacy multiplier, and still the fallback. p/c/f are per ONE serving
+   * and the food contributes p × servings.
+   */
   servings: number;
   p: number;
   c: number;
   f: number;
+  /**
+   * A REAL MEASURE, when there is one.
+   *
+   * Dustin, 24 Aug: he said "swap chicken thigh w 6 oz of chicken breast" and
+   * got "1 serving", with no control to change it. The amount and the unit had
+   * nowhere to go — this interface had no field for either — so a sentence
+   * that named both threw both away, and the row rendered without a stepper
+   * because there was no number to step.
+   *
+   * When `amount` and `base_amount` are both set, p/c/f describe `base_amount`
+   * of `unit` and the food contributes p × (amount / base_amount). Absent, it
+   * behaves exactly as before, so every added food saved before today still
+   * totals to the same number.
+   */
+  amount?: number | null;
+  unit?: string | null;
+  /** The amount p/c/f were quoted for. Without it, `amount` cannot be scaled. */
+  base_amount?: number | null;
+}
+
+/**
+ * How much of an added food is on the plate — one definition, because there are
+ * four places that need it and they must not disagree about a meal's calories.
+ */
+export function addedScale(ad: Pick<AddedFood, "servings" | "amount" | "base_amount">): number {
+  if (ad.amount != null && ad.base_amount != null && ad.base_amount > 0) {
+    return Number(ad.amount) / Number(ad.base_amount);
+  }
+  return Number(ad.servings) || 1;
 }
 
 export type ItemOverrides = {
@@ -276,7 +309,7 @@ export function planMealMacros(meal: PlanMeal, overrides?: ItemOverrides | null)
     f += (Number(item.fats) || 0) * scale;
   }
   for (const ad of ov?.__added || []) {
-    const sv = ad.servings || 1;
+    const sv = addedScale(ad);
     p += (Number(ad.p) || 0) * sv;
     c += (Number(ad.c) || 0) * sv;
     f += (Number(ad.f) || 0) * sv;

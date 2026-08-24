@@ -27,28 +27,39 @@ import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope
 interface InItem { id: string; food: string; amount: number | null; unit: string | null }
 
 export interface MealEditOp {
-  op: "set" | "remove" | "add";
-  /** set/remove: the item id from the list we sent. */
+  op: "set" | "remove" | "add" | "swap";
+  /** set/remove/swap: the item id from the list we sent. */
   id?: string;
   /** set: the new amount, in the item's own unit. */
   amount?: number;
-  /** add: a food not already on the meal. */
+  /** add/swap: the food going on the plate. */
   name?: string;
   servings?: number;
   p?: number;
   c?: number;
   f?: number;
+  /**
+   * THE MEASURE, when they gave one.
+   *
+   * Dustin, 24 Aug: "swap chicken thigh w 6 oz of chicken breast" came back as
+   * "1 serving" with no way to change it, because `add` had no field for an
+   * amount or a unit and so both were discarded on the way through. p/c/f are
+   * quoted FOR `amount` of `unit` when these are present.
+   */
+  unit?: string;
 }
 
 const SYSTEM = `You edit ONE meal in a physique coach's app. You are given the meal's current items (each with an id, a food name, an amount and a unit) and a sentence from the person eating it. Turn the sentence into operations against those items.
 
 Respond with ONLY valid JSON — no markdown, no fences, no prose — exactly this shape:
-{"ops":[{"op":"set","id":"<id>","amount":<number>}|{"op":"remove","id":"<id>"}|{"op":"add","name":"<food>","servings":<number>,"p":<g>,"c":<g>,"f":<g>}],"note":"<one short plain sentence>"}
+{"ops":[{"op":"set","id":"<id>","amount":<number>}|{"op":"remove","id":"<id>"}|{"op":"add","name":"<food>","amount":<number>,"unit":"<unit>","p":<g>,"c":<g>,"f":<g>}|{"op":"swap","id":"<id>","name":"<food>","amount":<number>,"unit":"<unit>","p":<g>,"c":<g>,"f":<g>}],"note":"<one short plain sentence>"}
 
 Rules:
 - "set" changes an existing item's amount, in THAT ITEM'S OWN UNIT. If the item is "3 each" and they say "four eggs", that is {"op":"set","amount":4}. If the item is "50 g" and they say "double it", that is 100.
 - "remove" is for "no X", "skip the X", "drop the X", "without X". Prefer remove over setting an amount to 0.
-- "add" is ONLY for a food that is not already in the list. p/c/f are grams for ONE serving, from USDA / label knowledge; assume cooked weight and plain preparation unless told otherwise. Be realistic, never inflated.
+- "add" is ONLY for a food that is not already in the list. Give p/c/f from USDA / label knowledge; assume cooked weight and plain preparation unless told otherwise. Be realistic, never inflated.
+- WHENEVER THEY NAME A MEASURE — "6 oz", "200 g", "two tbsp" — put it in "amount" and "unit" and quote p/c/f FOR THAT MEASURE. Only fall back to "servings" with p/c/f per serving when they named no measure at all. Never round a stated measure to a serving.
+- "swap" replaces one item with a different food, keeping its place: {"op":"swap","id":"<id of the item going out>","name":"<food coming in>","amount":<number>,"unit":"<unit>","p":<g>,"c":<g>,"f":<g>}. Use it for "swap X for Y", "X instead of Y", "make it Y not X". If they name a measure for the new food, give it. IF THEY DO NOT, OMIT amount AND unit — the app will carry the old item's own weight across, which is what "swap" means. Do not invent a serving.
 - Match foods loosely — "the bread" should find "Homemade Sourdough", "eggs" should find "Boiled Eggs (whole)". If a food they mention is genuinely already listed, edit it rather than adding a duplicate.
 - Only act on what they actually said. Never change an item they did not mention. An empty ops array is a valid answer.
 - "note" is what you did, in one short sentence, in plain words. No emoji.`;
@@ -71,15 +82,27 @@ function validate(raw: unknown): { ops: MealEditOp[]; note: string } | null {
     } else if (op === "remove") {
       if (typeof x.id !== "string") continue;
       ops.push({ op: "remove", id: x.id });
-    } else if (op === "add") {
+    } else if (op === "add" || op === "swap") {
       const name = typeof x.name === "string" ? x.name.trim().slice(0, 80) : "";
       if (!name) continue;
+      // A swap has to say what it is replacing, or it is just an add wearing
+      // the wrong name and the old food silently stays on the plate.
+      if (op === "swap" && typeof x.id !== "string") continue;
       const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
+      const amount =
+        typeof x.amount === "number" && Number.isFinite(x.amount) && x.amount > 0 ? x.amount : undefined;
+      const unit = typeof x.unit === "string" && x.unit.trim() ? x.unit.trim().slice(0, 16) : undefined;
       ops.push({
-        op: "add",
+        op,
+        ...(op === "swap" ? { id: x.id as string } : {}),
         name,
-        servings: typeof x.servings === "number" && x.servings > 0 ? x.servings : 1,
+        // Only meaningful when no measure was given. Left at 1 otherwise so a
+        // reply carrying both cannot double-count.
+        servings: amount != null ? 1 : (typeof x.servings === "number" && x.servings > 0 ? x.servings : 1),
         p: num(x.p), c: num(x.c), f: num(x.f),
+        // An amount with no unit is not a measure, it is a number. Both or
+        // neither — a bare "6" would render as "6" and mean nothing.
+        ...(amount != null && unit ? { amount, unit } : {}),
       });
     }
   }

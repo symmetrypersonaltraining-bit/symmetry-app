@@ -20,6 +20,7 @@ import {
   computeDayTotals, planMealMacros, dayGroupMenuTarget, customMealMacros, adherencePct,
   customMealNutrientMap,
   kcalOf, EXTRA_POSITIONS, INSERT_POSITION_MIN, INSERT_POSITION_MAX,
+  addedScale, type AddedFood,
 } from "@/lib/nutrition/dailyTotals";
 import { planItemsToCustom } from "@/lib/nutrition/mealToCustom";
 import { parseFoodText, lastParseFailure, parseFailureMessage } from "@/lib/nutrition/parseClient";
@@ -121,6 +122,8 @@ function fmtDateLong(s: string) {
   return centralFormatDate(`${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`, { weekday: "long", month: "long", day: "numeric" });
 }
 function r(x: number) { return Math.round(x); }
+// Amounts, not calories. 0.25 cup and 6 oz both have to survive being shown.
+function r2(x: number) { return Math.round(x * 100) / 100; }
 
 // Human-friendly plan name for banners/timeline: prefer the plan's title,
 // else a short leading phrase from the change reason, else "Plan v{n}".
@@ -2826,30 +2829,73 @@ function PlanAdjustSheet({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setAiErr(String(json?.error || "That didn't work.")); return; }
-      const ops = (json?.ops || []) as { op: string; id?: string; amount?: number; name?: string; servings?: number; p?: number; c?: number; f?: number }[];
+      const ops = (json?.ops || []) as { op: string; id?: string; amount?: number; unit?: string; name?: string; servings?: number; p?: number; c?: number; f?: number }[];
       if (!ops.length) { setAiErr("I couldn't tell what to change — name the food and the amount."); return; }
 
-      const removed = new Set<string>();
+      const byId = new Map((meal.meal_items || []).map((it) => [it.id, it]));
+      const done: string[] = [];
+
       setAmounts((prev) => {
         const next = { ...prev };
         for (const op of ops) {
           if (op.op === "set" && op.id) next[op.id] = Math.max(0, Number(op.amount) || 0);
           // Removal IS an amount of zero here: item_overrides has no "gone"
           // for a planned item, and the steppers already treat 0 as removed.
-          if (op.op === "remove" && op.id) { next[op.id] = 0; removed.add(op.id); }
+          if (op.op === "remove" && op.id) next[op.id] = 0;
+          // A swap takes the old food off the plate and puts the new one on
+          // below. Same zeroing as a removal — the plan row has to stay.
+          if (op.op === "swap" && op.id) next[op.id] = 0;
         }
         return next;
       });
-      const newAdds = ops.filter((op) => op.op === "add").map((op) => ({
-        food_id: null,
-        name: String(op.name),
-        servings: Number(op.servings) || 1,
-        p: Number(op.p) || 0,
-        c: Number(op.c) || 0,
-        f: Number(op.f) || 0,
-      }));
+
+      const newAdds: AddedFood[] = [];
+      for (const op of ops) {
+        if (op.op === "set" && op.id) {
+          const it = byId.get(op.id);
+          if (it) done.push(`${it.food} → ${Number(op.amount) || 0}${it.unit ? " " + it.unit : ""}`);
+          continue;
+        }
+        if (op.op === "remove" && op.id) {
+          const it = byId.get(op.id);
+          if (it) done.push(`no ${it.food}`);
+          continue;
+        }
+        if (op.op !== "add" && op.op !== "swap") continue;
+
+        const out = op.op === "swap" && op.id ? byId.get(op.id) : undefined;
+        // THE WEIGHT CARRIES ACROSS. "swap chicken thigh w chicken breast" with
+        // no measure named means the same 170 g, not "1 serving" — and the old
+        // reply SAID "keeping same weight" while doing exactly that. If the
+        // model gave no amount, take the one coming off the plate.
+        const fromPlan = out ? (amounts[out.id] ?? (out.amount != null ? Number(out.amount) : null)) : null;
+        const amount = op.amount != null ? Number(op.amount) : (fromPlan && fromPlan > 0 ? fromPlan : null);
+        const unit = op.unit || (op.amount == null ? out?.unit || null : null);
+        // p/c/f describe whatever measure came back. Scaling needs to know
+        // which, so base_amount is stored alongside rather than assumed.
+        const base = op.amount != null ? Number(op.amount) : amount;
+
+        newAdds.push({
+          food_id: null,
+          name: String(op.name),
+          servings: Number(op.servings) || 1,
+          p: Number(op.p) || 0,
+          c: Number(op.c) || 0,
+          f: Number(op.f) || 0,
+          ...(amount != null && unit ? { amount, unit, base_amount: base } : {}),
+        });
+
+        const label = amount != null && unit ? `${r2(amount)} ${unit}` : `${Number(op.servings) || 1} serving`;
+        done.push(out ? `${out.food} → ${op.name}, ${label}` : `+ ${op.name}, ${label}`);
+      }
       if (newAdds.length) setAdds((prev) => [...prev, ...newAdds]);
-      setAiNote(String(json?.note || "Done — check it and save."));
+
+      // WHAT IT ACTUALLY DID, not what it said it did. The model's own note
+      // claimed "keeping same weight" on a swap that had dropped the weight —
+      // prose from the thing being checked is not a check. This sentence is
+      // built from the operations that were applied, so it cannot disagree
+      // with the rows on screen.
+      setAiNote(done.length ? done.join(" · ") : "Nothing changed.");
       setAiText("");
     } catch {
       setAiErr("Couldn't reach the app's AI just then.");
@@ -2891,15 +2937,45 @@ function PlanAdjustSheet({
           )}
         </div>
       ))}
-      {adds.map((ad, i) => (
-        <div key={"add" + i} className="flex items-center gap-2 rounded-xl p-2.5 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px dashed var(--brand-border)" }}>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold truncate" style={{ color: "var(--brand-text)" }}>{ad.name} <span style={{ color: BLUE, fontSize: 9, fontWeight: 800 }}>ADDED</span></p>
-            <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>{ad.servings} serving{ad.servings === 1 ? "" : "s"} · P{r(ad.p * ad.servings)} C{r(ad.c * ad.servings)} F{r(ad.f * ad.servings)}</p>
+      {/* AN ADDED FOOD IS EDITABLE TOO.
+          It had a name, a serving count and an ✕, and nothing else — so a food
+          the AI put on the plate could only be accepted or deleted. Dustin hit
+          exactly that: he asked for 6 oz, got "1 serving", and had no control
+          to correct it. It steps in its own unit when it has one and by whole
+          servings when it does not, which is what every row saved before today
+          still looks like. */}
+      {adds.map((ad, i) => {
+        const measured = ad.amount != null && ad.unit;
+        const shown = measured ? Number(ad.amount) : Number(ad.servings) || 1;
+        const step = measured ? stepFor(ad.unit || null) : 1;
+        const bump = (delta: number) =>
+          setAdds((prev) =>
+            prev.map((x, j) => {
+              if (j !== i) return x;
+              const next = Math.max(0, Math.round((shown + delta) * 100) / 100);
+              return measured ? { ...x, amount: next } : { ...x, servings: next };
+            }),
+          );
+        const sv = addedScale(ad);
+        return (
+          <div key={"add" + i} className="flex items-center gap-2 rounded-xl p-2.5 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px dashed var(--brand-border)" }}>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold truncate" style={{ color: "var(--brand-text)" }}>{ad.name} <span style={{ color: BLUE, fontSize: 9, fontWeight: 800 }}>ADDED</span></p>
+              <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>
+                {r(kcalOf(ad.p * sv, ad.c * sv, ad.f * sv))} cal · P{r(ad.p * sv)} C{r(ad.c * sv)} F{r(ad.f * sv)}
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={() => bump(-step)} className="w-8 h-8 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>−</button>
+              <span className="text-xs font-bold text-center" style={{ color: "var(--brand-text)", minWidth: 44 }}>
+                {r2(shown)}{measured ? ` ${ad.unit}` : shown === 1 ? " serving" : " servings"}
+              </span>
+              <button onClick={() => bump(step)} className="w-8 h-8 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>＋</button>
+            </div>
+            <button onClick={() => setAdds((p) => p.filter((_, j) => j !== i))} aria-label="remove" style={{ color: "var(--brand-text-secondary)", padding: 6 }}>✕</button>
           </div>
-          <button onClick={() => setAdds((p) => p.filter((_, j) => j !== i))} aria-label="remove" style={{ color: "var(--brand-text-secondary)", padding: 6 }}>✕</button>
-        </div>
-      ))}
+        );
+      })}
       {/* Say it, rather than tapping four controls. */}
       <div className="rounded-2xl p-2.5 mt-1 mb-2" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
         <div className="flex items-center gap-1.5 mb-1.5">

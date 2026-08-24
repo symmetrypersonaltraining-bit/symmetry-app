@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import GroceryListSheet from "./GroceryListSheet";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 import { useKeyboardInset, scrollFocusedIntoView } from "@/lib/useKeyboardInset";
-import { adherencePct, kcalOf } from "@/lib/nutrition/dailyTotals";
+import { adherencePct, kcalOf, addedScale } from "@/lib/nutrition/dailyTotals";
 import AiBadge from "@/components/AiBadge";
 import { centralFormatDate } from "@/lib/central-time";
 
@@ -760,8 +760,8 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
               c += (item.carbs   || 0) * scale;
               f += (item.fats    || 0) * scale;
             }
-            for (const ad of (ov.__added as { servings?: number; p?: number; c?: number; f?: number }[]) || []) {
-              const sv = ad.servings || 1;
+            for (const ad of (ov.__added as AddedFood[]) || []) {
+              const sv = addedScale(ad);
               p += (ad.p || 0) * sv;
               c += (ad.c || 0) * sv;
               f += (ad.f || 0) * sv;
@@ -1087,8 +1087,8 @@ export default function MealPlanClient({ clientId, clientName, mealPlan, todayLo
       const scale = (o != null && it.amount) ? o / it.amount : 1;
       p += (it.protein || 0) * scale; c += (it.carbs || 0) * scale; f += (it.fats || 0) * scale;
     }
-    for (const ad of (ov.__added as { servings?: number; p?: number; c?: number; f?: number }[]) || []) {
-      const sv = ad.servings || 1; p += (ad.p || 0) * sv; c += (ad.c || 0) * sv; f += (ad.f || 0) * sv;
+    for (const ad of (ov.__added as AddedFood[]) || []) {
+      const sv = addedScale(ad); p += (ad.p || 0) * sv; c += (ad.c || 0) * sv; f += (ad.f || 0) * sv;
     }
     return { kcal: kcalOf(p, c, f), protein: p, carbs: c, fats: f };
   }

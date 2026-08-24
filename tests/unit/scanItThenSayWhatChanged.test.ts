@@ -123,7 +123,10 @@ test("the sheet applies the change but never saves it", () => {
   assert.match(ADJUST, /async function runAiEdit\(\)/);
   // It writes the SAME pending state the steppers write.
   assert.match(ADJUST, /if \(op\.op === "set" && op\.id\) next\[op\.id\] = Math\.max\(0, Number\(op\.amount\) \|\| 0\);/);
-  assert.match(ADJUST, /if \(op\.op === "remove" && op\.id\) \{ next\[op\.id\] = 0;/);
+  assert.match(ADJUST, /if \(op\.op === "remove" && op\.id\) next\[op\.id\] = 0;/);
+  // A swap zeroes the outgoing item the same way — the plan row has to stay,
+  // and the replacement goes on as an added food below it.
+  assert.match(ADJUST, /if \(op\.op === "swap" && op\.id\) next\[op\.id\] = 0;/);
   assert.match(ADJUST, /Nothing is saved until you press Save\./,
     "the person is not told the change is still pending");
   // And it must not call either save path itself.
