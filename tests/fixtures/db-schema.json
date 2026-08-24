@@ -1300,7 +1300,11 @@
     "bot_set",
     "session_feed_token",
     "session_feed_enabled",
-    "session_feed_name_style"
+    "session_feed_name_style",
+    "session_mirror_enabled",
+    "session_mirror_calendar_id",
+    "session_mirror_synced_at",
+    "session_mirror_error"
   ],
   "usda_nutrient_map": [
     "usda_id",

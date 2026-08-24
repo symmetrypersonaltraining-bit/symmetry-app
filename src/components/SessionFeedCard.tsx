@@ -13,12 +13,22 @@ import { useEffect, useState } from "react";
  * Every trainer gets this card. Off until they switch it on.
  */
 
-type State = { enabled: boolean; nameStyle: string; url: string | null };
+type State = {
+  enabled: boolean;
+  nameStyle: string;
+  url: string | null;
+  mirrorEnabled: boolean;
+  mirrorCalendarId: string | null;
+  mirrorSyncedAt: string | null;
+  mirrorError: string | null;
+};
 
 export default function SessionFeedCard() {
   const [s, setS] = useState<State | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishNote, setPublishNote] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -164,6 +174,105 @@ export default function SessionFeedCard() {
           </p>
         </div>
       )}
+
+      {/* ── The Google calendar the gym's PushPress can read ─────────────────
+          A subscribe link is fine for a colleague's own calendar, but PushPress
+          Grow's Two-Way / Smart Sync connects to a Google ACCOUNT. Pointing it
+          at the primary calendar would put the dentist and the school run on
+          the gym's shared calendar, so the app writes a calendar of its own. */}
+      <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--brand-border)" }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>
+              <i className="ti ti-calendar-plus mr-1.5" style={{ color: "#4285F4" }} />
+              Put them on their own Google calendar
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
+              {s.mirrorEnabled
+                ? "On — “Symmetry — Client Sessions” in your Google account. This is the one to give PushPress."
+                : "For gym software that reads a Google calendar. Your own calendar is never touched."}
+            </p>
+          </div>
+          <div
+            className="w-11 h-6 rounded-full relative transition-colors"
+            style={{
+              background: s.mirrorEnabled ? "var(--brand-primary)" : "var(--brand-border)",
+              cursor: busy ? "default" : "pointer",
+              opacity: busy ? 0.5 : 1,
+            }}
+            onClick={() => !busy && act(s.mirrorEnabled ? "mirror_off" : "mirror_on")}
+          >
+            <div
+              className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all"
+              style={{ left: s.mirrorEnabled ? "calc(100% - 20px)" : "4px" }}
+            />
+          </div>
+        </div>
+
+        {s.mirrorEnabled && (
+          <div className="mt-3 space-y-2">
+            <div className="flex gap-2 flex-wrap items-center">
+              <button
+                onClick={async () => {
+                  setPublishing(true);
+                  setPublishNote(null);
+                  try {
+                    const res = await fetch("/api/calendar/mirror", { method: "POST" });
+                    const j = await res.json();
+                    if (j.error) setPublishNote("Failed: " + j.error);
+                    else if (j.skipped) setPublishNote(j.reason);
+                    else
+                      setPublishNote(
+                        `${j.published} session${j.published === 1 ? "" : "s"} published` +
+                          (j.removed ? `, ${j.removed} removed` : "") +
+                          (j.createdCalendar ? " — calendar created" : "") +
+                          (j.errors?.length ? ` — ${j.errors.length} problem(s)` : ""),
+                      );
+                    // Pick up the stored calendar id and the run's error state.
+                    const r2 = await fetch("/api/calendar/feed-settings");
+                    const j2 = await r2.json();
+                    if (!j2.error) setS(j2 as State);
+                  } catch (e) {
+                    setPublishNote("Failed: " + (e as Error).message);
+                  } finally {
+                    setPublishing(false);
+                  }
+                }}
+                disabled={publishing}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
+                style={{ background: "#4285F4", border: "none", cursor: "pointer", opacity: publishing ? 0.6 : 1 }}
+              >
+                {publishing ? "Publishing…" : s.mirrorCalendarId ? "Publish now" : "Create it and publish"}
+              </button>
+              {s.mirrorSyncedAt && (
+                <span className="text-[11px]" style={{ color: "var(--brand-text-secondary)" }}>
+                  last published{" "}
+                  {new Date(s.mirrorSyncedAt).toLocaleString("en-US", { timeZone: "America/Chicago" })}
+                </span>
+              )}
+            </div>
+
+            {publishNote && (
+              <p className="text-[11px]" style={{ color: "var(--brand-text-secondary)" }}>
+                {publishNote}
+              </p>
+            )}
+
+            {/* The last run's problems, kept rather than cleared. A mirror that
+                half-works silently is how the gym's calendar goes wrong. */}
+            {s.mirrorError && (
+              <p className="text-[11px]" style={{ color: "#f87171" }}>
+                Last run reported: {s.mirrorError}
+              </p>
+            )}
+
+            <p className="text-[11px]" style={{ color: "var(--brand-text-secondary)" }}>
+              Don&apos;t edit that calendar by hand — it gets rewritten. Change the session in your
+              own calendar and it follows.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

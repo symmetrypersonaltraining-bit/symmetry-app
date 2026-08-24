@@ -25,7 +25,15 @@ type Row = {
   session_feed_token: string | null;
   session_feed_enabled: boolean;
   session_feed_name_style: string;
+  session_mirror_enabled: boolean;
+  session_mirror_calendar_id: string | null;
+  session_mirror_synced_at: string | null;
+  session_mirror_error: string | null;
 };
+
+const COLS =
+  "id, session_feed_token, session_feed_enabled, session_feed_name_style, " +
+  "session_mirror_enabled, session_mirror_calendar_id, session_mirror_synced_at, session_mirror_error";
 
 async function currentTrainer() {
   const supabase = await createClient();
@@ -36,10 +44,10 @@ async function currentTrainer() {
   const db = createAdminClient();
   const { data } = await db
     .from("trainers")
-    .select("id, session_feed_token, session_feed_enabled, session_feed_name_style")
+    .select(COLS)
     .eq("auth_user_id", user.id)
     .maybeSingle();
-  return (data as Row | null) ?? null;
+  return (data as unknown as Row | null) ?? null;
 }
 
 function payload(row: Row) {
@@ -52,6 +60,10 @@ function payload(row: Row) {
     url: row.session_feed_token
       ? `${APP_ORIGIN}/api/calendar/sessions?token=${row.session_feed_token}`
       : null,
+    mirrorEnabled: row.session_mirror_enabled,
+    mirrorCalendarId: row.session_mirror_calendar_id,
+    mirrorSyncedAt: row.session_mirror_synced_at,
+    mirrorError: row.session_mirror_error,
   };
 }
 
@@ -94,6 +106,18 @@ export async function POST(req: NextRequest) {
     case "rotate":
       patch = { session_feed_token: randomBytes(32).toString("hex") };
       break;
+    // The mirrored Google calendar is a SEPARATE switch from the .ics feed.
+    // One publishes a link; the other writes events into his Google account.
+    // Bundling them would mean turning on a subscribe link also started
+    // creating calendars in somebody's Google, which is not the same consent.
+    case "mirror_on":
+      patch = { session_mirror_enabled: true };
+      break;
+    case "mirror_off":
+      // The calendar and its events stay. Deleting a shared calendar out from
+      // under whoever subscribed to it is not an off switch, it is a surprise.
+      patch = { session_mirror_enabled: false };
+      break;
     case "names":
       if (body.nameStyle !== "full" && body.nameStyle !== "initial") {
         return NextResponse.json({ error: "Unknown name style" }, { status: 400 });
@@ -108,11 +132,11 @@ export async function POST(req: NextRequest) {
     .from("trainers")
     .update(patch)
     .eq("id", row.id)
-    .select("id, session_feed_token, session_feed_enabled, session_feed_name_style")
+    .select(COLS)
     .maybeSingle();
 
   if (error || !data) {
     return NextResponse.json({ error: "Could not save that" }, { status: 500 });
   }
-  return NextResponse.json(payload(data as Row));
+  return NextResponse.json(payload(data as unknown as Row));
 }
