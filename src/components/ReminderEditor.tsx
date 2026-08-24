@@ -16,6 +16,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import {
   calcReminder,
   nextDueDate,
@@ -129,22 +130,44 @@ export default function ReminderEditor() {
       // under-billing: the screen looked fine and the number was simply too
       // small.
       //
-      // Scoping to the client_ids that actually have a live reminder takes it
-      // from ~4,859 rows to a couple of hundred, which is both correct and
-      // faster. The explicit limit is a backstop that would now have to be
-      // genuinely exceeded rather than silently hit.
+      // Scoping to the client_ids that actually have a live reminder narrows it
+      // and is correct — but the claim that followed here, that it left "a
+      // couple of hundred" rows and the limit was only a backstop, was wrong by
+      // a factor of twenty. See the note below the id list.
       const reminderClientIds = Array.from(
         new Set((rems || []).map((r: any) => r.client_id).filter(Boolean)),
       );
-      const { data: appts } = reminderClientIds.length
-        ? await sup
-            .from("appointments")
-            .select("client_id, scheduled_at, status")
-            .in("client_id", reminderClientIds)
-            .gte("scheduled_at", new Date(Date.now() - 200 * 86400000).toISOString())
-            .order("scheduled_at")
-            .limit(5000)
-        : { data: [] as any[] };
+      //
+      // 24 AUG — AND IT WAS STILL TRUNCATING. Scoping to reminder clients did
+      // not take this to "a couple of hundred": measured against the live
+      // database it is 3,977 rows, because the window has a floor and no
+      // ceiling, so it drags in every future booking out to Aug 2028 as well.
+      // `.limit(5000)` bounded nothing — PostgREST caps a response at 1,000
+      // whatever the limit says — so the read stopped dead at 19 Dec 2026.
+      //
+      // Today's cycles sort before that cut and so they still arrive, which is
+      // the only reason nobody has been under-billed a second time. That is
+      // luck, not design: the cut walks backwards every time he programmes
+      // further ahead, and it lands on the current cycle without a word.
+      //
+      // Paged, so the full 3,977 arrive in four round trips. NOT bounded at
+      // `now` even though only 427 rows sit in the past — a cycle window can
+      // close up to seven days in the future, and dropping those rows would
+      // change what a client is billed. Correctness first, then the round trip.
+      const apptsRes = reminderClientIds.length
+        ? await fetchAllRows<any>(
+            () =>
+              sup
+                .from("appointments")
+                .select("client_id, scheduled_at, status")
+                .in("client_id", reminderClientIds)
+                .gte("scheduled_at", new Date(Date.now() - 200 * 86400000).toISOString())
+                .order("scheduled_at")
+                .order("id"),
+            { label: "ReminderEditor.appointments" },
+          )
+        : ([] as any[]);
+      const appts = apptsRes;
       const byClient: Record<string, any> = {};
       (clients || []).forEach((c: any) => { byClient[c.id] = c; });
       const calendarCadenceOf = (cid: string): Cadence | null => {

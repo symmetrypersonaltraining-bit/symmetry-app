@@ -25,6 +25,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { Db } from "@/lib/ai/scope";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { applyProposal, loadDayTree, CT_TODAY, Proposal, type WorkoutUndoStep } from "@/lib/ai/workoutAdjust";
 import { assembleCoachContext, assembleTrainingContext } from "@/lib/ai/coach-context";
 import { getValidAccessToken, gcalFetch } from "@/lib/gcal";
@@ -265,8 +266,10 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
   let programIds: string[] | null = null;
   async function myProgramIds(): Promise<string[]> {
     if (programIds) return programIds;
-    const { data } = await db.from("programs").select("id, owner_trainer_id").limit(5000);
-    const rows = (data || []) as { id: string; owner_trainer_id: string | null }[];
+    const rows = await fetchAllRows<{ id: string; owner_trainer_id: string | null }>(
+      () => db.from("programs").select("id, owner_trainer_id").order("id"),
+      { label: "agent-tools.myProgramIds" },
+    );
     programIds = rows
       .filter((r) => r.owner_trainer_id === null || r.owner_trainer_id === caller.trainerId)
       .map((r) => r.id);
@@ -280,25 +283,39 @@ export async function execTrainerTool(db: Db, name: string, input: Record<string
    * the level above, so a row can never be more visible than the programme it
    * belongs to — the same rule the RLS policies enforce, restated here because
    * the admin client does not consult them.
+   *
+   * PAGED, and the `.limit(20000)` these carried is gone. PostgREST caps a
+   * response at 1,000 rows and has never honoured a number above it, so that
+   * limit read like a bound and was decoration. It matters here more than
+   * almost anywhere else in the app, because a SHORT id list does not fail —
+   * it narrows. `query_table` ends in `.in(col, ids)`, so a truncated list
+   * means a trainer's own programme rows quietly stop existing as far as her
+   * assistant is concerned, and it answers "there is nothing there" in a
+   * completely ordinary voice.
+   *
+   * Measured 24 Aug against the live database: Dustin sits at 1,153 days and
+   * 3,338 sections and only escapes because the owner skips this scoping
+   * entirely. Every other trainer is at ~244 days and ~755 sections — three
+   * quarters of the way to a cap they would cross by building a few more
+   * programmes, with no error when they did.
    */
   const descendantCache = new Map<string, string[]>();
   async function programmeScopedIds(level: "phases" | "days" | "sections"): Promise<string[]> {
     const hit = descendantCache.get(level);
     if (hit) return hit;
-    let ids: string[];
-    if (level === "phases") {
-      const { data } = await db.from("phases").select("id, program_id")
-        .in("program_id", await myProgramIds()).limit(20000);
-      ids = ((data || []) as { id: string }[]).map((r) => r.id);
-    } else if (level === "days") {
-      const { data } = await db.from("days").select("id, phase_id")
-        .in("phase_id", await programmeScopedIds("phases")).limit(20000);
-      ids = ((data || []) as { id: string }[]).map((r) => r.id);
-    } else {
-      const { data } = await db.from("sections").select("id, day_id")
-        .in("day_id", await programmeScopedIds("days")).limit(20000);
-      ids = ((data || []) as { id: string }[]).map((r) => r.id);
-    }
+    const [table, col, parents] =
+      level === "phases"
+        ? (["phases", "program_id", await myProgramIds()] as const)
+        : level === "days"
+          ? (["days", "phase_id", await programmeScopedIds("phases")] as const)
+          : (["sections", "day_id", await programmeScopedIds("days")] as const);
+    const rows = parents.length
+      ? await fetchAllRows<{ id: string }>(
+          () => db.from(table).select("id").in(col, parents).order("id"),
+          { label: `agent-tools.programmeScopedIds(${level})` },
+        )
+      : [];
+    const ids = rows.map((r) => r.id);
     descendantCache.set(level, ids);
     return ids;
   }

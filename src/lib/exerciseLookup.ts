@@ -26,6 +26,8 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { fetchAllRows } from "@/lib/fetchAllRows";
+
 /**
  * Case, punctuation and spacing removed — nothing else.
  *
@@ -103,16 +105,28 @@ export async function findExerciseIdByName(
 
   // Alias pass. Compared in JS rather than SQL because Postgres array
   // containment is case-sensitive, and the aliased set is tiny — the column
-  // has only just started being used. Bounded so it stays cheap if that changes.
-  const { data: aliased } = await db
-    .from("exercises")
-    .select("id, name, aliases, client_owner_id")
-    .not("aliases", "is", null)
-    .limit(1000);
+  // has only just started being used.
+  //
+  // Paged. `.limit(1000)` was sitting exactly ON PostgREST's own cap, which is
+  // the worst place for a bound to be: the 1,001st aliased movement would not
+  // error, it would just stop being findable by any of its alternate names, and
+  // the symptom would be a duplicate library row rather than a stack trace.
+  const aliased = await fetchAllRows<{
+    id: string;
+    name: string | null;
+    aliases: string[] | null;
+    client_owner_id: string | null;
+  }>(
+    () =>
+      db
+        .from("exercises")
+        .select("id, name, aliases, client_owner_id")
+        .not("aliases", "is", null)
+        .order("id"),
+    { label: "exerciseLookup.aliases" },
+  );
 
-  const hits = ((aliased as
-    | { id: string; name: string | null; aliases: string[] | null; client_owner_id: string | null }[]
-    | null) || []).filter((r) => rowMatchesName(r, clean));
+  const hits = aliased.filter((r) => rowMatchesName(r, clean));
 
   return hits.length ? preferShared(hits, clientId) : null;
 }

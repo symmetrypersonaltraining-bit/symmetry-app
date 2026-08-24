@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { fx } from "@/lib/fx";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { notifyMessageReaction } from "@/app/(app)/home/messageActions";
 
 /**
@@ -58,9 +59,21 @@ async function loadAll(force = false): Promise<void> {
     try {
       const supabase: any = createClient();
       // Every reaction the caller is allowed to see. RLS does the filtering, and
-      // the table is small — one row per tap, not per message.
-      const res = await supabase.from("message_reactions").select("message_id, user_id, emoji").limit(5000);
-      cache = (res.data as Reaction[]) || [];
+      // the table is small — one row per tap, not per message (45 rows today).
+      //
+      // Paged rather than `.limit(5000)`, which was never a bound: PostgREST
+      // caps a response at 1,000 rows whatever the limit says, so the day the
+      // gym's 1,001st kudos lands the oldest ones would start rendering as if
+      // nobody had tapped them. Ordered because a paged read without ORDER BY
+      // can repeat one row and miss another.
+      cache = await fetchAllRows<Reaction>(
+        () =>
+          supabase
+            .from("message_reactions")
+            .select("message_id, user_id, emoji")
+            .order("id"),
+        { label: "MessageReactions.loadAll" },
+      );
     } catch {
       cache = cache || [];
     } finally {

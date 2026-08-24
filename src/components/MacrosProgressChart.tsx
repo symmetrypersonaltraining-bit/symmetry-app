@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { computeDayTotals, LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
 import { centralToday, shiftDate } from "@/lib/central-time";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 
 type Daily = { date: string; calories: number; protein: number; carbs: number; fats: number };
 const RANGES = ["1wk", "2wk", "4wk", "8wk", "Custom"];
@@ -35,19 +36,35 @@ export default function MacrosProgressChart({ clientId }: { clientId: string | n
       // Bounded to the widest range this chart can display (8wk) plus headroom, and ordered
       // NEWEST first. Unbounded + ascending was a silent-truncation trap: PostgREST caps a
       // response at 1000 rows, so once a client passed ~1000 meal logs the cap would keep the
-      // OLDEST rows and recent weeks would quietly vanish from the chart with no error. The
-      // busiest client is at 416 rows today, so this lands before it could bite.
+      // OLDEST rows and recent weeks would quietly vanish from the chart with no error.
+      //
+      // The `.limit(2000)` that replaced it was the same trap wearing a bigger number —
+      // the server ignores anything above its own cap, so it bought nothing at all. The
+      // busiest client is at 564 rows in this window today; several log every day, so the
+      // ceiling is a couple of years away, not never. Paged, so it cannot arrive.
       const sinceDate = new Date();
       sinceDate.setUTCDate(sinceDate.getUTCDate() - 400);
       const since = sinceDate.toISOString().slice(0, 10);
-      const { data: logs } = await (supabase as any)
-        .from("meal_adherence_logs")
-        .select("*")
-        .eq("client_id", clientId)
-        .gte("log_date", since)
-        .order("log_date", { ascending: false })
-        .limit(2000);
-      const rows = (logs || []) as (LogRow & { log_date: string })[];
+      let rows: (LogRow & { log_date: string })[] = [];
+      try {
+        rows = await fetchAllRows<LogRow & { log_date: string }>(
+          () =>
+            (supabase as any)
+              .from("meal_adherence_logs")
+              .select("*")
+              .eq("client_id", clientId)
+              .gte("log_date", since)
+              .order("log_date", { ascending: false })
+              .order("id"),
+          { label: "MacrosProgressChart.meal_adherence_logs" },
+        );
+      } catch {
+        // An empty chart is honest. A half-length one is not.
+        if (!active) return;
+        setDaily([]);
+        setLoading(false);
+        return;
+      }
       const mealIds = Array.from(new Set(rows.map(r => r.meal_id).filter(Boolean)));
       const pseudoMeals: PlanMeal[] = [];
       if (mealIds.length) {
