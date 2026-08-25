@@ -293,7 +293,23 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
             {ask ? (
               /* Replace or add as well — Dustin's answer, 17 Aug. Both wordings
                  name the sessions involved, because "replace" with nothing named
-                 is how you clear a day you meant to add to. */
+                 is how you clear a day you meant to add to.
+
+                 ADD IS THE PRIMARY BUTTON, 24 Aug. It was the other way round,
+                 and the destructive answer was the one styled as the default:
+                 solid, brand-coloured, full width, first. Replace was a single
+                 tap on the obvious button; "Add as well" was a faint dashed
+                 outline underneath it.
+
+                 Robby Burns logged "Volleyball - 2 hours" on the 21st and
+                 "2 hours pickleball" on the 23rd. Both times his Ankle & Hip
+                 Daily Mobility was marked skipped in the same millisecond, and
+                 on the 24th he messaged: "my solo workouts have disappeared?"
+                 He had not replaced anything — he had played volleyball AND
+                 done his mobility, and the app recorded him as skipping it.
+
+                 Adding is the common case and the safe one; replacing takes
+                 something off the day. The safe answer gets the weight. */
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>
                   {pickedDate === ctToday() ? "Today" : pickedDate} already has {describeReplaced(ask.replacing)}.
@@ -301,19 +317,20 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
                 <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 14, lineHeight: 1.45 }}>
                   What should &ldquo;{ask.day.label}&rdquo; do?
                 </div>
-                <button disabled={busy} onClick={() => { const a = ask; setAsk(null); addLibrary(a.day, "replace", a.replacing); }}
-                  style={{ width: "100%", padding: "12px", borderRadius: 12, border: "none", background: "var(--brand-primary, #7c9cf5)", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 800 }}>
-                  Replace it
-                </button>
-                <div style={{ fontSize: 11.5, opacity: 0.65, margin: "6px 2px 12px", lineHeight: 1.4 }}>
-                  {describeReplaced(ask.replacing)} {ask.replacing.length > 1 ? "get" : "gets"} marked skipped. Nothing is deleted, and your programme is unchanged.
-                </div>
                 <button disabled={busy} onClick={() => { const a = ask; setAsk(null); addLibrary(a.day, "add"); }}
-                  style={{ width: "100%", padding: "12px", borderRadius: 12, border: "1px dashed rgba(140,150,180,.5)", background: "transparent", cursor: "pointer", fontSize: 14, fontWeight: 700, color: "inherit" }}>
+                  style={{ width: "100%", padding: "12px", borderRadius: 12, border: "none", background: "var(--brand-primary, #7c9cf5)", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 800 }}>
                   Add as well
                 </button>
+                <div style={{ fontSize: 11.5, opacity: 0.65, margin: "6px 2px 12px", lineHeight: 1.4 }}>
+                  Both sessions stay on that day. Pick this if you did the extra
+                  activity <em>as well as</em> what was planned.
+                </div>
+                <button disabled={busy} onClick={() => { const a = ask; setAsk(null); addLibrary(a.day, "replace", a.replacing); }}
+                  style={{ width: "100%", padding: "12px", borderRadius: 12, border: "1px dashed rgba(140,150,180,.5)", background: "transparent", cursor: "pointer", fontSize: 14, fontWeight: 700, color: "inherit" }}>
+                  Replace it instead
+                </button>
                 <div style={{ fontSize: 11.5, opacity: 0.65, margin: "6px 2px 0", lineHeight: 1.4 }}>
-                  Two sessions on that day.
+                  {describeReplaced(ask.replacing)} {ask.replacing.length > 1 ? "get" : "gets"} marked skipped — only do this if you did <em>not</em> do {ask.replacing.length > 1 ? "them" : "it"}. Nothing is deleted, and your programme is unchanged.
                 </div>
                 <button onClick={() => setAsk(null)} style={{ marginTop: 14, width: "100%", padding: "10px", borderRadius: 12, border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: "inherit", opacity: 0.7 }}>← Back</button>
               </div>
