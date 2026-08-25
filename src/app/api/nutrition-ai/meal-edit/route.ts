@@ -43,22 +43,38 @@ export interface MealEditOp {
    *
    * Dustin, 24 Aug: "swap chicken thigh w 6 oz of chicken breast" came back as
    * "1 serving" with no way to change it, because `add` had no field for an
-   * amount or a unit and so both were discarded on the way through. p/c/f are
-   * quoted FOR `amount` of `unit` when these are present.
+   * amount or a unit and so both were discarded on the way through.
    */
   unit?: string;
+  /**
+   * THE QUANTITY p/c/f ACTUALLY DESCRIBE. The app multiplies; the model does not.
+   *
+   * Dustin, 24 Aug, second attempt: "add 200 g of potatoes" came back as
+   * 200 g at 76 cal / 2P / 17C / 0F. That is the figure for ONE HUNDRED grams —
+   * it set the amount to 200 and quoted the macros for something else, and the
+   * app displayed the mismatch as fact.
+   *
+   * The old prompt asked it to "quote p/c/f FOR THAT MEASURE", which is recall
+   * AND arithmetic in one step, and the arithmetic is the half a language model
+   * is worst at. So now it states a reference quantity it is confident about —
+   * per 100 g, per oz, per item — and `amount / per_amount` does the scaling in
+   * code, where multiplication is reliable.
+   */
+  per_amount?: number;
 }
 
 const SYSTEM = `You edit ONE meal in a physique coach's app. You are given the meal's current items (each with an id, a food name, an amount and a unit) and a sentence from the person eating it. Turn the sentence into operations against those items.
 
 Respond with ONLY valid JSON — no markdown, no fences, no prose — exactly this shape:
-{"ops":[{"op":"set","id":"<id>","amount":<number>}|{"op":"remove","id":"<id>"}|{"op":"add","name":"<food>","amount":<number>,"unit":"<unit>","p":<g>,"c":<g>,"f":<g>}|{"op":"swap","id":"<id>","name":"<food>","amount":<number>,"unit":"<unit>","p":<g>,"c":<g>,"f":<g>}],"note":"<one short plain sentence>"}
+{"ops":[{"op":"set","id":"<id>","amount":<number>}|{"op":"remove","id":"<id>"}|{"op":"add","name":"<food>","amount":<number>,"unit":"<unit>","per_amount":<number>,"p":<g>,"c":<g>,"f":<g>}|{"op":"swap","id":"<id>","name":"<food>","amount":<number>,"unit":"<unit>","per_amount":<number>,"p":<g>,"c":<g>,"f":<g>}],"note":"<one short plain sentence>"}
 
 Rules:
 - "set" changes an existing item's amount, in THAT ITEM'S OWN UNIT. If the item is "3 each" and they say "four eggs", that is {"op":"set","amount":4}. If the item is "50 g" and they say "double it", that is 100.
 - "remove" is for "no X", "skip the X", "drop the X", "without X". Prefer remove over setting an amount to 0.
 - "add" is ONLY for a food that is not already in the list. Give p/c/f from USDA / label knowledge; assume cooked weight and plain preparation unless told otherwise. Be realistic, never inflated.
-- WHENEVER THEY NAME A MEASURE — "6 oz", "200 g", "two tbsp" — put it in "amount" and "unit" and quote p/c/f FOR THAT MEASURE. Only fall back to "servings" with p/c/f per serving when they named no measure at all. Never round a stated measure to a serving.
+- WHENEVER THEY NAME A MEASURE — "6 oz", "200 g", "two tbsp" — put it in "amount" and "unit". Only fall back to "servings" with p/c/f per serving when they named no measure at all. Never round a stated measure to a serving.
+- DO NOT MULTIPLY. p/c/f must be the figures for a REFERENCE quantity you are confident about — per 100 g, per 1 oz, per 1 cup, per 1 item — and you state that quantity in "per_amount", in the SAME unit as "amount". The app multiplies. Example: they say 200 g of cooked white potato, you know the per-100 g figures, so you answer amount 200, unit "g", per_amount 100, p 2, c 17, f 0 — and the app works out 4 / 34 / 0. Getting this wrong by quoting per-100 g figures against a 200 g amount halves someone's carbs on their own log.
+- If you genuinely quoted p/c/f for the whole amount, set per_amount equal to amount. Never leave per_amount out when amount is present.
 - "swap" replaces one item with a different food, keeping its place: {"op":"swap","id":"<id of the item going out>","name":"<food coming in>","amount":<number>,"unit":"<unit>","p":<g>,"c":<g>,"f":<g>}. Use it for "swap X for Y", "X instead of Y", "make it Y not X". If they name a measure for the new food, give it. IF THEY DO NOT, OMIT amount AND unit — the app will carry the old item's own weight across, which is what "swap" means. Do not invent a serving.
 - Match foods loosely — "the bread" should find "Homemade Sourdough", "eggs" should find "Boiled Eggs (whole)". If a food they mention is genuinely already listed, edit it rather than adding a duplicate.
 - Only act on what they actually said. Never change an item they did not mention. An empty ops array is a valid answer.
@@ -92,6 +108,13 @@ function validate(raw: unknown): { ops: MealEditOp[]; note: string } | null {
       const amount =
         typeof x.amount === "number" && Number.isFinite(x.amount) && x.amount > 0 ? x.amount : undefined;
       const unit = typeof x.unit === "string" && x.unit.trim() ? x.unit.trim().slice(0, 16) : undefined;
+      // The quantity p/c/f describe. Absent, the only safe reading is "the
+      // amount itself" — which is the OLD behaviour and the one that halved
+      // the potatoes, so the prompt insists on it and this is the backstop.
+      const perAmount =
+        typeof x.per_amount === "number" && Number.isFinite(x.per_amount) && x.per_amount > 0
+          ? x.per_amount
+          : amount;
       ops.push({
         op,
         ...(op === "swap" ? { id: x.id as string } : {}),
@@ -102,7 +125,7 @@ function validate(raw: unknown): { ops: MealEditOp[]; note: string } | null {
         p: num(x.p), c: num(x.c), f: num(x.f),
         // An amount with no unit is not a measure, it is a number. Both or
         // neither — a bare "6" would render as "6" and mean nothing.
-        ...(amount != null && unit ? { amount, unit } : {}),
+        ...(amount != null && unit ? { amount, unit, per_amount: perAmount } : {}),
       });
     }
   }

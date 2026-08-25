@@ -83,7 +83,7 @@ test("the route accepts a swap, and refuses one that names nothing to replace", 
 });
 
 test("an amount with no unit is refused, because a bare number is not a measure", () => {
-  assert.match(code(ROUTE), /amount != null && unit \? \{ amount, unit \}/);
+  assert.match(code(ROUTE), /amount != null && unit \? \{ amount, unit, per_amount/);
 });
 
 test("a measure and a serving count can never both count", () => {
@@ -127,4 +127,56 @@ test("an added row can be corrected, not just deleted", () => {
   assert.match(addedBlock, /bump\(-step\)/, "the added row lost its decrement control");
   assert.match(addedBlock, /bump\(step\)/, "the added row lost its increment control");
   assert.match(addedBlock, /stepFor\(ad\.unit/, "a measured row must step in its own unit");
+});
+
+// ── the reference quantity ───────────────────────────────────────────────────
+
+test("the model states a reference quantity and the APP multiplies", () => {
+  // Dustin, second attempt: "add 200 g of potatoes" came back 200 g at
+  // 76 cal / 2P / 17C / 0F. That is the per-100 g figure. It set the amount to
+  // 200 and quoted the macros for something else, and the sheet showed the
+  // mismatch as fact — half the real carbs, on a log he makes decisions from.
+  //
+  // The old prompt said "quote p/c/f FOR THAT MEASURE": recall AND arithmetic
+  // in one step, and the arithmetic is the half a language model is worst at.
+  assert.match(ROUTE, /DO NOT MULTIPLY/);
+  assert.match(ROUTE, /"per_amount"/, "the reference quantity is no longer asked for");
+  // code(), not ROUTE — the comment above the fix QUOTES the instruction it
+  // removed, and a scanner reading comments flags its own explanation. This
+  // suite has been bitten by that before.
+  assert.doesNotMatch(
+    code(ROUTE),
+    /quote p\/c\/f FOR THAT MEASURE/,
+    "the instruction that asked the model to do the multiplication is back",
+  );
+  assert.match(ROUTE, /Never leave per_amount out when amount is present/);
+});
+
+test("200 g quoted per 100 g doubles, rather than being taken at face value", () => {
+  // The exact reported case, as arithmetic.
+  const potato = { servings: 1, amount: 200, base_amount: 100 };
+  assert.equal(addedScale(potato), 2);
+
+  const meal: PlanMeal = { id: "m", name: "M", timing: null, position: 1, meal_items: [] };
+  const got = planMealMacros(meal, {
+    __added: [
+      { name: "White Potatoes (cooked)", servings: 1, p: 2, c: 17, f: 0, amount: 200, unit: "g", base_amount: 100 },
+    ],
+  });
+  assert.equal(got.protein, 4);
+  assert.equal(got.carbs, 34);
+  assert.equal(got.fats, 0);
+  assert.equal(got.kcal, 152, "the sheet showed 76 — the figure for half of what he asked for");
+});
+
+test("a reference equal to the amount still means take it as quoted", () => {
+  // The model IS allowed to pre-multiply, as long as it says so.
+  assert.equal(addedScale({ servings: 1, amount: 200, base_amount: 200 }), 1);
+});
+
+test("a missing or nonsense reference falls back to the amount, never to zero", () => {
+  // Division by a zero or absent base would wipe the food's macros silently.
+  assert.equal(addedScale({ servings: 1, amount: 200, base_amount: null }), 1);
+  assert.equal(addedScale({ servings: 1, amount: 200, base_amount: 0 }), 1);
+  assert.match(ROUTE, /: amount;/, "per_amount no longer falls back to the amount itself");
 });

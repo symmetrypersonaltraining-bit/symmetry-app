@@ -2829,7 +2829,7 @@ function PlanAdjustSheet({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setAiErr(String(json?.error || "That didn't work.")); return; }
-      const ops = (json?.ops || []) as { op: string; id?: string; amount?: number; unit?: string; name?: string; servings?: number; p?: number; c?: number; f?: number }[];
+      const ops = (json?.ops || []) as { op: string; id?: string; amount?: number; unit?: string; per_amount?: number; name?: string; servings?: number; p?: number; c?: number; f?: number }[];
       if (!ops.length) { setAiErr("I couldn't tell what to change — name the food and the amount."); return; }
 
       const byId = new Map((meal.meal_items || []).map((it) => [it.id, it]));
@@ -2871,9 +2871,17 @@ function PlanAdjustSheet({
         const fromPlan = out ? (amounts[out.id] ?? (out.amount != null ? Number(out.amount) : null)) : null;
         const amount = op.amount != null ? Number(op.amount) : (fromPlan && fromPlan > 0 ? fromPlan : null);
         const unit = op.unit || (op.amount == null ? out?.unit || null : null);
-        // p/c/f describe whatever measure came back. Scaling needs to know
-        // which, so base_amount is stored alongside rather than assumed.
-        const base = op.amount != null ? Number(op.amount) : amount;
+        // p/c/f describe `per_amount` of `unit` — a reference quantity the model
+        // is confident about — and the app multiplies. Asking it to hand back
+        // pre-multiplied figures is what produced 200 g of potato carrying the
+        // macros for 100 g. Falls back to the amount itself, which is the old
+        // reading, only when no reference came back at all.
+        const base =
+          op.per_amount != null && Number(op.per_amount) > 0
+            ? Number(op.per_amount)
+            : op.amount != null
+              ? Number(op.amount)
+              : amount;
 
         newAdds.push({
           food_id: null,
