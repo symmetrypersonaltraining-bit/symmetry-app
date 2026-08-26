@@ -581,11 +581,28 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
       if (tab === "upcoming") {
         if (c.notificationStatus === "paid" || c.notificationStatus === "cancelled") return false;
         if (!c.dueDate) return true;
-        return c.dueDate >= today && c.dueDate <= thirtyStr;
+        // PAST DUE COUNTS AS UPCOMING. It read `c.dueDate >= today`, so the
+        // moment a payment went late it dropped off the default tab — the one
+        // screen in the app whose job is "who owes me money" hid the people who
+        // owe it, and the only way back to them was knowing to press All.
+        //
+        // Dustin arrived here from a dashboard row reading "Payments overdue —
+        // 2", found a header saying 0 Overdue (fixed below) over a list that
+        // did not contain either of them.
+        //
+        // Something unpaid and late is the most upcoming thing on the screen.
+        return c.dueDate <= thirtyStr;
       }
       return true;
     })
     .sort((a, b) => {
+      // Late first, whatever its status weight. Bringing overdue rows back onto
+      // the Upcoming tab is only half the fix — dropped into a due-date sort
+      // they land above the rest by date anyway, but a `disabled` or `paused`
+      // late row would sort to the bottom of a long list and be missed again.
+      const la = a.dueDate && daysUntil(a.dueDate, today) < 0 && a.notificationStatus !== "paid" ? 0 : 1;
+      const lb = b.dueDate && daysUntil(b.dueDate, today) < 0 && b.notificationStatus !== "paid" ? 0 : 1;
+      if (la !== lb) return la - lb;
       const wa = statusSortWeight(a.notificationStatus);
       const wb = statusSortWeight(b.notificationStatus);
       if (wa !== wb) return wa - wb;
@@ -596,11 +613,30 @@ export default function PaymentsClient({ clients }: { clients: ClientPayment[] }
       return a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0;
     });
 
-  const pendingCount = filtered.filter(c => c.notificationStatus === "pending" || c.notificationStatus === "no_reminder").length;
-  const totalOwed = filtered
+  // THE HEADER COUNTS THE BOOK, NOT THE TAB — and it used to count `filtered`.
+  //
+  // 26 Aug, Dustin's dashboard: "Payments overdue — 2 past due and
+  // unconfirmed." He tapped through, and this header said 0 Overdue.
+  //
+  // Neither was wrong about its own data. The Upcoming tab keeps a row only
+  // when `c.dueDate >= today`, which is the definition of NOT overdue — so
+  // counting overdue rows out of the filtered set was asking how many of the
+  // rows that are not late are late. The answer is structurally zero, on the
+  // default tab, forever. The one number on the billing screen that means
+  // somebody owes money and is late could not ever say so.
+  //
+  // Search made it worse in a quieter way: typing a name into the box changed
+  // "Total Owed" to that client's balance, under a heading that reads like the
+  // business total.
+  //
+  // A header is a summary of everything. The tab and the search box filter the
+  // LIST below it, and nothing above it.
+  const inBook = localClients;
+  const pendingCount = inBook.filter(c => c.notificationStatus === "pending" || c.notificationStatus === "no_reminder").length;
+  const totalOwed = inBook
     .filter(c => c.notificationStatus !== "paid" && c.notificationStatus !== "cancelled" && c.notificationStatus !== "no_reminder" && c.notificationStatus !== "disabled")
     .reduce((a, c) => a + c.amountDue, 0); // amount_due is final; credits already applied
-  const overdueCount = filtered.filter(c => c.dueDate && daysUntil(c.dueDate, today) < 0 && c.notificationStatus !== "paid").length;
+  const overdueCount = inBook.filter(c => c.dueDate && daysUntil(c.dueDate, today) < 0 && c.notificationStatus !== "paid").length;
 
   async function handleMarkPaid(c: ClientPayment) {
     if (!c.reminderId) return;

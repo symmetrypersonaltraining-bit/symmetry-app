@@ -81,6 +81,13 @@ const fmtDay = (d: string) =>
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * How far ahead a reminder is considered live. The appointment read below is
+ * bounded by this SAME constant rather than a second number, because the safety
+ * of that bound is derived from this one — see the note at the read.
+ */
+const REMINDER_HORIZON_DAYS = 45;
+
 export default function ReminderEditor() {
   const [rows, setRows] = useState<Rem[]>([]);
   const [edits, setEdits] = useState<Record<string, Edit>>({});
@@ -95,7 +102,7 @@ export default function ReminderEditor() {
         .from("payment_reminders")
         .select("id, client_id, due_date, amount_due, billing_credits, sms_message, notification_status, approved_at, credit_details, half_price_sessions")
         .in("notification_status", ["pending", "sent"])
-        .lte("due_date", new Date(Date.now() + 45 * 86400000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
+        .lte("due_date", new Date(Date.now() + REMINDER_HORIZON_DAYS * 86400000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
         .order("due_date");
       const { data: clients } = await sup
         .from("clients")
@@ -150,10 +157,29 @@ export default function ReminderEditor() {
       // luck, not design: the cut walks backwards every time he programmes
       // further ahead, and it lands on the current cycle without a word.
       //
-      // Paged, so the full 3,977 arrive in four round trips. NOT bounded at
-      // `now` even though only 427 rows sit in the past — a cycle window can
-      // close up to seven days in the future, and dropping those rows would
-      // change what a client is billed. Correctness first, then the round trip.
+      // 26 AUG — AND IT WAS BOUNDED AT ONE END ONLY, WHICH IS WHY THE PAGE
+      // TOOK MINUTES. Dustin: "payments overdue takes me to pmts but takes
+      // minutes to load."
+      //
+      // The window had a floor and no ceiling, so it dragged in every future
+      // booking to Aug 2028: 3,736 rows, four sequential round trips, on a
+      // phone, before the billing screen would draw. Every one of those rows
+      // past the horizon was downloaded and then ignored.
+      //
+      // A ceiling is provably safe here, and the proof is short. The reminder
+      // query above only takes rows with due_date <= today + 45. A cycle window
+      // ENDS at reminderSendDate(due_date), which is due_date - 7. So no cycle
+      // this component can compute reaches beyond today + 38, and no
+      // appointment after that can be counted by anything on this screen.
+      // APPT_HORIZON_DAYS is deliberately the same 45 rather than 38: it is
+      // tied to the reminder horizon it is derived from, so the two cannot
+      // drift apart, and it leaves a week of slack besides.
+      //
+      // 3,736 rows becomes 608. Four round trips becomes one. Still paged,
+      // because a bound is not a guarantee — the roster grows, and fetchAllRows
+      // throws at its ceiling rather than silently returning a short answer,
+      // which is the whole reason the under-billing below went unnoticed.
+      const APPT_HORIZON_DAYS = REMINDER_HORIZON_DAYS;
       const apptsRes = reminderClientIds.length
         ? await fetchAllRows<any>(
             () =>
@@ -162,6 +188,7 @@ export default function ReminderEditor() {
                 .select("client_id, scheduled_at, status")
                 .in("client_id", reminderClientIds)
                 .gte("scheduled_at", new Date(Date.now() - 200 * 86400000).toISOString())
+                .lte("scheduled_at", new Date(Date.now() + APPT_HORIZON_DAYS * 86400000).toISOString())
                 .order("scheduled_at")
                 .order("id"),
             { label: "ReminderEditor.appointments" },
