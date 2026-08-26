@@ -105,11 +105,44 @@ test("dismissed rows are simply not drawn", () => {
 test("a dismissal that did not save puts the row back", () => {
   const i = ADMIN.indexOf("async function dismiss(");
   assert.ok(i > 0);
-  const fn = ADMIN.slice(i, i + 1200);
+  // Anchored on the function's END rather than a character count. A fixed slice
+  // silently shrinks to nothing the moment somebody adds a comment, and then
+  // passes for the wrong reason.
+  const end = ADMIN.indexOf("useEffect(", i);
+  assert.ok(end > i, "the dismiss function moved — re-anchor this test");
+  const fn = ADMIN.slice(i, end);
   assert.match(fn, /const keep = rows;/);
   assert.match(fn, /setRows\(keep \?\? null\);/,
     "a dismissal that quietly failed is worse than the row — he would think it was handled");
-  assert.match(fn, /onConflict: "trainer_id,row_key,subject_id"/, "dismissing twice would error");
+});
+
+test("the write can actually match the index it conflicts on", () => {
+  // THE ORIGINAL ASSERTION HERE REQUIRED THE BUG, and its reason was exactly
+  // backwards: it said the upsert stopped "dismissing twice" from erroring,
+  // when in fact it made dismissing ONCE error. `onConflict` named three bare
+  // columns; the unique index is on COALESCE(subject_id, ...), an expression.
+  // Postgres matches ON CONFLICT against a real index, so all of it failed with
+  // 42P10 and admin_dismissals stayed empty from the day it shipped until the
+  // day Dustin said the row would not clear.
+  assert.match(ADMIN, /rpc\("dismiss_admin_row"/);
+  // COMMENTS OUT FIRST. The component now carries a note quoting the broken
+  // upsert verbatim so the next person does not reintroduce it — and read raw,
+  // that note is indistinguishable from the bug it warns about. A test that
+  // fails on its own documentation teaches people to delete the documentation.
+  const withoutComments = ADMIN.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  assert.doesNotMatch(withoutComments, /onConflict: "trainer_id,row_key,subject_id"/);
+
+  const sql = read("supabase/migrations/20260826b_dismiss_admin_row.sql");
+  // The RPC's conflict target must be the index's own expression, character for
+  // character — that is the entire point of moving the write server-side.
+  assert.match(
+    sql,
+    /on conflict \(trainer_id, row_key, coalesce\(subject_id, '00000000-0000-0000-0000-000000000000'::uuid\)\)/,
+  );
+  // And it must not be able to clear somebody else's rows.
+  assert.match(sql, /v_trainer uuid := public\.my_trainer_id\(\);/);
+  assert.doesNotMatch(sql, /p_trainer_id/, "a trainer parameter would let a caller name someone else");
+  assert.match(sql, /revoke all on function public\.dismiss_admin_row/);
 });
 
 test("the dismissal is his, and only appears when we know who he is", () => {
