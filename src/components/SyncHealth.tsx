@@ -90,11 +90,27 @@ export default function SyncHealth() {
   // success — and a disabled or disconnected calendar returns 200 with
   // {skipped:true}. Neither is healthy. Judge the payload, not the status code.
   const skipped = r.skipped === true;
-  const bad = run.ok === false || errs.length > 0 || skipped || stale;
+  // A RUN THAT NEVER ANSWERED IS NOT A HEALTHY RUN.
+  //
+  // Dustin, 26 Aug, screenshot: a green dot, "Calendar in sync", 27 min ago —
+  // above the words "Timeout of 55000 ms reached" in green text. The sync had
+  // not completed for a day and the card said it was fine.
+  //
+  // Two holes, both here. `ok` is NULL when the scheduler gave up waiting (it
+  // is only false on a real HTTP failure), and `run.error` — which is where a
+  // timeout lands — was rendered on screen but never consulted in the verdict.
+  // So the card printed the reason it was broken in the colour for "healthy".
+  //
+  // `ok !== true` rather than `ok === false`: unknown is not success. A status
+  // card that reads the opposite of its own error text is worse than no card.
+  const timedOut = !!run.error;
+  const bad = run.ok !== true || timedOut || errs.length > 0 || skipped || stale;
 
   const tone = bad ? "#ef4444" : "#22c55e";
-  const headline = run.ok === false
+  const headline = run.ok === false || timedOut
     ? "Calendar sync failed"
+    : run.ok !== true
+      ? "Calendar sync did not finish"
     : skipped
       ? "Calendar sync is switched off"
       : errs.length > 0

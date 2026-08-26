@@ -96,10 +96,26 @@ test("it judges the payload, not the HTTP status", () => {
   // success — and a disabled or disconnected calendar returns 200 with
   // {skipped:true}. Both looked healthy for weeks.
   const c = code(PANEL);
-  assert.match(c, /run\.ok === false \|\| errs\.length > 0 \|\| skipped \|\| stale/,
+  assert.match(c, /const bad = run\.ok !== true \|\| timedOut \|\| errs\.length > 0 \|\| skipped \|\| stale;/,
     "health is being read off the status code again");
   assert.match(c, /r\.skipped === true/,
     "a switched-off calendar still reads as a healthy sync");
+});
+
+test("a run that timed out is not 'in sync'", () => {
+  // 26 Aug. Dustin's dashboard drew a GREEN card reading "Calendar in sync"
+  // directly above the words "the run timed out". The sync had been dying at
+  // 55 seconds every hour for a day and a half.
+  //
+  // `ok === false` was the whole test, and a timed-out run does not set ok to
+  // false — it never returns a payload at all, so ok is NULL. Null is not
+  // false, so the card fell through to green. The two changes: `ok !== true`
+  // rather than `ok === false`, so absence of success is not success; and the
+  // recorded error is consulted, which is where a timeout actually lands.
+  const c = code(PANEL);
+  assert.match(c, /const timedOut = !!run\.error;/);
+  assert.match(c, /run\.ok === false \|\| timedOut/, "a timeout still renders as a completed run");
+  assert.doesNotMatch(c, /const bad = run\.ok === false/, "ok === false is back — a NULL ok reads as healthy");
 });
 
 test("it goes red when the last run is simply old", () => {
