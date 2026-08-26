@@ -199,6 +199,12 @@ export async function mirrorSessions(opts: {
   since?: Date | null;
   /** Stop after this many writes so a big first run cannot blow the budget. */
   maxWrites?: number;
+  /**
+   * Wall-clock stop, as an epoch ms. A write count is a poor proxy for time —
+   * 200 calls is fine at 40 ms each and fatal at 400 ms — and it was the write
+   * count alone that let this overrun and take the calendar sync with it.
+   */
+  deadlineMs?: number;
 }): Promise<MirrorResult> {
   const { calendarId, created } = await ensureMirrorCalendar(opts.token, opts.calendarId);
   const errors: string[] = [];
@@ -238,6 +244,10 @@ export async function mirrorSessions(opts: {
       unchanged += 1;
       continue;
     }
+    if (opts.deadlineMs && Date.now() > opts.deadlineMs) {
+      cappedAt = written;
+      break;
+    }
     if (written >= maxWrites) {
       // Named, not silent. A capped run that reported success would look
       // identical to a complete one, and the gym would be missing sessions
@@ -245,12 +255,39 @@ export async function mirrorSessions(opts: {
       cappedAt = maxWrites;
       break;
     }
-    const body = JSON.stringify(mirrorEventBody(session));
-    const path = `/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`;
+    // CREATE IS A POST, UPDATE IS A PUT — and getting that wrong is what broke
+    // this on 25 Aug. The original code PUT everything on the belief that a PUT
+    // to a not-yet-existing id creates it. It does not: Google answers 404, so
+    // EVERY event failed, nothing was ever created, and because nothing
+    // succeeded the next run retried all of them. Two hundred doomed calls an
+    // hour, inside the calendar sync's own time budget, which is what took the
+    // sync down. Google's events.insert takes a caller-supplied `id` in the
+    // BODY; events.update needs the event to already exist.
+    const payload = mirrorEventBody(session);
+    const base = `/calendars/${encodeURIComponent(calendarId)}/events`;
     try {
-      // A PUT to an id that does not exist yet creates it, so insert and update
-      // are the same call. `import` would need an iCalUID and an organizer.
-      await gcalFetch(opts.token, path, { method: "PUT", body });
+      if (existing.has(eventId)) {
+        await gcalFetch(opts.token, `${base}/${eventId}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        try {
+          await gcalFetch(opts.token, base, {
+            method: "POST",
+            body: JSON.stringify({ ...payload, id: eventId }),
+          });
+        } catch (e) {
+          // 409 = the id is already taken, which happens when a previous run
+          // created it and our listing missed it (a cancelled event, a paging
+          // edge). Updating it is the right answer, not reporting a failure.
+          if (!/\b409\b/.test((e as Error).message)) throw e;
+          await gcalFetch(opts.token, `${base}/${eventId}`, {
+            method: "PUT",
+            body: JSON.stringify(payload),
+          });
+        }
+      }
       written += 1;
     } catch (e) {
       errors.push(`${session.display_name} ${session.starts_at}: ${(e as Error).message}`);

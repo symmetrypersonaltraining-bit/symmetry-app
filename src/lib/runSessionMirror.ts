@@ -7,17 +7,19 @@
  * being right after a manual publish and wrong after an automatic one, with
  * nothing on screen to say which had last run.
  *
- * ── WHY IT HANGS OFF THE SYNC ────────────────────────────────────────────────
+ * ── WHY IT HAS ITS OWN SCHEDULE ──────────────────────────────────────────────
  *
  * The chain from Dustin turning a session orange to another trainer seeing it:
  *
  *     his Google  →  gcal-sync  →  appointments  →  mirror  →  the gym
  *
- * Only the first hop is on a clock we do not own. gcal-sync already runs hourly
- * (narrow) and twice daily (full), so publishing at the END of that pass adds
- * no latency of its own — the mirror is current the moment the appointment row
- * is. A separate cron would have added its own wait for no benefit and could
- * have run while the sync was mid-write.
+ * This used to run at the tail of gcal-sync, so the mirror was current the
+ * moment the appointment row was. That saved fifteen minutes of latency and
+ * cost a day and a half of outage: the mirror failed every write, retried all
+ * of them hourly, and did it inside a sync that had five seconds of headroom.
+ * See /api/cron/session-mirror for the full account. It now runs at :40 against
+ * rows the sync wrote at :25, which is close enough for a read-only copy and
+ * cannot take billing down.
  */
 
 import { getValidAccessToken } from "@/lib/gcal";
@@ -53,13 +55,15 @@ export type RunMirrorOutcome =
 /**
  * `db` is a service-role client. `full` forces a rewrite of every event rather
  * than only what changed — the first run, or after somebody has edited the
- * mirror by hand and it needs putting back.
+ * mirror by hand and it needs putting back. `deadlineMs` is a wall-clock stop:
+ * the pass gives up writing at that instant and reports itself capped, which is
+ * what keeps a slow Google from consuming the whole request.
  */
 export async function runSessionMirror(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
   trainer: MirrorTrainer,
-  opts: { full?: boolean } = {},
+  opts: { full?: boolean; deadlineMs?: number } = {},
 ): Promise<RunMirrorOutcome> {
   if (!trainer.session_mirror_enabled) {
     return { skipped: "The mirrored calendar is switched off." };
@@ -96,6 +100,7 @@ export async function runSessionMirror(
         ? null
         : new Date(trainer.session_mirror_synced_at),
     maxWrites: MIRROR_MAX_WRITES_PER_RUN,
+    deadlineMs: opts.deadlineMs,
   });
 
   // THE WATERMARK ONLY MOVES ON A CLEAN, COMPLETE PASS. Advancing it after a

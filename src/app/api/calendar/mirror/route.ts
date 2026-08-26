@@ -1,9 +1,9 @@
 // POST /api/calendar/mirror  →  publish this trainer's sessions to their
 //                               dedicated Google calendar
 //
-// The manual half. The automatic half runs at the tail of every Google Calendar
-// sync, through the same runSessionMirror() — see that file for why it hangs
-// off the sync rather than a cron of its own.
+// The manual half. The automatic half is /api/cron/session-mirror, on its own
+// schedule, through the same runSessionMirror(). It used to run at the tail of
+// the Google Calendar sync; see that cron route for why that was a mistake.
 //
 // A trainer can only ever mirror THEIR OWN sessions: the trainer is resolved
 // from the session and there is no parameter that could name another.
