@@ -76,3 +76,30 @@ test("a run that failed cannot mark itself published", () => {
   );
   assert.match(code(RUN), /clean \? \{ session_mirror_synced_at/);
 });
+
+// ── and it has to actually finish ────────────────────────────────────────────
+
+test("a capped publish resumes instead of rewriting its first page forever", () => {
+  // Measured the moment the mirror was switched back on: published 83, capped
+  // 83, zero errors — the write count never came near maxWrites, the clock is
+  // what stops it. And the watermark deliberately does not move on a capped
+  // run, so `since` stays null and the incremental skip stays off. Without a
+  // cursor that means run two starts at the top of the window and rewrites the
+  // same 83 events. An hour at a time, forever, never reaching the 84th of 721.
+  assert.match(code(MIRROR), /if \(opts\.resumeAfter && new Date\(session\.starts_at\) < opts\.resumeAfter\)/);
+  assert.match(code(RUN), /resumeAfter:\s*\n?\s*opts\.full \|\| !trainer\.session_mirror_cursor/);
+  assert.match(code(RUN), /session_mirror_cursor: clean \? null : result\.resumeAfter,/);
+  assert.match(code(RUN), /session_mirror_cursor/);
+  assert.match(code(RUN), /MIRROR_TRAINER_COLS[\s\S]{0,220}session_mirror_cursor/);
+});
+
+test("the resume point is only offered when there is more to do", () => {
+  // A pass that reached the end of the window must report null, or the next run
+  // would skip everything before a point it had already finished with — and the
+  // early part of the window would stop being maintained.
+  assert.match(code(MIRROR), /resumeAfter: cappedAt === null \? null : resumeAfter,/);
+  // Recorded on every successful write, not only where the deadline breaks the
+  // loop: maxWrites can end it too, and a cursor set in one exit and not the
+  // other loses whatever sits between them.
+  assert.match(code(MIRROR), /written \+= 1;\s*\n[\s\S]{0,320}resumeAfter = session\.starts_at;/);
+});

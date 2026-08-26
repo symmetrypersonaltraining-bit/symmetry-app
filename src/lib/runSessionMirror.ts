@@ -43,10 +43,11 @@ export type MirrorTrainer = {
   session_mirror_enabled: boolean;
   session_mirror_calendar_id: string | null;
   session_mirror_synced_at: string | null;
+  session_mirror_cursor: string | null;
 };
 
 export const MIRROR_TRAINER_COLS =
-  "id, auth_user_id, session_mirror_enabled, session_mirror_calendar_id, session_mirror_synced_at";
+  "id, auth_user_id, session_mirror_enabled, session_mirror_calendar_id, session_mirror_synced_at, session_mirror_cursor";
 
 export type RunMirrorOutcome =
   | { skipped: string }
@@ -101,6 +102,12 @@ export async function runSessionMirror(
         : new Date(trainer.session_mirror_synced_at),
     maxWrites: MIRROR_MAX_WRITES_PER_RUN,
     deadlineMs: opts.deadlineMs,
+    // Pick up where the last capped run stopped. A full rewrite starts over by
+    // definition, and so does a run with no cursor stored.
+    resumeAfter:
+      opts.full || !trainer.session_mirror_cursor
+        ? null
+        : new Date(trainer.session_mirror_cursor),
   });
 
   // THE WATERMARK ONLY MOVES ON A CLEAN, COMPLETE PASS. Advancing it after a
@@ -114,6 +121,15 @@ export async function runSessionMirror(
     .update({
       session_mirror_calendar_id: result.calendarId,
       ...(clean ? { session_mirror_synced_at: now.toISOString() } : {}),
+      // THE CURSOR IS WHAT MAKES A CAPPED PUBLISH FINISH.
+      //
+      // The watermark deliberately does not move on a capped run, so `since`
+      // stays null and the incremental skip stays off — which, on its own,
+      // meant every run restarted at the top of the window and rewrote the
+      // same first 83 events an hour at a time, never reaching the 84th. The
+      // cursor is the other half: where to carry on from. Cleared the moment a
+      // pass reaches the end, at which point the watermark takes over.
+      session_mirror_cursor: clean ? null : result.resumeAfter,
       session_mirror_error: clean
         ? null
         : [

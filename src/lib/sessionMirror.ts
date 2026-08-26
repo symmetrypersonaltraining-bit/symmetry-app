@@ -164,6 +164,12 @@ export type MirrorResult = {
   unchanged: number;
   /** True when maxWrites stopped the pass early — the next run finishes it. */
   cappedAt: number | null;
+  /**
+   * Where a capped pass stopped, as the `starts_at` of the last session it
+   * wrote. The next run resumes from here. Null when the pass reached the end
+   * of the window, which is what says the publish is complete.
+   */
+  resumeAfter: string | null;
   errors: string[];
 };
 
@@ -197,6 +203,26 @@ export async function mirrorSessions(opts: {
   windowEnd: Date;
   /** Skip events unchanged since this. null = rewrite the lot. */
   since?: Date | null;
+  /**
+   * Resume a capped pass: skip sessions starting before this.
+   *
+   * WITHOUT THIS, A FIRST PUBLISH NEVER FINISHES. It is 721 events and a run
+   * writes ~83 of them before the deadline. `since` stays null until a pass
+   * completes cleanly — that is deliberate, so a partial run cannot mark
+   * unwritten sessions as published — but it also means the skip below is
+   * disabled, so run two starts at the top of the window again and rewrites
+   * the same first 83. Forever, an hour at a time, never reaching event 84.
+   *
+   * Measured on the real calendar the moment the mirror was switched back on:
+   * `published: 83, capped: 83`. The write count never came close to
+   * maxWrites; the clock is the only thing that stops it.
+   *
+   * A timestamp rather than a count, because a count means a different session
+   * between one run and the next. Sessions at exactly this instant are
+   * rewritten rather than skipped — a tie is rare and rewriting is harmless,
+   * whereas skipping one loses it until the next full pass.
+   */
+  resumeAfter?: Date | null;
   /** Stop after this many writes so a big first run cannot blow the budget. */
   maxWrites?: number;
   /**
@@ -213,6 +239,7 @@ export async function mirrorSessions(opts: {
   let unchanged = 0;
   let removed = 0;
   let cappedAt: number | null = null;
+  let resumeAfter: string | null = null;
 
   const wanted = new Map<string, MirrorSession>();
   for (const s of opts.sessions) {
@@ -233,6 +260,13 @@ export async function mirrorSessions(opts: {
       );
 
   for (const [eventId, session] of wanted) {
+    // Already written by an earlier leg of this same publish. `wanted` arrives
+    // ordered by scheduled_at, so everything before the resume point is behind
+    // us and everything after is still to do.
+    if (opts.resumeAfter && new Date(session.starts_at) < opts.resumeAfter) {
+      unchanged += 1;
+      continue;
+    }
     // Skipped only when the event is ALREADY THERE and untouched. A session
     // that has never been published is written however old it is — otherwise a
     // `since` in the future would quietly publish nothing at all.
@@ -289,6 +323,10 @@ export async function mirrorSessions(opts: {
         }
       }
       written += 1;
+      // The high-water mark, kept on every success rather than only at the
+      // break: the loop can also exit on maxWrites, and a resume point set in
+      // one place and not the other is how half a calendar goes missing.
+      resumeAfter = session.starts_at;
     } catch (e) {
       errors.push(`${session.display_name} ${session.starts_at}: ${(e as Error).message}`);
     }
@@ -313,5 +351,11 @@ export async function mirrorSessions(opts: {
     }
   }
 
-  return { calendarId, createdCalendar: created, written, unchanged, removed, cappedAt, errors };
+  // A pass that ran to the end of the window has nothing to resume from, and
+  // saying so is what lets the caller promote it to a completed publish.
+  return {
+    calendarId, createdCalendar: created, written, unchanged, removed, cappedAt,
+    resumeAfter: cappedAt === null ? null : resumeAfter,
+    errors,
+  };
 }

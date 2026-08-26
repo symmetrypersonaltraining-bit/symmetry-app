@@ -1305,6 +1305,7 @@
     "session_mirror_enabled",
     "session_mirror_calendar_id",
     "session_mirror_synced_at",
+    "session_mirror_cursor",
     "session_mirror_error"
   ],
   "usda_nutrient_map": [
