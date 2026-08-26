@@ -351,6 +351,17 @@
     "created_at",
     "updated_at"
   ],
+  "client_error_log": [
+    "id",
+    "client_id",
+    "user_id",
+    "scope",
+    "message",
+    "detail",
+    "path",
+    "user_agent",
+    "created_at"
+  ],
   "client_notifications": [
     "id",
     "client_id",

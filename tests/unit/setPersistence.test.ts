@@ -73,10 +73,18 @@ test("logSet checks that the row actually landed", () => {
     "the upsert's result is discarded — supabase-js resolves errors, it does not throw");
   assert.match(body, /\.select\("id"\)/,
     "without select the write cannot report which rows it changed");
-  const errIdx = body.indexOf("if (setErr) throw setErr;");
+  // ORDERING, not spelling. 26 Aug the one-line `if (setErr) throw setErr;`
+  // became a block so the failure could also be recorded server-side (a client
+  // lost 27 minutes of sets to this branch and the only trace was a sentence on
+  // her own screen). The property that matters is unchanged and is what is
+  // asserted: the throw happens BEFORE anything turns green.
+  const errIdx = body.indexOf("throw setErr;");
   const greenIdx = body.indexOf('updateSet(peId, si, "done", true)');
   assert.ok(errIdx > 0 && errIdx < greenIdx,
     "the set turns green before the write is verified");
+  // And the recording must not have replaced the throw.
+  assert.match(body, /if \(setErr\) \{[\s\S]{0,400}throw setErr;/,
+    "a failed write no longer stops the set going green");
   assert.match(body, /if \(!setRows \|\| !setRows\.length\)/,
     "nought rows changed is not an error in PostgREST — with client_id null RLS matches nothing and reports nothing");
 });

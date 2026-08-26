@@ -51,6 +51,11 @@ const ALLOWED: Record<string, { max: number; why: string }> = {
   "src/app/api/agent/session/route.ts": { max: 1, why: "ai_chat_sessions — conversation cache" },
   "src/app/api/feedback/describe/route.ts": { max: 2, why: "app_feedback enrichment — internal queue only" },
   "src/app/api/cron/check-videos/route.ts": { max: 1, why: "files its own feedback row; the sweep result is reported separately" },
+  // Nobody is told this worked, and that is deliberate: it records a write that
+  // has ALREADY failed, on the way to showing the client the error. Checking it
+  // would mean a failure inside failure reporting could throw over the top of
+  // the real message — the one thing the workout logger must never do.
+  "src/lib/logClientError.ts": { max: 1, why: "client_error_log — fire-and-forget telemetry about an error already being surfaced" },
 
   // ── Seen-markers and read receipts. Failure means something shows once more
   //    than it should, which is the safe direction.

@@ -31,6 +31,7 @@ import {
   type SetTimerState, type SetTimerMode,
 } from "@/lib/setTimer";
 import { alarmPlan, armRestAlarm, type ArmedAlarm } from "@/lib/restAlarm";
+import { logClientError } from "@/lib/logClientError";
 
 interface Exercise {
   id: string;
@@ -1484,8 +1485,25 @@ export default function WorkoutLogger({
       // Nought rows changed is the same failure wearing a different hat: with
       // client_id null (RLS: client_id = my_client_id()) every upsert matches
       // nothing and reports no error at all.
-      if (setErr) throw setErr;
+      // TELL SOMEONE OTHER THAN HER. The guard below is right and it stays
+      // exactly as it was — what is added is a record. On 26 Aug a client lost
+      // 27 minutes of sets to this branch and the only trace it ever left was a
+      // sentence on her own screen; the cause still is not known.
+      if (setErr) {
+        void logClientError({
+          clientId, scope: "set_log", error: setErr,
+          detail: { prescribed_exercise_id: peId, set_number: si + 1, workout_log_id: logId },
+        });
+        throw setErr;
+      }
       if (!setRows || !setRows.length) {
+        // Nought rows and NO error is the quiet one — an RLS refusal returns
+        // exactly this — so it is worth recording even though there is no
+        // error object to attach.
+        void logClientError({
+          clientId, scope: "set_log", error: new Error("upsert affected 0 rows"),
+          detail: { prescribed_exercise_id: peId, set_number: si + 1, workout_log_id: logId },
+        });
         throw new Error("That set didn't save. Your other sets are safe — tap it again.");
       }
       updateSet(peId, si, "done", true);
@@ -1840,8 +1858,19 @@ export default function WorkoutLogger({
           .from("set_logs")
           .upsert(rows, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" })
           .select("id");
-        if (bulkErr) throw bulkErr;
+        if (bulkErr) {
+          void logClientError({
+            clientId, scope: "bulk_set_log", error: bulkErr,
+            detail: { prescribed_exercise_id: peId, attempted: rows.length, workout_log_id: logId },
+          });
+          throw bulkErr;
+        }
         if (!bulkRows || bulkRows.length !== rows.length) {
+          void logClientError({
+            clientId, scope: "bulk_set_log",
+            error: new Error("upsert affected " + (bulkRows?.length ?? 0) + " of " + rows.length + " rows"),
+            detail: { prescribed_exercise_id: peId, attempted: rows.length, saved: bulkRows?.length ?? 0, workout_log_id: logId },
+          });
           throw new Error(
             "Only " + (bulkRows?.length ?? 0) + " of " + rows.length +
             " sets saved. Tap the ones still unticked to try again.",
