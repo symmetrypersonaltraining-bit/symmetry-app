@@ -8,6 +8,12 @@ import { sanitizeNutrients } from "./nutrients";
 interface ParseResult {
   items: CustomItem[];
   description?: string | null;
+  /**
+   * Foods the person named that are not in the database, so no macros exist for
+   * them and NOTHING was added. Named rather than dropped: silently losing a
+   * food off a logged meal is the same class of error as inventing one.
+   */
+  unresolved?: string[];
 }
 
 function num(v: unknown): number {
@@ -42,12 +48,20 @@ function mapItem(raw: Record<string, unknown>): CustomItem | null {
   // as null so "unknown" stays distinguishable from "contains none".
   const mi = sanitizeNutrients(raw.micros ?? raw.nutrients);
 
+  // `est` means "an AI estimated this". Since 26 Aug the parser resolves every
+  // item to a food_catalog row and reads the numbers off it, so an item that
+  // carries a food_id is NOT an estimate — it is the database, same as one
+  // picked by hand from food search. Marking it estimated would tell the person
+  // to distrust the most trustworthy number on the screen.
+  const foodId = typeof raw.food_id === "string" ? raw.food_id : null;
   return {
     n: String(name),
     a,
     p, c, f, k,
     free: !!(raw.free ?? raw.unlimited ?? raw.is_unlimited),
-    est: true,
+    est: !foodId,
+    db: !!foodId,
+    ...(foodId ? { food_id: foodId } : {}),
     fac: 1,
     mi: Object.keys(mi).length ? mi : null,
   };
@@ -153,7 +167,14 @@ export async function parseFoodText(text: string, clientId?: string): Promise<Pa
       lastFailure = "empty";
       return null;
     }
-    return { items, description: (json.description as string) || null };
+    const unresolved = Array.isArray(json.unresolved)
+      ? (json.unresolved as unknown[]).filter((u): u is string => typeof u === "string")
+      : undefined;
+    return {
+      items,
+      description: (json.description as string) || null,
+      ...(unresolved && unresolved.length ? { unresolved } : {}),
+    };
   } catch {
     lastFailure = "unavailable";
     return null;

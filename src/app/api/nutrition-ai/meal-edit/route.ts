@@ -24,9 +24,7 @@ import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  CatalogRow, ResolvedFood, macrosFromRow, describeCandidates, PICK_SYSTEM, validatePick,
-} from "@/lib/nutrition/foodResolve";
+import { resolveFood } from "@/lib/nutrition/resolveFoodOp";
 
 interface InItem { id: string; food: string; amount: number | null; unit: string | null }
 
@@ -131,66 +129,6 @@ function validate(raw: unknown): { ops: MealEditOp[]; note: string } | null {
   return { ops, note: typeof r.note === "string" ? r.note.slice(0, 200) : "" };
 }
 
-/** How many candidate rows the picker sees. Enough to contain the right one,
- *  short enough that the whole list is read. */
-const CANDIDATES = 10;
-
-/**
- * A food the model named → a row in food_catalog → real macros.
- *
- * Returns null when nothing in the catalogue IS that food, and null means the
- * food is not added. That is the point: a near-miss becomes a wrong number in
- * somebody's log and looks exactly like a right one.
- */
-async function resolveOneFood(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db: any,
-  apiKey: string,
-  clientId: string | null,
-  name: string,
-  amount: number | undefined,
-  unit: string | undefined,
-): Promise<ResolvedFood | null> {
-  if (!name.trim()) return null;
-
-  // match_food_for_ai, NOT search_food_catalog. The latter matches the whole
-  // phrase as one substring — "white potatoes, boiled" returns zero rows — and
-  // ranks an exact lowercase name first, which is how "banana" resolves to a
-  // crowd-submitted row reading 242 kcal and 14 g of fat.
-  const { data } = await db.rpc("match_food_for_ai", {
-    p_term: name.trim(),
-    p_client_id: clientId,
-    p_limit: CANDIDATES,
-  });
-  const rows = ((data as CatalogRow[] | null) || []).filter(
-    (r) => r && r.protein != null && r.carbs != null && r.fats != null,
-  );
-  if (!rows.length) return null;
-
-  const picked = await callClaudeJson({
-    meter: { clientId, feature: "meal_edit" },
-    apiKey,
-    model: HAIKU_MODEL,
-    system: PICK_SYSTEM,
-    maxTokens: 60,
-    messages: [
-      { role: "user", content: `THEY ASKED FOR:\n${name}\n\nCANDIDATE ROWS:\n${describeCandidates(rows)}` },
-    ],
-    validate: (raw) => {
-      const n = validatePick(raw, rows.length);
-      return n === null ? null : { n };
-    },
-  });
-
-  // No answer, or an explicit "none of these". Both mean do not add it.
-  if (!picked.value || picked.value.n === 0) return null;
-
-  const row = rows[picked.value.n - 1];
-  // Amount defaults to one of the row's own servings when they named no
-  // measure — still the row's figures, never an invented portion.
-  return macrosFromRow(row, amount ?? (row.serving_grams ? Number(row.serving_grams) : 1), unit ?? (row.serving_grams ? "g" : ""));
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -264,7 +202,7 @@ export async function POST(req: NextRequest) {
     for (const op of ops) {
       if (op.op !== "add" && op.op !== "swap") continue;
       try {
-        const resolved = await resolveOneFood(admin, apiKey, clientId, op.name || "", op.amount, op.unit);
+        const resolved = await resolveFood({ db: admin, apiKey, clientId }, op.name || "", op.amount, op.unit);
         if (!resolved) { op.unresolved = true; continue; }
         op.food_id = resolved.food_id;
         op.resolved_name = resolved.name;

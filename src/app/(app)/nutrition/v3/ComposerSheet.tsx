@@ -111,6 +111,15 @@ export default function ComposerSheet({
     setParsing(false);
     if (!result || !result.items.length) { setParseFailed(parseFailureMessage(lastParseFailure())); return; }
     setItems((prev) => [...prev, ...result.items]);
+    // A food that is not in the database is NOT added, and saying so is the
+    // whole point — every number on these rows now comes from a real row, so a
+    // food with no row has no honest macros to show. Dropping it quietly would
+    // leave a logged meal missing an item nobody noticed.
+    setParseFailed(
+      result.unresolved?.length
+        ? `Added the rest. Couldn't find ${result.unresolved.slice(0, 3).join(", ")} in the food database — add ${result.unresolved.length > 1 ? "those" : "that"} from Food search so the macros are right.`
+        : null,
+    );
     setText("");
   }
 

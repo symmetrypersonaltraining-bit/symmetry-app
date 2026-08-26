@@ -76,6 +76,48 @@ export interface ParsedItem {
   f: number;
   /** Micronutrients keyed by the registry. Absent key = unknown, never zero. */
   micros?: NutrientMap;
+  /** The food_catalog row every figure above came from. */
+  food_id?: string;
+  /** True when that row is USDA-verified rather than crowd-submitted. */
+  verified?: boolean;
+}
+
+/**
+ * WHAT THE MODEL IS ALLOWED TO SAY when parsing free text into foods.
+ *
+ * A name and a measure. Nothing else — 26 Aug 2026. The parse prompt used to
+ * ask it to "estimate macros using USDA / nutrition-label knowledge", which is
+ * recall plus arithmetic, and it got both wrong in ways that looked right:
+ * "200 g of potatoes" came back carrying the per-100 g figures.
+ *
+ * Every number is now read from a food_catalog row afterwards. This validator
+ * is the gate: a kcal or a protein the model volunteers has nowhere to land.
+ */
+export interface ParsedName {
+  name: string;
+  amount: number | null;
+  unit: string | null;
+}
+
+export function validateParsedNames(raw: unknown): { items: ParsedName[] } | null {
+  if (!raw || typeof raw !== "object") return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const items = (raw as any).items;
+  if (!Array.isArray(items) || items.length === 0) return null;
+  const out: ParsedName[] = [];
+  for (const it of items) {
+    if (!it || typeof it !== "object") continue;
+    const name = typeof it.name === "string" ? it.name.trim().slice(0, 120) : "";
+    if (!name) continue;
+    const amountRaw = it.amount;
+    const amount =
+      amountRaw == null || !Number.isFinite(Number(amountRaw)) || Number(amountRaw) <= 0
+        ? null
+        : Number(amountRaw);
+    const unit = typeof it.unit === "string" && it.unit.trim() ? it.unit.trim().slice(0, 16) : null;
+    out.push({ name, amount, unit });
+  }
+  return out.length ? { items: out } : null;
 }
 
 export interface ParseResult {

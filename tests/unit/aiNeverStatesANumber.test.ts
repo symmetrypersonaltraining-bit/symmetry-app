@@ -26,6 +26,7 @@ import { toGrams, macrosFromRow, describeCandidates, validatePick, type CatalogR
 
 const ROUTE = readFileSync(join(process.cwd(), "src/app/api/nutrition-ai/meal-edit/route.ts"), "utf8");
 const RESOLVE = readFileSync(join(process.cwd(), "src/lib/nutrition/foodResolve.ts"), "utf8");
+const OP = readFileSync(join(process.cwd(), "src/lib/nutrition/resolveFoodOp.ts"), "utf8");
 const CLIENT = readFileSync(join(process.cwd(), "src/app/(app)/nutrition/v3/NutritionV3Client.tsx"), "utf8");
 
 /** Comments out — these files explain the rule by naming what it forbids. */
@@ -181,6 +182,67 @@ test("the resolver uses the AI matcher, not the phrase-substring search", () => 
   // search_food_catalog matches the whole phrase as one substring, so
   // "white potatoes, boiled" returns nothing at all, and it ranks an exact
   // lowercase name above a verified row.
-  assert.match(code(ROUTE), /rpc\("match_food_for_ai"/);
-  assert.doesNotMatch(code(ROUTE), /rpc\("search_food_catalog"/);
+  assert.match(code(OP), /rpc\("match_food_for_ai"/);
+  assert.doesNotMatch(code(OP), /rpc\("search_food_catalog"/);
+});
+
+test("there is ONE resolver, shared by every door", () => {
+  // meal-edit (the Adjust sheet) and parse (every client's daily logging) must
+  // not each own a copy of "how a food becomes a number" — two copies drift,
+  // and the drift is two screens disagreeing about the same dinner.
+  assert.match(code(ROUTE), /from "@\/lib\/nutrition\/resolveFoodOp"/);
+  assert.match(code(OP), /export async function resolveFood/);
+});
+
+test("an unstated amount falls back to the ROW's serving, not an invented one", () => {
+  assert.match(
+    code(OP),
+    /amount \?\? \(row\.serving_grams \? Number\(row\.serving_grams\) : 1\)/,
+  );
+});
+
+// ── the everyday logger, which is the bigger surface ─────────────────────────
+
+const PARSE = readFileSync(join(process.cwd(), "src/app/api/nutrition-ai/parse/route.ts"), "utf8");
+const PARSE_CLIENT = readFileSync(join(process.cwd(), "src/lib/nutrition/parseClient.ts"), "utf8");
+
+test("the food parser no longer asks a model for macros either", () => {
+  // /nutrition-ai/parse is the "describe what you ate" path every client uses
+  // daily — a far bigger surface than the Adjust sheet. Its prompt used to say
+  // "estimate macros for the stated amount of each item using USDA /
+  // nutrition-label knowledge", which is the same recall-plus-arithmetic that
+  // returned the per-100 g figures for a 200 g request.
+  assert.match(PARSE, /YOU NEVER STATE A NUTRITION FIGURE/);
+  assert.doesNotMatch(code(PARSE), /estimate macros for the stated amount/);
+  // The reply shape it accepts has no macro fields at all.
+  assert.match(PARSE, /\{"items":\[\{"name":string,"amount":number\|null,"unit":string\|null\}\]\}/);
+  assert.match(code(PARSE), /validate: validateParsedNames/);
+});
+
+test("parse resolves every item against the catalogue", () => {
+  assert.match(code(PARSE), /resolveFood\(deps, named\.name, named\.amount, named\.unit\)/);
+  // The ROW's name goes back, not the words typed.
+  assert.match(code(PARSE), /name: got\.name/);
+});
+
+test("an unfindable food is named, not silently dropped", () => {
+  // Losing a food off a logged meal is the same class of error as inventing
+  // one: the total is wrong and nothing on screen says why.
+  assert.match(code(PARSE), /unresolved\.push\(named\.name\)/);
+  assert.match(code(PARSE), /unresolved\.length \? \{ unresolved \}/);
+  assert.match(code(PARSE_CLIENT), /unresolved/);
+});
+
+test("totals are summed from the resolved items, in code", () => {
+  // They used to be whatever the model said they were, with the items summing
+  // to something else entirely.
+  assert.match(code(PARSE), /const totals = items\.reduce\(/);
+});
+
+test("a catalogue-resolved item is not flagged as an AI estimate", () => {
+  // `est` tells the person to distrust the number. Once it comes from a real
+  // row that would be pointing them away from the most reliable figure on the
+  // screen.
+  assert.match(code(PARSE_CLIENT), /est: !foodId/);
+  assert.match(code(PARSE_CLIENT), /db: !!foodId/);
 });

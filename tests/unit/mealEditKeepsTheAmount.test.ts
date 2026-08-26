@@ -101,12 +101,7 @@ test("a swap with no stated amount is resolved against the catalogue, not invent
   // "keeping same weight" made true, but the weight now travels to the SERVER,
   // which looks the food up and scales a real row — rather than the client
   // stitching a macro figure together from what the model said.
-  assert.match(code(ROUTE), /resolveOneFood\(admin, apiKey, clientId, op\.name \|\| "", op\.amount, op\.unit\)/);
-  assert.match(
-    code(ROUTE),
-    /amount \?\? \(row\.serving_grams \? Number\(row\.serving_grams\) : 1\)/,
-    "an unstated amount must fall back to the ROW's own serving, never to an invented portion",
-  );
+  assert.match(code(ROUTE), /resolveFood\(\{ db: admin, apiKey, clientId \}, op\.name/);
 });
 
 test("the summary is built from what was applied, not from the model's prose", () => {
