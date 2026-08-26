@@ -1,5 +1,82 @@
 # Backlog — the single work queue
 
+> ## 👉 26 Aug — THE SYNC OUTAGE I CAUSED, AND THREE THINGS HE HIT (`b5ecaa8`)
+>
+> ### The outage
+>
+> **The calendar sync timed out at 55s every hour from 25 Aug 11:25 to 26 Aug
+> 19:25.** Appointments, payment rows and payment reminders all stopped. My
+> fault, in three compounding pieces:
+>
+> 1. I hung the session mirror on the **end of `/api/gcal-sync`**, which was
+>    already using ~55 of its 60 seconds.
+> 2. I created Google events with **PUT**, believing a PUT to an unused id
+>    creates one. It does not — Google answers **404**. So every write failed,
+>    the watermark never advanced, and all 200 writes retried the next hour.
+> 3. `SyncHealth` rendered it **green**. A timed-out run never returns a payload,
+>    so `ok` is NULL, and the card tested `ok === false`. Null is not false.
+>
+> Dustin's dashboard showed "Calendar in sync" directly above "the run timed
+> out". Fixed: POST-to-create with a 409→PUT fallback; the mirror moved to
+> `/api/cron/session-mirror` (jobid 44, `40 * * * *`) with its own 48s
+> wall-clock budget; `ok !== true || run.error` now counts as bad.
+>
+> **19:25 run: 200, ok, 693 appointments, 15 reminders. First clean run since
+> the 25th.** Mirror re-enabled and verified against the real Google calendar —
+> blue booked, orange + free for cancelled, no attendees, correct CT times.
+>
+> A fourth bug showed up only once it was running: the watermark deliberately
+> does not move on a capped run, which also switches the incremental skip off,
+> so every run rewrote its own first page and never reached event 84 of 721.
+> `trainers.session_mirror_cursor` is the resume point. Watermark = "published
+> and current"; cursor = "carry on from here". Currently working through the
+> backlog at ~90/run; expected complete overnight.
+>
+> **Lesson worth keeping: the write count was never the binding constraint.
+> Measured, it stops at ~90 on time and never approaches `maxWrites: 200`.**
+>
+> ### The three he reported
+>
+> *"payments overdue takes me to pmts but takes minutes to load ... programkung
+> running out won't let me clear and routes to client list, data check failing
+> goes to client list."*
+>
+> - **The ✕ on Today's Admin had never once worked.** `admin_dismissals` had
+>   ZERO rows since the day it shipped. The client upserted with
+>   `onConflict: "trainer_id,row_key,subject_id"`; the unique index is on
+>   `COALESCE(subject_id, ...)`, an expression. Postgres matches ON CONFLICT
+>   against a real index, so every call died with 42P10 before the conflict
+>   mattered. Now `dismiss_admin_row()` — server-side, no trainer parameter.
+> - **"Data check failing" → `/settings/data-health`,** a new page.
+>   `run_integrity_checks()` had been writing results since 16 Aug with nothing
+>   in the app reading them; the dashboard row was the first reader and had
+>   nowhere to hand over to. Latest run only, criticals first, every client
+>   named in a check's detail linked.
+> - **"Programming running out"** with one name now opens that name's programme
+>   rather than the roster.
+> - **Payments said "0 Overdue" while 2 were past due.** The Upcoming tab keeps
+>   `dueDate >= today` — the definition of not-overdue — and the header counted
+>   overdue out of that filtered set. Structurally zero on the default tab,
+>   forever. Worse, the rows were hidden too. Header now counts the book; past
+>   due counts as upcoming and sorts to the top.
+> - **The "minutes to load" was `ReminderEditor`:** its appointment window had a
+>   floor and no ceiling, so it pulled every booking to Aug 2028. **3,736 rows,
+>   four round trips, on a phone.** Bounded at the same horizon the reminders
+>   use → **608 rows, one round trip.**
+>
+> ### Still open from this
+>
+> - `mirrors[].unchanged` conflates "already correct" with "skipped by the
+>   resume cursor". Cosmetic, in a JSON response nobody reads on screen, but it
+>   is the same class of misleading report as the rest of this entry.
+> - The first publish is still catching up. Check
+>   `trainers.session_mirror_cursor` is NULL and `session_mirror_synced_at` is
+>   set before calling it done.
+> - Gym owner still needs asking: PushPress **Grow vs Core**, and which Google
+>   account to point Two-Way/Smart Sync at.
+
+---
+
 > ## 👉 24 Aug — "6 OZ" HAD NOWHERE TO GO (`137a079`)
 >
 > From the Adjust / edit sheet: *"swap chicken thigh w 6 oz of chicken breast"*.
