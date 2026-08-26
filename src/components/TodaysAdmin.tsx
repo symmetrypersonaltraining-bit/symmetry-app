@@ -118,10 +118,30 @@ export default function TodaysAdmin() {
     try {
       const sb = createClient() as any;
       const until = addDays(todayCT(), DISMISS_DAYS);
-      const { error } = await sb
-        .from("admin_dismissals")
-        .upsert({ trainer_id: me, row_key: key, subject_id: null, until, dismissed_at: new Date().toISOString() },
-                { onConflict: "trainer_id,row_key,subject_id" });
+      // THIS WAS AN UPSERT, AND IT HAD NEVER WORKED ONCE.
+      //
+      // `{ onConflict: "trainer_id,row_key,subject_id" }` names three columns.
+      // The unique index is on an expression — COALESCE(subject_id, a zero
+      // uuid) — because NULLs are distinct from each other in a plain unique
+      // index and a whole-row dismissal would otherwise store a hundred copies
+      // of itself. Postgres matches ON CONFLICT against an actual index, so
+      // every call was refused with 42P10 before it got as far as caring
+      // whether the row existed.
+      //
+      // admin_dismissals had zero rows in it from the day this shipped to 26
+      // Aug, when Dustin said the Programming row would not clear. The catch
+      // below was doing its job perfectly the whole time: putting the row back
+      // and saying so. Nothing was broken about the reporting — the write was
+      // simply impossible.
+      //
+      // dismiss_admin_row() does the insert server-side where the ON CONFLICT
+      // can name the same expression. It takes no trainer argument: the trainer
+      // comes from my_trainer_id(), so it can only ever clear your own rows.
+      const { error } = await sb.rpc("dismiss_admin_row", {
+        p_row_key: key,
+        p_until: until,
+        p_subject_id: null,
+      });
       if (error) throw error;
     } catch {
       setRows(keep ?? null);
@@ -278,7 +298,18 @@ export default function TodaysAdmin() {
                 // Each name goes straight to that client's programme. The names
                 // used to be a sentence with one button to /clients underneath.
                 subjects: short.map((c) => ({ id: c.id, name: c.name, href: `/clients/${c.id}/program` })),
-                href: "/clients", cta: "All",
+                // ONE NAME MEANS THE BUTTON GOES TO THAT NAME'S PROGRAMME.
+                //
+                // "All →" always pointed at /clients, so with a single client
+                // running out the row offered two controls: a chip that went
+                // where he needed and a button that went to the roster. Dustin,
+                // 26 Aug: "programming running out ... routes to client list."
+                //
+                // With several, the roster genuinely is the only page that
+                // holds all of them, and the chips above are the direct route.
+                ...(short.length === 1
+                  ? { href: `/clients/${short[0].id}/program`, cta: "Open" }
+                  : { href: "/clients", cta: "All" }),
               }
             : {
                 key: "coverage", tone: "good",
@@ -316,7 +347,12 @@ export default function TodaysAdmin() {
             sub:
               live.map((c) => c.check_name.replace(/_/g, " ")).slice(0, 2).join(" · ") +
               (who.length ? " — " + who.slice(0, 4).join(", ") + (who.length > 4 ? " +" + (who.length - 4) : "") : ""),
-            href: "/clients", cta: "Look",
+            // /settings/data-health, NOT /clients. Same fault the notes row
+            // had above: a counted, named, red row whose button dropped him on
+            // the roster with nothing on it about the fault. The checker had
+            // been writing results since 16 Aug with no page to read them on;
+            // there is one now.
+            href: "/settings/data-health", cta: "Look",
           });
         }
 
