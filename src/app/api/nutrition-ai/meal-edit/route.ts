@@ -23,6 +23,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  CatalogRow, ResolvedFood, macrosFromRow, describeCandidates, PICK_SYSTEM, validatePick,
+} from "@/lib/nutrition/foodResolve";
 
 interface InItem { id: string; food: string; amount: number | null; unit: string | null }
 
@@ -32,53 +36,56 @@ export interface MealEditOp {
   id?: string;
   /** set: the new amount, in the item's own unit. */
   amount?: number;
-  /** add/swap: the food going on the plate. */
+  /** add/swap: the food going on the plate, as they described it. */
   name?: string;
-  servings?: number;
+  /** add/swap: the measure they named, if they named one. */
+  unit?: string;
+
+  // ── FILLED IN BY THE SERVER FROM food_catalog, NEVER BY THE MODEL ──────────
+  //
+  // There is deliberately no p/c/f in what the model may return. Two prompting
+  // attempts failed on consecutive tries - "6 oz of chicken breast" came back
+  // as one serving, "200 g of potatoes" came back carrying the per-100 g
+  // figures - and the answer is not a third prompt. A macro figure comes from
+  // a row in the catalogue or it does not exist.
+
+  /** The catalogue row this resolved to. */
+  food_id?: string;
+  /** The row's own name, so a wrong CHOICE is visible on screen and fixable. */
+  resolved_name?: string;
+  verified?: boolean;
+  /** Straight off the row, for `per_amount` of `unit`. */
   p?: number;
   c?: number;
   f?: number;
-  /**
-   * THE MEASURE, when they gave one.
-   *
-   * Dustin, 24 Aug: "swap chicken thigh w 6 oz of chicken breast" came back as
-   * "1 serving" with no way to change it, because `add` had no field for an
-   * amount or a unit and so both were discarded on the way through.
-   */
-  unit?: string;
-  /**
-   * THE QUANTITY p/c/f ACTUALLY DESCRIBE. The app multiplies; the model does not.
-   *
-   * Dustin, 24 Aug, second attempt: "add 200 g of potatoes" came back as
-   * 200 g at 76 cal / 2P / 17C / 0F. That is the figure for ONE HUNDRED grams —
-   * it set the amount to 200 and quoted the macros for something else, and the
-   * app displayed the mismatch as fact.
-   *
-   * The old prompt asked it to "quote p/c/f FOR THAT MEASURE", which is recall
-   * AND arithmetic in one step, and the arithmetic is the half a language model
-   * is worst at. So now it states a reference quantity it is confident about —
-   * per 100 g, per oz, per item — and `amount / per_amount` does the scaling in
-   * code, where multiplication is reliable.
-   */
   per_amount?: number;
+  servings?: number;
+  /**
+   * Set when nothing in the catalogue is that food. The sheet says so and
+   * offers the search. NOTHING IS ADDED - a fabricated row that looks like
+   * every other row is the failure being designed out.
+   */
+  unresolved?: boolean;
 }
 
 const SYSTEM = `You edit ONE meal in a physique coach's app. You are given the meal's current items (each with an id, a food name, an amount and a unit) and a sentence from the person eating it. Turn the sentence into operations against those items.
 
+YOU NEVER STATE A NUTRITION FIGURE. No calories, no protein, no carbs, no fat, not for any food, not even if you are sure. The app reads every number from its food database. Your job is what the sentence MEANS.
+
 Respond with ONLY valid JSON — no markdown, no fences, no prose — exactly this shape:
-{"ops":[{"op":"set","id":"<id>","amount":<number>}|{"op":"remove","id":"<id>"}|{"op":"add","name":"<food>","amount":<number>,"unit":"<unit>","per_amount":<number>,"p":<g>,"c":<g>,"f":<g>}|{"op":"swap","id":"<id>","name":"<food>","amount":<number>,"unit":"<unit>","per_amount":<number>,"p":<g>,"c":<g>,"f":<g>}],"note":"<one short plain sentence>"}
+{"ops":[{"op":"set","id":"<id>","amount":<number>}|{"op":"remove","id":"<id>"}|{"op":"add","name":"<food>","amount":<number>,"unit":"<unit>"}|{"op":"swap","id":"<id>","name":"<food>","amount":<number>,"unit":"<unit>"}],"note":"<one short plain sentence>"}
 
 Rules:
 - "set" changes an existing item's amount, in THAT ITEM'S OWN UNIT. If the item is "3 each" and they say "four eggs", that is {"op":"set","amount":4}. If the item is "50 g" and they say "double it", that is 100.
 - "remove" is for "no X", "skip the X", "drop the X", "without X". Prefer remove over setting an amount to 0.
-- "add" is ONLY for a food that is not already in the list. Give p/c/f from USDA / label knowledge; assume cooked weight and plain preparation unless told otherwise. Be realistic, never inflated.
-- WHENEVER THEY NAME A MEASURE — "6 oz", "200 g", "two tbsp" — put it in "amount" and "unit". Only fall back to "servings" with p/c/f per serving when they named no measure at all. Never round a stated measure to a serving.
-- DO NOT MULTIPLY. p/c/f must be the figures for a REFERENCE quantity you are confident about — per 100 g, per 1 oz, per 1 cup, per 1 item — and you state that quantity in "per_amount", in the SAME unit as "amount". The app multiplies. Example: they say 200 g of cooked white potato, you know the per-100 g figures, so you answer amount 200, unit "g", per_amount 100, p 2, c 17, f 0 — and the app works out 4 / 34 / 0. Getting this wrong by quoting per-100 g figures against a 200 g amount halves someone's carbs on their own log.
-- If you genuinely quoted p/c/f for the whole amount, set per_amount equal to amount. Never leave per_amount out when amount is present.
-- "swap" replaces one item with a different food, keeping its place: {"op":"swap","id":"<id of the item going out>","name":"<food coming in>","amount":<number>,"unit":"<unit>","p":<g>,"c":<g>,"f":<g>}. Use it for "swap X for Y", "X instead of Y", "make it Y not X". If they name a measure for the new food, give it. IF THEY DO NOT, OMIT amount AND unit — the app will carry the old item's own weight across, which is what "swap" means. Do not invent a serving.
-- Match foods loosely — "the bread" should find "Homemade Sourdough", "eggs" should find "Boiled Eggs (whole)". If a food they mention is genuinely already listed, edit it rather than adding a duplicate.
+- "add" is ONLY for a food that is not already in the list.
+- "swap" replaces one item with a different food, keeping its place: {"op":"swap","id":"<id of the item going out>","name":"<food coming in>","amount":<number>,"unit":"<unit>"}. Use it for "swap X for Y", "X instead of Y", "make it Y not X".
+- NAME THE FOOD THE WAY A FOOD DATABASE WOULD, and include the preparation they implied — "chicken breast, cooked", "white potatoes, boiled", "white rice, cooked". Do not include the amount in the name.
+- WHENEVER THEY NAME A MEASURE — "6 oz", "200 g", "two tbsp" — put the number in "amount" and the unit in "unit", exactly as they said it. Do not convert it.
+- If they name NO measure: for "add", omit amount and unit. For "swap", also omit them — the app carries the weight of the item being replaced across, which is what a swap means.
+- Match foods loosely against what is already on the meal — "the bread" should find "Homemade Sourdough", "eggs" should find "Boiled Eggs (whole)". If a food they mention is genuinely already listed, edit it rather than adding a duplicate.
 - Only act on what they actually said. Never change an item they did not mention. An empty ops array is a valid answer.
-- "note" is what you did, in one short sentence, in plain words. No emoji.`;
+- "note" is what you did, in one short sentence, in plain words. No numbers, no emoji.`;
 
 const MAX_OPS = 25;
 
@@ -104,32 +111,84 @@ function validate(raw: unknown): { ops: MealEditOp[]; note: string } | null {
       // A swap has to say what it is replacing, or it is just an add wearing
       // the wrong name and the old food silently stays on the plate.
       if (op === "swap" && typeof x.id !== "string") continue;
-      const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
       const amount =
         typeof x.amount === "number" && Number.isFinite(x.amount) && x.amount > 0 ? x.amount : undefined;
       const unit = typeof x.unit === "string" && x.unit.trim() ? x.unit.trim().slice(0, 16) : undefined;
-      // The quantity p/c/f describe. Absent, the only safe reading is "the
-      // amount itself" — which is the OLD behaviour and the one that halved
-      // the potatoes, so the prompt insists on it and this is the backstop.
-      const perAmount =
-        typeof x.per_amount === "number" && Number.isFinite(x.per_amount) && x.per_amount > 0
-          ? x.per_amount
-          : amount;
       ops.push({
         op,
         ...(op === "swap" ? { id: x.id as string } : {}),
         name,
-        // Only meaningful when no measure was given. Left at 1 otherwise so a
-        // reply carrying both cannot double-count.
-        servings: amount != null ? 1 : (typeof x.servings === "number" && x.servings > 0 ? x.servings : 1),
-        p: num(x.p), c: num(x.c), f: num(x.f),
         // An amount with no unit is not a measure, it is a number. Both or
         // neither — a bare "6" would render as "6" and mean nothing.
-        ...(amount != null && unit ? { amount, unit, per_amount: perAmount } : {}),
+        ...(amount != null && unit ? { amount, unit } : {}),
       });
+      // NOTE what is NOT read here: p, c, f, servings, per_amount. Even if the
+      // model volunteers them they are dropped on the floor. The resolver below
+      // fills those from food_catalog, and there is no path by which a number
+      // the model produced reaches a client's log.
     }
   }
   return { ops, note: typeof r.note === "string" ? r.note.slice(0, 200) : "" };
+}
+
+/** How many candidate rows the picker sees. Enough to contain the right one,
+ *  short enough that the whole list is read. */
+const CANDIDATES = 10;
+
+/**
+ * A food the model named → a row in food_catalog → real macros.
+ *
+ * Returns null when nothing in the catalogue IS that food, and null means the
+ * food is not added. That is the point: a near-miss becomes a wrong number in
+ * somebody's log and looks exactly like a right one.
+ */
+async function resolveOneFood(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  apiKey: string,
+  clientId: string | null,
+  name: string,
+  amount: number | undefined,
+  unit: string | undefined,
+): Promise<ResolvedFood | null> {
+  if (!name.trim()) return null;
+
+  // match_food_for_ai, NOT search_food_catalog. The latter matches the whole
+  // phrase as one substring — "white potatoes, boiled" returns zero rows — and
+  // ranks an exact lowercase name first, which is how "banana" resolves to a
+  // crowd-submitted row reading 242 kcal and 14 g of fat.
+  const { data } = await db.rpc("match_food_for_ai", {
+    p_term: name.trim(),
+    p_client_id: clientId,
+    p_limit: CANDIDATES,
+  });
+  const rows = ((data as CatalogRow[] | null) || []).filter(
+    (r) => r && r.protein != null && r.carbs != null && r.fats != null,
+  );
+  if (!rows.length) return null;
+
+  const picked = await callClaudeJson({
+    meter: { clientId, feature: "meal_edit" },
+    apiKey,
+    model: HAIKU_MODEL,
+    system: PICK_SYSTEM,
+    maxTokens: 60,
+    messages: [
+      { role: "user", content: `THEY ASKED FOR:\n${name}\n\nCANDIDATE ROWS:\n${describeCandidates(rows)}` },
+    ],
+    validate: (raw) => {
+      const n = validatePick(raw, rows.length);
+      return n === null ? null : { n };
+    },
+  });
+
+  // No answer, or an explicit "none of these". Both mean do not add it.
+  if (!picked.value || picked.value.n === 0) return null;
+
+  const row = rows[picked.value.n - 1];
+  // Amount defaults to one of the row's own servings when they named no
+  // measure — still the row's figures, never an invented portion.
+  return macrosFromRow(row, amount ?? (row.serving_grams ? Number(row.serving_grams) : 1), unit ?? (row.serving_grams ? "g" : ""));
 }
 
 export async function POST(req: NextRequest) {
@@ -188,6 +247,40 @@ export async function POST(req: NextRequest) {
     const ops = result.value.ops.filter((o) => o.op === "add" || (o.id && known.has(o.id)));
 
     await logUsage(clientId, "meal_edit", result.tokensIn, result.tokensOut, HAIKU_MODEL);
+
+    // ── EVERY NUMBER COMES FROM A ROW ────────────────────────────────────────
+    //
+    // Each food the model named is looked up in food_catalog, and a second,
+    // small call picks WHICH row it meant — with the candidates' real macros in
+    // front of it. That second step is judgement, not recall, and it is needed
+    // because neither ranking is safe alone: the top hit for "banana" is a row
+    // reading 242 kcal and 14 g of fat, while verified-first turns "chicken
+    // breast" into oven-roasted deli roll.
+    //
+    // Sequential rather than parallel: two or three foods at most, and a burst
+    // of concurrent Haiku calls against one client's meter is not worth the
+    // handful of milliseconds.
+    const admin = createAdminClient();
+    for (const op of ops) {
+      if (op.op !== "add" && op.op !== "swap") continue;
+      try {
+        const resolved = await resolveOneFood(admin, apiKey, clientId, op.name || "", op.amount, op.unit);
+        if (!resolved) { op.unresolved = true; continue; }
+        op.food_id = resolved.food_id;
+        op.resolved_name = resolved.name;
+        op.verified = resolved.verified;
+        op.p = resolved.p; op.c = resolved.c; op.f = resolved.f;
+        op.amount = resolved.amount;
+        op.unit = resolved.unit;
+        op.per_amount = resolved.per_amount;
+        op.servings = 1;
+      } catch {
+        // A lookup that fell over is not licence to invent one. It is the same
+        // outcome as no match: say so, add nothing.
+        op.unresolved = true;
+      }
+    }
+
     return NextResponse.json({ ops, note: result.value.note });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";

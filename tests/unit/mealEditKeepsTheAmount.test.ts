@@ -83,29 +83,29 @@ test("the route accepts a swap, and refuses one that names nothing to replace", 
 });
 
 test("an amount with no unit is refused, because a bare number is not a measure", () => {
-  assert.match(code(ROUTE), /amount != null && unit \? \{ amount, unit, per_amount/);
-});
-
-test("a measure and a serving count can never both count", () => {
-  // p/c/f are quoted for the measure when there is one. Leaving `servings` at
-  // whatever the model felt like would multiply the plate by it.
-  assert.match(code(ROUTE), /servings: amount != null \? 1 :/);
+  assert.match(code(ROUTE), /amount != null && unit \? \{ amount, unit \}/);
 });
 
 test("the model is told to carry the weight across rather than invent a serving", () => {
-  assert.match(ROUTE, /IF THEY DO NOT, OMIT amount AND unit/);
-  assert.match(ROUTE, /Never round a stated measure to a serving/);
+  // 26 Aug: p/c/f left the model's contract entirely — see
+  // aiNeverStatesANumber.test.ts. What survives here is the MEANING half: a
+  // swap with no measure named must not invent one, because the app carries
+  // the outgoing item's own weight across.
+  assert.match(ROUTE, /For "swap", also omit them/);
+  assert.match(ROUTE, /Do not convert it/);
 });
 
 // ── the client ───────────────────────────────────────────────────────────────
 
-test("a swap with no stated amount takes the weight off the item it replaces", () => {
-  // This is the "keeping same weight" claim, made true. 170 g of thigh out,
-  // 170 g of breast in — not one serving.
+test("a swap with no stated amount is resolved against the catalogue, not invented", () => {
+  // "keeping same weight" made true, but the weight now travels to the SERVER,
+  // which looks the food up and scales a real row — rather than the client
+  // stitching a macro figure together from what the model said.
+  assert.match(code(ROUTE), /resolveOneFood\(admin, apiKey, clientId, op\.name \|\| "", op\.amount, op\.unit\)/);
   assert.match(
-    code(CLIENT),
-    /const fromPlan = out \? \(amounts\[out\.id\] \?\? \(out\.amount != null \? Number\(out\.amount\) : null\)\) : null/,
-    "the replaced item's own amount is no longer carried across",
+    code(ROUTE),
+    /amount \?\? \(row\.serving_grams \? Number\(row\.serving_grams\) : 1\)/,
+    "an unstated amount must fall back to the ROW's own serving, never to an invented portion",
   );
 });
 
@@ -130,27 +130,12 @@ test("an added row can be corrected, not just deleted", () => {
 });
 
 // ── the reference quantity ───────────────────────────────────────────────────
-
-test("the model states a reference quantity and the APP multiplies", () => {
-  // Dustin, second attempt: "add 200 g of potatoes" came back 200 g at
-  // 76 cal / 2P / 17C / 0F. That is the per-100 g figure. It set the amount to
-  // 200 and quoted the macros for something else, and the sheet showed the
-  // mismatch as fact — half the real carbs, on a log he makes decisions from.
-  //
-  // The old prompt said "quote p/c/f FOR THAT MEASURE": recall AND arithmetic
-  // in one step, and the arithmetic is the half a language model is worst at.
-  assert.match(ROUTE, /DO NOT MULTIPLY/);
-  assert.match(ROUTE, /"per_amount"/, "the reference quantity is no longer asked for");
-  // code(), not ROUTE — the comment above the fix QUOTES the instruction it
-  // removed, and a scanner reading comments flags its own explanation. This
-  // suite has been bitten by that before.
-  assert.doesNotMatch(
-    code(ROUTE),
-    /quote p\/c\/f FOR THAT MEASURE/,
-    "the instruction that asked the model to do the multiplication is back",
-  );
-  assert.match(ROUTE, /Never leave per_amount out when amount is present/);
-});
+//
+// 26 Aug: the model no longer supplies p/c/f at all, so `base_amount` is now
+// filled from the CATALOGUE ROW's serving size rather than from anything the
+// model said. The arithmetic below is unchanged and is what makes 200 g of a
+// per-100 g row come out as 200 g of food — see aiNeverStatesANumber.test.ts
+// for the enforcement that no model figure can reach it.
 
 test("200 g quoted per 100 g doubles, rather than being taken at face value", () => {
   // The exact reported case, as arithmetic.
@@ -170,13 +155,19 @@ test("200 g quoted per 100 g doubles, rather than being taken at face value", ()
 });
 
 test("a reference equal to the amount still means take it as quoted", () => {
-  // The model IS allowed to pre-multiply, as long as it says so.
   assert.equal(addedScale({ servings: 1, amount: 200, base_amount: 200 }), 1);
 });
 
-test("a missing or nonsense reference falls back to the amount, never to zero", () => {
+test("a missing or nonsense reference falls back to servings, never to zero", () => {
   // Division by a zero or absent base would wipe the food's macros silently.
   assert.equal(addedScale({ servings: 1, amount: 200, base_amount: null }), 1);
   assert.equal(addedScale({ servings: 1, amount: 200, base_amount: 0 }), 1);
-  assert.match(ROUTE, /: amount;/, "per_amount no longer falls back to the amount itself");
+});
+
+test("the client stores the row's serving as the base", () => {
+  assert.match(
+    code(CLIENT),
+    /base_amount: Number\(op\.per_amount\) \|\| 1/,
+    "the scale base must come from the resolved catalogue row",
+  );
 });

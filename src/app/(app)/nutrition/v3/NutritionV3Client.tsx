@@ -2829,11 +2829,19 @@ function PlanAdjustSheet({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setAiErr(String(json?.error || "That didn't work.")); return; }
-      const ops = (json?.ops || []) as { op: string; id?: string; amount?: number; unit?: string; per_amount?: number; name?: string; servings?: number; p?: number; c?: number; f?: number }[];
+      const ops = (json?.ops || []) as {
+        op: string; id?: string; amount?: number; unit?: string; name?: string;
+        // Everything below is filled by the SERVER from food_catalog. The model
+        // has no field to put a nutrition figure in — see the meal-edit route.
+        food_id?: string; resolved_name?: string; verified?: boolean;
+        servings?: number; p?: number; c?: number; f?: number; per_amount?: number;
+        unresolved?: boolean;
+      }[];
       if (!ops.length) { setAiErr("I couldn't tell what to change — name the food and the amount."); return; }
 
       const byId = new Map((meal.meal_items || []).map((it) => [it.id, it]));
       const done: string[] = [];
+      const notFound: string[] = [];
 
       setAmounts((prev) => {
         const next = { ...prev };
@@ -2843,8 +2851,10 @@ function PlanAdjustSheet({
           // for a planned item, and the steppers already treat 0 as removed.
           if (op.op === "remove" && op.id) next[op.id] = 0;
           // A swap takes the old food off the plate and puts the new one on
-          // below. Same zeroing as a removal — the plan row has to stay.
-          if (op.op === "swap" && op.id) next[op.id] = 0;
+          // below — but only if the new one actually resolved. Zeroing the old
+          // one for a food that could not be found would leave the meal short
+          // and nothing to show for it.
+          if (op.op === "swap" && op.id && !op.unresolved) next[op.id] = 0;
         }
         return next;
       });
@@ -2863,38 +2873,33 @@ function PlanAdjustSheet({
         }
         if (op.op !== "add" && op.op !== "swap") continue;
 
-        const out = op.op === "swap" && op.id ? byId.get(op.id) : undefined;
-        // THE WEIGHT CARRIES ACROSS. "swap chicken thigh w chicken breast" with
-        // no measure named means the same 170 g, not "1 serving" — and the old
-        // reply SAID "keeping same weight" while doing exactly that. If the
-        // model gave no amount, take the one coming off the plate.
-        const fromPlan = out ? (amounts[out.id] ?? (out.amount != null ? Number(out.amount) : null)) : null;
-        const amount = op.amount != null ? Number(op.amount) : (fromPlan && fromPlan > 0 ? fromPlan : null);
-        const unit = op.unit || (op.amount == null ? out?.unit || null : null);
-        // p/c/f describe `per_amount` of `unit` — a reference quantity the model
-        // is confident about — and the app multiplies. Asking it to hand back
-        // pre-multiplied figures is what produced 200 g of potato carrying the
-        // macros for 100 g. Falls back to the amount itself, which is the old
-        // reading, only when no reference came back at all.
-        const base =
-          op.per_amount != null && Number(op.per_amount) > 0
-            ? Number(op.per_amount)
-            : op.amount != null
-              ? Number(op.amount)
-              : amount;
+        // NOT IN THE DATABASE = NOT ADDED. No macros were invented server-side
+        // and none are invented here; the person is told and pointed at the
+        // search. A fabricated row looks exactly like a real one on this sheet,
+        // which is the whole reason this branch exists.
+        if (op.unresolved || op.p == null) {
+          notFound.push(String(op.name || "that food"));
+          continue;
+        }
 
         newAdds.push({
-          food_id: null,
-          name: String(op.name),
+          food_id: op.food_id ?? null,
+          // The DATABASE ROW's name, not the words they used. A wrong choice is
+          // then visible on the row and one tap from being corrected — a wrong
+          // name you can see beats a wrong number you cannot.
+          name: String(op.resolved_name || op.name),
           servings: Number(op.servings) || 1,
           p: Number(op.p) || 0,
           c: Number(op.c) || 0,
           f: Number(op.f) || 0,
-          ...(amount != null && unit ? { amount, unit, base_amount: base } : {}),
+          ...(op.amount != null && op.unit
+            ? { amount: Number(op.amount), unit: op.unit, base_amount: Number(op.per_amount) || 1 }
+            : {}),
         });
 
-        const label = amount != null && unit ? `${r2(amount)} ${unit}` : `${Number(op.servings) || 1} serving`;
-        done.push(out ? `${out.food} → ${op.name}, ${label}` : `+ ${op.name}, ${label}`);
+        const label = op.amount != null && op.unit ? `${r2(Number(op.amount))} ${op.unit}` : "1 serving";
+        const out = op.op === "swap" && op.id ? byId.get(op.id) : undefined;
+        done.push(out ? `${out.food} → ${op.resolved_name || op.name}, ${label}` : `+ ${op.resolved_name || op.name}, ${label}`);
       }
       if (newAdds.length) setAdds((prev) => [...prev, ...newAdds]);
 
@@ -2903,7 +2908,15 @@ function PlanAdjustSheet({
       // prose from the thing being checked is not a check. This sentence is
       // built from the operations that were applied, so it cannot disagree
       // with the rows on screen.
-      setAiNote(done.length ? done.join(" · ") : "Nothing changed.");
+      setAiNote(done.length ? done.join(" · ") : null);
+      if (notFound.length) {
+        setAiErr(
+          `Couldn't find ${notFound.join(" or ")} in the food database, so ${notFound.length > 1 ? "they were" : "it was"} not added — ` +
+            `use "Add from the food database" below and I'll keep the rest.`,
+        );
+      } else if (!done.length) {
+        setAiErr("I couldn't tell what to change — name the food and the amount.");
+      }
       setAiText("");
     } catch {
       setAiErr("Couldn't reach the app's AI just then.");

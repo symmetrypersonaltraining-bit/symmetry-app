@@ -108,7 +108,10 @@ test("an op pointing at an item that was never sent is dropped", () => {
 test("a nonsense reply cannot produce a nonsense meal", () => {
   assert.match(ROUTE, /Math\.max\(0, x\.amount\)/, "a negative amount is not a smaller portion");
   assert.match(ROUTE, /const MAX_OPS = 25;/);
-  assert.match(ROUTE, /typeof x\.servings === "number" && x\.servings > 0 \? x\.servings : 1/);
+  // 26 Aug: servings no longer comes from the model at all — nor do p/c/f.
+  // The add/swap branch reads name, amount and unit and nothing else, and the
+  // macros are resolved from food_catalog. See aiNeverStatesANumber.test.ts.
+  assert.match(ROUTE, /YOU NEVER STATE A NUTRITION FIGURE/);
 });
 
 test("it has its own feature name but shares the parse allowance", () => {
@@ -126,7 +129,10 @@ test("the sheet applies the change but never saves it", () => {
   assert.match(ADJUST, /if \(op\.op === "remove" && op\.id\) next\[op\.id\] = 0;/);
   // A swap zeroes the outgoing item the same way — the plan row has to stay,
   // and the replacement goes on as an added food below it.
-  assert.match(ADJUST, /if \(op\.op === "swap" && op\.id\) next\[op\.id\] = 0;/);
+  // A swap zeroes the outgoing item — but only when the replacement actually
+  // resolved to a catalogue row. Emptying the slot for a food that could not be
+  // found would leave the meal short with nothing to show for it.
+  assert.match(ADJUST, /if \(op\.op === "swap" && op\.id && !op\.unresolved\) next\[op\.id\] = 0;/);
   assert.match(ADJUST, /Nothing is saved until you press Save\./,
     "the person is not told the change is still pending");
   // And it must not call either save path itself.
@@ -140,6 +146,14 @@ test("it sends the amounts on screen, not the plan's", () => {
 });
 
 test("it can be dictated", () => {
-  const fn = ADJUST.slice(ADJUST.indexOf("Say it, rather than tapping"), ADJUST.indexOf("Add from the food database"));
+  // The end anchor is searched FROM the start anchor. The phrase "Add from the
+  // food database" now also appears earlier, inside the message shown when a
+  // food is not in the catalogue — searching the whole file found that one and
+  // sliced backwards to an empty string, which passes for nothing and fails
+  // for the wrong reason.
+  const from = ADJUST.indexOf("Say it, rather than tapping");
+  assert.ok(from > -1, "the say-it block moved — re-anchor this test");
+  const to = ADJUST.indexOf("Add from the food database", from);
+  const fn = ADJUST.slice(from, to > -1 ? to : from + 4000);
   assert.match(fn, /<MicButton/, "typing 'no bread, four eggs, add a banana' on a phone is the thing this replaces");
 });
