@@ -32,6 +32,18 @@ export type Banner = {
    * treatment on the nudges is precisely how the loud treatment stops working.
    */
   fromPerson?: boolean;
+  /**
+   * Which notification_preferences row decides whether this may interrupt.
+   *
+   * Carried on the banner rather than worked out at display time because the
+   * banner is built from a feed item that knows its kind, and the thing that
+   * shows it does not. Undefined means "no preference governs this" — it shows.
+   *
+   * 26 Aug: banners had no such field and consulted no preference at all, so a
+   * client who had switched the group chat off in Settings still got a
+   * full-width banner over her workout for every group post. See MessageNotifier.
+   */
+  eventKey?: string;
 };
 
 export function bannersForDelta(opts: {

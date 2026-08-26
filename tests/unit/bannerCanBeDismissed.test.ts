@@ -53,7 +53,14 @@ test("dismissal is per source — one wave-off does not mute everything", () => 
     "dismissal must be keyed to the source, not a global flag");
   assert.match(code, /queued\.filter\(\(q\) => !dismissed\.current\.has\(q\.href\)\)/,
     "a dismissed source is re-queued on the next poll");
-  assert.match(code, /while \(next && dismissed\.current\.has\(next\.href\)\)/,
+  // The skip-over rule, not its spelling. 26 Aug this loop gained two more
+  // reasons to hold a banner back — a muted event and an open workout — so the
+  // dismissal check moved into an `allowed()` predicate beside them. What has
+  // to stay true is that a banner already queued from a dismissed source is
+  // stepped over rather than shown.
+  assert.match(code, /const allowed = \(b: Banner\) =>\s*\n?\s*!dismissed\.current\.has\(b\.href\)/,
+    "dismissal is no longer consulted when choosing the next banner");
+  assert.match(code, /while \(next && !allowed\(next\)\) next = queue\.current\.shift\(\);/,
     "a dismissed banner already sitting in the queue is still shown");
   // The thing that must NOT be true.
   assert.ok(!/dismissed\.current = new Set\(\[["'`]all/.test(code),

@@ -6,12 +6,89 @@
 // can't double-fire with other Toasters). Mounted for BOTH trainer and client.
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useNotificationFeed } from "@/lib/useNotificationFeed";
 import { type Banner } from "@/lib/messageBanners";
+import { createClient } from "@/lib/supabase/client";
+import { NOTIFICATION_EVENTS } from "@/lib/notificationEvents";
 
 export default function MessageNotifier() {
   const router = useRouter();
+
+  /**
+   * ── THE SETTINGS SCREEN HAS TO MEAN THIS SCREEN TOO ──────────────────────
+   *
+   * Jennifer, 26 Aug: *"Strange thing is I have all notifications turned off in
+   * settings. I shouldn't be getting any messages."*
+   *
+   * She was right, and it was worse than she knew. She switched Group chat off
+   * on 14 August. notification_preferences gated PUSH only — sendPushToUser
+   * checks it, this banner never did — so two group posts at 10:55 raised two
+   * banners across the top of her screen anyway.
+   *
+   * And she has no push subscription at all. Not one row in push_subscriptions.
+   * So the only notification this app could ever deliver to her was the one
+   * kind that ignored her settings, which made every toggle on that screen
+   * decorative for the person who had actually gone looking for them.
+   *
+   * Same rule as push, read from the same table, keyed by the same event: an
+   * event she has switched off does not interrupt her, on any surface. A
+   * `forced` event still comes through, exactly as it does for push.
+   *
+   * Fails OPEN, for the same reason isMuted does: a message that should have
+   * been announced and was not is indistinguishable from no message at all.
+   */
+  const [mutedKeys, setMutedKeys] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    let on = true;
+    (async () => {
+      try {
+        const sb = createClient();
+        const { data: auth } = await sb.auth.getUser();
+        const uid = auth?.user?.id;
+        if (!uid) { if (on) setMutedKeys(new Set()); return; }
+        const { data, error } = await sb
+          .from("notification_preferences")
+          .select("event_key, enabled")
+          .eq("user_id", uid);
+        if (error) { if (on) setMutedKeys(new Set()); return; }
+        const off = new Set(
+          ((data as { event_key: string; enabled: boolean }[] | null) || [])
+            .filter((r) => r.enabled === false)
+            .map((r) => r.event_key),
+        );
+        if (on) setMutedKeys(off);
+      } catch {
+        if (on) setMutedKeys(new Set());
+      }
+    })();
+    return () => { on = false; };
+  }, []);
+
+  /**
+   * ── NOT OVER A WORKOUT ───────────────────────────────────────────────────
+   *
+   * The same 26 August report, and it is one incident rather than two:
+   * *"About midway through my workout. It wouldn't let me check a completed
+   * set. It happened about the same time a notification two group messages."*
+   *
+   * Her session ran 10:45–11:12. The two group posts landed at 10:55:26 and
+   * 10:55:27 — dead centre. This banner is `position: fixed`, full width, at
+   * z-index 3000, and it is a tap target that NAVIGATES AWAY. Two of them back
+   * to back sit over the top of the logger for up to eighteen seconds while
+   * somebody is tapping set checkboxes with a phone on a bench.
+   *
+   * A workout is the one screen in this app where an accidental tap costs
+   * something that cannot be got back: she finished with twenty-seven minutes
+   * of work and zero sets recorded.
+   *
+   * So banners HOLD rather than drop. They stay queued and appear when she
+   * leaves the logger — the message is not lost, it is just not thrown over the
+   * thing she is in the middle of. Deliberately keyed on the route rather than
+   * on logger state, so nothing inside the logger has to change to support it.
+   */
+  const pathname = usePathname();
+  const inWorkout = !!pathname && pathname.startsWith("/workout/");
   // A QUEUE, not a single slot (626775f9 verification, 2026-07-31). The old
   // version compared groupDelta against directDelta and rendered whichever won,
   // so a poll window containing 1 group message and 2 direct messages showed
@@ -54,13 +131,35 @@ export default function MessageNotifier() {
     setBanner(null);
   }
 
-  // Show the next queued banner as soon as the slot is free.
+  // Show the next queued banner as soon as the slot is free — and only when
+  // showing it is allowed.
+  //
+  // Both new rules are applied HERE rather than when the banner is queued, and
+  // that ordering is the point:
+  //
+  //   • preferences may still be loading when a message arrives. Filtering at
+  //     queue time would show a muted banner in that window; filtering here
+  //     means it is dropped the moment we know, and nothing is announced on a
+  //     guess about what she asked for.
+  //   • the workout hold has to RELEASE. `inWorkout` is in the dependency list,
+  //     so leaving the logger re-runs this and the held banner appears then.
+  //     Dropping it at queue time would lose the message outright, which is the
+  //     failure this component was built to prevent.
   useEffect(() => {
     if (banner) return;
+    if (inWorkout) return;              // held, not dropped — released on exit
+    // Preferences not read yet. HOLD — `mutedKeys` is in the dependency list,
+    // so this runs again the moment they land. Showing now and filtering later
+    // is not an option: the banner would already have been on her screen.
+    // The loader sets an empty set on failure, so this cannot wait forever.
+    if (mutedKeys === null) return;
+    const allowed = (b: Banner) =>
+      !dismissed.current.has(b.href) &&
+      !(b.eventKey && mutedKeys.has(b.eventKey));
     let next = queue.current.shift();
-    while (next && dismissed.current.has(next.href)) next = queue.current.shift();
+    while (next && !allowed(next)) next = queue.current.shift();
     if (next) setBanner(next);
-  }, [banner, tick]);
+  }, [banner, tick, inWorkout, mutedKeys]);
 
   // Each banner gets its own time on screen — longer when a person sent it.
   //
@@ -133,6 +232,15 @@ export default function MessageNotifier() {
           : `New message — ${i.title}`,
       href: i.href,
       fromPerson: i.fromPerson === true,
+      // group → "Group chat"; a client's thread → the trainer's "Messages from
+      // clients"; the trainer thread → a client's "Messages from your coach".
+      // The same three keys the settings screen writes and push reads.
+      eventKey:
+        i.kind === "group"
+          ? NOTIFICATION_EVENTS.GROUP_MESSAGE.key
+          : i.kind === "client"
+            ? NOTIFICATION_EVENTS.MESSAGE_FROM_CLIENT.key
+            : NOTIFICATION_EVENTS.MESSAGE_FROM_COACH.key,
     }));
     const fresh = queued.filter((q) => !dismissed.current.has(q.href));
     if (fresh.length) {
