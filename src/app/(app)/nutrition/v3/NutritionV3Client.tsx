@@ -2835,6 +2835,9 @@ function PlanAdjustSheet({
         // has no field to put a nutrition figure in — see the meal-edit route.
         food_id?: string; resolved_name?: string; verified?: boolean;
         servings?: number; p?: number; c?: number; f?: number; per_amount?: number;
+        // The row's own serving choices, straight from food_catalog.serving_options.
+        options?: { label: string; gramsEach: number }[];
+        grams_each?: number;
         unresolved?: boolean;
       }[];
       if (!ops.length) { setAiErr("I couldn't tell what to change — name the food and the amount."); return; }
@@ -2895,6 +2898,10 @@ function PlanAdjustSheet({
           ...(op.amount != null && op.unit
             ? { amount: Number(op.amount), unit: op.unit, base_amount: Number(op.per_amount) || 1 }
             : {}),
+          // The row's real portions, so this row gets a unit picker rather than
+          // whatever single string the resolver settled on.
+          ...(Array.isArray(op.options) && op.options.length ? { options: op.options } : {}),
+          ...(op.grams_each != null ? { grams_each: Number(op.grams_each) } : {}),
         });
 
         const label = op.amount != null && op.unit ? `${r2(Number(op.amount))} ${op.unit}` : "1 serving";
@@ -2982,6 +2989,12 @@ function PlanAdjustSheet({
         const measured = ad.amount != null && ad.unit;
         const shown = measured ? Number(ad.amount) : Number(ad.servings) || 1;
         const step = measured ? stepFor(ad.unit || null) : 1;
+        // Grams is always offered: somebody who weighs their food should not
+        // have to accept "1 bagel" because that is what the row happened to
+        // list first.
+        const unitChoices = measured
+          ? Array.from(new Set([...(ad.options || []).map((o) => o.label), "g", ad.unit || "g"].filter(Boolean) as string[]))
+          : [];
         const bump = (delta: number) =>
           setAdds((prev) =>
             prev.map((x, j) => {
@@ -3001,9 +3014,62 @@ function PlanAdjustSheet({
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => bump(-step)} className="w-8 h-8 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>−</button>
-              <span className="text-xs font-bold text-center" style={{ color: "var(--brand-text)", minWidth: 44 }}>
-                {r2(shown)}{measured ? ` ${ad.unit}` : shown === 1 ? " serving" : " servings"}
-              </span>
+              {/* TYPE IT. Dustin, 27 Aug: "should have all unit options and be
+                  able to edit not just 100, 200, etc." Stepping from 1 to 140 g
+                  is fourteen taps; this is one. The steppers stay for the
+                  common small nudge. */}
+              <input
+                type="number"
+                inputMode="decimal"
+                value={String(r2(shown))}
+                onChange={(e) => {
+                  const v = Math.max(0, Number(e.target.value) || 0);
+                  setAdds((prev) => prev.map((x, j) => (j !== i ? x : measured ? { ...x, amount: v } : { ...x, servings: v })));
+                }}
+                className="text-xs font-bold text-center rounded-lg"
+                style={{ width: 52, height: 32, background: "transparent", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}
+              />
+              {/* THE UNIT IS A CHOICE, not a fixed string.
+                  Every one of these came from the row's own serving_options —
+                  "1 bagel (95 g)", "1 oz", "100 g" — which is data that has
+                  been in the table all along and that nothing read. Switching
+                  rescales the macros by what one of the new unit weighs, so it
+                  is exact rather than a conversion. */}
+              {unitChoices.length > 1 ? (
+                <select
+                  value={ad.unit || "g"}
+                  onChange={(e) => {
+                    const nextUnit = e.target.value;
+                    setAdds((prev) => prev.map((x, j) => {
+                      if (j !== i) return x;
+                      const perG = (Number(x.p) || 0) / (Number(x.grams_each) || 1);
+                      const perGc = (Number(x.c) || 0) / (Number(x.grams_each) || 1);
+                      const perGf = (Number(x.f) || 0) / (Number(x.grams_each) || 1);
+                      const each = nextUnit === "g" ? 1 : (x.options || []).find((o) => o.label === nextUnit)?.gramsEach || 1;
+                      return {
+                        ...x,
+                        unit: nextUnit,
+                        // A sensible starting quantity in the new unit rather
+                        // than carrying "100" across from grams to bagels.
+                        amount: nextUnit === "g" ? Math.round((Number(x.amount) || 1) * (Number(x.grams_each) || 1)) : 1,
+                        base_amount: 1,
+                        grams_each: each,
+                        p: perG * each, c: perGc * each, f: perGf * each,
+                      };
+                    }));
+                  }}
+                  className="text-xs font-bold rounded-lg"
+                  style={{ height: 32, background: "transparent", border: "1px solid var(--brand-border)", color: "var(--brand-text)", maxWidth: 92 }}
+                >
+                  {unitChoices.map((u) => (
+                    <option key={u} value={u} style={{ background: "var(--brand-bg)" }}>{u}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-xs font-bold" style={{ color: "var(--brand-text)", minWidth: 34 }}>
+                  {measured ? ad.unit : shown === 1 ? "serving" : "servings"}
+                </span>
+              )}
               <button onClick={() => bump(step)} className="w-8 h-8 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>＋</button>
             </div>
             <button onClick={() => setAdds((p) => p.filter((_, j) => j !== i))} aria-label="remove" style={{ color: "var(--brand-text-secondary)", padding: 6 }}>✕</button>

@@ -148,6 +148,20 @@ export interface AddedFood {
   unit?: string | null;
   /** The amount p/c/f were quoted for. Without it, `amount` cannot be scaled. */
   base_amount?: number | null;
+  /**
+   * What ONE of `unit` weighs, and every other portion this row can be counted
+   * in — both straight off the catalogue row's serving_options.
+   *
+   * Dustin, 27 Aug: "should have all unit options and be able to edit not just
+   * 100, 200, etc." Until now an added food had one fixed unit string and no
+   * way to change it, because the code read serving_grams (100 on 574,372 of
+   * 574,650 rows) and never opened serving_options at all.
+   *
+   * Together these are what let the sheet offer a real unit picker: switching
+   * unit rescales p/c/f by gramsEach, which is exact rather than a conversion.
+   */
+  grams_each?: number | null;
+  options?: { label: string; gramsEach: number }[] | null;
 }
 
 /**

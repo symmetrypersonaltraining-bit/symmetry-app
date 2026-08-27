@@ -213,9 +213,21 @@ test("there is ONE resolver, shared by every door", () => {
 });
 
 test("an unstated amount falls back to the ROW's serving, not an invented one", () => {
+  // 27 Aug: this used to assert the fallback was `row.serving_grams`, and the
+  // intent was right — take the portion from the row, never invent one. But
+  // serving_grams is 100 on 574,372 of 574,650 rows, so in practice "the row's
+  // serving" meant 100 g of everything: a bagel and a bit, and 343 calories of
+  // cream cheese. Dustin: "everything ... only gives 100 gram increments."
+  //
+  // The row's REAL serving lives in serving_options and always did — the bagel
+  // he added carries "1 bagel (95 g)". Same rule, now reading the column that
+  // actually holds the answer.
+  assert.match(code(OP), /const hh = householdServing\(row\);/);
+  assert.match(code(OP), /if \(hh\) \{ amt = 1; un = hh\.label; \}/);
+  // And 100 g survives only where a row genuinely knows nothing but weights.
   assert.match(
     code(OP),
-    /amount \?\? \(row\.serving_grams \? Number\(row\.serving_grams\) : 1\)/,
+    /amt = Number\(row\.serving_grams\) > 0 \? Number\(row\.serving_grams\) : 100; un = "g";/,
   );
 });
 

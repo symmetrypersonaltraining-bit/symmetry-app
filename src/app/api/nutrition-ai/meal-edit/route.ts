@@ -57,6 +57,9 @@ export interface MealEditOp {
   c?: number;
   f?: number;
   per_amount?: number;
+  /** The row's own serving choices, so the sheet can offer a unit picker. */
+  options?: { label: string; gramsEach: number }[];
+  grams_each?: number;
   servings?: number;
   /**
    * Set when nothing in the catalogue is that food. The sheet says so and
@@ -211,6 +214,13 @@ export async function POST(req: NextRequest) {
         op.amount = resolved.amount;
         op.unit = resolved.unit;
         op.per_amount = resolved.per_amount;
+        // The row's real portions travel with it. Without these the sheet can
+        // only ever show the one unit the resolver happened to choose.
+        op.options = resolved.options || [];
+        op.grams_each =
+          resolved.unit === "g"
+            ? 1
+            : (resolved.options || []).find((o) => o.label === resolved.unit)?.gramsEach;
         op.servings = 1;
       } catch {
         // A lookup that fell over is not licence to invent one. It is the same

@@ -64,6 +64,99 @@ export interface CatalogRow {
   serving_grams: number | null;
   verified: boolean | null;
   source: string | null;
+  /**
+   * THE REAL SERVINGS, AND THEY HAVE BEEN THERE ALL ALONG.
+   *
+   * 574,515 of 574,650 rows carry this. The bagel Dustin added on 27 Aug holds
+   * [100 g, 1 oz, 1 bagel (95 g)] — and every food he added arrived as "100 g"
+   * because nothing in this file ever read the column.
+   *
+   * `serving_grams` is 100 on 574,372 rows and `serving_desc` is the string
+   * "100 g" on the same 574,372. Reading only those two is why the app could
+   * offer exactly one portion size for every food in the world.
+   */
+  serving_options?: ServingOption[] | null;
+}
+
+export interface ServingOption {
+  desc: string;
+  grams: number;
+}
+
+/** "100 g", "1 oz", "28g" — a portion expressed only as a weight. */
+const MASS_ONLY = /^\s*[\d.]+\s*(g|gm|kg|oz|lb|lbs|ml|l|fl\s?oz|grams?|ounces?|pounds?)\s*$/i;
+
+export type Serving = {
+  /** What one of them is called, singular: "bagel", "slice", "serving". */
+  label: string;
+  /** What ONE of them weighs. */
+  gramsEach: number;
+};
+
+/**
+ * Read a catalogue serving option into something a person can count.
+ *
+ * The descriptions are not uniform — "1 bagel (95 g)", "2 BAGELS (86 g)",
+ * "1 serving (90 g)" — and the leading number matters: two bagels weighing 86 g
+ * means ONE bagel is 43 g. Getting that backwards doubles somebody's breakfast.
+ */
+export function parseServingOption(o: ServingOption): Serving | null {
+  if (!o || !(Number(o.grams) > 0) || !o.desc) return null;
+  if (MASS_ONLY.test(o.desc)) return null;         // a weight, not a countable thing
+  const m = o.desc.match(/^\s*([\d.]+)?\s*(.+?)\s*(?:\([^)]*\))?\s*$/);
+  if (!m) return null;
+  const count = m[1] ? Number(m[1]) : 1;
+  if (!(count > 0)) return null;
+  let label = (m[2] || "serving").trim().toLowerCase();
+  if (!label) return null;
+  // "2 BAGELS" counts bagels, not BAGELS-plural. Crude singularisation is right
+  // here: these are food words, not arbitrary English.
+  if (count !== 1 && label.endsWith("es") && /(ch|sh|s|x|z)es$/.test(label)) label = label.slice(0, -2);
+  else if (count !== 1 && label.endsWith("s") && !label.endsWith("ss")) label = label.slice(0, -1);
+  return { label: label.slice(0, 24), gramsEach: Number(o.grams) / count };
+}
+
+/**
+ * The portion a person would actually name, or null when the row only knows
+ * weights.
+ *
+ * Prefers a countable thing ("1 bagel") over a weight ("100 g", "1 oz"),
+ * because "one bagel" is what somebody ate and 100 g is a laboratory answer.
+ */
+export function householdServing(row: CatalogRow): Serving | null {
+  for (const o of row.serving_options || []) {
+    const s = parseServingOption(o);
+    if (s) return s;
+  }
+  return null;
+}
+
+/** Every portion this row can be counted in, for the unit picker. */
+export function servingChoices(row: CatalogRow): Serving[] {
+  const out: Serving[] = [];
+  const seen = new Set<string>();
+  for (const o of row.serving_options || []) {
+    const s = parseServingOption(o);
+    if (s && !seen.has(s.label)) { seen.add(s.label); out.push(s); }
+  }
+  return out;
+}
+
+/**
+ * Did they name one of this row's own servings? "a bagel" -> 1 bagel (95 g).
+ *
+ * Matched on the label rather than exactly, so "bagels", "bagel" and "1 bagel"
+ * all land on the same option.
+ */
+export function servingByUnit(row: CatalogRow, unit: string | null | undefined): Serving | null {
+  if (!unit) return null;
+  const u = unit.trim().toLowerCase().replace(/s$/, "");
+  if (!u) return null;
+  for (const s of servingChoices(row)) {
+    const l = s.label.replace(/s$/, "");
+    if (l === u || l.includes(u) || u.includes(l)) return s;
+  }
+  return null;
 }
 
 /**
@@ -99,6 +192,12 @@ export type ResolvedFood = {
   amount: number;
   unit: string;
   per_amount: number;
+  /**
+   * Every portion this row can be counted in, so the sheet can offer a UNIT
+   * PICKER instead of a fixed string. Dustin, 27 Aug: "should have all unit
+   * options and be able to edit not just 100, 200, etc."
+   */
+  options?: Serving[];
 };
 
 /**
@@ -124,34 +223,63 @@ export function macrosFromRow(
   if (![p, c, f].every((n) => Number.isFinite(n))) return null;
   if (!(amount > 0)) return null;
 
-  const grams = toGrams(amount, unit);
   const perGrams = Number(row.serving_grams);
+  const base = Number.isFinite(perGrams) && perGrams > 0 ? perGrams : 100;
+  const choices = servingChoices(row);
+  /** The row's macros for one gram — everything below scales from this. */
+  const per1g = { p: p / base, c: c / base, f: f / base };
 
-  // Mass in, mass on the row: exact, and the common case (the USDA set is all
-  // per 100 g).
-  if (grams != null && Number.isFinite(perGrams) && perGrams > 0) {
+  // ── 1. A WEIGHT THEY NAMED ────────────────────────────────────────────────
+  // Exact, and the right answer whenever somebody says "200 g" or "6 oz".
+  const grams = toGrams(amount, unit);
+  if (grams != null) {
     return {
-      food_id: row.id,
-      name: row.name,
-      verified: !!row.verified,
+      food_id: row.id, name: row.name, verified: !!row.verified,
       p, c, f,
       amount: Math.round(grams * 100) / 100,
       unit: "g",
-      per_amount: perGrams,
+      per_amount: base,
+      options: choices,
     };
   }
 
-  // No usable mass — count the row's own servings instead. "2 cups of rice"
-  // becomes 2 × whatever one serving of that row is, labelled with the row's
-  // own wording so nobody reads it as grams.
+  // ── 2. A SERVING THIS ROW ACTUALLY HAS ────────────────────────────────────
+  //
+  // "a bagel" against a row carrying "1 bagel (95 g)". This is the branch that
+  // did not exist: every one of these fell through to the row's serving_desc,
+  // which is the literal string "100 g" on 574,372 of 574,650 rows. So "add a
+  // bagel and cream cheese" became 100 g of bagel and 100 g of cream cheese —
+  // 343 calories of cream cheese, against about 30 g that anybody spreads.
+  //
+  // p/c/f are quoted for ONE of them and per_amount is 1, so the downstream
+  // scale (amount / per_amount) is simply how many they had.
+  const named = servingByUnit(row, unit) || (unit ? null : householdServing(row));
+  if (named) {
+    return {
+      food_id: row.id, name: row.name, verified: !!row.verified,
+      p: per1g.p * named.gramsEach,
+      c: per1g.c * named.gramsEach,
+      f: per1g.f * named.gramsEach,
+      amount,
+      unit: named.label,
+      per_amount: 1,
+      options: choices,
+    };
+  }
+
+  // ── 3. A UNIT THE ROW HAS NEVER HEARD OF ──────────────────────────────────
+  //
+  // "2 cups of rice" where the row lists no cup. There is no honest volume
+  // conversion without a density the catalogue does not carry, so this counts
+  // the row's own base portion rather than inventing one — and it says so in
+  // the unit, so nobody reads it as cups.
   return {
-    food_id: row.id,
-    name: row.name,
-    verified: !!row.verified,
+    food_id: row.id, name: row.name, verified: !!row.verified,
     p, c, f,
     amount,
     unit: (row.serving_desc || "serving").slice(0, 16),
     per_amount: 1,
+    options: choices,
   };
 }
 

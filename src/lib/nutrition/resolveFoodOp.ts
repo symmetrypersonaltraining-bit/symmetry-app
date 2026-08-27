@@ -16,7 +16,7 @@
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import {
   CatalogRow, ResolvedFood, macrosFromRow, describeCandidates, PICK_SYSTEM, validatePick,
-  TERMS_SYSTEM, validateTerms,
+  TERMS_SYSTEM, validateTerms, householdServing,
 } from "@/lib/nutrition/foodResolve";
 
 /** Enough rows to contain the right one; short enough that the whole list gets read. */
@@ -140,13 +140,32 @@ export async function resolveFood(
   // from a right one.
   if (!row) return null;
 
-  const scaled = macrosFromRow(
-    row,
-    // No stated measure means one of the ROW's own servings — never an invented
-    // portion. For the USDA set that is 100 g.
-    amount ?? (row.serving_grams ? Number(row.serving_grams) : 1),
-    unit ?? (row.serving_grams ? "g" : ""),
-  );
+  // ── WHAT "NO AMOUNT GIVEN" SHOULD MEAN ─────────────────────────────────────
+  //
+  // It used to mean `serving_grams`, which is 100 on 574,372 of 574,650 rows.
+  // So "add a bagel and cream cheese" put 100 g of each on the plate: a bagel
+  // and a bit, and 343 calories of cream cheese against the ~30 g anybody
+  // actually spreads. Dustin, 27 Aug: "everything in ai 'just say what changed'
+  // only gives 100 gram increments."
+  //
+  // It now means ONE of the thing — the row's own countable serving, which for
+  // that bagel is "1 bagel (95 g)" and has been sitting in serving_options the
+  // whole time. Only a row that knows nothing but weights falls back to 100 g,
+  // and that is an honest fallback rather than a default.
+  const hh = householdServing(row);
+  let amt = amount ?? null;
+  let un = unit ?? null;
+  if (amt == null && un == null) {
+    if (hh) { amt = 1; un = hh.label; }
+    else { amt = Number(row.serving_grams) > 0 ? Number(row.serving_grams) : 100; un = "g"; }
+  } else if (amt == null) {
+    amt = 1;                       // "in grams" with no number is one of them
+  } else if (un == null) {
+    // A bare number. Count the row's own servings rather than reading it as
+    // grams — "2" after "add 2 bagels" is two bagels, not two grams.
+    un = hh ? hh.label : "";
+  }
+  const scaled = macrosFromRow(row, amt, un);
   if (!scaled) return null;
 
   // Micronutrients ride along from the same row. They were being recalled by a
