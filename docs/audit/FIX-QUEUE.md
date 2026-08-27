@@ -1,5 +1,12 @@
 # Fix queue — walk through this with Dustin before touching anything
 
+> **⚠️ SUPERSEDED AS THE DECISION RECORD — 27 Aug, midday.**
+> `MASTER-LIST.md` in this folder is now the authoritative list: all **70**
+> findings numbered, every figure re-verified against live data, and a
+> `DECISION:` slot under each. Dustin's answers go **there**. This file stays as
+> the plain-English walkthrough of the top items and as the record of how the
+> queue was first framed.
+
 **How to use this document.** Dustin, 27 Aug: *"i need each explained to me first
 so i understand exactly what's going on and can confirm how i want it to function
 before we start."*
