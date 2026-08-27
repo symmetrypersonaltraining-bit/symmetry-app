@@ -115,6 +115,66 @@ actually on — flat, monthly-less-cancellations, or per-session.
 ❓ Go ahead? Also: do you want clients to see the cancellation deduction spelled
 out ("$840 − 5 missed × $70"), or just the final figure?
 
+## 2.1b The reminder editor treats EVERY client as per-session — "Use calculated" would overcharge $1,097 [MECHANICAL]
+
+**Found 27 Aug from Dustin's screenshot of Cheyenne Martin's card.**
+
+**What's happening.** Cheyenne's card reads *"6 sessions × $80 = $480"*, then a
+red *"Draft $400 does not match calculated $480"*, with a **"Use calculated $480"**
+button. The $400 is correct. The $480 is wrong. Tapping that button overcharges
+her $80.
+
+**Why.** `ReminderEditor.tsx:207` resolves the billing type like this:
+
+```ts
+c.billing_type === "flat" || c.billing_type === "none" || c.billing_type === "per_session"
+  ? c.billing_type
+  : (c.flat_billing === true ? "flat" : "per_session")
+```
+
+**`"monthly_adjusted"` is not in that list** — so it falls through to
+`per_session`. And every one of the 42 active clients is `monthly_adjusted`. The
+editor is mis-classifying the entire roster.
+
+Her real rule: $640 monthly − 3 cancelled × $80 = **$400**, which is exactly what
+the database stored. The editor instead computes 6 trained × $80 = $480.
+
+**Blast radius — 11 of 14 open reminders would change on one tap:**
+
+| client | correct | "Use calculated" would bill | difference |
+|---|---|---|---|
+| Sariah Duncan | $612.50 | $787.50 | **+$175.00** |
+| Lesly Spencer | $560.00 | $720.00 | **+$160.00** |
+| Sharon Rambo | $300.00 | $450.00 | **+$150.00** |
+| Lauren Standefer | $600.00 | $750.00 | **+$150.00** |
+| Hassan Kareem | $907.50 | $990.00 | **+$82.50** |
+| Cheyenne Martin | $400.00 | $480.00 | **+$80.00** |
+| Stacie Weever | $640.00 | $720.00 | **+$80.00** |
+| Sara Prince | $900.00 | $975.00 | **+$75.00** |
+| Claudine Ocon | $600.00 | $675.00 | **+$75.00** |
+| Tim Yancey | $490.00 | $560.00 | **+$70.00** |
+| Todd Prine | $675.00 | $525.00 | **−$150.00** |
+
+**$1,097.50 of over-billing** across ten clients, and Todd under-billed by $150.
+
+**Also explains three other things on that card:**
+- Every card shows **BLOCKED** with a red mismatch — because the calculation is
+  wrong for everybody, not because anything is actually wrong.
+- The green *"Billed $400 — 1 session covered"* is false. That label means "you
+  comped a session" (Dustin, 18 Aug: *"so I can screenshot the dates n show her I
+  gave her 2 free"*). He comped nothing — it is the gap between the correct
+  amount and the broken calculation.
+- Editing the session count or the remote-sessions box also recomputes on the
+  wrong rule (`setCount`, `setHalfPrice`, same `billingType`).
+
+**What I'd do.** Add `monthly_adjusted` to the accepted list, and make the
+fallback throw or warn on an unrecognised billing type rather than silently
+guessing `per_session`. The saved amounts in the database are all correct — this
+is display-and-recalculate only, so nothing needs back-correcting.
+
+❓ Go ahead? And do you want the "Use calculated" button disabled entirely until
+this is fixed, so it cannot be tapped by accident in the meantime?
+
 ## 2.2 Christine Latham was charged $640 twice in seven days [YOUR CALL]
 
 **What's happening.** Reminders due 22 Jul and 29 Jul, both $640, on a $640/month
