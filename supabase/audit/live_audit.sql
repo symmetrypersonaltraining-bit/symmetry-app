@@ -216,6 +216,35 @@ integrity as (
     and ran_at = (select max(ran_at) from integrity_checks)
 )
 
+-- ── 11. THE NUDGE SWEEP STAYS DEAD ─────────────────────────────────────────
+-- Dustin, 27 Aug 2026: "nudge should be gone period. 4th time this has come up."
+--
+-- The sweep that wrote these rows was never running from this repo: it stamped
+-- suppressed='preview_mode', a string deleted from src/ on 13 Aug, and the
+-- metered path (feature='nudge_sweep') has zero rows in ai_usage_log to this
+-- day. It fired daily at ~02:13 UTC and wrote ~30 rows in one second. It was
+-- frozen on 27 Aug by trg_ai_nudge_log_frozen, which discards every write.
+-- Backup: bak_ai_nudge_log_20260827 (857 rows).
+--
+-- This check asserts on the ANSWER -- did anything get written -- not on the
+-- presence of the trigger, because the trigger existing proves nothing about
+-- whether it works. Proved red-first on 27 Aug: the identical expression run
+-- against bak_ai_nudge_log_20260827 (the pre-freeze snapshot) returns FAIL with
+-- "34 rows written today", and returns ok against the live table.
+nudge_frozen as (
+  select 'ai' as area,
+    'the nudge sweep is still dead' as check_name,
+    case when exists (
+      select 1 from ai_nudge_log
+       where created_at >= timestamptz '2026-08-27 13:00:00+00'
+    ) then 'FAIL' else 'ok' end as status,
+    (select count(*)::text from ai_nudge_log
+      where created_at >= timestamptz '2026-08-27 13:00:00+00')
+      || ' rows written since the freeze (must stay 0); '
+      || (select count(*)::text from ai_nudge_log where sent)
+      || ' sent all-time (must stay 20)' as detail
+),
+
 select * from search_manual
 union all select * from search_ai
 union all select * from serving_cover
@@ -227,4 +256,5 @@ union all select * from future_done
 union all select * from sync_recent
 union all select * from integrity
 union all select * from upsert_targets
+union all select * from nudge_frozen
 order by status desc, area, check_name;

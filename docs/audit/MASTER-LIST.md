@@ -455,8 +455,36 @@ So a build nobody controls is generating nudges daily, writing messages toward
 clients, and it is invisible to your $95 spend cap and to the AI health page
 because it never logs usage.
 
-> **DECISION — stop it tonight at the database level, or investigate first to
-> see what it has been sending?** _(blank)_
+> **DECISION — Dustin, 27 Aug:** *"nudge should be gone period. 4th time this
+> has come up."*
+>
+> **DONE, at the database level, 27 Aug ~13:00 UTC.** Backed up first
+> (`bak_ai_nudge_log_20260827`, 857 rows — nothing deleted), then frozen with
+> `trg_ai_nudge_log_frozen`, which discards every insert and update to
+> `ai_nudge_log`.
+>
+> **Proved, not assumed.** A real insert and a real update were attempted after
+> the freeze: both returned 0 rows, the count stayed at 857, the probe row did
+> not land, and the all-time sent count stayed at 20. A check was added to
+> `live_audit.sql` and shown to go **red first** — the identical expression run
+> against the pre-freeze snapshot returns FAIL with "34 rows written today".
+>
+> **Why a trigger and not a code change.** The sweep is not running from this
+> repo, so a flag added here would not be read by it. The database is the only
+> place we can reliably stand in front of it. To reverse:
+> `drop trigger trg_ai_nudge_log_frozen on public.ai_nudge_log;`
+>
+> **Still open — for the overnight run:** rip the nudge feature out of the
+> codebase (`src/app/api/ai-nudges/*` and its segment logic), and find and
+> remove whatever deployed thing is still calling it, which is Vercel-side and
+> needs Dustin's hands or a redeploy. Until then the trigger is the wall.
+>
+> **One correction to the audit's claim.** It said the sweep "writes messages to
+> clients". It has **not sent anything since 13 August** — 19 went out on 12 Aug
+> and 1 on 13 Aug, and every row since has been suppressed
+> (`preview_mode`, `escalated_to_trainer`, `client_opted_out`). It was
+> generating and discarding, not messaging. The exposure was smaller than
+> reported; the unmetered daily model spend was real.
 
 ## 23. `verify-food` can overwrite your food database [MECHANICAL]
 
@@ -887,7 +915,7 @@ These eleven cannot — they need you specifically. In rough order of consequenc
 | # | Decision | Why only you can make it |
 |---|---|---|
 | **1** | Permission to edit `WorkoutLogger.tsx` for the cancel-deletes-sets fix, and whether Cancel is hidden or refuses on a finished workout | Standing rule: both loggers off limits |
-| **22** | Stop the rogue nudge sweep tonight, or investigate what it has been sending first | It is writing to clients from a build nobody controls |
+| ~~**22**~~ | ~~Stop the rogue nudge sweep~~ — **ANSWERED AND DONE 27 Aug.** *"nudge should be gone period."* Frozen at the database level, proved, live check added. Codebase removal is queued for the overnight run. | — |
 | **9** | What happens to Christine Latham's duplicate $640 | Real money, real client |
 | **10** | Correct her current $320 invoice to $400, or let the next cycle be right | It is already 5 days overdue |
 | **19** | What happens to 1,109 rows of AI-guessed nutrition already in clients' logs | Leave / flag / recompute — all three are defensible |
