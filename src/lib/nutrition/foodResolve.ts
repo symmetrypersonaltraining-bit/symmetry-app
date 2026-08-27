@@ -179,15 +179,58 @@ export const PICK_SYSTEM = `You choose which row of a food database a person mea
 You are given a food as they described it, and a numbered list of candidate rows with their real macros.
 
 Respond with ONLY valid JSON, no markdown and no prose:
-{"pick": <the number of the best row, or 0 if none of them is that food>}
+{"pick": <the number of the best row, or 0 if none of them is that kind of food at all>}
 
 How to choose:
-- The row must BE the food they described. "Chicken breast, roll, oven-roasted" is deli meat and is NOT plain chicken breast. "Chipotle White Rice" is not generic white rice.
+- Pick the row that is THE SAME KIND OF FOOD. A generic entry for that food is a correct answer — it does not have to match their wording, their brand, or their exact recipe. Somebody who says "sourdough cinnamon roll" is eating a cinnamon roll: "Sweet rolls, cinnamon, commercially prepared" is the right pick, not a miss.
 - Prefer plain, whole, unbranded entries over branded products, unless they named a brand.
-- Prefer a row marked [USDA] when it is genuinely the same food. Those are checked; the rest are crowd-submitted and some are badly wrong.
+- Prefer a row marked [USDA] when it is the same food. Those are checked; the rest are crowd-submitted and some are badly wrong.
 - USE THE NUMBERS AS EVIDENCE. A banana at 242 kcal with 14 g of fat is not a banana, whatever it is called. A chicken breast with 3.6 g of carbs is suspect. If a row's macros are impossible for the food they named, do not pick it.
-- Match the preparation they asked for where a row offers it — cooked vs raw, skinless vs with skin.
-- ANSWER 0 RATHER THAN FORCING IT. A wrong row silently becomes a wrong number in someone's food log, and the app handles 0 gracefully by asking them to search. A near-miss is worse than an honest miss.`;
+- Match the preparation where a row offers it — cooked vs raw, skinless vs with skin. Where no row offers it, the closest preparation of the same food is still the right pick.
+- A DIFFERENT FOOD IS NOT A CLOSE MATCH. "Chicken breast, roll, oven-roasted" is deli meat and is not plain chicken breast. "Chipotle White Rice" is not generic white rice. A plain sourdough roll is not a cinnamon roll. Reject those.
+- ANSWER 0 ONLY WHEN NOTHING IN THE LIST IS THAT KIND OF FOOD. 0 is for "there is no cinnamon roll here", not for "there is no SOURDOUGH cinnamon roll here". Answering 0 when a good generic row is sitting in the list sends the person off to search a database by hand for a food it already has, which is the worst outcome of the three.`;
+
+/**
+ * When the first search comes back with nothing usable, what else to look for.
+ *
+ * ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
+ *
+ * Dustin, 26 Aug: *"that button is supposed to be ai search and get numbers not
+ * add from library ... I tell it what I ate in normal words, it searches and
+ * gets macros n calories accurately."*
+ *
+ * He typed "Sour Dough Cinnamon Roll" and was told the food database did not
+ * have it. The database has "Sweet rolls, cinnamon, commercially prepared",
+ * "Fast foods, miniature cinnamon rolls" and four more, all USDA-checked.
+ *
+ * People do not describe food the way a nutrition database names it. One
+ * literal search of their exact phrase is not searching — it is a lookup, and
+ * it fails on any wording the database happens not to use. So when the first
+ * pass finds nothing, the model gets asked what else this food might be
+ * called, and those go back through the same search.
+ */
+export const TERMS_SYSTEM = `A food database could not find what somebody described. Suggest other terms to search for THE SAME FOOD.
+
+Respond with ONLY valid JSON, no markdown and no prose:
+{"terms": ["...", "..."]}
+
+Rules:
+- Two or three terms, most specific first.
+- Go from how a person talks to how a nutrition database writes: drop brands, drop adjectives it will not index, keep the food itself. "Sour dough cinnamon roll" -> ["cinnamon roll", "sweet roll cinnamon"]. "My protein shake w/ almond milk" -> ["protein shake", "almond milk"] only if they are separate foods, otherwise the main one.
+- Keep it the SAME FOOD. A shorter, plainer name for it — never a different food you think is similar. "Cinnamon roll" for a sourdough cinnamon roll is right; "bread" is not.
+- Terms only. No macros, no commentary.`;
+
+export function validateTerms(raw: unknown): string[] | null {
+  if (!raw || typeof raw !== "object") return null;
+  const t = (raw as { terms?: unknown }).terms;
+  if (!Array.isArray(t)) return null;
+  const out = t
+    .filter((x): x is string => typeof x === "string")
+    .map((x) => x.trim())
+    .filter((x) => x.length > 1 && x.length < 80)
+    .slice(0, 3);
+  return out.length ? out : null;
+}
 
 export function validatePick(raw: unknown, candidateCount: number): number | null {
   if (!raw || typeof raw !== "object") return null;

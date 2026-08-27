@@ -160,12 +160,30 @@ test("the candidates carry their real macros, because that is the evidence", () 
   assert.doesNotMatch(listed, /\[USDA\][^\n]*\n2\. [^\n]*\[USDA\]/, "the unverified row must not be labelled verified");
 });
 
-test("the picker is told to answer 0 rather than force a near-miss", () => {
-  assert.match(RESOLVE, /ANSWER 0 RATHER THAN FORCING IT/);
-  assert.match(RESOLVE, /A near-miss is worse than an honest miss/);
-  // And the specific traps that ranking alone falls into.
+test("the picker rejects a DIFFERENT food, and only a different food", () => {
+  // 26 Aug: this used to assert "ANSWER 0 RATHER THAN FORCING IT" and "a
+  // near-miss is worse than an honest miss". Both were written after the banana
+  // incident and both were overtuned — the picker started answering 0 on
+  // anything short of an exact wording match. Dustin typed "Sour Dough Cinnamon
+  // Roll" and was told the database did not have it, with Pillsbury Cinnamon
+  // Rolls and two USDA cinnamon-roll rows sitting IN the candidate list.
+  //
+  // What must survive is the rejection of a genuinely different food. What must
+  // NOT survive is refusing a correct generic row for the food they named.
+  assert.match(RESOLVE, /A DIFFERENT FOOD IS NOT A CLOSE MATCH/);
   assert.match(RESOLVE, /oven-roasted" is deli meat/);
+  assert.match(RESOLVE, /plain sourdough roll is not a cinnamon roll/);
+  // The numbers-as-evidence rule is the one that caught the banana. It stays.
   assert.match(RESOLVE, /242 kcal with 14 g of fat is not a banana/);
+});
+
+test("a generic row for the same food is a correct answer, not a miss", () => {
+  assert.match(RESOLVE, /THE SAME KIND OF FOOD/);
+  assert.match(RESOLVE, /it does not have to match their wording, their brand, or their exact recipe/);
+  // The exact case that failed, named in the prompt so it cannot regress
+  // quietly into "no SOURDOUGH cinnamon roll" meaning "no cinnamon roll".
+  assert.match(RESOLVE, /ANSWER 0 ONLY WHEN NOTHING IN THE LIST IS THAT KIND OF FOOD/);
+  assert.match(RESOLVE, /there is no SOURDOUGH cinnamon roll here/);
 });
 
 test("0 is a valid answer and anything off the list is not", () => {
@@ -245,4 +263,63 @@ test("a catalogue-resolved item is not flagged as an AI estimate", () => {
   // screen.
   assert.match(code(PARSE_CLIENT), /est: !foodId/);
   assert.match(code(PARSE_CLIENT), /db: !!foodId/);
+});
+
+// ── it has to SEARCH, not merely look up ─────────────────────────────────────
+//
+// Dustin, 26 Aug: *"that button is supposed to be ai search and get numbers not
+// add from library. add from library button is literally right under that, why
+// would we have two buttons to same exact thing? ... I tell it what I ate in
+// normal words, it searches and gets macros n calories accurately."*
+//
+// He typed "Sour Dough Cinnamon Roll". The app said the food database did not
+// have it and pointed him at the manual search control directly beneath — two
+// controls for one job, with the wrong one doing it.
+//
+// The database was never the problem. Measured against it the same day:
+//   match_food_for_ai('Sour Dough Cinnamon Roll') → returned Pillsbury Cinnamon
+//   Rolls and two USDA cinnamon-roll rows, IN the candidate list.
+//   match_food_for_ai('cinnamon roll')           → "Roll, sweet, cinnamon bun,
+//   frosted" 452 kcal and "no frosting" 372 kcal, both USDA-checked.
+//
+// One literal search of somebody's exact phrase is a lookup, not a search, and
+// it fails on any wording the database happens not to use.
+
+test("a miss searches again under other names before giving up", () => {
+  assert.match(code(OP), /TERMS_SYSTEM/);
+  assert.match(code(OP), /if \(!row\) \{/);
+  assert.match(code(OP), /const more = await search\(alt\);/);
+  assert.match(RESOLVE, /export const TERMS_SYSTEM/);
+  assert.match(RESOLVE, /Sour dough cinnamon roll" -> \["cinnamon roll"/);
+});
+
+test("the retry finds rows — it never redefines the food", () => {
+  // The alternate term is a way of reaching candidates. Judging against it
+  // instead of against what they actually said is how "cinnamon roll" would
+  // start matching whatever the second search dragged in.
+  assert.match(
+    code(OP),
+    /THEY ASKED FOR:\\n\$\{term\}/,
+    "the pick is judged against the invented search term rather than the person's words",
+  );
+  assert.match(RESOLVE, /never a different food you think is similar/);
+});
+
+test("the same term is not searched twice", () => {
+  assert.match(code(OP), /if \(alt\.toLowerCase\(\) === term\.toLowerCase\(\)\) continue;/);
+});
+
+test("an unfindable food still adds nothing", () => {
+  // Searching harder must not become guessing. Null still means not added.
+  assert.match(code(OP), /if \(!row\) return null;/);
+});
+
+test("the failure message no longer sends him to the button underneath", () => {
+  const CLIENT_SRC = readFileSync(join(process.cwd(), "src/app/(app)/nutrition/v3/NutritionV3Client.tsx"), "utf8");
+  assert.doesNotMatch(
+    code(CLIENT_SRC),
+    /use "Add from the food database" below/,
+    "the AI box is still handing its job to the manual control below it",
+  );
+  assert.match(code(CLIENT_SRC), /Everything else was applied/);
 });

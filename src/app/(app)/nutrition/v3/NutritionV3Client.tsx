@@ -2910,9 +2910,22 @@ function PlanAdjustSheet({
       // with the rows on screen.
       setAiNote(done.length ? done.join(" · ") : null);
       if (notFound.length) {
+        // DON'T SEND HIM TO THE BUTTON UNDERNEATH.
+        //
+        // Dustin, 26 Aug: "that button is supposed to be ai search and get
+        // numbers not add from library. add from library button is literally
+        // right under that, why would we have two buttons to same exact thing?"
+        //
+        // Right on both counts. Typing what you ate and searching a database by
+        // hand are two different jobs, and this message quietly turned the
+        // first into the second — for a food ("Sour Dough Cinnamon Roll") the
+        // database actually had six good rows for. The resolver now searches
+        // again under other names before it ever gets here, so reaching this
+        // line should be rare; when it does, say what happened and leave the
+        // choice alone rather than pushing him at the control below.
         setAiErr(
-          `Couldn't find ${notFound.join(" or ")} in the food database, so ${notFound.length > 1 ? "they were" : "it was"} not added — ` +
-            `use "Add from the food database" below and I'll keep the rest.`,
+          `I couldn't find ${notFound.join(" or ")} in the food database, so ${notFound.length > 1 ? "they were" : "it was"} left off. ` +
+            `Everything else was applied. Try naming it more plainly, or add it below.`,
         );
       } else if (!done.length) {
         setAiErr("I couldn't tell what to change — name the food and the amount.");
