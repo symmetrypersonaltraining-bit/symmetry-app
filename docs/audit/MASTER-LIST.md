@@ -196,13 +196,77 @@ charged are right; the sentence explaining them is wrong.
 **Why.** `ReminderEditor.tsx:428` hard-codes `basis: "sessions_trained"` for
 every client. ⚠️ Confirmed today: **all three of Tim, Sharon and Christine are
 `monthly_adjusted`, none is `sessions_trained`.** [re-verified 27 Aug] Your own
-editor shows Tim the correct line ($840 − 5 cancelled × $70 = $490), so the two
-screens contradict each other.
+editor shows Tim **$560** — see #8b, found after this section was written. Both
+screens are wrong, in two different places, for two different reasons.
 
 **Proposed fix.** Describe the billing type the client is actually on.
 
 > **DECISION — go ahead? And should the client see the deduction spelled out
 > ("$840 − 5 missed × $70") or just the final figure?** _(blank)_
+
+## 8b. The reminder editor treats EVERY client as per-session — one tap overcharges $1,097 [MECHANICAL]
+
+**Found 27 Aug ~09:50 CT from Dustin's screenshot of Cheyenne Martin's card, and
+re-verified against live data before being written here.**
+
+**What you see.** Her card reads *"6 sessions × $80 = $480"*, then a red *"Draft
+$400 does not match calculated $480"*, with a **"Use calculated $480"** button
+beside it. **The $400 is correct. The $480 is wrong.** Tapping that button
+overcharges her $80.
+
+**Why.** This is a DIFFERENT line from #8. `ReminderEditor.tsx:207`:
+
+```ts
+c.billing_type === "flat" || c.billing_type === "none" || c.billing_type === "per_session"
+  ? c.billing_type
+  : (c.flat_billing === true ? "flat" : "per_session")
+```
+
+`"monthly_adjusted"` is not in that list, so it falls through to `per_session`.
+**All 42 active clients are `monthly_adjusted`** [re-verified 27 Aug], so the
+editor mis-classifies the entire roster. #8 is the *client-facing* invoice
+(line 428, `credit_details.basis`); this is the *trainer-facing* editor and its
+recalculate button.
+
+Cheyenne's real rule: $640 monthly − 3 cancelled × $80 = **$400**, which is what
+the database correctly stored.
+
+**Blast radius — 11 of the 14 open reminders would change on one tap**
+[re-verified 27 Aug]:
+
+| client | correct | "Use calculated" bills | difference |
+|---|---|---|---|
+| Sariah Duncan | $612.50 | $787.50 | **+$175.00** |
+| Lesly Spencer | $560.00 | $720.00 | **+$160.00** |
+| Sharon Rambo | $300.00 | $450.00 | **+$150.00** |
+| Lauren Standefer | $600.00 | $750.00 | **+$150.00** |
+| Hassan Kareem | $907.50 | $990.00 | **+$82.50** |
+| Cheyenne Martin | $400.00 | $480.00 | **+$80.00** |
+| Stacie Weever | $640.00 | $720.00 | **+$80.00** |
+| Sara Prince | $900.00 | $975.00 | **+$75.00** |
+| Claudine Ocon | $600.00 | $675.00 | **+$75.00** |
+| Tim Yancey | $490.00 | $560.00 | **+$70.00** |
+| Todd Prine | $675.00 | $525.00 | **−$150.00** |
+
+**$1,097.50 over-billed** across ten clients; Todd $150 under.
+
+**It also explains three things on that screen:**
+- Every card showing **BLOCKED** with a red mismatch — the calculation is wrong
+  for everybody, not the drafts.
+- The green *"Billed $400 — 1 session covered"*. That label means "you comped a
+  session" (Dustin, 18 Aug: *"so I can screenshot the dates n show her I gave her
+  2 free"*). He comped nothing; it is the gap between the right amount and the
+  broken calculation.
+- Editing the session count or the remote-at-half box recomputes on the wrong
+  rule too (`setCount`, `setHalfPrice`, same `billingType`).
+
+**Proposed fix.** Add `monthly_adjusted` to the accepted list, and make the
+fallback warn on an unrecognised billing type rather than silently guessing.
+Stored amounts are all correct — this is display and recalculate only, so nothing
+needs back-correcting.
+
+> **DECISION — go ahead? And disable the "Use calculated" button until it is
+> fixed, so it cannot be tapped by accident in the meantime?** _(blank)_
 
 ## 9. Christine Latham was charged $640 twice in seven days [YOUR CALL]
 
