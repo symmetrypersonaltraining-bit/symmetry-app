@@ -86,6 +86,34 @@ export interface ServingOption {
 /** "100 g", "1 oz", "28g" — a portion expressed only as a weight. */
 const MASS_ONLY = /^\s*[\d.]+\s*(g|gm|kg|oz|lb|lbs|ml|l|fl\s?oz|grams?|ounces?|pounds?)\s*$/i;
 
+/**
+ * "each", "serving", "whole" — a word that means ONE OF THEM and names nothing.
+ *
+ * Dustin, 28 Aug, having typed "thomas cinnamon swirl bagel w cream cheese":
+ * the sheet came back reading **1 100 g**, 293 cal. The search was right — it
+ * found Thomas' own row, brand and all. What went wrong is below it.
+ *
+ * The model is asked for the measure THEY named and, when they name none for a
+ * countable food, it tends to answer with a placeholder: "each", "serving",
+ * "whole". That is not a measure. But it is a non-empty string, so it took the
+ * `unit` path, missed the row's "1 bagel (95 g)" (a bagel is not an "each"),
+ * and fell through to the last-resort branch, which labels the portion with
+ * `serving_desc` — the literal string "100 g" on 574,372 of 574,650 rows.
+ *
+ * Hence a screen that says "1 100 g" and charges 100 g of bagel for one bagel.
+ *
+ * These words are now read as what they mean: no unit was named, so give them
+ * one of the thing. An unrecognised REAL unit ("2 cups" against a row with no
+ * cup) still falls through to the honest weight fallback — counting bagels
+ * because somebody said cups would be a guess wearing a number.
+ */
+const GENERIC_ONE = /^(each|serving|servings|portion|portions|piece|pieces|whole|item|items|unit|units|count|ct)$/i;
+
+/** True when `unit` is a placeholder for "one of them" rather than a measure. */
+export function isGenericUnit(unit: string | null | undefined): boolean {
+  return !!unit && GENERIC_ONE.test(unit.trim());
+}
+
 export type Serving = {
   /** What one of them is called, singular: "bagel", "slice", "serving". */
   label: string;
@@ -253,7 +281,9 @@ export function macrosFromRow(
   //
   // p/c/f are quoted for ONE of them and per_amount is 1, so the downstream
   // scale (amount / per_amount) is simply how many they had.
-  const named = servingByUnit(row, unit) || (unit ? null : householdServing(row));
+  // A placeholder unit is the same as no unit: one of whatever this row counts.
+  const asked = isGenericUnit(unit) ? null : unit;
+  const named = servingByUnit(row, asked) || (asked ? null : householdServing(row));
   if (named) {
     return {
       food_id: row.id, name: row.name, verified: !!row.verified,
