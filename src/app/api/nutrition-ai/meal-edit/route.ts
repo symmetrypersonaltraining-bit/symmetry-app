@@ -47,8 +47,10 @@ export interface MealEditOp {
   // figures - and the answer is not a third prompt. A macro figure comes from
   // a row in the catalogue or it does not exist.
 
-  /** The catalogue row this resolved to. */
-  food_id?: string;
+  /** The catalogue row this resolved to, or null when it is an estimate. */
+  food_id?: string | null;
+  /** True when the numbers came from the model because the catalogue had nothing. */
+  estimated?: boolean;
   /** The row's own name, so a wrong CHOICE is visible on screen and fixable. */
   resolved_name?: string;
   verified?: boolean;
@@ -214,6 +216,7 @@ export async function POST(req: NextRequest) {
         const resolved = await resolveFood({ db: admin, apiKey, clientId }, op.name || "", op.amount, op.unit);
         if (!resolved) { op.unresolved = true; continue; }
         op.food_id = resolved.food_id;
+        op.estimated = !!resolved.estimated;
         op.resolved_name = resolved.name;
         op.verified = resolved.verified;
         op.p = resolved.p; op.c = resolved.c; op.f = resolved.f;

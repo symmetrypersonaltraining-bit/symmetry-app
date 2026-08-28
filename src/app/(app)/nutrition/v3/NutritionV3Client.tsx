@@ -2839,6 +2839,7 @@ function PlanAdjustSheet({
         options?: { label: string; gramsEach: number }[];
         grams_each?: number;
         unresolved?: boolean;
+        estimated?: boolean;
       }[];
       if (!ops.length) { setAiErr("I couldn't tell what to change — name the food and the amount."); return; }
 
@@ -2887,6 +2888,7 @@ function PlanAdjustSheet({
 
         newAdds.push({
           food_id: op.food_id ?? null,
+          estimated: !!op.estimated,
           // The DATABASE ROW's name, not the words they used. A wrong choice is
           // then visible on the row and one tap from being corrected — a wrong
           // name you can see beats a wrong number you cannot.
@@ -2904,7 +2906,9 @@ function PlanAdjustSheet({
           ...(op.grams_each != null ? { grams_each: Number(op.grams_each) } : {}),
         });
 
-        const label = op.amount != null && op.unit ? `${r2(Number(op.amount))} ${op.unit}` : "1 serving";
+        const label =
+          (op.amount != null && op.unit ? `${r2(Number(op.amount))} ${op.unit}` : "1 serving") +
+          (op.estimated ? " · estimated" : "");
         const out = op.op === "swap" && op.id ? byId.get(op.id) : undefined;
         done.push(out ? `${out.food} → ${op.resolved_name || op.name}, ${label}` : `+ ${op.resolved_name || op.name}, ${label}`);
       }
@@ -3007,7 +3011,12 @@ function PlanAdjustSheet({
         return (
           <div key={"add" + i} className="flex items-center gap-2 rounded-xl p-2.5 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px dashed var(--brand-border)" }}>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold truncate" style={{ color: "var(--brand-text)" }}>{ad.name} <span style={{ color: BLUE, fontSize: 9, fontWeight: 800 }}>ADDED</span></p>
+              <p className="text-xs font-semibold truncate" style={{ color: "var(--brand-text)" }}>{ad.name} <span style={{ color: BLUE, fontSize: 9, fontWeight: 800 }}>ADDED</span>{ad.estimated ? (
+                /* Not in the food database, so these numbers are the AI's. It
+                   still gets logged - what it must not do is look identical to
+                   a row that came off a label. */
+                <span title="Not in the food database - these macros are an AI estimate" style={{ color: "#CA8A04", fontSize: 9, fontWeight: 800, marginLeft: 4 }}>EST</span>
+              ) : null}</p>
               <p style={{ color: "var(--brand-text-secondary)", fontSize: 10 }}>
                 {r(kcalOf(ad.p * sv, ad.c * sv, ad.f * sv))} cal · P{r(ad.p * sv)} C{r(ad.c * sv)} F{r(ad.f * sv)}
               </p>

@@ -17,6 +17,7 @@ import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import {
   CatalogRow, ResolvedFood, macrosFromRow, describeCandidates, PICK_SYSTEM, validatePick,
   TERMS_SYSTEM, validateTerms, householdServing,
+  ESTIMATE_SYSTEM, validateEstimate, estimatedFood, toGrams, isGenericUnit,
 } from "@/lib/nutrition/foodResolve";
 
 /** Enough rows to contain the right one; short enough that the whole list gets read. */
@@ -135,10 +136,45 @@ export async function resolveFood(
     }
   }
 
-  // Nothing in the catalogue IS this food. Null means it is NOT ADDED anywhere:
-  // a near-miss becomes a wrong number in someone's log and is indistinguishable
-  // from a right one.
-  if (!row) return null;
+  // ── THE CATALOGUE DOES NOT HAVE IT. ASK ANYWAY. ───────────────────────────
+  //
+  // Dustin, 28 Aug: "That function needs to function as AI. It does not pull
+  // foods just from my database... If I say I ate one Thomas cinnamon swirl
+  // bagel, that's what it needs to log, one bagel... If I wanted to look up
+  // from the database, I would click the button that says database."
+  //
+  // He is right. The box says "Just say what changed" and there is a separate
+  // button underneath saying "Add from the food database" — a miss that sends
+  // him to that button is two controls doing one job, which is the same
+  // complaint he made about the search on 26 Aug.
+  //
+  // The catalogue still goes first and still wins whenever it holds the food;
+  // a real row beats recall every time. This is only what happens after it
+  // does not, and what comes back is MARKED as an estimate rather than being
+  // laid down among the real rows looking identical to them.
+  if (!row) {
+    const est = await callClaudeJson({
+      meter: { clientId: deps.clientId, feature: "food_parse" },
+      apiKey: deps.apiKey,
+      model: HAIKU_MODEL,
+      system: ESTIMATE_SYSTEM,
+      maxTokens: 120,
+      messages: [{ role: "user", content: term }],
+      validate: (raw) => {
+        const e = validateEstimate(raw);
+        return e === null ? null : { e };
+      },
+    });
+    // Still nothing. NOT ADDED — the model saying "I don't know this food" is
+    // an answer, and a better one than a number nobody can check.
+    if (!est.value) return null;
+    const e = est.value.e;
+
+    // A weight they named is still a weight: 60 g of it is 60/grams of one.
+    const g = isGenericUnit(unit) ? null : toGrams(amount ?? 1, unit);
+    const n = g != null ? g / e.grams : (amount ?? 1);
+    return { ...estimatedFood(term, e, Math.round(n * 1000) / 1000), micros: null };
+  }
 
   // ── WHAT "NO AMOUNT GIVEN" SHOULD MEAN ─────────────────────────────────────
   //

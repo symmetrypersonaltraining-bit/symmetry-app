@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { validateEstimate, estimatedFood } from "../../src/lib/nutrition/foodResolve.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { toGrams, macrosFromRow, describeCandidates, validatePick, type CatalogRow } from "../../src/lib/nutrition/foodResolve";
@@ -321,9 +322,44 @@ test("the same term is not searched twice", () => {
   assert.match(code(OP), /if \(alt\.toLowerCase\(\) === term\.toLowerCase\(\)\) continue;/);
 });
 
-test("an unfindable food still adds nothing", () => {
-  // Searching harder must not become guessing. Null still means not added.
-  assert.match(code(OP), /if \(!row\) return null;/);
+// SUPERSEDED, 28 Aug, by Dustin: "That function needs to function as AI. It
+// does not pull foods just from my database... If I wanted to look up from the
+// database, I would click the button that says database."
+//
+// A catalogue miss used to end the sentence. It now asks the model for the food
+// and marks what comes back as an estimate. The invariant that survives is not
+// "never a number" — it is "never an UNCHECKED number, and never one wearing a
+// verified row's clothes". These test that, against the real validator.
+test("a food the model does not know still adds nothing", () => {
+  assert.equal(validateEstimate({ unknown: true }), null);
+  assert.equal(validateEstimate({}), null);
+  assert.equal(validateEstimate({ serving: "bagel" }), null);          // no numbers
+  assert.equal(validateEstimate({ serving: "bagel", grams: 95 }), null);
+});
+
+test("an estimate that cannot be true is refused", () => {
+  const ok = { serving: "tbsp", grams: 15, p: 1, c: 0.5, f: 5, confident: true };
+  assert.deepEqual(validateEstimate(ok), ok);
+
+  // The likeliest way for this to go wrong: per-100 g numbers handed back for a
+  // 15 g serving. 34 g of fat cannot fit in 15 g of cream cheese.
+  assert.equal(validateEstimate({ ...ok, p: 6, c: 5, f: 34 }), null);
+  // "100 g" is not a portion anybody counts.
+  assert.equal(validateEstimate({ ...ok, serving: "100 g" }), null);
+  // Negative and absurd values are replies, not foods.
+  assert.equal(validateEstimate({ ...ok, f: -2 }), null);
+  assert.equal(validateEstimate({ ...ok, grams: 9000 }), null);
+});
+
+test("an estimate is marked as one, and carries no food_id", () => {
+  const e = validateEstimate({ serving: "bagel", grams: 95, p: 10, c: 55, f: 2, confident: true });
+  assert.ok(e);
+  const food = estimatedFood("thomas cinnamon swirl bagel", e, 1);
+  assert.equal(food.estimated, true);
+  assert.equal(food.food_id, null, "an estimate must not carry a catalogue id");
+  assert.equal(food.verified, false);
+  assert.equal(food.unit, "bagel");
+  assert.equal(food.per_amount, 1);
 });
 
 test("the failure message no longer sends him to the button underneath", () => {

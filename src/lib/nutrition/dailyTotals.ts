@@ -121,6 +121,14 @@ export interface CustomMeta {
 
 export interface AddedFood {
   food_id?: string | null;
+  /**
+   * The numbers came from the model, not from a catalogue row.
+   *
+   * Carried so the row can SAY SO on screen. An estimate is fine — Dustin
+   * estimates restaurant plates himself — but an estimate that looks exactly
+   * like a verified row is the failure he called out on 24 Aug.
+   */
+  estimated?: boolean;
   name: string;
   /**
    * The legacy multiplier, and still the fallback. p/c/f are per ONE serving

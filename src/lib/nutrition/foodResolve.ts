@@ -209,10 +209,37 @@ export function toGrams(amount: number, unit: string | null | undefined): number
 }
 
 export type ResolvedFood = {
-  food_id: string;
+  /** Null when this did not come from a row — see `estimated`. */
+  food_id: string | null;
   /** The row's name, shown on screen so a wrong CHOICE is visible and fixable. */
   name: string;
   verified: boolean;
+  /**
+   * TRUE WHEN THE NUMBERS CAME FROM THE MODEL, NOT FROM A ROW.
+   *
+   * Dustin, 28 Aug: *"That function needs to function as AI. It does not pull
+   * foods just from my database... If I wanted to look up from the database, I
+   * would click the button that says database."*
+   *
+   * He is right, and the previous design was too narrow. The box is labelled
+   * "Just say what changed" and sits above a separate button labelled "Add from
+   * the food database" — making the first one a second door to the second one
+   * is two controls for one job, which is the same complaint he made on 26 Aug
+   * about the search.
+   *
+   * So the catalogue is tried FIRST and still wins whenever it holds the food:
+   * a real row beats recall, every time, and 574,650 rows cover most of what
+   * anybody eats. But a miss is no longer a dead end. The model is asked for
+   * the food directly, and what comes back is marked — visibly, on the row —
+   * as an estimate.
+   *
+   * The mark is the whole point. His standard on 24 Aug was that the AI must
+   * never be "a guess", and the failure that produced it was a guess DRESSED AS
+   * A FACT: a fabricated row indistinguishable from a real one. An estimate
+   * that says it is an estimate is not that failure. He estimates restaurant
+   * meals himself — he did it here on 27 Aug for a plate of Texas barbecue.
+   */
+  estimated?: boolean;
   /** Macros for `per_amount` of `unit`, straight off the row. */
   p: number;
   c: number;
@@ -398,4 +425,64 @@ export function validatePick(raw: unknown, candidateCount: number): number | nul
   if (n === 0) return 0;
   if (n < 1 || n > candidateCount) return null;
   return n;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WHEN THE CATALOGUE GENUINELY DOES NOT HAVE IT
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const ESTIMATE_SYSTEM = `A food database has been searched and does not contain the food a person just said they ate. Give the nutrition for it yourself.
+
+Answer for ONE of the thing, the way a person counts it — one bagel, one slice, one cup, one tablespoon — NOT per 100 g, unless the food is genuinely only ever weighed.
+
+Respond with ONLY valid JSON — no markdown, no fences, no prose:
+{"serving":"<what one is called, singular, lowercase>","grams":<what ONE weighs>,"p":<protein g in one>,"c":<carbs g in one>,"f":<fat g in one>,"confident":<true|false>}
+
+Rules:
+- "serving" is a countable word: bagel, slice, egg, cup, tbsp, bar, cookie, packet, piece, sandwich. Never "100 g". Never "serving" on its own if a better word exists.
+- p, c and f are for ONE of them, in grams, and must be consistent with "grams". They are the nutrition-label numbers, not per 100 g.
+- Do NOT return calories. The app derives them.
+- "confident": true when this is a specific branded product whose label is well known, or a plain whole food (an egg, a banana, chicken breast). False when you are reasoning from a typical recipe — a restaurant dish, a homemade item, something regional.
+- If you do not actually know this food, return {"unknown":true}. Say so rather than inventing. A number nobody can check is worse than no number.`;
+
+export type FoodEstimate = { serving: string; grams: number; p: number; c: number; f: number; confident: boolean };
+
+/**
+ * Read the estimate reply, and refuse anything that is not arithmetically sane.
+ *
+ * The model is being trusted for a number here, which is exactly the thing this
+ * file exists to avoid, so the reply is checked rather than believed: the
+ * macros have to weigh less than the food does.
+ */
+export function validateEstimate(raw: unknown): FoodEstimate | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (r.unknown === true) return null;
+  const serving = typeof r.serving === "string" ? r.serving.trim().toLowerCase().slice(0, 24) : "";
+  if (!serving || MASS_ONLY.test(serving)) return null;
+  const grams = Number(r.grams);
+  const p = Number(r.p), c = Number(r.c), f = Number(r.f);
+  if (![grams, p, c, f].every((n) => Number.isFinite(n) && n >= 0)) return null;
+  // A portion has to have a weight, and a plausible one. 5000 g is not a food.
+  if (!(grams > 0) || grams > 5000) return null;
+  // Protein, carbs and fat cannot outweigh the food they are in. This catches
+  // the per-100 g answer given for a 30 g serving, which is the single most
+  // likely way for this to be wrong.
+  if (p + c + f > grams * 1.05) return null;
+  return { serving, grams, p, c, f, confident: r.confident === true };
+}
+
+/** An estimate, shaped exactly like a resolved row so nothing downstream cares. */
+export function estimatedFood(name: string, est: FoodEstimate, amount: number): ResolvedFood {
+  return {
+    food_id: null,
+    name,
+    verified: false,
+    estimated: true,
+    p: est.p, c: est.c, f: est.f,
+    amount,
+    unit: est.serving,
+    per_amount: 1,
+    options: [{ label: est.serving, gramsEach: est.grams }],
+  };
 }
