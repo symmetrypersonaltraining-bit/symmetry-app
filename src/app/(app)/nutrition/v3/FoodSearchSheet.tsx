@@ -253,33 +253,62 @@ export default function FoodSearchSheet({
     setAmt(String(Math.max(s, next)));
   }
 
-  // Switching units keeps the SAME real quantity where the dimensions allow it
-  // (25 g → 0.882 oz), so changing the unit never silently changes the food.
+  // ── SWITCHING A UNIT MUST NOT CHANGE THE FOOD ─────────────────────────────
+  //
+  // Dustin, 28 Aug, on the database sheet: cream cheese reading
+  //
+  //     100  [ serving v ]        100 serving · P714 C357 F3571 · 35714 cal
+  //
+  // Thirty-five thousand calories. Ten kilograms of cream cheese.
+  //
+  // It opened correctly on "100 g" — the row's own base — and he tapped the
+  // unit dropdown and chose "serving", which is offered on every food. That is
+  // an entirely reasonable thing to tap. But "serving" HAS no dimension that
+  // the mass converter understands, so the conversion quietly failed, the
+  // number stayed at 100, and its meaning changed underneath it: 100 servings
+  // of a food whose serving IS 100 g. A hundredfold, in one tap, silently.
+  //
+  // The base serving is the missing link and the row carries it. One serving of
+  // this food is `baseGrams`, so grams and servings convert both ways, and the
+  // quantity survives the switch: 100 g becomes 1 serving, not 100 of them.
   function changeUnit(next: string) {
     if (next === unit) { setUnit(next); return; }
-    // Switching units keeps the SAME real quantity, so changing the unit never
-    // silently changes the food. Named units have no dimension servingsFor()
-    // understands, so anything involving one converts through grams instead —
-    // 2 eggs becomes 88 g, not 2 g.
-    const gramsPer = (u: string) => {
-      const hit = picked && picked.named.find((x) => x.label === u);
-      return hit ? hit.gramsPerUnit : null;
+
+    /** What one of a NAMED portion weighs ("egg" -> 44), else null. */
+    const gramsPer = (u: string) => picked?.named.find((x) => x.label === u)?.gramsPerUnit ?? null;
+    const base = picked?.baseGrams && isFinite(picked.baseGrams) && picked.baseGrams > 0 ? picked.baseGrams : null;
+
+    /** The current quantity, in grams. Null when this unit has no weight. */
+    const toG = (amount: number, u: string): number | null => {
+      if (!(amount > 0)) return null;
+      if (u === "serving") return base != null ? amount * base : null;
+      const per = gramsPer(u);
+      if (per) return amount * per;
+      const g = servingsFor(amount, u, "1 g");     // mass units convert here
+      return isFinite(g) && g > 0 ? g : null;
     };
-    const fromG = gramsPer(unit);
-    const toG = gramsPer(next);
-    if (fromG || toG) {
-      const grams = fromG ? amtNum * fromG : servingsFor(amtNum, unit, "1 g");
-      if (isFinite(grams) && grams > 0) {
-        const out = toG ? grams / toG : servingsFor(grams, "g", `1 ${next}`);
-        if (isFinite(out) && out > 0) setAmt(String(Math.round(out * 1000) / 1000));
-      }
+
+    /** Grams back out into the requested unit. */
+    const fromG = (grams: number, u: string): number | null => {
+      if (u === "serving") return base != null ? grams / base : null;
+      const per = gramsPer(u);
+      if (per) return grams / per;
+      const out = servingsFor(grams, "g", `1 ${u}`);
+      return isFinite(out) && out > 0 ? out : null;
+    };
+
+    const grams = toG(amtNum, unit);
+    const out = grams != null ? fromG(grams, next) : null;
+    if (out != null && isFinite(out) && out > 0) {
+      setAmt(String(Math.round(out * 1000) / 1000));
       setUnit(next);
       return;
     }
-    const converted = servingsFor(amtNum, unit, `1 ${next}`);
-    if (isFinite(converted) && converted > 0) {
-      setAmt(String(Math.round(converted * 1000) / 1000));
-    }
+
+    // NO HONEST CONVERSION EXISTS between these two. Rather than leave the old
+    // number sitting under a unit that now means something else — which is the
+    // whole bug above — reset to one of the new unit. One is always true.
+    setAmt("1");
     setUnit(next);
   }
 
