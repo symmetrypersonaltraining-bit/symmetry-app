@@ -1,0 +1,106 @@
+# The 93 documents removed from the Claude Project on 27-28 Aug 2026
+#
+# WHY: the project has a 2 MB storage cap and was refusing every write.
+# WHAT WAS KEPT: the entire Movement Method chain -- 135 documents, 5.2 MB --
+#   because a scheduled cloud run at 02:00 reads them out of the project, and
+#   there is nowhere else it can reach. A private repo does not work: a cloud
+#   session cannot authenticate to one. The public repo does not work either:
+#   the engine packs carry client names (checked, 176 hits across 3 files).
+# WHERE THESE WENT: every one is in the verified archive, in two places --
+#   C:\Users\dusti\Claude\Projects\Trainer App\project-archive-2026-08-27\
+#   and symmetry-project-archive-2026-08-27.zip in the chat.
+# TO RESTORE ONE: write it back to the same path it came from.
+#
+claude/AI-BUILD-HANDOFF-8-13.md
+claude/AI-SPEC-8-12-in-progress.md
+claude/BROOKE-SWEEP-2026-08-23-1908.md
+claude/BROOKE-SWEEP-2026-08-24-0730.md
+claude/BROOKE-SWEEP-2026-08-24-1305.md
+claude/BROOKE-SWEEP-2026-08-24-1615.md
+claude/BROOKE-SWEEP-2026-08-25-1612.md
+claude/BROOKE-SWEEP-2026-08-25-2221.md
+claude/BROOKE-SWEEP-2026-08-26-0809.md
+claude/BROOKE-SWEEP-2026-08-26-1030.md
+claude/BROOKE-SWEEP-2026-08-26-1310.md
+claude/BROOKE-SWEEP-2026-08-26-1920.md
+claude/CALENDAR-DETECTOR-FIX-8-16.md
+claude/CARRYOVER-7-31-EVENING.md
+claude/CLIENT-NOTES-TRIAGE-2026-08-21.md
+claude/COMMAND-CENTER-MEAL-PLANS-2026-08-22.md
+claude/DATABASE-DECISION-8-17.md
+claude/FOOD-LOGGER-REVAMP-SPEC.md
+claude/FRIDAY-BUILD-STATUS-8-14.md
+claude/GROUP-MESSAGE-DRAFT-app-update.md
+claude/GROUP-MESSAGE-READY-2026-08-17.md
+claude/HANDOFF-2026-08-17-PM.md
+claude/HANDOFF-2026-08-20-OVERNIGHT.md
+claude/HANDOFF-2026-08-21-FRI-SCHEDULED.md
+claude/HANDOFF-2026-08-21-FULL.md
+claude/HANDOFF-2026-08-21-LATE.md
+claude/HANDOFF-2026-08-21-NIGHT.md
+claude/HANDOFF-2026-08-22-MORNING.md
+claude/HANDOFF-2026-08-22-NIGHT.md
+claude/HANDOFF-2026-08-22-NIGHT2.md
+claude/HANDOFF-2026-08-22-OVERNIGHT.md
+claude/HANDOFF-2026-08-23-EARLY.md
+claude/HANDOFF-2026-08-23-TRAINER-PARITY.md
+claude/HANDOFF-2026-08-24-0400.md
+claude/HANDOFF-2026-08-24-FULL.md
+claude/HANDOFF-2026-08-24-PM.md
+claude/HANDOFF-2026-08-26-PM.md
+claude/HANDOFF-7-20.md
+claude/HANDOFF-7-23.md
+claude/HANDOFF-7-31.md
+claude/HANDOFF-8-16-0500-NO-BRIDGE.md
+claude/HANDOFF-8-16-OVERNIGHT-SCHEDULED.md
+claude/HANDOFF-8-16-OVERNIGHT.md
+claude/HANDOFF-8-16-PASS3.md
+claude/HANDOFF-8-16-PASS4.md
+claude/HANDOFF-8-16-PASS5.md
+claude/HANDOFF-8-16-PASS6.md
+claude/HANDOFF-8-16-PASS7.md
+claude/HANDOFF-8-16-SCHEDULED-0129.md
+claude/HANDOFF-8-17-PASS8.md
+claude/HANDOFF-8-17.md
+claude/HANDOFF-BILLING-2026-08-18.md
+claude/HANDOFF-COMPLETE-8-17.md
+claude/HANDOFF-CROSSOVER-2026-08-20-NIGHT.md
+claude/HANDOFF-MULTITRAINER-2026-08-20-PM.md
+claude/HANDOFF-OVERNIGHT-2026-08-20.md
+claude/MEAL-CHANGES-HOW-IT-WORKS-8-14.md
+claude/MIGRATION-PAUSED-7-23.md
+claude/MORNING-2026-08-22.md
+claude/MORNING-7-31.md
+claude/MORNING.md
+claude/NEXT-CHAT-PASTE-7-23.txt
+claude/NUDGE-SLIPPING-BUCKET-EVIDENCE.md
+claude/OPEN-ITEMS-7-20.md
+claude/OVERNIGHT-2026-08-16-MORNING-REPORT.md
+claude/OVERNIGHT-8-16-RUN3-NO-BRIDGE.md
+claude/OVERNIGHT-BRIEF-CORRECTED.md
+claude/PENDING-SHIP-2026-08-23-PER-ROOM.md
+claude/PENDING-WORK-2026-08-22.md
+claude/PLAN-SECOND-TRAINER-DECISIONS.md
+claude/PLAN-SECOND-TRAINER.md
+claude/POINTER-7-31-EVENING.md
+claude/PUSH-LIST-2026-08-22.md
+claude/PUSHPRESS-CALENDAR-2026-08-24.md
+claude/RESUME-HERE-8-17.md
+claude/SESSION-HANDOFF-8-14-FULL.md
+claude/SESSION-LOG-7-31-FRIDAY-BUILD.md
+claude/SESSION-LOG-8-07-FRIDAY-BUILD.md
+claude/SESSION-LOG-8-13-AI-BUILD-CLOSEOUT.md
+claude/SESSION-LOG-8-13-TIMER.md
+claude/SESSION-LOG-8-16-OVERNIGHT.md
+claude/UNSHIPPED-1d53cc5-billed-rate.patch
+claude/WACO-PLAN-AND-HANDOFF-8-11.md
+claude/WEEKEND-AGENDA.md
+claude/WHERE-WE-ARE-2026-08-21-PM.md
+claude/add-copy-meal-mockup.html
+claude/feedback-fix-2026-08-25.patch
+claude/feedback-fix-2026-08-26.patch
+claude/gerard-logger-fix-bd84302.patch
+claude/help-center-READY-8-07.patch
+claude/help-center-b5f080d.patch
+claude/ship-2026-08-21-fri.patches.txt
+claude/trainer-dashboard-8-16.html

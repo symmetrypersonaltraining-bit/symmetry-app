@@ -12,6 +12,44 @@ into prose. See **§ What did not survive** at the end — about 8 low-severity
 items exist only as the phrase "and others" and cannot be recovered from the
 record. That is stated rather than papered over.
 
+## UPDATE — 28 Aug, after four commits from another session
+
+`994cd4a`, `55e1090`, `93f1d86`, `391297b` landed on the food path. Re-checked
+against live data and the running code, not against the commit messages:
+
+**Genuinely fixed.** The "1 100 g" bug — the model answering "each" / "serving"
+/ "whole" when no measure was named, which took the unit path, missed the row's
+own "1 bagel (95 g)", and fell through to the literal string `100 g` that sits
+on 574,372 rows. `isGenericUnit()` now reads those words as "one of the thing".
+
+**A policy change worth recording as a decision.** `nutrition-ai/meal-edit` may
+now return model figures when the catalogue misses, marked `estimated: true` and
+shown as an estimate on the row. That partly answers the second open question in
+**#19** — the choice made was *estimate, but label it* rather than *log nothing
+and ask*. Confirm that is what you want and I will close that half of #19.
+
+**NOT fixed, despite touching the same file — #47 is still live.** I replayed
+the real exported `householdServing()` against real catalogue rows rather than
+reading the code:
+
+    Bananas, raw      -> 1 cup, mashed = 225 g
+    Cheese, cheddar   -> 1 cup, diced  = 132 g
+    Nuts, almonds     -> 1 cup, whole  = 143 g
+
+Still the first countable option, still alphabetical, still a cup.
+
+**Everything else re-checked 28 Aug and unchanged:** #1 five empty sessions in
+14 days · #20 71 saved meals across 7 clients · #21 Brooke still 198 g against
+160 g · #48 still 15 of 1,859 plan items carry nutrients · Group 5 static audit
+still 5 findings.
+
+**#19 has grown.** 1,109 → **1,128** rows of AI-estimated nutrition, still 18
+clients. It is accumulating at roughly 19 rows a day while the decision is open.
+
+**#22 is holding.** Zero nudge rows since the freeze; sent still 20 all-time.
+
+---
+
 ## Status of the numbers in this file
 
 Every figure marked **[re-verified 27 Aug ~12:00 CT]** was run against the live
