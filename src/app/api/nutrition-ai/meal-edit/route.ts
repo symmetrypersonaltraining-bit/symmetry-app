@@ -81,12 +81,18 @@ Rules:
 - "remove" is for "no X", "skip the X", "drop the X", "without X". Prefer remove over setting an amount to 0.
 - "add" is ONLY for a food that is not already in the list.
 - "swap" replaces one item with a different food, keeping its place: {"op":"swap","id":"<id of the item going out>","name":"<food coming in>","amount":<number>,"unit":"<unit>"}. Use it for "swap X for Y", "X instead of Y", "make it Y not X".
-- NAME THE FOOD THE WAY A FOOD DATABASE WOULD, and include the preparation they implied — "chicken breast, cooked", "white potatoes, boiled", "white rice, cooked". Do not include the amount in the name.
+- ONE OPERATION PER FOOD. A sentence often names more than one. "a bagel w cream cheese" is TWO foods and therefore TWO ops — one for the bagel, one for the cream cheese. "eggs and toast", "chicken with rice", "coffee w creamer" are all two. Never fold a second food into the first one's name.
+- "with", "w", "w/", "and", "plus", "topped with", "on the side" all introduce ANOTHER food. The only exception is when the two words are one dish a database would list under a single name — "peanut butter", "cream of rice", "chicken parmesan", "macaroni and cheese".
+- NAME THE FOOD THE WAY A FOOD DATABASE WOULD, and include the preparation they implied — "chicken breast, cooked", "white potatoes, boiled", "white rice, cooked". Preparation is HOW IT WAS COOKED, not what it was served with. Do not include the amount in the name.
 - WHENEVER THEY NAME A MEASURE — "6 oz", "200 g", "two tbsp" — put the number in "amount" and the unit in "unit", exactly as they said it. Do not convert it.
-- If they name NO measure: for "add", omit amount and unit. For "swap", also omit them — the app carries the weight of the item being replaced across, which is what a swap means.
+- If they name NO measure: for "add", omit amount and unit. For "swap", also omit them — the app carries the weight of the item being replaced across, which is what a swap means. NEVER invent a placeholder unit. "each", "serving", "whole" and "piece" are not measures — if they did not name one, leave both fields out.
 - Match foods loosely against what is already on the meal — "the bread" should find "Homemade Sourdough", "eggs" should find "Boiled Eggs (whole)". If a food they mention is genuinely already listed, edit it rather than adding a duplicate.
 - Only act on what they actually said. Never change an item they did not mention. An empty ops array is a valid answer.
-- "note" is what you did, in one short sentence, in plain words. No numbers, no emoji.`;
+- "note" is what you did, in one short sentence, in plain words. No numbers, no emoji.
+
+WORKED EXAMPLE — "thomas cinnamon swirl bagel w cream cheese", nothing matching on the plate:
+{"ops":[{"op":"add","name":"Thomas cinnamon swirl bagel"},{"op":"add","name":"cream cheese"}],"note":"Added a cinnamon swirl bagel and cream cheese."}
+Two foods, two ops, no amounts, no units, no numbers.`;
 
 const MAX_OPS = 25;
 
