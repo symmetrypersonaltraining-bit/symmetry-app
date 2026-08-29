@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { startDictation } from '@/lib/dictation';
 import AiBadge from "@/components/AiBadge";
+import { centralToday } from '@/lib/central-time';
 
 // \u2500\u2500\u2500 Types \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
@@ -354,7 +355,7 @@ export default function AssessmentPage() {
                   current year by someone tabbing through. */}
               <input
                 type="date"
-                max={new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })}
+                max={centralToday()}
                 value={data.date_of_birth}
                 onChange={e => set('date_of_birth', e.target.value)}
                 className={inputClass}
