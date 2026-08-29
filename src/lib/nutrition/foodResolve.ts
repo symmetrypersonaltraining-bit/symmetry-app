@@ -145,18 +145,69 @@ export function parseServingOption(o: ServingOption): Serving | null {
 }
 
 /**
+ * A measure of volume rather than a thing you can hold.
+ *
+ * ⚠️ MY BUG, 26 AUG, AND IT DOUBLED PEOPLE'S CALORIES.
+ *
+ * The serving fix took the FIRST countable option on the row, and USDA stores
+ * them alphabetically, so "cup" beats everything. Replayed against the real
+ * catalogue on 28 Aug:
+ *
+ *     Bananas, raw      ->  1 cup, mashed = 225 g   (~200 kcal, not 105)
+ *     Cheese, cheddar   ->  1 cup, diced  = 132 g   (533 kcal)
+ *     Nuts, almonds     ->  1 cup, whole  = 143 g   (828 kcal)
+ *
+ * 59,477 catalogue rows of 298,392 auto-picked a cup. "Add a banana" charged
+ * somebody a cup of mashed banana.
+ *
+ * A cup is still a real serving and stays available in the unit picker -- it is
+ * only wrong as the DEFAULT, because nobody saying "a banana" means a cup of
+ * mashed banana. Volume is the last resort, after every piece-like option.
+ */
+const VOLUME_ISH = /^(cup|tbsp|tablespoon|tsp|teaspoon|quart|pint|gallon|fl\s?oz|fluid\s?ounce|liter|litre)\b/i;
+
+/**
  * The portion a person would actually name, or null when the row only knows
  * weights.
  *
- * Prefers a countable thing ("1 bagel") over a weight ("100 g", "1 oz"),
- * because "one bagel" is what somebody ate and 100 g is a laboratory answer.
+ * ⚠️ MY BUG, 26 AUG, AND IT DOUBLED PEOPLE'S CALORIES. The first version took
+ * the FIRST countable option, and USDA stores them alphabetically, so "cup"
+ * won almost every time:
+ *
+ *     Bananas, raw     ->  1 cup, mashed  225 g   (200 kcal for "a banana")
+ *     Cheese, cheddar  ->  1 cup, diced   132 g   (533 kcal)
+ *     Nuts, almonds    ->  1 cup, whole   143 g   (828 kcal)
+ *
+ * 59,477 of 298,392 catalogue rows defaulted to a cup.
+ *
+ * ⚠️ AND MY FIRST FIX WAS ALSO WRONG, caught only by replaying it against the
+ * REAL catalogue instead of rows I had invented. "Any piece beats a volume"
+ * gave `Nuts, almonds -> 1 almond = 1 g` -- wrong in the other direction. My
+ * invented rows had a "1 medium" banana and a "1 slice" cheddar; neither
+ * exists on the real row. Test data you wrote yourself agrees with you.
+ *
+ * So: a real piece, else a volume. A piece under 5 g is not offered as the
+ * default -- "1 almond" is a genuine option and stays in the unit picker, but
+ * nobody logs one almond.
+ *
+ * ⚠️ DELIBERATELY NOT CHANGED: rows whose only options are "100 g" and "1 oz"
+ * still return null and fall through to the existing weight default. Preferring
+ * the ounce would change the default portion on tens of thousands of foods --
+ * most verified USDA rows carry exactly those two options and nothing else --
+ * and whether "add chicken breast" should mean 1 oz or 100 g is Dustin's call,
+ * not a bug fix. It is in the review list.
  */
 export function householdServing(row: CatalogRow): Serving | null {
+  let volume: Serving | null = null;
+  let tiny: Serving | null = null;
   for (const o of row.serving_options || []) {
     const s = parseServingOption(o);
-    if (s) return s;
+    if (!s) continue;
+    if (VOLUME_ISH.test(s.label)) { if (!volume) volume = s; continue; }
+    if (s.gramsEach < 5) { if (!tiny) tiny = s; continue; }
+    return s;
   }
-  return null;
+  return volume || tiny;
 }
 
 /** Every portion this row can be counted in, for the unit picker. */
