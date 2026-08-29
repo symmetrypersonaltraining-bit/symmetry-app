@@ -374,9 +374,31 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
       blocking.push("Per-session billing but no session rate on file - set the client's session rate");
     }
     expected = round2(sessionsTrained * (i.sessionRate ?? 0));
-    if (i.sessionRate != null && sessionsTrained === 0) {
-      warnings.push("No sessions trained in this cycle - amount is $0");
-    }
+    // per_session clients are billed for what happened, so nobody is now on the
+    // old comment's "nobody" - Todd Prine moved here 29 Aug.
+  }
+
+  // ── A $0 BILL IS A CONVERSATION, NOT AN INVOICE ─────────────────────────
+  //
+  // Sharon Rambo cancelled four in a row between 18 and 29 August. Her next
+  // half-cycle computes to $300 - 4 x $75 = $0, and nothing anywhere stopped
+  // that from being approved and emailed to her as a demand for nothing.
+  //
+  // Zero is a legitimate ARITHMETIC answer under every one of the three rules;
+  // it is never a legitimate thing to send. Blocking rather than warning,
+  // because the screen already carried a warning about a zero per-session cycle
+  // and it stopped nothing. Overridable: Dustin may genuinely want to record a
+  // $0 cycle rather than delete the row.
+  if (expected === 0 && blocking.length === 0) {
+    const why =
+      billingType === "per_session"
+        ? "no sessions were trained in this cycle"
+        : billingType === "flat"
+          ? "the flat rate on file is $0"
+          : "every session the rate covers was cancelled";
+    const msg = "This comes to $0 - " + why + ". Nothing should be sent; talk to them instead.";
+    if (i.override) warnings.push(msg + " - OVERRIDDEN by trainer");
+    else blocking.push(msg);
   }
 
   if (Math.abs(i.draftAmount - expected) > 0.009) {

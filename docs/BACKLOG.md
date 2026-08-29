@@ -1,5 +1,59 @@
 # Backlog — the single work queue
 
+## 2026-08-29 — Billing rule replaced (SHIPPED)
+
+The rule, locked with Dustin 29 Aug:
+
+    credited = min(cancelled, max(0, plan - trained))
+    amount   = monthly rate - credited x session rate
+
+- Credit stops at the sessions actually MISSED, so a cancellation the client
+  made up costs nothing. Fixed a $565/cycle leak (Lesly 160, Lauren 75,
+  Martha 87.50, Hassan 82.50, Cheyenne 80, Stacie 80).
+- Sessions above the plan are NOT charged (his call). ~$365/cycle of goodwill.
+- Make-ups need no detection: a make-up is a trained session in its own cycle
+  and the credit shrinks to meet it, so consecutive cycles sum to the sessions
+  delivered. Google Calendar carries no link between a cancelled event and its
+  replacement, so detection would have been a guess.
+- Late cancels need no feature: "if its last min I won't turn it orange in cal",
+  so the slot stays scheduled and is billed. half_price_sessions removed from
+  the arithmetic.
+- $0 invoices now BLOCK (overridable). Sharon Rambo's next half-cycle computes
+  to exactly $0 after four consecutive cancellations.
+
+ROOT BUG FIXED: ReminderEditor's own billing-type list omitted
+"monthly_adjusted", so all 15 monthly clients fell through to per_session and
+saving a card wrote the wrong basis back over the correct one. It now calls
+resolveBillingType. This is why the problem returned four times.
+
+Client surfaces (due banner, billing history) now render the identical receipt
+via invoiceLines(), instead of running their own arithmetic.
+
+DB: recalc_pending_payment_reminders() rewritten; approved_at added to the
+guard so an approved figure is never recalculated. Backups:
+bak_payment_reminders_20260829_billing, bak_clients_billing_20260829,
+bak_recalc_fn_20260829.
+
+PROFILES CHANGED
+- Todd Prine -> per_session $75. A pilot booked week by week; a week that never
+  gets booked leaves no cancelled event, so the monthly rule was blind to it.
+  He had been paying trained x rate in practice for months ($675 for 9,
+  $600 for 8).
+- Celeste Lennon, Greg Lennon, Krysta Ruiz-Schnitzler, Troy Schnitzler ->
+  no billing, stale fees cleared.
+- Madeleine Coker: flat $75/month CONFIRMED CORRECT (programming only, checks in
+  once a month, no in-person training). Do not flag again.
+- Sharon Rambo: 2x/week CONFIRMED. Her plan of 4 per half-cycle at $75 is right.
+
+OPEN
+- Sharon Rambo's Sep 7 invoice will compute to $0 (4 consecutive cancellations,
+  18-29 Aug). It will block rather than send. Needs a conversation, not a bill.
+- Watch the first real approval under the new rule.
+
+
+---
+
+
 > ## 👉 26 Aug — THE SYNC OUTAGE I CAUSED, AND THREE THINGS HE HIT (`b5ecaa8`)
 >
 > ### The outage

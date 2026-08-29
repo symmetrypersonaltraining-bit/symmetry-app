@@ -60,11 +60,13 @@ test("the session count drives the amount, not the fee on file", () => {
   assert.deepEqual(r.blocking, []);
 });
 
-test("zero sessions bills $0 and warns rather than blocking", () => {
+test("zero sessions bills $0 and BLOCKS - it used only to warn", () => {
+  // Superseded 29 Aug. A warning beside a live Approve button is a label, not a
+  // guard, and Sharon Rambo's next half-cycle computes to exactly $0.
   const r = calcReminder(base({ sessionsTrained: 0, draftAmount: 0 }));
   assert.equal(r.expected, 0);
-  assert.deepEqual(r.blocking, []);
-  assert.ok(r.warnings.some((w) => w.includes("No sessions trained")));
+  assert.ok(r.blocking.some((b) => /comes to \$0/.test(b)));
+  assert.ok(r.blocking.some((b) => /no sessions were trained/.test(b)));
 });
 
 test("per_session with no session rate BLOCKS", () => {
@@ -398,6 +400,38 @@ test("nobody cancelling pays the rate exactly", () => {
   assert.equal(r.cancelDeduction, 0);
 });
 
+test("a $0 bill is blocked rather than sent", () => {
+  // Sharon Rambo cancelled four in a row, 18-29 August. Her next half-cycle
+  // computes to $300 - 4 x $75 = $0, and until now nothing stopped that being
+  // approved and emailed to her as a demand for nothing.
+  const r = calcReminder(adj({ fee: 300, sessionRate: 75, expectedSessions: 4,
+    cancelledFull: 4, sessionsTrained: 0, draftAmount: 0 }));
+  assert.equal(r.expected, 0);
+  assert.ok(r.blocking.some((b) => /comes to \$0/.test(b)),
+    "a zero invoice has to stop at the screen");
+});
+
+test("a $0 bill can be overridden, because recording one is a real choice", () => {
+  const r = calcReminder(adj({ fee: 300, sessionRate: 75, expectedSessions: 4,
+    cancelledFull: 4, sessionsTrained: 0, draftAmount: 0, override: true }));
+  assert.deepEqual(r.blocking, []);
+  assert.ok(r.warnings.some((b) => /comes to \$0.*OVERRIDDEN/.test(b)));
+});
+
+test("a per-session cycle with no sessions is blocked too", () => {
+  // Todd Prine, if a month of flying wipes out his schedule entirely.
+  const r = calcReminder(base({ billingType: "per_session", sessionRate: 75,
+    sessionsTrained: 0, draftAmount: 0 }));
+  assert.ok(r.blocking.some((b) => /no sessions were trained/.test(b)));
+});
+
+test("a real bill is never mistaken for a zero one", () => {
+  const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 1, sessionsTrained: 7, draftAmount: 560 }));
+  assert.equal(r.expected, 560);
+  assert.ok(!r.blocking.some((b) => /comes to \$0/.test(b)));
+});
+
 test("more cancellations than the rate covers cannot make the bill negative", () => {
   // Six cancels against a four-session rate. The credit is capped at the plan,
   // so this is now structurally impossible rather than clamped after the fact —
@@ -408,6 +442,8 @@ test("more cancellations than the rate covers cannot make the bill negative", ()
   assert.equal(r.sessionsCredited, 4, "the credit stops at the four the rate covers");
   assert.ok(r.warnings.some((w) => /beyond the 4 the rate covers/.test(w)),
     "two uncredited cancellations have to say why");
+  assert.ok(r.blocking.some((b) => /comes to \$0/.test(b)),
+    "and $0 still must not be sendable");
 });
 
 // ─── late cancels need no feature ───────────────────────────────────────────
