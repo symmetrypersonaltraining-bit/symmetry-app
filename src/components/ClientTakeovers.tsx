@@ -67,6 +67,13 @@ interface Winner {
   my_rank: number | null;
 }
 
+interface PastDue {
+  id: string;
+  due_date: string;
+  amount: number;
+  daysLate: number;
+}
+
 interface Announcement {
   id: string;
   body: string;
@@ -79,6 +86,7 @@ type Pick =
   | { kind: "winner"; key: string; winner: Winner }
   | { kind: "challenge"; key: string; challenge: Challenge; myScore: number; myRank: number | null; total: number; people: number; joined: boolean }
   | { kind: "announcement"; key: string; announcement: Announcement }
+  | { kind: "pastdue"; key: string; due: PastDue }
   | { kind: "lapse"; key: string; firstName: string; tier: LapseTier; daysSince: number; priorDays: number }
   | null;
 
@@ -147,6 +155,56 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
         const yr = Number(todayCT.slice(0, 4));
         const leap = (yr % 4 === 0 && yr % 100 !== 0) || yr % 400 === 0;
         const effMd = dobMd === "02-29" && !leap ? "02-28" : dobMd;
+        // ── 0. MONEY, BEFORE ANYTHING ELSE ───────────────────────────────
+        //
+        // Dustin, 29 Aug, having chased two clients by email: "send ... app
+        // screen take over letting them know payment is late."
+        //
+        // The banner on the home screen was already there and had been up for
+        // over a week in both cases, unacknowledged. A banner is easy not to
+        // see. This is the one thing in here that costs him money to have
+        // missed, so it goes ahead of the birthday.
+        //
+        // ONLY when the trainer has approved the reminder (status "sent"), the
+        // client has not said they paid, and the due date has actually passed.
+        // Nothing here dunning anybody early.
+        //
+        // The key carries TODAY'S DATE, deliberately, and this is the whole
+        // difference between this and everything below it. An announcement is
+        // seen once and gone. A debt is not: dismissing it must not make it
+        // disappear until it is settled, so it returns tomorrow, once a day,
+        // until they tap "I've paid this" — which sets client_ack_at and ends
+        // it for good.
+        {
+          const { data: overdue } = await supabase
+            .from("payment_reminders")
+            .select("id, due_date, amount_due, notification_status, client_ack_at, paid_confirmed_at")
+            .eq("client_id", cid)
+            .eq("notification_status", "sent")
+            .is("client_ack_at", null)
+            .is("paid_confirmed_at", null)
+            .lt("due_date", todayCT)
+            .order("due_date", { ascending: true })
+            .limit(1);
+          const od = ((overdue as { id: string; due_date: string; amount_due: number }[]) ?? [])[0];
+          if (od) {
+            const key = "pastdue-" + od.id + "-" + todayCT;
+            if (!seen.has(key) && alive) {
+              const days = Math.max(
+                1,
+                Math.round((Date.parse(todayCT) - Date.parse(od.due_date)) / 86400000),
+              );
+              setMeId(cid);
+              setPick({
+                kind: "pastdue",
+                key,
+                due: { id: od.id, due_date: od.due_date, amount: Number(od.amount_due) || 0, daysLate: days },
+              });
+              return;
+            }
+          }
+        }
+
         const bdayKey = "birthday-" + todayCT.slice(0, 4);
         if (effMd && effMd === todayCT.slice(5, 10) && !seen.has(bdayKey)) {
           if (alive) {
@@ -399,6 +457,31 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
 
   const holdsSlot = useTakeoverSlot("announcements", TAKEOVER_PRIORITY.ANNOUNCEMENTS, !!pick);
 
+  /**
+   * They say they have paid. Same field the home-screen banner writes, so this
+   * clears both at once and shows on Dustin's side as acknowledged — it does
+   * NOT mark the invoice paid, which is his to confirm.
+   */
+  async function markPaid(reminderId: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      // Through the RPC, NOT a direct update. Clients have SELECT on their own
+      // payment_reminders and no UPDATE policy at all, so writing the column
+      // from here would fail silently on every tap. ack_payment_reminder is
+      // what the home-screen banner already uses.
+      const { error } = await supabase.rpc("ack_payment_reminder", { reminder_id: reminderId });
+      // A failed write must not strand them on this screen for ever. The
+      // takeover closes either way; if the update did not land it comes back
+      // tomorrow, which is the right failure — it never silently marks a debt
+      // acknowledged that Dustin will not see.
+      if (!error) fx("tap");
+      await dismiss();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveDob() {
     if (busy) return;
     // A date they have to fix later is worse than no date. Reject the two
@@ -601,6 +684,53 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
           </button>
         </div>
       </>,
+    );
+  }
+
+  // ── PAYMENT PAST DUE ──────────────────────────────────────────────────────
+  //
+  // The only takeover about money, and the tone matters more here than
+  // anywhere else in this file: these are people who pay him every month and
+  // have almost certainly just forgotten. It states the fact, gives the number
+  // and the date, and gets out of the way. No red, no warning triangle, no
+  // guilt — an invoice, not a debt collector.
+  //
+  // "I've paid this" is the way out and it is honest: it sets client_ack_at,
+  // which is the same field the home-screen banner uses, so tapping it here
+  // clears it there too and tells Dustin on his side.
+  if (pick.kind === "pastdue") {
+    const d = pick.due;
+    const money = (n: number) => "$" + (Math.round(n * 100) / 100).toLocaleString("en-US");
+    return shell(
+      <div style={{ padding: "calc(46px + env(safe-area-inset-top)) 20px 30px", maxWidth: 460, margin: "0 auto" }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, color: "var(--brand-primary)", textAlign: "center" }}>
+          PAYMENT PAST DUE
+        </div>
+
+        <div style={{ fontSize: 46, fontWeight: 800, textAlign: "center", marginTop: 14, color: "var(--brand-text)", fontVariantNumeric: "tabular-nums" }}>
+          {money(d.amount)}
+        </div>
+        <div style={{ fontSize: 13.5, textAlign: "center", color: "var(--brand-muted, #8b93a7)", marginTop: 6 }}>
+          Due {centralFormat(d.due_date + "T12:00:00Z", { weekday: "long", month: "long", day: "numeric" })}
+          {" · "}
+          {d.daysLate === 1 ? "1 day ago" : d.daysLate + " days ago"}
+        </div>
+
+        <p style={{ fontSize: 15, lineHeight: 1.6, color: "var(--brand-text)", marginTop: 24, textAlign: "center" }}>
+          This one has slipped past its due date. Please get it settled as soon as you can — if
+          you have already sent it, tap below and {coachFirstName} will check it off.
+        </p>
+
+        <button onClick={() => void markPaid(d.id)} disabled={busy} style={primaryBtn}>
+          {busy ? "One moment…" : "I've paid this"}
+        </button>
+        <button onClick={() => void dismiss(() => router.push(`${basePath}/messages`))} style={quietBtn}>
+          Message {coachFirstName}
+        </button>
+        <button onClick={() => void dismiss()} style={quietBtn}>
+          Not now
+        </button>
+      </div>,
     );
   }
 

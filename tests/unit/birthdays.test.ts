@@ -224,9 +224,15 @@ test("the ask-for-a-birthday screen comes back if it is skipped", () => {
   // yields to every dated thing above it. It still outranks "when is your
   // birthday", because a client who has gone quiet is a bigger deal than a
   // missing field, and because that one asks again in thirty days anyway.
+  // `pastdue` joined on 29 Aug and goes AHEAD of the birthday, which is the one
+  // deliberate break in the shelf-life rule. Dustin had two clients a week past
+  // due with the home-screen banner up and unread the whole time; an unpaid
+  // invoice is the only thing in here that costs him money to have missed. It
+  // is also the only one that returns after being dismissed, so putting it
+  // first costs a birthday nothing — that client sees the birthday tomorrow.
   assert.deepEqual(
     order,
-    ["birthday", "winner", "challenge", "announcement", "lapse", "askdob"],
-    "priority is by shelf life: a birthday is true for one day and goes first; asking for something goes last",
+    ["pastdue", "birthday", "winner", "challenge", "announcement", "lapse", "askdob"],
+    "money first; then shelf life — a birthday is true for one day, and asking for something goes last",
   );
 });
