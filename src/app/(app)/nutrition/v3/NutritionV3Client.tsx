@@ -915,10 +915,35 @@ export default function NutritionV3Client(props: Props) {
     else setSheetStack((prev) => [...prev.slice(0, -1), s]);
   }
 
+  /**
+   * ⚠️ EDITS IN "ADJUST / EDIT" SURVIVE OPENING ANOTHER SHEET.
+   *
+   * Dustin, 29 Aug: "if I put the butter down to 0 because I didn't eat it,
+   * and then I bumped the egg whites up to 8 oz, as soon as I click on the
+   * button to add something else, those revert back to what they were before.
+   * That needs to hold until I'm done on that page and hit save."
+   *
+   * He is right and the cause is structural. Opening the food database PUSHES a
+   * sheet, only the top sheet renders, so PlanAdjustSheet UNMOUNTS. Its amounts
+   * and adds are useState seeded from `existingOv` -- the SAVED overrides. Come
+   * back and it remounts, re-seeds from the database, and every unsaved change
+   * is gone. Nothing was lost in transit; it was never held anywhere that
+   * outlives the component.
+   *
+   * So the in-progress edit lives HERE, in the parent that stays mounted for
+   * the whole stack, keyed by row. A ref rather than state on purpose: the
+   * sheet owns its own rendering while it is up, and re-rendering the whole
+   * screen on every tap of a stepper is what this file spent August getting
+   * away from.
+   *
+   * Cleared on save and on the X, never on Back.
+   */
+  const adjustDrafts = useRef<Record<string, { amounts: Record<string, number>; adds: unknown[] }>>({});
+
   function openSheet(s: NonNullable<SheetState>) { setSheetStack((prev) => [...prev, s]); }
   function replaceSheet(s: NonNullable<SheetState>) { setSheetStack((prev) => [...prev.slice(0, -1), s]); }
   function backSheet() { setSheetStack((prev) => prev.slice(0, -1)); }
-  function closeAllSheets() { setSheetStack([]); }
+  function closeAllSheets() { adjustDrafts.current = {}; setSheetStack([]); }
 
   // ---- inserted meals -----------------------------------------------------
   function freeInsertPosition(): number | null {
@@ -1920,6 +1945,29 @@ export default function NutritionV3Client(props: Props) {
                 const meta: CustomMeta = { ...row.meta, items: [...row.meta.items, item] };
                 await patchCustom(row, meta);
                 backSheet();
+              } else if (row.kind === "plan" && s.target === "adjust" && s.rowKey && adjustDrafts.current[s.rowKey]) {
+                // ⚠️ ADDING A FOOD USED TO OVERWRITE THE EDIT IN PROGRESS.
+                //
+                // Dustin, 29 Aug: "if I put the butter down to 0 ... and then I
+                // bumped the egg whites up to 8 oz, as soon as I click on the
+                // button to add something else, those revert back."
+                //
+                // Losing the sheet's state was only half of it. The branch below
+                // reads row.log.item_overrides -- the SAVED overrides -- and
+                // upsertLog()s them straight back. So adding a food did not
+                // merely forget his butter and egg whites: it RE-COMMITTED the
+                // pre-edit values over them, which is why they came back looking
+                // deliberate.
+                //
+                // The composer path three branches up already had this right:
+                // "Nothing is written to the database here -- the draft is not a
+                // meal until it is saved." Same rule here. Put the food in the
+                // draft, go back, write nothing. Save is the only thing that
+                // writes.
+                const d = adjustDrafts.current[s.rowKey];
+                d.adds = [...d.adds, { food_id: item.food_id ?? null, name: item.n, servings: 1, p: item.p, c: item.c, f: item.f }];
+                backSheet();
+                toast.success(`${item.n} added — save to keep it ✓`);
               } else if (row.kind === "plan") {
                 const ov = { ...(row.log?.item_overrides || {}) } as ItemOverrides;
                 const added = [...(ov.__added || []), { food_id: item.food_id ?? null, name: item.n, servings: 1, p: item.p, c: item.c, f: item.f }];
@@ -2322,6 +2370,8 @@ export default function NutritionV3Client(props: Props) {
     return (
       <PlanAdjustSheet
         key={rowKey}
+        draftKey={rowKey}
+        drafts={adjustDrafts}
         meal={row.chosen}
         existingOv={existingOv}
         loggedNow={loggedNow}
@@ -2763,12 +2813,16 @@ export default function NutritionV3Client(props: Props) {
 // ---------------------------------------------------------------------------
 
 function PlanAdjustSheet({
-  meal, existingOv, loggedNow, clientId, onOpenFoodSearch, onSave, onSaveToPlan, onClose, onBack,
+  meal, existingOv, loggedNow, clientId, draftKey, drafts, onOpenFoodSearch, onSave, onSaveToPlan, onClose, onBack,
 }: {
   meal: PlanMeal;
   clientId: string;
   existingOv: ItemOverrides;
   loggedNow: boolean;
+  /** Key for this row's in-progress edit in the parent's draft store. */
+  draftKey: string;
+  /** Lives in the parent so it survives this sheet unmounting. See adjustDrafts. */
+  drafts: React.MutableRefObject<Record<string, { amounts: Record<string, number>; adds: unknown[] }>>;
   onOpenFoodSearch: () => void;
   onSave: (clean: ItemOverrides) => Promise<void>;
   /** Same edit, kept for good — rewrites the meal in the plan itself. */
@@ -2777,7 +2831,13 @@ function PlanAdjustSheet({
   onBack: () => void;
 }) {
   const { firstName: coachFirstName } = useCoach();
+  // Seed from the IN-PROGRESS draft if there is one, and only fall back to the
+  // saved overrides when this row is being opened fresh. Without this, opening
+  // the food database and coming back re-seeded from the database and threw
+  // away everything typed.
   const [amounts, setAmounts] = useState<Record<string, number>>(() => {
+    const held = drafts.current[draftKey]?.amounts;
+    if (held) return { ...held };
     const seed: Record<string, number> = {};
     for (const it of meal.meal_items || []) {
       const o = existingOv[it.id] as { amount?: number } | undefined;
@@ -2785,7 +2845,15 @@ function PlanAdjustSheet({
     }
     return seed;
   });
-  const [adds, setAdds] = useState(existingOv.__added || []);
+  const [adds, setAdds] = useState(() => {
+    const held = drafts.current[draftKey]?.adds as (typeof existingOv.__added) | undefined;
+    return held ? [...held] : (existingOv.__added || []);
+  });
+  // Mirror every change up. Cheap, and it means no control has to remember to
+  // do it -- the bug was one place forgetting, so nowhere gets the chance.
+  useEffect(() => {
+    drafts.current[draftKey] = { amounts, adds };
+  }, [amounts, adds, drafts, draftKey]);
   const [saving, setSaving] = useState(false);
   // ── SAY THE CHANGE INSTEAD OF TAPPING IT ─────────────────────────────────
   //
