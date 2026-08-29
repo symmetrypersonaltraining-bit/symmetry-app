@@ -33,6 +33,38 @@ import {
 import { alarmPlan, armRestAlarm, type ArmedAlarm } from "@/lib/restAlarm";
 import { logClientError } from "@/lib/logClientError";
 
+/**
+ * A number a client actually typed, or null when they typed nothing.
+ *
+ * ⚠️ `parseFloat(x) || null` RETURNS NULL FOR ZERO, because 0 is falsy. Two
+ * consequences, both live:
+ *
+ *   * 286 sets are on record as completed with every value null -- no reps, no
+ *     weight, no time, no distance. Done, with nothing behind them.
+ *   * Machine Assisted Pull Up has 164 logged sets and only 5 carry an assist
+ *     of ZERO. Reducing the assist to zero is the entire point of Dustin's
+ *     pull-up rule -- "ALWAYS Machine Assisted, progress by reducing the
+ *     assist" -- so the moment a client finally reaches the thing the rule
+ *     exists for, the app recorded it as "didn't enter anything".
+ *
+ * 0 is data. Absence is null. They are not the same and the language conflates
+ * them, so it has to be said explicitly.
+ */
+function typedNumber(raw: string | null | undefined): number | null {
+  if (raw == null) return null;
+  const t = String(raw).trim();
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Same rule, whole numbers. */
+function typedInt(raw: string | null | undefined): number | null {
+  const n = typedNumber(raw);
+  return n == null ? null : Math.round(n);
+}
+
+
 interface Exercise {
   id: string;
   name: string;
@@ -1376,7 +1408,33 @@ export default function WorkoutLogger({
       client_id: clientId, day_id: day.id, log_date: sessionDate,
       started_at: new Date().toISOString(), completed: false,
     }).select("id").single();
-    if (error) throw error;
+    // 23505 = the partial unique index workout_logs_one_open_per_day refused a
+    // SECOND open log for this client, day and date.
+    //
+    // That index is new (29 Aug) and it exists because select-then-insert has
+    // no lock in it: two starts milliseconds apart both looked, both found
+    // nothing, and both inserted. 59 client/day/date combinations ended up with
+    // more than one log, and whatever was written against the loser vanished
+    // from history -- Tyler Dorsett's 160 lb x 10 lat pulldown among them.
+    //
+    // Losing the race is now the NORMAL outcome for the second caller, not an
+    // error to surface. The row that won is the row we want, so read it back
+    // and carry on. Throwing here would show a client a failure at the exact
+    // moment the database protected their session -- which is the shape of
+    // Lauren's 11 Aug complaint, quoted above.
+    if (error) {
+      if ((error as { code?: string }).code === "23505") {
+        const { data: won } = await supabase.from("workout_logs")
+          .select("id, completed")
+          .eq("client_id", clientId).eq("day_id", day.id).eq("log_date", sessionDate)
+          .eq("completed", false).maybeSingle();
+        if (won?.id) {
+          setWorkoutLogId(won.id);
+          return { id: won.id, alreadyCompleted: false };
+        }
+      }
+      throw error;
+    }
     setWorkoutLogId(data.id);
     return { id: data.id, alreadyCompleted: false };
   }
@@ -1474,12 +1532,12 @@ export default function WorkoutLogger({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
         exercise_id: allFlat.find(p => p.id === peId)?.exercises?.id ?? null,
         set_number: si + 1,
-        weight_lbs: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (s.weight?.trim() ? (parseFloat(s.weight) || null) : null),
-        reps: isCardioEx(allFlat.find(p => p.id === peId)) ? null : (s.reps?.trim() ? (parseInt(s.reps) || null) : null),
+        weight_lbs: isCardioEx(allFlat.find(p => p.id === peId)) ? null : typedNumber(s.weight),
+        reps: isCardioEx(allFlat.find(p => p.id === peId)) ? null : typedInt(s.reps),
         duration_seconds: s.time ? parseTimeToSecs(s.time) : null,
         distance_meters: feetToMeters(s.distance),
-        speed: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.speed ? parseFloat(s.speed) || 0 : null) : null,
-        heart_rate: isCardioEx(allFlat.find(p => p.id === peId)) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
+        speed: isCardioEx(allFlat.find(p => p.id === peId)) ? typedNumber(s.speed) : null,
+        heart_rate: isCardioEx(allFlat.find(p => p.id === peId)) ? typedInt(s.hr) : null,
         completed: true, logged_at: new Date().toISOString(),
       }, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" })
         .select("id");
@@ -1584,12 +1642,12 @@ export default function WorkoutLogger({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
         exercise_id: pe?.exercises?.id ?? null,
         set_number: si + 1,
-        weight_lbs: isCardioEx(pe) ? null : (s.weight?.trim() ? (parseFloat(s.weight) || null) : null),
-        reps: isCardioEx(pe) ? null : (s.reps?.trim() ? (parseInt(s.reps) || null) : null),
+        weight_lbs: isCardioEx(pe) ? null : typedNumber(s.weight),
+        reps: isCardioEx(pe) ? null : typedInt(s.reps),
         duration_seconds: s.time ? parseTimeToSecs(s.time) : null,
         distance_meters: feetToMeters(s.distance),
-        speed: isCardioEx(pe) ? (s.speed ? parseFloat(s.speed) || 0 : null) : null,
-        heart_rate: isCardioEx(pe) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
+        speed: isCardioEx(pe) ? typedNumber(s.speed) : null,
+        heart_rate: isCardioEx(pe) ? typedInt(s.hr) : null,
         completed: false,
       }, { onConflict: "workout_log_id,prescribed_exercise_id,set_number" });
     } catch (e) {
@@ -1856,12 +1914,12 @@ export default function WorkoutLogger({
         workout_log_id: logId, prescribed_exercise_id: peId, client_id: clientId,
         exercise_id: currentExercise.exercises?.id ?? null,
         set_number: i + 1,
-        weight_lbs: isCardioEx(currentExercise) ? null : (s.weight?.trim() ? (parseFloat(s.weight) || null) : null),
-        reps: isCardioEx(currentExercise) ? null : (s.reps?.trim() ? (parseInt(s.reps) || null) : null),
+        weight_lbs: isCardioEx(currentExercise) ? null : typedNumber(s.weight),
+        reps: isCardioEx(currentExercise) ? null : typedInt(s.reps),
         duration_seconds: s.time ? parseTimeToSecs(s.time) : null,
         distance_meters: feetToMeters(s.distance),
-        speed: isCardioEx(currentExercise) ? (s.speed ? parseFloat(s.speed) || 0 : null) : null,
-        heart_rate: isCardioEx(currentExercise) ? (s.hr ? parseInt(s.hr) || 0 : null) : null,
+        speed: isCardioEx(currentExercise) ? typedNumber(s.speed) : null,
+        heart_rate: isCardioEx(currentExercise) ? typedInt(s.hr) : null,
         completed: true, logged_at: new Date().toISOString(),
       }));
       if (rows.length) {
