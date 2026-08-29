@@ -306,6 +306,44 @@ feedback_locked as (
       where polrelid = 'public.app_feedback'::regclass) as detail
 ),
 
+-- ── 14. A PAYMENT MARKER MUST CARRY MONEY ──────────────────────────────────
+-- Social-media reminders ("POST STORIES - Perfect Day Macro Log") were being
+-- filed as payment markers against live billed clients, because
+-- gcal_sync_payments inserted the row whether or not it found a $ figure in
+-- the title. Fixed 29 Aug: no amount, no row. The four existing rows were
+-- backed up to bak_calendar_payments_noamount_20260829 and removed.
+-- Red-first proof: feeding the function one social post and one real payment
+-- returns {synced:1, skipped_no_amount:1} and only the payment lands.
+payments_have_money as (
+  select 'billing' as area,
+    'every calendar payment marker carries an amount' as check_name,
+    case when count(*) = 0 then 'ok' else 'FAIL' end as status,
+    count(*) || ' markers with no dollar figure' as detail
+  from calendar_payments where amount is null
+),
+
+-- ── 15. BODY FAT MUST NOT SHOW A DASH WHEN A READING EXISTS ────────────────
+-- The client profile took the newest metrics ROW and read body_fat_pct off it.
+-- Most weigh-ins are weight-only, so six clients showed "-" with a trend line
+-- drawn beside it: Lauren, Dustin, Jennifer, Claudine, Robert Miller, Jerry
+-- Bourgeois. Each field now finds its own newest reading.
+--
+-- This asserts the DATA SHAPE the bug fed on still exists -- clients whose
+-- newest row has no body fat but who do have a reading. It is informational:
+-- it stays non-zero because that shape is normal and correct. The fix is that
+-- the UI no longer reads a dash off it.
+bodyfat_shape as (
+  select 'metrics' as area,
+    'clients whose newest row lacks body fat but who have a reading' as check_name,
+    'ok' as status,
+    count(*) || ' (each must now show their last real reading, not a dash)' as detail
+  from clients c
+  where c.archived_at is null
+    and exists (select 1 from metrics m where m.client_id=c.id and m.body_fat_pct is not null)
+    and (select m2.body_fat_pct from metrics m2 where m2.client_id=c.id
+          order by m2.metric_date desc, m2.created_at desc limit 1) is null
+),
+
 select * from search_manual
 union all select * from search_ai
 union all select * from serving_cover
@@ -320,4 +358,6 @@ union all select * from upsert_targets
 union all select * from nudge_frozen
 union all select * from cancel_regression
 union all select * from feedback_locked
+union all select * from payments_have_money
+union all select * from bodyfat_shape
 order by status desc, area, check_name;

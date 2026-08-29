@@ -126,10 +126,37 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
 
   const latestMetric = metrics.length > 0 ? metrics[metrics.length - 1] : null;
   const prevMetric = metrics.length > 1 ? metrics[metrics.length - 2] : null;
-  const weightDelta = latestMetric?.weight != null && prevMetric?.weight != null
-    ? latestMetric.weight - prevMetric.weight : null;
-  const bfDelta = latestMetric?.body_fat_pct != null && prevMetric?.body_fat_pct != null
-    ? latestMetric.body_fat_pct - prevMetric.body_fat_pct : null;
+
+  /**
+   * The newest actual READING of a field, and the one before it.
+   *
+   * ⚠️ Body Fat read "—" for six clients who have a reading on file: Lauren,
+   * Dustin, Jennifer, Claudine, Robert Miller and Jerry Bourgeois. The tile
+   * took the newest ROW and then read the field off it -- and most weigh-ins
+   * are weight-only, so the newest row's body_fat_pct is usually null while a
+   * real reading sits a few rows back. Their own dashboard showed the number,
+   * so the two screens disagreed about the same client.
+   *
+   * A trend line was drawn beside the dash, which is the tell: the series had
+   * values, the headline did not.
+   *
+   * Each field now finds its own newest reading. Weight is unaffected -- every
+   * weigh-in has one -- so this only changes fields that are recorded
+   * intermittently, which is exactly the ones that were broken.
+   */
+  function newestTwo(key: "weight" | "body_fat_pct" | "lean_mass" | "fat_mass") {
+    const vals = metrics.filter((m) => m?.[key] != null);
+    return {
+      latest: vals.length ? vals[vals.length - 1] : null,
+      prev: vals.length > 1 ? vals[vals.length - 2] : null,
+    };
+  }
+  const wSeries = newestTwo("weight");
+  const bfSeries = newestTwo("body_fat_pct");
+  const weightDelta = wSeries.latest?.weight != null && wSeries.prev?.weight != null
+    ? wSeries.latest.weight - wSeries.prev.weight : null;
+  const bfDelta = bfSeries.latest?.body_fat_pct != null && bfSeries.prev?.body_fat_pct != null
+    ? bfSeries.latest.body_fat_pct - bfSeries.prev.body_fat_pct : null;
 
   const weights = metrics.map(m => m.weight).filter((v): v is number => v != null);
   const bodyFats = metrics.map(m => m.body_fat_pct).filter((v): v is number => v != null);
@@ -220,8 +247,8 @@ function OverviewTab({ client, allWorkouts, metrics, clientId, programs, current
           style={{ color: "var(--brand-text-secondary)" }}>Body Metrics Overview</p>
         <div className="space-y-2">
           {latestMetric ? [
-            { label: "Weight", latest: latestMetric?.weight, unit: "lb", delta: weightDelta, values: weights, color: "var(--brand-primary)", icon: "ti-scale" },
-            { label: "Body Fat", latest: latestMetric?.body_fat_pct, unit: "%", delta: bfDelta, values: bodyFats, color: "#f59e0b", icon: "ti-percentage" },
+            { label: "Weight", latest: wSeries.latest?.weight, unit: "lb", delta: weightDelta, values: weights, color: "var(--brand-primary)", icon: "ti-scale" },
+            { label: "Body Fat", latest: bfSeries.latest?.body_fat_pct, unit: "%", delta: bfDelta, values: bodyFats, color: "#f59e0b", icon: "ti-percentage" },
           ].map(m => (
             <div key={m.label} className="rounded-xl p-3 flex items-center gap-3"
               style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
