@@ -347,8 +347,14 @@ export default function AssessmentPage() {
               {VoiceInput({ field: "phone", placeholder: "(555) 000-0000" })}
             </Field>
             <Field label="Date of Birth">
+              {/* max is not decoration. Without it this input accepted
+                  2026-08-04 for Madeleine Coker, recording her as 23 days old,
+                  and the birthday bot would have announced it to the group. A
+                  date picker with no upper bound will eventually be handed the
+                  current year by someone tabbing through. */}
               <input
                 type="date"
+                max={new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })}
                 value={data.date_of_birth}
                 onChange={e => set('date_of_birth', e.target.value)}
                 className={inputClass}

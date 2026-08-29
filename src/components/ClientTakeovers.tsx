@@ -332,7 +332,27 @@ export default function ClientTakeovers({ basePath = "" }: { basePath?: string }
         // A month-stamped key means skipping costs them nothing today and asks
         // again in thirty days. Answering writes the date, and the date itself
         // is what stops it — not the seen-marker.
-        if (!meC?.date_of_birth && alive) {
+        // ...and ask again when the date on file cannot be right.
+        //
+        // Madeleine Coker's date of birth was stored as 2026-08-04 -- 23 days
+        // old on 27 Aug -- because the intake form had no upper bound on its
+        // date input. The prompt below already validates what a CLIENT types
+        // (no future, no year before 1900); it simply never ran for her,
+        // because it only fired on a MISSING date and hers was present.
+        //
+        // Dustin, 28 Aug: "make sure she is able to update it herself first."
+        // She can -- RLS lets a client write their own row -- she was just
+        // never asked. An impossible date is now treated as no date.
+        const __dobOnFile = meC?.date_of_birth || "";
+        const __dobYear = Number(__dobOnFile.slice(0, 4));
+        const __dobImpossible =
+          !!__dobOnFile &&
+          (__dobOnFile > todayCT || !__dobYear || __dobYear < 1900 ||
+           // Nobody training here is under 13. A date inside that window is a
+           // typo or a default, not a birthday, and the birthday bot would
+           // announce it to the whole group.
+           __dobYear > Number(todayCT.slice(0, 4)) - 13);
+        if ((!meC?.date_of_birth || __dobImpossible) && alive) {
           const askKey = "birthday-ask-" + todayCT.slice(0, 7);
           if (!seen.has(askKey)) {
             setMeId(cid);
