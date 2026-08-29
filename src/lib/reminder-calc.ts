@@ -1,61 +1,66 @@
 // Pure reminder calculation + verification logic. No I/O.
 //
-// ── THE RULE (Dustin, 2026-08-20), in his own words ────────────────────────
+// ── THE RULE (Dustin, 2026-08-29), in his own words ───────────────────────
 //
-//   "for clients that pay a monthly rate and train in person, for example $640
-//    for 2 x a week, their monthly on due date is $640 minus any cancelled
-//    sessions based on that monthly rate divided by the number of sessions (8)
-//    in this case. cancelled sessions are only to be deducted when i mark them
-//    cancelled (orange) in my gcal."
+//   "we need to charge actual sessions trained instead of refund cancelled...
+//    thats time I'm working without pay"
+//   "im thinking dont charge extras above plan"
 //
-//     amount = monthly rate - (orange-cancelled sessions x session rate)
+//     credited = min(cancelled, max(0, plan - trained))
+//     amount   = monthly rate - credited x session rate
 //
-// Sessions TRAINED do not enter into it. A client who trains nine times in a
-// month with an eight-session rate pays the rate, not nine sessions; a client
-// who cancels three pays the rate less three.
+// Three properties, all deliberate.
 //
-// The divisor is `expected_sessions_per_cycle`, set per client and NEVER
-// derived from the calendar. A month with five Mondays does not make the rate
-// stretch further, and Dustin's rates already encode it exactly: 990/82.50=12,
-// 640/80=8, 350/87.50=4.
+// 1. NEVER PAID BELOW THE SESSIONS DELIVERED. The credit stops as soon as it
+//    would drop the bill under trained x rate. Lesly trained all 8 of her 8 and
+//    cancelled 2; the previous rule handed her $160 back for sessions she did
+//    not miss. Across the 29 Aug batch that leak was $565 in a single cycle --
+//    Lesly 160, Lauren 75, Martha 87.50, Hassan 82.50, Cheyenne 80, Stacie 80.
 //
-// WHY THIS REPLACES THE 31 JULY RULE. That rule was
-// `amount = sessions_trained x rate`, which is a different number in any month
-// containing a cancellation. Measured against the payment markers in Dustin's
-// own Google Calendar on 20 Aug: 16 of 20 open reminders disagreed, $2,660
-// under-billed and $318 over-billed across a single cycle. Sharon Rambo was out
-// by $450 on her own; Todd Prine by $300 the other way.
+// 2. EXTRAS ABOVE THE PLAN ARE NOT CHARGED. A calendar month at 3x/week holds
+//    13 or 14 slots against a 12-session rate, so most clients run over. Tim
+//    trained 14 in the cycle closing 23 Sep and is billed for 12. Dustin's
+//    call: the rate stays the same every month and the extras are goodwill.
+//
+// 3. MAKE-UPS NEED NO DETECTION. Dustin asked to cross-reference a cancelled
+//    session against the make-up. Nothing needs to. A made-up session appears
+//    as TRAINED in whatever cycle it happened in and the credit shrinks to
+//    match, so consecutive cycles sum to the sessions actually delivered:
+//
+//        Aug   7 trained, 1 cancelled    ->  640 - 80  =  560
+//        Sep   8 trained (incl. make-up) ->  640 -  0  =  640
+//        15 sessions x $80 = 1200.  Exact, with no make-up flag anywhere.
+//
+//    This matters because Google Calendar carries NO link between a cancelled
+//    event and its replacement. Detection would have been a guess dressed up as
+//    a fact, and it could not have told a make-up from a moved day -- which is
+//    the distinction Dustin specifically asked us to be certain about.
+//
+// LATE CANCELS NEED NO FEATURE. Dustin: "i handle late cancel. if its last min
+// I won't turn it orange in cal." An un-orange slot stays 'scheduled', counts
+// as trained, and is billed. `halfPriceSessions` therefore no longer enters the
+// arithmetic; nothing in the app could ever set it and no client was on it.
 //
 // Superseded, for the record:
 //
-//   2026-07-31:  amount = sessions_trained x session_rate
-//
-// We count what actually happened. A session that happened is billed; a session
-// that did not happen is not billed. That is the whole model.
-//
-// This REPLACES the 2026-07-03 rule, which started from a fee on file and
-// subtracted credits for cancellations. That model had to guess at a monthly
-// fee and then reconcile it against reality, and the two drifted apart -- Todd's
-// calendar says $900/mo while he averages 2 sessions/week, and that gap was
-// real overbilling. Counting forward from sessions removes the guess.
-//
-// Cancellations are DISPLAY ONLY. They are shown so Dustin can see the shape of
-// the cycle, but they are not deducted from anything, because there is nothing
-// to deduct them from -- an uncancelled session was never added in the first
-// place. `cancelledFull` / `cancelledHalf` survive on the RESULT for rendering
-// and are absent from every arithmetic path below.
+//   2026-08-20  amount = monthly rate - cancelled x rate
+//               Credited cancellations the client had already made up.
+//   2026-07-31  amount = sessions_trained x rate
+//               No ceiling: a client with a $900 commitment who trained six
+//               times paid $450, and Dustin had held the slots.
+//   2026-07-03  fee on file less invented credits
 //
 // Billing type is authoritative on `clients.billing_type`:
-//   per_session  amount = sessionsTrained * session_rate
-//   flat         amount = current_fees, every cycle, regardless of anything
-//   none         no reminder is ever generated or shown (couples who pay
-//                together: Troy/Krysta, Celeste/Greg)
+//   monthly_adjusted  the rule above
+//   per_session       amount = sessionsTrained x rate. Todd Prine, from 29 Aug:
+//                     a pilot booked a week at a time, so a week that never gets
+//                     booked leaves no cancelled event and the monthly rule is
+//                     blind to it. He had been paying trained x rate in practice
+//                     for months -- $675 for 9, $600 for 8.
+//   flat              amount = current_fees, every cycle, regardless of anything
+//   none              no reminder is ever generated or shown (couples who pay
+//                     together, and clients not currently billed)
 
-// "semimonthly" = two fixed dates each month (Sharon Rambo: the 7th and the
-// 23rd), NOT every 14 days. Biweekly drifts away from a fixed pair immediately
-// — 07-07, 07-21, 08-04 instead of 07-07, 07-23, 08-07 — which is exactly how
-// her reminders ended up on the wrong dates while Google Calendar, which is the
-// source of truth for payments, had the right ones all along.
 export type Cadence = "monthly" | "semimonthly" | "biweekly" | "weekly" | "quarterly";
 export type BillingType =
   /** Rate minus (orange-cancelled x session rate). The majority case. */
@@ -129,8 +134,12 @@ export interface ReminderCalcResult {
   baseRate: number | null;
   /** Cancellations x rate. Positive number, already subtracted from `expected`. */
   cancelDeduction: number;
-  /** Half-price remote sessions x (rate/2). Already subtracted. */
+  /** Always 0. Late cancels are handled by not marking them orange. Kept so existing render code compiles. */
   halfPriceDeduction: number;
+  /** Cancellations that actually cost a session, so earned a credit. */
+  sessionsCredited: number;
+  /** Sessions delivered above the plan. Null when the client has no plan. */
+  sessionsExtra: number | null;
   /**
    * The cycle has not closed yet, so this figure can still move and must not
    * be sent. True only when `todayCT` was supplied and is before `cycleEnd`.
@@ -225,7 +234,8 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
   const cycleEnd = reminderSendDate(i.dueDate);
 
   const cancelled = Math.max(0, Number(i.cancelledFull) || 0);
-  const halfPrice = Math.max(0, Number(i.halfPriceSessions) || 0);
+  // halfPriceSessions is dead: late cancels are handled by not marking them
+  // orange in the calendar, so the slot stays billable. Read nowhere below.
 
   const base = {
     cycleStart,
@@ -240,6 +250,8 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
     baseRate: null as number | null,
     cancelDeduction: 0,
     halfPriceDeduction: 0,
+    sessionsCredited: 0,
+    sessionsExtra: null as number | null,
     provisional: false,
   };
 
@@ -279,7 +291,9 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
   let expected: number;
   let baseRate: number | null = null;
   let cancelDeduction = 0;
-  let halfPriceDeduction = 0;
+  let sessionsCredited = 0;
+  let sessionsExtra: number | null = null;
+  const halfPriceDeduction = 0;
 
   if (billingType === "flat") {
     // Flat clients pay current_fees per cycle regardless of what they trained.
@@ -295,26 +309,50 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
       );
     }
   } else if (billingType === "monthly_adjusted") {
-    // THE RULE. Start at the rate, take off what was cancelled.
+    // THE RULE. Start at the rate; take off only the sessions they actually
+    // missed. A cancellation the client made up later shows as a trained
+    // session, so the shortfall closes and the credit closes with it.
     if (i.fee == null) {
       blocking.push("Monthly rate billing but no monthly rate on file - set the client's rate first");
     }
     if (i.sessionRate == null) {
-      // Without the per-session figure there is no deduction, and billing the
-      // full rate silently would charge for sessions that did not happen.
-      blocking.push("Monthly rate billing but no session rate on file - the cancellation deduction cannot be worked out");
+      blocking.push("Monthly rate billing but no session rate on file - the cancellation credit cannot be worked out");
+    }
+    if (i.expectedSessions == null) {
+      // Without the plan there is no shortfall to cap the credit against, and
+      // the rule silently degenerates into the 20 August one it replaced.
+      blocking.push("Monthly rate billing but no session count on file - set how many sessions the rate covers");
     }
     baseRate = i.fee ?? null;
     const rate = i.sessionRate ?? 0;
-    cancelDeduction = round2(cancelled * rate);
-    halfPriceDeduction = round2(halfPrice * (rate / 2));
-    // Floored at zero. More cancellations than the rate covers is a
-    // conversation, not a credit note the app invents on its own.
-    expected = round2(Math.max(0, (i.fee ?? 0) - cancelDeduction - halfPriceDeduction));
-    if ((i.fee ?? 0) - cancelDeduction - halfPriceDeduction < -0.009) {
+    const plan = i.expectedSessions ?? 0;
+    sessionsCredited = Math.min(cancelled, Math.max(0, plan - sessionsTrained));
+    sessionsExtra = i.expectedSessions == null ? null : Math.max(0, sessionsTrained - plan);
+    cancelDeduction = round2(sessionsCredited * rate);
+    expected = round2(Math.max(0, (i.fee ?? 0) - cancelDeduction));
+    if (cancelled > sessionsCredited) {
+      // Not a problem -- it is the rule working. Said out loud so the number on
+      // the screen and the number of orange marks in the calendar do not look
+      // like a contradiction when Dustin screenshots this for a client.
+      //
+      // TWO DIFFERENT REASONS, and saying the wrong one would be a lie in a
+      // client's hand. If they still hit the plan, the cancelled sessions were
+      // made up. If they did not, the calendar simply held more slots than the
+      // rate covers -- a 12-session rate against a month with 14 bookings.
+      const uncredited = cancelled - sessionsCredited;
       warnings.push(
-        "Deductions ($" + round2(cancelDeduction + halfPriceDeduction) + ") exceed the rate ($" +
-        (i.fee ?? 0) + ") - billed $0, the difference is not carried forward"
+        sessionsTrained >= plan
+          ? uncredited + " of " + cancelled + " cancelled session" +
+            (uncredited === 1 ? " was" : "s were") + " made up inside this cycle, so " +
+            (uncredited === 1 ? "it is" : "they are") + " not credited"
+          : uncredited + " cancelled session" + (uncredited === 1 ? "" : "s") +
+            " beyond the " + plan + " the rate covers - not credited"
+      );
+    }
+    if (sessionsExtra) {
+      warnings.push(
+        sessionsExtra + " session" + (sessionsExtra === 1 ? "" : "s") +
+        " above the " + plan + " the rate covers - not charged"
       );
     }
     // The rate should divide by the session rate into the expected sessions.
@@ -335,8 +373,7 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
     if (i.sessionRate == null) {
       blocking.push("Per-session billing but no session rate on file - set the client's session rate");
     }
-    halfPriceDeduction = round2(halfPrice * ((i.sessionRate ?? 0) / 2));
-    expected = round2(Math.max(0, sessionsTrained * (i.sessionRate ?? 0) - halfPriceDeduction));
+    expected = round2(sessionsTrained * (i.sessionRate ?? 0));
     if (i.sessionRate != null && sessionsTrained === 0) {
       warnings.push("No sessions trained in this cycle - amount is $0");
     }
@@ -347,14 +384,15 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
       billingType === "flat"
         ? "flat rate $" + (i.fee ?? 0)
         : billingType === "monthly_adjusted"
-          ? "$" + (i.fee ?? 0) + " less " + cancelled + " cancelled x $" + (i.sessionRate ?? 0)
+          ? "$" + (i.fee ?? 0) + " less " + sessionsCredited + " missed x $" + (i.sessionRate ?? 0)
           : sessionsTrained + " sessions x $" + (i.sessionRate ?? 0);
     const msg = "Draft $" + i.draftAmount + " does not match calculated $" + expected + " (" + basis + ")";
     if (i.override) warnings.push(msg + " - OVERRIDDEN by trainer");
     else blocking.push(msg);
   }
 
-  return { ...base, notApplicable: false, expected, baseRate, cancelDeduction, halfPriceDeduction, provisional, blocking, warnings };
+  return { ...base, notApplicable: false, expected, baseRate, cancelDeduction, halfPriceDeduction,
+           sessionsCredited, sessionsExtra, provisional, blocking, warnings };
 }
 
 // ─── A REMINDER IS ITEMISED AT THE RATE IT WAS BILLED AT ─────────────────────

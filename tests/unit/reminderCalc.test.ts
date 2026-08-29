@@ -270,25 +270,109 @@ test("a sent reminder still shows the message the client sees", () => {
     "the client-facing message is invisible once the reminder is sent");
 });
 
-// ─── THE RULE, 20 Aug 2026 ──────────────────────────────────────────────────
+// ─── THE RULE, 29 Aug 2026 ──────────────────────────────────────────────────
 //
-// Dustin: "$640 for 2 x a week, their monthly on due date is $640 minus any
-// cancelled sessions based on that monthly rate divided by the number of
-// sessions (8) in this case. cancelled sessions are only to be deducted when i
-// mark them cancelled (orange) in my gcal."
+// Dustin: "we need to charge actual sessions trained instead of refund
+// cancelled... thats time I'm working without pay" / "dont charge extras above
+// plan."
+//
+//     credited = min(cancelled, max(0, plan - trained))
+//     amount   = monthly rate - credited x session rate
+//
+// The credit stops at the sessions actually missed, so a cancellation the
+// client made up costs nothing, and extras above the plan are free.
 //
 // Every fixture below is a real client's real numbers.
 
 const adj = (over: Partial<ReminderCalcInput> = {}): ReminderCalcInput =>
   base({ billingType: "monthly_adjusted", ...over });
 
-test("Grant Weever: $640, four cancelled at $80, pays $320", () => {
+test("every billing type the database can hold survives the round trip", () => {
+  // THE 29 AUG BUG, as a test. ReminderEditor kept its own hand-written list of
+  // billing types and "monthly_adjusted" was not on it, so all 15 monthly
+  // clients fell through to per_session: wrong itemisation, a false red
+  // mismatch, a Reset that set the wrong figure, and a save() that wrote the
+  // wrong basis back over the correct one. The screen said
+  // "8 sessions × $70 = $560" beside an amount of $490.
+  //
+  // The component now calls resolveBillingType, so this is the only list, and
+  // a type that falls through it is a bug on every screen at once.
+  for (const t of ["monthly_adjusted", "flat", "per_session", "paid_by_other", "none"] as const) {
+    assert.equal(resolveBillingType({ billingType: t }), t, t + " fell through");
+  }
+  // Unknown or absent still degrades the old way rather than throwing.
+  assert.equal(resolveBillingType({ billingType: null, flatBilling: true }), "flat");
+  assert.equal(resolveBillingType({ billingType: null }), "per_session");
+  assert.equal(resolveBillingType({ billingType: "nonsense" as never }), "per_session");
+});
+
+test("Grant Weever: $640 for 8, trained 6 and missed 2, pays $480", () => {
   const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
-    cancelledFull: 4, sessionsTrained: 5, draftAmount: 320 }));
-  assert.equal(r.expected, 320);
-  assert.equal(r.cancelDeduction, 320);
+    cancelledFull: 2, sessionsTrained: 6, draftAmount: 480 }));
+  assert.equal(r.expected, 480);
+  assert.equal(r.cancelDeduction, 160);
+  assert.equal(r.sessionsCredited, 2);
   assert.equal(r.baseRate, 640);
   assert.deepEqual(r.blocking, []);
+});
+
+test("a cancellation the client made up is not credited", () => {
+  // Lesly Spencer, the cycle closing 11 Sep: 8 of 8 trained AND 2 cancelled,
+  // because she moved both. The 20 Aug rule handed her $160 back for sessions
+  // she did not miss. Across the whole open batch that leak was $565 a cycle.
+  const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 2, sessionsTrained: 8, draftAmount: 640 }));
+  assert.equal(r.expected, 640, "she got all 8 sessions; the rate is the rate");
+  assert.equal(r.sessionsCredited, 0);
+  assert.equal(r.cancelDeduction, 0);
+  assert.ok(r.warnings.some((w) => /made up inside this cycle/.test(w)),
+    "two orange marks and no deduction has to explain itself");
+});
+
+test("the bill never falls below the sessions actually delivered", () => {
+  // The property the whole rule exists for. Every combination: what is billed
+  // divided by the rate is never fewer sessions than were trained.
+  for (let trained = 0; trained <= 12; trained++) {
+    for (let cancelled = 0; cancelled <= 8; cancelled++) {
+      const r = calcReminder(adj({ fee: 840, sessionRate: 70, expectedSessions: 12,
+        cancelledFull: cancelled, sessionsTrained: trained, draftAmount: 0, override: true }));
+      const paidFor = r.expected / 70;
+      assert.ok(paidFor >= Math.min(trained, 12) - 1e-9,
+        `trained ${trained}, cancelled ${cancelled}: billed for ${paidFor}`);
+      assert.ok(r.expected <= 840 + 1e-9, "extras above the plan are never charged");
+    }
+  }
+});
+
+test("a make-up in the next cycle bills there, and the two cycles add up", () => {
+  // Dustin asked how to cross-reference a cancelled session against its make-up.
+  // Nothing has to: the make-up is a trained session in September, the credit
+  // shrinks to match, and the pair sums to the sessions actually delivered.
+  const aug = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 1, sessionsTrained: 7, draftAmount: 560 }));
+  const sep = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 0, sessionsTrained: 8, draftAmount: 640 }));
+  assert.equal(aug.expected, 560);
+  assert.equal(sep.expected, 640);
+  assert.equal(aug.expected + sep.expected, 15 * 80,
+    "15 sessions delivered across two cycles, 15 sessions paid for");
+});
+
+test("sessions above the plan are counted and not charged", () => {
+  // Tim Yancey trained 14 against a 12-session rate in the cycle closing 23 Sep.
+  const r = calcReminder(adj({ fee: 840, sessionRate: 70, expectedSessions: 12,
+    cancelledFull: 0, sessionsTrained: 14, draftAmount: 840 }));
+  assert.equal(r.expected, 840);
+  assert.equal(r.sessionsExtra, 2);
+  assert.ok(r.warnings.some((w) => /above the 12 the rate covers/.test(w)));
+});
+
+test("without a session count on file the rule cannot run", () => {
+  // No plan means no shortfall to cap the credit against, and the rule quietly
+  // degenerates into the 20 August one it replaced. Refuse instead.
+  const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: null,
+    cancelledFull: 2, sessionsTrained: 6, draftAmount: 480 }));
+  assert.ok(r.blocking.some((b) => /no session count on file/.test(b)));
 });
 
 test("sessions TRAINED never move the amount", () => {
@@ -314,33 +398,43 @@ test("nobody cancelling pays the rate exactly", () => {
   assert.equal(r.cancelDeduction, 0);
 });
 
-test("deductions can never take a bill below zero", () => {
+test("more cancellations than the rate covers cannot make the bill negative", () => {
+  // Six cancels against a four-session rate. The credit is capped at the plan,
+  // so this is now structurally impossible rather than clamped after the fact —
+  // but the extra orange marks still have to be accounted for out loud.
   const r = calcReminder(adj({ fee: 350, sessionRate: 87.5, expectedSessions: 4,
     cancelledFull: 6, sessionsTrained: 0, draftAmount: 0 }));
   assert.equal(r.expected, 0, "a negative invoice is not a thing");
-  assert.ok(r.warnings.some((w) => /exceed the rate/.test(w)),
-    "six cancels against a four-session rate has to say something");
+  assert.equal(r.sessionsCredited, 4, "the credit stops at the four the rate covers");
+  assert.ok(r.warnings.some((w) => /beyond the 4 the rate covers/.test(w)),
+    "two uncredited cancellations have to say why");
 });
 
-// ─── half price while he is away ────────────────────────────────────────────
+// ─── late cancels need no feature ───────────────────────────────────────────
 //
-// "only time i will bill half price is when im on vacation and i am going to
-// train them from the app. this will be done manually so ill need an option
-// for that somehow."
+// Dustin, 29 Aug: "i handle late cancel. of its last min I won't turn it orange
+// in cal." So a late cancel is simply a slot that stays 'scheduled' — it counts
+// as trained and it is billed. There is nothing to build, and half-price
+// sessions (which nothing in the app could ever set) are gone from the
+// arithmetic entirely.
 
-test("a remote session at half price takes off half the session rate", () => {
-  const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
-    cancelledFull: 0, halfPriceSessions: 2, sessionsTrained: 8, draftAmount: 560 }));
-  assert.equal(r.halfPriceDeduction, 80);
-  assert.equal(r.expected, 560);
+test("a slot left un-orange is billed, which is how a late cancel is charged", () => {
+  // Same client, same week. One cancellation given notice, one late.
+  const withNotice = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 1, sessionsTrained: 7, draftAmount: 560 }));
+  const lateCancel = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 0, sessionsTrained: 8, draftAmount: 640 }));
+  assert.equal(withNotice.expected, 560, "notice given, the session comes off");
+  assert.equal(lateCancel.expected, 640, "no orange mark, so it is billed");
 });
 
-test("half price and cancellations both come off", () => {
-  const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
-    cancelledFull: 1, halfPriceSessions: 2, sessionsTrained: 5, draftAmount: 480 }));
-  assert.equal(r.cancelDeduction, 80);
-  assert.equal(r.halfPriceDeduction, 80);
-  assert.equal(r.expected, 480);
+test("half-price deductions are gone from the arithmetic", () => {
+  // The field survives on the input type so older callers still typecheck, but
+  // it must not move a single cent.
+  const withField = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    cancelledFull: 0, halfPriceSessions: 4, sessionsTrained: 8, draftAmount: 640 }));
+  assert.equal(withField.expected, 640, "a dead field moved the amount");
+  assert.equal(withField.halfPriceDeduction, 0);
 });
 
 test("half price is never applied on its own", () => {
@@ -396,7 +490,7 @@ test("an override still downgrades the mismatch to a warning", () => {
 test("the mismatch message explains the rule, not a session count", () => {
   const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
     cancelledFull: 2, sessionsTrained: 6, draftAmount: 999 }));
-  assert.ok(r.blocking.some((b) => /\$640 less 2 cancelled x \$80/.test(b)),
+  assert.ok(r.blocking.some((b) => /\$640 less 2 missed x \$80/.test(b)),
     "a blocked amount has to say what the right number was made of");
 });
 
