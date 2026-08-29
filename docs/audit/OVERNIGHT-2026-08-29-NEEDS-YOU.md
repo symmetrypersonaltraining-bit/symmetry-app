@@ -179,6 +179,43 @@ open Progress for a chart that is not there. Home, Progress, or both?
 
 > **YOUR ANSWER:**
 
+
+## 14. Verified food rows that carry no household measure
+
+Raised by your cream cheese report on 29 Aug. The unit picker was never the
+fault — it offers whatever household servings the **row** declares. The row you
+opened declared none, and the search was indifferent to that. Fixed: a row you
+can portion now ranks above one that only knows weights.
+
+But **verified rows still outrank portionable ones, deliberately** — a verified
+USDA row with accurate macros and no tablespoon beats an unverified crowd row
+that has one. Being correct outranks being convenient, which I think is your
+rule, but it has a consequence:
+
+Measured across six spreadable foods, the top hit is portionable for **cream
+cheese, butter, mayonnaise and sour cream** — and for **peanut butter and olive
+oil** it is a verified row offering only "100 g" and "1 oz". So those two still
+open on grams.
+
+Filling that gap means **adding gram-per-tablespoon weights to verified rows**.
+USDA publishes them. I did not do it, because writing nutrition numbers into
+your food database from my own recall is exactly the thing your standing rule
+forbids, and I have been wrong four times tonight on numbers I was confident
+about.
+
+Three ways to go:
+
+| | what happens |
+|---|---|
+| **Import them** | pull the household gram weights from USDA's own dataset for the verified rows. Sourced, no guessing. A job, not a fix |
+| **You add them as you hit them** | the sheet already has "These numbers look wrong — fix them"; a "one tbsp weighs ___" control would make it your data |
+| **Leave it** | those foods open in grams; the picker still lets you type oz |
+
+Same shape as **#12** (the missing micronutrients on the `usda` source) — one
+import that came in without a field.
+
+> **YOUR ANSWER:**
+
 ---
 
 ## And one that is not on the audit list

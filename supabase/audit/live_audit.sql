@@ -367,6 +367,61 @@ board_names as (
       || ' disambiguated with a last initial' as detail
 ),
 
+-- ── 17. THE TOP HIT MUST BE SOMETHING YOU CAN PORTION ──────────────────────
+-- Dustin, 29 Aug: "cream cheese ... there is no tablespoon or teaspoon options
+-- in there at all."
+--
+-- The unit picker was never the fault -- it already offers whatever household
+-- servings the ROW declares. Searching "cream cheese" returned, in order:
+--   1 food club      100 g · 1 oz · 2 Tbsp (28 g)   portionable
+--   2 Philadelphia   100 g · 1 oz · 28 g            <- what he opened
+--   3 H-E-B          100 g · 1 oz · 2 Tbsp (31 g)   portionable
+-- He picked the brand he recognises and got the one row of three that cannot
+-- be measured in anything a person uses. 487 of 1,250 cream cheese rows carry
+-- a tbsp; 42,236 rows catalogue-wide do. The data was there and the ranking
+-- was indifferent to it.
+--
+-- Fixed by ranking portionable rows above weights-only ones, AFTER verified and
+-- AFTER macro plausibility -- a portion is a convenience, being correct is not.
+portionable_first as (
+  select 'search' as area,
+    'the top hit is portionable, unless it is verified' as check_name,
+    case when count(*) filter (where not ok) = 0 then 'ok' else 'FAIL' end as status,
+    count(*) filter (where portionable) || ' of ' || count(*)
+      || ' probe foods return a portionable top hit; '
+      || count(*) filter (where not portionable and is_verified)
+      || ' return a VERIFIED weights-only row, which outranks on purpose' as detail
+  from (
+    select p.term,
+      coalesce(r.verified, false) as is_verified,
+      exists (
+        select 1 from jsonb_array_elements(coalesce(r.serving_options,'[]'::jsonb)) o
+         where (o->>'grams') is not null and (o->>'grams')::numeric > 0
+           and (o->>'desc') !~* '^\s*[\d.]+\s*(g|gm|kg|oz|lb|lbs|ml|l|fl\s?oz|grams?|ounces?|pounds?)\s*$'
+      ) as portionable,
+      -- ⚠️ THE ASSERTION IS DELIBERATELY NOT "always portionable", because that
+      -- is not what the fix promises and asserting it would ship this check
+      -- RED. Verified is ranked ABOVE portionable on purpose: a verified USDA
+      -- row with accurate macros and no tablespoon beats an unverified crowd
+      -- row that has one. Being correct outranks being convenient.
+      --
+      -- Measured 29 Aug: 4 of 6 probes return a portionable top hit; the other
+      -- two (peanut butter, olive oil) return VERIFIED rows carrying only
+      -- "100 g" and "1 oz". Those are a DATA-COVERAGE gap in the verified
+      -- source, not a ranking fault, and filling it means adding gram weights
+      -- to verified rows -- which is Dustin's call, not an unattended one. It
+      -- is in the needs-you list beside the missing micronutrients.
+      (exists (
+        select 1 from jsonb_array_elements(coalesce(r.serving_options,'[]'::jsonb)) o
+         where (o->>'grams') is not null and (o->>'grams')::numeric > 0
+           and (o->>'desc') !~* '^\s*[\d.]+\s*(g|gm|kg|oz|lb|lbs|ml|l|fl\s?oz|grams?|ounces?|pounds?)\s*$'
+      ) or coalesce(r.verified, false)) as ok
+    from (values ('cream cheese'),('peanut butter'),('butter'),('mayonnaise'),
+                 ('sour cream'),('olive oil')) p(term)
+    cross join lateral (select * from search_food_catalog(p.term, null, 1)) r
+  ) z
+),
+
 select * from search_manual
 union all select * from search_ai
 union all select * from serving_cover
@@ -384,4 +439,5 @@ union all select * from feedback_locked
 union all select * from payments_have_money
 union all select * from bodyfat_shape
 union all select * from board_names
+union all select * from portionable_first
 order by status desc, area, check_name;
