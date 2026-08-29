@@ -245,6 +245,35 @@ nudge_frozen as (
       || ' sent all-time (must stay 20)' as detail
 ),
 
+-- ── 12. CANCEL MUST NEVER AGAIN EAT A FINISHED WORKOUT ─────────────────────
+-- Dustin granted permission for this fix on 27 Aug. discardSession deleted
+-- set_logs with NO condition and guarded only the parent, so cancelling an
+-- ALREADY-COMPLETED session destroyed its sets and left the row standing,
+-- still reading complete. 15 sessions were lost that way.
+--
+-- Check #7 above still counts the historical damage and will stay red; that is
+-- a record, not a regression. THIS check is scoped to sessions created after
+-- the fix, so it starts green and goes red the moment it happens again.
+--
+-- Proved red-first on 28 Aug on a scratch row, then cleaned up: the OLD
+-- statement destroyed 3 of 3 sets on a finished workout and left it complete;
+-- the NEW guarded delete matched 0 rows and all 3 survived. The legitimate
+-- path was proved too -- discarding an UNFINISHED session matched 1 row and
+-- the ON DELETE CASCADE removed its 4 sets, which is why the explicit
+-- set_logs delete could be removed rather than guarded.
+cancel_regression as (
+  select 'workouts' as area,
+    'no session completed since the cancel fix has lost its sets' as check_name,
+    case when count(*) = 0 then 'ok' else 'FAIL' end as status,
+    count(*) || ' completed sessions created after 2026-08-28 ran over 5 minutes '
+      || 'and recorded no sets' as detail
+  from workout_logs wl
+  where wl.completed
+    and wl.created_at >= timestamptz '2026-08-28 00:00:00+00'
+    and wl.completed_at - wl.started_at > interval '5 minutes'
+    and not exists (select 1 from set_logs sl where sl.workout_log_id = wl.id)
+),
+
 select * from search_manual
 union all select * from search_ai
 union all select * from serving_cover
@@ -257,4 +286,5 @@ union all select * from sync_recent
 union all select * from integrity
 union all select * from upsert_targets
 union all select * from nudge_frozen
+union all select * from cancel_regression
 order by status desc, area, check_name;

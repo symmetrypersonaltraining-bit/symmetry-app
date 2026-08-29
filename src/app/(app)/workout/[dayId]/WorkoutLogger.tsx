@@ -708,6 +708,20 @@ export default function WorkoutLogger({
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const [activeExerciseIdx, setActiveExerciseIdx] = useState(0);
   const [workoutComplete, setWorkoutComplete] = useState(false);
+  // ...and seed it from the database, because local state does not survive a
+  // reload. Reopening a FINISHED workout left this false, which is what put a
+  // live Cancel button on top of a completed session's data.
+  useEffect(() => {
+    if (!existingLogId) return;
+    let on = true;
+    (async () => {
+      const { data } = await supabase.from("workout_logs")
+        .select("completed").eq("id", existingLogId).maybeSingle();
+      if (on && data?.completed) setWorkoutComplete(true);
+    })();
+    return () => { on = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingLogId]);
   const [sessionCancelled, setSessionCancelled] = useState(false);
   const [timePick, setTimePick] = useState<{ peId: string; si: number } | null>(null);
   const [sessionMode, setSessionMode] = useState(false);
@@ -1908,13 +1922,36 @@ export default function WorkoutLogger({
     setDiscarding(true);
     try {
       if (workoutLogId) {
-        const { error: slErr } = await supabase.from("set_logs").delete().eq("workout_log_id", workoutLogId);
-        if (slErr) throw slErr;
-        // completed=false guard: a finished workout must never be deletable from here, even if
-        // this component somehow still holds its id.
-        const { error: wlErr } = await supabase.from("workout_logs").delete()
-          .eq("id", workoutLogId).eq("completed", false);
+        // Dustin, 27 Aug 2026, granting permission for this one fix: cancelling was
+        // deleting the sets of a workout that was ALREADY FINISHED. 15 sessions were
+        // destroyed that way - Jennifer 26 Aug (27 min), Cheyenne 22 Aug (50 min),
+        // Sara Prince x4, Claudine 1 Aug (63 min), Lauren, Celeste, Stacie, Lesly,
+        // and three of Dustin's own. The set data is not recoverable.
+        //
+        // The old code deleted set_logs with NO CONDITION AT ALL, then deleted the
+        // parent guarded by completed=false - with a comment above it saying a
+        // finished workout must never be deletable from here. The guard was on the
+        // wrong statement. PostgREST does not error on a delete that matches nothing,
+        // so both calls "succeeded", the screen cleared, and the workout row survived
+        // still reading complete. Adherence looked fine; the training history was gone.
+        //
+        // The set_logs delete is gone entirely rather than guarded, because it was
+        // never needed: set_logs_workout_log_id_fkey is ON DELETE CASCADE, so the
+        // sets go when the parent goes. Deleting the parent IS deleting the sets, and
+        // one guarded statement cannot disagree with itself the way two did.
+        const { data: killed, error: wlErr } = await supabase.from("workout_logs")
+          .delete().eq("id", workoutLogId).eq("completed", false).select("id");
         if (wlErr) throw wlErr;
+        // A delete that matched nothing is not a success. Either the workout is
+        // finished or the row is already gone; in both cases there is nothing to
+        // discard and the sets must be left exactly where they are.
+        if (!killed || killed.length === 0) {
+          setWorkoutComplete(true);
+          if (typeof window !== "undefined") {
+            window.alert("This workout is already finished, so there is nothing to discard. Your sets are safe.");
+          }
+          return;
+        }
       }
       // The scheduled_workouts row is deliberately left alone: cancelling a session does not
       // unschedule the workout - it stays on the calendar to be done later.
@@ -2534,12 +2571,18 @@ export default function WorkoutLogger({
         {/* Top bar */}
         <div className="flex items-center justify-between px-3 pt-2 pb-2 flex-shrink-0 gap-2">
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Not offered once the workout is finished. workoutComplete is seeded
+                from the database on mount (see the effect beside its useState), so
+                this survives a reload - which is how a client reached Cancel on a
+                finished session in the first place. */}
+            {!workoutComplete && (
             <button onClick={discardSession} disabled={discarding}
               className="flex items-center gap-1 px-2.5 h-9 rounded-full"
               style={{ background: "rgba(255,90,90,0.16)", border: "1px solid rgba(255,90,90,0.4)" }}>
               <i className="ti ti-x text-sm" style={{ color: "#ff8a8a" }} />
               <span className="text-xs font-bold" style={{ color: "#ff8a8a" }}>Cancel</span>
             </button>
+            )}
             <Link href={isTrainerSession && clientId ? `/clients/${clientId}` : "/home"}
               className="w-9 h-9 rounded-full flex items-center justify-center"
               style={{ background: "rgba(255,255,255,0.08)" }} aria-label="Exit to previous screen">
