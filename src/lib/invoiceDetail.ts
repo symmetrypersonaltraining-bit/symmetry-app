@@ -31,6 +31,12 @@ export interface InvoiceDetail {
   cancelDeduction: number;
   halfPriceSessions: number;
   halfPriceDeduction: number;
+  /** Cancellations that actually cost a session, so earned a credit. */
+  sessionsCredited: number;
+  /** Sessions delivered above the plan. Null when the client has no plan. */
+  sessionsExtra: number | null;
+  /** How many sessions the monthly rate covers. */
+  expectedSessions: number | null;
   /** True while the cycle has not closed, so the figure can still move. */
   provisional: boolean;
 }
@@ -62,6 +68,9 @@ export function parseInvoiceDetail(credit_details: unknown, halfPriceSessions?: 
     cancelDeduction: numOrNull(cd.cancel_deduction) ?? 0,
     halfPriceSessions: numOrNull(cd.half_price_sessions) ?? numOrNull(halfPriceSessions) ?? 0,
     halfPriceDeduction: numOrNull(cd.half_price_deduction) ?? 0,
+    sessionsCredited: numOrNull(cd.sessions_credited) ?? 0,
+    sessionsExtra: numOrNull(cd.sessions_extra),
+    expectedSessions: numOrNull(cd.expected_sessions),
     provisional: cd.provisional === true,
   };
 }
@@ -72,30 +81,89 @@ export function shortDate(iso: string): string {
   return centralFormatDate(iso.slice(0, 10), { month: "short", day: "numeric" });
 }
 
+export interface InvoiceLine {
+  label: string;
+  value: string;
+  tone: "base" | "credit" | "muted" | "total";
+}
+
 /**
- * The one-line sum, in the client's words rather than the schema's.
+ * THE SAME RECEIPT THE TRAINER SEES.
+ *
+ * Dustin screenshots his own payments screen to explain a bill. That only works
+ * while the two screens say the same thing, and for months they did not: his
+ * card itemised one way, the client's banner another, and the arithmetic on the
+ * client's phone did not work out ("8 sessions × $70 = $490"; 8 × 70 is 560).
+ *
+ * So this renders the identical three lines: what the rate covers, what came
+ * off it, what is owed. Read from `credit_details`, never recomputed — a screen
+ * that recalculates is a screen that can disagree with the invoice beside it.
+ */
+export function invoiceLines(d: InvoiceDetail, amountDue: number): InvoiceLine[] {
+  const lines: InvoiceLine[] = [];
+  const money = (n: number) => "$" + n;
+
+  if (d.basis === "monthly_less_missed" || d.basis === "monthly_less_cancellations") {
+    if (d.monthlyRate == null) return [];
+    lines.push({
+      label: d.expectedSessions != null && d.sessionRate != null
+        ? d.expectedSessions + " sessions × " + money(d.sessionRate)
+        : "Monthly rate",
+      value: money(d.monthlyRate),
+      tone: "base",
+    });
+    // `sessions_credited` is only written by the 29 Aug rule. Older rows carry
+    // the raw cancellation count, so fall back to that rather than showing a
+    // deduction with no line explaining it.
+    const credited = d.sessionsCredited || (d.cancelDeduction > 0 ? d.datesCancelled.length : 0);
+    if (d.cancelDeduction > 0 && credited > 0) {
+      lines.push({
+        label: credited + (credited === 1 ? " session" : " sessions") + " covered · not charged",
+        value: "− " + money(d.cancelDeduction),
+        tone: "credit",
+      });
+    }
+    if (d.sessionsExtra != null && d.sessionsExtra > 0) {
+      lines.push({
+        label: d.sessionsExtra + (d.sessionsExtra === 1 ? " session" : " sessions") + " above the plan",
+        value: "not charged",
+        tone: "muted",
+      });
+    }
+  } else if (d.basis === "sessions_trained") {
+    if (d.sessionRate == null) return [];
+    lines.push({
+      label: d.datesTrained.length + " sessions trained × " + money(d.sessionRate),
+      value: money(d.datesTrained.length * d.sessionRate),
+      tone: "base",
+    });
+  } else if (d.basis === "flat") {
+    if (d.monthlyRate == null) return [];
+    lines.push({ label: "Flat rate", value: money(d.monthlyRate), tone: "base" });
+    if (d.datesCancelled.length > 0) {
+      lines.push({
+        label: d.datesCancelled.length + " cancelled",
+        value: "not deducted",
+        tone: "muted",
+      });
+    }
+  } else {
+    return [];
+  }
+
+  lines.push({ label: "Due", value: money(amountDue), tone: "total" });
+  return lines;
+}
+
+/**
+ * The one-line sum, for anywhere too narrow for the receipt.
  *
  * Returns null when there is nothing worth showing — a flat rate needs no
  * explanation, and neither does a bill with no detail behind it.
  */
 export function explainAmount(d: InvoiceDetail, amountDue: number): string | null {
-  if (d.basis === "monthly_less_cancellations") {
-    if (d.monthlyRate == null) return null;
-    const parts: string[] = ["$" + d.monthlyRate];
-    if (d.cancelDeduction > 0 && d.datesCancelled.length) {
-      parts.push(
-        "− " + d.datesCancelled.length + " cancelled ($" + d.cancelDeduction + ")",
-      );
-    }
-    if (d.halfPriceDeduction > 0) {
-      parts.push("− " + d.halfPriceSessions + " at half rate ($" + d.halfPriceDeduction + ")");
-    }
-    if (parts.length === 1) return "$" + d.monthlyRate + " — nothing cancelled this cycle";
-    return parts.join(" ") + " = $" + amountDue;
-  }
-  if (d.basis === "sessions_trained") {
-    if (d.sessionRate == null || !d.datesTrained.length) return null;
-    return d.datesTrained.length + " sessions × $" + d.sessionRate + " = $" + amountDue;
-  }
-  return null;
+  const lines = invoiceLines(d, amountDue);
+  if (lines.length < 2) return null;
+  const body = lines.slice(0, -1).map((l) => l.label + " " + l.value).join(" · ");
+  return body + " = $" + amountDue;
 }

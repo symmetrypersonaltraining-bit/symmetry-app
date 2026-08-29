@@ -12,23 +12,24 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseInvoiceDetail, explainAmount, shortDate } from "../../src/lib/invoiceDetail.ts";
+import { parseInvoiceDetail, explainAmount, invoiceLines, shortDate } from "../../src/lib/invoiceDetail.ts";
 
-// Grant Weever's real cycle: $640, four cancelled at $80.
+// Grant Weever's real cycle: $640 for 8 sessions at $80. He trained 6 and
+// cancelled 2 — both of them genuinely missed, so both are credited.
 const GRANT = {
-  basis: "monthly_less_cancellations",
+  basis: "monthly_less_missed",
   billing_type: "monthly_adjusted",
   cycle: "2026-07-07 to 2026-08-07",
   rate: "80.00",
   monthly_rate: "640",
   expected_sessions: 8,
-  sessions_trained: 5,
-  dates_trained: ["2026-07-09", "2026-07-14", "2026-07-16", "2026-07-21", "2026-07-23"],
-  sessions_cancelled: 4,
-  dates_cancelled: ["2026-07-10", "2026-07-28", "2026-08-04", "2026-08-06"],
-  cancel_deduction: 320,
-  half_price_sessions: 0,
-  half_price_deduction: 0,
+  sessions_trained: 6,
+  dates_trained: ["2026-08-10", "2026-08-11", "2026-08-20", "2026-08-27", "2026-09-01", "2026-09-03"],
+  sessions_cancelled: 2,
+  dates_cancelled: ["2026-08-18", "2026-08-25"],
+  sessions_credited: 2,
+  sessions_extra: 0,
+  cancel_deduction: 160,
   provisional: false,
 };
 
@@ -40,37 +41,102 @@ test("the cycle is split out of the stored string", () => {
 
 test("dates trained and cancelled both come through", () => {
   const d = parseInvoiceDetail(GRANT);
-  assert.equal(d.datesTrained.length, 5);
-  assert.equal(d.datesCancelled.length, 4);
-  assert.equal(d.cancelDeduction, 320);
+  assert.equal(d.datesTrained.length, 6);
+  assert.equal(d.datesCancelled.length, 2);
+  assert.equal(d.cancelDeduction, 160);
 });
 
-test("the one-liner explains the rule, not the schema", () => {
+test("the client sees the same three lines the trainer does", () => {
+  // Dustin screenshots his own payments screen to explain a bill. That only
+  // works while both screens itemise identically.
   const d = parseInvoiceDetail(GRANT);
-  assert.equal(explainAmount(d, 320), "$640 − 4 cancelled ($320) = $320");
+  assert.deepEqual(invoiceLines(d, 480), [
+    { label: "8 sessions × $80", value: "$640", tone: "base" },
+    { label: "2 sessions covered · not charged", value: "− $160", tone: "credit" },
+    { label: "Due", value: "$480", tone: "total" },
+  ]);
 });
 
-test("a clean cycle says so rather than showing a subtraction of nothing", () => {
-  const d = parseInvoiceDetail({ ...GRANT, dates_cancelled: [], sessions_cancelled: 0, cancel_deduction: 0 });
-  assert.equal(explainAmount(d, 640), "$640 — nothing cancelled this cycle");
-});
-
-test("half-price remote sessions appear in the explanation", () => {
-  const d = parseInvoiceDetail({ ...GRANT, half_price_sessions: 2, half_price_deduction: 80 });
-  assert.match(explainAmount(d, 240)!, /2 at half rate \(\$80\)/);
-});
-
-test("a sessions-trained bill is explained its own way", () => {
+test("a cancellation that was made up is not shown as covered", () => {
+  // Lesly: 8 of 8 trained, 2 cancelled and both made up inside the cycle. The
+  // old rule handed her $160 back for sessions she did not miss.
   const d = parseInvoiceDetail({
-    basis: "sessions_trained", cycle: "2026-07-01 to 2026-08-01", rate: "75",
-    dates_trained: ["2026-07-02", "2026-07-04"], dates_cancelled: [],
+    ...GRANT, sessions_trained: 8, sessions_cancelled: 2,
+    dates_cancelled: ["2026-08-17", "2026-08-25"],
+    sessions_credited: 0, cancel_deduction: 0,
   });
-  assert.equal(explainAmount(d, 150), "2 sessions × $75 = $150");
+  const lines = invoiceLines(d, 640);
+  assert.equal(lines.length, 2, "rate line and total, no credit line");
+  assert.equal(lines[0].value, "$640");
+  assert.equal(lines[1].value, "$640");
+  assert.ok(!lines.some((l) => l.tone === "credit"), "nothing was missed, so nothing is covered");
 });
 
-test("a flat bill needs no explanation and is given none", () => {
-  const d = parseInvoiceDetail({ basis: "flat", cycle: "2026-07-25 to 2026-08-25", monthly_rate: "350" });
-  assert.equal(explainAmount(d, 350), null, "a flat rate explains itself");
+test("sessions above the plan are shown, and shown as free", () => {
+  // Tim trained 14 against a 12-session rate. Dustin, 29 Aug: "dont charge
+  // extras above plan." A free session he cannot see is a free session he gets
+  // no credit for.
+  const d = parseInvoiceDetail({
+    ...GRANT, expected_sessions: 12, monthly_rate: "840", rate: "70",
+    sessions_trained: 14, sessions_cancelled: 0, dates_cancelled: [],
+    sessions_credited: 0, sessions_extra: 2, cancel_deduction: 0,
+  });
+  const lines = invoiceLines(d, 840);
+  const extra = lines.find((l) => l.label.includes("above the plan"));
+  assert.ok(extra, "the extras must be visible");
+  assert.equal(extra!.label, "2 sessions above the plan");
+  assert.equal(extra!.value, "not charged");
+});
+
+test("a clean cycle shows the rate and nothing subtracted from it", () => {
+  const d = parseInvoiceDetail({ ...GRANT, dates_cancelled: [], sessions_cancelled: 0,
+                                 sessions_credited: 0, cancel_deduction: 0 });
+  assert.deepEqual(invoiceLines(d, 640), [
+    { label: "8 sessions × $80", value: "$640", tone: "base" },
+    { label: "Due", value: "$640", tone: "total" },
+  ]);
+});
+
+test("a per-session bill is explained its own way", () => {
+  // Todd Prine from 29 Aug: a pilot booked a week at a time.
+  const d = parseInvoiceDetail({
+    basis: "sessions_trained", cycle: "2026-08-02 to 2026-09-02", rate: "75",
+    dates_trained: ["2026-08-03", "2026-08-06"], dates_cancelled: [],
+  });
+  assert.deepEqual(invoiceLines(d, 150), [
+    { label: "2 sessions trained × $75", value: "$150", tone: "base" },
+    { label: "Due", value: "$150", tone: "total" },
+  ]);
+});
+
+test("a flat bill says the cancellations were not deducted", () => {
+  // Jennifer Day is quarterly flat and cancelled four. Saying nothing invites
+  // the question; saying "not deducted" answers it before it is asked.
+  const d = parseInvoiceDetail({
+    basis: "flat", cycle: "2026-07-23 to 2026-10-23", monthly_rate: "1500",
+    dates_cancelled: ["2026-07-30", "2026-08-10", "2026-08-13", "2026-08-20"],
+  });
+  const lines = invoiceLines(d, 1500);
+  assert.equal(lines[1].label, "4 cancelled");
+  assert.equal(lines[1].value, "not deducted");
+});
+
+test("a row with no detail behind it explains nothing rather than guessing", () => {
+  assert.deepEqual(invoiceLines(parseInvoiceDetail({ basis: "" }), 100), []);
+  assert.equal(explainAmount(parseInvoiceDetail({ basis: "" }), 100), null);
+});
+
+test("older rows written under the 20 Aug rule still render", () => {
+  // sessions_credited did not exist before 29 Aug. A paid invoice from last
+  // month must not lose its credit line just because the schema moved on.
+  const d = parseInvoiceDetail({
+    basis: "monthly_less_cancellations", rate: "80", monthly_rate: "640",
+    expected_sessions: 8, dates_trained: [], dates_cancelled: ["2026-07-10", "2026-07-28"],
+    cancel_deduction: 160,
+  });
+  const lines = invoiceLines(d, 480);
+  assert.equal(lines[1].label, "2 sessions covered · not charged");
+  assert.equal(lines[1].value, "− $160");
 });
 
 // ─── it must never throw on a bad row ───────────────────────────────────────

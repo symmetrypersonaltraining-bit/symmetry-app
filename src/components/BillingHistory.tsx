@@ -17,7 +17,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { parseInvoiceDetail, explainAmount, shortDate, type InvoiceDetail } from "@/lib/invoiceDetail";
+import { parseInvoiceDetail, invoiceLines, shortDate, type InvoiceDetail } from "@/lib/invoiceDetail";
 
 interface Row {
   id: string;
@@ -102,7 +102,7 @@ export default function BillingHistory({ clientId }: { clientId?: string }) {
       <div className="space-y-1.5">
         {rows.map((r) => {
           const isOpen = open === r.id;
-          const sum = explainAmount(r.detail, r.amount);
+          const sum = invoiceLines(r.detail, r.amount);
           return (
             <div key={r.id} className="rounded-2xl overflow-hidden"
               style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
@@ -134,7 +134,21 @@ export default function BillingHistory({ clientId }: { clientId?: string }) {
               {isOpen && (
                 <div className="px-3 pb-3 text-xs space-y-1" style={{ color: "var(--brand-text-secondary)" }}>
                   <div style={{ height: 1, background: "var(--brand-border)", margin: "2px 0 8px" }} />
-                  {sum && <div style={{ color: "var(--brand-text)", fontWeight: 700 }}>{sum}</div>}
+                  {sum.map((l, li) => (
+                    <div key={li} className="flex items-baseline gap-2"
+                      style={{
+                        fontWeight: l.tone === "muted" ? 400 : 700,
+                        color: l.tone === "credit" ? "#22c55e"
+                             : l.tone === "muted" ? "var(--brand-text-secondary)"
+                             : "var(--brand-text)",
+                        borderTop: l.tone === "total" ? "1px solid var(--brand-border)" : undefined,
+                        paddingTop: l.tone === "total" ? 4 : undefined,
+                        marginTop: l.tone === "total" ? 2 : undefined,
+                      }}>
+                      <span>{l.label}</span>
+                      <span className="ml-auto tabular-nums">{l.value}</span>
+                    </div>
+                  ))}
                   <div>{"Due " + fmtDue(r.due_date)}</div>
                   {r.detail.datesTrained.length > 0 && (
                     <div>{"Trained (" + r.detail.datesTrained.length + "): " +
@@ -154,7 +168,7 @@ export default function BillingHistory({ clientId }: { clientId?: string }) {
                       {"Paid " + new Date(r.paidAt).toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric" })}
                     </div>
                   )}
-                  {!sum && r.detail.datesTrained.length === 0 && r.detail.datesCancelled.length === 0 && (
+                  {sum.length === 0 && r.detail.datesTrained.length === 0 && r.detail.datesCancelled.length === 0 && (
                     <div style={{ opacity: 0.7 }}>No session detail was recorded for this one.</div>
                   )}
                 </div>

@@ -19,6 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import {
   calcReminder,
+  resolveBillingType,
   nextDueDate,
   previousDueDate,
   reminderSendDate,
@@ -204,10 +205,22 @@ export default function ReminderEditor() {
       const out: Rem[] = (rems || [])
         .map((r: any) => {
           const c = byClient[r.client_id] || {};
-          const billingType: BillingType =
-            c.billing_type === "flat" || c.billing_type === "none" || c.billing_type === "per_session"
-              ? c.billing_type
-              : (c.flat_billing === true ? "flat" : "per_session");
+          // ⚠️ THE ONE MISSING WORD, 29 Aug. "monthly_adjusted" was absent from
+          // this list, so all 15 monthly clients fell through to per_session and
+          // every screen downstream believed it. Tim Yancey's card read
+          // "8 sessions × $70 = $560" beside an amount of $490, threw a red
+          // "does not match", reset to the wrong figure, and — worst — save()
+          // wrote basis:"sessions_trained" back over the correct value the
+          // nightly recalc had just written. The rule was right in the database
+          // and right in reminder-calc.ts; only the line choosing between them
+          // was wrong, which is why this came back four times.
+          //
+          // resolveBillingType() already knows every valid type. Use it rather
+          // than a second hand-maintained list that can fall out of step again.
+          const billingType: BillingType = resolveBillingType({
+            billingType: c.billing_type as BillingType | null,
+            flatBilling: c.flat_billing === true,
+          });
           // clients.billing_cadence is authoritative; the calendar is the fallback.
           const cad: Cadence | null = (c.billing_cadence as Cadence) || calendarCadenceOf(r.client_id);
           const la = (appr || [])
@@ -394,8 +407,10 @@ export default function ReminderEditor() {
       r.billingType === "flat"
         ? (r.fee ?? 0)
         : r.billingType === "monthly_adjusted"
-          ? round2(Math.max(0, (r.monthlyRate ?? 0) - r.cancelledFull * rate - half * (rate / 2)))
-          : round2(Math.max(0, n * rate - half * (rate / 2)));
+          // Only the sessions they actually missed, never the raw cancel count.
+          ? round2(Math.max(0, (r.monthlyRate ?? 0)
+              - Math.min(r.cancelledFull, Math.max(0, (r.expectedSessions ?? 0) - r.sessionsTrained)) * rate))
+          : round2(Math.max(0, n * rate));
     setEdit(r.id, { amount: String(amt), amountOverridesCount: false, override: false });
   };
 
@@ -454,7 +469,7 @@ export default function ReminderEditor() {
           // monthly_rate, cancel_deduction and half_price_deduction were read
           // by parseInvoiceDetail() and never written by anything, so that
           // branch could only ever have come out blank.
-          basis: r.billingType === "monthly_adjusted" ? "monthly_less_cancellations"
+          basis: r.billingType === "monthly_adjusted" ? "monthly_less_missed"
                : r.billingType === "flat" ? "flat"
                : r.billingType === "per_session" ? "sessions_trained"
                : "",
@@ -465,6 +480,8 @@ export default function ReminderEditor() {
           rate: r.sessionRate == null ? null : String(r.sessionRate),
           billing_type: r.billingType,
           sessions_trained: count,
+          sessions_credited: calc.sessionsCredited,
+          sessions_extra: calc.sessionsExtra,
           dates_trained: r.trainedDates,
           sessions_cancelled: r.cancelledFull + r.cancelledHalf,
           dates_cancelled: r.cancelledDates.map((c) => c.date),
@@ -626,29 +643,47 @@ export default function ReminderEditor() {
                   cancelled sessions based on that monthly rate divided by the
                   number of sessions (8)." Written out rather than summarised,
                   because this is the screen he screenshots for clients. */}
+              {/* THE BILL, READ TOP TO BOTTOM LIKE A RECEIPT: what the rate
+                  covers, what came off it, what is owed. Dustin, 29 Aug: "this
+                  needs to be set up where its very easy for me to confirm its
+                  correct, edit if needed and send it off." Three aligned lines
+                  beat one run-on sentence, and this is the screen he
+                  screenshots for clients. */}
               {adjusted ? (
-                <div className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>
-                  {"$" + (r.monthlyRate ?? "?") +
-                    (calc.cancelDeduction > 0
-                      ? " − " + r.cancelledFull + " cancelled × $" + (r.billedRate ?? "?") +
-                        " ($" + calc.cancelDeduction + ")"
-                      : "") +
-                    (calc.halfPriceDeduction > 0
-                      ? " − " + (parseInt(e.halfPrice, 10) || 0) + " remote at half ($" +
-                        calc.halfPriceDeduction + ")"
-                      : "") +
-                    " = $" + calc.expected}
-                </div>
+                <>
+                  <div className="flex items-baseline gap-2 text-xs font-semibold" style={{ color: "var(--brand-text)" }}>
+                    <span>{(r.expectedSessions ?? "?") + " sessions × $" + (r.billedRate ?? "?")}</span>
+                    <span className="ml-auto tabular-nums">{"$" + (r.monthlyRate ?? "?")}</span>
+                  </div>
+                  {calc.sessionsCredited > 0 && (
+                    <div className="flex items-baseline gap-2 text-xs font-semibold" style={{ color: "#22c55e" }}>
+                      <span>{calc.sessionsCredited + (calc.sessionsCredited === 1 ? " session" : " sessions") + " covered · not charged"}</span>
+                      <span className="ml-auto tabular-nums">{"− $" + calc.cancelDeduction}</span>
+                    </div>
+                  )}
+                  {/* Extras are not billed (Dustin, 29 Aug). Shown anyway, because
+                      a free session he cannot see is a free session he gets no
+                      credit for — the same reason the covered line exists. */}
+                  {!!calc.sessionsExtra && calc.sessionsExtra > 0 && (
+                    <div className="flex items-baseline gap-2 text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+                      <span>{calc.sessionsExtra + (calc.sessionsExtra === 1 ? " session" : " sessions") + " above the plan"}</span>
+                      <span className="ml-auto tabular-nums">not charged</span>
+                    </div>
+                  )}
+                </>
               ) : (
-                <div className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>
-                  {perSession
-                    ? r.sessionsTrained + " sessions × $" + (r.billedRate ?? "?") + " = $" + calc.expected
-                    : "Flat " + (r.cadence || "monthly") + " rate = $" + calc.expected}
+                <div className="flex items-baseline gap-2 text-xs font-semibold" style={{ color: "var(--brand-text)" }}>
+                  <span>{perSession
+                    ? r.sessionsTrained + " sessions trained × $" + (r.billedRate ?? "?")
+                    : "Flat " + (r.cadence || "monthly") + " rate"}</span>
+                  <span className="ml-auto tabular-nums">{"$" + calc.expected}</span>
                 </div>
               )}
-              {adjusted && calc.cancelDeduction === 0 && calc.halfPriceDeduction === 0 && (
+              {adjusted && calc.sessionsCredited === 0 && (
                 <div className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-                  Nothing cancelled this cycle — the full rate.
+                  {r.cancelledFull > 0
+                    ? "Nothing missed this cycle — every cancelled session was made up. The full rate."
+                    : "Nothing cancelled this cycle — the full rate."}
                 </div>
               )}
               {/* A discount nobody can see is a discount you get no credit for.
@@ -685,7 +720,9 @@ export default function ReminderEditor() {
                   {"Cancelled (" + r.cancelledDates.length + "): " +
                     r.cancelledDates.map((c) => fmtDay(c.date) + (c.type === "half" ? " (½)" : "")).join(", ") +
                     (adjusted
-                      ? " — deducted"
+                      ? (calc.sessionsCredited === r.cancelledDates.length ? " — not charged"
+                         : calc.sessionsCredited === 0 ? " — all made up, still charged"
+                         : " — " + calc.sessionsCredited + " credited, the rest made up")
                       : perSession
                         ? " — not billed"
                         : " — flat rate, not deducted")}

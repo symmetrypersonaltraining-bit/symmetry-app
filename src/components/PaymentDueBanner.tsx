@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import PayLinksRow from "./PayLinksRow";
 import type { PayDestination } from "@/lib/pay-links";
 import { payDestinationFor } from "@/lib/payDest";
-import { parseInvoiceDetail, explainAmount, shortDate, type InvoiceDetail } from "@/lib/invoiceDetail";
+import { parseInvoiceDetail, invoiceLines, shortDate, type InvoiceDetail } from "@/lib/invoiceDetail";
 
 interface Due {
   id: string; due: string; amount: number; note: string | null; acked: boolean;
@@ -85,13 +85,27 @@ export default function PaymentDueBanner() {
               with the invoice beside it. */}
           {(() => {
             const det = d.detail;
-            const sum = explainAmount(det, d.amount);
-            const hasDetail = !!sum || det.datesTrained.length > 0 || det.datesCancelled.length > 0;
+            const sum = invoiceLines(det, d.amount);
+            const hasDetail = sum.length > 0 || det.datesTrained.length > 0 || det.datesCancelled.length > 0;
             if (!hasDetail) return null;
             return (
               <div className="mt-1.5 rounded-xl px-2.5 py-2 text-xs space-y-1"
                 style={{ background: "var(--brand-card)", color: "var(--brand-text-secondary)" }}>
-                {sum && <div style={{ fontWeight: 700, color: "var(--brand-text)" }}>{sum}</div>}
+                {sum.map((l, li) => (
+                  <div key={li} className="flex items-baseline gap-2"
+                    style={{
+                      fontWeight: l.tone === "muted" ? 400 : 700,
+                      color: l.tone === "credit" ? "#22c55e"
+                           : l.tone === "muted" ? "var(--brand-text-secondary)"
+                           : "var(--brand-text)",
+                      borderTop: l.tone === "total" ? "1px solid var(--brand-border)" : undefined,
+                      paddingTop: l.tone === "total" ? 4 : undefined,
+                      marginTop: l.tone === "total" ? 2 : undefined,
+                    }}>
+                    <span>{l.label}</span>
+                    <span className="ml-auto tabular-nums">{l.value}</span>
+                  </div>
+                ))}
                 {det.cycleStart && det.cycleEnd && (
                   <div>{shortDate(det.cycleStart) + " – " + shortDate(det.cycleEnd)}</div>
                 )}
