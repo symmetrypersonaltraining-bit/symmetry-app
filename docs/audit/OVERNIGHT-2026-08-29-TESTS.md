@@ -157,3 +157,148 @@ upper bound, which is how the date got in.
 0 fail** · `npx next build` → *Compiled successfully* (the `/login` prerender
 error about Supabase env vars is expected in the sandbox) · `node
 scripts/audit/static-audit.mjs` → clean.
+
+---
+
+## 7. Zero could not be recorded — #6
+
+Ran the old and new rules side by side over the inputs a client actually types:
+
+| input | OLD `parseFloat(x) \|\| null` | NEW `typedNumber` |
+|---|---|---|
+| `"0"` | **null** ⬅ the bug | **0** |
+| `"0.0"` | **null** | **0** |
+| `""` / `"  "` | null | null |
+| `"abc"` / null / undefined | null | null |
+| `"135"` / `"12.5"` / `"-5"` | unchanged | unchanged |
+
+Live consequence: **164** Machine Assisted Pull Up sets on record, **5** with a
+zero assist. Reaching zero assist is the point of the rule and it stored as
+"didn't enter anything". Also **286** sets marked completed with every value
+null.
+
+## 8. Two logs created milliseconds apart — #5
+
+Checked before building the index, not assumed: **0** duplicate groups among
+INCOMPLETE logs, so nothing conflicted. The 59 historical duplicates are all
+among COMPLETED logs, which the partial index deliberately does not cover.
+
+| Step | Result |
+|---|---|
+| First open log for a client/day/date | inserted |
+| Second, simulating the race | **refused, 23505, naming `workout_logs_one_open_per_day`** |
+| Scratch rows after cleanup | 0 |
+
+The code now treats losing that race as the normal outcome it is — reads back
+the row that won rather than throwing, which is the shape of Lauren's 11 Aug
+complaint already quoted in that function.
+
+## 9. Body Fat showed a dash — #39
+
+The six the audit named, each now showing their last real reading:
+
+| client | before | after | reading dated |
+|---|---|---|---|
+| Claudine Ocon | — | 24.2 | 4 Aug |
+| Dustin | — | **5.2** ⚠️ | 2 Aug |
+| Jennifer Day | — | 30 | 5 Jun |
+| Jerry Bourgeois | — | 30 | 16 Jul |
+| Lauren Standefer | — | 28.7 | 5 Aug |
+| Robert Miller | — | 34.6 | 2 Jun |
+
+⚠️ **Dustin's own reads 5.2% against 11.5% in June.** That is the number on
+file and the tile will now show it. It looks like a mis-entry rather than a
+measurement — flagged, not quietly corrected.
+
+## 10. Social posts filed as payments — #12
+
+Checked before changing: **634 of 638** markers carry an amount, all **4**
+without one are social posts, and **0** reminders have ever been generated from
+an amount-less marker — so the change excludes nothing that was working.
+
+**Red-first:** fed the function one social post and one real payment together →
+`{synced: 1, skipped_no_amount: 1}`, only the payment landed, amount parsed to
+`123.45`. Probe rows removed. The 4 live rows were backed up to
+`bak_calendar_payments_noamount_20260829` before deletion.
+
+## 11. Invoices printed false arithmetic — #8
+
+| client | phone said | actually |
+|---|---|---|
+| Tim Yancey | "8 sessions × $70 = $490" | 8 × 70 = 560 |
+| Sharon Rambo | "6 sessions × $75 = $300" | 6 × 75 = 450 |
+
+**Root cause, measured:** `credit_details.basis` was hard-coded to
+`sessions_trained` for everyone. Live billing types: **15 monthly_adjusted, 5
+flat, 16 none, ZERO per_session.** The single basis it wrote was the only one
+nobody had.
+
+⚠️ **And the fix set a trap for itself, caught before shipping.**
+`storedIsNewShape` asked *"is basis exactly 'sessions_trained'?"* as a proxy for
+*"does this row carry the structured shape?"* — the same question only while
+every row used that one basis. Changing the basis would have made every new
+monthly or flat row look like the OLD shape and silently recompute counts from
+live data. It now asks whether the fields are present.
+
+## 12. The "N overdue" badge — #14
+
+| window | overdue it could ever show | rows |
+|---|---|---|
+| OLD (today..+30, pending/paused) | **0 — structurally** | 11 |
+| NEW (−90..+30, + sent) | **2** | 18 |
+
+The two are Christine Latham $320 (22 Aug) and Sharon Rambo $300 (23 Aug) — the
+same two the other panel already showed, so the panels now agree.
+
+## 13. The leaderboard named everyone in full — #4
+
+34 on the board, **0** names containing a surname, **0** duplicate labels,
+exactly **2** disambiguated (`Sharon G.`, `Sharon R.`).
+
+⚠️ **Two corrections to the audit entry.** "23 never opted in" was measured
+against `leaderboard_opt_in`, which **this board does not use** — it uses
+`exclude_from_rankings`, an opt-OUT, and the 2 who used it are correctly absent.
+And ranking the whole roster is a **deliberate** decision documented in
+`GroupChallenge.tsx` on 1 Aug. Not reversed unattended.
+
+## 14. The bell ignored the settings screen — #36
+
+Live at the time of the fix: **Jennifer Day has group chat off and one unread
+group message** lighting her bell. Claudine had the same condition on 27 Aug and
+is currently at zero unread.
+
+## 15. Future-dated completions and missing supervised sessions — #7, #59
+
+Supervised workouts with no appointment, by date — the audit's example
+reproduces exactly:
+
+| date | count | who |
+|---|---|---|
+| 3 Sep | 2 | Troy Schnitzler, Tyler Dorsett |
+| 2 Sep | 3 | Krysta, Todd Prine, Troy |
+| **27 Aug** | **2** | **Troy Schnitzler, Tyler Dorsett** ⬅ the audit's case |
+| 26 Aug | 2 | Krysta, Troy |
+
+227 overall, per the integrity checker.
+
+---
+
+## ⚠️ THE PATTERN IN TONIGHT'S TEST FAILURES
+
+Four unit tests failed tonight. **Three of them failed on changes that improved
+the behaviour they exist to protect**, because they assert that a source file
+contains a string:
+
+1. `notificationsRespectSettings` ×2 — required
+   `from("notification_preferences")` to be textually inside
+   `MessageNotifier.tsx`. Moving it into a shared hook — the entire point of the
+   fix — broke them.
+2. `addAheadAndRemoveGuard` — required the literal `max={maxDate}`. Making the
+   bound conditional preserved exactly what it guards and still broke it.
+
+The fourth was real and mine: the Central-date guard, which caught me **twice**.
+
+All four are now assertions about behaviour or about the rule wherever it lives.
+This is `docs/AUDIT.md`'s thesis, still live in the suite: a spell-checker
+cannot tell a refactor from a regression, so it fails on the safe one and passes
+on the dangerous one.

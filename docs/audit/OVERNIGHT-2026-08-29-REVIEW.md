@@ -114,10 +114,102 @@ was one step from filing "the cascade is broken".
 
 ---
 
-## Still queued for tonight
+### #6 · Zero is a number again `b988f56` [logger — you approved]
 
-#5 duplicate workout logs · #6 zero cannot be recorded · #8 invoice arithmetic ·
-#12 social posts stored as payments · #14 the unreachable overdue badge ·
-#36 the bell ignoring notification settings · #39 Body Fat showing "—" for six
-clients · #43 challenge scoring · #59 today's supervised sessions · and a fresh
-audit pass at the end.
+`parseFloat(x) || null` returns null for zero, so **286 sets** are on record as
+completed with nothing behind them — and **Machine Assisted Pull Up has 164
+logged sets with only 5 at zero assist.** Reaching zero assist is the entire
+point of your pull-up rule, and the app recorded it as "didn't enter anything".
+
+**What to check:** log a set with 0 assist on an assisted pull-up and confirm it
+sticks.
+
+### #5 · Only one workout can be open at a time `b988f56` [logger — you approved]
+
+Two logs were being created milliseconds apart and the sets written to the loser
+left history — Tyler's 160 lb × 10 lat pulldown among them. **No data was
+changed**: there were zero duplicate groups among open logs, so the index went on
+clean. The 59 historical duplicates are all among completed logs and are in the
+needs-you list.
+
+### #39 · Body Fat shows the reading `9a0bb05`
+
+Six clients showed "—" with a trend line drawn beside it. Each field now finds
+its own newest reading.
+
+⚠️ **Yours reads 5.2%**, against 11.5% in June. That is what is on file and the
+tile will now show it. It looks like a mis-entry — I have not touched it.
+
+### #12 · A social post is not a payment `9a0bb05`
+
+"POST STORIES — Perfect Day Macro Log" was filed as a payment marker against
+Jennifer Day, and another against Stacie Weever. Nothing broke only because both
+already had an open invoice blocking generation. Now an event needs a dollar
+figure. The four bogus rows are backed up and removed.
+
+### #8 · Your invoices explain the right billing `ff776eb`
+
+Tim's phone said "8 sessions × $70 = $490". **Not one client is on per-session
+billing** — 15 monthly, 5 flat, 16 none, zero per-session — and that was the one
+basis the code wrote for everybody.
+
+**What to check:** open Tim Yancey's and Sharon Rambo's invoices and confirm the
+line now describes monthly billing. **Newly sent invoices carry the fix; already-sent
+ones keep what they were sent with**, which is deliberate.
+
+### #14 · The overdue badge can fire `ff776eb`
+
+It counted a subset the query had already excluded — unreachable, not empty.
+Now shows Christine ($320) and Sharon ($300), matching the other panel.
+
+### #4 · The leaderboard stops naming everyone in full `469214a`
+
+Every client saw every other client's full name. Now first names, with a last
+initial only where one repeats — you have two Sharons.
+
+⚠️ **The audit was wrong about the rest of this one.** It said 23 people never
+opted in, measured against a column **this board does not use**. The board uses
+an opt-out, and the 2 who used it are correctly absent. Ranking everyone is a
+deliberate decision your own code documents from 1 Aug. **I did not reverse it.**
+If you want opt-in-only, say so.
+
+### #36 · The bell obeys the settings screen `b045431`
+
+Jennifer's complaint, still true on three surfaces after the banner was fixed —
+because the check lived inside one component. **Right now she has group chat off
+and an unread group message on her bell.** One shared reader now.
+
+### #7 · A future date cannot already be done `1863098`
+
+Guarded in the picker and, more importantly, on the server. **The existing
+28 Aug row is untouched** — see the needs-you list.
+
+### #59 · Supervised sessions appear on Today `1863098`
+
+Today's Sessions was built from appointments alone, so a supervised workout with
+no appointment was invisible on your own screen — Troy and Tyler on the 27th,
+and it recurs most weeks (227 overall). They now show, with no invented time.
+A cancelled session also no longer counts toward "N scheduled".
+
+---
+
+## ⚠️ Worth your attention
+
+**Three of tonight's four test failures were false alarms** — tests asserting
+that a source file contains a string, breaking on changes that improved the
+behaviour they exist to protect. The fourth was real and caught me twice. All
+four now assert behaviour. This is `docs/AUDIT.md`'s thesis, still live in your
+suite: a spell-checker cannot tell a refactor from a regression.
+
+**Deploy check still outstanding:** `/api/set-client-mode` should 404 in
+production once Vercel redeploys. Worth one click.
+
+---
+
+## Still queued
+
+#43 challenge scoring · #40/#41 Lauren's charts and the weight tile · #42 the
+two average-calorie figures · #33 library swap search · #48–#51 the food and
+plan-item items · #57 Brooke's coverage warning · #58 the 70 mismatched
+assignments (needs you) · #24/#25 the two AI prompt faults · and a fresh audit
+pass at the end.
