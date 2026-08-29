@@ -260,6 +260,24 @@ export async function POST(req: Request) {
   if (exercises.length > 40) return NextResponse.json({ error: "That's more than 40 exercises." }, { status: 400 });
 
   const date = /^\d{4}-\d{2}-\d{2}$/.test(body.date || "") ? (body.date as string) : CT_TODAY();
+
+  // ⚠️ A SESSION CANNOT HAVE BEEN COMPLETED ON A DAY THAT HAS NOT HAPPENED.
+  //
+  // The picker allows 35 days ahead, which is right for SCHEDULING a workout
+  // and wrong the moment "mark completed on this date" is ticked. One live
+  // instance: a completed log dated 2026-08-28, created on 25 Aug, duration
+  // 0.19 seconds, zero sets. Celeste has used the same button five times this
+  // month, so it is a path people actually take.
+  //
+  // Guarded on the SERVER, not only in the picker. A max= attribute is a
+  // courtesy to the person typing; it is not a rule, and anything that posts to
+  // this route directly never sees it.
+  if (body.markDone && date > CT_TODAY()) {
+    return NextResponse.json(
+      { error: "That date hasn't happened yet, so the workout can't already be done. Schedule it instead, or pick a date up to today." },
+      { status: 400 },
+    );
+  }
   const db = createAdminClient();
 
   let phaseId = await ensurePhaseId(db, clientId);

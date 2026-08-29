@@ -107,7 +107,7 @@ export default async function HomePage(props: {
     // Today's scheduled workouts — provides day_id for Start button + completion status
     const { data: todayWorkoutRows } = await supabase
       .from("scheduled_workouts")
-      .select("id, client_id, status, day_id, supervised, position, days(id, label)")
+      .select("id, client_id, status, day_id, supervised, position, days(id, label), clients(id, name)")
       .is("deleted_at", null)
       .eq("scheduled_date", todayStrCT);
 
@@ -165,6 +165,51 @@ export default async function HomePage(props: {
           : [],
       };
     });
+
+    // ⚠️ A SUPERVISED SESSION WITH NO APPOINTMENT WAS INVISIBLE HERE.
+    //
+    // This list is built from appointments alone, so a workout marked
+    // supervised that has no matching calendar appointment simply does not
+    // appear -- the trainer's own Today's Sessions omits a session he is
+    // running. On 27 Aug that was Troy Schnitzler and Tyler Dorsett. It is not
+    // a one-off: 2 people on 3 Sep, 3 on 2 Sep, 2 on 26 Aug, and the integrity
+    // checker counts 227 supervised workouts with no appointment overall.
+    //
+    // Added here rather than by creating the missing appointments, deliberately:
+    // writing calendar entries Dustin did not make is a bigger and less
+    // reversible act than showing him a session he already scheduled. The
+    // underlying sync gap stays on the list as its own item.
+    const shownClientIds = new Set(trainerHomeSessions.map((s) => s.clientId));
+    for (const w of todayWorkoutRows || []) {
+      const row = w as any;
+      if (row.supervised !== true || !row.client_id) continue;
+      if (shownClientIds.has(row.client_id)) continue;
+      shownClientIds.add(row.client_id);
+      const day = clientDayMap[row.client_id];
+      trainerHomeSessions.push({
+        id: "sw-" + row.id,
+        clientId: row.client_id,
+        clientName: row.clients?.name || "Unknown",
+        // No appointment means no time was ever set for it. Say so rather than
+        // inventing one -- a made-up time on a trainer's schedule is worse than
+        // a missing one.
+        startTime: "",
+        endTime: "",
+        status: row.status === "completed" ? "completed"
+              : row.status === "cancelled_client" ? "cancelled_client"
+              : "scheduled",
+        title: "Training Session",
+        workouts: day
+          ? [{ id: day.dayId, label: day.dayLabel, isCardio: /cardio|run|bike|swim|tread|ellip/i.test(day.dayLabel) }]
+          : [],
+      });
+    }
+
+    // ⚠️ A CANCELLED SESSION WAS STILL COUNTED IN THE "N SCHEDULED" BADGE.
+    // Same audit item. Cancelled is not scheduled.
+    const scheduledTodayCount = trainerHomeSessions.filter(
+      (s) => s.status !== "cancelled_client" && s.status !== "cancelled",
+    ).length;
 
     const loggedTodayCount = trainerHomeSessions.filter((s) => s.status === "completed").length;
 
@@ -276,7 +321,7 @@ export default async function HomePage(props: {
         <TrainerHome
           todaySessions={trainerHomeSessions}
           completedCount={loggedTodayCount}
-          scheduledCount={trainerHomeSessions.length}
+          scheduledCount={scheduledTodayCount}
           clients={(clients || []) as Array<{ id: string; name: string }>}
           notificationCount={reminders.length}
           dateLabel={trainerDateLabel}

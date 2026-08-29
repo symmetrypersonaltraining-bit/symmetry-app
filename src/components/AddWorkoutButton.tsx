@@ -58,6 +58,11 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
   // the other direction. Adding a session ahead is the more common thing to
   // want, and generation only materialises five weeks out, so that is the bound.
   const maxDate = daysAheadCT(35);
+  // 35 days ahead is right for SCHEDULING and wrong for "already done" -- a
+  // session cannot have been completed on a day that has not happened. The
+  // server refuses it either way; this stops the picker offering it. One live
+  // instance got through: a completed log dated 28 Aug, created on the 25th.
+  const todayCT = daysAgoCT(0);
 
   async function resolveClientId(): Promise<string | null> {
     const { data: u } = await supabase.auth.getUser();
@@ -287,7 +292,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
               <label style={{ fontSize: 12.5, fontWeight: 700, opacity: 0.75 }}>Date</label>
-              <input type="date" value={pickedDate} min={minDate} max={maxDate} onChange={(e) => setPickedDate(e.target.value)} style={{ flex: 1, minWidth: 150, padding: "9px 10px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", fontSize: 14, fontFamily: "inherit" }} />
+              <input type="date" value={pickedDate} min={minDate} max={markDone ? todayCT : maxDate} onChange={(e) => setPickedDate(e.target.value)} style={{ flex: 1, minWidth: 150, padding: "9px 10px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", fontSize: 14, fontFamily: "inherit" }} />
               {pickedDate !== ctToday() && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--brand-primary, #7c9cf5)" }}>{pickedDate > ctToday() ? "scheduled ahead" : "backdated"}</span>}
             </div>
             {ask ? (

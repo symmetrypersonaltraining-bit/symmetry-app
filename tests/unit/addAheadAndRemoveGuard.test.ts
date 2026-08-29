@@ -49,12 +49,34 @@ test("the comment stripper strips, or the guards below are theatre", () => {
 // ─── A: adding a workout to tomorrow ────────────────────────────────────────
 
 test("the date box accepts future dates", () => {
-  assert.doesNotMatch(ADD, /type="date"[^>]*max=\{ctToday\(\)\}/,
-    "max is today again — picking tomorrow is clamped back and the workout lands on today");
-  assert.match(ADD, /type="date"[^>]*max=\{maxDate\}/,
-    "the date box no longer uses the forward bound");
+  // The regression this guards against: max pinned to today, so picking
+  // tomorrow was clamped back and the workout landed on today.
+  //
+  // 29 Aug: the bound is now CONDITIONAL, and that is the point of it. A
+  // session being SCHEDULED may be up to 35 days ahead; a session being marked
+  // ALREADY DONE may not be in the future at all, because a day that has not
+  // happened cannot have been trained. One live instance got through -- a
+  // completed log dated 28 Aug, created on the 25th, 0.19 seconds, zero sets.
+  //
+  // So this asserts the intent rather than one spelling of it: the forward
+  // bound still governs scheduling, and today governs "mark completed".
+  assert.match(ADD, /type="date"[^>]*max=\{markDone \? todayCT : maxDate\}/,
+    "the date box lost either the forward bound or the mark-done bound");
   assert.match(ADD, /const maxDate = daysAheadCT\(/,
     "there is no forward bound at all");
+  assert.match(ADD, /const todayCT = daysAgoCT\(0\)/,
+    "there is no today bound for marking a session already done");
+});
+
+test("the server refuses a completed workout dated in the future", () => {
+  // The picker attribute is a courtesy to whoever is typing. It is not a rule,
+  // and anything posting to the route directly never sees it.
+  // Comments stripped: this route documents the guard in prose right above it.
+  const API = read("src/app/api/workout-manual/route.ts")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  assert.match(API, /body\.markDone && date > CT_TODAY\(\)/,
+    "the server will accept a completed workout dated in the future again");
 });
 
 test("the backward bound survives — backdating is why this sheet exists", () => {
