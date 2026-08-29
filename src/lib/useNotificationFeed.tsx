@@ -28,6 +28,7 @@ import { aggregateNotifications, type NotifRow, type RawUnread } from "@/lib/not
 import { fetchGroupUnread, markGroupRead } from "@/lib/groupUnread";
 import {isTrainerEmail } from "@/lib/trainer";
 import { useCoach } from "@/lib/useCoach";
+import { NOTIFICATION_EVENTS } from "@/lib/notificationEvents";
 
 export interface NotificationFeed {
   items: NotifRow[];
@@ -138,7 +139,33 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
       }
 
-      const group = await fetchGroupUnread(supabase, user.id, clientMode);
+      // ⚠️ THE BELL, THE NAV BADGE AND THE FLASHING TAB ALL IGNORED THE
+      // CLIENT'S OWN SETTINGS.
+      //
+      // Jennifer, 26 Aug: "I have all notifications turned off in settings. I
+      // shouldn't be getting any messages." The BANNER was fixed that day.
+      // These three were not, because they read this feed and this feed knew
+      // nothing about preferences -- so on 27 Aug she and Claudine both still
+      // had a red bell and a flashing Messages tab for an unread group message
+      // (from the BOT) on a chat they had both switched off.
+      //
+      // Read once, here, so every surface downstream inherits it rather than
+      // each one growing its own copy. Fails open: a preference we could not
+      // read silences nothing.
+      const { data: prefRows } = await supabase
+        .from("notification_preferences")
+        .select("event_key, enabled")
+        .eq("user_id", user.id);
+      const mutedKeys = new Set(
+        ((prefRows as { event_key: string; enabled: boolean }[] | null) || [])
+          .filter((r) => r.enabled === false)
+          .map((r) => r.event_key),
+      );
+      const groupMuted = mutedKeys.has(NOTIFICATION_EVENTS.GROUP_MESSAGE.key);
+
+      const group = groupMuted
+        ? { count: 0, ids: [] as string[], snippet: null, latest: null, fromPerson: false, anchorId: null }
+        : await fetchGroupUnread(supabase, user.id, clientMode);
 
       const agg = aggregateNotifications(unread, {
         isTrainer, myUserId: user.id, clientNames, clientMode,

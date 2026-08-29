@@ -11,6 +11,7 @@ import { useNotificationFeed } from "@/lib/useNotificationFeed";
 import { type Banner } from "@/lib/messageBanners";
 import { createClient } from "@/lib/supabase/client";
 import { NOTIFICATION_EVENTS } from "@/lib/notificationEvents";
+import { useMutedEventKeys } from "@/lib/useMutedEvents";
 
 export default function MessageNotifier() {
   const router = useRouter();
@@ -38,32 +39,11 @@ export default function MessageNotifier() {
    * Fails OPEN, for the same reason isMuted does: a message that should have
    * been announced and was not is indistinguishable from no message at all.
    */
-  const [mutedKeys, setMutedKeys] = useState<Set<string> | null>(null);
-  useEffect(() => {
-    let on = true;
-    (async () => {
-      try {
-        const sb = createClient();
-        const { data: auth } = await sb.auth.getUser();
-        const uid = auth?.user?.id;
-        if (!uid) { if (on) setMutedKeys(new Set()); return; }
-        const { data, error } = await sb
-          .from("notification_preferences")
-          .select("event_key, enabled")
-          .eq("user_id", uid);
-        if (error) { if (on) setMutedKeys(new Set()); return; }
-        const off = new Set(
-          ((data as { event_key: string; enabled: boolean }[] | null) || [])
-            .filter((r) => r.enabled === false)
-            .map((r) => r.event_key),
-        );
-        if (on) setMutedKeys(off);
-      } catch {
-        if (on) setMutedKeys(new Set());
-      }
-    })();
-    return () => { on = false; };
-  }, []);
+  // One shared reader, not a private copy. This check lived only here from
+  // 26 Aug, which is why the bell, the nav badge and the flashing Messages tab
+  // carried on ignoring the same preference for another day. See
+  // useMutedEventKeys for the full account.
+  const mutedKeys = useMutedEventKeys();
 
   /**
    * ── NOT OVER A WORKOUT ───────────────────────────────────────────────────

@@ -33,13 +33,41 @@ const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:]
 
 const NOTIFIER = code(read("src/components/MessageNotifier.tsx"));
 const BANNERS = code(read("src/lib/messageBanners.ts"));
+/**
+ * 29 Aug: the preference read moved OUT of MessageNotifier into a shared hook,
+ * because living in one component is exactly why the bell, the nav badge and
+ * the flashing Messages tab carried on ignoring the same setting for another
+ * day after the banner was fixed.
+ *
+ * These assertions used to require the query to be textually inside
+ * MessageNotifier.tsx, so moving it broke them while the behaviour improved --
+ * a string check failing for the one reason it should not. They now follow the
+ * rule to wherever it lives, and the real behaviour is asserted underneath.
+ */
+const MUTED_HOOK = code(read("src/lib/useMutedEvents.ts"));
+const FEED = code(read("src/lib/useNotificationFeed.tsx"));
 
 // ── the settings screen governs every surface ────────────────────────────────
 
 test("the in-app banner reads the same preferences push reads", () => {
-  assert.match(NOTIFIER, /from\("notification_preferences"\)/,
-    "the banner ignores the settings screen again");
-  assert.match(NOTIFIER, /\.filter\(\(r\) => r\.enabled === false\)/);
+  assert.match(MUTED_HOOK, /from\("notification_preferences"\)/,
+    "the shared preference reader stopped reading preferences");
+  assert.match(MUTED_HOOK, /\.filter\(\(r\) => r\.enabled === false\)/);
+  assert.match(NOTIFIER, /useMutedEventKeys\(\)/,
+    "the banner stopped consulting the shared preference reader");
+});
+
+test("the BELL, the nav badge and the Messages tab read it too", () => {
+  // Jennifer and Claudine both had group chat off and a red bell for an unread
+  // group message anyway. Those three surfaces all render from this one feed,
+  // so the check belongs in the feed rather than in each of them.
+  assert.match(FEED, /from\("notification_preferences"\)/,
+    "the notification feed ignores the settings screen again");
+  assert.match(FEED, /NOTIFICATION_EVENTS\.GROUP_MESSAGE\.key/);
+  assert.match(FEED, /const groupMuted = mutedKeys\.has\(/,
+    "the feed stopped deriving whether group chat is muted");
+  assert.match(FEED, /groupMuted[\s\S]{0,400}fetchGroupUnread/,
+    "a muted group chat must not even be counted for the bell");
 });
 
 test("a banner carries the event that governs it", () => {
@@ -58,8 +86,16 @@ test("nothing is announced before the preferences are known", () => {
   // Filtering at queue time would show a muted banner during the load window —
   // and once it is on screen it has already interrupted her.
   assert.match(NOTIFIER, /if \(mutedKeys === null\) return;/);
+  // ...and the shared reader must FAIL OPEN, on every path. A message that
+  // should have been announced and was not is indistinguishable from no
+  // message at all, so an error, a missing session or a thrown client all
+  // resolve to "nothing is muted" rather than silencing the app.
+  assert.match(MUTED_HOOK, /catch \{[\s\S]{0,120}setMuted\(new Set\(\)\)/);
+  assert.match(MUTED_HOOK, /if \(error\) \{ if \(on\) setMuted\(new Set\(\)\); return; \}/);
+  assert.match(MUTED_HOOK, /if \(!uid\) \{ if \(on\) setMuted\(new Set\(\)\); return; \}/);
   // But a failed read must not silence the app forever, so it settles to empty.
-  assert.match(NOTIFIER, /catch \{[\s\S]{0,120}setMutedKeys\(new Set\(\)\)/);
+  // (the fail-open assertions moved to MUTED_HOOK above when the reader was
+  //  extracted; MessageNotifier no longer owns that code)
 });
 
 // ── not over a workout ───────────────────────────────────────────────────────
