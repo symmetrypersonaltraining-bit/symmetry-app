@@ -9,6 +9,7 @@ import PendingRemindersPanel from "@/components/PendingRemindersPanel";
 import { TRAINER_EMAIL } from "@/lib/trainer";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { getServerUser } from "@/lib/auth/serverUser";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 
 async function isClientMode(asMarker?: string): Promise<boolean> {
   // Explicit ?as=client marker OR the cookie. The marker guarantees the client
@@ -171,7 +172,16 @@ export default async function HomePage(props: {
     type WE = { id: string; dayId: string | null; clientId: string; clientName: string; date: string; dayLabel: string; status: string };
     const workoutRangeEnd = new Date();
     workoutRangeEnd.setMonth(workoutRangeEnd.getMonth() + 3);
-    const { data: workoutRows } = await supabase
+    // THE TRAINER CALENDAR HAS SHOWN NOTHING SINCE 29 JULY, and this read is why.
+    // 4,589 live scheduled workouts sit in the window; PostgREST caps every
+    // response at 1,000 and reports no error; the rows are ordered by date
+    // ascending, so the 1,000 that arrive are the OLDEST and the last one is
+    // dated 2026-07-29. Today and everything future -- 2,063 rows -- never
+    // reached the page. This is the same failure Dustin reported on 24 Aug in a
+    // different read, which is exactly why paging it once is not enough and the
+    // static audit now looks for the shape.
+    const workoutRows = await fetchAllRows<any>(
+      () => supabase
       .from("scheduled_workouts")
       .select("id, day_id, client_id, scheduled_date, status, days(id, label), clients(id, name)")
       .is("deleted_at", null)
@@ -182,7 +192,9 @@ export default async function HomePage(props: {
         return dt.toISOString().slice(0, 10);
       })())
       .lte("scheduled_date", workoutRangeEnd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
-      .order("scheduled_date");
+      .order("scheduled_date") as any,
+      { label: "trainer calendar workouts" },
+    );
 
     const workoutMap: Record<string, WE[]> = {};
     for (const w of workoutRows || []) {

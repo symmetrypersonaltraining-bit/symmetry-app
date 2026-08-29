@@ -26,22 +26,20 @@ export default async function WorkoutsLibraryPage() {
     .is("client_owner_id", null) // exclude clients' personal AI-created workouts from the main library
     .order("position");
 
+  // This page used to read all 3,369 sections and all 10,866 prescribed
+  // exercises into the browser to count them per day. PostgREST caps every
+  // response at 1,000 and returns no error, so roughly 9% of the data arrived
+  // and the counts were whatever that 9% happened to hold. Measured 28 Aug
+  // against the aggregate below: of 1,112 days that have exercises, the old
+  // read showed 471 as "0 exercises", gave a wrong non-zero count for 629,
+  // and got 12 right.
+  //
+  // Counting is what the database is for. One row per day, and it cannot
+  // truncate.
   const SECTION_COUNTS: Record<string, number> = {};
-  // Fetch exercise counts per day
-  const { data: sections } = await supabase
-    .from("sections")
-    .select("id, day_id");
-
-  if (sections) {
-    const { data: prescriptions } = await supabase
-      .from("prescribed_exercises")
-      .select("id, sections(day_id)");
-    if (prescriptions) {
-      for (const pe of prescriptions as any[]) {
-        const dayId = pe.sections?.day_id;
-        if (dayId) SECTION_COUNTS[dayId] = (SECTION_COUNTS[dayId] || 0) + 1;
-      }
-    }
+  const { data: counts } = await supabase.rpc("library_day_exercise_counts");
+  for (const row of (counts || []) as { day_id: string; exercise_count: number }[]) {
+    SECTION_COUNTS[row.day_id] = Number(row.exercise_count) || 0;
   }
 
   const mapped: DayWithProgram[] = (days || []).map((d: any) => ({

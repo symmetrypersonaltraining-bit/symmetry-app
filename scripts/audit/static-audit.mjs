@@ -86,8 +86,27 @@ for (const file of files) {
   // count them per day; 9% arrive and the counts on screen are simply wrong.
   for (const m of s.matchAll(/\.from\(\s*["'`]([a-z_0-9]+)["'`]\s*\)/g)) {
     const tbl = m[1];
-    if (!BIG_TABLES[tbl] || paged) continue;
-    const chunk = s.slice(m.index, m.index + 700);
+    if (!BIG_TABLES[tbl]) continue;
+    // ⚠️ THIS DETECTOR CRIED WOLF, AND THAT IS WORTH MORE THAN THE FIX.
+    //
+    // It flagged clients/[clientId]/day/[dayId]/page.tsx:29 as an unfiltered
+    // read of `days`. The statement there is `.eq("id", dayId).maybeSingle()`
+    // -- one row, by primary key. There are already guards for both. They
+    // never ran, because the window was a fixed 700 characters and that
+    // statement carries a nine-line comment inside it: stripComments() blanks
+    // comments to SPACES so line numbers survive, so the blanked text still
+    // ate the whole window and `.eq(` sat past the end of it.
+    //
+    // A fixed-size window over source is a guess about how long people write.
+    // Read to the end of the STATEMENT instead. AUDIT.md rule 2 exists because
+    // an audit that cries wolf gets ignored, which is worse than no audit --
+    // and this one had started doing exactly that.
+    const semi = s.indexOf(";", m.index);
+    const chunk = s.slice(m.index, semi === -1 ? m.index + 4000 : Math.min(semi + 1, m.index + 4000));
+    // `paged` was file-level: one fetchAllRows anywhere in a file silenced
+    // every read in it. program/page.tsx now pages two reads, which would have
+    // hidden any third. Scope it to the statement.
+    if (/fetchAllRows/.test(chunk) || (paged && /fetchAllRows/.test(s.slice(Math.max(0, m.index - 400), m.index)))) continue;
     const first = chunk.match(/\.from\([^)]*\)\s*\.\s*(\w+)/);
     if (!first || first[1] !== "select") continue;      // a write, not a read
     if (chunk.includes("head: true")) continue;          // a count

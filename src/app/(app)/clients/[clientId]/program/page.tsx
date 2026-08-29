@@ -8,6 +8,7 @@ import { dedupeInsertRows, type ExistingSlot } from "@/lib/scheduleDedupe";
 import { scheduleWriteError } from "@/lib/scheduleConflict";
 import Link from "next/link";
 import { centralToday, centralWeekStart, shiftDate, centralFormatDate } from "@/lib/central-time";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 
 // ---- Types ----
 interface ClientRow {
@@ -196,9 +197,16 @@ function WorkoutEditor({
   useEffect(() => {
     if (tab !== "program") return;
     setLoadingDays(true);
-    supabase
-      .from("days")
-      .select(`
+    // Dustin, 24 Aug: "where the hell did that programming go!?" -- this is the
+    // same fault. days has 1,167 rows, PostgREST caps every response at 1,000
+    // and reports no error, so 167 never arrived. There was no .order() either,
+    // so WHICH 167 vanished changed between page loads: Postgres may return an
+    // unordered set in any order it likes. A paged read with no ORDER BY is not
+    // more correct than a truncated one, only slower -- hence the order below.
+    fetchAllRows<any>(
+      () => supabase
+        .from("days")
+        .select(`
         id, label, position,
         phases(label, position,
           programs(name,
@@ -206,7 +214,10 @@ function WorkoutEditor({
           )
         )
       `)
-      .then(({ data }) => {
+        .order("id") as any,
+      { label: "program-page day picker" },
+    )
+      .then((data) => {
         const rows: ProgramDay[] = [];
         for (const d of (data || []) as any[]) {
           const ph = d.phases;
@@ -727,9 +738,13 @@ function LibraryPanel({
 
   useEffect(() => {
     setLoading(true);
-    supabase
-      .from("days")
-      .select(`
+    // Same 1,000-row cap as the picker above. This is the read behind "swap in a
+    // workout from the library" reaching 171 of 600 names -- typing "push" found
+    // one match when 24 exist, because the other 23 were never fetched.
+    fetchAllRows<any>(
+      () => supabase
+        .from("days")
+        .select(`
         id, label, position,
         phases(
           id, label, position,
@@ -745,7 +760,10 @@ function LibraryPanel({
           )
         )
       `)
-      .then(({ data }) => {
+        .order("id") as any,
+      { label: "program-page library days" },
+    )
+      .then((data) => {
         const rows: LibraryDay[] = [];
         for (const d of (data || []) as any[]) {
           const ph = d.phases;
