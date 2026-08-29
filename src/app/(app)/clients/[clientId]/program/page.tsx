@@ -8,7 +8,7 @@ import { dedupeInsertRows, type ExistingSlot } from "@/lib/scheduleDedupe";
 import { scheduleWriteError } from "@/lib/scheduleConflict";
 import Link from "next/link";
 import { centralToday, centralWeekStart, shiftDate, centralFormatDate } from "@/lib/central-time";
-import { fetchAllRows } from "@/lib/fetchAllRows";
+import { fetchAllRowsSafe } from "@/lib/fetchAllRows";
 
 // ---- Types ----
 interface ClientRow {
@@ -203,7 +203,7 @@ function WorkoutEditor({
     // so WHICH 167 vanished changed between page loads: Postgres may return an
     // unordered set in any order it likes. A paged read with no ORDER BY is not
     // more correct than a truncated one, only slower -- hence the order below.
-    fetchAllRows<any>(
+    fetchAllRowsSafe<any>(
       () => supabase
         .from("days")
         .select(`
@@ -741,7 +741,7 @@ function LibraryPanel({
     // Same 1,000-row cap as the picker above. This is the read behind "swap in a
     // workout from the library" reaching 171 of 600 names -- typing "push" found
     // one match when 24 exist, because the other 23 were never fetched.
-    fetchAllRows<any>(
+    fetchAllRowsSafe<any>(
       () => supabase
         .from("days")
         .select(`

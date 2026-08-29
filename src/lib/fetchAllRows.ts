@@ -113,3 +113,45 @@ export async function fetchAllRows<T>(
     }
   }
 }
+
+/**
+ * Read every row, but NEVER take the screen down doing it.
+ *
+ * ⚠️ WHY THIS EXISTS, 29 Aug 2026, and it is my regression.
+ *
+ * The truncation sweep replaced reads shaped
+ *
+ *     const { data } = await supabase.from("scheduled_workouts")...
+ *
+ * with `await fetchAllRows(...)`. That fixed the trainer calendar showing
+ * nothing since 29 July -- and quietly changed the failure mode from
+ * DEGRADE to DIE. The old form destructured `data` and ignored `error`
+ * entirely, so a failed read rendered an empty calendar and the page still
+ * came up. fetchAllRows THROWS, and an uncaught throw in a server component
+ * is a 500 on the trainer's main screen.
+ *
+ * On the client side it was worse: two `.then()` chains had no `.catch()`,
+ * because the old builder never rejected. A rejection there leaves the
+ * loading flag set and the page spins forever.
+ *
+ * Dustin, 29 Aug: "coaches app won't pull up, its staying on client view."
+ *
+ * So: correctness of the DATA is worth paging for; correctness of the PAGE is
+ * not worth dying for. This returns whatever arrived, reports the failure, and
+ * lets the screen render. A short calendar is a bug. A blank app is an outage.
+ */
+export async function fetchAllRowsSafe<T>(
+  makeQuery: () => PageableQuery<T>,
+  opts: FetchAllOptions,
+): Promise<T[]> {
+  try {
+    return await fetchAllRows<T>(makeQuery, opts);
+  } catch (e) {
+    // Deliberately console.error and carry on: the caller renders with what it
+    // has. Silence here would recreate the original bug -- a short read that
+    // looks like a complete one -- so it must be loud in the log and harmless
+    // on screen.
+    console.error(`fetchAllRowsSafe(${opts.label}) failed; rendering with partial data`, e);
+    return [];
+  }
+}

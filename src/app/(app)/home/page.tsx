@@ -9,7 +9,7 @@ import PendingRemindersPanel from "@/components/PendingRemindersPanel";
 import { TRAINER_EMAIL } from "@/lib/trainer";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { getServerUser } from "@/lib/auth/serverUser";
-import { fetchAllRows } from "@/lib/fetchAllRows";
+import { fetchAllRowsSafe } from "@/lib/fetchAllRows";
 
 async function isClientMode(asMarker?: string): Promise<boolean> {
   // Explicit ?as=client marker OR the cookie. The marker guarantees the client
@@ -225,7 +225,7 @@ export default async function HomePage(props: {
     // reached the page. This is the same failure Dustin reported on 24 Aug in a
     // different read, which is exactly why paging it once is not enough and the
     // static audit now looks for the shape.
-    const workoutRows = await fetchAllRows<any>(
+    const workoutRows = await fetchAllRowsSafe<any>(
       () => supabase
       .from("scheduled_workouts")
       .select("id, day_id, client_id, scheduled_date, status, days(id, label), clients(id, name)")
