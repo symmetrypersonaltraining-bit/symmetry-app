@@ -344,6 +344,29 @@ bodyfat_shape as (
           order by m2.metric_date desc, m2.created_at desc limit 1) is null
 ),
 
+-- ── 16. THE BOARD NEVER SHOWS A SURNAME, AND NEVER TWO OF THE SAME NAME ────
+-- Every client's FULL NAME was on every other client's home screen next to
+-- their session count. Fixed 29 Aug: first names, with a last initial only
+-- where a first name repeats -- there are two Sharons, and "Sharon" twice is
+-- worse than a full name because nobody can tell which score is theirs.
+--
+-- Asserts BOTH halves, because fixing one and breaking the other is the
+-- obvious failure: no surname on screen, and no two rows sharing a label.
+board_names as (
+  select 'privacy' as area,
+    'the challenge board shows first names and no duplicates' as check_name,
+    case when (select count(*) from v_challenge_roster
+                where ranked and cname ~ '^[^ ]+ [^ ]{2,}') = 0
+          and (select count(*) from (select cname from v_challenge_roster
+                where ranked group by cname having count(*) > 1) d) = 0
+         then 'ok' else 'FAIL' end as status,
+    (select count(*)::text from v_challenge_roster where ranked)
+      || ' on the board, '
+      || (select count(*) filter (where cname ~ '^[A-Za-z]+ [A-Z]\.$')::text
+            from v_challenge_roster where ranked)
+      || ' disambiguated with a last initial' as detail
+),
+
 select * from search_manual
 union all select * from search_ai
 union all select * from serving_cover
@@ -360,4 +383,5 @@ union all select * from cancel_regression
 union all select * from feedback_locked
 union all select * from payments_have_money
 union all select * from bodyfat_shape
+union all select * from board_names
 order by status desc, area, check_name;
