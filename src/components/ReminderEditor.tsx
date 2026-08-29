@@ -243,7 +243,18 @@ export default function ReminderEditor() {
           // record. Fall back to what we just derived otherwise. If the two
           // disagree, say so rather than silently picking one.
           const cd = r.credit_details;
-          const storedIsNewShape = cd && typeof cd === "object" && cd.basis === "sessions_trained";
+          // ⚠️ This asked "is basis exactly 'sessions_trained'?" as a proxy for
+          // "does this row carry the structured shape?". Those were the same
+          // question only while every row was written with that one basis. The
+          // basis now follows the client's real billing type, so keying on it
+          // would have made every NEW monthly or flat row look like the OLD
+          // shape and silently recompute counts from live data instead of
+          // reading what the bill was actually calculated from -- which is the
+          // drift this whole file exists to prevent.
+          //
+          // Ask the question that was always meant: does it carry the fields?
+          const storedIsNewShape = !!cd && typeof cd === "object"
+            && ("sessions_trained" in cd || "cycle" in cd);
           let sessionsTrained = trained;
           let outTrainedDates = trainedDates;
           let staleNote: string | null = null;
@@ -424,7 +435,32 @@ export default function ReminderEditor() {
         sms_message: e.note || null,
         half_price_sessions: parseInt(e.halfPrice, 10) || 0,
         credit_details: {
-          basis: "sessions_trained",
+          // ⚠️ THE BILL EXPLAINED ITSELF WRONG ON EVERY CLIENT'S PHONE.
+          //
+          // This was hard-coded to "sessions_trained" for everyone, so the
+          // client-facing line always read "N sessions x $rate" no matter what
+          // they were actually on. Tim Yancey's phone said "8 sessions x $70 =
+          // $490" -- 8 x 70 is 560. Sharon Rambo's said "6 sessions x $75 =
+          // $300" -- that is 450. The amounts charged were right; the sentence
+          // explaining them was arithmetic that does not work, sitting on the
+          // screen Dustin screenshots for clients.
+          //
+          // NOT ONE CLIENT IS ON PER-SESSION BILLING. Checked, 29 Aug: 15 are
+          // monthly_adjusted, 5 are flat, 16 are none. So the one basis this
+          // wrote was the only one nobody had.
+          //
+          // The basis now follows the client's actual billing type, and the
+          // numbers the monthly explanation needs are written with it --
+          // monthly_rate, cancel_deduction and half_price_deduction were read
+          // by parseInvoiceDetail() and never written by anything, so that
+          // branch could only ever have come out blank.
+          basis: r.billingType === "monthly_adjusted" ? "monthly_less_cancellations"
+               : r.billingType === "flat" ? "flat"
+               : r.billingType === "per_session" ? "sessions_trained"
+               : "",
+          monthly_rate: calc.baseRate ?? null,
+          cancel_deduction: calc.cancelDeduction ?? 0,
+          half_price_deduction: calc.halfPriceDeduction ?? 0,
           cycle: calc.cycleStart + " to " + calc.cycleEnd,
           rate: r.sessionRate == null ? null : String(r.sessionRate),
           billing_type: r.billingType,

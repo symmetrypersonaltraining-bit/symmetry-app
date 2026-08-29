@@ -215,12 +215,32 @@ export default async function HomePage(props: {
     // Payment reminders due in 30 days
     const thirtyDays = new Date();
     thirtyDays.setDate(thirtyDays.getDate() + 30);
+    // Overdue lives in the past, so the window has to reach into it.
+    // shiftDate/centralToday rather than another hand-rolled toLocaleDateString:
+    // the suite caps that idiom at 99 copies and this would have been the 100th.
+    const ninetyBackCT = shiftDate(todayStrCT, -90);
     const { data: remindersRaw } = await supabase
       .from("payment_reminders")
       .select("id, client_id, due_date, amount_due, billing_credits, notification_status, email_sent_at, clients(id, name)")
-      .gte("due_date", todayStrCT)
+      // ⚠️ THE "N OVERDUE" BADGE COULD NEVER FIRE, and this is why.
+      //
+      // The panel computes `overdue = reminders.filter(daysUntil(due) < 0)`.
+      // This query started at TODAY, so nothing before today was ever in the
+      // set it filtered. The badge counted a subset that had been excluded
+      // upstream -- structurally unreachable, not merely empty. Two panels on
+      // the same screen could therefore read "2 overdue" and "none".
+      //
+      // It was excluded twice over: the status filter allowed only pending and
+      // paused, and BOTH genuinely overdue invoices are 'sent' -- Christine
+      // Latham $320 due 22 Aug and Sharon Rambo $300 due 23 Aug. An invoice
+      // that has been sent and not paid is exactly what "overdue" means.
+      //
+      // So: look back 90 days as well as forward 30, and count sent-and-unpaid
+      // as pending does. 'paid' stays out, which is the only status that
+      // should be.
+      .gte("due_date", ninetyBackCT)
       .lte("due_date", thirtyDays.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
-      .in("notification_status", ["pending", "paused"])
+      .in("notification_status", ["pending", "paused", "sent"])
       .order("due_date");
 
     const reminders = (remindersRaw || []).map((r: any) => ({
