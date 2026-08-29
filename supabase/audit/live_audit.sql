@@ -274,6 +274,38 @@ cancel_regression as (
     and not exists (select 1 from set_logs sl where sl.workout_log_id = wl.id)
 ),
 
+-- ── 13. THE OWNER'S FEEDBACK IS HIS ALONE ──────────────────────────────────
+-- Dustin, 28 Aug: "no testers don't see feedback".
+--
+-- app_feedback had one FOR ALL policy on trainer_can_see_client(client_id),
+-- and that function returns is_trainer() when client_id is null. Every row
+-- Dustin files himself has a null client_id, so all 66 were readable AND
+-- DELETABLE by every trainer, including the five testers added 22-23 Aug.
+--
+-- Proved 28 Aug by impersonating tester Justin Ray's JWT inside a rolled-back
+-- transaction: before, 66 rows readable and 66 deletable; after, 0 and 0,
+-- while the owner still sees all 106. Read is split from delete so that even a
+-- future mistake on the read side cannot destroy anything.
+--
+-- This check asserts on the POLICY SHAPE rather than on a count, because the
+-- count is identical whether the fix is present or the table is empty.
+feedback_locked as (
+  select 'security' as area,
+    'only the owner can delete app_feedback' as check_name,
+    case when exists (
+      select 1 from pg_policy
+       where polrelid = 'public.app_feedback'::regclass
+         and polcmd = 'd'
+         and pg_get_expr(polqual, polrelid) like '%is_owner%'
+    ) and not exists (
+      select 1 from pg_policy
+       where polrelid = 'public.app_feedback'::regclass
+         and polcmd = '*'
+    ) then 'ok' else 'FAIL' end as status,
+    (select string_agg(polname || ':' || polcmd::text, ' ') from pg_policy
+      where polrelid = 'public.app_feedback'::regclass) as detail
+),
+
 select * from search_manual
 union all select * from search_ai
 union all select * from serving_cover
@@ -287,4 +319,5 @@ union all select * from integrity
 union all select * from upsert_targets
 union all select * from nudge_frozen
 union all select * from cancel_regression
+union all select * from feedback_locked
 order by status desc, area, check_name;
