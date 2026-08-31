@@ -737,6 +737,40 @@ export default function WorkoutLogger({
   const [sets, setSets] = useState<Record<string, SetData[]>>(buildInitialSets);
   const [workoutLogId, setWorkoutLogId] = useState<string | null>(existingLogId);
   const [saving, setSaving] = useState(false);
+  /**
+   * WHICH SET IS SAVING — not "is anything saving".
+   *
+   * Dustin, 31 Aug: "jenn is having issues clicking buttons, sometimes it wont
+   * click to log exercises."
+   *
+   * Every tick in the workout was `disabled={saving}`, and logSet() raised that
+   * one flag for the whole of two awaited round trips. So ticking ANY set went
+   * on to disable EVERY set, plus Complete, until the write came back. On gym
+   * wi-fi that is a few hundred milliseconds to a couple of seconds where the
+   * screen looks completely normal and simply does not respond — so you tap
+   * again, and the second tap is swallowed too.
+   *
+   * A set save is a per-set fact and now blocks only its own button. The two
+   * places that really are whole-session operations — logAllCurrentSets and
+   * completeWorkout — still raise `saving` and still block everything, which is
+   * correct: neither can safely overlap a tick.
+   *
+   * Concurrency this now permits is already handled downstream: set_logs is
+   * keyed by (workout_log_id, prescribed_exercise_id, set_number) and upserted,
+   * and ensureWorkoutLog is race-hardened by workout_logs_one_open_per_day plus
+   * the 23505 read-back. Two ticks in flight write two different rows.
+   */
+  const [savingSets, setSavingSets] = useState<ReadonlySet<string>>(() => new Set());
+  const setKey = (peId: string, si: number) => peId + ":" + si;
+  const isSetSaving = (peId: string, si: number) => savingSets.has(setKey(peId, si));
+  function markSetSaving(peId: string, si: number, on: boolean) {
+    setSavingSets((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(setKey(peId, si));
+      else next.delete(setKey(peId, si));
+      return next;
+    });
+  }
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const [activeExerciseIdx, setActiveExerciseIdx] = useState(0);
   const [workoutComplete, setWorkoutComplete] = useState(false);
@@ -1312,7 +1346,30 @@ export default function WorkoutLogger({
     }
   }
 
-  async function ensureWorkoutLog(): Promise<{ id: string; alreadyCompleted: boolean }> {
+  /**
+   * ONE ensureWorkoutLog AT A TIME.
+   *
+   * Ticking two sets in quick succession is now possible — that is the point of
+   * the per-set saving flag above — and both ticks call this. It is already
+   * safe to run twice (workout_logs_one_open_per_day plus the 23505 read-back
+   * below), but safe is not the same as free: the loser of that race pays an
+   * extra insert and an extra read on gym wi-fi, which is the exact latency the
+   * per-set change exists to remove.
+   *
+   * Concurrent callers share the first call's promise. It is cleared as soon as
+   * it settles, so a FAILED one is never handed to the next tap — a cached
+   * rejection would turn one dropped request into a session that can never save
+   * again.
+   */
+  const ensureInFlight = useRef<Promise<{ id: string; alreadyCompleted: boolean }> | null>(null);
+  function ensureWorkoutLog(): Promise<{ id: string; alreadyCompleted: boolean }> {
+    if (ensureInFlight.current) return ensureInFlight.current;
+    const p = ensureWorkoutLogUncached().finally(() => { ensureInFlight.current = null; });
+    ensureInFlight.current = p;
+    return p;
+  }
+
+  async function ensureWorkoutLogUncached(): Promise<{ id: string; alreadyCompleted: boolean }> {
     // Dustin, 2026-08-06, mid-session on Knee Stability P2 Day 2:
     //   "Couldn't finish the workout: insert or update on table
     //    scheduled_workouts violates foreign key constraint
@@ -1524,7 +1581,8 @@ export default function WorkoutLogger({
    * race the state update.
    */
   async function logSet(peId: string, si: number, overrides?: Partial<SetData>) {
-    setSaving(true);
+    // Its own button only. See savingSets above.
+    markSetSaving(peId, si, true);
     try {
       const { id: logId } = await ensureWorkoutLog();
       const s = { ...sets[peId][si], ...(overrides ?? {}) };
@@ -1601,7 +1659,7 @@ export default function WorkoutLogger({
         "That set didn't save — check your connection and tap it again.",
       );
     }
-    finally { setSaving(false); }
+    finally { markSetSaving(peId, si, false); }
   }
 
   /**
@@ -3324,7 +3382,7 @@ export default function WorkoutLogger({
                       &ldquo;{pe.cue}&rdquo;
                     </p>
                   )}
-                  {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); else saveTypedSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); else saveTypedSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); else saveTypedSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { unlogSet(pe.id, si); } else { logSet(pe.id, si); } }} disabled={saving} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="flex items-center gap-1.5 mb-1 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["weight","Weight"],["reps","Reps"],["time","Time"],["distance","Distance"],["each_side","Each side"]] as [string,string][]).map(([f, lab]) => { const on = sFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? sFields.filter((x: string) => x !== f) : [...sFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{sTimer && renderTimerModeSwitch(pe.id)}<div className="grid mb-2" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
+                  {cardio ? (<><div className="flex items-center gap-1.5 mb-2 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["time","Time"],["speed","Speed"],["hr","HR"]] as [string,string][]).map(([f, lab]) => { const on = cardioFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? cardioFields.filter((x: string) => x !== f) : [...cardioFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{peSets.map((setEntry, si) => (<div key={si} className="flex items-center gap-1.5 mb-2"><div className="w-6 text-center text-xs font-bold" style={{ color: setEntry.done ? "#22c55e" : "var(--brand-text-secondary)" }}>{si + 1}</div>{cardioFields.includes("time") && (<input type="text" value={setEntry.time} onChange={e => updateSet(pe.id, si, "time", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); else saveTypedSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"min"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("speed") && (<input type="text" value={setEntry.speed} onChange={e => updateSet(pe.id, si, "speed", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); else saveTypedSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"mph"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="decimal" />)}{cardioFields.includes("hr") && (<input type="text" value={setEntry.hr} onChange={e => updateSet(pe.id, si, "hr", e.target.value)} onBlur={() => { if (setEntry.done) logSet(pe.id, si); else saveTypedSet(pe.id, si); }} /* a logged set stays editable (Troy, 6/29) — correcting 135 to 155 must not require un-logging first */ placeholder={"bpm"} className="flex-1 min-w-0 text-center text-sm font-semibold py-2.5 rounded-xl outline-none" style={{ background: setEntry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)", color: setEntry.done ? "#22c55e" : "var(--brand-text)", border: `1px solid ${setEntry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}` }} inputMode="numeric" />)}<button onClick={e => { e.stopPropagation(); if (setEntry.done) { unlogSet(pe.id, si); } else { logSet(pe.id, si); } }} disabled={saving || isSetSaving(pe.id, si)} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0" style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}><i className="ti ti-check text-sm text-white" /></button></div>))}</>) : (<><div className="flex items-center gap-1.5 mb-1 mt-3 flex-wrap"><span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>Track:</span>{([["weight","Weight"],["reps","Reps"],["time","Time"],["distance","Distance"],["each_side","Each side"]] as [string,string][]).map(([f, lab]) => { const on = sFields.includes(f); return (<button key={f} type="button" onClick={e => { e.stopPropagation(); saveCardioFields(pe.id, on ? sFields.filter((x: string) => x !== f) : [...sFields, f], pe.exercise_id ?? undefined); }} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: on ? "var(--brand-primary)" : "var(--brand-card)", color: on ? "white" : "var(--brand-text-secondary)", border: "none" }}>{lab}</button>); })}</div>{sTimer && renderTimerModeSwitch(pe.id)}<div className="grid mb-2" style={{ gridTemplateColumns: sGrid, gap: "8px" }}>
                     <div />
                     {sFields.includes("weight") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>{isPerHandLoad(pe) ? "LBS/HAND" : "LBS"}</div>}
                     {sFields.includes("reps") && <div className="text-center text-xs font-medium" style={{ color: "var(--brand-text-secondary)" }}>REPS</div>}
@@ -3380,7 +3438,7 @@ export default function WorkoutLogger({
                         }} inputMode="decimal" />)}
                       {sTimer && renderSetTimerButton(pe.id, si)}
                       <button onClick={e => { e.stopPropagation(); if (setEntry.done) { unlogSet(pe.id, si); } else { logSet(pe.id, si); } }}
-                        disabled={saving}
+                        disabled={saving || isSetSaving(pe.id, si)}
                         className="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
                         style={{ background: setEntry.done ? "#22c55e" : "var(--brand-primary)" }}>
                         <i className="ti ti-check text-lg text-white" style={{ opacity: setEntry.done ? 1 : 0.5 }} />
