@@ -5,6 +5,27 @@ import { createClient } from '@/lib/supabase/client';
 import { computeDayTotals, LogRow, PlanMeal } from '@/lib/nutrition/dailyTotals';
 import { centralFormatDate } from "@/lib/central-time";
 
+/**
+ * "Open the weight logger" — a broadcast, because the sender is on this page.
+ *
+ * Dustin, 31 Aug: "hassan tried to log weight and its requiring measurements to
+ * log weight. not right!"
+ *
+ * The weigh-in nudge read "It's been N days since your last weigh-in · Log it
+ * now" and its button went to /log-bodyfat — the caliper page, which wants
+ * seven skinfold sites or a body-fat percentage and will not accept a weight at
+ * all. Hassan did exactly what the card told him to and was asked to measure
+ * his subscapular fold in order to write down a number off his bathroom scale.
+ *
+ * The nudge renders on /progress, the same page as these cards, so it cannot
+ * fix this with a link: a soft navigation to the page you are already on will
+ * not remount this component, and a hard one reloads the screen under the
+ * person's thumb. An event opens the weight card where they are standing,
+ * which is what the nudge's own header comment said it should do all along —
+ * "it logs INLINE".
+ */
+export const LOG_WEIGHT_EVENT = "sym:log-weight";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface MetricCardsProps {
@@ -559,13 +580,23 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
   const supabase = createClient();
 
   useEffect(() => {
+    // Opening the weight card with its form up, from two places: the Sunday
+    // reminder's /progress?log=weight deep link, and the weigh-in nudge, which
+    // sits on THIS page and so cannot use a URL — a soft navigation to the page
+    // you are already on does not remount this component, and a hard one would
+    // reload the screen underneath the person's thumb.
+    const openWeight = () => {
+      setExpandedKey("weight");
+      setAutoLogWeight(true);
+      setTimeout(() => {
+        document.getElementById("metric-weight-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 250);
+    };
     try {
-      if (new URLSearchParams(window.location.search).get("log") === "weight") {
-        setExpandedKey("weight");
-        setAutoLogWeight(true);
-        setTimeout(() => { document.getElementById("metric-weight-panel")?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 250);
-      }
+      if (new URLSearchParams(window.location.search).get("log") === "weight") openWeight();
     } catch { /* ignore */ }
+    window.addEventListener(LOG_WEIGHT_EVENT, openWeight);
+    return () => window.removeEventListener(LOG_WEIGHT_EVENT, openWeight);
   }, []);
 
   const [rangeMode, setRangeMode] = useState(3);

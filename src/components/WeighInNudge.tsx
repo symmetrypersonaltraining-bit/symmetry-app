@@ -23,8 +23,8 @@
 
 import { useState } from "react";
 import { centralToday } from "@/lib/central-time";
-import Link from "next/link";
 import AiBadge from "@/components/AiBadge";
+import { LOG_WEIGHT_EVENT } from "@/components/MetricCards";
 
 const KEY = "sym:weighin-nudge-dismissed";
 
@@ -84,16 +84,29 @@ export default function WeighInNudge({
         <div style={{ fontSize: 13, fontWeight: 800, color: "var(--brand-text)" }}>{headline}</div>
         <p style={{ margin: "3px 0 0", fontSize: 12, lineHeight: 1.55, color: "var(--brand-text-secondary)" }}>{body}</p>
         <div style={{ display: "flex", gap: 7, marginTop: 10 }}>
-          <Link
-            href="/log-bodyfat"
+          {/* WEIGH-IN, NOT BODY FAT.
+              This went to /log-bodyfat, which asks for seven skinfold sites or
+              a body-fat percentage and will not take a weight at all. Hassan
+              tapped "Log it now" on a card counting the days since his last
+              WEIGH-IN and was asked to measure his subscapular fold.
+              It now opens the weight card on this page, which is what the
+              header comment above always said this should do. */}
+          <button
+            onClick={() => {
+              // NOT dismissed here. Opening the card is not logging a weight,
+              // and a nudge that clears itself on the way to the form is a
+              // nudge that vanishes for anyone who gets distracted between the
+              // tap and the scale. It goes when the weigh-in lands.
+              try { window.dispatchEvent(new CustomEvent(LOG_WEIGHT_EVENT)); } catch { /* no-op */ }
+            }}
             style={{
               flex: 1, textAlign: "center", fontSize: 12, fontWeight: 800, padding: "10px 6px",
               borderRadius: 10, background: "var(--brand-primary)", color: "#fff", minHeight: 42,
-              display: "grid", placeItems: "center", textDecoration: "none",
+              display: "grid", placeItems: "center", border: "none", cursor: "pointer",
             }}
           >
             Log it now
-          </Link>
+          </button>
           <button
             onClick={dismiss}
             style={{

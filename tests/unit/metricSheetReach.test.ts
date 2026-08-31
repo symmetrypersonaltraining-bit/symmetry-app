@@ -71,8 +71,26 @@ test("the weigh-in nudge points at a screen that can take the number", () => {
     .readFileSync(path.join(process.cwd(), "src/components/WeighInNudge.tsx"), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "");
-  assert.doesNotMatch(nudge, /progress\?log=weight/, "the nudge points at a parameter no page reads");
-  assert.match(nudge, /href="\/log-bodyfat"/, "the weigh-in nudge does not lead to a screen that saves a metric");
+  // THIS ASSERTION USED TO REQUIRE href="/log-bodyfat", and 31 Aug is the day
+  // that cost somebody a weigh-in. Hassan tapped "Log it now" on a card
+  // counting the days since his last WEIGH-IN and landed on the caliper page,
+  // which wants seven skinfold sites or a typed body-fat percentage and has no
+  // weight field at all. Dustin: "its requiring measurements to log weight.
+  // not right!"
+  //
+  // The test was not wrong by accident. It was written as "leads to a screen
+  // that saves A METRIC", and /log-bodyfat does save a metric — just never the
+  // one this card is asking for. Pinning the destination pinned the bug, and
+  // the suite went green over a button nobody could complete.
+  //
+  // So assert the property, not the URL: whatever asks for a weigh-in has to
+  // lead to something that takes a WEIGHT.
+  assert.doesNotMatch(nudge, /log-bodyfat/, "the weigh-in nudge leads to the body-fat page, which cannot take a weight");
+  assert.match(
+    nudge,
+    /LOG_WEIGHT_EVENT|href="\/log"|progress\?log=weight/,
+    "the weigh-in nudge no longer leads anywhere that records a weight",
+  );
 });
 
 test("/log still exists and still writes a metric", () => {
