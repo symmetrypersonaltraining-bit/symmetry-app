@@ -63,9 +63,13 @@ test("the keep state reaches onSave rather than being swallowed by the sheet", (
     /onSave: \(items: CustomItem\[\], name: string, keep: boolean\)/,
     "onSave no longer receives the keep flag"
   );
+  // The KEEP FLAG is what this test is about. It used to pin the whole call,
+  // including the name fallback — so replacing the literal "Custom meal" with a
+  // description built from the items failed a test that has no opinion about
+  // names. Assert the third argument, which is the thing that matters.
   assert.match(
     COMPOSER,
-    /onSave\(items, name\.trim\(\) \|\| "Custom meal", keep\)/,
+    /onSave\(items, .*?, keep\)/,
     "the save button no longer passes the keep flag through"
   );
 });

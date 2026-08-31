@@ -5,7 +5,7 @@
 // save. Side-by-side compare vs the plan meal it replaces (swap mode).
 
 import { useState } from "react";
-import { CustomItem, Macros, customMealMacros, customMealNutrientMap } from "@/lib/nutrition/dailyTotals";
+import { describeItems, CustomItem, Macros, customMealMacros, customMealNutrientMap } from "@/lib/nutrition/dailyTotals";
 import { countKnownNutrients, formatNutrient, groupedNutrients, pctOfDaily } from "@/lib/nutrition/nutrients";
 import { parseFoodText, lastParseFailure, parseFailureMessage } from "@/lib/nutrition/parseClient";
 import Sheet from "./Sheet";
@@ -331,7 +331,7 @@ export default function ComposerSheet({
             </button>
           )}
           <button
-            onClick={async () => { setSaving(true); try { await onSave(items, name.trim() || "Custom meal", keep); } finally { setSaving(false); } }}
+            onClick={async () => { setSaving(true); try { await onSave(items, name.trim() || describeItems(items), keep); } finally { setSaving(false); } }}
             disabled={saving}
             className="w-full mt-1 py-3 rounded-2xl text-sm font-bold text-white"
             style={{ background: "var(--brand-primary)" }}

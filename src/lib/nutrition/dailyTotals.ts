@@ -82,6 +82,26 @@ export interface PlanMeal {
   meal_items: PlanItem[];
 }
 
+/**
+ * A NAME FOR A MEAL NOBODY NAMED — built from what is in it.
+ *
+ * The composer fell back to the literal string "Custom meal" when the name box
+ * was left empty, and that string is what lands in `off_plan_details`. 47 rows
+ * in the last 60 days say "Custom meal" and nothing else, so the one column
+ * that exists to record WHAT was eaten records that something was.
+ *
+ * Nobody types a name for a plate of leftovers, and they should not have to:
+ * the items are right there. "Sirloin, potato, white rice" is a description.
+ * "Custom meal" is a shrug.
+ */
+export function describeItems(items: Pick<CustomItem, "n">[]): string {
+  const names = (items || []).map((i) => (i?.n || "").trim()).filter(Boolean);
+  if (!names.length) return "Custom meal";
+  const shown = names.slice(0, 3).join(", ");
+  const rest = names.length - 3;
+  return rest > 0 ? `${shown} +${rest} more` : shown;
+}
+
 export interface CustomItem {
   n: string;            // food name
   a?: string | null;    // amount label ("6 oz cooked")
