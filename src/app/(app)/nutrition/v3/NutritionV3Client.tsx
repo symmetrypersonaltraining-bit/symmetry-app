@@ -271,6 +271,85 @@ export default function NutritionV3Client(props: Props) {
   const [customEnd, setCustomEnd] = useState(today);
 
   const planMeals = useMemo(() => [...(activePlan?.meals || [])].sort((a, b) => a.position - b.position), [activePlan]);
+
+  /**
+   * EVERY MEAL WE KNOW ABOUT, BY ID — not just the ones at this position.
+   *
+   * Dustin, 31 Aug: he ate last week's Dinner as both Lunch and Dinner, logged
+   * both Off-plan with the right macros, opened either one to edit the items —
+   * and the sheet showed him chicken thigh, white rice and avocado oil. The
+   * PLANNED Lunch, item for item.
+   *
+   * The log row was correct the whole time. `meal_id` pointed at the sirloin
+   * Dinner exactly as it should. What went wrong is one line below:
+   *
+   *     const options = byPos[pos];
+   *     const chosen  = options.find(o => o.id === log?.meal_id) || ... || options[0];
+   *
+   * `options` is the plan meals AT THAT POSITION. The eaten meal is a Dinner,
+   * position 5; the row being drawn is position 3. So the find missed, and the
+   * `|| options[0]` fallback quietly served the planned Lunch instead. No error,
+   * no empty state — a confident, wrong answer that looks exactly like a right
+   * one, which is why repointing meal_id in the database changed nothing.
+   *
+   * A meal id identifies a MEAL. Resolving it only against one position is the
+   * bug, so resolve it against every meal on every plan we hold.
+   */
+  const mealById = useMemo(() => {
+    const m = new Map<string, PlanMeal>();
+    const sets = [...(livePlans || []), ...(mealPlan ? [mealPlan] : [])];
+    for (const p of sets) for (const meal of p?.meals || []) if (meal?.id) m.set(meal.id, meal);
+    return m;
+  }, [livePlans, mealPlan]);
+
+  /**
+   * The ones that are not on any live plan — an older version, an archived one.
+   *
+   * Leftovers are usually from a plan that has since been superseded, so this is
+   * the common case rather than the exotic one. Fetched once per id and cached;
+   * a miss leaves the row falling back exactly as it did before, so a failed
+   * lookup can never be worse than today's behaviour.
+   */
+  const [fetchedMeals, setFetchedMeals] = useState<Record<string, PlanMeal>>({});
+  useEffect(() => {
+    const wanted = Array.from(
+      new Set(
+        logs
+          .map((l) => l.meal_id)
+          .filter((id): id is string => !!id && !mealById.has(id) && !fetchedMeals[id]),
+      ),
+    );
+    if (!wanted.length) return;
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("meals")
+          .select("id, name, position, timing, meal_items(id, food, amount, unit, protein, carbs, fats, kcal, position, basis)")
+          .in("id", wanted);
+        if (!alive || !data?.length) return;
+        setFetchedMeals((prev) => {
+          const next = { ...prev };
+          for (const m of data as unknown as PlanMeal[]) if (m?.id) next[m.id] = m;
+          return next;
+        });
+      } catch {
+        /* the row falls back to the planned meal, exactly as before */
+      }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [logs, mealById]);
+
+  /** The meal this log row is actually about, wherever it lives. */
+  const eatenMeal = useCallback(
+    (log: DbLog | undefined): PlanMeal | undefined => {
+      const id = log?.meal_id;
+      if (!id) return undefined;
+      return mealById.get(id) || fetchedMeals[id];
+    },
+    [mealById, fetchedMeals],
+  );
   const planPositions = useMemo(() => new Set(planMeals.map((m) => m.position)), [planMeals]);
 
   // ---- daily macro TARGET -------------------------------------------------
@@ -434,7 +513,13 @@ export default function NutritionV3Client(props: Props) {
           out.push({ key: "p" + pos, kind: "custom", position: pos, meta, log, options, defaultOrd: i * 10 });
           return;
         }
-        const chosen = options.find((o) => o.id === log?.meal_id) || options.find((o) => o.id === optSel[pos]) || options[0];
+        // The log decides. Only when it names no meal — or names one we cannot
+        // find anywhere — does the slot's own plan meal get to answer.
+        const chosen =
+          eatenMeal(log) ||
+          options.find((o) => o.id === log?.meal_id) ||
+          options.find((o) => o.id === optSel[pos]) ||
+          options[0];
         out.push({ key: "p" + pos, kind: "plan", position: pos, options, chosen, log, defaultOrd: i * 10 });
       });
     }
@@ -454,7 +539,7 @@ export default function NutritionV3Client(props: Props) {
       return ao - bo || a.defaultOrd - b.defaultOrd;
     });
     return out;
-  }, [logs, planMeals, openMode, optSel]);
+  }, [logs, planMeals, openMode, optSel, eatenMeal]);
 
   const extras = useMemo(
     () =>
@@ -467,7 +552,16 @@ export default function NutritionV3Client(props: Props) {
     [logs, planPositions]
   );
 
-  const totals = useMemo(() => computeDayTotals(logs, planMeals), [logs, planMeals]);
+  // The totals resolve a log by meal id before falling back to position, so
+  // they need the same widened set the rows use — otherwise a meal eaten from
+  // another position or an older plan is priced as the slot's planned meal.
+  const totalsMeals = useMemo(() => {
+    const extra = logs
+      .map((l) => eatenMeal(l))
+      .filter((m): m is PlanMeal => !!m && !planMeals.some((p) => p.id === m.id));
+    return extra.length ? [...planMeals, ...extra] : planMeals;
+  }, [logs, planMeals, eatenMeal]);
+  const totals = useMemo(() => computeDayTotals(logs, totalsMeals), [logs, totalsMeals]);
 
   // Averages for the unified summary card. When "today" is selected we still
   // fetch a 1W window so ADHERENCE % and LOGGING RATE stay visible; when a
