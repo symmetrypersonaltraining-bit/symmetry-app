@@ -1,4 +1,5 @@
 import { redirect, notFound } from "next/navigation";
+import { requireUser } from "@/lib/auth/serverUser";
 import { createClient } from "@/lib/supabase/server";
 import WorkoutLogger from "./WorkoutLogger";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
@@ -16,8 +17,7 @@ export default async function WorkoutDayPage({
   const { dayId } = await params;
   const { forClient } = await searchParams;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
 
   const isTrainer = await viewerIsTrainer(supabase, user);
   // Which APP this is, not which person. A trainer in Client View is looking at

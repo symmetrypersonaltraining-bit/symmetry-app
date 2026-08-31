@@ -22,7 +22,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import ClientNotesPanel, { type ClientNote } from "@/components/ClientNotesPanel";
 
@@ -41,8 +41,7 @@ const SYMPTOM = /pain|hurt|sore|afraid|burn|crack|swell/i;
 
 export default async function ClientNotesPage() {
   const supabase = await createClient();
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
   if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
 
   // RLS scopes this to the viewer's own clients (trainer_all_exercise_notes →

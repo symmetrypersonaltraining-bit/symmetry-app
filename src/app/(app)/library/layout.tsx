@@ -15,15 +15,14 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export const dynamic = "force-dynamic";
 
 export default async function LibraryLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
   if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
   return <>{children}</>;
 }

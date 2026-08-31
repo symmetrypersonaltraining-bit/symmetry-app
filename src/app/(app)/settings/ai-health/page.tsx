@@ -23,7 +23,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { trainerForAuthUser } from "@/lib/trainerResolve";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
@@ -44,8 +44,7 @@ interface LogRow {
 
 export default async function AiHealthPage() {
   const supabase = await createClient();
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
   if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
 
   // EVERY TRAINER GETS THIS PAGE. IT SHOWS THEM THEIR OWN.

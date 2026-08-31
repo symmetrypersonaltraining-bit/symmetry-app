@@ -8,7 +8,7 @@ import TrainerHome from "./TrainerHome";
 import PendingRemindersPanel from "@/components/PendingRemindersPanel";
 import { TRAINER_EMAIL } from "@/lib/trainer";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import { fetchAllRowsSafe } from "@/lib/fetchAllRows";
 
 async function isClientMode(asMarker?: string): Promise<boolean> {
@@ -42,8 +42,7 @@ export default async function HomePage(props: {
   const searchParams = (await props.searchParams) ?? {};
   const supabase = await createClient();
   // Local token verification first; see src/lib/auth/verifyJwt.ts.
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
 
   const isTrainer = await viewerIsTrainer(supabase, user);
   const isInClientMode = isTrainer ? await isClientMode(searchParams.as) : false;

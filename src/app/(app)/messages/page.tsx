@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
 import MessagesClient from "./MessagesClient";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
@@ -14,8 +14,7 @@ export default async function MessagesPage(props: {
 }) {
   const searchParams = await props.searchParams;
   const supabase = await createClient();
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
 
   const __cookieStore = await cookies();
   // Deterministic client-view signal: the cookie OR an explicit ?as=client

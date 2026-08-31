@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import MetricCards from "@/components/MetricCards";
 import GoalsSection from "@/components/GoalsSection";
 import ConsistencyCalendar from "@/components/ConsistencyCalendar";
@@ -14,8 +14,7 @@ import { coachForViewer } from "@/lib/coachIdentity";
 
 export default async function ClientPreviewProgressPage() {
   const supabase = await createClient();
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
   if (!(await viewerIsTrainer(supabase, user))) redirect("/progress");
 
   const { data: clientRecord } = await supabase

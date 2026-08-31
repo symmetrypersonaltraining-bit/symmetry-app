@@ -17,15 +17,14 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import WelcomeClient from "./WelcomeClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function WelcomePage() {
   const supabase = await createClient();
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
 
   const { data: c } = await supabase
     .from("clients")

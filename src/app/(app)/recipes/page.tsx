@@ -10,7 +10,7 @@
 // arrives populated instead of flashing empty.
 
 import { createClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import { redirect } from "next/navigation";
 import RecipesClient from "./RecipesClient";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
@@ -19,8 +19,7 @@ import { CT_TODAY } from "@/lib/ai/coach-context";
 export const dynamic = "force-dynamic";
 export default async function RecipesPage() {
   const supabase = await createClient();
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
 
   const isTrainer = await viewerIsTrainer(supabase, user);
   let clientId: string | null = null;

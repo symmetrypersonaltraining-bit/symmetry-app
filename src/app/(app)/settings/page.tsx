@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import SettingsClient from "./SettingsClient";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { readFlag } from "@/lib/flags";
@@ -10,8 +10,7 @@ import { trainerForAuthUser } from "@/lib/trainerResolve";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ gcal?: string; as?: string }> }) {
   const supabase = await createClient();
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
 
   const { data: profile } = await supabase.from("clients").select("name").eq("auth_user_id", user.id).maybeSingle();
   const isTrainer = await viewerIsTrainer(supabase, user);

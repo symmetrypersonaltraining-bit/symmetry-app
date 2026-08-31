@@ -1,7 +1,7 @@
 import NewProgramButton from "@/components/NewProgramButton";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import Link from "next/link";
 
 // Program names are deliberately generic — no client's name is ever baked into
@@ -11,8 +11,7 @@ import Link from "next/link";
 
 export default async function ProgramsLibraryPage() {
   const supabase = await createClient();
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
 
   const [{ data: programs }, { data: assignments }, { data: clients }] = await Promise.all([
     supabase

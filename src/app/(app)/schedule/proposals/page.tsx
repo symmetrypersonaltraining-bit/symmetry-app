@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import ProposalsClient from "./ProposalsClient";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 
@@ -15,8 +15,7 @@ import { viewerIsTrainer } from "@/lib/auth/viewer";
 // trainer-only rows in front of clients.
 export default async function ScheduleProposalsPage() {
   const supabase = await createClient();
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
   if (!(await viewerIsTrainer(supabase, user))) redirect("/home");
 
   const { data: rows } = await supabase

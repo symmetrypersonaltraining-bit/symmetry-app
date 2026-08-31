@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import Link from "next/link";
 import { EmptyStateCard } from "@/components/FunMoments";
 
@@ -16,8 +16,7 @@ interface DayWithProgram {
 
 export default async function WorkoutsLibraryPage() {
   const supabase = await createClient();
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
 
   // Fetch all days with their phase + program info
   const { data: days } = await supabase

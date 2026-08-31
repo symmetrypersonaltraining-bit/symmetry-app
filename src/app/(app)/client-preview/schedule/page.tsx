@@ -1,14 +1,13 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import ScheduleClient from "../../schedule/ScheduleClient";
 import { TRAINER_EMAIL } from "@/lib/trainer";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 
 export default async function ClientPreviewSchedulePage() {
   const supabase = await createClient();
-  const { data: { user } } = await getServerUser(supabase);
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
   if (!(await viewerIsTrainer(supabase, user))) redirect("/schedule");
 
   const { data: clientRecord } = await supabase

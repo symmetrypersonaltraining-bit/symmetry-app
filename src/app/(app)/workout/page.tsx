@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { requireUser } from "@/lib/auth/serverUser";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import AddWorkoutButton from "@/components/AddWorkoutButton";
@@ -39,8 +40,7 @@ export default async function WorkoutPage(props: {
 }) {
   const searchParams = (await props.searchParams) ?? {};
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
 
   const isTrainer = await viewerIsTrainer(supabase, user);
   const inClientMode = isTrainer ? await isClientMode(searchParams.as) : false;

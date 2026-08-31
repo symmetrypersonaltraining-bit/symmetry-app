@@ -74,6 +74,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/draco/") ||
     pathname.startsWith("/anatomy-preview") ||
     pathname === "/privacy" ||
+    // "We could not reach auth" lands here. Sending it back through the auth
+    // gate that could not answer is a redirect loop with a spinner on it.
+    pathname === "/reconnecting" ||
     // /install is the QR target. A client scans it while signed OUT — that is
     // the entire scenario — so a login redirect here defeats the purpose.
     pathname === "/install" ||

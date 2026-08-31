@@ -18,7 +18,7 @@ import RefreshHandle from "@/components/RefreshHandle";
 import GlobalCoach from "@/components/GlobalCoach";
 import { isTrainerEmail, noteTrainerEmail } from "@/lib/trainer";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
-import { getServerUser } from "@/lib/auth/serverUser";
+import { requireUser } from "@/lib/auth/serverUser";
 import { coachForViewer } from "@/lib/coachIdentity";
 import { CoachProvider } from "@/lib/useCoach";
 
@@ -32,11 +32,12 @@ export default async function AppLayout({
   // Supabase Auth cannot stop this layout — and therefore the whole app — from
   // rendering. Falls back to asking Supabase, capped, when it cannot.
   // src/lib/auth/verifyJwt.ts has the incident and the trade-off.
-  const {
-    data: { user },
-  } = await getServerUser(supabase);
-
-  if (!user) redirect("/login");
+  // DEGRADED IS NOT SIGNED OUT. requireUser keeps the two apart: an
+  // unreachable auth service sends somebody to /reconnecting with their session
+  // intact, never to /login. This layout is the gate the whole app passes
+  // through, so it is the one that was signing Jenn out on a bad minute of
+  // gym wi-fi. See src/lib/auth/serverUser.ts.
+  const user = await requireUser(supabase);
 
   const email = user?.email ?? "";
 
