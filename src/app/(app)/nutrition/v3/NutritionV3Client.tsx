@@ -641,6 +641,51 @@ export default function NutritionV3Client(props: Props) {
         payload.est_micros = micros;
       }
     }
+    // ── est_* AND off_plan_macros, OR NEITHER ────────────────────────────────
+    //
+    // The two have to travel together. est_* are four numeric columns the app
+    // adds up; off_plan_macros is the structured record with a description that
+    // the nightly rollup and the coach read to know WHAT was eaten. A row with
+    // one and not the other is a meal the totals can count and nothing can
+    // explain.
+    //
+    // 266 such rows were backfilled by hand across 15 clients on 5 Aug and the
+    // write path was never fixed, so it kept producing them. Measured 31 Aug,
+    // off-plan rows carrying est_* with no off_plan_macros:
+    //
+    //   w/c 27 Jul and earlier    0 of 162     <- before this screen took over
+    //   w/c  3 Aug               36 of 113
+    //   w/c 10 Aug               60 of  86
+    //   w/c 17 Aug               85 of 120
+    //   w/c 24 Aug               88 of  91     <- essentially all of them
+    //
+    // Not a legacy scar, then: an active fault getting worse, because the older
+    // screen mirrored these and this one — which replaced it in early August —
+    // never learned to. MealPlanClient has carried the same six lines the whole
+    // time. This is them, at the one place all ~12 call sites already funnel
+    // through, which is where it should have been to begin with.
+    //
+    // An explicit off_plan_macros in `patch` still wins: the AI and photo paths
+    // write their own richer version and must not be flattened.
+    if (
+      payload.adherence === "Off-plan" &&
+      payload.est_kcal != null &&
+      payload.off_plan_macros == null
+    ) {
+      payload.off_plan_macros = {
+        kcal: Number(payload.est_kcal) || 0,
+        protein: Number(payload.est_protein) || 0,
+        carbs: Number(payload.est_carbs) || 0,
+        fats: Number(payload.est_fats) || 0,
+        // What was eaten, in the words that were actually recorded. "Custom
+        // meal" is a placeholder the ticket calls out separately; falling back
+        // to it here at least never invents a description that was never given.
+        description: (payload.off_plan_details as string) || "Off-plan meal",
+        estimated: true,
+      };
+      if (payload.analysis_status == null) payload.analysis_status = "client";
+    }
+
     const { data, error } = await supabase
       .from("meal_adherence_logs")
       .upsert(payload, { onConflict: "client_id,log_date,meal_position" })
