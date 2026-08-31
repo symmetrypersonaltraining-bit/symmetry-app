@@ -76,7 +76,7 @@ Rules:
 - "focus": ONE sentence, under 120 characters, no leading "Focus:".
 - "coachRead": 2-4 sentences, plain text, no question at the end.
 - "foodFocus": TWO sentences, plain text. The first states how last week actually went using the given numbers (averages, adherence, signed vs-target deltas) — a real figure, not an adjective. The second is the one thing to work on this week. It shares a screen with the nutrition coach card, so anything longer is a wall of text above their food logger.
-- "programmingQuestion": ONE question, under 140 characters, asking this client whether anything about their PROGRAMMING should change — exercises, volume, session length, days, an area they want more or less of, something that has been bothering them physically. Ground it in what actually happened in their last two weeks so it does not read as a form letter: if they skipped legs twice, ask about that; if every session ran long, ask about session length. Never ask about weight, diet or body composition. Never ask a yes/no question they can dismiss with one word.`;
+- "programmingQuestion": ONE question, under 140 characters, asking this client whether anything about their PROGRAMMING should change — exercises, volume, session length, days, an area they want more or less of, something that has been bothering them physically. Ground it in what actually happened in the two FINISHED weeks you are given so it does not read as a form letter — and never describe the week they are about to start, which has not happened yet and in which they have done nothing: if they skipped legs twice, ask about that; if every session ran long, ask about session length. Never ask about weight, diet or body composition. Never ask a yes/no question they can dismiss with one word.`;
 
 interface WeeklyReply {
   focus: string;
@@ -194,7 +194,12 @@ async function runSweep(opts: {
         continue;
       }
 
-      const cmp = await fetchWeeklyComparison(db, c.id, today);
+      // "nextWeek": this sweep runs late on a Saturday and its copy is read
+      // from Sunday onwards, so the window labels are shifted by one. Without
+      // it the client is told how "this week" is going before their week has
+      // begun — Dustin, Monday 31 Aug: "5 out of 8?? its Monday the week
+      // starts today..."
+      const cmp = await fetchWeeklyComparison(db, c.id, today, "nextWeek");
 
       // Nothing to write about at all. Leaving last week's copy up would be
       // worse than leaving it blank — it would read as a comment on a week

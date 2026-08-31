@@ -247,13 +247,43 @@ export function weeklyNumbersBlock(
   // his numbers were measured against a target that took effect five days after
   // the week closed. Defaults to `target` so single-target callers are unchanged.
   currentTarget: MacroTarget | null = target,
+  /**
+   * WHEN THE READER WILL SEE THIS.
+   *
+   * "now" — a live surface, read the moment it is built. The windows are what
+   * they say: last week, and this week so far.
+   *
+   * "nextWeek" — copy generated late on a Saturday FOR the week beginning the
+   * next day. By the time anybody reads it, both windows have aged by one:
+   * what was "this week so far" is a finished week, and "last week" is the week
+   * before that.
+   *
+   * Dustin, Monday 31 Aug, on a card written the previous Saturday night:
+   * *"5 out of 8?? its Monday the week starts today..."*
+   *
+   * Nothing was miscounted. The run at 10:55pm Saturday was handed Aug 23-29
+   * as "THIS WEEK SO FAR" — correct at that instant, a complete week — and the
+   * model dutifully wrote "this week". Published a few hours later it read as a
+   * claim about a week that was two days old, in which he had trained once.
+   *
+   * A number that was true when written and false when read is still false, and
+   * this one asked him to explain a shortfall that had not happened.
+   */
+  audience: "now" | "nextWeek" = "now",
 ): string {
+  const forNextWeek = audience === "nextWeek";
   const lines: string[] = [
     "WEEK-OVER-WEEK NUMBERS — computed from this client's real logs. Every figure and direction below is already worked out; state them as given and do NOT recompute any of them.",
+    ...(forNextWeek
+      ? [
+          "",
+          "THIS COPY IS PUBLISHED FOR THE WEEK THAT STARTS TOMORROW, and the labels below already account for that — they are what the windows will be WHEN THE CLIENT READS THIS. Use them exactly as written. Never call either of these windows \"this week\": the client's week starts the day they read this and has no numbers in it yet, so any claim about how it is going is one they can see is wrong.",
+        ]
+      : []),
     "",
-    ...weekFactsLines(last, "LAST WEEK", target),
+    ...weekFactsLines(last, forNextWeek ? "THE WEEK BEFORE LAST" : "LAST WEEK", target),
     "",
-    ...weekFactsLines(current, "THIS WEEK SO FAR", currentTarget),
+    ...weekFactsLines(current, forNextWeek ? "LAST WEEK" : "THIS WEEK SO FAR", currentTarget),
   ];
 
   // A mid-window target change is the single most useful thing a coach can be
@@ -296,7 +326,11 @@ export function weeklyNumbersBlock(
       "",
       current.window.complete
         ? "WEEK OVER WEEK — direction is stated for you, do NOT recompute it:"
-        : "WEEK OVER WEEK (this week is still partial, so these are early reads — say so rather than declaring a verdict). Direction is stated for you, do NOT recompute it:",
+        : forNextWeek
+          // The later window is short AND this is next-week copy, so it cannot
+          // be called "this week" here either — that is the whole bug.
+          ? "WEEK OVER WEEK (the later window is a part-week, so these are early reads — say so rather than declaring a verdict). Direction is stated for you, do NOT recompute it:"
+          : "WEEK OVER WEEK (this week is still partial, so these are early reads — say so rather than declaring a verdict). Direction is stated for you, do NOT recompute it:",
       ...moves,
     );
   }

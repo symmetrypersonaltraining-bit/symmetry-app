@@ -156,7 +156,18 @@ function toTarget(row: unknown): MacroTarget | null {
  * Last complete week vs this week so far, for one client.
  * `today` is injectable so callers (and tests) can pin the date.
  */
-export async function fetchWeeklyComparison(db: Db, clientId: string, today = CT_TODAY()): Promise<WeeklyComparison> {
+export async function fetchWeeklyComparison(
+  db: Db,
+  clientId: string,
+  today = CT_TODAY(),
+  /**
+   * "nextWeek" for copy generated tonight and read from tomorrow onwards — the
+   * weekly sweep. It shifts the WINDOW LABELS by one so the client is not told
+   * how "this week" is going before their week has started. See
+   * weeklyNumbersBlock for the incident that produced it.
+   */
+  audience: "now" | "nextWeek" = "now",
+): Promise<WeeklyComparison> {
   const last = lastWeekWindow(today);
   const current = thisWeekWindow(today);
   // One read spanning both windows, then split in memory — two windows, two
@@ -223,7 +234,7 @@ export async function fetchWeeklyComparison(db: Db, clientId: string, today = CT
     current: currentFacts,
     target,
     currentTarget,
-    block: weeklyNumbersBlock(lastFacts, currentFacts, target, currentTarget),
+    block: weeklyNumbersBlock(lastFacts, currentFacts, target, currentTarget, audience),
   };
 }
 
