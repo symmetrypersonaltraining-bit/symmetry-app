@@ -200,11 +200,27 @@ export default function FoodSearchSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, tab]);
 
+  /**
+   * A BADGE ON 96% OF ROWS IS NOT A BADGE, IT IS WALLPAPER.
+   *
+   * Dustin, 31 Aug: "why does everything say unverified?"
+   *
+   * Because almost everything is. 21,776 of 574,664 rows carry verified — 3.8%.
+   * The other 552,888 came from Open Food Facts, so an amber UNVERIFIED sat on
+   * essentially every result he ever saw. Amber reads as a warning; a warning on
+   * every row is one he has to learn to ignore, and once he has learned that, it
+   * cannot warn him about anything.
+   *
+   * The 3.8% is the useful signal, so that is the one that gets said out loud.
+   * The rest carry their source quietly — where the numbers came from, in grey,
+   * as information rather than an alarm.
+   */
   function badge(f: CatalogFood) {
     if (f.source === "client" || f.client_id === clientId)
       return <span style={{ color: "#42A5F5", fontSize: 9, fontWeight: 800 }}>MY FOOD</span>;
-    if (f.verified) return <span style={{ color: "#22c55e", fontSize: 9, fontWeight: 800 }}>✓ VERIFIED</span>;
-    return <span style={{ color: "#f59e0b", fontSize: 9, fontWeight: 800 }}>UNVERIFIED</span>;
+    if (f.verified) return <span style={{ color: "#22c55e", fontSize: 9, fontWeight: 800 }}>✓ USDA</span>;
+    // Not a warning. Just where it came from, for anyone who wants to know.
+    return <span style={{ color: "var(--brand-text-secondary)", fontSize: 9, fontWeight: 700, opacity: 0.75 }}>community</span>;
   }
 
   // Open the amount picker for a food, seeded with its own base serving so the
