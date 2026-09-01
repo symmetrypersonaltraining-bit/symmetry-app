@@ -25,8 +25,9 @@ ten-day guard treats them as one payment. **October's pair is 27 days apart,
 which looks exactly like an ordinary monthly gap** — so she would be invoiced
 $700 twice, $1,400 for eight sessions at $87.50.
 
-**The calendar is the source of truth, so this has to be fixed there: delete the
-recurring payment on the 3rd in Google Calendar.** Deleting the rows in the
+**She stays on the 3rd** (Dustin, 1 Sep: "ah its on the 3rd ok leave it there"),
+so the series to remove is the NEW one on the 30th. The calendar is the source
+of truth, so it has to go from Google Calendar — deleting the rows in the
 database only brings them back on the next sync. A new integrity check,
 `two_payment_series_one_month`, will keep flagging her until it is done.
 
@@ -44,8 +45,8 @@ So on the evidence the 30th is the same payment on a different day, not an extra
 one. If you know otherwise — she owes for a period I cannot see — say so and I
 will raise it.
 
-Her anchor is moved to the 30th either way, so from now on she is picked up on
-the 30th.
+Her anchor is back on the 3rd, which is where it already was and where her
+billing has been working from since July.
 
 ---
 
