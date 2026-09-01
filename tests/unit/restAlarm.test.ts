@@ -213,3 +213,51 @@ describe("the pieces that make it survive a locked screen", () => {
     assert.match(logger, /canRingLocked/, "nothing tells the client the alarm is limited to this screen");
   });
 });
+
+// ============================================================================
+// LOGGING A SET OPENS NOTHING.
+//
+// Dustin, 1 Sep: "remove automatic rest timer on all workouts. it auto pops up
+// on some workouts when you log a movement, remove that its annoying."
+//
+// It looked like "some workouts" because it fired on any movement carrying a
+// rest value, and rest is only populated on Jenn's JD6 days. There, every
+// movement has one -- 20s on foam rolling included -- so every tap threw an
+// opaque full-screen overlay over the app. It sits above the nav, so it reads
+// as a freeze rather than a timer: "new pop up anytime I click to check".
+//
+// The timer still exists and still rings through a locked phone. The rule is
+// only that the CLIENT opens it. These assert on the wiring, because the bug
+// was one call in one branch and nothing else about the timer changed.
+// ============================================================================
+describe("the rest timer is opt-in", () => {
+  const logger = strip(read("src/app/(app)/workout/[dayId]/WorkoutLogger.tsx"));
+  const start = logger.indexOf("async function logSet(");
+  const logSet = logger.slice(start, logger.indexOf("async function saveTypedSet(", start));
+
+  it("does not start on a logged set", () => {
+    assert.ok(logSet.length > 200, "logSet body not found - this test is asserting on nothing");
+    assert.ok(
+      !/setRestTimer\s*\(/.test(logSet),
+      "logSet starts the rest timer again; logging a set must open nothing",
+    );
+  });
+
+  it("still has a way in, or the timer is dead code", () => {
+    assert.match(logger, /const startRest = \(/, "no opt-in opener left");
+    assert.match(logger, /onClick=\{e => \{ e\.stopPropagation\(\); startRest\(/,
+      "startRest is never wired to anything tappable");
+  });
+
+  it("reads a rest written in minutes as minutes", () => {
+    // "2 min" is stored on Jenn's rack pull. Parsing the leading digits alone
+    // gives a two second rest, which is worse than no timer.
+    assert.match(logger, /\/min\/i\.test\(pe\.rest\) \? n \* 60 : n/,
+      "a rest written in minutes is counted as seconds");
+  });
+
+  it("refuses to time a rest of 0 or none", () => {
+    assert.match(logger, /pe\.rest === "none" \|\| pe\.rest === "0"/,
+      "a 0 / none rest means go straight into the next movement, not a 0:00 clock");
+  });
+});

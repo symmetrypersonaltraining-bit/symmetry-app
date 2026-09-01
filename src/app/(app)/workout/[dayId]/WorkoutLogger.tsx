@@ -1639,17 +1639,22 @@ export default function WorkoutLogger({
       }
       updateSet(peId, si, "done", true);
       if (navigator.vibrate) navigator.vibrate(50);
-      const pe = allFlat.find(p => p.id === peId);
-      if (pe?.rest && pe.rest !== "none" && pe.rest !== "0") {
-        const match = pe.rest.match(/(\d+)/);
-        if (match) {
-          setRestTimer(parseInt(match[1]));
-          // Carried so the notification can say what is coming, which is the
-          // difference between an alarm you have to unlock the phone to
-          // understand and one you can act on from the lock screen.
-          setRestForExercise(pe.exercises?.name ?? null);
-        }
-      }
+      // NO REST TIMER HERE. Logging a set does not open anything.
+      //
+      // Dustin, 1 Sep: "remove automatic rest timer on all workouts. it auto
+      // pops up on some workouts when you log a movement, remove that its
+      // annoying."
+      //
+      // It fired off THIS line, so it fired on every movement carrying a rest
+      // value -- and rest is only filled in on Jenn's JD6 days, which is why it
+      // looked like "some workouts". Every set she logged there, foam rolling
+      // included, threw a full-screen opaque overlay over the app for 20 to 120
+      // seconds. It covers the nav, so it reads as the app freezing: "new pop
+      // up anytime I click to check" (Jenn, 1 Sep).
+      //
+      // The timer itself is fine and stays -- startRest() opens it when the
+      // client taps the rest chip. Wanting a rest timer and being handed one
+      // uninvited are different things.
     } catch (e) {
       // Say it. A failure the client cannot see is reported as flakiness and can
       // never be diagnosed — the same lesson completeWorkout already learned on
@@ -3308,6 +3313,24 @@ export default function WorkoutLogger({
         const __list = currentSection?.prescribed_exercises ?? [];
         const __blocks = groupSection(__list as never);
         const __idxOf = (peId: string) => __list.findIndex((x) => x.id === peId);
+        // The only way the rest timer opens now: the client asks for it.
+        // Returns null when there is nothing to count (no rest, or a rest of
+        // "0"/"none", which means go straight into the next movement).
+        const startRest = (pe: { rest: string | null; exercises?: { name?: string | null } | null }) => {
+          if (!pe.rest || pe.rest === "none" || pe.rest === "0") return;
+          const match = pe.rest.match(/(\d+)/);
+          if (!match) return;
+          const n = parseInt(match[1]);
+          // "2 min" has to mean 120, not 2. The stored strings are seconds
+          // ("90s") except where they are written in minutes, and a 2 second
+          // rest is not a thing anyone programmes.
+          setRestTimer(/min/i.test(pe.rest) ? n * 60 : n);
+          // Carried so the notification can say what is coming, which is the
+          // difference between an alarm you have to unlock the phone to
+          // understand and one you can act on from the lock screen.
+          setRestForExercise(pe.exercises?.name ?? null);
+        };
+
         const renderCard = (pe: (typeof __list)[number], i: number) => {
           const peSets = sets[pe.id] || [];
           const doneCount = peSets.filter(s => s.done).length;
@@ -3345,6 +3368,19 @@ export default function WorkoutLogger({
                       <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
                         {pe.sets} sets{pe.volume_value ? ` \u00b7 ${pe.volume_value}` : ""}{pe.load_descriptor ? ` \u00b7 ${pe.load_descriptor}` : ""}{sFields.includes("each_side") ? " \u00b7 each side" : ""}
                       </p>
+                      {/* Rest was never shown on an ordinary card -- it only
+                          ever started a timer nobody asked for. Now it is
+                          readable, and tapping it starts the clock. */}
+                      {restLabel(pe.rest) && (
+                        isImmediate(pe.rest)
+                          ? <p className="text-xs mt-1" style={{ color: "var(--brand-primary)" }}>{"\u2193 " + restLabel(pe.rest)}</p>
+                          : <button type="button"
+                              onClick={e => { e.stopPropagation(); startRest(pe); }}
+                              className="text-xs mt-1 px-2 py-0.5 rounded-full"
+                              style={{ color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}>
+                              {restLabel(pe.rest)}{" \u00b7 tap to time"}
+                            </button>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
                       {/* The "watch demo" button was removed in favour of tapping
@@ -3580,12 +3616,14 @@ export default function WorkoutLogger({
                             into the next one" was communicated by nothing
                             happening. */}
                         {rest && (
-                          <p className="text-xs mt-1" style={{
-                            color: isImmediate(m.rest) ? "var(--brand-primary)" : "var(--brand-text-secondary)",
-                            opacity: isImmediate(m.rest) ? 1 : 0.85,
-                          }}>
-                            {isImmediate(m.rest) ? "\u2193 " + rest : rest}
-                          </p>
+                          isImmediate(m.rest)
+                            ? <p className="text-xs mt-1" style={{ color: "var(--brand-primary)" }}>{"\u2193 " + rest}</p>
+                            : <button type="button"
+                                onClick={e => { e.stopPropagation(); startRest(m); }}
+                                className="text-xs mt-1 px-2 py-0.5 rounded-full"
+                                style={{ color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}>
+                                {rest}{" \u00b7 tap to time"}
+                              </button>
                         )}
                       </div>
                     );
