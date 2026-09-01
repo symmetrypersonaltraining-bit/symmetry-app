@@ -593,14 +593,31 @@ export function logConsumedNutrients(
 
 // Macros for a day-custom (itemized) meal.
 export function customMealMacros(meta: CustomMeta): Macros {
-  let p = 0, c = 0, f = 0;
+  let p = 0, c = 0, f = 0, k = 0;
   for (const it of meta.items || []) {
     const fac = it.fac ?? 1;
     p += (Number(it.p) || 0) * fac;
     c += (Number(it.c) || 0) * fac;
     f += (Number(it.f) || 0) * fac;
+    // THE ROW AND THE TOTAL BENEATH IT MUST ADD UP.
+    //
+    // `k` is the catalogue's own label kcal, and every item card in the app
+    // prints it -- `(it.k ?? kcalOf(it.p, it.c, it.f)) * fac`. The total under
+    // those cards ignored it and recomputed Atwater 4/4/9 from the macros
+    // instead. Label kcal and 4/4/9 disagree routinely (fibre, sugar alcohols,
+    // the manufacturer's own rounding), so a client could read 100 cal on a row
+    // and watch 118 land in the day.
+    //
+    // Summing what the rows show is the property a person actually checks. The
+    // 4/4/9 identity was never printed as a claim; "these add up" was.
+    k += itemKcal(it) * fac;
   }
-  return { kcal: kcalOf(p, c, f), protein: p, carbs: c, fats: f };
+  return { kcal: k, protein: p, carbs: c, fats: f };
+}
+
+/** What one item's card prints, before its multiplier. One definition. */
+export function itemKcal(it: Pick<CustomItem, "k" | "p" | "c" | "f">): number {
+  return it.k != null ? Number(it.k) || 0 : kcalOf(Number(it.p) || 0, Number(it.c) || 0, Number(it.f) || 0);
 }
 
 function estMacros(log: LogRow): Macros {

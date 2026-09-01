@@ -596,8 +596,23 @@ export function validateActReply(raw: unknown): ActReply | null {
   const confirmation = actStr(r.confirmation);
 
   if (intent === "none") {
-    if (!replyText) return null;
-    return { intent: "none", params: { clarify: Boolean(p.clarify) }, confirmation: null, reply: replyText };
+    // THE PROMPT ASKS FOR EXACTLY WHAT THIS REJECTED.
+    //
+    // ACT_SYSTEM_PROMPT tells the model, for a training-worded message, to
+    // answer intent "none" with params {"clarify":false} and an EMPTY reply --
+    // "never a clarifying question". This then treated an empty reply on intent
+    // "none" as a hard parse failure, so every model that obeyed was thrown
+    // away and retried, and the retry obeyed the same instruction and failed
+    // the same way. Two model calls and doubled latency on every training
+    // question in the nutrition chat, and about 30% of coach_action logged as
+    // failed -- a standing tax on the budget the spend cap exists to guard.
+    //
+    // Text is only required where a clarifying question was actually promised.
+    // A clarifying question that is blank is genuinely useless, so text is
+    // still required there. Everywhere else "none" means there is nothing to
+    // say, and saying nothing is the correct answer.
+    if (!replyText && Boolean(p.clarify)) return null;
+    return { intent: "none", params: { clarify: Boolean(p.clarify) }, confirmation: null, reply: replyText ?? "" };
   }
 
   // Every action intent needs a human confirmation sentence — nothing mutates

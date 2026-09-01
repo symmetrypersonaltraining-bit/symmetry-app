@@ -91,17 +91,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not read the photo — try again or enter macros manually.' });
     }
 
-    const kcal = Math.round(Number(result.calories) || 0);
-    const protein = Math.round((Number(result.protein_g) || 0) * 10) / 10;
-    const carbs = Math.round((Number(result.carbs_g) || 0) * 10) / 10;
-    const fats = Math.round((Number(result.fat_g ?? result.fats_g) || 0) * 10) / 10;
-    const description = typeof result.description === 'string' && result.description ? result.description : 'Photo meal';
-    const source = result.source === 'restaurant_official' ? 'restaurant_official' : 'visual_estimate';
-
-    // Nutrients. Unlike the macros above these do NOT coerce missing to 0 —
-    // the model is told to return null when it cannot look the item up, and a
-    // null has to survive to the column. Zeroing an unknown sodium would make a
-    // day of restaurant food read as a low-sodium day.
+    // ONE MEANING OF "THE MODEL DID NOT SAY", for every column on the row.
+    //
+    // This helper lived twenty lines below and was used only for the nutrients,
+    // while the three macros above coerced a missing value to a real 0 g. Same
+    // row, same update, two different ways of recording the same absence -- and
+    // only one of them detectable afterwards. The guard above catches a missing
+    // `calories`, not a missing individual macro, so this does happen.
     const nutOrNull = (v: unknown, dp: number): number | null => {
       if (v == null) return null;
       const x = Number(v);
@@ -109,6 +105,18 @@ export async function POST(req: NextRequest) {
       const f = Math.pow(10, dp);
       return Math.round(x * f) / f;
     };
+
+    const kcal = Math.round(Number(result.calories) || 0);
+    const protein = nutOrNull(result.protein_g, 1);
+    const carbs = nutOrNull(result.carbs_g, 1);
+    const fats = nutOrNull(result.fat_g ?? result.fats_g, 1);
+    const description = typeof result.description === 'string' && result.description ? result.description : 'Photo meal';
+    const source = result.source === 'restaurant_official' ? 'restaurant_official' : 'visual_estimate';
+
+    // Nutrients, through the same helper as the macros. The model is told to
+    // return null when it cannot look an item up, and a null has to survive to
+    // the column: zeroing an unknown sodium would make a day of restaurant food
+    // read as a low-sodium day.
     const fiber = nutOrNull(result.fiber_g, 1);
     const sugar = nutOrNull(result.sugar_g, 1);
     const sodium = nutOrNull(result.sodium_mg, 0);
