@@ -1,5 +1,49 @@
 # Backlog — the single work queue
 
+## 2026-09-01 — Overnight run (SHIPPED, af27201 → 802c864)
+
+Seven commits, 19 findings closed, unit tests 2,529 → 2,601. Full write-ups:
+
+- `docs/audit/OVERNIGHT-2026-09-01-SHIPPED.md` — what landed and why
+- `docs/audit/OVERNIGHT-2026-09-01-NEEDS-YOU.md` — decisions only Dustin can make
+- `docs/audit/OVERNIGHT-2026-09-01-NEW-FINDINGS.md` — turned up while fixing
+
+MONEY: #11 a client billed on the 29th skipped February entirely and every cycle
+after was out of step (sessions in the gap billed to nobody) · #18 the payments
+screen read sms_sent_at and said nobody had been emailed · #65 the one live
+critical was a false alarm firing on a quiet calendar.
+
+NUTRITION: #48/#50 an added food lost its size and every nutrient when the meal
+was saved · #49 typed amount box (was 13 taps for 300 g → 170 g) · #54 the day
+total ignored the label kcal its own rows printed · #53 correcting a scanned
+food stripped its gram weight and nutrients · #27 a missing macro stored as 0.
+
+AI: #24 the prompt asked for exactly what the validator rejected (~30% of
+coach_action, doubled latency) · #25 the assessment named 8 programmes that do
+not exist.
+
+PROGRESS: #40/#41/#44 double-filtered series, two range controls, a tile that
+ignored its own range · #45 leaderboard open at the top · #46 swapped-out
+sessions counted · #43 the board scored 326 finished workouts as zero.
+
+CLEANUP: #33 library search saw 400 of 1,205 days · #67 chart blocked page
+scroll · #22 nudge deleted outright · N1 archiving now retires the meal plan ·
+N2 duplicate macro targets surfaced.
+
+ROSTER: Robert Miller, Bobbie Page, Christine Latham archived; outstanding
+invoices deleted. Archiving is now datable (archive_effective_on + 06:40 CT job)
+and an archived client cannot be invoiced.
+
+CLOSED WITHOUT WORK: #17 (fixed hours earlier), #69 (stale finding — fixed
+23 Aug, before the audit that reported it).
+
+STILL OPEN, needs Dustin: #19 (1,128 guessed nutrition rows, +19/day), #43
+membership, #38, #56/#61, #58, #62, #63, #64, #66, #68, #70, #52/#55, and the
+Steph duplicate macro-target row.
+
+---
+
+
 ## 2026-08-29 — Billing rule replaced (SHIPPED)
 
 The rule, locked with Dustin 29 Aug:
