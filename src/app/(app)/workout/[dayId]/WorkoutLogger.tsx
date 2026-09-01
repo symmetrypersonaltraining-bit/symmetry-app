@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import MicButton from "@/components/MicButton";
 import { createClient } from "@/lib/supabase/client";
+import { groupSection, memberLabel, restLabel, isImmediate, membersInRound } from "@/lib/supersets";
 // Aliased: this file already has a local submitFeedback() handler, and the
 // import silently shadowed it — the call below was recursing into itself.
 import { submitFeedback as fileFeedback } from "@/lib/feedback";
@@ -3297,8 +3298,17 @@ export default function WorkoutLogger({
           ))}
         </div>
 
-        {/* Exercise cards */}
-        {currentSection?.prescribed_exercises.map((pe, i) => {
+        {/* Exercise cards.
+            A section is drawn as BLOCKS, not as a flat list. A superset or
+            circuit is one block containing its rounds; everything else is the
+            single card it always was. groupSection() is given ONE section, so
+            grouping can never span two — see the note there on "Gym B — Upper
+            (Supported)", where A and B are each used twice in one day. */}
+        {(() => {
+        const __list = currentSection?.prescribed_exercises ?? [];
+        const __blocks = groupSection(__list as never);
+        const __idxOf = (peId: string) => __list.findIndex((x) => x.id === peId);
+        const renderCard = (pe: (typeof __list)[number], i: number) => {
           const peSets = sets[pe.id] || [];
           const doneCount = peSets.filter(s => s.done).length;
           const isActive = i === activeExerciseIdx;
@@ -3449,7 +3459,148 @@ export default function WorkoutLogger({
               )}
             </div>
           );
-        })}
+        };
+
+        // ── A SUPERSET IS ONE CARD, LOGGED IN THE ORDER IT IS PERFORMED ──────
+        //
+        // Dustin, 1 Sep: "the movements should check off/log in proper order
+        // they are performed in on 1 screen so its easy to log."
+        //
+        // So the block is drawn round by round rather than movement by
+        // movement: round 1 is A1 then A2, round 2 is A1 then A2 again. That is
+        // the order she does them in, and it is the order she taps down the
+        // screen. The old layout gave each movement its own card and only
+        // advanced once a movement was FULLY logged, which is the opposite
+        // shape — all four sets of the squat, then all four pull-ups.
+        //
+        // Every input calls the same updateSet / logSet / unlogSet /
+        // saveTypedSet as the ordinary card, and reads the same tracked-field
+        // config, so the two layouts cannot drift on what a set MEANS. Only the
+        // arrangement differs.
+        const renderGroupBlock = (block: { label: string; tag: string; members: (typeof __list)[number][]; rounds: number }) => {
+          const isCircuit = block.members.length > 2;
+          const anyActive = block.members.some((m) => __idxOf(m.id) === activeExerciseIdx);
+          const totalSets = block.members.reduce((n, m) => n + Math.max(1, m.sets ?? 1), 0);
+          const doneSets = block.members.reduce(
+            (n, m) => n + (sets[m.id] || []).filter((x) => x.done).length, 0);
+          const allDone = totalSets > 0 && doneSets >= totalSets;
+          return (
+            <div key={"grp-" + block.tag + "-" + block.members[0].id}
+              className="rounded-2xl mb-3 overflow-hidden"
+              style={{
+                background: "var(--brand-surface)",
+                border: anyActive ? "1.5px solid var(--brand-primary)" : "1px solid var(--brand-border)",
+              }}>
+              <div className="px-4 pt-3 pb-2" style={{ background: "var(--brand-card)" }}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold tracking-wide"
+                    style={{ color: "var(--brand-primary)", letterSpacing: 0.6 }}>
+                    {(isCircuit ? "CIRCUIT " : "SUPERSET ") + block.label}
+                  </span>
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full"
+                    style={{
+                      background: allDone ? "#22c55e20" : "var(--brand-bg)",
+                      color: allDone ? "#22c55e" : "var(--brand-text-secondary)",
+                    }}>
+                    {doneSets}/{totalSets}
+                  </span>
+                </div>
+                <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>
+                  {block.members.map((m, mi) => memberLabel(block.label, mi) + " " + (m.exercises?.name ?? "")).join("  ·  ")}
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--brand-text-secondary)", opacity: 0.8 }}>
+                  {block.rounds} round{block.rounds === 1 ? "" : "s"} — alternate, no rest between movements
+                </p>
+              </div>
+
+              {Array.from({ length: block.rounds }, (_, r) => (
+                <div key={r} style={{ borderTop: "1px solid var(--brand-border)" }}>
+                  <div className="px-4 pt-2.5 pb-1 text-xs font-bold"
+                    style={{ color: "var(--brand-text-secondary)" }}>
+                    {"Round " + (r + 1)}
+                  </div>
+                  {membersInRound<(typeof __list)[number]>(block as never, r).map((m) => {
+                    const mi = block.members.findIndex((x) => x.id === m.id);
+                    const mSets = sets[m.id] || [];
+                    const entry = mSets[r];
+                    if (!entry) return null;
+                    const mCardio = isCardioEx(m);
+                    const f: string[] = mCardio
+                      ? (fieldCfg[m.id] || ["time", "speed", "hr"])
+                      : (fieldCfg[m.id] || defaultTrackedFields(m));
+                    const cols: [string, string, string][] = mCardio
+                      ? ([["time", "min", "decimal"], ["speed", "mph", "decimal"], ["hr", "bpm", "numeric"]] as [string, string, string][])
+                          .filter(([k]) => f.includes(k))
+                      : ([["weight", isPerHandLoad(m) ? "lbs/hand" : "lbs", "decimal"],
+                          ["reps", "reps", "numeric"],
+                          ["distance", "ft", "decimal"],
+                          ["time", "min", "decimal"]] as [string, string, string][])
+                          .filter(([k]) => f.includes(k));
+                    const rest = restLabel(m.rest);
+                    return (
+                      <div key={m.id} className="px-4 pb-2">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-xs font-bold" style={{ color: "var(--brand-primary)", minWidth: 22 }}>
+                            {memberLabel(block.label, mi)}
+                          </span>
+                          <span className="text-sm font-semibold flex-1 min-w-0"
+                            style={{ color: "var(--brand-text)" }}>{m.exercises?.name}</span>
+                          <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
+                            {m.volume_value ?? ""}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          {cols.map(([k, ph, mode]) => (
+                            <input key={k} type="text" inputMode={mode as "decimal" | "numeric"}
+                              aria-label={(m.exercises?.name ?? "movement") + " round " + (r + 1) + " " + k}
+                              value={(entry as unknown as Record<string, string>)[k] ?? ""}
+                              onChange={(e) => updateSet(m.id, r, k as never, e.target.value)}
+                              onBlur={() => { if (entry.done) logSet(m.id, r); else saveTypedSet(m.id, r); }}
+                              placeholder={ph}
+                              className="flex-1 min-w-0 text-center text-base font-semibold py-2.5 rounded-xl outline-none"
+                              style={{
+                                background: entry.done ? "rgba(34,197,94,0.08)" : "var(--brand-bg)",
+                                color: entry.done ? "#22c55e" : "var(--brand-text)",
+                                border: `1px solid ${entry.done ? "rgba(34,197,94,0.2)" : "var(--brand-border)"}`,
+                              }} />
+                          ))}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setActiveExerciseIdx(__idxOf(m.id)); if (entry.done) unlogSet(m.id, r); else logSet(m.id, r); }}
+                            disabled={saving || isSetSaving(m.id, r)}
+                            aria-label={(entry.done ? "Un-log " : "Log ") + (m.exercises?.name ?? "set")}
+                            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                            style={{ background: entry.done ? "#22c55e" : "var(--brand-primary)" }}>
+                            <i className="ti ti-check text-lg text-white" style={{ opacity: entry.done ? 1 : 0.5 }} />
+                          </button>
+                        </div>
+                        {/* THE INSTRUCTION THAT USED TO REACH HER AS SILENCE.
+                            rest is stored on every movement and was never
+                            rendered anywhere — it only ever started a timer.
+                            A '0' correctly started no timer, so "go straight
+                            into the next one" was communicated by nothing
+                            happening. */}
+                        {rest && (
+                          <p className="text-xs mt-1" style={{
+                            color: isImmediate(m.rest) ? "var(--brand-primary)" : "var(--brand-text-secondary)",
+                            opacity: isImmediate(m.rest) ? 1 : 0.85,
+                          }}>
+                            {isImmediate(m.rest) ? "\u2193 " + rest : rest}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          );
+        };
+        return __blocks.map((b) =>
+          b.kind === "single"
+            ? renderCard(b.pe as never, __idxOf((b.pe as { id: string }).id))
+            : renderGroupBlock(b as never),
+        );
+        })()}
 
         {/* Trainer AI programming note */}
         {isTrainerSession && (
