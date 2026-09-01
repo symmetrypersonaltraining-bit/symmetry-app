@@ -3218,7 +3218,34 @@ function PlanAdjustSheet({
           {!it.is_unlimited && (
             <div className="flex items-center gap-1">
               <button onClick={() => setAmounts((p) => ({ ...p, [it.id]: Math.max(0, Math.round(((p[it.id] || 0) - stepFor(it.unit)) * 100) / 100) }))} className="w-8 h-8 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>−</button>
-              <span className="text-xs font-bold text-center" style={{ color: "var(--brand-text)", minWidth: 44 }}>{amounts[it.id] ?? 0}{it.unit ? ` ${it.unit}` : ""}</span>
+              {/* TYPE THE NUMBER. Dustin, on going 300 g -> 170 g: thirteen
+                  taps of the minus button, because grams step by ten and this
+                  was a read-only label sitting between two buttons. The
+                  steppers stay for a small nudge; anything bigger is a number
+                  you already know, so you should be able to say it.
+
+                  No unit dropdown here, deliberately. An added food carries
+                  grams_each and the catalogue's serving_options, so switching
+                  its unit is an exact rescale. A plan item carries neither -- a
+                  dropdown would have to guess what a cup of this weighs, and a
+                  macro total built on a guess is worse than one more tap. */}
+              <input
+                type="number" inputMode="decimal" min={0} step="any"
+                aria-label={`${it.food} amount${it.unit ? " in " + it.unit : ""}`}
+                value={amounts[it.id] ?? 0}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  // An empty box is mid-typing, not zero. Zero means "take it
+                  // out" and is what the minus button walks you down to.
+                  if (raw === "") return;
+                  const n = Number(raw);
+                  if (!Number.isFinite(n) || n < 0) return;
+                  setAmounts((p) => ({ ...p, [it.id]: Math.round(n * 100) / 100 }));
+                }}
+                className="text-xs font-bold text-center rounded-lg py-1"
+                style={{ color: "var(--brand-text)", width: 56, background: "var(--brand-card)", border: "1px solid var(--brand-border)" }}
+              />
+              {it.unit && <span className="text-xs font-bold" style={{ color: "var(--brand-text-secondary)" }}>{it.unit}</span>}
               <button onClick={() => setAmounts((p) => ({ ...p, [it.id]: Math.round(((p[it.id] || 0) + stepFor(it.unit)) * 100) / 100 }))} className="w-8 h-8 rounded-lg text-sm font-bold" style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>＋</button>
             </div>
           )}
