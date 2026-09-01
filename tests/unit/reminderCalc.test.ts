@@ -289,6 +289,69 @@ test("a sent reminder still shows the message the client sees", () => {
 const adj = (over: Partial<ReminderCalcInput> = {}): ReminderCalcInput =>
   base({ billingType: "monthly_adjusted", ...over });
 
+// ─── month arithmetic that does not skip February ────────────────────────────
+
+test("a due date late in the month does not skip a whole month", () => {
+  // setUTCMonth(+1) on the 29th, 30th or 31st overflowed past the month asked
+  // for, because February is too short to hold the day: 29 Jan + 1 month became
+  // 1 March. A client billed on the 29th had NO February invoice at all, and
+  // every cycle after it was permanently out of step.
+  assert.equal(nextDueDate("2026-01-29", "monthly"), "2026-02-28");
+  assert.equal(nextDueDate("2026-01-30", "monthly"), "2026-02-28");
+  assert.equal(nextDueDate("2026-01-31", "monthly"), "2026-02-28");
+  assert.equal(nextDueDate("2026-03-31", "monthly"), "2026-04-30");
+  assert.equal(previousDueDate("2026-03-31", "monthly"), "2026-02-28");
+  // Leap years still have a 29th.
+  assert.equal(nextDueDate("2028-01-31", "monthly"), "2028-02-29");
+  // Quarterly lands in a short month too: 31 Dec + 3 months is 31 March, but
+  // 30 Nov + 3 months must be 28 Feb, not 2 March.
+  assert.equal(nextDueDate("2026-11-30", "quarterly"), "2027-02-28");
+  // Ordinary dates are untouched.
+  assert.equal(nextDueDate("2026-05-15", "monthly"), "2026-06-15");
+  assert.equal(nextDueDate("2026-08-30", "monthly"), "2026-09-30");
+});
+
+test("no month is ever skipped, at any anchor day, across a year", () => {
+  for (let day = 1; day <= 31; day++) {
+    const start = "2026-01-" + String(day).padStart(2, "0");
+    if (new Date(start + "T00:00:00Z").getUTCDate() !== day) continue;
+    let d = start;
+    const seen: number[] = [];
+    for (let i = 0; i < 12; i++) { d = nextDueDate(d, "monthly"); seen.push(Number(d.slice(5, 7))); }
+    const expected = [2,3,4,5,6,7,8,9,10,11,12,1];
+    assert.deepEqual(seen, expected, "anchor " + day + " skipped a month: " + seen.join(","));
+  }
+});
+
+test("the cycle starts where the last invoice actually ended", () => {
+  // Guessing backwards can never be a true inverse -- "the 31st, minus a month"
+  // from 28 February is 28 January, not 31 January -- so a recomputed start
+  // overlaps or gaps against the previous cycle's end. Sessions in a gap are
+  // billed to nobody; sessions in an overlap are billed twice.
+  const withActual = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    dueDate: "2026-03-31", cadence: "monthly", previousDueDateActual: "2026-01-31",
+    cancelledFull: 0, sessionsTrained: 8, draftAmount: 640 }));
+  assert.equal(withActual.cycleStart, "2026-01-24", "must open at the recorded prior send date");
+  const guessed = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+    dueDate: "2026-03-31", cadence: "monthly",
+    cancelledFull: 0, sessionsTrained: 8, draftAmount: 640 }));
+  assert.equal(guessed.cycleStart, "2026-02-21", "with no record it still falls back to the calculation");
+});
+
+test("consecutive cycles tile exactly when the real due dates are known", () => {
+  // The property that matters: no day belongs to two cycles, and no day belongs
+  // to none. Anchored on the 31st, the worst case.
+  const dues = ["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30", "2026-05-31"];
+  let prevEnd: string | null = null;
+  for (let i = 1; i < dues.length; i++) {
+    const r = calcReminder(adj({ fee: 640, sessionRate: 80, expectedSessions: 8,
+      dueDate: dues[i], cadence: "monthly", previousDueDateActual: dues[i - 1],
+      cancelledFull: 0, sessionsTrained: 8, draftAmount: 640 }));
+    if (prevEnd) assert.equal(r.cycleStart, prevEnd, "gap or overlap at " + dues[i]);
+    prevEnd = r.cycleEnd;
+  }
+});
+
 test("every billing type the database can hold survives the round trip", () => {
   // THE 29 AUG BUG, as a test. ReminderEditor kept its own hand-written list of
   // billing types and "monthly_adjusted" was not on it, so all 15 monthly

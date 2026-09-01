@@ -103,6 +103,18 @@ export interface ReminderCalcInput {
   /** @deprecated Retained for callers; no longer produces a warning. */
   lastPaymentAmount?: number | null;
   lastCycleApprovedOn?: string | null; // CT date the PREVIOUS round was approved
+  /**
+   * The due date of this client's PREVIOUS reminder, when one exists.
+   *
+   * Clamping stops the month arithmetic skipping February, but it still cannot
+   * make previousDueDate() a true inverse of nextDueDate(): "the 31st, minus a
+   * month" from 28 February is 28 January, not 31 January. Guessing backwards
+   * is only ever an approximation of a date that is already recorded.
+   *
+   * So when the real one is known, use it. Cycles then tile against what was
+   * actually billed rather than against a reconstruction of it.
+   */
+  previousDueDateActual?: string | null;
   draftAmount: number; // current amount_due on the reminder row
   override: boolean; // Dustin explicitly accepted a non-calculated amount
   /** @deprecated Use billingType. true is read as 'flat'. */
@@ -149,6 +161,31 @@ export interface ReminderCalcResult {
   warnings: string[];
 }
 
+// ── MONTH ARITHMETIC THAT DOES NOT SKIP FEBRUARY ────────────────────────────
+//
+// `setUTCMonth(m + 1)` on a 29th, 30th or 31st overflows into the month after
+// the one you asked for, because the target month is too short to hold the day:
+//
+//     29 Jan  + 1 month  ->  29 Feb  ->  1 March    (2026 is not a leap year)
+//     31 Mar  + 1 month  ->  31 Apr  ->  1 May
+//
+// A client billed on the 29th therefore had no February invoice at all -- the
+// due date jumped straight from January to March -- and every cycle after it
+// was permanently one or two days out of step, so the window between two
+// consecutive reminders left a gap that belonged to no cycle. Sessions in that
+// gap were billed to nobody. Lauren Standefer and Tim Yancey are both on the
+// 30th; Jennifer Day is quarterly on the 30th.
+//
+// Clamping to the last day of the target month is what a person means by "the
+// 31st of a month with 30 days in it".
+function addMonthsClamped(dt: Date, months: number): void {
+  const day = dt.getUTCDate();
+  dt.setUTCDate(1);                      // park on a day every month has
+  dt.setUTCMonth(dt.getUTCMonth() + months);
+  const lastDayOfTarget = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate();
+  dt.setUTCDate(Math.min(day, lastDayOfTarget));
+}
+
 export function previousDueDate(dueDate: string, cadence: Cadence | null): string {
   const parts = dueDate.split("-").map(Number);
   const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
@@ -165,8 +202,8 @@ export function previousDueDate(dueDate: string, cadence: Cadence | null): strin
   }
   if (cadence === "weekly") dt.setUTCDate(dt.getUTCDate() - 7);
   else if (cadence === "biweekly") dt.setUTCDate(dt.getUTCDate() - 14);
-  else if (cadence === "quarterly") dt.setUTCMonth(dt.getUTCMonth() - 3);
-  else dt.setUTCMonth(dt.getUTCMonth() - 1); // monthly default
+  else if (cadence === "quarterly") addMonthsClamped(dt, -3);
+  else addMonthsClamped(dt, -1); // monthly default
   return dt.toISOString().slice(0, 10);
 }
 
@@ -181,8 +218,8 @@ export function nextDueDate(dueDate: string, cadence: Cadence | null): string {
   }
   if (cadence === "weekly") dt.setUTCDate(dt.getUTCDate() + 7);
   else if (cadence === "biweekly") dt.setUTCDate(dt.getUTCDate() + 14);
-  else if (cadence === "quarterly") dt.setUTCMonth(dt.getUTCMonth() + 3);
-  else dt.setUTCMonth(dt.getUTCMonth() + 1);
+  else if (cadence === "quarterly") addMonthsClamped(dt, 3);
+  else addMonthsClamped(dt, 1);
   return dt.toISOString().slice(0, 10);
 }
 
@@ -230,7 +267,12 @@ export function calcReminder(i: ReminderCalcInput): ReminderCalcResult {
   // trained that day fell into no cycle at all. Six clients, $467.50 unbilled.
   // When a reminder happened to be approved is a fact about Dustin's Tuesday,
   // not about when a client trained.
-  const cycleStart = reminderSendDate(previousDueDate(i.dueDate, i.cadence));
+  const cycleStart = reminderSendDate(
+    // The recorded previous due date beats any recomputation of it.
+    i.previousDueDateActual && i.previousDueDateActual < i.dueDate
+      ? i.previousDueDateActual
+      : previousDueDate(i.dueDate, i.cadence),
+  );
   const cycleEnd = reminderSendDate(i.dueDate);
 
   const cancelled = Math.max(0, Number(i.cancelledFull) || 0);

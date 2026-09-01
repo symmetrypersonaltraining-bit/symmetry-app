@@ -51,6 +51,7 @@ interface Rem {
   halfPriceSessions: number;
   cadence: Cadence | null;
   billingType: BillingType;
+  previousDueDateActual: string | null;
   sessionsTrained: number;
   trainedDates: string[];
   cancelledFull: number;
@@ -118,6 +119,13 @@ export default function ReminderEditor() {
         .from("payment_reminders")
         .select("client_id, approved_at, due_date")
         .not("approved_at", "is", null);
+      // Every reminder's due date, approved or not, so a cycle can start where
+      // the last one actually ended instead of where subtracting a month from
+      // this one happens to land. See previousDueDateActual in reminder-calc.
+      const allDue = await fetchAllRows<{ client_id: string; due_date: string }>(
+        () => sup.from("payment_reminders").select("client_id, due_date"),
+        { label: "payment_reminders.due_date", orderedBy: "due_date" },
+      );
       // BOTH scheduled and cancelled appointments now load. The old
       // .ilike("status","cancelled%") filter is gone: under the sessions-trained
       // rule the scheduled rows ARE the bill, so dropping them dropped the
@@ -233,7 +241,14 @@ export default function ReminderEditor() {
           // cycle's send date so the cycles tile exactly — see the note in
           // reminder-calc.ts on why the prior-approval date must not move the
           // start (it dropped real sessions out of every cycle).
-          const start = reminderSendDate(previousDueDate(r.due_date, cad));
+          // The latest recorded due date BEFORE this one. Null for a client's
+          // first ever reminder, which then falls back to the calculation.
+          const prevActual = (allDue || [])
+            .filter((x) => x.client_id === r.client_id && x.due_date < r.due_date)
+            .map((x) => x.due_date)
+            .sort()
+            .pop() || null;
+          const start = reminderSendDate(prevActual ?? previousDueDate(r.due_date, cad));
           const end = reminderSendDate(r.due_date);
 
           let trained = 0, full = 0, half = 0;
@@ -316,6 +331,7 @@ export default function ReminderEditor() {
             cancelledFull: full,
             cancelledHalf: half,
             cancelledDates,
+            previousDueDateActual: prevActual,
             lastApprovedOn: la,
             approved_at: r.approved_at || null,
             provisional: !!(storedIsNewShape && cd.provisional),
@@ -428,6 +444,7 @@ export default function ReminderEditor() {
       dueDate: e.due,
       sessionsTrained: parseInt(e.count, 10) || 0,
       billingType: r.billingType,
+      previousDueDateActual: r.previousDueDateActual,
       cancelledFull: r.cancelledFull,
       cancelledHalf: r.cancelledHalf,
       lastCycleApprovedOn: r.lastApprovedOn,
