@@ -36,6 +36,7 @@ import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
 import { fetchWeeklyComparison } from "@/lib/ai/weekly-context";
+import { CLAIMS_THIS_WEEK, trimToWord } from "@/lib/ai/weekly-copy-guards";
 import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { isCronRequest } from "@/lib/cron-auth";
 import { WEEKLY_WRITER_RULES, weekStartOf } from "@/lib/ai/weekly-numbers";
@@ -97,6 +98,7 @@ function isQuestionWeek(weekStart: string): boolean {
   return ((weeks % 2) + 2) % 2 === 0;
 }
 
+
 function validateWeekly(raw: unknown): WeeklyReply | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -105,13 +107,27 @@ function validateWeekly(raw: unknown): WeeklyReply | null {
   const coachRead = s("coachRead");
   const foodFocus = s("foodFocus");
   if (!focus || !coachRead || !foodFocus) return null;
+  // A question is one sentence a person reads on a phone. 200 was tight enough
+  // that the model's own overrun got chopped mid-word; the prompt asks for
+  // under 140, so this is headroom for a long one rather than a licence.
+  const question = trimToWord(s("programmingQuestion"), 320);
   return {
-    focus: focus.slice(0, 200),
-    coachRead: coachRead.slice(0, 900),
-    foodFocus: foodFocus.slice(0, 900),
+    focus: trimToWord(focus, 200),
+    coachRead: trimToWord(coachRead, 900),
+    foodFocus: trimToWord(foodFocus, 900),
     // Optional on purpose. A missing question costs one skipped fortnightly
     // prompt; failing validation over it would cost the whole client's week.
-    programmingQuestion: s("programmingQuestion").slice(0, 200),
+    // Dropped outright when it describes a week that has not happened -- no
+    // question at all beats one whose first clause the client can see is wrong.
+    programmingQuestion: (() => {
+      if (!question) return "";
+      if (!CLAIMS_THIS_WEEK.test(question)) return question;
+      // Loud, not silent. If this fires often the prompt needs work, and a
+      // question quietly disappearing is exactly the kind of thing that goes
+      // unnoticed for a month.
+      console.error("weekly-ai: dropped a question that described the coming week:", question);
+      return "";
+    })(),
   };
 }
 
