@@ -26,7 +26,6 @@ const COACHING = [
   // still covers every surface that survives.
   "cron/weekly-ai/route.ts",       // the Sunday sweep that writes both
   "weekly-brief/route.ts",         // the pre-session brief
-  "ai-nudges/route.ts",            // the Monday nudge, sent to a real person
   "celebration/route.ts",          // one sentence on their best moment of the week
 ];
 

@@ -140,7 +140,6 @@ const PER_CLIENT = [
 // The nudge digest stays: the SCHEDULED sweep covers the whole business and is
 // the owner's. A trainer running it by hand gets her own, addressed to her.
 const OWNER_WIDE = [
-  ["src/app/api/ai-nudges/route.ts", "ownerAuthUid(admin)"],
 ] as const;
 
 test("no route resolves a trainer by taking whatever trainer_settings row comes first", () => {

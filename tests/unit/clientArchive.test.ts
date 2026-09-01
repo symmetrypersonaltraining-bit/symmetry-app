@@ -36,7 +36,6 @@ const ROSTER_QUERIES: { file: string; near: string }[] = [
   { file: "app/(app)/home/messageActions.ts", near: "admin.from('clients')" },
   { file: "app/(app)/messages/page.tsx", near: "allClients" },
   { file: "app/api/attention/route.ts", near: "primary_goal, created_at" },
-  { file: "app/api/ai-nudges/route.ts", near: "primary_goal, auth_user_id" },
   { file: "app/api/challenge/route.ts", near: "allClients" },
   { file: "app/api/leaderboard/route.ts", near: "namesRes" },
   { file: "components/TrainerWeekDigest.tsx", near: "digest_snoozed_until" },

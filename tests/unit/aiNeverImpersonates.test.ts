@@ -46,7 +46,6 @@ const ROOT = process.cwd();
  * small lie in the other direction.
  */
 const APP_AUTHORED = [
-  "src/app/api/ai-nudges/route.ts",
   "src/app/api/cron/birthdays/route.ts",
   "src/app/api/cron/coachbot/route.ts",
   "src/app/api/workout-ai/route.ts",
@@ -72,34 +71,10 @@ test("every message the app writes is signed as the bot", () => {
   );
 });
 
-test("the nudge prompt does not tell the model to write as Dustin", () => {
-  const src = readFileSync(join(ROOT, "src/app/api/ai-nudges/route.ts"), "utf8");
-  const at = src.indexOf("const SYSTEM =");
-  const prompt = src.slice(at, src.indexOf("`;", at));
-  // The original opening line was "You write short re-engagement messages FROM
-  // Dustin... they look like he wrote them." Marking the row as the bot while
-  // the copy still says "I've been watching your logs" is only half a fix — the
-  // bubble says Coach Bot and the words say Dustin.
-  // `${coachFirstName}` since 20 Aug: the prompt became a function of the
-  // client's own coach, because as a module constant it named the owner to
-  // every client of every trainer — and then told them to take the question to
-  // him. What this test guards is unchanged: the model must be told it is NOT
-  // the coach.
-  assert.ok(
-    !/look like \$\{coachFirstName\} wrote them/.test(prompt),
-    "the prompt still asks for copy that impersonates the coach",
-  );
-  assert.match(
-    prompt,
-    /NOT from \$\{coachFirstName\}/,
-    "the prompt no longer tells the model it is not writing as the coach",
-  );
-  assert.match(
-    prompt,
-    /const SYSTEM = \(coachFirstName: string/,
-    "the prompt is back to a module constant, so it names one trainer to everybody's clients",
-  );
-});
+// The nudge sweep's own impersonation test lived here. /api/ai-nudges was
+// deleted on 1 Sep -- Dustin, five times over: "nudge should be gone period" --
+// so there is no prompt left to check. The rule it guarded still applies to
+// every route in APP_AUTHORED above.
 
 test("the bot bubble is decided by sender_kind, ahead of who sent it", () => {
   // If isMe were evaluated first, a bot message whose from_id is the trainer

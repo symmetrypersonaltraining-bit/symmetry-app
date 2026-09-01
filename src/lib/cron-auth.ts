@@ -13,7 +13,7 @@
 //                        the variable unset that compares against the literal
 //                        string "Bearer undefined", so anyone sending exactly
 //                        that header authenticates.
-//   /api/ai-nudges       correct, but on its own header name.
+//   /api/ai-nudges       was correct, on its own header name. Route deleted 1 Sep.
 //
 // CRON_SECRET is not set on this project and may never be, so the rule has to
 // be right in that state rather than assume someone remembers.

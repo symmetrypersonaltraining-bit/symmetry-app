@@ -270,17 +270,10 @@ test("a failed rejection is not reported as rejected", () => {
 // already records `status: "failed"` with a detail, so the summary names who
 // has no draft.
 //
-// /api/ai-nudges never messages clients (that was deleted deliberately, and
-// stays deleted). But `ai_nudge_log` IS the guardrail state: "one per client
-// per 48h, max 3 per rolling 7 days" is computed by reading that table back. An
-// unchecked insert does not lose a log line, it defeats a stated rule — the
-// same client comes round again next run as though nothing happened. And the
-// digest to Dustin, which is the entire output of the run, was inserted
-// unchecked while the response reported `generated: N` to a caller nobody
-// reads.
+// The nudge half of this note is now history: /api/ai-nudges was deleted on
+// 1 Sep, so there is no unchecked insert left in it to guard.
 
 const WEEKLY = read("src/app/api/cron/weekly-ai/route.ts");
-const NUDGES = read("src/app/api/ai-nudges/route.ts");
 
 // Superseded 21 Aug. The approval step was retired -- "correct i dont need to
 // approve if the ai is set up to be accurate based on real numbers" -- so the
@@ -300,26 +293,10 @@ test("the programming question can report a failure it could never report before
   assert.match(WEEKLY, /if \(qErr\) console\.error/);
 });
 
-test("every nudge-ledger write is checked, because the ledger IS the cooldown", () => {
-  const bare = NUDGES.match(/(?<!=\s)await\s+admin\s*\n?\s*\.from\("ai_nudge_log"\)\s*\n?\s*\.insert\(/g) || [];
-  assert.equal(bare.length, 0, `${bare.length} ledger writes still discard their result`);
-  for (const name of ["escErr", "supErr", "logErr"]) {
-    assert.match(NUDGES, new RegExp(`error: ${name}`), `${name} is gone — a ledger row is unchecked again`);
-  }
-});
-
-test("a cooldown that was not recorded is reported to Dustin, not swallowed", () => {
-  assert.match(NUDGES, /ledgerErrors\.push\(/);
-  assert.match(NUDGES, /cooldowns are not recorded/);
-});
-
-test("a digest that never arrived is not reported as a successful run", () => {
-  assert.match(NUDGES, /const \{ error: digestErr \}/);
-  assert.match(NUDGES, /if \(digestErr\)/);
-  const guard = NUDGES.indexOf("if (digestErr)");
-  const ok = NUDGES.indexOf('mode: "digest_only"', guard);
-  assert.ok(guard > 0 && ok > guard, "the success response is returned before the digest is known to have landed");
-});
+// Three tests here guarded the nudge sweep's ledger writes, its cooldown
+// reporting and its digest. The route was deleted on 1 Sep, so the writes they
+// checked no longer exist. The ai_nudge_log table survives as history; nothing
+// writes to it.
 
 // ── The last three where a person was still being told something ──────────
 //

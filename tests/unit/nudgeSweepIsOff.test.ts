@@ -18,10 +18,18 @@
 //      reviving it one row rather than a deploy, and stops a stray manual call
 //      from starting a sweep in the meantime.
 //
-// The ENGINE is deliberately untouched: segment.ts, the guardrails, the copy,
-// and tests/unit/nudgeSegments.test.ts all stay. This file guards the OFF, not
-// the engine — if it ever fails, read it as "the sweep came back on", and check
-// that was on purpose.
+// UPDATE, 1 Sep. "Keep engine for later" did not survive contact with how many
+// times this had to be said. Dustin, five separate occasions, most recently:
+// "nudge shoukd be gone period. 4th time this has come up."
+//
+// So the engine is gone too — route.ts and segment.ts are deleted, and this
+// file now guards the ABSENCE. The database freeze that stopped it sending has
+// been holding since 27 Aug (zero rows written; the all-time sent count has not
+// moved off 20) and is left in place, because a table that nothing writes to is
+// a cheaper guarantee than a file nobody has re-added yet.
+//
+// If this file ever fails, read it as "the sweep came back", and check that was
+// on purpose.
 //
 // Pure node, no browser, no network.
 // ============================================================================
@@ -32,7 +40,6 @@ import fs from "node:fs";
 import path from "node:path";
 
 const ROOT = process.cwd();
-const route = fs.readFileSync(path.join(ROOT, "src/app/api/ai-nudges/route.ts"), "utf8");
 const vercel = JSON.parse(fs.readFileSync(path.join(ROOT, "vercel.json"), "utf8"));
 
 describe("the nudge sweep is off", () => {
@@ -45,48 +52,33 @@ describe("the nudge sweep is off", () => {
     );
   });
 
-  it("refuses to run unless the flag says so", () => {
-    assert.match(
-      route,
-      /readFlag\(admin, "nudges_live"\)/,
-      "the route must read nudges_live before doing anything",
-    );
-    // And bail on it. A flag that is read and then ignored is the state this
-    // route was already in for weeks.
-    assert.match(
-      route,
-      /if \(!live\) \{[\s\S]{0,300}return NextResponse\.json/,
-      "reading the flag is not enough — the route has to return early when it is off",
-    );
+  it("has no route left to run", () => {
+    // The strongest form of off. A flag can be flipped and a schedule can be
+    // re-added; a file that does not exist has to be written again first.
+    for (const f of ["src/app/api/ai-nudges/route.ts", "src/app/api/ai-nudges/segment.ts"]) {
+      assert.ok(!fs.existsSync(path.join(ROOT, f)), f + " is back. Was that deliberate?");
+    }
   });
 
-  it("checks the flag before it can spend anything", () => {
-    const flagAt = route.indexOf('readFlag(admin, "nudges_live")');
-    // The CALL, not the import at the top of the file.
-    const spendAt = route.indexOf("await callClaudeJson<");
-    assert.ok(flagAt > 0 && spendAt > 0, "expected both the flag check and the model call");
-    assert.ok(
-      flagAt < spendAt,
-      "the flag is checked AFTER the model call — an off sweep would still pay for itself",
-    );
+  it("nothing in the app writes to the nudge ledger any more", () => {
+    // ai_nudge_log survives as history. Nothing should add to it: the table was
+    // the cooldown state for a sweep that no longer exists.
+    const hits: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of fs.readdirSync(dir)) {
+        const full = path.join(dir, e);
+        if (fs.statSync(full).isDirectory()) walk(full);
+        else if (/\.tsx?$/.test(e)) {
+          const src = fs.readFileSync(full, "utf8");
+          if (/from\(["']ai_nudge_log["']\)[\s\S]{0,80}\.(insert|upsert|update)\(/.test(src)) {
+            hits.push(path.relative(ROOT, full));
+          }
+        }
+      }
+    };
+    walk(path.join(ROOT, "src"));
+    assert.deepEqual(hits, [], "something is writing nudge cooldowns again");
   });
-});
-
-describe("the engine is kept, not deleted", () => {
-  const kept = [
-    "src/app/api/ai-nudges/segment.ts",
-    "src/app/api/ai-nudges/route.ts",
-    "tests/unit/nudgeSegments.test.ts",
-  ];
-  for (const f of kept) {
-    it(`${f} still exists`, () => {
-      assert.ok(
-        fs.existsSync(path.join(ROOT, f)),
-        `${f} was deleted. "Keep engine for later" means the segmentation survives being ` +
-          "switched off — turning it back on must not mean rewriting it.",
-      );
-    });
-  }
 });
 
 describe("settings do not promise a digest nobody receives", () => {

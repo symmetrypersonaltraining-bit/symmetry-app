@@ -218,7 +218,7 @@ export default function ExperienceSettings({ isTrainer, isOwner = false }: { isT
             AUTOMATION · OWNER ONLY
           </p>
           {/* The "send AI check-ins to clients" switch is GONE, not defaulted
-              off — /api/ai-nudges cannot message a client any more whatever
+              off — the nudge sweep was deleted on 1 Sep and cannot message a client whatever
               this said. Leaving a toggle that promises delivery the code
               refuses to perform is worse than having no toggle: it is a lie in
               the settings screen, and the first person to notice would be a

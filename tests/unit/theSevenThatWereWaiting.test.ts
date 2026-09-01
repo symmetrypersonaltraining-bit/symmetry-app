@@ -86,23 +86,13 @@ for (const f of ["src/app/api/cron/coachbot/route.ts", "src/app/api/cron/birthda
   });
 }
 
-// ── 3. The nudge digest ─────────────────────────────────────────────────────
-
-test("a trainer's sweep covers her clients and lands in her inbox", () => {
-  const src = read("src/app/api/ai-nudges/route.ts");
-  assert.match(src, /const trainerAuth = caller \? caller\.id : await ownerAuthUid\(admin\);/,
-    "the digest still always goes to the owner");
-  assert.match(src, /callerScope \? scopeRoster\(allClients, callerScope/,
-    "the sweep still runs over every client in the business");
-  assert.match(src, /select\("id, name, primary_goal, auth_user_id, trainer_id"\)/,
-    "the roster read has no trainer_id to scope on");
-});
-
-test("the scheduler keeps the whole-business sweep", () => {
-  const src = read("src/app/api/ai-nudges/route.ts");
-  assert.match(src, /let caller: \{ id: string; email: string \| null \} \| null = null;/);
-  assert.match(src, /: allClients;/, "a cron run would be scoped to nobody");
-});
+// ── 3. The nudge digest — GONE ──────────────────────────────────────────────
+//
+// Both tests here checked how /api/ai-nudges scoped its sweep and where the
+// digest landed. The route was deleted on 1 Sep (Dustin, five times over:
+// "nudge should be gone period"), so there is nothing left to scope. The
+// database freeze that stopped it sending has been holding since 27 Aug and
+// stays; nudgeSweepIsOff.test.ts now guards the absence.
 
 // ── 4. Pages reachable by a client ──────────────────────────────────────────
 
