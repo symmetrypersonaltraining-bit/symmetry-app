@@ -171,6 +171,41 @@ async function compressPhoto(file: File): Promise<{ base64: string; blob: Blob }
 // Main component
 // ---------------------------------------------------------------------------
 
+
+// Everything the search sheet knows about the food the client just picked.
+//
+// Both add paths used to write { food_id, name, servings, p, c, f } and drop
+// the rest: the amount label the client chose, fibre, sugar, sodium, saturated
+// fat and the other 29 nutrients. A food with a full lab panel in the catalogue
+// became a three-macro food the moment it was added to a meal.
+//
+// p/c/f (and the nutrients) arrive already scaled to the amount picked, so
+// servings stays 1 -- the multiplier is spent, not pending.
+function addedFromPick(item: {
+  n: string; a?: string | null; p: number; c: number; f: number;
+  food_id?: string | null; est?: boolean;
+  fi?: number | null; su?: number | null; so?: number | null; sf?: number | null;
+  mi?: Record<string, number | null> | null;
+}) {
+  // "170 g" -> amount 170, unit "g", so the plan row reads as a measure rather
+  // than as "1 serving". base_amount is deliberately absent: the macros are
+  // already final, so there is nothing left to scale by.
+  const m = (item.a || "").trim().match(/^([\d.]+)\s*(.*)$/);
+  const amount = m ? Number(m[1]) : null;
+  const unit = m && m[2] ? m[2] : null;
+  return {
+    food_id: item.food_id ?? null,
+    name: item.n,
+    servings: 1,
+    p: item.p, c: item.c, f: item.f,
+    ...(Number.isFinite(amount as number) ? { amount, unit } : {}),
+    a: item.a ?? null,
+    estimated: item.est ?? undefined,
+    fi: item.fi ?? null, su: item.su ?? null, so: item.so ?? null, sf: item.sf ?? null,
+    mi: item.mi ?? null,
+  };
+}
+
 export default function NutritionV3Client(props: Props) {
   const { firstName: coachFirstName } = useCoach();
   const { clientId, clientName, mealPlan, livePlans, incomingPlan, todayLogs, macroTarget, today } = props;
@@ -2104,12 +2139,12 @@ export default function NutritionV3Client(props: Props) {
                 // draft, go back, write nothing. Save is the only thing that
                 // writes.
                 const d = adjustDrafts.current[s.rowKey];
-                d.adds = [...d.adds, { food_id: item.food_id ?? null, name: item.n, servings: 1, p: item.p, c: item.c, f: item.f }];
+                d.adds = [...d.adds, addedFromPick(item)];
                 backSheet();
                 toast.success(`${item.n} added — save to keep it ✓`);
               } else if (row.kind === "plan") {
                 const ov = { ...(row.log?.item_overrides || {}) } as ItemOverrides;
-                const added = [...(ov.__added || []), { food_id: item.food_id ?? null, name: item.n, servings: 1, p: item.p, c: item.c, f: item.f }];
+                const added = [...(ov.__added || []), addedFromPick(item)];
                 await upsertLog(row.position, {
                   meal_id: row.chosen?.id ?? null,
                   adherence: row.log?.adherence && !ov.__unlogged ? row.log.adherence : "Skipped",

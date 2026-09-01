@@ -19,6 +19,8 @@
 // day's overrides are folded in. Kept pure so the scaling can be tested without
 // a database, because getting it wrong silently rewrites someone's plan.
 
+import { addedScale } from "./dailyTotals";
+
 export interface PlanItemLike {
   id: string;
   food: string;
@@ -38,6 +40,23 @@ export interface AddedLike {
   p?: number;
   c?: number;
   f?: number;
+  /**
+   * A REAL MEASURE, when there is one.
+   *
+   * These three were missing, so saving a meal to the plan threw away every
+   * measured added food's actual size. `dailyTotals.addedScale()` already knew
+   * that p/c/f describe `base_amount` of `unit` and the food contributes
+   * amount / base_amount of them; this module scaled by `servings` alone.
+   *
+   * 170 g of chicken quoted per 100 g therefore counted as 1.7x on the day it
+   * was eaten and 1x the moment it was saved into the plan, and 50 g counted as
+   * 0.5x then 1x. The plan silently disagreed with the day it came from, in
+   * whichever direction the client had adjusted -- and the size and unit they
+   * had typed were replaced by the words "1 serving".
+   */
+  amount?: number | null;
+  unit?: string | null;
+  base_amount?: number | null;
 }
 
 export interface ResolvedItem {
@@ -98,16 +117,23 @@ export function resolveEditedItems(
     });
   }
 
-  // Foods added to the meal become items of it. They arrive already priced per
-  // serving, so servings multiplies them the same way the day total does.
+  // Foods added to the meal become items of it, scaled the SAME way the day
+  // total scales them -- addedScale() is the single definition, shared rather
+  // than reimplemented, because two definitions of "how much is on the plate"
+  // is exactly how a plan comes to disagree with the day it was saved from.
   const added = (ov.__added as AddedLike[] | undefined) || [];
   for (const ad of added) {
     if (!ad || !ad.name) continue;
-    const sv = num(ad.servings) || 1;
+    const sv = addedScale({ servings: num(ad.servings) || 1, amount: ad.amount ?? null, base_amount: ad.base_amount ?? null });
+    // Display and arithmetic are separate questions. A food picked as "170 g"
+    // arrives with its macros ALREADY scaled, so there is nothing left to
+    // multiply -- but the plan row should still say 170 g. Only a base_amount
+    // means "these macros describe a different size from the one on the plate".
+    const measured = ad.amount != null && num(ad.amount) > 0;
     out.push({
       food: ad.name,
-      amount: round1(sv),
-      unit: "serving",
+      amount: round1(measured ? num(ad.amount) : sv),
+      unit: measured ? (ad.unit ?? null) : "serving",
       basis: null,
       protein: Math.round(num(ad.p) * sv),
       carbs: Math.round(num(ad.c) * sv),

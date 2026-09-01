@@ -190,6 +190,27 @@ export interface AddedFood {
    */
   grams_each?: number | null;
   options?: { label: string; gramsEach: number }[] | null;
+  /**
+   * NUTRIENTS BEYOND THE MACROS, carried the same way CustomItem carries them.
+   *
+   * The search sheet has scaled and returned all 33 for a long time. This
+   * interface had nowhere to put them, so the add-to-a-planned-meal path wrote
+   * name + three macros and dropped fibre, sugar, sodium, saturated fat and the
+   * other 29 on the floor. A food with a full lab-measured panel in the
+   * catalogue became a three-macro food the moment it was added to a meal, and
+   * the day's nutrient totals silently understated themselves with no way for
+   * the screen to tell.
+   *
+   * Units follow food_catalog exactly: sodium in MILLIGRAMS, the rest in GRAMS.
+   * Undefined means unknown, which is a different fact from zero.
+   */
+  fi?: number | null;
+  su?: number | null;
+  so?: number | null;
+  sf?: number | null;
+  mi?: Record<string, number | null> | null;
+  /** The label the client picked it by ("170 g"), so the row can say so. */
+  a?: string | null;
 }
 
 /**
@@ -444,8 +465,24 @@ export function planMealNutrientMap(meal: PlanMeal, overrides?: ItemOverrides | 
     if (Object.keys(n).length === 0) continue;
     out = addNutrients(out, scaleNutrients(n, scale));
   }
-  // __added foods carry macros only (the quick-add sheet never collected
-  // micros), so they contribute nothing here rather than a false zero.
+  // Added foods contribute their nutrients too. They used to contribute
+  // nothing -- the comment here said "the quick-add sheet never collected
+  // micros", which stopped being true once the sheet started returning all 33.
+  // It was the write into __added that dropped them, so the day total
+  // understated itself by exactly the foods a client added by hand.
+  for (const ad of overrides?.__added || []) {
+    const legacy: Nutrients = { fiber: ad.fi ?? null, sugar: ad.su ?? null,
+                                sodium: ad.so ?? null, satFat: ad.sf ?? null };
+    const n = readNutrients(ad.mi);
+    const merged: NutrientMap = { ...n };
+    if (legacy.fiber != null) merged.fiber = legacy.fiber;
+    if (legacy.sugar != null) merged.sugar = legacy.sugar;
+    if (legacy.sodium != null) merged.sodium = legacy.sodium;
+    if (legacy.satFat != null) merged.sat_fat = legacy.satFat;
+    if (Object.keys(merged).length === 0) continue;
+    // p/c/f arrive already scaled to the amount picked, and so do these.
+    out = addNutrients(out, merged);
+  }
   return out;
 }
 

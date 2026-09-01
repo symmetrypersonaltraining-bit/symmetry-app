@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveEditedItems } from "../../src/lib/nutrition/planEdit";
+import { addedScale } from "../../src/lib/nutrition/dailyTotals";
 
 /**
  * AN EDIT THAT LASTS LONGER THAN A DAY.
@@ -119,4 +120,67 @@ test("the caller can only ever edit their own plan", () => {
 
 test("an edit is never allowed to empty a meal", () => {
   assert.match(ROUTE, /That would leave the meal empty/);
+});
+
+// ─── a measured added food keeps its measure when the meal is saved ──────────
+//
+// resolveEditedItems scaled added foods by `servings` alone, while the day
+// total scales them with addedScale(), which knows that p/c/f describe
+// `base_amount` of `unit`. AddedLike had no amount/base_amount fields at all,
+// so the size was dropped at the type level before the arithmetic even ran.
+//
+// 170 g of chicken quoted per 100 g therefore counted as 1.7x on the day it was
+// eaten and 1x the moment it was saved into the plan. The plan disagreed with
+// the day it came from, and the amount the client had typed was replaced by the
+// words "1 serving".
+
+test("a measured added food scales by its amount, not by servings", () => {
+  const [item] = resolveEditedItems([], {
+    __added: [{ name: "Chicken breast", servings: 1, p: 31, c: 0, f: 4,
+                amount: 170, base_amount: 100, unit: "g" }],
+  });
+  assert.equal(item.protein, 53, "170 g against a 100 g base is 1.7x, not 1x");
+  assert.equal(item.fats, 7);
+  assert.equal(item.amount, 170, "the plan must keep the size the client typed");
+  assert.equal(item.unit, "g", "and its unit");
+});
+
+test("scaling down is wrong in the other direction too", () => {
+  const [item] = resolveEditedItems([], {
+    __added: [{ name: "Olive oil", servings: 1, p: 0, c: 0, f: 14,
+                amount: 50, base_amount: 100, unit: "g" }],
+  });
+  assert.equal(item.fats, 7, "half the base amount is half the fat");
+  assert.equal(item.amount, 50);
+});
+
+test("an unmeasured added food still behaves exactly as before", () => {
+  const [item] = resolveEditedItems([], {
+    __added: [{ name: "Protein shake", servings: 2, p: 25, c: 3, f: 1 }],
+  });
+  assert.equal(item.protein, 50);
+  assert.equal(item.amount, 2);
+  assert.equal(item.unit, "serving");
+});
+
+test("the plan and the day agree on what an added food contributes", () => {
+  // The property that matters. Two modules, one answer.
+  const added = { name: "Rice, cooked", servings: 1, p: 4, c: 45, f: 0,
+                  amount: 240, base_amount: 150, unit: "g" };
+  const [item] = resolveEditedItems([], { __added: [added] });
+  const scale = addedScale(added);
+  assert.equal(item.carbs, Math.round(45 * scale),
+    "the plan item must carry the same macros the day total counted");
+});
+
+test("a food picked by measure reads as that measure, not as a serving", () => {
+  // The search sheet scales p/c/f to the amount picked, so there is nothing
+  // left to multiply — but the plan row still has to say "170 g".
+  const [item] = resolveEditedItems([], {
+    __added: [{ name: "Chicken breast", servings: 1, p: 53, c: 0, f: 7,
+                amount: 170, unit: "g", a: "170 g" }],
+  });
+  assert.equal(item.protein, 53, "already-scaled macros must not be scaled twice");
+  assert.equal(item.amount, 170);
+  assert.equal(item.unit, "g");
 });
