@@ -5,6 +5,50 @@ ordered by what it costs to leave open.
 
 ---
 
+## 0. Sariah has TWO payment series in your calendar — she will be billed twice in October
+
+Added later on 1 Sep, and this one has a deadline.
+
+Adding her to the 30th did not move her; it added a **second** recurring $700
+beside the one on the 3rd that has run since July. Both are in Google Calendar,
+both sync, and both go out to December:
+
+| month | events |
+|-------|--------|
+| Sep | 3rd, 30th |
+| Oct | 3rd, 30th |
+| Nov | 3rd, 30th |
+| Dec | 3rd, 30th |
+
+August and September's pairs are close enough together that the generator's new
+ten-day guard treats them as one payment. **October's pair is 27 days apart,
+which looks exactly like an ordinary monthly gap** — so she would be invoiced
+$700 twice, $1,400 for eight sessions at $87.50.
+
+**The calendar is the source of truth, so this has to be fixed there: delete the
+recurring payment on the 3rd in Google Calendar.** Deleting the rows in the
+database only brings them back on the next sync. A new integrity check,
+`two_payment_series_one_month`, will keep flagging her until it is done.
+
+### And the question I could not answer for you
+
+You said "we just missed a pmt". I do not think one was missed, and I did not
+want to raise an invoice on a guess.
+
+Her 3 September invoice ($525, sent 28 Aug) covers the cycle **27 Jul – 27 Aug**.
+An invoice dated 30 August would cover **23 Jul – 23 Aug** — the same month.
+Billing both charges her twice for one month of training. Her August payment of
+$700 was made on the 3rd and is marked paid.
+
+So on the evidence the 30th is the same payment on a different day, not an extra
+one. If you know otherwise — she owes for a period I cannot see — say so and I
+will raise it.
+
+Her anchor is moved to the 30th either way, so from now on she is picked up on
+the 30th.
+
+---
+
 ## 1. 1,128 rows of AI-guessed nutrition, growing ~19 a day  (#19)
 
 Across 18 clients. Every day this stays open adds about 19 more. Three separate
