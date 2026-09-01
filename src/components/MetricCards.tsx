@@ -317,6 +317,10 @@ function ExpandedPanel({
   onClose,
   onLogged,
   autoLog,
+  rangeIdx,
+  setRangeIdx,
+  startDate,
+  endDate,
 }: {
   cfg: MetricConfig;
   allData: DataPoint[];
@@ -324,10 +328,15 @@ function ExpandedPanel({
   onClose: () => void;
   onLogged: () => void;
   autoLog?: boolean;
+  /** The one range, shared with the tiles behind this panel. */
+  rangeIdx: number;
+  setRangeIdx: (i: number) => void;
+  /** The window that range resolves to, computed once by the parent. */
+  startDate: string;
+  endDate: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<any>(null);
-  const [rangeIdx, setRangeIdx] = useState(2);
   // Auto-open the log form when arrived via /progress?log=weight (Sunday reminder).
   const [showLog, setShowLog] = useState(!!autoLog);
   const [logValue, setLogValue] = useState('');
@@ -336,15 +345,29 @@ function ExpandedPanel({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const supabase = createClient();
 
-  const filteredData = (() => {
-    const cutoffStr = isoDaysAgo(centralToday(), RANGES[rangeIdx].days);
-    return allData.filter(d => d.date >= cutoffStr);
-  })();
+  // ONE FILTER, ONE WINDOW.
+  //
+  // `allData` used to arrive ALREADY filtered by the parent's range, and then
+  // this filtered it again by its own -- and the second pass can only ever
+  // narrow what the first threw away. Body fat, lean mass and fat mass are read
+  // at InBody cadence, not weekly, so the parent's window usually left one
+  // point; no button here could widen past it, and every range said "Not enough
+  // data for this range" on a client with years of readings.
+  //
+  // The two ranges also disagreed by default -- the tile opened at 8 weeks and
+  // this panel at 4 -- so the same statistic read +13.4 lb behind and +18.6 lb
+  // in front. The range is now one piece of state, owned by the parent.
+  const filteredData = allData.filter(d => d.date >= startDate && d.date <= endDate);
 
   const chartData = filteredData.length >= 2 ? filteredData : allData.slice(-10);
 
-  const current = allData.length > 0 ? allData[allData.length - 1].value : null;
-  const startVal = filteredData.length > 1 ? filteredData[0].value : null;
+  // BOTH ENDPOINTS FROM THE SAME ARRAY. `current` came from allData and
+  // `startVal` from filteredData, so the subtraction could span two different
+  // windows -- which is how the narrower range produced the larger number.
+  const current = filteredData.length > 0 ? filteredData[filteredData.length - 1].value
+                : allData.length > 0 ? allData[allData.length - 1].value : null;
+  const startVal = filteredData.length > 1 ? filteredData[0].value
+                 : chartData.length > 1 ? chartData[0].value : null;
   const delta = current != null && startVal != null ? current - startVal : null;
   const deltaSign = delta != null ? (delta >= 0 ? '+' : '') : '';
   const deltaGood = delta != null ? (cfg.lowerIsBetter ? delta < 0 : delta > 0) : null;
@@ -625,10 +648,17 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
         .eq('client_id', clientId)
         .gte('metric_date', wideSince)
         .order('metric_date', { ascending: true }),
+      // THE TILE HAS A RANGE CONTROL AND IGNORED IT. This counted every log in
+      // a fixed 180-day window, whatever the buttons above it said, so "8
+      // weeks" and "1 week" showed the same number. And with no `completed`
+      // filter it counted abandoned sessions as done -- the streak query five
+      // lines below has always filtered on it, so the two disagreed.
       supabase.from('workout_logs')
         .select('id', { count: 'exact', head: true })
         .eq('client_id', clientId)
-        .gte('log_date', wideSince + 'T00:00:00'),
+        .eq('completed', true)
+        .gte('log_date', startDate + 'T00:00:00')
+        .lte('log_date', endDate + 'T23:59:59'),
       supabase.from('workout_logs')
         .select('log_date, completed, status')
         .eq('client_id', clientId)
@@ -732,16 +762,21 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
     setTargets(tgt ? { kcal: Number(tgt.calories) || 0, protein: Number(tgt.protein) || 0, carbs: Number(tgt.carbs) || 0, fats: Number(tgt.fats) || 0 } : null);
 
     setLoading(false);
-  }, [clientId]);
+  }, [clientId, startDate, endDate]);
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  const getDataPoints = (key: string): DataPoint[] => {
+  /** Every reading of this metric that was loaded, unwindowed. */
+  const getAllDataPoints = (key: string): DataPoint[] => {
     if (key === 'workouts' || key === 'streak') return [];
     return allMetrics
-      .filter(m => m[key as keyof MetricRow] != null && inWindow(m.metric_date))
+      .filter(m => m[key as keyof MetricRow] != null)
       .map(m => ({ date: m.metric_date, value: Number(m[key as keyof MetricRow]) }));
   };
+
+  /** The tile's series: the same readings, inside the active window. */
+  const getDataPoints = (key: string): DataPoint[] =>
+    getAllDataPoints(key).filter(p => inWindow(p.date));
 
   const getSummary = (key: string) => {
     if (key === 'workouts') return { current: String(workoutCount), change: null as string | null, changeNum: null as number | null };
@@ -827,7 +862,14 @@ export default function MetricCards({ clientId }: MetricCardsProps) {
           <div id={expandedKey === 'weight' ? 'metric-weight-panel' : undefined}>
             <ExpandedPanel
               cfg={cfg}
-              allData={getDataPoints(expandedKey)}
+              // Unfiltered. The panel windows it once, itself. Handing it a
+              // pre-filtered array was half of why the sparse metrics never
+              // drew: filtering twice can only narrow.
+              allData={getAllDataPoints(expandedKey)}
+              rangeIdx={rangeMode}
+              setRangeIdx={setRangeMode}
+              startDate={startDate}
+              endDate={endDate}
               clientId={clientId}
               onClose={() => setExpandedKey(null)}
               onLogged={() => setRefreshKey(k => k + 1)}

@@ -60,7 +60,13 @@ export async function GET(req: NextRequest) {
         .select("client_id, log_date")
         .in("client_id", ids)
         .eq("completed", true)
-        .gte("log_date", since),
+        // Closed at BOTH ends. `since` was computed and `today` was not used as
+        // a ceiling, so a row dated in the future counted as another distinct
+        // day and pushed somebody up the board for a workout they had not done
+        // yet. The challenge endpoint has always bounded its window at both
+        // ends; this one only ever bounded the past.
+        .gte("log_date", since)
+        .lte("log_date", today),
     ]);
 
     // Demo/test accounts never rank against real people, and neither does the

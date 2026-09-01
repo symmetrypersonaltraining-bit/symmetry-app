@@ -163,10 +163,18 @@ export default function ClientWeekSummary() {
           supabase.from("scheduled_workouts").select("scheduled_date, status").is("deleted_at", null).eq("client_id", cid).gte("scheduled_date", addDays(today, -60)).lte("scheduled_date", today),
         ]);
 
-        const lastRows = swLast.data || [];
+        // A SWAPPED-OUT SESSION IS NOT STILL ON THE PLAN.
+        //
+        // Replacing a day does not delete its row: AddWorkoutButton and
+        // OffPlanBanner rewrite the original's status to 'skipped' and insert
+        // the replacement beside it. Both rows survive `deleted_at is null`, so
+        // the denominator counted the same session twice and the card read
+        // "1/2 workouts done" on a day the client did exactly what was asked.
+        const swappedOut = (r: { status?: string | null }) => r.status === "skipped";
+        const lastRows = (swLast.data || []).filter((r: any) => !swappedOut(r));
         const totalLast = lastRows.length;
         const doneLast = lastRows.filter((r: any) => r.status === "completed").length;
-        const thisRows = swThis.data || [];
+        const thisRows = (swThis.data || []).filter((r: any) => !swappedOut(r));
         const totalThis = thisRows.length;
         const doneThis = thisRows.filter((r: any) => r.status === "completed").length;
 

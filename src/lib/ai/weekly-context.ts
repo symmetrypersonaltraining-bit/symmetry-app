@@ -122,7 +122,13 @@ function factsFor(
     consistency: sum.consistency,
     accuracy: sum.accuracy,
     adherenceBasis: sum.adherenceBasis,
-    workoutsScheduled: sw.length,
+    // A swapped-out session is not still on the plan. Replacing a day rewrites
+    // the original's status to 'skipped' and inserts the replacement beside it;
+    // both rows survive `deleted_at is null`. Counting both made the AI brief
+    // report a client as half-adherent on a week they did every session --
+    // and made the brief disagree with the week card, which is worse than
+    // either number being wrong on its own.
+    workoutsScheduled: sw.filter((w) => w.status !== "skipped").length,
     workoutsCompleted: sw.filter((w) => w.status === "completed").length,
     weightStart: wi.length ? Number(wi[0].weight) : null,
     weightEnd: wi.length ? Number(wi[wi.length - 1].weight) : null,

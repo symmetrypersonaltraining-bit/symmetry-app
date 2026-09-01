@@ -48,8 +48,18 @@ describe("the AI's week windows are the definition", () => {
 
   it("scheduled and completed are counted the same way the card counts them", () => {
     const ctx = strip(read("src/lib/ai/weekly-context.ts"));
-    assert.match(ctx, /workoutsScheduled: sw\.length/, "the AI stopped counting scheduled rows in the window");
+    const card = strip(read("src/components/ClientWeekSummary.tsx"));
+    assert.match(ctx, /workoutsScheduled: sw\.filter\(\(w\) => w\.status !== "skipped"\)\.length/,
+      "the AI stopped counting scheduled rows in the window");
     assert.match(ctx, /status === "completed"/, "the AI stopped counting completions by status");
+    // A SWAPPED-OUT SESSION IS NOT STILL ON THE PLAN, and both surfaces have to
+    // agree about that. Replacing a day rewrites the original to 'skipped' and
+    // inserts the replacement beside it; both survive `deleted_at is null`, so
+    // counting raw rows made a fully adherent week read as half done -- and
+    // made the brief disagree with the card, which is worse than either being
+    // wrong alone.
+    assert.ok(/status !== "skipped"/.test(ctx), "the brief counts swapped-out sessions");
+    assert.ok(/=== "skipped"/.test(card), "the card counts swapped-out sessions");
   });
 });
 
