@@ -243,6 +243,20 @@ describe("the rest timer is opt-in", () => {
     );
   });
 
+  it("reaches session mode as well as the card list", () => {
+    // startRest must be declared ABOVE the `if (sessionMode && currentExercise)`
+    // early return. Declared below it, session mode returns first and that whole
+    // view has no rest timer at all -- which is how the fix for the pop-up
+    // silently removed the feature for anyone using session mode.
+    const decl = logger.indexOf("const startRest = (");
+    const sessionReturn = logger.indexOf("if (sessionMode && currentExercise)");
+    assert.ok(decl > 0 && sessionReturn > 0, "could not locate startRest or the session-mode return");
+    assert.ok(decl < sessionReturn,
+      "startRest is declared after the session-mode early return, so session mode cannot open the timer");
+    assert.match(logger, /startRest\(currentExercise\)/,
+      "session mode never calls startRest, so it has no way to open the timer");
+  });
+
   it("still has a way in, or the timer is dead code", () => {
     assert.match(logger, /const startRest = \(/, "no opt-in opener left");
     assert.match(logger, /onClick=\{e => \{ e\.stopPropagation\(\); startRest\(/,

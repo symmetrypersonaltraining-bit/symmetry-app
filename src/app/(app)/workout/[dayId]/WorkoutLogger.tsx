@@ -2539,6 +2539,28 @@ export default function WorkoutLogger({
     );
   }
 
+  // The only way the rest timer opens: the client asks for it. Declared here,
+  // above the session-mode early return, so BOTH views can reach it -- session
+  // mode returns before the card list is evaluated, so a helper declared down
+  // there leaves this view with no timer at all.
+  //
+  // Returns without doing anything when there is nothing to count: no rest, or
+  // a rest of "0"/"none", which means go straight into the next movement.
+  const startRest = (pe: { rest: string | null; exercises?: { name?: string | null } | null }) => {
+    if (!pe.rest || pe.rest === "none" || pe.rest === "0") return;
+    const match = pe.rest.match(/(\d+)/);
+    if (!match) return;
+    const n = parseInt(match[1]);
+    // "2 min" has to mean 120, not 2. The stored strings are seconds ("90s")
+    // except where they are written in minutes, and a 2 second rest is not a
+    // thing anyone programmes.
+    setRestTimer(/min/i.test(pe.rest) ? n * 60 : n);
+    // Carried so the notification can say what is coming, which is the
+    // difference between an alarm you have to unlock the phone to understand
+    // and one you can act on from the lock screen.
+    setRestForExercise(pe.exercises?.name ?? null);
+  };
+
   // \u2500\u2500\u2500 SESSION MODE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   if (sessionMode && currentExercise) {
     const peSets = sets[currentExercise.id] || [];
@@ -2873,6 +2895,17 @@ export default function WorkoutLogger({
             )}
             {xFields.includes("each_side") && (
               <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>Each side</span>
+            )}
+            {/* Rest reaches session mode too, and only on a tap. Without this
+                the whole view had no timer at all once the automatic one went. */}
+            {restLabel(currentExercise.rest) && (
+              isImmediate(currentExercise.rest)
+                ? <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>{restLabel(currentExercise.rest)}</span>
+                : <button type="button" onClick={e => { e.stopPropagation(); startRest(currentExercise); }}
+                    className="text-[11px] px-2 py-0.5 rounded-full"
+                    style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
+                    {restLabel(currentExercise.rest)}{" \u00b7 tap to time"}
+                  </button>
             )}
             {currentExercise.cue && (
               <button type="button" onClick={() => setShowCue(v => !v)}
@@ -3313,24 +3346,6 @@ export default function WorkoutLogger({
         const __list = currentSection?.prescribed_exercises ?? [];
         const __blocks = groupSection(__list as never);
         const __idxOf = (peId: string) => __list.findIndex((x) => x.id === peId);
-        // The only way the rest timer opens now: the client asks for it.
-        // Returns null when there is nothing to count (no rest, or a rest of
-        // "0"/"none", which means go straight into the next movement).
-        const startRest = (pe: { rest: string | null; exercises?: { name?: string | null } | null }) => {
-          if (!pe.rest || pe.rest === "none" || pe.rest === "0") return;
-          const match = pe.rest.match(/(\d+)/);
-          if (!match) return;
-          const n = parseInt(match[1]);
-          // "2 min" has to mean 120, not 2. The stored strings are seconds
-          // ("90s") except where they are written in minutes, and a 2 second
-          // rest is not a thing anyone programmes.
-          setRestTimer(/min/i.test(pe.rest) ? n * 60 : n);
-          // Carried so the notification can say what is coming, which is the
-          // difference between an alarm you have to unlock the phone to
-          // understand and one you can act on from the lock screen.
-          setRestForExercise(pe.exercises?.name ?? null);
-        };
-
         const renderCard = (pe: (typeof __list)[number], i: number) => {
           const peSets = sets[pe.id] || [];
           const doneCount = peSets.filter(s => s.done).length;
