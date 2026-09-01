@@ -146,6 +146,17 @@ export default function FoodSearchSheet({
   const [unit, setUnit] = useState("serving");
   const [creating, setCreating] = useState(false);
   const [cf, setCf] = useState({ name: "", serving: "1 serving", p: "", c: "", f: "" });
+  /**
+   * What the row being CORRECTED already knew, kept so the correction does not
+   * throw it away. Null when the food is being typed from scratch, in which
+   * case there is nothing to keep.
+   */
+  const [carry, setCarry] = useState<{
+    baseGrams: number | null;
+    options: { desc: string; grams: number }[] | null;
+    fiber: number | null; sugar: number | null; sodium: number | null; sat_fat: number | null;
+    micros: Record<string, number | null> | null;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const catalogOk = useRef<boolean | null>(null);
   // Barcode scanning: scanner overlay, in-flight lookup, and the miss panel.
@@ -455,6 +466,24 @@ export default function FoodSearchSheet({
   function editPicked() {
     if (!picked) return;
     setPendingBarcode(picked.barcode ?? null);
+    // CORRECTING THE MACROS MUST NOT DESTROY THE REST OF THE ROW.
+    //
+    // This form collects a name, a serving and three macros, and saveCustomFood
+    // wrote exactly those. So fixing a scanned product's protein also stripped
+    // its gram weight, its serving options and every nutrient the Open Food
+    // Facts import had given it -- the correction left the food WORSE than the
+    // row it was correcting, and un-re-portionable for good.
+    setCarry({
+      baseGrams: picked.baseGrams ?? null,
+      // Back to the shape the column stores. mapRow parses serving_options
+      // into {label, gramsPerUnit}; the row holds {desc, grams}.
+      options: picked.named && picked.named.length
+        ? picked.named.map((n) => ({ desc: n.label, grams: n.gramsPerUnit }))
+        : null,
+      fiber: picked.fiber ?? null, sugar: picked.sugar ?? null,
+      sodium: picked.sodium ?? null, sat_fat: picked.sat_fat ?? null,
+      micros: picked.micros && hasAnyNutrient(picked.micros) ? picked.micros : null,
+    });
     setCf({
       name: picked.name || "",
       // The base serving, not the amount currently dialled in — the numbers
@@ -486,6 +515,14 @@ export default function FoodSearchSheet({
   async function saveCustomFood() {
     const p = parseFloat(cf.p) || 0, c = parseFloat(cf.c) || 0, f = parseFloat(cf.f) || 0;
     if (!cf.name.trim() || p + c + f === 0) return;
+    const serving = cf.serving || "1 serving";
+    // "30 g", "2 Tbsp (30 g)", "1 slice (28g)" all name a mass. Anything else
+    // does not, and guessing one would be worse than leaving it unset.
+    const gramMatch = serving.match(/([\d.]+)\s*g\b/i);
+    const baseGrams = gramMatch ? Number(gramMatch[1]) : (carry?.baseGrams ?? null);
+    const servingOptions =
+      carry?.options ??
+      (baseGrams != null ? [{ desc: serving, grams: baseGrams }] : null);
     setBusy(true);
     let id: string | null = null;
     setSaveWarning(null);
@@ -496,11 +533,31 @@ export default function FoodSearchSheet({
         .insert({
           created_by_client_id: clientId,
           name: cf.name.trim(),
-          serving_desc: cf.serving || "1 serving",
+          serving_desc: serving,
           kcal: kcalOf(p, c, f),
           protein: p, carbs: c, fats: f,
           source: "client",
           verified: false,
+          // A FOOD WITH NO GRAM WEIGHT CAN ONLY EVER BE LOGGED IN ITSELF.
+          //
+          // serving_grams is what mapRow reads into baseGrams; without it
+          // multiplierForNamed returns null, the unit list collapses to the one
+          // typed serving, and the serving-to-gram bridge has no base, so a
+          // food entered as "1 slice" is a food you can only ever have in
+          // slices. Parsed from the typed serving when it names a mass, else
+          // inherited from the row being corrected.
+          ...(baseGrams != null ? { serving_grams: baseGrams } : {}),
+          // At minimum the base serving itself, so the picker has something to
+          // offer besides "1 serving".
+          ...(servingOptions ? { serving_options: servingOptions } : {}),
+          // Carried through a correction rather than blanked. null stays null:
+          // an unknown sodium is a different fact from zero, all the way to the
+          // day total.
+          ...(carry?.fiber != null ? { fiber: carry.fiber } : {}),
+          ...(carry?.sugar != null ? { sugar: carry.sugar } : {}),
+          ...(carry?.sodium != null ? { sodium: carry.sodium } : {}),
+          ...(carry?.sat_fat != null ? { sat_fat: carry.sat_fat } : {}),
+          ...(carry?.micros ? { micros: carry.micros } : {}),
           ...(pendingBarcode ? { barcode: pendingBarcode } : {}),
         })
         .select()
@@ -524,6 +581,7 @@ export default function FoodSearchSheet({
     if (saved && id) {
       setCreating(false);
       setCf({ name: "", serving: "1 serving", p: "", c: "", f: "" });
+      setCarry(null);
       openPicked(mapRow(saved, true));
       return;
     }
