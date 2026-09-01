@@ -161,7 +161,11 @@ export default function GoalCard({
           axis labels to about 40px — caught on the live screen a minute after
           shipping, not in review, because at phone width it looks perfect.
           A chart does not get more readable past ~480px; it just gets louder. */}
-      <div style={{ position: "relative", touchAction: "none", marginTop: 12, maxWidth: 480 }}>
+      {/* pan-y, not none. This chart DOES scrub on touch, so it needs the
+          horizontal gesture -- but "none" took the vertical one too, and the
+          page stopped scrolling wherever the chart sat. pan-y gives the browser
+          back the scroll and keeps the scrub. */}
+      <div style={{ position: "relative", touchAction: "pan-y", marginTop: 12, maxWidth: 480 }}>
         <svg
           ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", width: "100%", height: "auto", overflow: "visible" }}
           role="img"

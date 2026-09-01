@@ -199,3 +199,34 @@ test("every fetchAllRows call site orders its query", () => {
   }
   assert.deepEqual(bad, [], `paged reads with no .order() — pages can overlap and skip: ${bad.join(", ")}`);
 });
+
+/**
+ * A LIMIT BELOW THE CEILING TRUNCATES JUST AS SILENTLY.
+ *
+ * The ban above only catches a `.limit(n)` larger than the server's own cap,
+ * because that is the shape that looks careful and is not. It does not catch a
+ * small, deliberate-looking limit on a list that is then SEARCHED IN THE
+ * BROWSER — and that is the same bug wearing a smaller number.
+ *
+ * The workout-library swap list read `.from("days").order("label").limit(400)`
+ * against 1,205 rows and filtered the result client-side, so the search box
+ * could only ever see the front of the alphabet. Typing "push" matched 24 days
+ * in the library and found a handful, with nothing on screen to say the rest
+ * had been cut off.
+ *
+ * There is no general way to spot "fetched, then filtered locally" from the
+ * source, so this names the case instead of pretending to a rule.
+ */
+test("the workout library swap list is paged, not capped", () => {
+  // Comments explaining the old bug quote the old code. Strip them, or the
+  // explanation trips the rule it is explaining.
+  const src = readFileSync(join(SRC, "components/ScheduleBoard.tsx"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const block = src.slice(src.indexOf("const [libDays, setLibDays]"));
+  // To the end of the effect that loads it — the first setLibDays match is the
+  // useState declaration two lines in, not the fetch.
+  const head = block.slice(0, block.indexOf("}, [movePick]);"));
+  assert.match(head, /fetchAllRows</, "the swap list is not paged");
+  assert.ok(!/\.limit\(\d+\)/.test(head),
+    "a capped read feeding a client-side search hides whatever it did not fetch");
+});

@@ -239,7 +239,13 @@ function FullChart({
     <div className="relative select-none">
       <svg
         width="100%" viewBox={`0 0 ${W} ${H}`}
-        style={{ overflow: "visible", touchAction: "none" }}
+        // NO touchAction: "none" here. It tells the browser this element
+        // handles its own gestures, so a finger landing on the chart scrolled
+        // nothing -- and on a phone this chart is most of the width of the
+        // screen. It has no touch handlers at all (onMouseLeave is the only
+        // one), so it was buying nothing and charging the client a dead zone
+        // in the middle of their own home page.
+        style={{ overflow: "visible" }}
         onMouseLeave={() => setHovered(null)}
       >
         <defs>

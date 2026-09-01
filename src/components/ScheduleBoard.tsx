@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { openTarget } from "./WorkoutDaySheet";
 import { extraConfirmFor, removalVerdict } from "@/lib/removeGuard";
 import { useRouter } from "next/navigation";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { createClient } from "@/lib/supabase/client";
 import { isPeakWeekLocked } from "@/lib/peak-week";
 import { moveScheduledWorkout } from "@/lib/moveWorkout";
@@ -185,8 +186,22 @@ export default function ScheduleBoard({
     (async () => {
       try {
         const supabase: any = createClient();
-        const { data } = await supabase.from("days").select("id, label").order("label").limit(400);
-        setLibDays((data as { id: string; label: string }[]) || []);
+        // THE WHOLE LIBRARY, NOT THE FIRST 400 ALPHABETICALLY.
+        //
+        // The list is filtered in the browser, so anything the query did not
+        // fetch simply does not exist as far as search is concerned. There are
+        // 1,205 days; .limit(400) ordered by label meant the search box could
+        // only ever see the front of the alphabet. "push" matches 24 of them
+        // and found a fraction, with nothing on screen to say the rest had been
+        // cut off -- the same silent-truncation family as the calendar.
+        //
+        // Two columns across twelve hundred rows is a small read; paging it is
+        // cheaper than explaining to somebody why their workout is missing.
+        const rows = await fetchAllRows<{ id: string; label: string }>(
+          () => supabase.from("days").select("id, label"),
+          { label: "days.library-swap", orderedBy: "label" },
+        );
+        setLibDays(rows);
       } catch { setLibDays([]); }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
