@@ -20,7 +20,7 @@ export default async function PaymentsPage() {
   // All payment reminders (newest first per client for history)
   const { data: reminderRows } = await supabase
     .from("payment_reminders")
-    .select("id, client_id, due_date, amount_due, billing_credits, notification_status, sms_sent_at, approved_at, notes")
+    .select("id, client_id, due_date, amount_due, billing_credits, notification_status, email_sent_at, approved_at, notes")
     .order("due_date", { ascending: false });
 
   // Cancelled sessions per client in last 35 days (one billing cycle)
@@ -60,7 +60,12 @@ export default async function PaymentsPage() {
       amountDue: cur ? Number(cur.amount_due) : (c.current_fees ? Number(c.current_fees) : 0),
       billingCredits: cur ? Number(cur.billing_credits ?? 0) : 0,
       notificationStatus: cur?.notification_status ?? "no_reminder",
-      emailSentAt: cur?.sms_sent_at ?? null,
+      // sms_sent_at, not email_sent_at, was read here. NOTHING has ever written
+      // sms_sent_at -- 0 rows of 52, against 30 with email_sent_at -- so the
+      // "emailed" line on this page was blank for every client who had in fact
+      // been emailed. Home reads email_sent_at and showed it; two screens
+      // disagreeing about the same fact.
+      emailSentAt: cur?.email_sent_at ?? null,
       approvedAt: cur?.approved_at ?? null,
       notes: cur?.notes ?? null,
       hasReminder: !!cur,
@@ -69,7 +74,7 @@ export default async function PaymentsPage() {
         dueDate: r.due_date,
         amountDue: Number(r.amount_due),
         notificationStatus: r.notification_status,
-        emailSentAt: r.sms_sent_at ?? null,
+        emailSentAt: r.email_sent_at ?? null,
       })),
     };
   });
