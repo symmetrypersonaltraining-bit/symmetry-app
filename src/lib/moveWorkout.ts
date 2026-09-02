@@ -65,7 +65,7 @@ export async function moveScheduledWorkout(
   // board move has been found in the data. The guard simply was not connected.
   const { data: before } = await sb
     .from("scheduled_workouts")
-    .select("scheduled_date, workout_log_id")
+    .select("scheduled_date, workout_log_id, workout_logs(completed, completed_at)")
     .eq("id", w.id)
     .maybeSingle();
   const fromDate = (before as { scheduled_date?: string } | null)?.scheduled_date ?? null;
@@ -90,15 +90,36 @@ export async function moveScheduledWorkout(
     // Already fetched above, in the same round trip that got the old date.
     logId = (before as { workout_log_id?: string | null } | null)?.workout_log_id ?? null;
   }
-  if (logId) {
+  // A FINISHED SESSION'S LOG DOES NOT MOVE.
+  //
+  // Jenn Day, 1 Sep: "Still can't view previous weeks."
+  //
+  // She moved her completed 26 Aug workout to 5 Sep, and this line dragged the
+  // LOG to 5 Sep with it — so the record of a session she had actually trained,
+  // completed_at 2026-08-26 11:12 CT, claimed to be a week in the future. The
+  // calendar and the history disagreed, last week showed a gap where a workout
+  // she had done used to be, and she reported it as the app being broken.
+  //
+  // The schedule and the log answer different questions. The schedule is a plan
+  // and Dustin and his clients move it wherever they like — that is not in
+  // question and never was. The log is a record of something that happened, and
+  // when it happened is not a scheduling decision. completed_at already knows.
+  //
+  // So: an unfinished log still follows the move (it is a shell for work not yet
+  // done, and its date is part of the plan). A completed one stays put.
+  const completed = Boolean(
+    (before as { workout_logs?: { completed?: boolean } | null } | null)?.workout_logs?.completed,
+  );
+  if (logId && !completed) {
     try {
-      // Still never fatal — the reasoning above holds, the schedule is
-      // authoritative and a stale log_date is the smaller problem. But this
-      // call returns its error rather than throwing, so the catch below has
-      // never seen one and a log left on the old date was completely silent.
+      // Still never fatal — the schedule has already moved and a stale log_date
+      // on an unfinished shell is a smaller problem than telling someone the
+      // move failed when it did not. This call returns its error rather than
+      // throwing, so the catch below has never seen one and a log left on the
+      // old date was completely silent.
       const { error: logErr } = await sb.from("workout_logs").update({ log_date: toDate }).eq("id", logId);
       if (logErr) console.error("moveScheduledWorkout: schedule moved, log left on the old date —", logErr.message);
-    } catch { /* schedule is authoritative for where the session sits */ }
+    } catch { /* schedule is authoritative for where an unfinished session sits */ }
   }
   return null;
 }
