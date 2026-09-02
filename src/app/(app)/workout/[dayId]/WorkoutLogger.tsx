@@ -775,9 +775,25 @@ export default function WorkoutLogger({
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const [activeExerciseIdx, setActiveExerciseIdx] = useState(0);
   const [workoutComplete, setWorkoutComplete] = useState(false);
-  // ...and seed it from the database, because local state does not survive a
-  // reload. Reopening a FINISHED workout left this false, which is what put a
-  // live Cancel button on top of a completed session's data.
+  // FINISHED IS A FACT ABOUT THE ROW. JUST-FINISHED IS A MOMENT.
+  //
+  // Lauren, 2 Sep: logged one set of nine on "LS6 Wed - Quad Dominant", hit
+  // complete, and could not get back in - the celebration screen was all the
+  // logger would render, so her one logged set was unreachable and the other
+  // eight could not be done.
+  //
+  // workoutComplete is seeded from the database so a finished session does not
+  // offer Cancel, and that part is right. But the same flag also gated the
+  // completion screen, so seeding it turned every reopen of a finished workout
+  // into a dead end. A celebration is for the moment you finish; it is not a
+  // state a workout lives in forever.
+  //
+  // justCompleted is set ONLY by the three paths that finish a workout during
+  // this visit, and only that renders the screen. Reopening a completed session
+  // now opens the logger, with every set exactly where it was left and every
+  // one of them still editable - which is what "view/edit past workouts always"
+  // means.
+  const [justCompleted, setJustCompleted] = useState(false);
   useEffect(() => {
     if (!existingLogId) return;
     let on = true;
@@ -2142,6 +2158,7 @@ export default function WorkoutLogger({
           .select("id").eq("workout_log_id", logId).limit(1);
         if (__linked && __linked.length) {
           setWorkoutComplete(true);
+          setJustCompleted(true);
           if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
           return;
         }
@@ -2335,6 +2352,7 @@ export default function WorkoutLogger({
         }
       }
       setWorkoutComplete(true);
+      setJustCompleted(true);
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
     } catch (e) {
       // Say it. The sets are all still in the database and the session stays
@@ -2499,7 +2517,7 @@ export default function WorkoutLogger({
     setSwapTargetPe(null);
   }
 
-    if (workoutComplete) {
+    if (justCompleted) {
     const symLines = ["That's the rep you won't remember and the one that counted.", "Logged. The work doesn't care how you felt about it.", "Showed up. Did the work. That's the whole thing.", "Not talked about. Done.", "It wasn't easy. It was worth it.", "The discipline is doing it when you don't feel it. You did."];
     const completionLine = symLines[(day.label ? day.label.length : 0) % symLines.length];
     return (
@@ -3217,7 +3235,9 @@ export default function WorkoutLogger({
                   background: completeError ? "#ef4444" : progressPct === 100 ? "#22c55e" : "rgba(255,255,255,0.06)",
                   color: completeError || progressPct === 100 ? "white" : "rgba(255,255,255,0.3)",
                 }}>
-                {saving ? "Saving\u2026" : completeError ? "Try again \u21bb" : "Complete \u2713"}
+                {/* Already-finished sessions reopen into the logger now, so the
+                    button has to stop claiming there is something to complete. */}
+                {saving ? "Saving\u2026" : completeError ? "Try again \u21bb" : workoutComplete ? "Save changes \u2713" : "Complete \u2713"}
               </button>
             )}
           </div>
@@ -3705,7 +3725,9 @@ export default function WorkoutLogger({
             : progressPct === 100
             ? { background: "#22c55e", color: "white" }
             : { background: "var(--brand-surface)", color: "var(--brand-text-secondary)", border: "1px solid var(--brand-border)" }}>
-          {saving ? "Saving\u2026" : completeError ? "Try again \u21bb" : progressPct === 100 ? "\ud83c\udfc6 Complete Workout" : `${progressPct}% \u2014 keep going!`}
+          {saving ? "Saving\u2026" : completeError ? "Try again \u21bb"
+            : workoutComplete ? "Save changes \u2713"
+            : progressPct === 100 ? "\ud83c\udfc6 Complete Workout" : `${progressPct}% \u2014 keep going!`}
         </button>
       </div>
       {!sessionMode && (
