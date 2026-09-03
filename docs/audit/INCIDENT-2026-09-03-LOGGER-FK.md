@@ -77,3 +77,45 @@ their own session, and the only recovery is a reload they have no way to know
 about. It is not rare by nature — reprogramming mid-day is normal here — it has
 just been invisible, because the client sees a Postgres error and gives up
 rather than reporting it.
+
+
+---
+
+## Part 2 of the fix, applied 3 Sep: programme content is now audited
+
+`programme_audit` had rows for `programs` and `program_assignments` going back
+weeks — but nothing at all for `days`, `sections` or `prescribed_exercises`. The
+tables carried guards (`trg_pe_block_cross_client_edit`,
+`trg_section_block_cross_client_edit`) and guards refuse a bad write; they do not
+record a legitimate one. So the most consequential act in the system — rewriting
+what a client is about to train — was the one thing with no history.
+
+`audit_programme_content()` now covers all three, **statement-level** rather than
+row-level. That is the whole design: a programme rewrite touches thousands of
+rows (11,312 in `prescribed_exercises` alone), and a row-level trigger would
+produce a haystack instead of a history, with four table lookups on every row of
+a bulk delete. A transition table gives one row per statement — *"13:13:01,
+DELETE 10 row(s) on prescribed_exercises"* — which is the sentence that was
+missing this morning.
+
+It **records, it does not block.** Reprogramming mid-day is legitimate; a trigger
+refusing it would remove control, which is the mistake made on 1 Sep with the
+completed-workout-move guard that was added and dropped the same day.
+
+Two things were fixed after watching the first version run:
+
+- it logged statements that changed nothing (a cascade matching no rows still
+  wrote "DELETE 0 row(s)"), which is the noise that makes real entries easy to
+  miss;
+- every row in one transaction shared a timestamp, because the column defaults
+  to `now()` — the transaction start. `clock_timestamp()` advances within a
+  transaction, so the order of "deleted the old, inserted the new" survives,
+  which is exactly the sequence you want when reconstructing an incident.
+
+**A programme change with no `auth_uid` did not come from somebody using the
+app.** That absence is a signal, not a gap: it is the fingerprint of a Claude
+session over the MCP, which is how this incident happened.
+
+Verified by running a full create-then-delete cycle on a throwaway day and
+reading the trail back: six entries, in order, milliseconds apart, no zero-row
+noise. Probe rows and the throwaway day removed afterwards.
