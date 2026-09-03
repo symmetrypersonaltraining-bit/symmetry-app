@@ -12,6 +12,19 @@ import VideoZoom from "@/components/VideoZoom";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
 
+// Pinned, not @latest: jsdelivr resolves @latest on every request and caps
+// browser caching at about a week, so repeat visitors re-fetched this all the
+// time. 3.46.0 is what @latest resolves to right now, so pinning it is
+// byte-for-byte what the app is already serving — no icon can change or
+// disappear — it only stops the set moving underneath us later.
+//
+// VERIFY THE VERSION EXISTS BEFORE EVER CHANGING THIS. The first draft of this
+// commit pinned 3.19.0, a version that has never been published. It would have
+// 404'd the whole stylesheet and taken all 144 icons off every screen for every
+// client. Checked against the npm registry, not from memory.
+const ICON_CSS =
+  "https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css";
+
 export const metadata: Metadata = {
   title: "Symmetry Corrective",
   description: "Train smarter. Move better. Live stronger.",
@@ -67,10 +80,55 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
+        {/* THE ICON FONT NO LONGER HOLDS UP THE FIRST PAINT.
+          *
+          * Dustin, 3 Sep: "the app has been loading very slow for me".
+          *
+          * A plain <link rel="stylesheet"> in <head> is render-blocking: the
+          * browser paints NOTHING until it has been fetched and parsed. This
+          * one is on a third origin, so it also costs a DNS lookup and a TLS
+          * handshake before the request even starts — all of it in front of
+          * the first pixel, on every page, every load.
+          *
+          * Two changes, neither of which touches a single icon:
+          *
+          * 1. PINNED. It was `@latest`, which makes jsdelivr resolve the
+          *    version on every request and caps browser caching at ~7 days
+          *    instead of the year a pinned version gets. Repeat visitors were
+          *    re-fetching it all week. 3.46.0 is what `@latest` resolves to
+          *    today, so pinning it is byte-for-byte what is already being
+          *    served — it just stops the set moving under us later, which is
+          *    its own outage waiting to happen.
+          *
+          * 2. NON-BLOCKING. rel="preload" starts the download immediately
+          *    without holding up paint, and a few lines of inline script
+          *    attach it as a real stylesheet as soon as it lands. <noscript>
+          *    keeps a plain blocking link for anyone without JS, who would
+          *    otherwise get no icons at all.
+          *
+          * What this does NOT fix: the app uses 144 icons and this font ships
+          * about 5,800 of them, from a CDN that is a single point of failure
+          * with no fallback. Self-hosting a subset is the real answer and it
+          * touches 72 files, so it is its own change.
+          */}
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
+        <link rel="preload" as="style" href={ICON_CSS} crossOrigin="anonymous" />
+        {/* This layout is a SERVER component, so the usual
+          * media="print" onLoad={...} trick is not available — React cannot
+          * hand an event handler to the client from here. A preload plus three
+          * lines of inline script does the same job and runs before hydration.
+          */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              `(function(){var l=document.createElement('link');` +
+              `l.rel='stylesheet';l.href=${JSON.stringify(ICON_CSS)};` +
+              `document.head.appendChild(l);})();`,
+          }}
         />
+        <noscript>
+          <link rel="stylesheet" href={ICON_CSS} />
+        </noscript>
       </head>
       <body>
         <HapticTap />
