@@ -135,11 +135,15 @@ export async function POST(req: NextRequest) {
   // Send invite email via Resend
   const resendKey = process.env.RESEND_API_KEY;
   let inviteCoachFirstName: string | null = null;
-  if ((client as { trainer_id?: string }).trainer_id) {
+  // Hoisted to a const so the guard actually narrows it. Repeating the cast
+  // expression on the next line produced a fresh `string | undefined` that
+  // TypeScript could not connect to the `if` above.
+  const inviteTrainerId = (client as { trainer_id?: string }).trainer_id;
+  if (inviteTrainerId) {
     const { data: tRow } = await admin
       .from("trainers")
       .select("first_name, name")
-      .eq("id", (client as { trainer_id?: string }).trainer_id)
+      .eq("id", inviteTrainerId)
       .limit(1);
     const t = tRow?.[0] as { first_name?: string; name?: string } | undefined;
     inviteCoachFirstName = t?.first_name || (t?.name || "").split(/\s+/)[0] || null;

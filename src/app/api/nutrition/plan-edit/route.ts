@@ -134,7 +134,11 @@ export async function POST(req: NextRequest) {
       const { data: allMeals } = await admin
         .from("meals").select("id, name, timing, position, swaps, rotation")
         .eq("meal_plan_id", meal.meal_plan_id).order("position");
-      const src = (allMeals as { id: string; name: string; timing: string | null; position: number; swaps: string | null; rotation: unknown }[]) || [];
+      // Cast removed. It hand-declared `rotation: unknown`, and rotation is a
+      // jsonb column, so copying a meal was assigning unknown into Json. The
+      // typed client already infers every column in the select above
+      // correctly -- this cast was replacing real types with guessed ones.
+      const src = allMeals || [];
 
       for (const m of src) {
         // A failed copy used to `continue`: the loop moved on, the archive
@@ -166,7 +170,11 @@ export async function POST(req: NextRequest) {
             // the trap flagged in docs/BACKLOG.md item 4.
             .from("meal_items").select("food, amount, unit, basis, protein, carbs, fats, is_unlimited, position, kcal, micros")
             .eq("meal_id", m.id).order("position");
-          const rows = (its as Record<string, unknown>[]) || [];
+          // Same: Record<string, unknown> threw away the shape the select
+          // already guarantees, which is what made the insert below
+          // uncheckable. The explicit column list is still what matters
+          // (see the note above it); this just stops discarding its types.
+          const rows = its || [];
           if (rows.length) {
             // Same reasoning as the column list above: a silently empty meal in
             // the clone is indistinguishable from a meal the trainer meant to

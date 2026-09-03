@@ -54,7 +54,18 @@ test("AI health is every trainer's page, showing them their own", () => {
   assert.match(src, /const isOwner = !!me\?\.isOwner;/);
   // The scoping moved into the RPC argument on 24 Aug, when the page stopped
   // fetching 5,000 log lines it could only receive 1,000 of.
-  assert.match(src, /p_trainer: isOwner \? null :/, "a non-owner would read every trainer's rows");
+  //
+  // null OR undefined for the owner branch, since 3 Sep. The argument is
+  // `p_trainer uuid DEFAULT NULL::uuid`, so omitting it and passing null are
+  // the same call — but once the Supabase client is typed against the generated
+  // schema, the generated signature describes an OPTIONAL argument rather than
+  // a nullable one, and null no longer type-checks.
+  //
+  // The half of this that matters is unchanged and still strict: the non-owner
+  // branch must still scope to their own trainer id. That is the leak this
+  // guards, and widening the owner branch does not touch it.
+  assert.match(src, /p_trainer: isOwner \? (?:null|undefined) :/, "a non-owner would read every trainer's rows");
+  assert.match(src, /p_trainer: isOwner \? \w+ : \(me\?\.id \?\?/, "the non-owner branch must scope to their own id");
   assert.match(src, /monthUsd=\{isOwner \? /, "spend is not owner-gated");
   // Fail closed: an unresolvable trainer must match nothing, not everything.
   assert.match(src, /me\?\.id \?\? "00000000-0000-0000-0000-000000000000"/);

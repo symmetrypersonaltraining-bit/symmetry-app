@@ -77,7 +77,12 @@ export default async function AiHealthPage() {
   const since = new Date(Date.now() - 60 * 86_400_000).toISOString();
   const { data } = await db.rpc("ai_feature_health", {
     p_since: since,
-    p_trainer: isOwner ? null : (me?.id ?? "00000000-0000-0000-0000-000000000000"),
+    // undefined, not null, for the owner. The argument is
+    // `p_trainer uuid DEFAULT NULL::uuid`, so omitting it and passing null are
+    // the same call — but the generated types describe an optional argument
+    // rather than a nullable one, which is a limit of what gen types can see in
+    // a function signature. Omitting it is both accurate and identical.
+    p_trainer: isOwner ? undefined : (me?.id ?? "00000000-0000-0000-0000-000000000000"),
   });
 
   interface HealthRow {

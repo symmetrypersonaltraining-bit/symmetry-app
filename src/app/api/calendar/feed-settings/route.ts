@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Database } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +86,10 @@ export async function POST(req: NextRequest) {
   if (!row) return NextResponse.json({ error: "Not a trainer" }, { status: 403 });
 
   const db = createAdminClient();
-  let patch: Record<string, unknown>;
+  // The trainers Update type rather than an untyped record, so a typo in a
+  // column name below is a compile error instead of a PATCH that quietly
+  // changes nothing.
+  let patch: Database["public"]["Tables"]["trainers"]["Update"];
 
   switch (body.action) {
     case "on":

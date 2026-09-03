@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Database } from "@/lib/database.types";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { validateVerifyResult } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
@@ -81,7 +82,14 @@ export async function POST(req: NextRequest) {
     let applied = false;
     if (v.confidence === "high") {
       const nowIso = new Date().toISOString();
-      const fullUpdate: Record<string, unknown> = {
+      // The food_catalog Update type, not an untyped record.
+      //
+      // Worth knowing what this proves: the retry below exists for "column-name
+      // drift (e.g. no kcal column yet)". food_catalog.kcal is numeric and has
+      // been there all along, so that fallback cannot fire for the reason it
+      // names. Left in place -- removing it is its own change -- but the
+      // compiler now guarantees the column list here is real.
+      const fullUpdate: Database["public"]["Tables"]["food_catalog"]["Update"] = {
         protein: v.corrected.protein,
         carbs: v.corrected.carbs,
         fats: v.corrected.fats,

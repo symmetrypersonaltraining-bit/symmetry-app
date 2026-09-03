@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Database } from "@/lib/database.types";
 import { Resend } from "resend";
 import { buildInviteEmailHtml } from "@/lib/inviteEmail";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
@@ -137,7 +138,23 @@ export async function POST(req: NextRequest) {
 
   // 3) Create the client profile with all assessment info
   const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-  const { data: clientRow, error: cErr } = await admin.from("clients").insert({
+  // Built as a named, TYPED const rather than an inline literal. The inline
+  // form spread `...(cond ? {trainer_id} : {})` in, which left TypeScript
+  // unable to line the object up against the clients Insert type at all — so
+  // none of these columns were being checked. Naming it means a wrong column
+  // or a wrong type here is a compile error instead of a 400 from PostgREST
+  // during somebody's onboarding.
+  // trainer_id is NOT NULL with no default, so the generated Insert type marks
+  // it required — but it is supplied by the stamp_client_trainer() BEFORE
+  // INSERT trigger when omitted, falling back to the owner, and `gen types`
+  // cannot see triggers. Verified against the live trigger definition rather
+  // than assumed: omitting it here is correct and always has been.
+  //
+  // So the type is the real Insert with that ONE column relaxed, and the
+  // assertion at the call site says exactly that and nothing more. Every other
+  // column is still fully checked.
+  type ClientInsert = Database["public"]["Tables"]["clients"]["Insert"];
+  const clientInsert: Omit<ClientInsert, "trainer_id"> & { trainer_id?: string } = {
     // Explicit: the trigger cannot see the creator through the admin client.
     ...(creatorTrainerId ? { trainer_id: creatorTrainerId } : {}),
     name, email, phone: nn(data.phone), date_of_birth: nn(data.date_of_birth),
@@ -151,7 +168,9 @@ export async function POST(req: NextRequest) {
     emergency_contact_name: nn(data.emergency_contact_name), emergency_contact_phone: nn(data.emergency_contact_phone),
     assessment_id: assessment.id, auth_user_id: authUserId,
     onboarding_complete: false, payment_reminders_enabled: true, slug,
-  }).select("id, name").single();
+  };
+  const { data: clientRow, error: cErr } = await admin
+    .from("clients").insert(clientInsert as ClientInsert).select("id, name").single();
   if (cErr) return NextResponse.json({ error: cErr.message }, { status: 500 });
 
   // 4) Two-way link so the assessment shows on the client profile.

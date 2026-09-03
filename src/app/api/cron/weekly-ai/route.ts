@@ -32,6 +32,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Database } from "@/lib/database.types";
 import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
@@ -261,7 +262,10 @@ async function runSweep(opts: {
       const trainerOwnsFocus =
         c.weekly_focus_source === "trainer" && c.weekly_focus_week === week && !!c.weekly_focus;
 
-      const update: Record<string, string | null> = {
+      // The clients Update type, not an untyped record. This runs unattended
+      // on a cron across the whole roster, which is the worst place for a
+      // mistyped column to fail silently.
+      const update: Database["public"]["Tables"]["clients"]["Update"] = {
         ai_focus: result.value.coachRead,
         ai_focus_date: today,
         ai_food_focus: result.value.foodFocus,

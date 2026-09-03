@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Database, Json } from "@/lib/database.types";
 import { resolveAiScope } from "@/lib/ai/scope";
 import { mapOffProduct, OffProductJson } from "@/lib/nutrition/off";
 
@@ -66,9 +67,15 @@ export async function POST(req: NextRequest) {
     if (!row) return NextResponse.json({ found: false, barcode });
 
     // 3) Insert into food_catalog; tolerate a race on the unique barcode index.
+    // serving_options is a jsonb column, so the generated type for it is `Json`.
+    // OffCatalogRow declares it as ServingOption[] -- a real interface, which is
+    // the right thing for the rest of the code to work with, but TypeScript
+    // cannot prove a structural interface satisfies Json's recursive shape.
+    // The value IS plain serialisable data; this cast says only that, and every
+    // other column in the row stays fully checked.
     const { data: inserted, error: insErr } = await admin
       .from("food_catalog")
-      .insert(row)
+      .insert({ ...row, serving_options: row.serving_options as unknown as Json })
       .select()
       .single();
     if (insErr) {
