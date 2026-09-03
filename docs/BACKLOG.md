@@ -1,5 +1,54 @@
 # Backlog — the single work queue
 
+## 2026-09-03 — Overnight run (SHIPPED, 5ef146c4 → e1eb7b88)
+
+Seven commits. Unit suite GREEN for the first time since 1 Sep, and CI now
+enforces it. Full write-ups:
+
+- `docs/audit/OVERNIGHT-2026-09-03-SHIPPED.md`
+- `docs/audit/OVERNIGHT-2026-09-03-NEEDS-YOU.md`
+- `docs/audit/OVERNIGHT-2026-09-03-NEW-FINDINGS.md`
+- `docs/audit/CALENDAR-SYNC-2026-09-03.md` — the 207, cause found, NOT fixed
+- `docs/audit/FEATURE-AUDIT.md` — the list to walk together
+
+SPEED: the icon font was a render-blocking stylesheet on a third origin at
+`@latest`, in front of the first pixel on every page · the home screen made five
+database round trips in a row that did not need each other · 45 RLS policies
+called `auth.uid()` once per ROW · 52 foreign keys had no covering index.
+
+WEIGHT: `clients.current_weight` was a cache nothing kept in sync — ten clients
+drifted from their own weigh-in log, up to 11 lb. Dustin's own record read 207.2
+on one screen and 196.2 on another. Now a database trigger; drift is 0.
+
+INTEGRITY BOARD: `scheduled_workout_null_assignment_id` RETIRED — all 493 rows
+were the standard workflow, since Dustin does not use grouped programmes ·
+`client_coverage_under_14_days` could never see a client with NO sessions at all,
+now fixed, and it immediately surfaced Erin Arit · `clients.is_test_account`
+added so tester accounts stop being rediscovered every sweep.
+
+CI: the type checker over `src/` and the unit suite are now blocking. Neither had
+ever run in CI. The unit gate needed the red test fixed first — and that test was
+asserting the bug (#24) rather than guarding against it.
+
+PHASE 1: `src/lib/database.types.ts` landed additively. Two protocol corrections
+proved rather than argued: there are ZERO Postgres enums, so `billing_type`
+generates as `string | null` and Phase 3 Task 3A has nothing to extract; and
+`src/lib/types.ts` has zero importers. Blast radius of typing the factories
+measured — admin 9 errors, server 191, client 135. That re-scopes 1B from a step
+into a project.
+
+STILL OPEN, needs Dustin: Todd Prine's calendar (ends 4 Sep, 67 sessions
+programmed to 9 Oct) · Erin Arit (209 appts, 24 payments, zero programming) · the
+`adopt` clause for the 207 · his 16/17 Aug weigh-ins · Steph's duplicate macro row
+· cardio logging (0 rows/30d) · movement assessment (0 rows ever) · push (1 of 28).
+
+DELIBERATELY UNTOUCHED: both workout loggers · the 130 duplicate RLS policies
+(biggest DB win left, but they change who can see what) · `volume_value` stays
+free text · `days` rows stay per-client.
+
+---
+
+
 ## 2026-09-01 — Overnight run (SHIPPED, af27201 → 802c864)
 
 Seven commits, 19 findings closed, unit tests 2,529 → 2,601. Full write-ups:
