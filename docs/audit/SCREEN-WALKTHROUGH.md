@@ -166,4 +166,48 @@ So it lands in one commit when we walk Messages.
 
 ---
 
-*(next: screen 2 — Workout tab)*
+**Home confirmed closed 3 Sep.** "Progress tabs from home work fine" — the
+expand issue was the /progress page, carried to that screen. Home's only
+outstanding item is the Share button, deferred to Messages by design.
+
+---
+
+## Screen 2 — Workout tab (`/workout`)  ·  walked 3 Sep 2026
+
+**What it is for:** *(to be filled in from Dustin's words)*
+
+Note: this is the **tab**, not the logger. `/workout/[dayId]` is the logger and
+is off limits without per-item permission.
+
+### Click inventory — screen 2
+
+| # | control | where | should do | actual | verdict |
+|---|---|---|---|---|---|
+| 1 | **Add workout** | top of tab | opens the add sheet — the only one in the app now | | ☐ |
+| 2 | Add sheet: **pick a library day** | add sheet | adds that session to the chosen day | | ☐ |
+| 3 | Add sheet: **add / replace prompt** | when a day already has one | "add alongside" vs "replace" — both must be obvious | | ☐ |
+| 4 | Add sheet: **Build one** | add sheet | opens the builder | | ☐ |
+| 5 | Add sheet: **Custom** | add sheet | opens custom entry | | ☐ |
+| 6 | Add sheet: **close / backdrop** | add sheet | closes, adds nothing | | ☐ |
+| 7 | **‹ / › week arrows** | week bar | steps the week, capped at +8 | | ☐ |
+| 8 | **Tap a day** | week bar | opens that day's sheet | | ☐ |
+| 9 | **Tap a session card** | board | opens the logger for it | | ☐ |
+| 10 | **Start / launch** | session card | opens the logger | | ☐ |
+| 11 | **Move to today** | session card | moves it to today | | ☐ |
+| 12 | **Move…** | session card | opens the date picker | | ☐ |
+| 13 | Move picker: **pick a date** | move sheet | moves it there | | ☐ |
+| 14 | Move picker: **swap with another** | move sheet | swaps the two sessions | | ☐ |
+| 15 | Move picker: **cancel / backdrop** | move sheet | closes, moves nothing | | ☐ |
+| 16 | **Remove** | session card | removes the session — confirm what "remove" means vs skip | | ☐ |
+| 17 | **Show past / hide past** | board | toggles finished sessions | | ☐ |
+
+### Questions for this screen
+
+- Does **Remove** delete the session, mark it skipped, or something else? It
+  must not silently count against adherence — that was #46 on the old list.
+- Moving a session: does the client's **log history** follow it? Rewriting a
+  log's date on a scheduling action is what broke Jenn's history in August.
+
+---
+
+*(next: screen 3)*
