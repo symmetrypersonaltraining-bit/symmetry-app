@@ -52,4 +52,28 @@ trainer editing the programme while she trained. The second is far more serious,
 because it means any client training while Dustin re-programmes them is locked
 out of their own session.
 
-**Question outstanding for Dustin.** Asked, not yet answered.
+## CONFIRMED CAUSE — Dustin, 3 Sep
+
+> "I was reprogramming mid session. I replaced the workout I was actually
+> logging through claude project. once i had it revert today's workout it was
+> good."
+
+It was the serious version. Not a client tapping swap — **the trainer replacing
+the day a client was actively logging, from a Claude project session writing
+straight to the database.**
+
+That also explains the empty audit trail. There is **no audit trigger on `days`,
+`sections` or `prescribed_exercises`** — only the cross-client-edit guards
+(`trg_pe_block_cross_client_edit`, `trg_section_block_cross_client_edit`) and
+the owner/isolation stamps on `scheduled_workouts`. `programme_audit` exists and
+nothing writes to it for programme content, so a rewrite from a Claude session
+leaves no trace at all. Nobody could have reconstructed this from the audit; it
+had to be reconstructed from `created_at` timestamps.
+
+### What this means beyond one client
+
+Any client training while their programme is being rewritten is locked out of
+their own session, and the only recovery is a reload they have no way to know
+about. It is not rare by nature — reprogramming mid-day is normal here — it has
+just been invisible, because the client sees a Postgres error and gives up
+rather than reporting it.
