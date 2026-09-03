@@ -136,4 +136,34 @@ scratch later instead of falling out of this table.
 
 ---
 
+### Screen 1 test results — 3 Sep, Dustin tapping
+
+| # | control | result |
+|---|---|---|
+| 1 | Payment notice ✕ | n/a — he has no payment notice, and does not want one. Correct: the banner only renders when something is owed. |
+| 2 | Streak pill | ✅ display only, as designed |
+| 11 | Rest day slip | ✅ offered to share to the group — **and that is one of the auto-shares going opt-in** |
+| 13 | Join challenge | ✅ **not a bug.** The button renders only on `joined === false`. He is already a participant, so there is nothing to join. |
+| 16 | Dismiss brief | ✅ **not a bug.** It is not a permanent button — it belongs to the full-screen weekly brief, which only appears when there is a brief AND it wins a takeover slot. No brief, no button. |
+| 17 | Programming question | ✅ **not a bug.** Renders nothing on weeks nothing is being asked, and disappears once answered, by design — so it never becomes furniture. |
+| 19 | **Milestone badge "Share 🎉"** | ❌ **REAL BUG.** `onClick` is `router.push("/messages?client=group")` and nothing else. It opens the group chat and shares nothing. A button labelled Share that does not share. |
+
+**Not on this screen:** "fat mass, workouts and streak cards do not expand."
+Workouts and Streak tiles live on the **/progress** page inside `MetricCards`,
+not on Home — Home's Progress grid is only Body Weight, Body Fat, Lean Mass and
+Fat Mass. Carried to the Progress screen. (He has 19 fat-mass rows, so that tile
+has data and *should* expand — to be confirmed which screen he was on.)
+
+### The Share fix — deliberately deferred to Messages
+
+The right fix is not to make Share post automatically. It is to open the group
+with the message **already written** so he reads it and presses send. That is
+opt-in by construction, and it is the same change as making PR and workout posts
+client-initiated — which is already queued for Messages.
+
+Doing half of it here and half there is how a feature ends up behaving two ways.
+So it lands in one commit when we walk Messages.
+
+---
+
 *(next: screen 2 — Workout tab)*
