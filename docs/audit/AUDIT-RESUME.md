@@ -59,7 +59,7 @@ are NOT bugs and must stop being re-reported.
 | # | screen | notes |
 |---|---|---|
 | 1 | **Client home** | ✅ closed. Adherence now counts only days due; This Week moved under the streak; second "This week" card renamed Weekly Focus; Add Workout removed; AI Insights placeholder deleted; header is a banner; payments sit above This Week; milestone Share now carries the message. |
-| 2 | **Workout tab** | ◐ partly. Week bar removed. Library search now reads descriptions + difficulty. Full library access granted to clients. Start/View split NOT built. Move-when-logged NOT built. |
+| 2 | **Workout tab** | ◐ partly. Week bar removed. Library search reads descriptions + difficulty and every library workout is now described. Full library access granted to clients. Start/View split NOT built. Move-when-logged NOT built. |
 
 ### Next — screen 2 finish, then 3 onward
 
@@ -106,10 +106,37 @@ PREVIEW: client-preview and its four sub-screens
 
 - Fat Mass / Workouts / Streak tiles on **/progress** would not expand. Carried
   to that screen.
-- 396 library workouts still need descriptions (40 done).
-- 47 library days contain **no exercises at all**.
+- **Library descriptions are DONE.** 676 of 711 library days described, covering
+  every distinct workout that has movements in it. Written from the actual
+  exercises in each session, with a difficulty (beginner / intermediate /
+  advanced) as a first pass expected to be corrected by hand — that is his
+  judgement, not the data's. Search reads description + difficulty and splits
+  the query into words, so "chest strength balance" and "beginner" both work.
+
+  **The 35 left are all EMPTY — nine labels with sections but no exercises at
+  all:** Day 1 (11 copies), Day 2 (11), Day 3 (7), Day 4, Day 5, Back & Biceps
+  (Week 1-A), Chest & Triceps (Week 2-A), Legs Anterior (Week 2-B), Legs
+  Posterior (Week 1-B). They cannot be described because there is nothing in
+  them. They look like programme skeletons that were created and never filled.
+  **Decision needed: fill them or delete them.** One of them, "Day 3", has been
+  scheduled once.
 - Two days belonging to another client are visible to Jenn through the
   pre-existing `client_own_days` policy. Flagged, not changed.
+
+## Also fixed 3 Sep, after the walkthrough started
+
+- **A workout rewritten mid session no longer locks the client out.** Dustin
+  replaced Jennifer's day through a Claude project while she was logging it;
+  every prescribed exercise was deleted and recreated, and her phone kept
+  writing the dead ids. Two faults: the raw Postgres error was shown to her, and
+  draft hydration handed the dead ids straight back so reloading did not help.
+  Both fixed. It reloads rather than remapping — if the workout was replaced,
+  those sets may not belong to what replaced them.
+  See `docs/audit/INCIDENT-2026-09-03-LOGGER-FK.md`.
+- **Swap versus skip.** Every path that wrote `skipped` was actually a replace,
+  so a swap could never be told from a miss. Renamed to `replaced`; a genuine
+  skip needs no button, because a past session nobody logged already counts
+  against.
 
 ## Live state, 3 Sep
 
