@@ -218,4 +218,84 @@ is off limits without per-item permission.
 
 ---
 
+### Screen 2 findings — 3 Sep
+
+**What the tab is for, in his words:** finding and starting work. The problems
+are all about *getting to the right workout* and *what the buttons do*.
+
+#### 1. Library search is one line, and that line is the whole problem
+
+`AddWorkoutButton.tsx:281`:
+
+    const filtered = lib.filter((d) => d.label.toLowerCase().includes(q.toLowerCase()));
+
+It matches **the label and nothing else**. Search "chest" and you get workouts
+with "chest" in the title; a perfect chest session called "Upper Push A" is
+invisible. There is nothing else to match on — `days` has no description column.
+
+Library as it stands: **711 days · 435 distinct labels · 45 programs · 47 days
+with no exercises in them at all.**
+
+#### 2. Start vs View — one button doing two jobs
+
+`/workout/[dayId]` renders `WorkoutLogger`, which opens on an **overview** and
+waits for a tap to enter the session (`sessionMode`). So today every route in —
+board card, today's sessions, home — lands on the overview.
+
+Wanted: **View** keeps the overview. **Start** goes straight into logging.
+
+#### 3. Delete already does what he wants
+
+`removeWorkout` really deletes, with a second confirmation for a completed
+session — added 17 Aug after he deleted a stray third workout and lost a
+finished 70-minute Upper Push. Deleted rows are filtered out of adherence
+entirely, so they count neither for nor against. **No change needed.**
+
+#### 4. But "skipped" does NOT count against adherence, and he thinks it should
+
+Adherence filters `.neq("status", "skipped")`, so a skipped session leaves both
+the numerator and the denominator.
+
+That was deliberate: **every replace path marks the original skipped**, so
+counting skipped would punish a client for swapping a walk in for a cardio day.
+Dustin, 22 Aug: "im still showing an extra workout for yesterday that should not
+be there."
+
+He now says it should count if "left unlogged or marked skipped". Those are the
+same status today, so the app cannot tell a session someone *blew off* from one
+that was *replaced*. **Needs a decision — see the open question below.**
+
+#### 5. Moving a logged workout
+
+Unlogged: the session moves. Logged: he wants the log to stay put and the
+workout copied forward.
+
+#### 6. The week bar above the board
+
+The board already renders past + upcoming as one continuous chronological list
+with a Show past toggle. The week bar is a second, different navigation model
+sitting on top of a list that does not need one.
+
+### Guidance given
+
+- **Week bar: remove it.** The board is a list of what is coming; a week
+  scrubber above a continuous list is two navigation models fighting. Home's
+  This Week ring already answers "am I keeping up", and two week widgets that
+  look different and behave differently is the same fault as the two cards that
+  both said "This week".
+- **Moving a logged session: no dialog.** Unlogged moves; logged always leaves
+  the log where it happened and puts a fresh copy on the new date, with a line
+  saying so. You cannot move history — rewriting a log's date on a scheduling
+  action is exactly what broke Jenn's history in August — and there is no
+  sensible second option, because deleting the log is never right. A prompt
+  would imply a choice that should not exist.
+
+### Open question — the one that needs Dustin
+
+Can the app tell a **replaced** session from a **skipped** one? Today both are
+`status = 'skipped'`. Until they are distinguishable, making skipped count
+against adherence also penalises every swap.
+
+---
+
 *(next: screen 3)*
