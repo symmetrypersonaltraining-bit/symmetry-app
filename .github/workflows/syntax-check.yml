@@ -15,6 +15,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
+
       - name: Check for syntax/parse errors only
         run: |
           # The pattern is bounded to TS1000-TS1499 on purpose.
@@ -38,3 +39,37 @@ jobs:
             exit 1
           fi
           echo "Syntax OK"
+
+      # ── The two gates below are new (3 Sep) ──────────────────────────────
+      #
+      # Until tonight NOTHING in CI ran the type checker over src/ or ran the
+      # tests. Both gates existed as instructions a human was expected to
+      # remember, which is exactly how the same regressions kept reaching main:
+      # the rule was real, the enforcement was not.
+      #
+      # These are deliberately the two cheapest checks that would have caught
+      # the recurring faults, and nothing more. Neither is a style opinion.
+
+      - name: Type-check src/ (0 errors required)
+        run: |
+          # SCOPED TO src/ ON PURPOSE.
+          #
+          # 56 errors remain in the repo, every one of them OUTSIDE src/ —
+          # scripts, fixtures and test helpers that were never type-clean and
+          # are not shipped to anybody. Gating on the whole tree would mean this
+          # job is red on arrival, and a job that is red on arrival is a job
+          # everyone learns to scroll past. src/ is what runs on a client's
+          # phone and src/ is at zero, so src/ is what gets defended.
+          #
+          # When the other 56 are cleared this filter should go.
+          TSC_OUT=$(npx tsc --noEmit --skipLibCheck 2>&1 || true)
+          SRC_ERRS=$(echo "$TSC_OUT" | grep -E "^src/.*error TS" || true)
+          if [ -n "$SRC_ERRS" ]; then
+            echo "TYPE ERRORS IN src/ — these ship to clients:"
+            echo "$SRC_ERRS"
+            exit 1
+          fi
+          echo "src/ type-checks clean"
+
+      - name: Unit tests
+        run: npm run test:unit
