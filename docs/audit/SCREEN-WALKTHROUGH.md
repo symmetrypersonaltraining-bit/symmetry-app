@@ -91,4 +91,49 @@ substituted for Dustin's, repeatedly.
 
 ---
 
-*(next: screen 2)*
+### Click inventory — screen 1, client home
+
+Pulled from the code, not from memory, so nothing is missed. Every interactive
+element on this screen. Tap each, record what happens, set a verdict.
+
+**This is also the tutorial script.** "What happens when you tap this" is the
+only thing a tutorial ever needs to say, so the column below becomes tutorial
+copy directly rather than being written again later.
+
+| # | control | where | should do | actual | verdict |
+|---|---|---|---|---|---|
+| 1 | Payment notice **✕ dismiss** | payment banner | hides that notice, stays hidden | | ☐ |
+| 2 | Streak pill | header banner | display only — no tap target | | ☐ |
+| 3 | **View Schedule →** | This Week | opens the Workout tab | | ☐ |
+| 4 | **‹ previous week** | This Week | steps back a week; adherence recalculates for a FINISHED week (all 7 days) | | ☐ |
+| 5 | **› next week** | This Week | steps forward; disabled past +4 weeks; shows NO percentage for a future week | | ☐ |
+| 6 | **A day circle** | This Week | opens that day's sheet | | ☐ |
+| 7 | Day sheet **close / backdrop** | day sheet | closes, nothing changes | | ☐ |
+| 8 | Day sheet **progress link** | day sheet | opens Progress | | ☐ |
+| 9 | **Today's Workout card** | today block | opens that session's logger | | ☐ |
+| 10 | **Workout picker** (2+ today) | today block | each row opens its own session | | ☐ |
+| 11 | **Rest day slip** | shown when 0 scheduled | the permission slip; check whether it still offers to post to the group | | ☐ |
+| 12 | **Challenge card** | community pair | expand / collapse | | ☐ |
+| 13 | **Join challenge** | community pair | joins; button state changes | | ☐ |
+| 14 | **Group card** | community pair | opens group chat | | ☐ |
+| 15 | **Weekly Focus tiles** | weekly focus | display only? confirm nothing is tappable | | ☐ |
+| 16 | **Dismiss brief** | weekly focus | hides the weekly brief | | ☐ |
+| 17 | **Programming question submit** | below focus | saves the answer, card disappears | | ☐ |
+| 18 | **Macros card** | today's nutrition | opens Nutrition | | ☐ |
+| 19 | **Milestone badge** | badges row | opens group chat | | ☐ |
+| 20 | **View all →** | Progress heading | opens Progress | | ☐ |
+| 21 | **Each metric tile** | Progress grid | opens that metric's full chart | | ☐ |
+| 22 | Metric modal **close** | metric modal | closes | | ☐ |
+| 23 | **Coach bar** | Gerard + Sharon only | opens the coach | | ☐ |
+| 24 | Off-plan card | only when something off-plan was logged today | shows what was logged | | ☐ |
+
+### When we test
+
+**Every control on a page gets tapped before we leave that page.** Settled 3 Sep.
+Walking 39 screens and coming back to test them is two passes and a guarantee
+that something is missed; it also means the tutorial has to be written from
+scratch later instead of falling out of this table.
+
+---
+
+*(next: screen 2 — Workout tab)*
