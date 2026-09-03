@@ -315,7 +315,39 @@ test("malformed replies return null (→ callClaudeJson retries once)", () => {
   assert.strictEqual(nj.validateActReply({ intent: "delete_meal", params: { position: 4 }, reply: "y" }), null); // action without confirmation
   assert.strictEqual(nj.validateActReply({ intent: "delete_meal", params: {}, confirmation: "x", reply: "y" }), null); // no meal reference
   assert.strictEqual(nj.validateActReply({ intent: "move_meal", params: { from_position: 1 }, confirmation: "x", reply: "y" }), null); // move without a target
-  assert.strictEqual(nj.validateActReply({ intent: "none", params: {} }), null); // none without reply
+});
+
+// AN EMPTY REPLY ON INTENT "none" IS NOT MALFORMED. IT IS WHAT WE ASKED FOR.
+//
+// This test used to assert validateActReply({intent:"none", params:{}}) === null,
+// under the heading "none without reply". That assertion was the bug from the
+// 1 Sep run (#24), not a guard against it: ACT_SYSTEM_PROMPT tells the model
+// that for anything training-worded it must answer intent "none" with
+// {"clarify":false} and an EMPTY "reply" — "never a clarifying question"
+// (src/app/api/nutrition-ai/act/route.ts:58, and :185 builds that exact object
+// as its own fallback). Treating it as a parse failure meant every model that
+// obeyed was thrown away and retried, the retry obeyed the same instruction and
+// failed the same way, and ~30% of coach_action burned two calls and double the
+// latency to reach the same answer.
+//
+// The validator was fixed on 1 Sep. This test was not, so it has failed on
+// every run since — which is why the unit suite could not be made a blocking CI
+// gate. The contract it should have been asserting all along:
+test("intent none with no reply is VALID when nothing was promised", () => {
+  const r = nj.validateActReply({ intent: "none", params: {} });
+  assert.ok(r, "an empty reply on intent none is the documented answer for training-worded messages");
+  assert.strictEqual(r.intent, "none");
+  assert.strictEqual(r.reply, "");
+  assert.strictEqual(r.params.clarify, false);
+  assert.strictEqual(r.confirmation, null);
+});
+test("intent none WITH clarify:true still requires the question", () => {
+  // A clarifying question that is blank is genuinely useless, so this one
+  // must still be rejected and retried.
+  assert.strictEqual(nj.validateActReply({ intent: "none", params: { clarify: true } }), null);
+  const ok = nj.validateActReply({ intent: "none", params: { clarify: true }, reply: "Which meal?" });
+  assert.ok(ok);
+  assert.strictEqual(ok.params.clarify, true);
 });
 
 console.log("\nnutrition-json: /act meal resolution (finalizeAct / resolveMealRef)");
