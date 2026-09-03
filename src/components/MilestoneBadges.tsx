@@ -112,8 +112,21 @@ export default function MilestoneBadges() {
             <span className="text-[11px] font-semibold mt-1 text-center" style={{ color: "var(--brand-text)" }}>
               {b.label}
             </span>
+            {/* Arrives in the group chat with the message ALREADY WRITTEN, so
+                the client reads it and presses send -- or does not. It used to
+                push to /messages?client=group and nothing else, which dropped
+                you into the chat holding nothing to say. Dustin, 3 Sep: "when i
+                hit share on milestone badge it just goes to group msg it doesnt
+                actually share."
+                Deliberately still a two-step: nothing reaches the group unless a
+                person chose to put it there. */}
             <button
-              onClick={() => router.push("/messages?client=group")}
+              onClick={() =>
+                router.push(
+                  "/messages?client=group&draft=" +
+                    encodeURIComponent(`${b.icon} ${b.label} — just hit it!`)
+                )
+              }
               className="text-[10px] font-semibold mt-1"
               style={{ color: "var(--brand-primary)" }}
             >

@@ -134,6 +134,38 @@ export default function MessagesClient({ isTrainer, clients, selectedClientId, t
   // wrong" that keeps coming back. useSearchParams re-renders on the query.
   const searchParams = useSearchParams();
   const targetParam = searchParams.get("m");
+
+  // A SHARE BUTTON HAS TO ACTUALLY SHARE SOMETHING.
+  //
+  // Dustin, 3 Sep: "when i hit share on milestone badge it just goes to group
+  // msg it doesnt actually share" -- and then, after being told it was queued:
+  // "sill need to fix share milestone button."
+  //
+  // The badge called router.push("/messages?client=group") and stopped. You
+  // arrived in the group chat holding nothing, with no clue what you were meant
+  // to type. A button labelled Share that shares nothing is worse than no
+  // button: people press it, see the chat, and conclude the app is broken.
+  //
+  // It now arrives with ?draft= and the message is already written. The client
+  // reads it and presses send -- or does not. That is the whole design: nothing
+  // reaches the group chat unless a person chose to put it there. Dustin, same
+  // day: "I don't want anything automatically going in there."
+  //
+  // Fills ONCE, and only over an empty box, so it can never eat something
+  // half-typed. The parameter is then stripped from the URL so a refresh does
+  // not silently re-write the composer under them.
+  const draftParam = searchParams.get("draft");
+  const draftUsed = useRef(false);
+  useEffect(() => {
+    if (draftUsed.current || !draftParam) return;
+    draftUsed.current = true;
+    setBody((current) => (current.trim() ? current : draftParam));
+    inputRef.current?.focus();
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("draft");
+    const qs = next.toString();
+    router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false });
+  }, [draftParam, searchParams, router]);
   useEffect(() => {
     const target: string | null = targetParam;
 

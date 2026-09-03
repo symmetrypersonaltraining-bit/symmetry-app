@@ -154,15 +154,23 @@ not on Home — Home's Progress grid is only Body Weight, Body Fat, Lean Mass an
 Fat Mass. Carried to the Progress screen. (He has 19 fat-mass rows, so that tile
 has data and *should* expand — to be confirmed which screen he was on.)
 
-### The Share fix — deliberately deferred to Messages
+### The Share fix — done, 3 Sep
 
-The right fix is not to make Share post automatically. It is to open the group
-with the message **already written** so he reads it and presses send. That is
-opt-in by construction, and it is the same change as making PR and workout posts
-client-initiated — which is already queued for Messages.
+Deferred at first, then done immediately when he pushed back: "sill need to fix
+share milestone button." He was right — a visibly broken button should not wait
+for a screen we have not reached.
 
-Doing half of it here and half there is how a feature ends up behaving two ways.
-So it lands in one commit when we walk Messages.
+Share now opens the group chat with the message **already written**
+("🏅 50 Sessions — just hit it!"); the client reads it and presses send, or does
+not. Opt-in by construction, which is the same rule as the group auto-posting
+change still queued for Messages.
+
+The composer fills **once**, only over an empty box so it can never eat
+something half-typed, and the `draft` parameter is stripped from the URL so a
+refresh does not silently rewrite it.
+
+Covered by `tests/unit/shareActuallyShares.test.ts`, verified red against the
+old one-line `router.push` first.
 
 ---
 
