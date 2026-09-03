@@ -387,20 +387,74 @@ export default async function HomePage(props: {
   thirtyAhead.setDate(thirtyAhead.getDate() + 30);
   const thirtyAheadStr = thirtyAhead.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
-  // FIX: was .maybeSingle() — fails with error when client has 2 workouts today (cardio + lifting),
-  // causing null return and "Rest Day" to show incorrectly. Now returns all workouts as array.
-  const { data: todayWorkoutsRaw } = await supabase
-    .from("scheduled_workouts")
-    .select("id, status, days(label, phase_id, phases(label, programs(name)))")
-    .is("deleted_at", null)
-    .eq("client_id", clientRecord.id)
-    .eq("scheduled_date", today)
-    .order("id");
-  const todayWorkouts = todayWorkoutsRaw || [];
-
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
   const sixtyStr = sixtyDaysAgo.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+
+  // FIVE QUERIES, ONE WAVE.
+  //
+  // These ran one after another, each waiting for the previous round trip to
+  // come back before its own left the building. Nothing here depends on
+  // anything else here — every one needs only clientRecord.id, which is already
+  // resolved — so all that waiting bought nothing. On gym wi-fi at ~150 ms a
+  // hop it is most of a second of a client watching a blank home screen, on
+  // every single load.
+  //
+  // Promise.all so the five leave together and the page costs one round trip
+  // instead of five. Deliberately NOT allSettled: each destructures only `data`
+  // and every consumer below already tolerates null, which is exactly how the
+  // sequential version degraded too.
+  const [
+    { data: todayWorkoutsRaw },
+    { data: recentScheduled },
+    { data: metricsHistory },
+    { data: recentWorkouts },
+    { data: notifData },
+  ] = await Promise.all([
+    // FIX: was .maybeSingle() — fails with error when client has 2 workouts today (cardio + lifting),
+    // causing null return and "Rest Day" to show incorrectly. Now returns all workouts as array.
+    supabase
+      .from("scheduled_workouts")
+      .select("id, status, days(label, phase_id, phases(label, programs(name)))")
+      .is("deleted_at", null)
+      .eq("client_id", clientRecord.id)
+      .eq("scheduled_date", today)
+      .order("id"),
+    supabase
+      .from("scheduled_workouts")
+      .select("id, scheduled_date, status, days(label)")
+      .is("deleted_at", null)
+      .neq("status", "skipped")
+      .eq("client_id", clientRecord.id)
+      .gte("scheduled_date", sixtyStr)
+      .lte("scheduled_date", thirtyAheadStr)
+      .order("scheduled_date", { ascending: false }),
+    supabase
+      .from("metrics")
+      .select("metric_date, weight, body_fat_pct, lean_mass, fat_mass")
+      .eq("client_id", clientRecord.id)
+      .order("metric_date", { ascending: false })
+      .limit(30),
+    supabase
+      .from("scheduled_workouts")
+      .select("id, scheduled_date, status, days(label)")
+      .is("deleted_at", null)
+      .eq("client_id", clientRecord.id)
+      .eq("status", "completed")
+      .order("scheduled_date", { ascending: false })
+      .limit(5),
+    supabase
+      .from("client_notifications")
+      .select("id, type, title, body, amount_due, due_date")
+      .eq("client_id", clientRecord.id)
+      .is("dismissed_at", null)
+      .order("created_at", { ascending: false })
+      .limit(10),
+  ]);
+
+  const todayWorkouts = todayWorkoutsRaw || [];
+  const metrics = (metricsHistory || []).reverse();
+  const notifications = (notifData || []) as any[];
   // `skipped` is left out on purpose, everywhere this feeds.
   //
   // Every replace path in the app marks the original skipped and inserts the
@@ -414,16 +468,6 @@ export default async function HomePage(props: {
   // A skipped row means "this was replaced or the person did something else".
   // Either way it is not outstanding and it is not a session they failed to
   // do, so it counts neither as a circle nor against them.
-  const { data: recentScheduled } = await supabase
-    .from("scheduled_workouts")
-    .select("id, scheduled_date, status, days(label)")
-    .is("deleted_at", null)
-    .neq("status", "skipped")
-    .eq("client_id", clientRecord.id)
-    .gte("scheduled_date", sixtyStr)
-    .lte("scheduled_date", thirtyAheadStr)
-    .order("scheduled_date", { ascending: false });
-
   const thirtyAgo = new Date();
   thirtyAgo.setDate(thirtyAgo.getDate() - 30);
   const thirtyStr = thirtyAgo.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
@@ -522,32 +566,6 @@ export default async function HomePage(props: {
     completed: w.status === "completed",
     label: (w.days as any)?.label as string | undefined,
   }));
-
-  const { data: metricsHistory } = await supabase
-    .from("metrics")
-    .select("metric_date, weight, body_fat_pct, lean_mass, fat_mass")
-    .eq("client_id", clientRecord.id)
-    .order("metric_date", { ascending: false })
-    .limit(30);
-  const metrics = (metricsHistory || []).reverse();
-
-  const { data: recentWorkouts } = await supabase
-    .from("scheduled_workouts")
-    .select("id, scheduled_date, status, days(label)")
-    .is("deleted_at", null)
-    .eq("client_id", clientRecord.id)
-    .eq("status", "completed")
-    .order("scheduled_date", { ascending: false })
-    .limit(5);
-
-  const { data: notifData } = await supabase
-    .from("client_notifications")
-    .select("id, type, title, body, amount_due, due_date")
-    .eq("client_id", clientRecord.id)
-    .is("dismissed_at", null)
-    .order("created_at", { ascending: false })
-    .limit(10);
-  const notifications = (notifData || []) as any[];
 
   const firstName = (clientRecord.name || "").split(" ")[0];
 
