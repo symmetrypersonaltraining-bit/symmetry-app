@@ -700,24 +700,63 @@ export default function ClientDashboard({
         <MilestoneToast emoji="🎉" message={`${streakDays}-day streak — keep it going!`} once={`streak-${streakDays}`} />
       )}
         {/* Header */}
-        <div className="flex items-start justify-between pt-2">
-          <div>
-            <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>{greeting},</p>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--brand-text)" }}><span style={{ backgroundImage: hour < 12 ? "linear-gradient(100deg,#ff9f5a,#ff6b6b,#c86dd7)" : hour < 17 ? "linear-gradient(100deg,#7c9cf5,#5ec9a3,#ffd36e)" : "linear-gradient(100deg,#6366f1,#8b6ff0,#3aa8c1)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>{firstName}</span> 👋</h1>
+        {/* THE HEADER IS A BANNER, NOT LOOSE TEXT.
+            Dustin, 3 Sep: "put the good morning and the streak in an actual
+            banner so it's a bit cleaner. make it a diff banner than the rest of
+            the page to set it apart as the header."
+            One surface, its own background, greeting and streak on a shared
+            centre line so they read as two halves of one bar rather than two
+            things that happen to be near each other. The streak keeps its own
+            pill -- it is a live number, and flattening it into the banner would
+            lose that -- but it is sized and aligned to balance the greeting. */}
+        <div
+          className="rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3"
+          style={{
+            background: "var(--brand-bg-deep)",
+            border: "1px solid var(--brand-border)",
+            boxShadow: "0 1px 2px rgba(0,0,0,.04)",
+          }}
+        >
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-widest truncate" style={{ color: "var(--brand-text-secondary)" }}>{greeting}</p>
+            <h1 className="text-2xl font-bold leading-tight truncate" style={{ color: "var(--brand-text)" }}>
+              <span style={{ backgroundImage: hour < 12 ? "linear-gradient(100deg,#ff9f5a,#ff6b6b,#c86dd7)" : hour < 17 ? "linear-gradient(100deg,#7c9cf5,#5ec9a3,#ffd36e)" : "linear-gradient(100deg,#6366f1,#8b6ff0,#3aa8c1)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>{firstName}</span> 👋
+            </h1>
           </div>
-          <div className="flex items-center gap-2">
           {streakDays > 0 && (
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${isMilestone ? "animate-pulse" : ""}`}
-              style={{ background: isMilestone ? "#f59e0b20" : "var(--brand-surface)", border: `1px solid ${isMilestone ? "#f59e0b" : "var(--brand-border)"}` }}>
-              <StreakFlame days={streakDays} milestone={isMilestone} />
-              <div>
-                <span className="text-sm font-bold" style={{ color: isMilestone ? "#f59e0b" : "var(--brand-text)" }}><CountUp end={streakDays} duration={800} /></span>
-                <span className="text-xs ml-0.5" style={{ color: "var(--brand-text-secondary)" }}>day{streakDays !== 1 ? "s" : ""}</span>
+            <div
+              className={`shrink-0 flex flex-col items-center justify-center rounded-xl px-3.5 ${isMilestone ? "animate-pulse" : ""}`}
+              style={{
+                background: isMilestone ? "#f59e0b20" : "var(--brand-surface)",
+                border: `1px solid ${isMilestone ? "#f59e0b" : "var(--brand-border)"}`,
+                minWidth: 76,
+                // Matches the greeting stack's height so the two sides of the
+                // banner are the same size rather than one floating beside the
+                // other.
+                alignSelf: "stretch",
+              }}
+            >
+              <div className="flex items-center gap-1.5">
+                <StreakFlame days={streakDays} milestone={isMilestone} />
+                <span className="text-lg font-bold leading-none" style={{ color: isMilestone ? "#f59e0b" : "var(--brand-text)" }}><CountUp end={streakDays} duration={800} /></span>
               </div>
+              <span className="text-[10px] font-medium uppercase tracking-widest mt-0.5" style={{ color: "var(--brand-text-secondary)" }}>
+                day{streakDays !== 1 ? "s" : ""}
+              </span>
             </div>
           )}
-          </div>
         </div>
+
+        {/* MONEY STAYS ABOVE EVERYTHING.
+            Dustin, 3 Sep: "good catch on the payments notifications, i do not
+            have that one on my client app so i missed it. let's keep that above
+            the this week block for clients."
+            Moving This Week to the top had pushed this under it. A payment that
+            is due is the one thing on this screen with a deadline attached, so
+            it sits directly below the header and above everything else. */}
+        {notifications.length > 0 && (
+          <PaymentNotificationBanner notifications={notifications} />
+        )}
 
         {/* THIS WEEK SITS DIRECTLY UNDER THE STREAK, BY REQUEST.
             Dustin, 3 Sep: "leave the this week with the adherence up at the
@@ -741,10 +780,6 @@ export default function ClientDashboard({
             component header for why enlarging CoachFab was the wrong answer. */}
         <BigCoachBar />
 
-        {/* Payment Notifications */}
-        {notifications.length > 0 && (
-          <PaymentNotificationBanner notifications={notifications} />
-        )}
 
         {/* Add workout lived here AND on the Workout tab. Dustin, 3 Sep: "the add
             workout button needs to be removed from the home screen. We already
