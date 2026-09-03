@@ -11,7 +11,7 @@ import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
 import { useCoach } from "@/lib/useCoach";
 import { sessionsReplacedBy, slotForReplacement, skipVerdict, describeReplaced, type DateOccupant } from "@/lib/replaceOnDate";
 
-type LibDay = { id: string; label: string };
+type LibDay = { id: string; label: string; description?: string | null; difficulty?: string | null };
 
 function ctToday() { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }); }
 function daysAheadCT(n: number) {
@@ -92,7 +92,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
         const ph = await supabase.from("phases").select("id").in("program_id", progIds as string[]);
         const phaseIds = ((ph.data as any[]) || []).map((p) => p.id);
         if (phaseIds.length) {
-          const own = await supabase.from("days").select("id, label").in("phase_id", phaseIds as string[]).order("position");
+          const own = await supabase.from("days").select("id, label, description, difficulty").in("phase_id", phaseIds as string[]).order("position");
           for (const d of ((own.data as LibDay[]) || [])) days.push(d);
         }
       }
@@ -109,7 +109,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
     // single read at 1,000 rows whatever .limit() asks for, so a bigger number
     // here would have been another guess with a cliff behind it.
     const shared = { data: await fetchAllRowsSafe<LibDay>(
-      () => supabase.from("days").select("id, label").order("label"),
+      () => supabase.from("days").select("id, label, description, difficulty").order("label"),
       { label: "AddWorkoutButton library" },
     ) };
     for (const s of ((shared.data as LibDay[]) || [])) if (!days.find((d) => d.id === s.id)) days.push(s);
@@ -293,7 +293,39 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
     } finally { setBusy(false); }
   }
 
-  const filtered = lib.filter((d) => d.label.toLowerCase().includes(q.toLowerCase()));
+  // SEARCH THE DESCRIPTION, NOT JUST THE TITLE.
+  //
+  // Dustin, 3 Sep: "when they search for a workout, it should search the
+  // description. that way if they search for chest strength and balance, or
+  // something like that it will find the most appropriate workouts. also they
+  // can search beginner, intermediate, advanced, hard, easy."
+  //
+  // This matched d.label alone against 449 distinct names, so a perfect chest
+  // session called "Upper Push A" was invisible to anyone searching "chest".
+  // The library was there; it could not be reached.
+  //
+  // EVERY WORD HAS TO MATCH, not the phrase. "chest strength balance" is three
+  // requirements, and a substring test on the whole string finds nothing
+  // because no description contains that exact run of characters. Splitting on
+  // whitespace turns it into what he actually meant: show me the workouts that
+  // are all three.
+  //
+  // Title matches sort first. Somebody typing a name they already know should
+  // not have to scroll past nine descriptions that happen to mention it.
+  const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const haystack = (d: LibDay) =>
+    `${d.label} ${d.description ?? ""} ${d.difficulty ?? ""}`.toLowerCase();
+  const filtered = (terms.length === 0
+    ? lib
+    : lib.filter((d) => { const h = haystack(d); return terms.every((t) => h.includes(t)); })
+  ).slice().sort((a, b) => {
+    if (terms.length === 0) return 0;
+    const score = (d: LibDay) => {
+      const l = d.label.toLowerCase();
+      return terms.every((t) => l.includes(t)) ? 0 : 1;
+    };
+    return score(a) - score(b);
+  });
 
   return (
     <>
@@ -372,7 +404,25 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {filtered.map((d) => (
-                      <button key={d.id} disabled={busy} onClick={() => askOrAdd(d)} style={{ textAlign: "left", padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(140,150,180,.2)", background: "rgba(140,150,180,.06)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "inherit" }}>{d.label}</button>
+                      // The description is shown, not just searched. A list of
+                      // 449 titles is a list of 449 guesses; one line of what
+                      // the workout actually trains is what lets somebody pick
+                      // the right one without opening six of them.
+                      <button key={d.id} disabled={busy} onClick={() => askOrAdd(d)} style={{ textAlign: "left", padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(140,150,180,.2)", background: "rgba(140,150,180,.06)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "inherit" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ flex: 1, minWidth: 0 }}>{d.label}</span>
+                          {d.difficulty && (
+                            <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", padding: "2px 7px", borderRadius: 999, background: "rgba(140,150,180,.18)", opacity: 0.85 }}>
+                              {d.difficulty}
+                            </span>
+                          )}
+                        </div>
+                        {d.description && (
+                          <div style={{ marginTop: 5, fontSize: 12, fontWeight: 400, lineHeight: 1.45, opacity: 0.72, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                            {d.description}
+                          </div>
+                        )}
+                      </button>
                     ))}
                     {filtered.length === 0 && <div style={{ padding: 12, opacity: 0.6, fontSize: 13 }}>No matching workouts.</div>}
                   </div>
