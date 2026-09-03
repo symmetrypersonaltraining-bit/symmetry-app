@@ -489,7 +489,9 @@
     "client_owner_id",
     "created_by",
     "origin",
-    "swapped_from_day_id"
+    "swapped_from_day_id",
+    "description",
+    "difficulty"
   ],
   "device_tokens": [
     "id",

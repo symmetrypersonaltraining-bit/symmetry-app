@@ -1005,8 +1005,27 @@ export default function WorkoutLogger({
                   merged[peId] = merged[peId].concat(draftArr.slice(prev[peId].length));
                 }
               }
+              // A DRAFT MAY NOT RESURRECT AN EXERCISE THE WORKOUT NO LONGER HAS.
+              //
+              // This copied in every draft key `prev` did not have, which
+              // sounds like "lose nothing" and is actually how a dead
+              // prescribed_exercise_id survives a reload. `prev` is built from
+              // the day as the server has it right now; a key missing from it
+              // is an exercise that is GONE.
+              //
+              // 3 Sep: Jennifer's day was rewritten while she was logging it --
+              // every prescribed exercise deleted and recreated with new ids
+              // four minutes into her session. Her draft still held the old
+              // ones, so every tick wrote a foreign key that no longer existed
+              // and she got a raw Postgres error she could do nothing about.
+              // Reloading did not help, because this line handed the dead ids
+              // straight back.
+              //
+              // Sets against a deleted exercise cannot be saved by definition,
+              // so keeping them only guarantees the failure repeats. Anything
+              // still in the workout keeps its draft, above, untouched.
               for (const peId of Object.keys(draft)) {
-                if (!merged[peId]) merged[peId] = draft[peId];
+                if (!merged[peId] && prev[peId]) merged[peId] = draft[peId];
               }
               return merged;
             });
@@ -1676,8 +1695,38 @@ export default function WorkoutLogger({
       // never be diagnosed — the same lesson completeWorkout already learned on
       // 4 August.
       console.error("logSet", e);
+
+      // THE WORKOUT CHANGED UNDER HER. SAY THAT, NOT "23503".
+      //
+      // Dustin, 3 Sep: "I was reprogramming mid session. I replaced the workout
+      // I was actually logging through claude project." Jennifer's day had every
+      // prescribed exercise deleted and recreated four minutes into her session,
+      // so each tick wrote a foreign key that no longer existed and she was
+      // shown the constraint name. There is nothing a client can do with
+      // "set_logs_prescribed_exercise_id_fkey" except stop trusting the app.
+      //
+      // Reprogramming mid-day is legitimate and stays legitimate. What has to
+      // change is what the client sees when it happens to them.
+      //
+      // NOT A SILENT REMAP ONTO THE NEW EXERCISES. If the workout was replaced,
+      // these sets may not belong to the movements that replaced them, and
+      // quietly reassigning them would invent training that never happened. A
+      // reload is honest; a guess is a log nobody can trust.
+      const err = e as { code?: string; message?: string };
+      const staleExercise =
+        err?.code === "23503" ||
+        /set_logs_prescribed_exercise_id_fkey/.test(err?.message ?? "");
+
+      if (staleExercise) {
+        setCompleteError("Your coach just updated this workout — reloading it now.");
+        // The draft can no longer resurrect the dead ids (see the hydration
+        // guard above), so a reload lands on the day as it now stands.
+        setTimeout(() => { if (typeof window !== "undefined") window.location.reload(); }, 1400);
+        return;
+      }
+
       setCompleteError(
-        (e as { message?: string })?.message ||
+        err?.message ||
         "That set didn't save — check your connection and tap it again.",
       );
     }

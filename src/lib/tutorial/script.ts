@@ -353,6 +353,21 @@ export const TUTORIAL: TutorialChapter[] = [
         audioUrl: null,
       },
       {
+        id: "around-reprogramming-live",
+        title: "Reprogramming somebody who is mid workout",
+        body: [
+          "You can rewrite a day whenever you want, including one somebody is training right now. That has not changed.",
+          "What changed on the third of September is what the client sees. If you replace the workout under them, their next tap says your coach just updated this workout, and it reloads onto the new one.",
+          "It does not move their finished sets across. If you replaced the session, those sets belong to movements that are no longer there, and guessing where they go would invent training that never happened.",
+          "Every change you make to a day, a section or an exercise is now recorded, whoever made it and however.",
+        ],
+        narration:
+          "You can rewrite a day whenever you want, including one somebody is training right now. That has not changed. What changed is what the client sees. If you replace the workout under them, their next tap tells them their coach just updated it, and it reloads onto the new one. It does not move their finished sets across. If you replaced the session, those sets belong to movements that are no longer there, and guessing where they go would invent training that never happened. Every change to a day, a section or an exercise is now recorded, whoever made it and however.",
+        route: "/clients",
+        routeLabel: "Open Clients",
+        audioUrl: null,
+      },
+      {
         id: "around-header",
         title: "The two buttons in the corner",
         body: [
