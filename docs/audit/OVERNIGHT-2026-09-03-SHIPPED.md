@@ -180,3 +180,43 @@ Final state: **tsc 0 errors in `src/` · 2,649 unit tests + 43 nutrition tests,
 
 `server.ts` (191 errors) and `client.ts` (135) remain. Those are a project, not
 a commit.
+
+
+---
+
+## Correction, after Dustin reviewed the overnight docs
+
+Two of the three things I led NEEDS-YOU with were my error, not findings.
+
+**Todd Prine.** I reported his calendar running out while 67 sessions were
+programmed to October. His billing was already correct (`per_session`, $75) and
+he books a week at a time — "4th or 5th time explaining this." A calendar that
+only runs a week ahead is how he books, not a gap.
+
+Both calendar checks assumed every client's calendar reaches as far out as their
+programming. For a week-to-week client that is never true, so they generated a
+permanent and *growing* false alarm — the identical failure to
+`scheduled_workout_null_assignment_id`, retired the same morning for the same
+reason.
+
+Fixed with `clients.schedules_week_to_week`: such a client is judged against
+**their own booked horizon** — their latest actual appointment — rather than the
+full future. A fixed 7-day window was tried first and was still wrong, because a
+session on the 7th when he is booked through the 4th is next week's booking he
+has not made yet, not an unbooked session. Todd: 15 flagged rows → 1, and off
+the coverage check entirely. The remaining one is tomorrow's session, confirmed
+correct, unlinked only because of the `appointment_id` bug.
+
+**Erin Arit.** Not a client yet — she has not confirmed signing up. Left exactly
+as she is; no flag invented for someone who may not become one.
+
+`supervised_workout_no_appointment` now reports 187, and that number is now
+almost entirely the linking bug and nothing else. Previous function definitions:
+`bak_run_integrity_checks_20260903` and `bak_run_integrity_checks_20260903b`.
+
+**The pattern worth keeping.** Three times in one night a "finding" turned out to
+be normal work the check did not understand: the 493 assignment ids, Jerry, and
+now Todd. Every one cost Dustin an explanation he had already given. Before
+raising anything roster-shaped, read the "STOP RE-REPORTING THESE" section of
+STANDING-RULE-INVARIANTS first — and when a check disagrees with how he actually
+works, the check is what changes.

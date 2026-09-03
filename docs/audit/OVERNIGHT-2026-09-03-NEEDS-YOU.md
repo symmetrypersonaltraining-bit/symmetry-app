@@ -1,33 +1,25 @@
 # Still needs you — 3 Sep 2026
 
-Six things. The first three are the ones I would look at before anything else.
+Four things. The two I led with last night were both my error, and are struck
+through below rather than deleted, so the mistakes stay visible.
 
 ---
 
-## 1. Todd Prine's calendar runs out in two days, his programming runs to October
+## 1. ~~Todd Prine~~ — RESOLVED, and it was my error
 
-He has **67 future sessions** in the app, scheduled through **9 October**. His
-Google Calendar has **33 appointments ever** and the last one is **4 September**.
+I raised his calendar as a problem. It is not one. He books a week at a time, his
+billing was already correct (`per_session`, $75), and tomorrow's session is real.
 
-He is `per_session` billing. Sessions that exist in the app but not in the
-calendar are sessions nobody is being billed for, and 15 of the 18 genuinely
-unmatched supervised sessions in the whole database are his.
+The check was wrong, not Todd. Fixed: `clients.schedules_week_to_week` judges
+such a client against their own booked horizon instead of the full future.
+15 flagged rows → 1, and that one is the ordinary linking bug. Nothing needed
+from you.
 
-**Either his calendar needs extending, or those sessions should not be there.**
-I have not touched it.
+## 2. ~~Erin Arit~~ — not a client yet, nothing to decide
 
-## 2. Erin Arit — a paying client with nothing to train
-
-Created 1 Sep. **209 appointments. 24 payments. Zero programming, zero workout
-logs, zero scheduled workouts.**
-
-You named her with the tester accounts, but she does not look like one, so I
-deliberately did **not** flag her as a test account — flagging her would have
-hidden a real gap. She is now the single client showing on
-`client_coverage_under_14_days`, which is exactly where she should be.
-
-She is also half of `appointment_no_supervised_workout` (12 rows, her and Lauren
-Standefer). Probably one problem wearing two hats.
+She has not confirmed signing up. Left exactly as she is; no flag invented for
+someone who may not become a client. She will keep showing on the coverage check
+until she signs up or is archived, and that is expected rather than drift.
 
 ## 3. The 207 supervised sessions — reviewed, cause found, NOT fixed
 

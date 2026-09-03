@@ -123,3 +123,60 @@ Standefer. Erin is the same client flagged separately for having 209
 appointments, 24 payments and **no programming at all**. That is probably one
 finding wearing two hats, but I have not confirmed it and did not chase it
 tonight.
+
+---
+
+# Correction — 3 Sep, after Dustin reviewed this
+
+**Todd Prine was never a finding. I was wrong to raise him.**
+
+> "Todd schedules one week at a time so his billing should be set to charge by
+> the session rate. thats why he's not in calendar. 4th or 5th time explaining
+> this." — Dustin
+
+His billing was **already correct**: `per_session`, $75, anchor day 9. Nothing
+about Todd needed changing. What was wrong was the check, and my reading of it.
+A calendar that only ever runs a week ahead is not a gap — it is how he books.
+
+Both calendar checks assumed every client's calendar is populated as far out as
+their programming. For a week-to-week client that is never true and never will
+be, so they produced a permanent, *growing* false alarm. Same failure as
+`scheduled_workout_null_assignment_id`, retired the same morning for the same
+reason: a check that fires on normal work trains you to ignore the mail.
+
+## What changed
+
+`clients.schedules_week_to_week` (new, default false, set on Todd). A client
+carrying it is judged against **their own booked horizon** — the latest
+appointment they have actually made — rather than against the full future.
+
+A fixed 7-day window was tried first and was still the wrong question: Todd is
+booked through the 4th and programmed through October, so a session on the 7th
+is not an unbooked session, it is next week's booking he has not made yet. The
+horizon is self-adjusting and needs no maintenance.
+
+`client_coverage_under_14_days` uses the same idea — asking a week-to-week
+client for fourteen days of coverage is asking the wrong question.
+
+## Result
+
+Todd: **15 flagged rows → 1**, and off the coverage check entirely.
+
+The remaining one is **tomorrow's session, 4 September — confirmed correct by
+Dustin.** It has a real appointment behind it and is unlinked only because of
+the `appointment_id` bug this document describes. It is one of the 189, not a
+Todd problem, and it disappears when the `adopt` clause lands.
+
+`supervised_workout_no_appointment` now reports **187** — and that number is now
+almost entirely the linking bug and nothing else, which is what a check is
+supposed to do.
+
+## Erin Arit — also not a finding
+
+> "Erin is actually a new one, I have not recieved confirmation she is actually
+> signing up yet so ill update once she does."
+
+She stays exactly as she is. No flag invented for someone who may not become a
+client. She will keep appearing on `client_coverage_under_14_days` until she
+signs up or is archived, and **that is expected, not drift** — do not re-raise
+it as a finding.
