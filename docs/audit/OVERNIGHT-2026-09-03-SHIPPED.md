@@ -20,6 +20,9 @@ Supabase env vars is the expected sandbox one and is ignored.
 | 60510377 | CI now runs the two checks everyone was asked to remember |
 | 9b891176 | The shape of the database, in a file the compiler can read |
 | 6451095d | The feature audit, built from the routes and the database |
+| e1eb7b88 | The three morning documents |
+| cc20d7a8 | Backlog: the 3 Sep overnight run |
+| e7d4c4cc | The service-role client now answers to the schema |
 
 ## Database (all backed up first)
 
@@ -134,3 +137,46 @@ re-raising it.
 
 The fix is not a code change, it is that this is now written down where the next
 session will read it before running its own query.
+
+
+---
+
+## The service-role client is now type-checked (added after the docs above)
+
+`src/lib/supabase/admin.ts` is parameterised with `<Database>`. It is the client
+that uses the service role and bypasses RLS entirely, so a wrong column there is
+a write no policy would have stopped — which is why it went first.
+
+Nine errors surfaced, all nine fixed on their merits. **No `any`, no
+`@ts-ignore`, no `@ts-expect-error` in any of the seven files touched.**
+
+The two most telling:
+
+- **Two hand-written casts were replacing real types with guessed ones.** In the
+  meal-plan clone path, `allMeals as { …; rotation: unknown }[]` declared
+  `rotation` as `unknown` — and `rotation` is a jsonb column, so copying a meal
+  was assigning `unknown` into `Json` with nothing checking it. The other threw
+  away the shape its own `select` already guaranteed. Both deleted. The casts
+  were not describing the database, they were overriding it, and that is the
+  whole problem in one line.
+
+- **One looked like a live bug and was not.** `clients.trainer_id` is NOT NULL
+  with no default, and `create-client-from-assessment` omits it when the creator
+  has no `trainers` row — which reads like a guaranteed failure during
+  onboarding. It is not: `stamp_client_trainer()` is a BEFORE INSERT trigger
+  that fills it in, and `gen types` cannot see triggers. Checked against the live
+  trigger definition rather than assumed.
+
+**The new CI gate earned its keep within the hour.** Changing
+`p_trainer: isOwner ? null` to `undefined` — identical calls, since the argument
+is `DEFAULT NULL::uuid` — broke a test that pins that line by source text. That
+test guards a real leak: the AI health page once read the whole business's costs
+behind a bare "is a trainer" check. The owner branch now accepts either
+spelling, and the half that matters — a non-owner scoping to their own id — is
+asserted separately and more strictly than before.
+
+Final state: **tsc 0 errors in `src/` · 2,649 unit tests + 43 nutrition tests,
+0 failed · build compiled successfully.**
+
+`server.ts` (191 errors) and `client.ts` (135) remain. Those are a project, not
+a commit.

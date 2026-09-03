@@ -36,9 +36,19 @@ thing being checked is blind to total absence. There may be others.
 **`appointment_no_supervised_workout` and the coverage check are probably the
 same finding.** Erin Arit appears in both. Not chased.
 
-**56 tsc errors remain, all outside `src/`.** Scripts, fixtures and test helpers.
+**61 tsc errors remain, all outside `src/`** (56 before tonight; the generated
+types and the typed admin client surfaced a few more in tests). Scripts, fixtures and test helpers.
 The CI type gate is scoped to `src/` because of them. Clearing them would let
 the filter go.
+
+**`npm run test:e2e` cannot work for anybody.** The script is
+`"test:e2e": "playwright test"`, but **`@playwright/test` is not a dependency** —
+it appears nowhere in package.json. That accounts for 18 of the 61 remaining tsc
+errors on its own: `Cannot find module '@playwright/test'` in each spec, which
+then cascades into `page` being implicitly `any` everywhere. Not fixed tonight
+because adding it means a package.json change plus a synced lockfile (CI runs
+`npm ci`), and nothing is blocked by it. But the e2e suite is currently
+decorative and should be either restored or removed on purpose.
 
 **There is still no ESLint config at all.** `npm run lint` would hang in CI.
 Deliberately not added tonight — a lint config is a large pile of opinions and
