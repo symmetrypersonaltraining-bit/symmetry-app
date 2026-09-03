@@ -1,5 +1,4 @@
 "use client";
-import AddWorkoutButton from "@/components/AddWorkoutButton";
 import { centralDayOfWeek, shiftDate, centralHour, centralFormatDate } from "@/lib/central-time";
 import OffPlanToday from "@/components/OffPlanToday";
 
@@ -18,7 +17,6 @@ import CommunityPair from "@/components/CommunityPair";
 import ClientTakeovers from "@/components/ClientTakeovers";
 import { RestDaySlip } from "@/components/FunMoments";
 import WorkoutDaySheet from "@/components/WorkoutDaySheet";
-import AiBadge from "@/components/AiBadge";
 import BigCoachBar from "@/components/BigCoachBar";
 
 interface MetricPoint {
@@ -485,10 +483,30 @@ function WeekRing({
     return { dow: i, dateStr, workouts, isToday: dateStr === todayStr, dateNum };
   });
 
-  // Count individual workouts, not just days
-  const scheduled = weekDays.reduce((acc, d) => acc + d.workouts.length, 0);
-  const completed = weekDays.reduce((acc, d) => acc + d.workouts.filter(w => w.completed).length, 0);
+  // ADHERENCE IS MEASURED AGAINST WHAT IS DUE, NOT AGAINST THE WHOLE WEEK.
+  //
+  // Dustin, 3 Sep: "today is Thursday... I have five workouts scheduled. I've
+  // logged three. I have two on today. So at the end of today, I should be at a
+  // hundred percent."
+  //
+  // This counted all seven days, so Friday and Saturday's sessions were in the
+  // denominator on Thursday morning. He read 38% while being perfectly on
+  // track. Worse, the number could only ever fall as the week went on and then
+  // jump at the end -- so the one metric on the home screen meant to say "are
+  // you keeping up" was punishing people for days that had not happened yet.
+  //
+  // Only days up to and including today count. Today's own sessions DO count
+  // the moment the day starts, which is what makes finishing them read 100%.
+  //
+  // A past week is complete, so all seven days count. A future week has nothing
+  // due at all, so it reports no percentage rather than a demoralising 0%.
+  const isFutureWeek = weekOffset > 0;
+  const dueDays = weekOffset < 0 ? weekDays : weekDays.filter(d => d.dateStr <= todayStr);
+
+  const scheduled = dueDays.reduce((acc, d) => acc + d.workouts.length, 0);
+  const completed = dueDays.reduce((acc, d) => acc + d.workouts.filter(w => w.completed).length, 0);
   const adherence = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0;
+  const showAdherence = !isFutureWeek && scheduled > 0;
   const canGoNext = weekOffset < 4;
 
   // Render a single workout circle
@@ -525,7 +543,7 @@ function WeekRing({
         </button>
         <div className="text-center">
           <p className="text-xs font-semibold" style={{ color: "var(--brand-text-secondary)" }}>{weekLabel}</p>
-          {scheduled > 0 && (
+          {showAdherence && (
             <p className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>{adherence}% adherence</p>
           )}
         </div>
@@ -701,6 +719,21 @@ export default function ClientDashboard({
           </div>
         </div>
 
+        {/* THIS WEEK SITS DIRECTLY UNDER THE STREAK, BY REQUEST.
+            Dustin, 3 Sep: "leave the this week with the adherence up at the
+            top. I want that part first, right underneath the streak count."
+            It answers the same question the streak in the header is already
+            asking -- am I keeping up -- so the two belong together. */}
+        <div className="metric-card">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>This Week</span>
+            <Link href={`${basePath}/workout`} className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
+              View Schedule →
+            </Link>
+          </div>
+          <WeekRing allScheduled={scheduleSource} weekOffset={weekOffset} onPrev={() => setWeekOffset(o => o - 1)} onNext={() => setWeekOffset(o => Math.min(4, o + 1))} basePath={basePath} />
+        </div>
+
         {/* A large, in-flow way into the coach — renders for pool-gated clients
             ONLY (Gerard and Sharon) and returns null for everyone else. In-flow
             on purpose: it pushes content down rather than floating over it, so
@@ -713,21 +746,15 @@ export default function ClientDashboard({
           <PaymentNotificationBanner notifications={notifications} />
         )}
 
-        {/* Add workout (client can add an extra workout to today) */}
-        <div style={{ marginBottom: 12 }}><AddWorkoutButton /></div>
+        {/* Add workout lived here AND on the Workout tab. Dustin, 3 Sep: "the add
+            workout button needs to be removed from the home screen. We already
+            have that button on the workout tab, and that's where we actually
+            log one." Two doors to the same room, and the home screen is not the
+            one anybody starts a workout from. Removed here only -- the Workout
+            tab's button is untouched. */}
         {/* Renders nothing unless something off-plan was logged today. Additive
             card so the Today's Workout block below is untouched. */}
         <OffPlanToday />
-        {/* Week overview */}
-        <div className="metric-card">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--brand-text-secondary)" }}>This Week</span>
-            <Link href={`${basePath}/workout`} className="text-xs font-medium" style={{ color: "var(--brand-primary)" }}>
-              View Schedule →
-            </Link>
-          </div>
-          <WeekRing allScheduled={scheduleSource} weekOffset={weekOffset} onPrev={() => setWeekOffset(o => o - 1)} onNext={() => setWeekOffset(o => Math.min(4, o + 1))} basePath={basePath} />
-        </div>
 
         {/* Today's Workout — 0 workouts: rest day | 1 workout: single card | 2+: picker */}
         {_todayWorkouts.length === 0 ? (
@@ -881,19 +908,13 @@ export default function ClientDashboard({
           )}
         </div>
 
-        {/* AI Insights — trainer-only when viewing own client app */}
-        {isOwnTrainerView && (
-          <div className="rounded-2xl p-4" style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)" }}>
-            <div className="flex items-center gap-2 mb-2">
-              <AiBadge size={20} mood="explaining" title="" />
-              <span className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>AI Insights</span>
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "color-mix(in srgb, var(--brand-primary) 13%, transparent)", color: "var(--brand-primary)" }}>Trainer View</span>
-            </div>
-            <p className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>
-              AI-powered coaching insights will appear here when viewing a client&apos;s dashboard.
-            </p>
-          </div>
-        )}
+        {/* The "AI Insights" card was removed on 3 Sep. It rendered a heading, a
+            Trainer View pill and the sentence "AI-powered coaching insights will
+            appear here" -- and nothing else, ever. No data, no logic, no route
+            behind it. It showed only on isOwnTrainerView, so no client ever saw
+            it; it just sat at the bottom of Dustin's own dashboard promising a
+            feature that does not exist. If real insights are built later they
+            get a card that shows insights. */}
       </div>
     </>
   );

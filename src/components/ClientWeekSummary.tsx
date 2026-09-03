@@ -348,7 +348,11 @@ export default function ClientWeekSummary() {
           the header range + the top schedule widget. */}
       <div style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", borderRadius: 18, padding: 14, boxShadow: "0 8px 26px rgba(20,30,55,0.08)", marginBottom: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <div style={{ fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>📋 This week</div>
+          {/* Renamed 3 Sep. This said "This week", and so did the adherence card
+              higher up the same screen -- two cards, same title, different jobs,
+              and no way to tell from the heading which one you were reading.
+              This card is the weekly focus, so it says so. */}
+          <div style={{ fontWeight: 800, fontSize: 14, color: "var(--brand-text)" }}>🎯 Weekly Focus</div>
           <div style={{ fontSize: 11, color: "var(--brand-text-secondary)" }}>{fmtRange(s.thisWk, s.thisWkEnd)}</div>
         </div>
         <div style={{ display: "flex", gap: 6, marginBottom: focusText || s.totalThis ? 10 : 0 }}>
