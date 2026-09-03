@@ -297,6 +297,34 @@ export const TUTORIAL: TutorialChapter[] = [
         audioUrl: null,
       },
       {
+        id: "around-clienthome",
+        title: "What your clients actually see",
+        body: [
+          "Flip into Client View and their Home reads in this order.",
+          "A header banner with the greeting and their streak. Then anything they owe you, which sits above everything else because it is the only thing on that screen with a deadline attached.",
+          "Then This Week. Then today's workout, the challenge and group cards, their weekly focus, today's nutrition, and their progress charts.",
+        ],
+        narration:
+          "Flip into Client View and their Home reads in this order. A header banner with the greeting and their streak. Then anything they owe you, which sits above everything else, because it is the only thing on that screen with a deadline attached. Then This Week. Then today's workout, the challenge and group cards, their weekly focus, today's nutrition, and their progress charts.",
+        route: "/home",
+        routeLabel: "Open Home",
+        audioUrl: null,
+      },
+      {
+        id: "around-clientweek",
+        title: "The percentage on their week",
+        body: [
+          "This Week shows a circle for every session and an adherence percentage.",
+          "That percentage counts only the days that have already happened, including today. So somebody who has done everything asked of them so far reads one hundred percent on a Tuesday, rather than forty.",
+          "There is no Add Workout button on their Home. That one lives on the Workout tab, which is where anybody actually starts a session.",
+        ],
+        narration:
+          "This Week shows a circle for every session, and an adherence percentage. That percentage counts only the days that have already happened, including today. So somebody who has done everything asked of them so far reads one hundred percent on a Tuesday, rather than forty. One more thing. There is no Add Workout button on their Home. That one lives on the Workout tab, which is where anybody actually starts a session.",
+        route: "/home",
+        routeLabel: "Open Home",
+        audioUrl: null,
+      },
+      {
         id: "around-header",
         title: "The two buttons in the corner",
         body: [

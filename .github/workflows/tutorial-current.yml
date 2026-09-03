@@ -1,0 +1,106 @@
+# THE TUTORIAL IS THE SPEC, AND THIS IS WHAT KEEPS IT TRUE.
+#
+# src/lib/tutorial/script.ts is the written record of exactly how this app is
+# supposed to behave. It is what a new user is taught, what we check against
+# when something looks wrong, and the backup record of intent if the code and
+# the intention ever part ways.
+#
+# It only works if it is accurate. A tutorial describing a button that was
+# renamed three weeks ago is worse than none: the first thing a person cannot
+# find teaches them to distrust the rest of it.
+#
+# Written rules did not hold this. Nothing in CI ran the type checker or the
+# tests either, until 3 Sep, and the same regressions kept arriving. So this is
+# a gate rather than a paragraph.
+#
+# ── What it does ─────────────────────────────────────────────────────────────
+#
+# If a push changes screen code, it must ALSO touch the tutorial script or the
+# screen walkthrough — or say, in a commit message, why nothing observable
+# changed:
+#
+#     Tutorial: n/a — pure refactor, no control or copy changed
+#
+# That escape hatch is a sentence and not a flag on purpose. It forces a
+# decision instead of silence, and it leaves the reasoning in the history where
+# the next person can read it.
+#
+# ── Why it will not cry wolf ─────────────────────────────────────────────────
+#
+# It watches only real UI: pages and components under src/app/(app) and
+# src/components. Not lib, not api, not tests, not docs, not migrations. A
+# change there cannot alter what a user sees, so it is none of this job's
+# business.
+
+name: Tutorial stays current
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tutorial-current:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Does this change what a user sees?
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+            # First push to a new branch, or a force-push whose base is gone.
+            if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] \
+               || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+              echo "No usable base commit to compare against — nothing to check."
+              exit 0
+            fi
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD")
+
+          SCREENS=$(echo "$CHANGED" | grep -E '^src/(app/\(app\)/|components/).*\.tsx$' || true)
+          if [ -z "$SCREENS" ]; then
+            echo "No screen files changed. Nothing to keep in step."
+            exit 0
+          fi
+
+          RECORD=$(echo "$CHANGED" | grep -E '^(src/lib/tutorial/|docs/audit/SCREEN-WALKTHROUGH\.md)' || true)
+          if [ -n "$RECORD" ]; then
+            echo "Screen code changed, and so did the record:"
+            echo "$RECORD" | sed 's/^/  /'
+            exit 0
+          fi
+
+          # The written opt-out, in any commit message in this range.
+          if git log --format=%B "$BASE".."$HEAD" | grep -qiE '^[[:space:]]*Tutorial:[[:space:]]*n/?a'; then
+            echo "Screen code changed, and a commit says why the tutorial is unaffected:"
+            git log --format=%B "$BASE".."$HEAD" | grep -iE '^[[:space:]]*Tutorial:' | sed 's/^/  /'
+            exit 0
+          fi
+
+          echo "THE TUTORIAL HAS FALLEN BEHIND THE APP."
+          echo
+          echo "These screen files changed:"
+          echo "$SCREENS" | sed 's/^/  /'
+          echo
+          echo "But nothing in src/lib/tutorial/ or docs/audit/SCREEN-WALKTHROUGH.md did."
+          echo
+          echo "The tutorial is the written record of how this app is supposed to work —"
+          echo "for new users, and as our own reference when behaviour looks wrong. It is"
+          echo "only worth having if it is true."
+          echo
+          echo "Either update it in this change, or add a line to a commit message saying"
+          echo "why nothing a user could observe has changed:"
+          echo
+          echo "    Tutorial: n/a — pure refactor, no control or copy changed"
+          exit 1
