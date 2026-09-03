@@ -194,7 +194,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
         // all — so without asking which rows actually changed this would report
         // a replacement it had not made. That is the bug, not a precaution.
         const { data: skipped, error: skipErr } = await (supabase as any).from("scheduled_workouts")
-          .update({ status: "skipped", updated_at: new Date().toISOString() })
+          .update({ status: "replaced", updated_at: new Date().toISOString() })
           .in("id", replacing.map((r) => r.id))
           .eq("status", "scheduled")
           .select("id");

@@ -424,7 +424,7 @@ export default async function HomePage(props: {
       .from("scheduled_workouts")
       .select("id, scheduled_date, status, days(label)")
       .is("deleted_at", null)
-      .neq("status", "skipped")
+      .neq("status", "replaced")
       .eq("client_id", clientRecord.id)
       .gte("scheduled_date", sixtyStr)
       .lte("scheduled_date", thirtyAheadStr)

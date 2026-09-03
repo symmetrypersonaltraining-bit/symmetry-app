@@ -517,7 +517,7 @@ export async function POST(req: NextRequest) {
         // it fails quietly the "3 attempts + 1 completed reads as 25% instead
         // of 1/1" bug comes straight back with nothing to show for it, which is
         // how it went unnoticed the first time.
-        const { error: retireErr } = await admin.from("scheduled_workouts").update({ status: "skipped" })
+        const { error: retireErr } = await admin.from("scheduled_workouts").update({ status: "replaced" })
           .eq("client_id", clientId).eq("scheduled_date", today).eq("status", "scheduled")
           .eq("source", "client_self_assign").is("deleted_at", null)
           .in("day_id", priorAiDayIds);
@@ -529,7 +529,7 @@ export async function POST(req: NextRequest) {
       if (schedErr) console.error("workout-ai: replacement built but not scheduled —", schedErr.message);
       if (body.dayId) {
         // deleted_at guard: never resurrect a workout the client already deleted.
-        const { error: skipErr } = await admin.from("scheduled_workouts").update({ status: "skipped" })
+        const { error: skipErr } = await admin.from("scheduled_workouts").update({ status: "replaced" })
           .eq("client_id", clientId).eq("day_id", body.dayId).eq("scheduled_date", today).eq("status", "scheduled")
           .is("deleted_at", null);
         if (skipErr) console.error("workout-ai: original workout NOT marked replaced —", skipErr.message);

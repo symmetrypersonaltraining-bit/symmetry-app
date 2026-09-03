@@ -325,6 +325,20 @@ export const TUTORIAL: TutorialChapter[] = [
         audioUrl: null,
       },
       {
+        id: "around-adherence",
+        title: "Swapping versus skipping",
+        body: [
+          "These are two different things and the app now counts them differently.",
+          "If somebody swaps a walk for the stair climber, they trained. The original is marked replaced, it leaves the adherence sum entirely, and the session they actually did is what counts. Swapping never costs them anything.",
+          "If they simply do not do it, and do not move it, and do not log it, that counts against them. Nothing needs marking. A session in the past that nobody logged is a missed one.",
+        ],
+        narration:
+          "Swapping and skipping are two different things, and the app now counts them differently. If somebody swaps a walk for the stair climber, they trained. The original is marked replaced, it leaves the adherence sum entirely, and the session they actually did is what counts. Swapping never costs them anything. If they simply do not do it, and do not move it, and do not log it, then that counts against them. Nothing needs marking. A session in the past that nobody logged is a missed one.",
+        route: "/home",
+        routeLabel: "Open Home",
+        audioUrl: null,
+      },
+      {
         id: "around-header",
         title: "The two buttons in the corner",
         body: [

@@ -142,7 +142,12 @@ test("the comment stripper actually strips, or every guard below is theatre", ()
     "real code must survive");
 });
 
-// Anchor the proof to the SKIP, not to the function.
+// Anchor the proof to the RETIRE, not to the function.
+//
+// (It reads 'replaced' since 3 Sep, not 'skipped'. Same statement, renamed:
+// every one of these paths retires a session because something took its place,
+// which is not the same as somebody skipping one. The ORDERING this test exists
+// for is unchanged.)
 //
 // The mutation harness caught this on 17 Aug too: deleting the real `.select`
 // from the skip left the suite green, because `addLibrary` contains an
@@ -150,7 +155,7 @@ test("the comment stripper actually strips, or every guard below is theatre", ()
 // backdating branch. "Somewhere in this function" is not an assertion about the
 // statement that matters.
 function skipStatement(body: string, what: string): string {
-  const from = at(body, 'status: "skipped"', `${what}: the skip`);
+  const from = at(body, 'status: "replaced"', `${what}: the skip`);
   const to = at(body, "skipVerdict(", `${what}: the verdict`);
   assert.ok(from < to, `${what}: the verdict is read before the skip runs`);
   return body.slice(from, to);
@@ -163,7 +168,7 @@ test("a swap that could not be scheduled does not skip the original", () => {
   // is captured at all.
   assert.match(body, /const \{ (data: added, )?error: addErr \}/, "the insert is unchecked again");
   const guard = at(body, "if (addErr)", "the insert's failure branch");
-  const skip = at(body, 'status: "skipped"', "the skip of the original");
+  const skip = at(body, 'status: "replaced"', "the skip of the original");
   // The navigation moved into goToWorkout() on 22 Aug so it can resolve the
   // scheduled row rather than opening a bare day id. The ORDERING is what this
   // test exists for and it is unchanged: nothing sends the client onward until
@@ -200,7 +205,7 @@ test("adding a workout onto an occupied day asks before it replaces", () => {
     "the skip cannot prove it changed anything");
   const insert = at(body, 'from("scheduled_workouts").insert', "the insert of the new session");
   const guard = at(body, "if (ins.error)", "the insert's failure branch");
-  const skip = at(body, 'status: "skipped"', "the skip of what it replaces");
+  const skip = at(body, 'status: "replaced"', "the skip of what it replaces");
   assert.ok(insert < skip, "the day is cleared before the replacement is known to exist — a failure would leave it empty");
   assert.ok(guard < skip, "a failed insert falls through to the skip, emptying the day it was meant to fill");
   assert.match(body.slice(guard, skip), /return;/,

@@ -101,6 +101,13 @@
       "words": 72
     },
     {
+      "id": "around-adherence",
+      "chapter": "around",
+      "title": "Swapping versus skipping",
+      "text": "Swapping and skipping are two different things, and the app now counts them differently. If somebody swaps a walk for the stair climber, they trained. The original is marked replaced, it leaves the adherence sum entirely, and the session they actually did is what counts. Swapping never costs them anything. If they simply do not do it, and do not move it, and do not log it, then that counts against them. Nothing needs marking. A session in the past that nobody logged is a missed one.",
+      "words": 87
+    },
+    {
       "id": "around-header",
       "chapter": "around",
       "title": "The two buttons in the corner",

@@ -170,7 +170,7 @@ export default function ClientWeekSummary() {
         // the replacement beside it. Both rows survive `deleted_at is null`, so
         // the denominator counted the same session twice and the card read
         // "1/2 workouts done" on a day the client did exactly what was asked.
-        const swappedOut = (r: { status?: string | null }) => r.status === "skipped";
+        const swappedOut = (r: { status?: string | null }) => r.status === "replaced";
         const lastRows = (swLast.data || []).filter((r: any) => !swappedOut(r));
         const totalLast = lastRows.length;
         const doneLast = lastRows.filter((r: any) => r.status === "completed").length;

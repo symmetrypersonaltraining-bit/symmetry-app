@@ -202,7 +202,7 @@ export default function OffPlanBanner({
       // That is exactly how Dustin ended 17 Aug looking at two cardio sessions
       // on a day he thought he had swapped.
       const { data: skipped, error: skipErr } = await (supabase as any).from("scheduled_workouts")
-        .update({ status: "skipped" })
+        .update({ status: "replaced" })
         .in("id", replacing.map((r) => r.id))
         .eq("status", "scheduled")
         .select("id");
@@ -256,7 +256,7 @@ export default function OffPlanBanner({
         // losing that would be worse. But it has to be able to SAY so: this
         // call returns its error rather than throwing, so the catch below has
         // never once seen a failure here.
-        const { error: skipErr } = await (supabase as any).from("scheduled_workouts").update({ status: "skipped" })
+        const { error: skipErr } = await (supabase as any).from("scheduled_workouts").update({ status: "replaced" })
           .eq("client_id", clientId).eq("day_id", dayId).eq("scheduled_date", today).eq("status", "scheduled");
         if (skipErr) console.error("OffPlanBanner: session logged but the planned one was not skipped —", skipErr.message);
       } catch { /* the session is logged; this is bookkeeping */ }

@@ -128,7 +128,7 @@ function factsFor(
     // report a client as half-adherent on a week they did every session --
     // and made the brief disagree with the week card, which is worse than
     // either number being wrong on its own.
-    workoutsScheduled: sw.filter((w) => w.status !== "skipped").length,
+    workoutsScheduled: sw.filter((w) => w.status !== "replaced").length,
     workoutsCompleted: sw.filter((w) => w.status === "completed").length,
     weightStart: wi.length ? Number(wi[0].weight) : null,
     weightEnd: wi.length ? Number(wi[wi.length - 1].weight) : null,

@@ -5,7 +5,6 @@ import { cookies } from "next/headers";
 import AddWorkoutButton from "@/components/AddWorkoutButton";
 import Link from "next/link";
 import { type CalWorkout } from "@/components/RescheduleCalendar";
-import ScheduleWeekBar from "@/components/ScheduleWeekBar";
 import ScheduleBoard from "@/components/ScheduleBoard";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { coachForViewer } from "@/lib/coachIdentity";
@@ -136,7 +135,7 @@ export default async function WorkoutPage(props: {
     // walk and it did not replace it just created another."
     //
     // The swap was right. The screen never learned what skipped means.
-    todayScheduledList = (swList || []).filter((sw: any) => sw.status !== "skipped").map((sw: any) => {
+    todayScheduledList = (swList || []).filter((sw: any) => sw.status !== "replaced").map((sw: any) => {
       const d = sw.days;
       const ph = d?.phases;
       const prog = ph?.programs;
@@ -161,15 +160,31 @@ export default async function WorkoutPage(props: {
   // There is no upper bound now. If it is on the calendar it can be looked at.
   // The row count is bounded by what has actually been programmed, not by a
   // number someone picked.
+  // THE WEEK BAR IS GONE FROM THIS TAB (3 Sep).
+  //
+  // Dustin: "the this week / 1 week bar above those workout tabs, is that
+  // needed? im thinking maybe that's a bit too cluttered and confusing."
+  //
+  // It is not needed. ScheduleBoard below already renders past AND upcoming as
+  // one continuous chronological list with its own Show past toggle, so the bar
+  // was a second, different way of moving through time stacked on a list that
+  // does not need one. Home's This Week ring already answers "am I keeping up";
+  // this tab answers "what am I doing next", and that is a list.
+  //
+  // This was ScheduleWeekBar's only remaining caller, so the component is now
+  // unused. Left on disk deliberately rather than deleted in the same commit --
+  // one logical change at a time, and removing it is its own decision.
   let calWorkouts: CalWorkout[] = [];
   if (clientId) {
     const back = new Date(); back.setDate(back.getDate() - 30);
     const backStr = back.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-    // Skipped left out here too, so the board and the week bar agree with the
-    // card above them. Showing a replaced session in one of the three and not
-    // the others is worse than either answer on its own — and ScheduleWeekBar
-    // marks a whole day unfinished if any workout on it is not completed, so
-    // one replaced session made every day it touched look outstanding.
+    // Replaced sessions left out here too, so the board and the card above it
+    // agree. Showing a replaced session in one and not the other is worse than
+    // either answer on its own.
+    //
+    // (This used to read "skipped". Renamed 3 Sep: every path that wrote that
+    // status was a REPLACE, and calling it skipped is what made a deliberate
+    // miss impossible to count. See the scheduled_workouts.status comment.)
     //
     // The row is not gone: it keeps its status, and the trainer schedule still
     // lists it. This is the CLIENT's view of what is left to do.
@@ -177,7 +192,7 @@ export default async function WorkoutPage(props: {
       .from("scheduled_workouts")
       .select("id, day_id, scheduled_date, status, days(label)")
       .is("deleted_at", null)
-      .neq("status", "skipped")
+      .neq("status", "replaced")
       .eq("client_id", clientId)
       .gte("scheduled_date", backStr)
       .order("scheduled_date");
@@ -246,7 +261,6 @@ export default async function WorkoutPage(props: {
 
             <div style={{ marginTop: "0.85rem" }}>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
-              <ScheduleWeekBar workouts={calWorkouts} />
               <ScheduleBoard workouts={calWorkouts} ownerClientId={clientId || ""} />
             </div>
           </>
@@ -259,7 +273,6 @@ export default async function WorkoutPage(props: {
             </div>
             <div style={{ marginTop: "1rem" }}>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
-              <ScheduleWeekBar workouts={calWorkouts} />
               <ScheduleBoard workouts={calWorkouts} ownerClientId={clientId || ""} />
             </div>
           </>
@@ -287,8 +300,7 @@ export default async function WorkoutPage(props: {
             {calWorkouts.length > 0 && (
               <div style={{ marginTop: "1rem" }}>
                 <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
-                <ScheduleWeekBar workouts={calWorkouts} />
-                <ScheduleBoard workouts={calWorkouts} ownerClientId={clientId || ""} />
+                  <ScheduleBoard workouts={calWorkouts} ownerClientId={clientId || ""} />
               </div>
             )}
           </>

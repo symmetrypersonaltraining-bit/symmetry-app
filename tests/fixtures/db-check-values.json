@@ -369,6 +369,7 @@
       "scheduled",
       "completed",
       "skipped",
+      "replaced",
       "moved"
     ]
   },
