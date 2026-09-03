@@ -339,6 +339,20 @@ export const TUTORIAL: TutorialChapter[] = [
         audioUrl: null,
       },
       {
+        id: "around-library-access",
+        title: "Your clients can search your whole library",
+        body: [
+          "When a client taps Add Workout, the search covers every workout in the house library, not just the ones they have been given.",
+          "Until the third of September it only showed them workouts already on their own plan, which made the search look broken. It was a permission, not a search fault.",
+          "They can find and add anything from the library. They cannot see another client's personal copy of anything, and they cannot edit the library itself.",
+        ],
+        narration:
+          "When a client taps Add Workout, the search covers every workout in the house library, not only the ones they have already been given. Until the third of September it showed them just the workouts on their own plan, which made the search look broken. It was a permission, not a search fault. They can find and add anything from the library. They cannot see another client's personal copy of anything, and they cannot edit the library itself.",
+        route: "/workout",
+        routeLabel: "Open Workout",
+        audioUrl: null,
+      },
+      {
         id: "around-header",
         title: "The two buttons in the corner",
         body: [

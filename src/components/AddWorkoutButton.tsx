@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { scheduleWriteError } from "@/lib/scheduleConflict";
 import { createClient } from "@/lib/supabase/client";
+import { fetchAllRowsSafe } from "@/lib/fetchAllRows";
 import { FunLoader } from "@/components/FunMoments";
 import ManualWorkoutBuilder from "@/components/ManualWorkoutBuilder";
 import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
@@ -96,7 +97,21 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
         }
       }
     }
-    const shared = await supabase.from("days").select("id, label").order("label").limit(400); // full library (Dustin 7/13)
+    // THE CAP WAS BELOW THE LIBRARY, SO SEARCH COULD NOT SEE PAST "M".
+    //
+    // 400 rows, ordered by label, against a library that is now 732 days and
+    // 449 distinct names. Everything alphabetically after the cut-off simply did
+    // not exist as far as the search box was concerned -- and because the list
+    // is ordered by label, the missing part was always the back half of the
+    // alphabet, which reads like a broken search rather than a truncated one.
+    //
+    // fetchAllRowsSafe pages instead of guessing a number. PostgREST caps a
+    // single read at 1,000 rows whatever .limit() asks for, so a bigger number
+    // here would have been another guess with a cliff behind it.
+    const shared = { data: await fetchAllRowsSafe<LibDay>(
+      () => supabase.from("days").select("id, label").order("label"),
+      { label: "AddWorkoutButton library" },
+    ) };
     for (const s of ((shared.data as LibDay[]) || [])) if (!days.find((d) => d.id === s.id)) days.push(s);
     setLib(days);
     setLoading(false);
