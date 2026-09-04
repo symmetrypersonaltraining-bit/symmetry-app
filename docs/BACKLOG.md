@@ -1,5 +1,43 @@
 # Backlog — the single work queue
 
+## 2026-09-04 — Portion accuracy sweep (SHIPPED, 5e20d7e1 → 794b1b1c)
+
+Dustin, on the Edit custom meal sheet: *"its got all the same screw ups that we
+fixed on other features. this numbers r terrible. fix it moving firward and in
+my log"* — then, once the first fix was in: *"I dont want to find this accuracy
+problem again anywhere. find it from every path n get it fixed."*
+
+Three commits, four new test files, every one proven red against the unfixed
+code first. Full write-up: the **portion sweep interlude** in
+`docs/audit/SCREEN-WALKTHROUGH.md`.
+
+ROOT CAUSE: `food_catalog` stores macros per 100 g and, on 574,372 of its
+574,650 rows, knows no other portion. Every surface that turned a COUNTED food
+into a number fell back to that 100 g.
+
+- AI meal-edit + daily logging: a count multiplied the row's 100 g base
+  ("2 pancakes" = 200 g, 559 cal); no amount at all meant 100 g of the food
+  (butter, 743 cal). Now one portion-WEIGHT question — never a macro — with the
+  macros still straight off the row, flagged `portion_estimated`.
+- Manual "Add from the food database": the amount box opened on the FIRST named
+  serving, which USDA stores alphabetically, so a volume won on 93,752 of the
+  223,237 rows that have one. "Which serving is one of them" was answered in
+  three places and only one had the 26 Aug fix. Now one chooser.
+- Recipe builder: the amount box was DECORATION — the totals never multiplied by
+  it — under a panel reading "Edit any amount and the totals follow". Plus the
+  100 g default and no `serving_options` read at all.
+- `verify-food`: wrote a model's macros into `food_catalog` and set
+  `verified: true`. Never fired (zero `ai_verified_at` rows, no caller), and now
+  cannot.
+
+DUSTIN'S OWN LOG: `0c5ac7ab` (4 Sep, meal 1) 2,314 cal / 94P / 81C / 179F →
+1,034 / 58 / 60 / 63. Same rows, repaired portions, micros rescaled with them.
+Backed up to `bak_meal_adherence_logs_20260904`.
+
+STILL OPEN: coach chat "add a snack" (`/api/nutrition-ai/act`) still takes
+macros from the model. It is marked ESTIMATED on screen, so it is not the silent
+failure this sweep closed — see the open questions in `AUDIT-RESUME.md`.
+
 ## 2026-09-03 — Overnight run (SHIPPED, 5ef146c4 → e1eb7b88)
 
 Seven commits. Unit suite GREEN for the first time since 1 Sep, and CI now

@@ -335,7 +335,7 @@ fell back to that 100 g — so a pancake weighed 100 g, an egg weighed 100 g, an
 | Recipe builder — database search | added the row's per-100 g macros labelled "1 100 g"; almonds 579 cal, butter 717 | adds one real serving, verified rows ranked first |
 | Recipe builder — the amount box | **decoration.** Typing 8 oz over a chicken breast re-rendered the line and left the totals counting 100 g, under a panel reading "Edit any amount and the totals follow" | scales, for rows that have a basis (database + estimated). A hand-typed row's P/C/F is still the line total, and the panel now says so |
 | Coach chat "add a snack" (`/nutrition-ai/act`) | model-recalled macros, never checked against a row | unchanged, and it is MARKED — every item off this path renders as an estimate. Left as a decision, not a silent fix |
-| `/nutrition-ai/verify-food` | wrote model-recalled macros into `food_catalog` and set `verified: true` | see FIX-QUEUE — no caller exists, but the write is real |
+| `/nutrition-ai/verify-food` | wrote model-recalled macros into `food_catalog` and set `verified: true` — the flag the picker is told to trust | audits and reports; it does not write. Checked first: zero rows carried `ai_verified_at`, so nothing in the catalogue came from it |
 
 ### What is guaranteed from here
 

@@ -122,6 +122,14 @@ PREVIEW: client-preview and its four sub-screens
   scheduled once.
 - Two days belonging to another client are visible to Jenn through the
   pre-existing `client_own_days` policy. Flagged, not changed.
+- **Coach chat "add a snack" / "swap this meal" (`/api/nutrition-ai/act`)** is
+  the one food path still taking macros from the model rather than from a
+  `food_catalog` row. It is MARKED — every item off it renders as ESTIMATED —
+  so it is not the silent-wrong-number failure the 4 Sep sweep was closing, and
+  that is why it was left alone rather than changed unasked. **Decision needed:
+  route it through the same resolver as everything else, or keep it as a marked
+  estimate?** Routing it through costs a search + a pick per food and gains
+  USDA numbers; keeping it is faster and already honest on screen.
 
 ## Also fixed 3 Sep, after the walkthrough started
 
