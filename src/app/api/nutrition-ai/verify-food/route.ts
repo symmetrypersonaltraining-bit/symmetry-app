@@ -1,13 +1,46 @@
 // POST /api/nutrition-ai/verify-food
 // Body: { food_catalog_id: string, clientId?: string }
-// Sanity-checks a food_catalog entry's macros against known label/USDA values.
-// Returns the corrected macros; when the model is confident (high confidence)
-// the row is updated in place: verified=true, ai_verified_at=now(), corrected
-// macro values. Auth-checked, metered (feature 'verify'), Haiku.
+//
+// Audits one food_catalog row against the model's knowledge of labels and USDA
+// data, and REPORTS. It does not write.
+//
+// ── IT USED TO WRITE, AND THAT WAS BACKWARDS ─────────────────────────────────
+//
+// On a "high" confidence reply it overwrote the row's protein, carbs, fats and
+// kcal with the model's numbers and set `verified: true`. Three things wrong
+// with that, in increasing order of seriousness:
+//
+//   1. `verified` is what describeCandidates renders as [USDA] and what
+//      PICK_SYSTEM tells the picker to prefer — "those are checked; the rest
+//      are crowd-submitted and some are badly wrong". After this route ran, a
+//      Haiku recollection was indistinguishable from a lab measurement, to a
+//      model that had been told to trust the flag.
+//   2. Nothing checked the reply. validateEstimate refuses macros that outweigh
+//      the food they are in, precisely because "the per-100 g answer given for a
+//      30 g serving is the single most likely way for this to be wrong".
+//      validateVerifyResult checks no such thing.
+//   3. The basis could move silently. The row was handed to the model complete
+//      with serving_desc, serving_grams AND serving_options, and the prompt asked
+//      for "your best macros for the stated serving" — but the columns being
+//      written mean per `serving_grams`. A barcode-scanned bar with
+//      serving_grams 100 and a "1 bar (55 g)" option is exactly the case the
+//      prompt calls high confidence, and the label's per-bar numbers would land
+//      in the per-100 g columns. Every log of that food afterwards understated
+//      by ~45%, with nothing on screen saying the basis had moved.
+//
+// The whole architecture (see lib/nutrition/foodResolve.ts) rests on one rule:
+// a macro figure comes from a food_catalog row, never from a model. A route
+// that writes a model's macros INTO the row inverts that rule at its source.
+//
+// Checked 4 Sep before changing it: zero rows carry ai_verified_at, so nothing
+// in the catalogue came from here. No caller exists in src/ either. This makes
+// sure neither can change.
+//
+// What survives is the useful half — telling a person that a row looks wrong.
+// Auth-checked, metered (feature 'verify_food'), Haiku.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Database } from "@/lib/database.types";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { validateVerifyResult } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
@@ -79,40 +112,18 @@ export async function POST(req: NextRequest) {
     }
 
     const v = result.value;
-    let applied = false;
-    if (v.confidence === "high") {
-      const nowIso = new Date().toISOString();
-      // The food_catalog Update type, not an untyped record.
-      //
-      // Worth knowing what this proves: the retry below exists for "column-name
-      // drift (e.g. no kcal column yet)". food_catalog.kcal is numeric and has
-      // been there all along, so that fallback cannot fire for the reason it
-      // names. Left in place -- removing it is its own change -- but the
-      // compiler now guarantees the column list here is real.
-      const fullUpdate: Database["public"]["Tables"]["food_catalog"]["Update"] = {
-        protein: v.corrected.protein,
-        carbs: v.corrected.carbs,
-        fats: v.corrected.fats,
-        kcal: v.corrected.kcal,
-        verified: true,
-        ai_verified_at: nowIso,
-      };
-      let { error: updErr } = await admin.from("food_catalog").update(fullUpdate).eq("id", foodId);
-      if (updErr) {
-        // Column-name drift tolerance (e.g. no kcal column yet) — retry with the core set.
-        const minimal = { protein: v.corrected.protein, carbs: v.corrected.carbs, fats: v.corrected.fats, verified: true, ai_verified_at: nowIso };
-        ({ error: updErr } = await admin.from("food_catalog").update(minimal).eq("id", foodId));
-      }
-      if (updErr) console.error("verify-food: update failed", updErr.message);
-      else applied = true;
-    }
 
+    // NOTHING IS WRITTEN. See the header. `applied` stays in the response shape
+    // so an existing caller keeps working; it is now always false, and `suggested`
+    // says what to do with the numbers instead: show them to a person.
     return NextResponse.json({
       plausible: v.plausible,
       confidence: v.confidence,
       corrected: v.corrected,
       notes: v.notes,
-      applied, // true when the catalog row was updated (verified + corrected values)
+      applied: false,
+      suggested: true,
+      basis: food.serving_grams != null ? `per ${food.serving_grams} g` : (food.serving_desc || "per serving"),
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";

@@ -1115,6 +1115,7 @@
     "position",
     "food",
     "amount",
+    "base_amount",
     "unit",
     "protein",
     "carbs",
