@@ -441,6 +441,19 @@ into accent lands on mud wherever the accent is complementary (Ocean Dusk).
   which answers Bobbie Page's 20 Aug complaint more completely than a smaller
   number did. The only thing that opens the past section is a tap on it.
 - **The past window is 14 days**, as agreed, not the 7 it shipped with.
+- **View and Start landed on screens that looked identical.** Dustin: the view
+  screen was light and the logger dark before the rebuild, and that is the state
+  he wants back. The session view
+  has always pinned itself to a fixed dark ground whatever scheme is active; the
+  overview followed the theme, so on any dark scheme the two destinations were
+  the same colour and the two buttons appeared to do the same thing. The
+  overview is now pinned light — the mirror of what the session already does.
+  Surfaces only: the scheme's own primary and accent stay, so a client on Forest
+  gets green controls on white rather than somebody else's blue.
+  Checked before changing anything: every selector the rebuild added is
+  `.sym-*` scoped and none of them reach that screen, so no regression was
+  found — the overview has been following the theme throughout. The pin is
+  what makes the two destinations tell each other apart on a dark scheme.
 
 ### Still open on this screen
 

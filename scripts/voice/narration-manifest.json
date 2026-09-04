@@ -118,8 +118,8 @@
       "id": "around-workout-tile-format",
       "chapter": "around",
       "title": "The Workout tab, and the shape everything is moving to",
-      "text": "The Workout tab is the first screen on the app's new shape, and the shape is not new. It is the Weekly Focus card on your Home screen. Every day is that tile now, and each workout inside it is the same object at a smaller size. Today is the same tile filled bright, and it sits first rather than buried in date order. Its top bar sweeps, and it is the only thing on the screen that moves. Past workouts stay collapsed, and nothing there uses the word missed.",
-      "words": 90
+      "text": "The Workout tab is the first screen on the app's new shape, and the shape is not new. It is the Weekly Focus card on your Home screen. Every day is that tile now, and each workout inside it is the same object at a smaller size. Today is the same tile filled bright, and it sits first rather than buried in date order. Past workouts stay collapsed and reach back two weeks. View opens the overview on a light screen, Start opens the session on a dark one, so the two are never mistaken for each other.",
+      "words": 98
     },
     {
       "id": "around-moving-a-logged-workout",

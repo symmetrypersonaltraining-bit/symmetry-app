@@ -2984,3 +2984,41 @@ option:hover {
    a glowing button reads as a focus state. */
 [data-deep] .sym-tile,
 [data-deep] .sym-past { box-shadow: var(--block-glow), var(--tile-shadow), inset 0 1px 0 var(--tile-edge); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   THE OVERVIEW IS LIGHT, THE SESSION IS DARK.        Added 2026-09-04.
+
+   Dustin, on the shipped Start-vs-View split: "when we click on that view/edit
+   the screen it opens should be light/white like it was before. workout logger
+   (start) opens to dark so they are diff."
+
+   The session view has always pinned itself to a fixed dark ground
+   (--session-bg) whatever scheme is active, because that is the screen you hold
+   between sets. The overview followed the theme, so on any dark scheme the two
+   screens looked identical and View and Start landed somewhere that felt the
+   same. Pinning the overview light is the mirror of what the session already
+   does, and it makes the two destinations tell each other apart before you have
+   read a word.
+
+   NOT a hardcoded palette. The surfaces are neutral, but the primary and accent
+   still come from the active scheme, so a client on Forest gets green controls
+   on white rather than somebody else's blue. That matters on the natively dark
+   schemes especially — Midnight and Carbon Neon have no light variant to fall
+   back to, and deriving one from their own primary is what keeps this from
+   looking like a different app.
+   ════════════════════════════════════════════════════════════════════════════ */
+.sym-light {
+  --brand-bg: #F4F6F9;
+  --brand-surface: #FFFFFF;
+  --brand-card: color-mix(in srgb, var(--brand-primary) 9%, #FFFFFF);
+  --brand-border: color-mix(in srgb, var(--brand-primary) 16%, #DCE3EC);
+  --brand-text: #101923;
+  --brand-text-secondary: #53637A;
+  /* Elevation reads as shadow again, not as lift — the dark-mode variants would
+     be invisible on white. */
+  --shadow-1: 0 1px 2px rgba(16, 25, 35, .06), 0 1px 3px rgba(16, 25, 35, .08);
+  --shadow-2: 0 4px 10px rgba(16, 25, 35, .08), 0 2px 4px rgba(16, 25, 35, .06);
+  --shadow-3: 0 12px 32px rgba(16, 25, 35, .16), 0 4px 8px rgba(16, 25, 35, .08);
+  color-scheme: light;
+  color: var(--brand-text);
+}

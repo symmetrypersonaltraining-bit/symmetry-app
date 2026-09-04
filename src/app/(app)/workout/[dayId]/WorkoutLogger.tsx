@@ -3365,7 +3365,12 @@ export default function WorkoutLogger({
 
   // \u2500\u2500\u2500 STANDARD VIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   return (
-    <div style={{ background: "var(--brand-bg)", minHeight: "100vh", paddingBottom: 96 }}>
+    // THE OVERVIEW IS THE LIGHT SCREEN. The session view above pins itself to a
+    // fixed dark ground whatever scheme is active; this pins itself light, so
+    // View and Start land somewhere visibly different. .sym-light keeps the
+    // scheme's own primary and accent — only the surfaces are neutral. See the
+    // block at the end of globals.css.
+    <div className="sym-light" style={{ background: "var(--brand-bg)", minHeight: "100vh", paddingBottom: 96 }}>
       {/* "Can we make phone stay open during session?" (7/8) — the wake lock was
           wired to session mode only, so the day-card view, which is how most
           people actually log, still went dark between sets. The logger being
