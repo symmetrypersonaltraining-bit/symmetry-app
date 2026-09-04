@@ -20,7 +20,11 @@ test("search reads the description and the difficulty, not only the title", () =
 test("the query is split into words, so a multi-word search is AND not a phrase", () => {
   // "chest strength balance" appears in no description as that exact run of
   // characters. A substring test on the whole query finds nothing.
-  assert.match(src, /q\.toLowerCase\(\)\.split\(/, "the query must be split into terms");
+  // RE-ANCHORED 4 Sep. Lowercasing moved inside norm() when the search stopped
+  // treating spacing and punctuation as part of a word — "pushup" and "Push Up"
+  // are the same word. What this test is actually about, splitting into terms
+  // and requiring all of them, is unchanged.
+  assert.match(src, /q\.split\(\/\\s\+\//, "the query must be split into terms");
   assert.match(src, /terms\.every\(/, "every term must match, or it is a phrase search wearing a disguise");
 });
 

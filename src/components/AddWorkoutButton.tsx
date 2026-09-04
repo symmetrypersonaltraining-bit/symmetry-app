@@ -417,9 +417,13 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
   //
   // Title matches sort first. Somebody typing a name they already know should
   // not have to scroll past nine descriptions that happen to mention it.
-  const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+  // Same normalisation as the movement picker, for the same reason: the day
+  // labels were typed by hand too, and "Push-Up" and "Pushup" are the same word
+  // to everyone except a substring test. See MovementPicker for the full note.
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const terms = q.split(/\s+/).map(norm).filter(Boolean);
   const haystack = (d: LibDay) =>
-    `${d.label} ${d.description ?? ""} ${d.difficulty ?? ""}`.toLowerCase();
+    norm(`${d.label} ${d.description ?? ""} ${d.difficulty ?? ""}`);
   const hasAny = (tags: string[] | null | undefined, want: string[]) =>
     want.length === 0 || (tags || []).some((t) => want.includes(t));
 
@@ -437,7 +441,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
     .slice()
     .sort((a, b) => {
       if (terms.length === 0) return 0;
-      const score = (d: LibDay) => (terms.every((t) => d.label.toLowerCase().includes(t)) ? 0 : 1);
+      const score = (d: LibDay) => (terms.every((t) => norm(d.label).includes(t)) ? 0 : 1);
       return score(a) - score(b);
     });
 
@@ -611,8 +615,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
                   <input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") askAi(); }}
-                    placeholder="Search, or describe what you want"
+                              placeholder="Search, or describe what you want"
                     style={{ flex: 1, minWidth: 0, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", fontFamily: "inherit", fontSize: 14 }}
                   />
                   {/* Typing filters as you go; this hands the sentence to the AI,

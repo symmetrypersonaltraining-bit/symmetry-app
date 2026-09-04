@@ -32,7 +32,28 @@ export interface LibExercise {
   muscle_group: string | null;
   equipment_required: string[] | null;
   video_url: string | null;
+  aliases: string[] | null;
+  everfit_name: string | null;
 }
+
+/**
+ * SPACING AND PUNCTUATION ARE NOT PART OF THE WORD.
+ *
+ * Dustin, 4 Sep: "i typed in pushup".
+ *
+ * The library spells that movement three different ways — "Pushup", "Push Up",
+ * "Push-Up", and one "Push ups" — because the names were typed by hand over a
+ * year. A plain substring test therefore splits the twenty-three push-up
+ * variations into disjoint sets: "pushup" finds six of them, "push up" finds a
+ * different fourteen, and NEITHER spelling finds the lot. There is no way for
+ * the person searching to know which one to guess.
+ *
+ * Stripping everything that is not a letter or a digit, on both sides, collapses
+ * all four spellings onto the same string. Multi-word queries still work because
+ * each word is matched separately: "push up" becomes "push" and "up", and both
+ * appear in "pushupwithscapularcontrol".
+ */
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
 /** muscle_group is free text typed by hand over a year. Normalise, never trust. */
 function muscleKey(raw: string | null): string | null {
@@ -123,7 +144,7 @@ export default function MovementPicker({
     (async () => {
       const { data } = await supabase
         .from("exercises")
-        .select("id, name, modality, muscle_group, equipment_required, video_url, availability_status")
+        .select("id, name, modality, muscle_group, equipment_required, video_url, availability_status, aliases, everfit_name")
         .order("name");
       if (!on) return;
       const rows = ((data as (LibExercise & { availability_status: string | null })[]) || [])
@@ -168,7 +189,7 @@ export default function MovementPicker({
   }
 
   const results = useMemo(() => {
-    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const terms = q.split(/\s+/).map(norm).filter(Boolean);
     return all.filter((e) => {
       if (fMuscle.length) { const k = muscleKey(e.muscle_group); if (!k || !fMuscle.includes(k)) return false; }
       if (fMod.length) { const k = modalityKey(e.modality); if (!k || !fMod.includes(k)) return false; }
@@ -177,7 +198,10 @@ export default function MovementPicker({
         if (!keys.some((k) => fEquip.includes(k))) return false;
       }
       if (!terms.length) return true;
-      const hay = e.name.toLowerCase();
+      // Aliases and the Everfit name are searched too. They exist precisely
+      // because one movement goes by more than one name, so leaving them out of
+      // the search is leaving out the answer.
+      const hay = norm([e.name, e.everfit_name || "", ...(e.aliases || [])].join(" "));
       return terms.every((t) => hay.includes(t));
     });
   }, [all, q, fMuscle, fMod, fEquip]);
@@ -255,7 +279,6 @@ export default function MovementPicker({
 
       <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
         <input value={q} onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") askAi(); }}
           placeholder="Search, or describe what you want"
           style={{ flex: 1, minWidth: 0, padding: "10px 12px", borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-bg)", color: "var(--brand-text)", fontFamily: "inherit", fontSize: 14 }} />
         <button onClick={askAi} disabled={aiBusy || !q.trim()} title="Let AI read what you asked for"

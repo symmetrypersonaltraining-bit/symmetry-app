@@ -525,6 +525,28 @@ Two safety rules enforced here and tested:
   Activate / Integrate is the internal engine; it is on the row, which is
   exactly why keeping it off the screen has to be deliberate.
 
+### Search fix, 4 Sep — spelling
+
+Dustin, testing: "i typed in pushup".
+
+The movement library spells that lift **four** ways, because the names were
+typed by hand over a year: `Push Up`, `Push-Up`, `Pushup`, `Push ups`. Twenty-
+three variations exist. A plain substring test splits them into disjoint sets —
+"pushup" found six, "push up" found a different fourteen, and **neither spelling
+found all of them.** There was no way for the person searching to know which one
+to guess, and the ones they did not guess did not exist as far as the box was
+concerned.
+
+Both searches now strip everything that is not a letter or a digit, on both
+sides, before matching. Multi-word queries still AND: "push up" becomes "push"
+and "up", and both appear in "pushupwithscapularcontrol". The movement search
+also reads `aliases` and `everfit_name` — a movement goes by more than one name,
+which is what those columns are for.
+
+**Enter no longer fires the AI.** It was bound to Ask, so pressing it spent a
+metered call and replaced what had been typed. The list filters as you type;
+Ask is a deliberate tap.
+
 ### Still open on this screen
 
 - **The "modified from original" marker.** The link field exists but only 6 of 73
