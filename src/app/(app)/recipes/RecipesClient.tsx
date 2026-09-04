@@ -14,6 +14,29 @@
 import { useMemo, useState } from "react";
 import NumericInput from "@/components/NumericInput";
 import { createClient } from "@/lib/supabase/client";
+import { preferredServing, parseServingOption, type ServingOption } from "@/lib/nutrition/foodResolve";
+
+/**
+ * The portion a catalogue row should be ADDED at, and how much of the row's
+ * stored macros that is.
+ *
+ * Same chooser the AI path and the manual food sheet use, so all three agree
+ * about what one of something is. Before 4 Sep this screen used
+ * `serving_desc` — the literal string "100 g" on 574,372 of the 574,650 rows —
+ * so "add almonds" put 579 cal and 50 g of fat into a recipe under the label
+ * "1 100 g", and "butter" put 717.
+ */
+function catalogPortion(h: { serving_grams: number | null; serving_options: ServingOption[] | null }):
+  { amount: number; unit: string; scale: number } {
+  const base = Number(h.serving_grams) > 0 ? Number(h.serving_grams) : 100;
+  const one = preferredServing((h.serving_options || []).map(parseServingOption));
+  // No countable serving anywhere on the row: grams, said out loud. Honest, and
+  // the amount box scales it from here because base_amount travels with it.
+  if (!one) return { amount: base, unit: "g", scale: 1 };
+  return { amount: 1, unit: one.label, scale: one.gramsEach / base };
+}
+
+const r1 = (n: number) => Math.round(n * 10) / 10;
 
 import { useCoach } from "@/lib/useCoach";
 import AiBadge from "@/components/AiBadge";
@@ -318,7 +341,10 @@ function RecipeView({ rec, planMeals, onClose }: { rec: RecipeRow; planMeals: { 
   useMemo(() => {
     (async () => {
       const { data } = await supabase.from("recipe_ingredients")
-        .select("food, amount, unit, protein, carbs, fats, source, note")
+        // base_amount MUST be read back. Without it a saved recipe re-opens with
+        // no basis, every line silently reverts to scale 1, and the totals on the
+        // card stop matching the totals that were saved.
+        .select("food, amount, unit, base_amount, protein, carbs, fats, source, note")
         .eq("recipe_id", rec.id).order("position");
       setIngs((data as never[]) || []);
     })();
@@ -493,13 +519,20 @@ function RecipeBuilder({
   const [aiBusy, setAiBusy] = useState(false);
   const [aiNote, setAiNote] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState<{ id: string; name: string; serving_desc: string | null; protein: number; carbs: number; fats: number }[]>([]);
+  const [hits, setHits] = useState<{
+    id: string; name: string; serving_desc: string | null;
+    protein: number; carbs: number; fats: number;
+    // Read since 4 Sep. Without these the builder could only ever add a food
+    // "per 100 g" — the literal serving_desc on 574,372 of 574,650 rows — so
+    // "almonds" arrived as 579 cal and "butter" as 717, labelled "1 100 g".
+    serving_grams: number | null; serving_options: ServingOption[] | null;
+  }[]>([]);
 
   useMemo(() => {
     if (!initial) return;
     (async () => {
       const { data } = await supabase.from("recipe_ingredients")
-        .select("food, amount, unit, protein, carbs, fats, food_id, source, note")
+        .select("food, amount, unit, base_amount, protein, carbs, fats, food_id, source, note")
         .eq("recipe_id", initial.id).order("position");
       setIngs((data as RecipeIngredient[]) || []);
       setLoaded(true);
@@ -575,8 +608,13 @@ function RecipeBuilder({
     setQ(text);
     if (text.trim().length < 2) { setHits([]); return; }
     const { data } = await supabase.from("food_catalog")
-      .select("id, name, serving_desc, protein, carbs, fats")
-      .ilike("name", `%${text.trim()}%`).limit(8);
+      .select("id, name, serving_desc, protein, carbs, fats, serving_grams, serving_options, verified")
+      // Verified rows first. The raw ilike order puts a 242 kcal / 14 g-fat
+      // "banana" and an 89 kcal "chicken breast" at the top — the exact two
+      // rows that made the AI path stop trusting name matching in August.
+      .ilike("name", `%${text.trim()}%`)
+      .order("verified", { ascending: false })
+      .limit(8);
     setHits((data as never[]) || []);
   }
 
@@ -719,15 +757,27 @@ function RecipeBuilder({
           {hits.map((h) => (
             <button key={h.id}
               onClick={() => {
+                const q = catalogPortion(h);
                 setIngs((p) => [...p, {
-                  food: h.name, amount: 1, unit: h.serving_desc || "serving",
-                  protein: Number(h.protein) || 0, carbs: Number(h.carbs) || 0, fats: Number(h.fats) || 0,
+                  food: h.name, amount: q.amount, unit: q.unit, base_amount: q.amount,
+                  protein: r1((Number(h.protein) || 0) * q.scale),
+                  carbs: r1((Number(h.carbs) || 0) * q.scale),
+                  fats: r1((Number(h.fats) || 0) * q.scale),
                   food_id: h.id, source: "database",
                 }]);
                 setQ(""); setHits([]);
               }}
               style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", marginTop: 6, borderRadius: 10, border: "1px solid var(--brand-border)", background: "var(--brand-card)", color: "var(--brand-text)", fontSize: 12.5, cursor: "pointer" }}>
-              {h.name} <span style={{ color: "var(--brand-text-secondary)" }}>· {h.serving_desc || "1 serving"} · {r0(Number(h.protein))}P/{r0(Number(h.carbs))}C/{r0(Number(h.fats))}F</span>
+              {h.name} <span style={{ color: "var(--brand-text-secondary)" }}>· {(() => {
+                // The portion it will actually be ADDED at. It used to advertise
+                // serving_desc — "100 g" on 574,372 of 574,650 rows — and then
+                // add the per-100 g macros under that label.
+                const q = catalogPortion(h);
+                return `${q.amount} ${q.unit}`;
+              })()} · {(() => {
+                const q = catalogPortion(h);
+                return `${r0(Number(h.protein) * q.scale)}P/${r0(Number(h.carbs) * q.scale)}C/${r0(Number(h.fats) * q.scale)}F`;
+              })()}</span>
             </button>
           ))}
         </div>
@@ -773,7 +823,9 @@ function RecipeBuilder({
                 Per serving: <strong>{buildResult.per.protein}P · {buildResult.per.carbs}C · {buildResult.per.fats}F</strong> · {buildResult.per.kcal} cal
               </p>
               <p style={{ fontSize: 11, color: "var(--brand-text-secondary)", marginTop: 3, lineHeight: 1.4 }}>
-                Worked out from the ingredients below, not guessed. Edit any amount and the totals follow.
+                Worked out from the ingredients below, not guessed. Change the amount on a
+                database or estimated row and the totals follow; on a row you typed by hand the
+                P/C/F you entered IS the line.
               </p>
             </div>
           )}

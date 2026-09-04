@@ -21,9 +21,40 @@ export interface RecipeIngredient {
   protein: number;
   carbs: number;
   fats: number;
+  /**
+   * THE AMOUNT THE MACROS ABOVE WERE MEASURED FOR.
+   *
+   * Without it, `amount` was decoration. The box was editable, the ingredient
+   * line re-rendered as "8 oz chicken breast", and `recipeTotals` went on
+   * counting the 100 g the row was picked at — while the panel directly above
+   * said "Edit any amount and the totals follow." Found 4 Sep sweeping every
+   * path that turns a food into a number, after Dustin: "I dont want to find
+   * this accuracy problem again anywhere."
+   *
+   * Set by the two sources that KNOW what their numbers are for: a catalogue
+   * pick (one real serving) and the AI estimator (the amount it was asked
+   * about). Null on a row typed by hand, where the person entered the macros
+   * for the line as a whole and there is nothing to scale from — scaling those
+   * would double the macros of every recipe already saved.
+   */
+  base_amount?: number | null;
   food_id?: string | null;
   source?: IngredientSource;
   note?: string | null;
+}
+
+/**
+ * How many of its own basis is this ingredient line?
+ *
+ * 1 for a hand-typed row (its macros ARE the line), and `amount / base_amount`
+ * for a row that came from the catalogue or the estimator.
+ */
+export function ingredientScale(i: RecipeIngredient): number {
+  const base = Number(i.base_amount);
+  const amt = Number(i.amount);
+  if (!Number.isFinite(base) || base <= 0) return 1;
+  if (!Number.isFinite(amt) || amt <= 0) return 1;
+  return amt / base;
 }
 
 export interface RecipeInput {
@@ -65,9 +96,10 @@ export const kcalOf = (p: number, c: number, f: number) => Math.round(canonicalK
 export function recipeTotals(ingredients: RecipeIngredient[]): Macros {
   let p = 0, c = 0, f = 0;
   for (const i of ingredients || []) {
-    p += num(i.protein);
-    c += num(i.carbs);
-    f += num(i.fats);
+    const k = ingredientScale(i);
+    p += num(i.protein) * k;
+    c += num(i.carbs) * k;
+    f += num(i.fats) * k;
   }
   p = Math.round(p * 10) / 10;
   c = Math.round(c * 10) / 10;

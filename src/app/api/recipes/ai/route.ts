@@ -263,6 +263,10 @@ export async function POST(req: NextRequest) {
   const ingredients = value.ingredients.map((i) => ({
     ...i,
     source: "ai" as const,
+    // The macros it gave are for the amount it was asked about, so that amount
+    // is the basis. Without this the builder's amount box was decoration: it
+    // re-rendered the line and left the totals where they were.
+    base_amount: i.amount ?? null,
     kcal: kcalOf(i.protein, i.carbs, i.fats),
   }));
 
@@ -360,7 +364,8 @@ export async function POST(req: NextRequest) {
 
       if (fix.value && fix.value.ingredients.length) {
         const fixedRows = fix.value.ingredients.map((i) => ({
-          ...i, source: "ai" as const, kcal: kcalOf(i.protein, i.carbs, i.fats),
+          ...i, source: "ai" as const, base_amount: i.amount ?? null,
+          kcal: kcalOf(i.protein, i.carbs, i.fats),
         }));
         const fixedSv = fix.value.servings && fix.value.servings > 0 ? fix.value.servings : sv;
         const fixedPer = perServing(fixedRows, fixedSv);

@@ -299,3 +299,62 @@ against adherence also penalises every swap.
 ---
 
 *(next: screen 3)*
+
+---
+
+## Interlude — the portion sweep  ·  4 Sep 2026
+
+Not a walked screen. Recorded here because it changed what several screens
+DISPLAY, and this file is the record of what each screen is supposed to show.
+
+Dustin, on the Edit custom meal sheet, having typed
+"2 5 inch pancakes, 4 scrambled eggs w butter n cheese, 3 maple sausage links":
+
+> its got all the same screw ups that we fixed on other features. this numbers r
+> terrible. fix it moving firward and in my log
+
+Then, once the first fix was in:
+
+> I dont want to find this accuracy problem again anywhere. find it from every
+> path n get it fixed
+
+### The fault, in one sentence
+
+`food_catalog` stores macros per 100 g and, on 574,372 of its 574,650 rows,
+knows no other portion. Every surface that turned a counted food into a number
+fell back to that 100 g — so a pancake weighed 100 g, an egg weighed 100 g, and
+"w butter" cost 743 calories.
+
+### Every path, and what it does now
+
+| Path | Was | Now |
+|---|---|---|
+| Nutrition → Adjust / "just say what changed" (`/nutrition-ai/meal-edit`) | a count multiplied the row's 100 g base; no amount meant 100 g | one portion-weight question — a weight, never a macro — and the macros still straight off the row |
+| Daily food logging (`/nutrition-ai/parse`) | same resolver, same fault | same fix; both doors share one resolver |
+| "Add from the food database" sheet | the amount box opened on the FIRST named serving, a volume on 93,752 of the 223,237 rows that have one — "Bananas, raw" opened on 1 cup mashed (225 g) | opens on a real piece, using the one chooser all three surfaces now share |
+| Recipe builder — database search | added the row's per-100 g macros labelled "1 100 g"; almonds 579 cal, butter 717 | adds one real serving, verified rows ranked first |
+| Recipe builder — the amount box | **decoration.** Typing 8 oz over a chicken breast re-rendered the line and left the totals counting 100 g, under a panel reading "Edit any amount and the totals follow" | scales, for rows that have a basis (database + estimated). A hand-typed row's P/C/F is still the line total, and the panel now says so |
+| Coach chat "add a snack" (`/nutrition-ai/act`) | model-recalled macros, never checked against a row | unchanged, and it is MARKED — every item off this path renders as an estimate. Left as a decision, not a silent fix |
+| `/nutrition-ai/verify-food` | wrote model-recalled macros into `food_catalog` and set `verified: true` | see FIX-QUEUE — no caller exists, but the write is real |
+
+### What is guaranteed from here
+
+- **A macro figure comes from a `food_catalog` row.** Unchanged, and it is the
+  reason the portion question asks for a WEIGHT and refuses anything shaped like
+  a macro.
+- **"One of them" has exactly one definition** — `preferredServing` — and the AI
+  resolver, the manual food sheet and the recipe builder all call it. Two copies
+  of that rule is two screens disagreeing about the same banana, which is what
+  happened between 26 Aug and 4 Sep.
+- **An estimated portion is flagged** (`portion_estimated`) and is not dressed
+  as a serving the row actually carries. It is deliberately NOT shown as an "est"
+  badge: the macros are USDA and pointing a client away from them would be worse
+  than the gap it describes.
+
+### Dustin's own log, corrected
+
+`meal_adherence_logs` `0c5ac7ab` (4 Sep, meal 1) went from **2,314 cal /
+94P / 81C / 179F** to **1,034 / 58 / 60 / 63**. Same rows he was given — only
+the portions were repaired, and the micronutrients rescaled with them. Backed up
+first to `bak_meal_adherence_logs_20260904`.
+

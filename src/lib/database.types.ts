@@ -8955,6 +8955,7 @@ export type Database = {
       recipe_ingredients: {
         Row: {
           amount: number | null
+          base_amount: number | null
           carbs: number
           created_at: string
           fats: number
@@ -8971,6 +8972,7 @@ export type Database = {
         }
         Insert: {
           amount?: number | null
+          base_amount?: number | null
           carbs?: number
           created_at?: string
           fats?: number
@@ -8987,6 +8989,7 @@ export type Database = {
         }
         Update: {
           amount?: number | null
+          base_amount?: number | null
           carbs?: number
           created_at?: string
           fats?: number
