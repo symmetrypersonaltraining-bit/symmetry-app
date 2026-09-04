@@ -210,6 +210,45 @@ NOT to be built until that screen is walked. Capture it, do not fix it.
   skip needs no button, because a past session nobody logged already counts
   against.
 
+## WORKOUT NAMING & MODIFICATION — the rules, and what enforces them (4 Sep)
+
+His words, now also in the programming project's own instructions:
+
+> "public workouts should never get named by client names or initials"
+> "when i modify current workouts in the library, that's a 1 time thing, i do
+> not want those saved as near duplicates to the library ... just mark them in
+> calendar as modified from original"
+
+**RENAMED.** 160 day labels and 6 programme names carried a person: 28
+client-code prefixes (GG2, SG2, HK5/6, JD6, KR2, LK6, LS6, LSP6, MC6, MM2, RB6,
+RM6, SD6, SP/SP6, SR6, SW6, TS6, TY6, CH2, CL/CL2, CO2, GL2, GW2, AF) and four
+programmes ending "— Sara", "— Jennifer", "— Claudine", "— Tyler". Worse than
+the initials were the parentheses, which carried the REASON — "(back is talking
+today)", "(left leg or foot bothering him)", "(Dizzy Day (lightheaded,
+everything seated))". Conditions were kept, impersonally; the person was
+removed. Backed up to `bak_day_labels_initials_20260904` and
+`bak_program_names_20260904`.
+
+**ENFORCED.** Two triggers on `days`, both replayed against live data before
+being turned on:
+
+- `trg_library_name_is_not_a_person` — refuses a LIBRARY workout whose name
+  carries a client code (`^[A-Z]{2,4}[0-9] `, digit required so BW/DB/KB/SL/GHD
+  cannot trip it) or a client's first name (4+ letters, only after a dash, after
+  a paren, or possessive — the floor and the position are what stop "Day", as in
+  Jennifer Day, flagging the whole library). Client-owned workouts are not
+  policed. The error says what to do instead.
+- `trg_a_one_off_edit_stays_a_one_off` — refuses clearing `client_owner_id` on a
+  day stamped `library_fork`, `forked_for_swap`, `ai_adjust` or `ai_replace`. A
+  mid-block edit cannot become a library entry by any route.
+
+**STILL TO BUILD, at the workout/schedule screen** (deferred, one page at a
+time, and he had a parallel session in those files on 4 Sep):
+
+- The **"modified from original"** marker on the calendar. `days.swapped_from_day_id`
+  is the link and it exists, but only 6 of 63 fork rows carry it — the routes
+  that create a fork do not set it consistently. Fix the write, then surface it.
+
 ## OPEN — the 485 days stamped to a client that HE built (4 Sep)
 
 His rule, confirmed: *"if I created it under my account then it gets saved to my
