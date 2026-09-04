@@ -455,6 +455,47 @@ into accent lands on mud wherever the accent is complementary (Ocean Dusk).
   found — the overview has been following the theme throughout. The pin is
   what makes the two destinations tell each other apart on a dark scheme.
 
+### Add workout — rebuilt 4 Sep
+
+**The two entry points now come first.** "Type what I did" and "Build my own"
+sat underneath the entire library — Dustin: "its there but at the very bottom of
+100+ workoyts so Noone has seen it." They are the first thing on the sheet.
+
+**Filters, all precomputed on `days` by `refresh_day_facets()`:**
+
+| filter | source |
+|---|---|
+| Region — upper / lower / core / full | share of classified movements; 60% decides it |
+| Body part — chest, back, shoulders, biceps, triceps, arms, core, glutes, legs, hips, ankle, neck | `exercises.muscle_group` of the movements programmed |
+| Type — strength, cardio, mobility, conditioning, functional, rehab | `exercises.modality`, plus label keywords for cardio and rehab |
+| What it's for — muscle, strength, fat loss, corrective, rehab, mobility, balance, prep, at home, solo | label + description keywords |
+| Difficulty | the `difficulty` column |
+
+Region is by DOMINANCE, not presence. The first pass set it if a body part
+appeared at all, which made 887 of 1,195 days "full" — a label, not a filter.
+
+**AI search.** `/api/library-search` turns a sentence into a filter over that
+fixed vocabulary and the chips move to match, with a line saying what it
+understood. It never picks a workout, never writes, and never sees the library —
+handing 1,195 labels to a model on every keystroke would be slow and would let
+it invent a workout that reads right and does not exist. Postgres does the
+matching; every id came out of the database. Falls back to keyword search with
+no key.
+
+**View on every result.** Opens the workout in place — sections and movements,
+client-facing section names only — and Back returns to the same search with
+every chip still set. It is a layer, not a navigation.
+
+**Pull-forward is gone.** Adding used to look 7 days ahead for the same workout
+and move that row onto the chosen date. Dustin: "definitely do not like that,
+fix it a replace shouod reolace what they said not move anything." Add adds;
+replace replaces what was named, on the day it was named.
+
+> **Trade-off he should know about.** This re-opens Sara Prince's 11 Aug case:
+> doing Thursday's session on Tuesday now leaves Thursday's copy where it is,
+> and it is on the person to move or remove it. `src/lib/pullForward.ts` and its
+> tests are left in place; only this surface stopped calling it.
+
 ### Still open on this screen
 
 - **The "modified from original" marker.** The link field exists but only 6 of 73

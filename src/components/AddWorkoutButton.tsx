@@ -5,13 +5,40 @@ import { scheduleWriteError } from "@/lib/scheduleConflict";
 import { createClient } from "@/lib/supabase/client";
 import { fetchAllRowsSafe } from "@/lib/fetchAllRows";
 import { FunLoader } from "@/components/FunMoments";
+import AiBadge from "@/components/AiBadge";
 import ManualWorkoutBuilder from "@/components/ManualWorkoutBuilder";
-import { findSlotToPullForward, type SlotCandidate } from "@/lib/pullForward";
 
 import { useCoach } from "@/lib/useCoach";
 import { sessionsReplacedBy, slotForReplacement, skipVerdict, describeReplaced, type DateOccupant } from "@/lib/replaceOnDate";
 
-type LibDay = { id: string; label: string; description?: string | null; difficulty?: string | null };
+type LibDay = {
+  id: string; label: string; description?: string | null; difficulty?: string | null;
+  exercise_count?: number | null; region?: string | null;
+  focus_tags?: string[] | null; modality_tags?: string[] | null; intent_tags?: string[] | null;
+};
+
+/** One exercise as the preview shows it. */
+type PreviewEx = { id: string; name: string; sets: number | null; volume: string | null; cue: string | null };
+type PreviewSection = { id: string; name: string; items: PreviewEx[] };
+
+// THE FILTER VOCABULARY, and it is closed on purpose.
+//
+// Dustin, 4 Sep: "id like that search to have filters. bodypart, difficulty,
+// upper, lower, core, cardio, intention fir the workout, any others you can
+// think of."
+//
+// Every value here exists as a column on `days`, precomputed by
+// refresh_day_facets() — body part and equipment from the movements actually
+// programmed, intention from the label and description, because "what is this
+// FOR" is not something a movement list can answer. A glute bridge appears in a
+// hypertrophy day and a rehab day alike.
+const F_REGION: [string, string][] = [["upper", "Upper"], ["lower", "Lower"], ["core", "Core"], ["full", "Full body"]];
+const F_MODALITY: [string, string][] = [["strength", "Strength"], ["cardio", "Cardio"], ["mobility", "Mobility"], ["conditioning", "Conditioning"], ["functional", "Functional"], ["rehab", "Rehab"]];
+const F_INTENT: [string, string][] = [["hypertrophy", "Muscle"], ["strength", "Strength"], ["fat-loss", "Fat loss"], ["corrective", "Corrective"], ["rehab", "Rehab / pain"], ["mobility", "Mobility"], ["balance", "Balance"], ["prep", "Show prep"], ["at-home", "At home"], ["solo", "Solo"]];
+const F_FOCUS: [string, string][] = [["chest", "Chest"], ["back", "Back"], ["shoulders", "Shoulders"], ["biceps", "Biceps"], ["triceps", "Triceps"], ["arms", "Arms"], ["core", "Core"], ["glutes", "Glutes"], ["legs", "Legs"], ["hips", "Hips"], ["ankle", "Ankle"], ["neck", "Neck"]];
+const F_DIFF: [string, string][] = [["beginner", "Beginner"], ["intermediate", "Intermediate"], ["advanced", "Advanced"]];
+
+const DAY_COLS = "id, label, description, difficulty, exercise_count, region, focus_tags, modality_tags, intent_tags";
 
 function ctToday() { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }); }
 function daysAheadCT(n: number) {
@@ -44,6 +71,101 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
   const [pickedDate, setPickedDate] = useState<string>(dateStr || ctToday());
   const [markDone, setMarkDone] = useState(false);
   const [ask, setAsk] = useState<{ day: LibDay; replacing: DateOccupant[] } | null>(null);
+  // Filters. Region is single-choice; everything else is a set, because "chest
+  // or shoulders" is a real thing to want and "chest AND shoulders" is not how
+  // anybody searches a library.
+  const [fRegion, setFRegion] = useState<string | null>(null);
+  const [fMod, setFMod] = useState<string[]>([]);
+  const [fIntent, setFIntent] = useState<string[]>([]);
+  const [fFocus, setFFocus] = useState<string[]>([]);
+  const [fDiff, setFDiff] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiReading, setAiReading] = useState<string>("");
+  // The preview is a VIEW, not a navigation. Dustin, 4 Sep: "maje sure we can
+  // view, then go back to that screen without dropping the search." Leaving the
+  // sheet to look at a workout and coming back to an empty search box is how you
+  // make somebody stop looking. Everything above stays mounted; this just draws
+  // over it.
+  const [preview, setPreview] = useState<{ day: LibDay; sections: PreviewSection[] } | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+
+  const toggle = (arr: string[], v: string, set: (x: string[]) => void) =>
+    set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
+  const filterCount =
+    (fRegion ? 1 : 0) + fMod.length + fIntent.length + fFocus.length + fDiff.length;
+  function clearFilters() {
+    setFRegion(null); setFMod([]); setFIntent([]); setFFocus([]); setFDiff([]); setAiReading("");
+  }
+
+  /** Open a workout without leaving the sheet. */
+  async function openPreview(d: LibDay) {
+    setPreviewBusy(true);
+    setPreview({ day: d, sections: [] });
+    try {
+      const { data } = await (supabase as any)
+        .from("sections")
+        .select("id, position, client_facing_name, internal_name, prescribed_exercises(id, position, sets, volume_type, volume_value, cue, exercises(name))")
+        .eq("day_id", d.id)
+        .order("position");
+      const sections: PreviewSection[] = ((data as any[]) || []).map((sec) => ({
+        id: sec.id,
+        // NEVER the internal name. The corrective vocabulary — Inhibit,
+        // Lengthen, Activate, Integrate — is the engine, and it is not shown to
+        // clients. client_facing_name is what exists for this.
+        name: sec.client_facing_name || "Workout",
+        items: ((sec.prescribed_exercises as any[]) || [])
+          .sort((a, b) => (a.position || 0) - (b.position || 0))
+          .map((pe) => ({
+            id: pe.id,
+            name: pe.exercises ? pe.exercises.name : "Exercise",
+            sets: pe.sets ?? null,
+            volume: pe.volume_value ?? null,
+            cue: pe.cue ?? null,
+          })),
+      }));
+      setPreview({ day: d, sections });
+    } finally { setPreviewBusy(false); }
+  }
+
+  /**
+   * Hand the sentence to the model, and let it set the CHIPS.
+   *
+   * It deliberately does not return a shortlist for the screen to show. The
+   * point is options you can then adjust: the interpretation lands as filters
+   * you can see and tap off, so a near miss costs one tap instead of a
+   * rephrase. The route never picks a workout and never writes anything.
+   */
+  async function askAi() {
+    const text = q.trim();
+    if (!text || aiBusy) return;
+    setAiBusy(true);
+    try {
+      const res = await fetch("/api/library-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: text }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok || !j || !j.filter) {
+        setAiReading("Couldn't read that one — try the filters below.");
+        return;
+      }
+      setFRegion(j.filter.region || null);
+      setFMod(Array.isArray(j.filter.modality) ? j.filter.modality : []);
+      setFIntent(Array.isArray(j.filter.intent) ? j.filter.intent : []);
+      setFFocus(Array.isArray(j.filter.focus) ? j.filter.focus : []);
+      setFDiff(Array.isArray(j.filter.difficulty) ? j.filter.difficulty : []);
+      setAiReading(j.reading || "");
+      // The words themselves stop narrowing once the meaning has been turned
+      // into filters — otherwise "something easy for my sore back" also has to
+      // appear verbatim in a description, and nothing ever matches.
+      setQ("");
+      setShowFilters(true);
+    } catch {
+      setAiReading("Couldn't read that one — try the filters below.");
+    } finally { setAiBusy(false); }
+  }
   const minDate = daysAgoCT(90);
   // FORWARD, not just backward.
   //
@@ -92,7 +214,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
         const ph = await supabase.from("phases").select("id").in("program_id", progIds as string[]);
         const phaseIds = ((ph.data as any[]) || []).map((p) => p.id);
         if (phaseIds.length) {
-          const own = await supabase.from("days").select("id, label, description, difficulty").in("phase_id", phaseIds as string[]).order("position");
+          const own = await supabase.from("days").select(DAY_COLS).in("phase_id", phaseIds as string[]).order("position");
           for (const d of ((own.data as LibDay[]) || [])) days.push(d);
         }
       }
@@ -109,7 +231,7 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
     // single read at 1,000 rows whatever .limit() asks for, so a bigger number
     // here would have been another guess with a cliff behind it.
     const shared = { data: await fetchAllRowsSafe<LibDay>(
-      () => supabase.from("days").select("id, label, description, difficulty").order("label"),
+      () => supabase.from("days").select(DAY_COLS).order("label"),
       { label: "AddWorkoutButton library" },
     ) };
     for (const s of ((shared.data as LibDay[]) || [])) if (!days.find((d) => d.id === s.id)) days.push(s);
@@ -173,28 +295,8 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
         const completedAt = new Date(pickedDate + "T12:00:00Z").toISOString();
         const wl = await (supabase as any).from("workout_logs").insert({ client_id: cid, day_id: d.id, log_date: pickedDate, completed: true, completed_at: completedAt, started_at: completedAt, status: "Done as planned", source: "trainer_backfill" }).select("id").single();
         if (wl.error || !wl.data) { window.alert("Could not add: " + (wl.error ? wl.error.message : "no log created")); return; }
-        // Same rule for a finished session: if it was already on the calendar
-        // this week, mark THAT one done rather than leaving a duplicate behind.
-        const slotDone = await pullForwardSlot(cid, d.id, pickedDate);
-        if (slotDone) {
-          const mvC = await (supabase as any).from("scheduled_workouts")
-            .update({ scheduled_date: pickedDate, moved_from_date: slotDone.scheduled_date, position: pos, status: "completed", workout_log_id: wl.data.id, updated_at: new Date().toISOString() })
-            .eq("id", slotDone.id);
-          if (mvC.error) { window.alert(scheduleWriteError(mvC.error, "add")); return; }
-          window.location.reload();
-          return;
-        }
         const insC = await (supabase as any).from("scheduled_workouts").insert({ client_id: cid, day_id: d.id, scheduled_date: pickedDate, position: pos, status: "completed", workout_log_id: wl.data.id, source: "trainer" });
         if (insC.error) { window.alert(scheduleWriteError(insC.error, "add")); return; }
-        window.location.reload();
-        return;
-      }
-      const slot = await pullForwardSlot(cid, d.id, pickedDate);
-      if (slot) {
-        const mv = await (supabase as any).from("scheduled_workouts")
-          .update({ scheduled_date: pickedDate, moved_from_date: slot.scheduled_date, position: pos, updated_at: new Date().toISOString() })
-          .eq("id", slot.id);
-        if (mv.error) { window.alert(scheduleWriteError(mv.error, "add")); return; }
         window.location.reload();
         return;
       }
@@ -223,22 +325,25 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
   }
 
 
-  // Doing a planned session early consumes its slot instead of adding another.
-  // Sara Prince, 11 Aug: mobility done Sunday to get ahead left the same two
-  // sessions still sitting later in her week and her adherence reading 30%.
-  async function pullForwardSlot(cid: string, dayId: string, date: string) {
-    const { data } = await (supabase as any)
-      .from("scheduled_workouts")
-      .select("id, day_id, scheduled_date, status, deleted_at")
-      .eq("client_id", cid)
-      .eq("day_id", dayId)
-      .eq("status", "scheduled")
-      .is("deleted_at", null)
-      .gt("scheduled_date", date)
-      .order("scheduled_date", { ascending: true })
-      .limit(10);
-    return findSlotToPullForward((data as SlotCandidate[]) || [], dayId, date);
-  }
+  // PULL-FORWARD IS GONE, AND THAT WAS DELIBERATE.
+  //
+  // Adding a workout used to look 7 days ahead for the same session and MOVE
+  // that row onto the chosen date instead of adding a new one. It was added on
+  // 11 Aug for Sara Prince, who did Sunday's mobility early and was left with
+  // the same two sessions still sitting later in her week and her adherence
+  // reading 30%.
+  //
+  // Dustin, 4 Sep: "3 definitely do not like that, fix it a replace shouod
+  // reolace what they said not move anything."
+  //
+  // So Add adds. Replace replaces what was named, on the day it was named, and
+  // nothing else on the calendar moves on its own. The trade-off is real and
+  // is his to make: doing Thursday's session on Tuesday now leaves Thursday's
+  // copy where it is, and it is on the person to move or remove it.
+  //
+  // src/lib/pullForward.ts and its tests are left in place — the rule is sound
+  // and the completion path still reasons about the same window. Only this
+  // surface stopped calling it.
 
   async function addCustom() {
     if (busy || !text.trim()) return;
@@ -315,17 +420,51 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
   const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
   const haystack = (d: LibDay) =>
     `${d.label} ${d.description ?? ""} ${d.difficulty ?? ""}`.toLowerCase();
-  const filtered = (terms.length === 0
-    ? lib
-    : lib.filter((d) => { const h = haystack(d); return terms.every((t) => h.includes(t)); })
-  ).slice().sort((a, b) => {
-    if (terms.length === 0) return 0;
-    const score = (d: LibDay) => {
-      const l = d.label.toLowerCase();
-      return terms.every((t) => l.includes(t)) ? 0 : 1;
-    };
-    return score(a) - score(b);
-  });
+  const hasAny = (tags: string[] | null | undefined, want: string[]) =>
+    want.length === 0 || (tags || []).some((t) => want.includes(t));
+
+  const filtered = lib
+    .filter((d) => {
+      if (fRegion && d.region !== fRegion) return false;
+      if (!hasAny(d.modality_tags, fMod)) return false;
+      if (!hasAny(d.intent_tags, fIntent)) return false;
+      if (!hasAny(d.focus_tags, fFocus)) return false;
+      if (fDiff.length && !fDiff.includes((d.difficulty || "").toLowerCase())) return false;
+      if (terms.length === 0) return true;
+      const h = haystack(d);
+      return terms.every((t) => h.includes(t));
+    })
+    .slice()
+    .sort((a, b) => {
+      if (terms.length === 0) return 0;
+      const score = (d: LibDay) => (terms.every((t) => d.label.toLowerCase().includes(t)) ? 0 : 1);
+      return score(a) - score(b);
+    });
+
+  function chip(key: string, lab: string, on: boolean, onClick: () => void) {
+    return (
+      <button key={key} type="button" onClick={onClick}
+        style={{
+          padding: "6px 11px", borderRadius: 999, cursor: "pointer", fontSize: 12, fontWeight: 700,
+          fontFamily: "inherit", whiteSpace: "nowrap",
+          border: on ? "1px solid transparent" : "1px solid rgba(140,150,180,.35)",
+          background: on ? "var(--brand-primary)" : "transparent",
+          color: on ? "#fff" : "inherit",
+        }}>
+        {lab}
+      </button>
+    );
+  }
+  function chipRow(title: string, opts: [string, string][], sel: string[], set: (v: string[]) => void) {
+    return (
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: 0.6, marginBottom: 5 }}>{title}</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {opts.map(([v, lab]) => chip(v, lab, sel.includes(v), () => toggle(sel, v, set)))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -342,7 +481,58 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
               <input type="date" value={pickedDate} min={minDate} max={markDone ? todayCT : maxDate} onChange={(e) => setPickedDate(e.target.value)} style={{ flex: 1, minWidth: 150, padding: "9px 10px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", fontSize: 14, fontFamily: "inherit" }} />
               {pickedDate !== ctToday() && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--brand-primary, #7c9cf5)" }}>{pickedDate > ctToday() ? "scheduled ahead" : "backdated"}</span>}
             </div>
-            {ask ? (
+            {preview ? (
+              /* THE PREVIEW IS A LAYER, NOT A DESTINATION.
+                 Everything behind it — the search text, every chip, the scroll
+                 position — is still mounted, so Back is genuinely back. */
+              <div>
+                <button onClick={() => setPreview(null)}
+                  style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 700, color: "inherit", padding: "2px 0 10px" }}>
+                  ← Back to results
+                </button>
+                <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.3 }}>{preview.day.label}</div>
+                {preview.day.description && (
+                  <div style={{ fontSize: 12.5, opacity: 0.75, marginTop: 5, lineHeight: 1.45 }}>{preview.day.description}</div>
+                )}
+                <div style={{ fontSize: 11.5, opacity: 0.65, marginTop: 6 }}>
+                  {(preview.day.exercise_count ?? 0)} exercise{(preview.day.exercise_count ?? 0) === 1 ? "" : "s"}
+                  {preview.day.difficulty ? " · " + preview.day.difficulty : ""}
+                  {preview.day.region ? " · " + preview.day.region : ""}
+                </div>
+                {previewBusy && preview.sections.length === 0 ? (
+                  <div style={{ padding: "16px 0" }}><FunLoader label="Opening it up…" /></div>
+                ) : (
+                  <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+                    {preview.sections.map((sec) => (
+                      <div key={sec.id}>
+                        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".07em", textTransform: "uppercase", opacity: 0.6, marginBottom: 5 }}>{sec.name}</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                          {sec.items.map((it) => (
+                            <div key={it.id} style={{ display: "flex", gap: 8, alignItems: "baseline", padding: "8px 10px", borderRadius: 10, background: "rgba(140,150,180,.08)" }}>
+                              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}>
+                                {it.name}
+                                {it.cue && <span style={{ display: "block", fontSize: 11.5, fontWeight: 400, opacity: 0.7, marginTop: 2 }}>{it.cue}</span>}
+                              </span>
+                              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, opacity: 0.8 }}>
+                                {it.sets ? it.sets + " × " : ""}{it.volume || ""}
+                              </span>
+                            </div>
+                          ))}
+                          {sec.items.length === 0 && <div style={{ fontSize: 12, opacity: 0.6, padding: "6px 2px" }}>Nothing in this section.</div>}
+                        </div>
+                      </div>
+                    ))}
+                    {preview.sections.length === 0 && (
+                      <div style={{ fontSize: 13, opacity: 0.7, padding: "8px 2px" }}>This one has no movements saved against it yet.</div>
+                    )}
+                  </div>
+                )}
+                <button disabled={busy} onClick={() => { const d = preview.day; setPreview(null); askOrAdd(d); }}
+                  style={{ marginTop: 16, width: "100%", padding: 12, borderRadius: 12, border: "none", background: "var(--brand-primary)", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 800 }}>
+                  Add this workout
+                </button>
+              </div>
+            ) : ask ? (
               /* Replace or add as well — Dustin's answer, 17 Aug. Both wordings
                  name the sessions involved, because "replace" with nothing named
                  is how you clear a day you meant to add to.
@@ -394,23 +584,97 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
               />
             ) : !custom ? (
               <>
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your workouts" style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", marginBottom: 10 }} />
-                <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", userSelect: "none" }}>
+                {/* THE TWO ENTRY POINTS COME FIRST.
+                    Dustin, 4 Sep: "add workouts does not show the type what I
+                    did option or manual workout builder, thats the first issue.
+                    its there but at the very bottom of 100+ workoyts so Noone
+                    has seen it."
+                    They were literally below the library — you had to scroll
+                    past every workout in the house to find out you could type
+                    what you did. They are the first thing on the sheet now. */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                  <button onClick={() => setCustom(true)}
+                    style={{ flex: 1, padding: "12px 10px", borderRadius: 12, border: "1px solid rgba(140,150,180,.3)", background: "rgba(140,150,180,.08)", cursor: "pointer", color: "inherit", textAlign: "left", fontFamily: "inherit" }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 800 }}>Type what I did</div>
+                    <div style={{ fontSize: 11.5, opacity: 0.7, marginTop: 2, lineHeight: 1.35 }}>Already done — just record it</div>
+                  </button>
+                  <button onClick={() => setBuild(true)}
+                    style={{ flex: 1, padding: "12px 10px", borderRadius: 12, border: "1px solid rgba(140,150,180,.3)", background: "rgba(140,150,180,.08)", cursor: "pointer", color: "inherit", textAlign: "left", fontFamily: "inherit" }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 800 }}>Build my own</div>
+                    <div style={{ fontSize: 11.5, opacity: 0.7, marginTop: 2, lineHeight: 1.35 }}>Pick movements set by set</div>
+                  </button>
+                </div>
+
+                <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: 0.55, marginBottom: 7 }}>Or pick from the library</div>
+
+                <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                  <input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") askAi(); }}
+                    placeholder="Search, or describe what you want"
+                    style={{ flex: 1, minWidth: 0, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(140,150,180,.3)", background: "transparent", color: "inherit", fontFamily: "inherit", fontSize: 14 }}
+                  />
+                  {/* Typing filters as you go; this hands the sentence to the AI,
+                      which answers by SETTING THE CHIPS rather than returning a
+                      shortlist. A near miss then costs one tap instead of a
+                      rephrase, and you can always see what it understood. */}
+                  <button onClick={askAi} disabled={aiBusy || !q.trim()} title="Let AI read what you asked for"
+                    style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 5, padding: "10px 13px", borderRadius: 10, border: "none", background: "var(--brand-primary)", color: "#fff", cursor: aiBusy || !q.trim() ? "default" : "pointer", opacity: aiBusy || !q.trim() ? 0.5 : 1, fontWeight: 800, fontSize: 13, fontFamily: "inherit" }}>
+                    {aiBusy ? "…" : <><AiBadge size={16} mood="neutral" ring={false} title="" /> Ask</>}
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <button onClick={() => setShowFilters((v) => !v)}
+                    style={{ padding: "6px 11px", borderRadius: 999, border: "1px solid rgba(140,150,180,.35)", background: filterCount ? "rgba(140,150,180,.14)" : "transparent", color: "inherit", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit" }}>
+                    {showFilters ? "Hide filters" : "Filters"}{filterCount ? ` · ${filterCount}` : ""}
+                  </button>
+                  {filterCount > 0 && (
+                    <button onClick={clearFilters}
+                      style={{ border: "none", background: "transparent", color: "inherit", opacity: 0.65, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit" }}>
+                      Clear
+                    </button>
+                  )}
+                  <span style={{ marginLeft: "auto", fontSize: 11.5, opacity: 0.6, fontWeight: 700 }}>
+                    {filtered.length} workout{filtered.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                {aiReading && (
+                  <div style={{ fontSize: 12.5, lineHeight: 1.45, padding: "9px 11px", borderRadius: 10, marginBottom: 10, background: "color-mix(in srgb, var(--brand-primary) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--brand-primary) 24%, transparent)" }}>
+                    {aiReading}
+                  </div>
+                )}
+
+                {showFilters && (
+                  <div style={{ padding: "10px 0 2px" }}>
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: 0.6, marginBottom: 5 }}>Region</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {F_REGION.map(([v, lab]) => chip(v, lab, fRegion === v, () => setFRegion(fRegion === v ? null : v)))}
+                      </div>
+                    </div>
+                    {chipRow("Body part", F_FOCUS, fFocus, setFFocus)}
+                    {chipRow("Type", F_MODALITY, fMod, setFMod)}
+                    {chipRow("What it's for", F_INTENT, fIntent, setFIntent)}
+                    {chipRow("Difficulty", F_DIFF, fDiff, setFDiff)}
+                  </div>
+                )}
+
+                <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "4px 0 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", userSelect: "none" }}>
                   <input type="checkbox" checked={markDone} onChange={(e) => setMarkDone(e.target.checked)} style={{ width: 16, height: 16 }} />
                   Mark completed on this date (backlog a finished workout)
                 </label>
+
                 {loading ? (
                   <FunLoader label="Pulling up your workouts…" />
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {filtered.map((d) => (
-                      // The description is shown, not just searched. A list of
-                      // 449 titles is a list of 449 guesses; one line of what
-                      // the workout actually trains is what lets somebody pick
-                      // the right one without opening six of them.
-                      <button key={d.id} disabled={busy} onClick={() => askOrAdd(d)} style={{ textAlign: "left", padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(140,150,180,.2)", background: "rgba(140,150,180,.06)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "inherit" }}>
+                    {filtered.slice(0, 120).map((d) => (
+                      <div key={d.id} style={{ padding: "11px 12px", borderRadius: 12, border: "1px solid rgba(140,150,180,.2)", background: "rgba(140,150,180,.06)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ flex: 1, minWidth: 0 }}>{d.label}</span>
+                          <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, lineHeight: 1.3 }}>{d.label}</span>
                           {d.difficulty && (
                             <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", padding: "2px 7px", borderRadius: 999, background: "rgba(140,150,180,.18)", opacity: 0.85 }}>
                               {d.difficulty}
@@ -418,22 +682,42 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
                           )}
                         </div>
                         {d.description && (
-                          <div style={{ marginTop: 5, fontSize: 12, fontWeight: 400, lineHeight: 1.45, opacity: 0.72, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                          <div style={{ marginTop: 5, fontSize: 12, lineHeight: 1.45, opacity: 0.72, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                             {d.description}
                           </div>
                         )}
-                      </button>
+                        <div style={{ marginTop: 6, fontSize: 11, opacity: 0.6, fontWeight: 600 }}>
+                          {(d.exercise_count ?? 0)} exercise{(d.exercise_count ?? 0) === 1 ? "" : "s"}
+                          {d.region ? " · " + d.region : ""}
+                          {(d.modality_tags || []).length ? " · " + (d.modality_tags || []).slice(0, 3).join(", ") : ""}
+                        </div>
+                        <div style={{ display: "flex", gap: 6, marginTop: 9 }}>
+                          <button disabled={busy} onClick={() => askOrAdd(d)}
+                            style={{ flex: 1, padding: "9px 10px", borderRadius: 10, border: "none", background: "var(--brand-primary)", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 800, fontFamily: "inherit" }}>
+                            Add
+                          </button>
+                          {/* Every result opens. A list of names is a list of
+                              guesses; this is how you find out what one is
+                              without adding it to your week to look. */}
+                          <button onClick={() => openPreview(d)}
+                            style={{ flexShrink: 0, padding: "9px 14px", borderRadius: 10, border: "1px solid rgba(140,150,180,.35)", background: "transparent", color: "inherit", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit" }}>
+                            View
+                          </button>
+                        </div>
+                      </div>
                     ))}
-                    {filtered.length === 0 && <div style={{ padding: 12, opacity: 0.6, fontSize: 13 }}>No matching workouts.</div>}
+                    {filtered.length === 0 && (
+                      <div style={{ padding: 14, opacity: 0.7, fontSize: 13, lineHeight: 1.5 }}>
+                        Nothing matches that.{filterCount > 0 ? " Try clearing a filter." : ""}
+                      </div>
+                    )}
+                    {filtered.length > 120 && (
+                      <div style={{ padding: "8px 2px", fontSize: 11.5, opacity: 0.6 }}>
+                        Showing the first 120 of {filtered.length}. Narrow it with a filter or a word.
+                      </div>
+                    )}
                   </div>
                 )}
-                {/* Two different jobs, kept as two buttons. "Build" is for a
-                    workout you are about to DO and want to log set by set;
-                    "type what you did" is for one that already happened and
-                    only needs recording. Collapsing them into one flow makes
-                    both worse. */}
-                <button onClick={() => setBuild(true)} style={{ marginTop: 12, width: "100%", padding: "12px", borderRadius: 12, border: "none", background: "var(--brand-primary)", cursor: "pointer", fontSize: 14, fontWeight: 800, color: "#fff" }}>+ Build my own workout</button>
-                <button onClick={() => setCustom(true)} style={{ marginTop: 8, width: "100%", padding: "12px", borderRadius: 12, border: "1px dashed rgba(140,150,180,.5)", background: "transparent", cursor: "pointer", fontSize: 14, fontWeight: 700, color: "inherit" }}>Just type what I did</button>
               </>
             ) : (
               <>

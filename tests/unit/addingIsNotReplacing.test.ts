@@ -34,7 +34,10 @@ import { join } from "node:path";
 const SRC = readFileSync(join(process.cwd(), "src/components/AddWorkoutButton.tsx"), "utf8");
 
 /** The ask dialog only — the file has other buttons. */
-const DIALOG = SRC.slice(SRC.indexOf("{ask ? ("), SRC.indexOf(") : build ? ("));
+// RE-ANCHORED 4 Sep. The preview layer was added ahead of this branch, so the
+// chain reads `{preview ? ( … ) : ask ? ( … ) : build ? (`. The dialog itself is
+// unchanged; only the string that finds it moved.
+const DIALOG = SRC.slice(SRC.indexOf(") : ask ? ("), SRC.indexOf(") : build ? ("));
 
 test("the ask block was found, so the rest of this file means something", () => {
   assert.ok(DIALOG.length > 500, "the dialog moved — re-anchor these tests before trusting them");

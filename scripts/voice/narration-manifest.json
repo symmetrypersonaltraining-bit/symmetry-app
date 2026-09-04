@@ -122,6 +122,13 @@
       "words": 98
     },
     {
+      "id": "around-add-workout-sheet",
+      "chapter": "around",
+      "title": "Adding a workout, and finding the way you want to add it",
+      "text": "Adding a workout starts with two choices that used to be buried under the whole library. Type what I did records a session that already happened. Build my own picks movements set by set. Under those is the library, and the search now takes filters: region, body part, type, what the workout is for, and difficulty. If you would rather just say what you want, type it and press Ask. The AI answers by setting those filters and telling you what it understood, so a wrong read costs one tap rather than a rephrase. Every result has a View button that opens it in place, and going back returns you to the same search.",
+      "words": 114
+    },
+    {
       "id": "around-moving-a-logged-workout",
       "chapter": "around",
       "title": "Moving a workout you have already done",

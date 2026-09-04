@@ -333,6 +333,17 @@
     "movement_assessment_id",
     "created_by_trainer_id"
   ],
+  "client_error_log": [
+    "id",
+    "client_id",
+    "user_id",
+    "scope",
+    "message",
+    "detail",
+    "path",
+    "user_agent",
+    "created_at"
+  ],
   "client_goals": [
     "id",
     "client_id",
@@ -350,17 +361,6 @@
     "achieved_at",
     "created_at",
     "updated_at"
-  ],
-  "client_error_log": [
-    "id",
-    "client_id",
-    "user_id",
-    "scope",
-    "message",
-    "detail",
-    "path",
-    "user_agent",
-    "created_at"
   ],
   "client_notifications": [
     "id",
@@ -479,19 +479,25 @@
     "created_at"
   ],
   "days": [
-    "id",
-    "phase_id",
-    "label",
-    "position",
-    "created_at",
-    "day_of_week",
-    "swappable",
     "client_owner_id",
+    "created_at",
     "created_by",
-    "origin",
-    "swapped_from_day_id",
+    "day_of_week",
     "description",
-    "difficulty"
+    "difficulty",
+    "equipment_tags",
+    "exercise_count",
+    "focus_tags",
+    "id",
+    "intent_tags",
+    "label",
+    "modality_tags",
+    "origin",
+    "phase_id",
+    "position",
+    "region",
+    "swappable",
+    "swapped_from_day_id"
   ],
   "device_tokens": [
     "id",

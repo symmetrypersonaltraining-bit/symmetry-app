@@ -114,6 +114,7 @@ export const AI_FEATURES = {
   // because the food catalog still wants an auditor; wire it and drop the flag.
   verify_food:     { label: "Food catalog auditor",    surface: "client",    limitColumn: "ai_daily_verify_limit",     defaultLimit: 20, dormant: true },
   workout_build:   { label: "Create / replace workout",surface: "client",    limitColumn: "workout_build_daily_limit", defaultLimit: 8  },
+  library_search:  { label: "Library search",          surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
   recipe_ai:       { label: "Recipe builder",          surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 60 },
   movement_explain:{ label: "Movement explanation",    surface: "client",    limitColumn: "ai_daily_chat_limit",       defaultLimit: 60 },
   // Redrawing what the coach remembers about a client. Its own label because

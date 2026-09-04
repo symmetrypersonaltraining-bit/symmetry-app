@@ -5000,6 +5000,12 @@ export type Database = {
           position: number
           swappable: boolean | null
           swapped_from_day_id: string | null
+          region: string | null
+          focus_tags: string[] | null
+          modality_tags: string[] | null
+          equipment_tags: string[] | null
+          intent_tags: string[] | null
+          exercise_count: number | null
         }
         Insert: {
           client_owner_id?: string | null
@@ -5013,6 +5019,12 @@ export type Database = {
           position: number
           swappable?: boolean | null
           swapped_from_day_id?: string | null
+          region?: string | null
+          focus_tags?: string[] | null
+          modality_tags?: string[] | null
+          equipment_tags?: string[] | null
+          intent_tags?: string[] | null
+          exercise_count?: number | null
         }
         Update: {
           client_owner_id?: string | null
@@ -5026,6 +5038,12 @@ export type Database = {
           position?: number
           swappable?: boolean | null
           swapped_from_day_id?: string | null
+          region?: string | null
+          focus_tags?: string[] | null
+          modality_tags?: string[] | null
+          equipment_tags?: string[] | null
+          intent_tags?: string[] | null
+          exercise_count?: number | null
         }
         Relationships: [
           {

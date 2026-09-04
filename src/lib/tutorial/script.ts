@@ -368,6 +368,22 @@ export const TUTORIAL: TutorialChapter[] = [
         audioUrl: null,
       },
       {
+        id: "around-add-workout-sheet",
+        title: "Adding a workout, and finding the way you want to add it",
+        body: [
+          "Two entry points sit at the top now: Type what I did, for something already done, and Build my own, for picking movements set by set. They used to be underneath every workout in the library.",
+          "The library search takes filters — region, body part, type, what it is for, and difficulty — all computed from the movements actually in each workout.",
+          "Ask hands your sentence to the AI, which answers by setting those filters and telling you what it understood. You can then tap any of them off.",
+          "Every result has View. It opens the workout in place and Back returns to the same search.",
+          "Adding adds. It no longer moves a copy scheduled later in the week.",
+        ],
+        narration:
+          "Adding a workout starts with two choices that used to be buried under the whole library. Type what I did records a session that already happened. Build my own picks movements set by set. Under those is the library, and the search now takes filters: region, body part, type, what the workout is for, and difficulty. If you would rather just say what you want, type it and press Ask. The AI answers by setting those filters and telling you what it understood, so a wrong read costs one tap rather than a rephrase. Every result has a View button that opens it in place, and going back returns you to the same search.",
+        route: "/workout",
+        routeLabel: "Open Workout",
+        audioUrl: null,
+      },
+      {
         id: "around-moving-a-logged-workout",
         title: "Moving a workout you have already done",
         body: [

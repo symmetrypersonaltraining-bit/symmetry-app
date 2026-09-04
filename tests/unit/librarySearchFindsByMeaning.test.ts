@@ -25,10 +25,15 @@ test("the query is split into words, so a multi-word search is AND not a phrase"
 });
 
 test("the columns are actually fetched", () => {
-  const selects = src.match(/\.select\("id, label[^"]*"\)/g) || [];
-  assert.ok(selects.length >= 2, "expected both library reads to select day columns");
-  for (const sel of selects) {
-    assert.match(sel, /description/, `${sel} does not fetch the description it claims to search`);
-    assert.match(sel, /difficulty/, `${sel} does not fetch difficulty`);
-  }
+  // RE-ANCHORED 4 Sep. Both reads now share one DAY_COLS constant instead of
+  // repeating the column list, which is strictly harder to get wrong — but it
+  // means the old regex, which looked for two literal select strings, found
+  // none. This asserts the same thing through the constant: both library reads
+  // go through it, and it fetches everything the search claims to read.
+  const cols = src.match(/const DAY_COLS = "([^"]+)"/);
+  assert.ok(cols, "DAY_COLS is gone — the two library reads no longer share a column list");
+  assert.match(cols![1], /description/, "DAY_COLS does not fetch the description it claims to search");
+  assert.match(cols![1], /difficulty/, "DAY_COLS does not fetch difficulty");
+  const reads = src.match(/\.select\(DAY_COLS\)/g) || [];
+  assert.ok(reads.length >= 2, `expected both library reads to use DAY_COLS, found ${reads.length}`);
 });
