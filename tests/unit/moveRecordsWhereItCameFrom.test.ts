@@ -70,8 +70,8 @@ function stubClient(opts: {
 
 test("a move records the date it left", async () => {
   const { client, updates } = stubClient();
-  const err = await moveScheduledWorkout(client, { id: "sw-1" }, "2026-08-20");
-  assert.equal(err, null);
+  const outcome = await moveScheduledWorkout(client, { id: "sw-1" }, "2026-08-20");
+  assert.equal(outcome.ok, true);
   const sw = updates.find((u) => u.table === "scheduled_workouts");
   assert.ok(sw, "nothing was written to scheduled_workouts");
   assert.equal(sw!.payload.scheduled_date, "2026-08-20");
@@ -87,8 +87,8 @@ test("an unreadable row moves anyway, and does not blank moved_from_date", async
   // Omitting the key entirely is the difference between "unknown" and "never
   // moved", and the cron job reads null as the latter.
   const { client, updates } = stubClient({ row: null });
-  const err = await moveScheduledWorkout(client, { id: "sw-1" }, "2026-08-20");
-  assert.equal(err, null, "the move itself must still stand");
+  const outcome = await moveScheduledWorkout(client, { id: "sw-1" }, "2026-08-20");
+  assert.equal(outcome.ok, true, "the move itself must still stand");
   const sw = updates.find((u) => u.table === "scheduled_workouts")!;
   assert.equal(sw.payload.scheduled_date, "2026-08-20");
   assert.ok(
@@ -119,8 +119,13 @@ test("a duplicate-target collision is reported, not swallowed", async () => {
   const { client } = stubClient({
     updateError: { code: "23505", message: 'duplicate key value violates unique constraint "uq_scheduled_workout_one_per_day"' },
   });
-  const err = await moveScheduledWorkout(client, { id: "sw-1" }, "2026-08-20");
-  assert.match(String(err), /already on the calendar/i, "a collision must say what happened, not 'try again'");
+  const outcome = await moveScheduledWorkout(client, { id: "sw-1" }, "2026-08-20");
+  assert.equal(outcome.ok, false, "a collision must be reported as a failure the caller can show");
+  assert.match(
+    String(outcome.ok === false ? outcome.message : ""),
+    /already on the calendar/i,
+    "a collision must say what happened, not 'try again'",
+  );
 });
 
 test("every move path in the app sets moved_from_date", () => {

@@ -2673,3 +2673,314 @@ option:hover {
   .mic-live { animation: none; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35); }
   .mic-wave > span { animation: none; transform: scaleY(0.7); }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   THE TILE — the app's container shape.            Added 2026-09-04, screen 2.
+
+   Dustin, 4 Sep: "lets get the layout locked in and match it on every page so
+   it flows better." The shape is not new — it is the Weekly Focus card on the
+   client home screen (ClientWeekSummary.tsx): --brand-surface, a 1px border,
+   radius 18, padding 14, a soft shadow, and a bold 14px label with an icon
+   opposite a small meta.
+
+   Its gradient top edge was not designed either. That card carries an inline
+   `background: var(--brand-surface)`, which is exactly what the [data-deep]
+   blanket selector matches, so depth paints --card-topbar across its top. This
+   block makes that shape deliberate rather than incidental, and draws the cap
+   at EVERY depth level so the format does not depend on a setting.
+
+   NO SIDE BORDERS. A tile is capped, and the things inside it are capped.
+
+   SCOPED TO .sym-page ON PURPOSE. This is the Workout screen's format today
+   and it will become every screen's, but rule 6 of the audit is that a screen
+   is not edited before it is walked. Wrapping the page opts one screen in at a
+   time; when a screen is walked, it gets the wrapper and nothing else changes.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.sym-page {
+  /* RAISING IS A RELATIONSHIP, NOT A PROPERTY.
+     The first pass gave tiles a shadow and left the page where it was; between
+     two surfaces half a step apart that reads as a smudge, not as lift. So the
+     page sinks and the tile deepens toward the primary at the same time.
+     The amounts are split light/dark below: mixing near-black 30% into a light
+     page turns it grey, while the same 30% on a dark page is exactly what makes
+     a tile read as a slab sitting on top of it. */
+  --sink: 6%;
+  --tile-deep: 4%;
+  --tile-edge: color-mix(in srgb, #FFFFFF 70%, transparent);
+  --tile-shadow: 0 12px 28px -8px rgba(20, 30, 55, .20), 0 2px 6px rgba(20, 30, 55, .10);
+
+  --tile-bg: color-mix(in srgb, var(--brand-primary) var(--tile-deep), var(--brand-surface));
+  /* Everything a tile contains derives from the TILE, not from the raw token,
+     so the inside stays separable however far the outside has deepened. */
+  --in-tile: color-mix(in srgb, var(--brand-text) 7%, var(--tile-bg));
+  --tile-ctrl: color-mix(in srgb, var(--brand-text) 9%, var(--tile-bg));
+  --tile-ctrl-bd: color-mix(in srgb, var(--brand-text) 22%, var(--tile-bg));
+
+  /* The cap. Raw scheme colours read on a light card and vanish on a dark one —
+     Deep Purple's primary is #4A148C against a near-black surface — so the dark
+     block below lifts them, the same way [data-deep] already does for
+     --card-topbar. */
+  --tile-cap: linear-gradient(100deg,
+    var(--brand-primary) 0%,
+    var(--brand-accent) 46%,
+    var(--brand-accent-2, var(--brand-accent)) 78%,
+    var(--brand-primary) 100%);
+  --tile-cap-h: 3px;
+
+  background: color-mix(in srgb, #070A10 var(--sink), var(--brand-bg));
+  min-height: 100vh;
+}
+
+[data-appearance="dark"] .sym-page,
+[data-theme="midnight"] .sym-page,
+[data-theme="carbonneon"] .sym-page,
+[data-theme="midnightaurora"] .sym-page,
+[data-theme="midnightember"] .sym-page,
+[data-theme="midnightcitrus"] .sym-page,
+[data-theme="midnightorchid"] .sym-page,
+[data-theme="deepreef"] .sym-page {
+  --sink: 32%;
+  --tile-deep: 13%;
+  --tile-edge: color-mix(in srgb, #FFFFFF 9%, transparent);
+  --tile-shadow: 0 14px 30px -10px rgba(0, 0, 0, .62), 0 2px 6px rgba(0, 0, 0, .45);
+  --tile-cap: linear-gradient(100deg,
+    color-mix(in srgb, var(--brand-primary) 55%, white) 0%,
+    color-mix(in srgb, var(--brand-accent) 72%, white) 46%,
+    color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 72%, white) 78%,
+    color-mix(in srgb, var(--brand-primary) 55%, white) 100%);
+}
+
+/* With depth on, the cap IS the app-wide strip — one gradient, whole app —
+   and it thickens with the level exactly as it does everywhere else. */
+[data-deep] .sym-page { --tile-cap: var(--card-topbar); --tile-cap-h: var(--card-topbar-h); }
+
+/* ── the tile ─────────────────────────────────────────────────────────────── */
+.sym-tile {
+  position: relative;
+  overflow: hidden;
+  background: var(--tile-bg);
+  border: 1px solid var(--brand-border);
+  border-radius: 18px;
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: var(--tile-shadow), inset 0 1px 0 var(--tile-edge);
+}
+.sym-tile::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  z-index: 1;
+  height: var(--tile-cap-h);
+  background: var(--tile-cap);
+}
+/* One rung of the ladder per day: one colour, six shades down the week.
+   The rung must step in LIGHTNESS, not by mixing primary into the surface —
+   auto-dark DERIVES the surface from the primary, so on a dark scheme that is
+   teal into teal and every rung comes out identical. --tile-ladder is the
+   primary already pushed toward light (dark schemes) or dark (light ones);
+   stepping THAT is what makes six visible shades on all thirty schemes. */
+.sym-page { --tile-ladder: color-mix(in srgb, var(--brand-primary) 58%, #0A0E16); }
+[data-appearance="dark"] .sym-page,
+[data-theme="midnight"] .sym-page,
+[data-theme="carbonneon"] .sym-page,
+[data-theme="midnightaurora"] .sym-page,
+[data-theme="midnightember"] .sym-page,
+[data-theme="midnightcitrus"] .sym-page,
+[data-theme="midnightorchid"] .sym-page,
+[data-theme="deepreef"] .sym-page { --tile-ladder: color-mix(in srgb, var(--brand-primary) 58%, #FFFFFF); }
+.sym-tile[data-rung] { background: color-mix(in srgb, var(--tile-ladder) var(--rung), var(--tile-bg)); }
+
+.sym-tile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 11px;
+}
+.sym-tile-lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--brand-text);
+}
+.sym-tile-lbl i { font-size: 15px; color: var(--brand-primary); line-height: 1; }
+.sym-tile-meta { font-size: 11px; color: var(--brand-text-secondary); white-space: nowrap; }
+
+/* ── today ────────────────────────────────────────────────────────────────
+   Same tile, same label position, same cap — filled with the scheme gradient
+   so it stays far lighter than every other tile. Shape carries the system;
+   brightness carries "you are here". Everything inside inverts onto white, so
+   none of it depends on the dark-tile tokens. */
+.sym-tile.is-today {
+  background: linear-gradient(140deg,
+    color-mix(in srgb, var(--brand-primary) 90%, #000),
+    color-mix(in srgb, var(--brand-primary) 66%, #fff));
+  border-color: transparent;
+  box-shadow: var(--tile-shadow), inset 0 1px 0 rgba(255, 255, 255, .28),
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 26%, transparent);
+}
+.sym-tile.is-today::before {
+  height: calc(var(--tile-cap-h) + 1px);
+  background-image: linear-gradient(100deg, rgba(255,255,255,.5), #fff 38%, rgba(255,255,255,.6) 72%, #fff);
+  background-size: 200% 100%;
+  animation: sym-cap-sweep 3s linear infinite;
+}
+@keyframes sym-cap-sweep { to { background-position: 200% 50%; } }
+@media (prefers-reduced-motion: reduce) { .sym-tile.is-today::before { animation: none; } }
+.sym-tile.is-today .sym-tile-lbl,
+.sym-tile.is-today .sym-wo-name { color: #fff; }
+.sym-tile.is-today .sym-tile-lbl i { color: #fff; }
+.sym-tile.is-today .sym-tile-meta { color: rgba(255, 255, 255, .86); }
+.sym-tile.is-today .sym-wo { background: rgba(255, 255, 255, .16); }
+.sym-tile.is-today .sym-wo::before { background: rgba(255, 255, 255, .75); }
+.sym-tile.is-today .sym-wo-ic { background: rgba(255, 255, 255, .24); color: #fff; }
+.sym-tile.is-today .sym-badge { color: rgba(255, 255, 255, .9); border-color: rgba(255, 255, 255, .36); }
+.sym-tile.is-today .sym-bt { background: rgba(255, 255, 255, .18); border-color: rgba(255, 255, 255, .36); color: #fff; }
+.sym-tile.is-today .sym-bt.go { background: #fff; color: var(--brand-primary); border-color: transparent; }
+.sym-tile.is-today .sym-rest { background: rgba(255, 255, 255, .14); color: rgba(255, 255, 255, .85); }
+.sym-tile.is-today .sym-rest::before { background: rgba(255, 255, 255, .4); }
+
+/* ── a workout inside a tile ──────────────────────────────────────────────── */
+.sym-body { display: flex; flex-direction: column; gap: 9px; }
+.sym-wo {
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  border-radius: 13px;
+  padding: 13px 10px 10px;
+  background: var(--in-tile);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sym-wo::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 3px;
+  z-index: 1;
+  background: var(--tile-cap);
+}
+.sym-wo-row { display: flex; align-items: flex-start; gap: 8px; }
+.sym-wo-ic {
+  width: 23px; height: 23px; border-radius: 7px; flex: 0 0 auto;
+  display: grid; place-items: center; font-size: 13px; line-height: 1;
+  background: color-mix(in srgb, var(--brand-primary) 24%, var(--tile-bg));
+  color: var(--brand-primary);
+}
+/* THE NAME GETS BOTH ROWS AND IS NEVER CUT.
+   Dustin, 4 Sep: "all workout need to be readable... no more than 2 rows of
+   text per card." Two lines is the cap, so the name has the whole row to
+   itself and the count sits on the button strip instead of stealing width. */
+.sym-wo-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.32;
+  color: var(--brand-text);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sym-wo.is-done { opacity: .72; }
+.sym-acts { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.sym-acts .sym-sp { flex: 1; }
+.sym-badge {
+  font-size: 9.5px; font-weight: 800; color: var(--brand-text-secondary);
+  padding: 4px 6px; border-radius: 6px; white-space: nowrap;
+  border: 1px solid var(--tile-ctrl-bd);
+}
+.sym-rest {
+  position: relative; overflow: hidden; border-radius: 13px;
+  padding: 14px 11px 12px; text-align: center;
+  background: var(--in-tile);
+  font-size: 11.5px; font-weight: 700; color: var(--brand-text-secondary);
+}
+.sym-rest::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  background: var(--brand-border);
+}
+
+/* ── controls ─────────────────────────────────────────────────────────────
+   TWO CONTRAST RULES, BOTH FROM REAL FAILURES ON REAL SCHEMES.
+
+   1. A button fill is a fixed step off the surface it sits on, never the same
+      token — taking it from --brand-surface made buttons invisible wherever the
+      surface had been tinted.
+   2. A FILLED button pushes toward the scheme's own TEXT colour and labels
+      itself with the SURFACE colour. White-on-hue measured ~2:1 on Carbon Neon.
+      Mixing toward the text colour lands high-contrast on light and dark alike,
+      whatever hue the scheme uses. */
+.sym-bt {
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1;
+  padding: 7px 9px;
+  border: 1px solid var(--tile-ctrl-bd);
+  background: var(--tile-ctrl);
+  color: var(--brand-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sym-bt i { font-size: 12px; line-height: 1; }
+.sym-bt.ic { padding: 7px 8px; }
+.sym-bt.go {
+  padding: 7px 11px;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--brand-primary) 55%, var(--brand-text));
+  color: var(--brand-surface);
+}
+.sym-bt.warn {
+  border-color: color-mix(in srgb, var(--brand-warn) 60%, transparent);
+  background: color-mix(in srgb, var(--brand-warn) 14%, transparent);
+  color: color-mix(in srgb, var(--brand-warn) 55%, var(--brand-text));
+}
+.sym-bt:disabled { opacity: .5; cursor: default; }
+
+/* ── page title row + the past strip ──────────────────────────────────────── */
+.sym-title { display: flex; align-items: flex-start; gap: 10px; padding: 14px 0 12px; }
+.sym-title .sym-sp { flex: 1; }
+.sym-title h1 { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -.02em; color: var(--brand-text); }
+.sym-title p { margin: 2px 0 0; font-size: 12px; color: var(--brand-text-secondary); }
+
+.sym-past {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 13px 11px;
+  border-radius: 18px;
+  margin-bottom: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  border: 1px solid var(--brand-border);
+  background: var(--tile-bg);
+  color: var(--brand-text);
+  box-shadow: var(--tile-shadow), inset 0 1px 0 var(--tile-edge);
+}
+.sym-past::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  background: var(--brand-border);
+}
+.sym-past .sym-sp { flex: 1; }
+.sym-past-go { font-size: 11px; font-weight: 800; color: color-mix(in srgb, var(--brand-accent) 62%, var(--brand-text)); }
+
+/* Glow follows the tiles when depth is on, and never lands on a button —
+   a glowing button reads as a focus state. */
+[data-deep] .sym-tile,
+[data-deep] .sym-past { box-shadow: var(--block-glow), var(--tile-shadow), inset 0 1px 0 var(--tile-edge); }

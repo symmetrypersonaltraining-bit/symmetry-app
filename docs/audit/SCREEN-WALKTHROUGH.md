@@ -358,3 +358,83 @@ fell back to that 100 g — so a pancake weighed 100 g, an egg weighed 100 g, an
 the portions were repaired, and the micronutrients rescaled with them. Backed up
 first to `bak_meal_adherence_logs_20260904`.
 
+## Screen 2 — Workout tab — REBUILT 4 Sep 2026
+
+The visual rebuild, and the two behaviours agreed on 3 Sep, shipped together so
+there is one live version to test rather than four.
+
+### What this screen is for, in Dustin's words
+
+"A daily used thing for clients. It needs to be cleaner." Moving workouts has to
+be easy, starting has to be easy, and seeing what the week looks like has to be
+easy.
+
+### The format — and it is not only this screen's
+
+Everything is one object, taken from the **Weekly Focus card on the client home
+screen**: `--brand-surface`, a 1px border, radius 18, padding 14, a soft shadow,
+a bold 14px label with an icon on the left and a small meta on the right, and a
+gradient bar across the top. That bar was never bespoke — Weekly Focus carries
+an inline `background: var(--brand-surface)`, which is exactly what the
+`[data-deep]` blanket selector matches, so depth was already painting
+`--card-topbar` across its top.
+
+- **No side borders anywhere.** A tile is capped; the things inside it are capped.
+- **A day is a tile.** Label written out — "Saturday, Sep 5" — with a calendar
+  icon, session count on the right.
+- **A workout is the same object, smaller**, inside the tile.
+- **Today is the same tile filled bright** with the scheme gradient, and it
+  renders FIRST, above the past strip, not in date order. Its cap sweeps; it is
+  the only thing on the screen that moves.
+- **Ladder shading**: one colour, six shades deepening down the list.
+- **Raised**: the page sinks darker and the tile deepens toward the primary at
+  the same time. Shadow alone between two surfaces half a step apart reads as a
+  smudge, which is what the first attempt looked like.
+- Scoped to `.sym-page` so it opts in one screen at a time — rule 6.
+
+### Controls on a workout card
+
+| control | what it should do | verdict |
+|---|---|---|
+| **Start** | Enter the session immediately (`?start=1`) | BUILT 4 Sep — needs walking |
+| **View** | Open the overview and wait, the old behaviour | BUILT 4 Sep — needs walking |
+| **Calendar icon** | Open the move sheet (move to a date, or swap in from the library) | BUILT 4 Sep — needs walking |
+| **→ Today** | One tap to pull a past unlogged session to today | Carried over |
+| **Trash** | Soft-remove, with the completed-session confirm | Carried over |
+| **Press and hold** | Drag onto another day tile | Carried over |
+| **Add workout** | Unchanged; moved onto the title row so it stops costing a full row | BUILT 4 Sep — needs walking |
+| **Past N days** | Collapsed by default, never says "missed" | Carried over |
+
+### Decisions settled
+
+- **No "programme" language anywhere client-facing.** Dustin, 4 Sep: most
+  clients are not on a programme. Each is programmed personally, day by day, in
+  6-week blocks, from the library. Applies to every screen, not just this one.
+- **Max two rows of text per card.** The name gets both and is never truncated;
+  the count moved onto the button strip so it stops stealing width.
+- **Colour means the day, not the session type.** Session type is carried by the
+  icon alone.
+- **Moving a logged workout copies rather than moves.** The trained session and
+  its log stay put; a copy lands on the target date.
+
+### Three contrast rules, each from a real failure
+
+1. A button fill is a fixed step off the surface it sits on, never the same
+   token. Taking it from `--brand-surface` made buttons invisible on tinted days.
+2. A filled button pushes toward the scheme's own **text** colour and labels
+   itself with the **surface** colour. White-on-hue measured ~2:1 on Carbon Neon.
+3. No text ever sits on a saturated hue. Colour lives in caps, edges and the
+   field behind the cards.
+
+Also: the today gradient is a tonal ramp of the primary **alone**. Mixing primary
+into accent lands on mud wherever the accent is complementary (Ocean Dusk).
+
+### Still open on this screen
+
+- **The "modified from original" marker.** The link field exists but only 6 of 73
+  forks carry it — the fork routes do not set it. Not addressed here.
+- **Nutrition %** — Dustin is unhappy with how it calculates. Rule to be captured
+  at the Nutrition tab so both places change together.
+- **Group auto-posting** — nothing posts automatically; the rest lands at Messages.
+- **The AI components on this screen have not been reviewed yet** — see the
+  process note in AUDIT-RESUME.md. Home comes first.

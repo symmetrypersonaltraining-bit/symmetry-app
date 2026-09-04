@@ -794,19 +794,40 @@ export default function WorkoutLogger({
   // one of them still editable - which is what "view/edit past workouts always"
   // means.
   const [justCompleted, setJustCompleted] = useState(false);
+  // Set once the answer to "is this already finished?" is actually known.
+  // workoutComplete is false BOTH before the seed lands and when the session is
+  // genuinely unfinished, so anything that needs to branch on it has to wait
+  // for this rather than read the flag at mount and get the wrong answer.
+  const [completeSeeded, setCompleteSeeded] = useState(false);
   useEffect(() => {
-    if (!existingLogId) return;
+    if (!existingLogId) { setCompleteSeeded(true); return; }
     let on = true;
     (async () => {
       const { data } = await supabase.from("workout_logs")
         .select("completed").eq("id", existingLogId).maybeSingle();
-      if (on && data?.completed) setWorkoutComplete(true);
+      if (!on) return;
+      if (data?.completed) setWorkoutComplete(true);
+      setCompleteSeeded(true);
     })();
     return () => { on = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingLogId]);
   const [sessionCancelled, setSessionCancelled] = useState(false);
   const [timePick, setTimePick] = useState<{ peId: string; si: number } | null>(null);
+  // START vs VIEW.  Approved 3 Sep; permission to touch this file given 4 Sep.
+  //
+  // Everywhere a workout can be opened now offers two buttons. VIEW is the
+  // behaviour this screen has always had: it lands on the overview and waits
+  // for a tap. START carries `?start=1` and enters the session immediately,
+  // because "open the thing and then press the thing" is two taps for the one
+  // action anybody opening a workout at the gym actually wants.
+  //
+  // Read from the URL at mount rather than held in state upstream: this screen
+  // is reached by router.push from four surfaces and by a hard link from two
+  // more, and a query parameter is the only channel all six already share.
+  //
+  // It does NOT override draft hydration below. A live draft still wins, and a
+  // completed session still opens on the overview — see the guard there.
   const [sessionMode, setSessionMode] = useState(false);
   // The height this screen had before any keyboard opened. The session view is
   // pinned to it so the soft keyboard cannot reflow the layout — it covers the
@@ -1047,6 +1068,25 @@ export default function WorkoutLogger({
     __hydrated.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ?start=1 — enter the session rather than landing on the overview.
+  //
+  // Runs after BOTH the draft hydration above and the completion seed, and at
+  // most once. Reading the flag at mount instead would have been a check that
+  // could never fail: workoutComplete is false before the seed lands, so the
+  // guard would have passed for every workout including finished ones.
+  const __startApplied = useRef(false);
+  useEffect(() => {
+    if (__startApplied.current || !completeSeeded) return;
+    __startApplied.current = true;
+    if (workoutComplete) return;
+    try {
+      if (typeof window !== "undefined"
+        && new URLSearchParams(window.location.search).get("start") === "1") {
+        setSessionMode(true);
+      }
+    } catch { /* a malformed query string is not a reason to fail to open */ }
+  }, [completeSeeded, workoutComplete]);
   useEffect(() => {
     if (!__hydrated.current) return;
     try {

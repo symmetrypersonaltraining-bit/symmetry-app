@@ -211,101 +211,46 @@ export default async function WorkoutPage(props: {
   });
 
   return (
-    <>
-      <div style={{ background: "var(--brand-primary)" }} className="px-4 py-4">
-        <h1 className="text-white font-medium text-lg">Workout</h1>
-        <p className="text-white/60 text-sm">{displayDate}</p>
-      </div>
-      <div className="px-4 pt-3"><AddWorkoutButton /></div>
+    <div className="sym-page">
+      <div className="px-4">
+        {/* THE TITLE ROW, AND WHY THE HEADER BAND IS GONE.
+            The page used to open with a solid --brand-primary band carrying the
+            title, then a full-width Add workout button on its own line beneath
+            it. Between them that was most of a phone screen before the first
+            workout appeared. The band's job — say which screen this is — is done
+            by a title on the page itself, and Add workout keeps its prominence
+            on the same row rather than a row of its own.
 
-      <div className="px-4 py-4">
-        {todayScheduledList.length > 0 ? (
-          <>
-            {todayScheduledList.map((ts) => (
-            // Start moved onto the same row as the title instead of sitting on
-            // its own line under it. Two of these cards plus a full-width button
-            // each pushed My Schedule entirely below the fold, so clients never
-            // saw that the week strip and the board existed. The name still
-            // wraps to as many lines as it needs — nothing is truncated — the
-            // height saved is the button row and the padding around it.
-            <div key={ts.id} className="card card-glow mb-2.5" style={{ padding: 12 }}>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px]" style={{ color: "var(--brand-text-secondary)" }}>
-                    Today &middot; {ts.phaseLabel}
-                  </p>
-                  <h2 className="text-[15px] font-semibold leading-snug" style={{ color: "var(--brand-text)" }}>
-                    <i className={`ti ${/cardio/i.test(ts.dayLabel) ? "ti-run" : "ti-barbell"} mr-1.5`} style={{ color: "var(--brand-primary)" }} />
-                    {ts.dayLabel}
-                  </h2>
-                  <p className="text-[11px] truncate" style={{ color: "var(--brand-text-secondary)" }}>
-                    {ts.programName}
-                  </p>
-                </div>
-                {ts.status === "completed" ? (
-                  <div className="flex items-center gap-1.5 text-xs font-semibold flex-shrink-0" style={{ color: "#22c55e" }}>
-                    <i className="ti ti-check" /> Done
-                  </div>
-                ) : (
-                  <Link
-                    href={"/workout/" + ts.dayId}
-                    className="btn btn-primary flex-shrink-0 flex items-center gap-1.5"
-                    style={{ padding: "9px 14px", fontSize: 13, whiteSpace: "nowrap" }}
-                  >
-                    <i className="ti ti-player-play" /> Start
-                  </Link>
-                )}
-              </div>
-            </div>
-            ))}
+            Dustin, 4 Sep: "dont forget add workout button needs to stay as well
+            when we push it through." It stays; it just stops costing a row. */}
+        <div className="sym-title">
+          <div>
+            <h1>Workout</h1>
+            <p>{displayDate}</p>
+          </div>
+          <span className="sym-sp" />
+          <AddWorkoutButton />
+        </div>
 
-            <div style={{ marginTop: "0.85rem" }}>
-              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
-              <ScheduleBoard workouts={calWorkouts} ownerClientId={clientId || ""} />
-            </div>
-          </>
-        ) : allPhases.length > 0 ? (
-          <>
-            <div className="card mb-4 text-center py-6">
-              <i className="ti ti-moon text-3xl block mb-2" style={{ color: "var(--brand-text-secondary)" }} />
-              <p className="font-medium mb-1" style={{ color: "var(--brand-text)" }}>Rest Day</p>
-              <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>No workout scheduled for today.</p>
-            </div>
-            <div style={{ marginTop: "1rem" }}>
-              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
-              <ScheduleBoard workouts={calWorkouts} ownerClientId={clientId || ""} />
-            </div>
-          </>
+        {/* ONE LIST, NOT A CARD PLUS A LIST.
+            Today used to be rendered twice: a card up here, and again inside the
+            board below. The board now renders today FIRST and as the only bright
+            tile on the screen, so the separate card is redundant — and two
+            copies of the same session with their own buttons was a real source
+            of "I tapped Start and nothing happened, I was on the other one". */}
+        {calWorkouts.length > 0 || allPhases.length > 0 ? (
+          <ScheduleBoard workouts={calWorkouts} ownerClientId={clientId || ""} />
         ) : (
-          // The schedule stays, whatever else is true.
-          //
-          // This branch used to be a bare card, so the one state where
-          // something had gone wrong was also the only state with no way to
-          // reach your own schedule — no week strip, no board, nothing to tap.
-          // A client who landed here could not move a workout or even see that
-          // next week existed. If there are scheduled workouts to show, this is
-          // not "no programme", whatever the assignment lookup said.
-          <>
-            <div className="card mb-4 text-center py-8">
-              <i className="ti ti-barbell text-3xl block mb-2" style={{ color: "var(--brand-border)" }} />
-              <p className="font-medium mb-1" style={{ color: "var(--brand-text)" }}>
-                {calWorkouts.length > 0 ? "Nothing scheduled today" : "No program assigned"}
-              </p>
-              <p className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
-                {calWorkouts.length > 0
-                  ? "Your schedule is below."
-                  : "Contact your trainer to get started."}
-              </p>
+          <div className="sym-tile">
+            <div className="sym-tile-head">
+              <span className="sym-tile-lbl"><i className="ti ti-barbell" />Nothing scheduled yet</span>
             </div>
-            {calWorkouts.length > 0 && (
-              <div style={{ marginTop: "1rem" }}>
-                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--brand-text-secondary)" }}>My Schedule</p>
-                  <ScheduleBoard workouts={calWorkouts} ownerClientId={clientId || ""} />
-              </div>
-            )}
-          </>
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "var(--brand-text-secondary)" }}>
+              Add a workout above, or contact your trainer to get started.
+            </p>
+          </div>
         )}
       </div>
-    </>
+    </div>
   );
 }

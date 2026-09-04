@@ -22,6 +22,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { scheduleWriteError } from "./scheduleConflict";
 
+/**
+ * What actually happened. `moved` is the ordinary case. `copied` means the
+ * session had already been trained, so it stayed where it was and a fresh one
+ * was put on the target date instead. Callers MUST tell the client which they
+ * got — a move that silently leaves the card behind reads as a failure.
+ */
+export type MoveOutcome =
+  | { ok: true; kind: "moved" }
+  | { ok: true; kind: "copied"; fromDate: string | null }
+  | { ok: false; message: string };
+
 export interface MovableWorkout {
   id: string;
   /**
@@ -34,8 +45,8 @@ export interface MovableWorkout {
 }
 
 /**
- * Move a scheduled workout to `toDate`. Returns null on success, or a message
- * fit to show the client.
+ * Move a scheduled workout to `toDate`, or — when the session has already been
+ * trained — leave it alone and put a copy on `toDate` instead.
  *
  * Deliberately does NOT enforce the window or the Peak Week lock: those differ
  * per surface and are checked by the caller before we touch anything.
@@ -44,7 +55,7 @@ export async function moveScheduledWorkout(
   sb: SupabaseClient,
   w: MovableWorkout,
   toDate: string,
-): Promise<string | null> {
+): Promise<MoveOutcome> {
   // Read BEFORE the update, because the date we are about to overwrite is the
   // thing worth keeping. Seven code paths in this app move a scheduled workout;
   // the other six all set moved_from_date and this one did not, which had two
@@ -65,10 +76,63 @@ export async function moveScheduledWorkout(
   // board move has been found in the data. The guard simply was not connected.
   const { data: before } = await sb
     .from("scheduled_workouts")
-    .select("scheduled_date, workout_log_id, workout_logs(completed, completed_at)")
+    .select(
+      "scheduled_date, workout_log_id, client_id, assignment_id, day_id, published_workout_id, position, source, workout_logs(completed, completed_at)",
+    )
     .eq("id", w.id)
     .maybeSingle();
-  const fromDate = (before as { scheduled_date?: string } | null)?.scheduled_date ?? null;
+  const row = before as {
+    scheduled_date?: string;
+    workout_log_id?: string | null;
+    client_id?: string;
+    assignment_id?: string | null;
+    day_id?: string | null;
+    published_workout_id?: string | null;
+    position?: number | null;
+    source?: string | null;
+    workout_logs?: { completed?: boolean } | null;
+  } | null;
+  const fromDate = row?.scheduled_date ?? null;
+
+  // A TRAINED SESSION IS NOT MOVED. IT IS COPIED.
+  //
+  // Agreed with Dustin, 3 Sep. The earlier fix stopped the LOG following a
+  // completed session to its new date — right, because a log records something
+  // that happened and moving it made the streak and the calendar disagree. But
+  // it left the schedule row free to walk off on its own, so the day you
+  // actually trained went blank and the log sat there with nothing on the
+  // calendar to explain it.
+  //
+  // You cannot move history. What people want when they drag a finished
+  // session forward is the workout on the new day as well — so that is what
+  // they get: the trained one stays put with its log, and a fresh copy lands on
+  // the target date. No dialog: there is one right answer and asking every time
+  // is friction, not safety.
+  const completed = Boolean(row?.workout_logs?.completed);
+  if (completed) {
+    if (!row?.client_id) return { ok: false, message: "Couldn't copy that workout. Try again." };
+    const { error: copyErr } = await sb.from("scheduled_workouts").insert({
+      client_id: row.client_id,
+      assignment_id: row.assignment_id ?? null,
+      day_id: row.day_id ?? null,
+      published_workout_id: row.published_workout_id ?? null,
+      scheduled_date: toDate,
+      position: row.position ?? 1,
+      status: "scheduled",
+      source: row.source ?? "trainer",
+      // Provenance, and the same cron guard the move path arms below.
+      moved_from_date: fromDate,
+      // Deliberately NOT carried over: `workout_log_id` belongs to the session
+      // that was trained, and `supervised` / `appointment_id` belong to the
+      // appointment on the ORIGINAL date. Copying those would let
+      // sync_supervised_workouts_to_appointments() haul the copy straight back.
+    });
+    if (copyErr) {
+      const message = scheduleWriteError(copyErr, "copy");
+      if (message) return { ok: false, message };
+    }
+    return { ok: true, kind: "copied", fromDate };
+  }
 
   const { error } = await sb
     .from("scheduled_workouts")
@@ -80,7 +144,10 @@ export async function moveScheduledWorkout(
   // A move can now collide with uq_scheduled_workout_one_per_day: the target
   // day may already hold this exact session. "Try again" would be bad advice —
   // retrying cannot work — so say what actually happened.
-  if (error) return scheduleWriteError(error, "move");
+  if (error) {
+    const message = scheduleWriteError(error, "move");
+    if (message) return { ok: false, message };
+  }
 
   // Best effort, and never fatal: the workout has already moved, and a stale
   // log_date is a smaller problem than telling someone the move failed when it
@@ -88,8 +155,10 @@ export async function moveScheduledWorkout(
   let logId = w.workoutLogId ?? null;
   if (w.workoutLogId === undefined) {
     // Already fetched above, in the same round trip that got the old date.
-    logId = (before as { workout_log_id?: string | null } | null)?.workout_log_id ?? null;
+    logId = row?.workout_log_id ?? null;
   }
+  // A FINISHED SESSION NEVER REACHES HERE — see the copy branch above.
+  //
   // A FINISHED SESSION'S LOG DOES NOT MOVE.
   //
   // Jenn Day, 1 Sep: "Still can't view previous weeks."
@@ -107,10 +176,7 @@ export async function moveScheduledWorkout(
   //
   // So: an unfinished log still follows the move (it is a shell for work not yet
   // done, and its date is part of the plan). A completed one stays put.
-  const completed = Boolean(
-    (before as { workout_logs?: { completed?: boolean } | null } | null)?.workout_logs?.completed,
-  );
-  if (logId && !completed) {
+  if (logId) {
     try {
       // Still never fatal — the schedule has already moved and a stale log_date
       // on an unfinished shell is a smaller problem than telling someone the
@@ -121,7 +187,7 @@ export async function moveScheduledWorkout(
       if (logErr) console.error("moveScheduledWorkout: schedule moved, log left on the old date —", logErr.message);
     } catch { /* schedule is authoritative for where an unfinished session sits */ }
   }
-  return null;
+  return { ok: true, kind: "moved" };
 }
 
 /** How far back a workout may be dragged. Seven days, same on every surface. */

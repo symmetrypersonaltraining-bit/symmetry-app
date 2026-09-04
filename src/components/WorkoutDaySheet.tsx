@@ -138,9 +138,18 @@ export default function WorkoutDaySheet({
     setNotice(null);
     try {
       const supabase: any = createClient();
-      const failure = await moveScheduledWorkout(supabase, { id: moving.id }, target);
-      if (failure) throw new Error(failure);
-      if (onMoved) onMoved(moving.id, target);
+      const outcome = await moveScheduledWorkout(supabase, { id: moving.id }, target);
+      if (!outcome.ok) throw new Error(outcome.message);
+      // On a copy the original has NOT moved, so telling the parent it did
+      // would take a session off the day it was actually trained on screen.
+      // The refresh below brings the new copy in on its own.
+      if (outcome.kind === "moved" && onMoved) onMoved(moving.id, target);
+      if (outcome.kind === "copied") {
+        setNotice("Already logged, so it stayed on " + pretty(moving.date) + " — copy added to " + pretty(target) + ".");
+        setMoving(null);
+        router.refresh();
+        return;
+      }
       setMoving(null);
       onClose();
       // Re-fetch every server-rendered calendar on this screen so the move

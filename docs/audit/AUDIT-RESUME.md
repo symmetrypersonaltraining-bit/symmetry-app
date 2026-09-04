@@ -26,6 +26,17 @@ covered by a CI gate; see `CLAUDE.md` rule 1.
 
 ## How each screen goes
 
+0. **WALK EVERY AI COMPONENT ON THE SCREEN.** Added 4 Sep, at Dustin's
+   instruction: "we need to go through the logic and thinking for each ai
+   component on every screen... i want to make sure each ai function is doing
+   exactly what i want it to do." So for each screen, before anything else:
+   list every AI-driven element on it, and for each one write down what it
+   reads, what it decides, what it writes, when it runs, and what Dustin wants
+   it to do — then reconcile the two. An AI component that is merely working is
+   not the bar; it has to be doing the thing he actually wants.
+   **HOME IS OUTSTANDING.** Screen 1 was closed before this rule existed, so its
+   AI components have not been through it. Home is re-opened for an AI pass
+   before the Workout audit continues.
 1. **Inventory the controls from the CODE first**, never from memory. Grep the
    page and its components for `onClick`, `href`, `router.push`. Put them in a
    table in SCREEN-WALKTHROUGH.md before asking him anything.
@@ -59,22 +70,28 @@ are NOT bugs and must stop being re-reported.
 | # | screen | notes |
 |---|---|---|
 | 1 | **Client home** | ✅ closed. Adherence now counts only days due; This Week moved under the streak; second "This week" card renamed Weekly Focus; Add Workout removed; AI Insights placeholder deleted; header is a banner; payments sit above This Week; milestone Share now carries the message. |
-| 2 | **Workout tab** | ◐ partly. Week bar removed. Library search reads descriptions + difficulty and every library workout is now described. Full library access granted to clients. Start/View split NOT built. Move-when-logged NOT built. |
+| 2 | **Workout tab** | ◐ REBUILT 4 Sep, not yet walked. New tile format, Start/View split, move-a-logged-workout copies forward, Add workout on the title row. Everything on it now needs testing button by button — including the AI components, which have never been reviewed. |
 
-### Next — screen 2 finish, then 3 onward
+### Next — in this order
 
-**Screen 2 has two agreed changes still to build:**
+1. **Home, AI pass.** Every AI component on the home screen, against step 0
+   above. Screen 1 was closed before that rule existed.
+2. **Workout, full walk.** The screen was rebuilt on 4 Sep and NOTHING on it has
+   been tapped since. Every button, every path: add, edit, move, replace,
+   remove, start, view, drag, past strip — manually and through Claude. Plus its
+   AI components.
+3. Screen 3 onward.
 
-- **Start vs View.** Everywhere a workout can be started, two buttons: **View**
-  opens the current overview screen, **Start** goes straight into logging.
-  `/workout/[dayId]` renders WorkoutLogger, which opens on an overview and waits
-  for a tap (`sessionMode`). Start needs to carry a flag that enters the session
-  immediately. Applies on the workout tab, today's sessions higher up that page,
-  AND today's sessions on home. **Dustin has approved this.**
-- **Moving a logged workout.** Unlogged moves. Logged always leaves the log where
-  it happened and copies the workout to the new date, with a line saying so.
-  No dialog — you cannot move history, and deleting the log is never right.
-  **Agreed 3 Sep.**
+**Both 3-Sep changes are now built and shipped:**
+
+- **Start vs View** — `?start=1` enters `sessionMode` on mount, after draft
+  hydration and after the completion flag has actually been seeded. Reading the
+  flag at mount would have been a check that could never fail.
+- **Moving a logged workout** — a trained session stays where it was, with its
+  log, and a copy lands on the target date carrying `moved_from_date`.
+  `workout_log_id`, `supervised` and `appointment_id` are deliberately not
+  copied, so `sync_supervised_workouts_to_appointments()` cannot drag the copy
+  back.
 
 ### Not yet walked
 
@@ -92,7 +109,26 @@ PREVIEW: client-preview and its four sub-screens
 
 ---
 
+## The app's container shape — settled 4 Sep
+
+Every screen is moving to one object, taken from the **Weekly Focus card on the
+client home screen**. Full spec in `SCREEN-WALKTHROUGH.md` under screen 2. It is
+scoped to a `.sym-page` wrapper so a screen opts in only when it is walked —
+rule 6 still holds. Each screen gets a mockup Dustin approves before it changes.
+
+**No "programme" language anywhere client-facing.** Most clients are not on a
+programme; each is programmed personally, day by day, in 6-week blocks, from the
+library. This applies to every screen and most of them have not been walked yet.
+
 ## Carried decisions not yet built
+
+- **A light/dark toggle per colour scheme.** Requested 4 Sep. Today `AutoDark`
+  measures `--brand-bg` luminance and darkens genuinely light themes only, with
+  no way for a person to choose. Wants to be a setting: Auto / Light / Dark,
+  persisted the same way the theme is. Its own commit.
+- **The "modified from original" marker** on the workout/schedule screen. The
+  link field exists but only 6 of 73 forks carry it — the fork routes do not set
+  it.
 
 - **Nutrition %** — he is unhappy with how it calculates. Rule to be captured and
   built at the Nutrition tab so both places change together.

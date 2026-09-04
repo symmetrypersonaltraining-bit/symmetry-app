@@ -40,13 +40,19 @@ describe("a move does not rewrite a finished session's date", () => {
       "moveScheduledWorkout cannot tell a finished session from an unfinished one");
   });
 
-  it("only writes log_date when the session is not finished", () => {
-    assert.match(mv, /if \(logId && !completed\)/,
-      "a completed log's date is still being rewritten by a move");
-    // and the write is inside that guard, not somewhere else as well
+  it("never reaches the log write for a finished session", () => {
+    // Superseded 3 Sep. The guard used to be `if (logId && !completed)` around
+    // the log write. A finished session now returns from the copy branch BEFORE
+    // that write exists at all, which is a stronger guarantee than a condition:
+    // there is no path from a completed session to a log_date write.
+    const copyBranch = mv.indexOf("if (completed)");
+    const logWrite = mv.indexOf("update({ log_date");
+    assert.ok(copyBranch > -1, "the completed branch is gone — a finished session can be moved again");
+    assert.ok(logWrite > copyBranch,
+      "the log write is reachable before the completed branch returns");
     const writes = mv.match(/update\(\{ log_date/g) || [];
     assert.equal(writes.length, 1,
-      `log_date is written in ${writes.length} places; there must be exactly one, behind the guard`);
+      `log_date is written in ${writes.length} places; there must be exactly one`);
   });
 
   it("does not restrict where a workout may be moved", () => {

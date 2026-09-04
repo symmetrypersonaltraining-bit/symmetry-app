@@ -115,6 +115,20 @@
       "words": 78
     },
     {
+      "id": "around-workout-tile-format",
+      "chapter": "around",
+      "title": "The Workout tab, and the shape everything is moving to",
+      "text": "The Workout tab is the first screen on the app's new shape, and the shape is not new. It is the Weekly Focus card on your Home screen. Every day is that tile now, and each workout inside it is the same object at a smaller size. Today is the same tile filled bright, and it sits first rather than buried in date order. Its top bar sweeps, and it is the only thing on the screen that moves. Past workouts stay collapsed, and nothing there uses the word missed.",
+      "words": 90
+    },
+    {
+      "id": "around-moving-a-logged-workout",
+      "chapter": "around",
+      "title": "Moving a workout you have already done",
+      "text": "Moving a workout works two ways, depending on whether it has been done. An unfinished one moves, and its log moves with it. A workout you have already logged does not move at all. It stays on the day you trained it, with its log, and a fresh copy lands on the date you picked. You cannot move history, and deleting the log to tidy it up is never the right answer. The app tells you which of the two happened, and there is no dialog, because there is only one correct outcome.",
+      "words": 93
+    },
+    {
       "id": "around-reprogramming-live",
       "chapter": "around",
       "title": "Reprogramming somebody who is mid workout",

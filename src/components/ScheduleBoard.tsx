@@ -52,6 +52,19 @@ function weekStartOf(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   return addDays(dateStr, -new Date(y, m - 1, d).getDay());
 }
+const DOW_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+/** "Saturday, Sep 5" — the day label written out, matching Weekly Focus. */
+function longLabel(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return `${DOW_FULL[dt.getDay()]}, ${MON[dt.getMonth()]} ${dt.getDate()}`;
+}
+/**
+ * The ladder: one colour, six shades deepening down the week before it repeats.
+ * Percentages of --tile-ladder mixed into the tile background; see globals.css
+ * for why the ink is pre-lifted rather than mixed straight from the primary.
+ */
+const RUNGS = ["4%", "12%", "20%", "28%", "36%", "44%"];
 function shortLabel(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
@@ -231,6 +244,22 @@ export default function ScheduleBoard({
     return out;
   }, [today, daysBack]);
 
+  /**
+   * Reading order, which is deliberately NOT chronological order.
+   *
+   * Today is rendered first, on its own, above the past strip — it is what the
+   * client opened the app for. Everything after it runs in order: last week
+   * when the strip is open, then the rest of the week ahead.
+   *
+   * `rung` is the ladder position, and it counts down the list as it is READ,
+   * so the shading steps evenly however the past strip is toggled.
+   */
+  const todayFirst = upcomingDays.includes(today);
+  const orderedDays = useMemo(() => {
+    const seq = [...(showPast ? pastDays : []), ...upcomingDays.filter((d) => d !== today)];
+    return seq.map((date, i) => ({ date, rung: i + 1 }));
+  }, [showPast, pastDays, upcomingDays, today]);
+
   function flash(msg: string) {
     setNotice(msg);
     window.setTimeout(() => setNotice(null), 2200);
@@ -242,7 +271,10 @@ export default function ScheduleBoard({
     if (!w || w.date === toDate) return;
     if (toDate < minMoveDate) { flash("Can't move a workout more than 7 days back."); return; }
     if (isLockedDate(toDate) || isLockedDate(w.date)) { flash("Peak Week workouts are locked."); return; }
-    setWorkouts((prev) => prev.map((x) => (x.id === id ? { ...x, date: toDate } : x)));
+    // A trained session is copied, not moved, so it must NOT be optimistically
+    // dragged off its own day — it is staying there. See src/lib/moveWorkout.ts.
+    const willCopy = w.status === "completed";
+    if (!willCopy) setWorkouts((prev) => prev.map((x) => (x.id === id ? { ...x, date: toDate } : x)));
     try {
       const supabase: any = createClient();
       // Shared with the day sheet (src/lib/moveWorkout.ts). It also carries
@@ -250,12 +282,18 @@ export default function ScheduleBoard({
       // completed workouts became movable — the streak and the consistency
       // calendar read log_date, so without it the app disagreed with itself
       // about which day the session happened on.
-      const failure = await moveScheduledWorkout(supabase, { id }, toDate);
-      if (failure) throw new Error(failure);
-      flash("Moved ✓");
+      const outcome = await moveScheduledWorkout(supabase, { id }, toDate);
+      if (!outcome.ok) throw new Error(outcome.message);
+      // Say which of the two happened. A copy that reported "Moved" would look
+      // like a bug — the card the client dragged is still sitting where it was.
+      flash(
+        outcome.kind === "copied"
+          ? "Already logged, so it stayed put — copy added to " + shortLabel(toDate)
+          : "Moved ✓",
+      );
       router.refresh();
     } catch {
-      setWorkouts((prev) => prev.map((x) => (x.id === id ? { ...x, date: w.date } : x)));
+      if (!willCopy) setWorkouts((prev) => prev.map((x) => (x.id === id ? { ...x, date: w.date } : x)));
       flash("Couldn't move that workout. Try again.");
     }
   }
@@ -478,12 +516,20 @@ export default function ScheduleBoard({
 
   useEffect(() => () => cleanupDrag(), []); // safety on unmount
 
-  function launchWorkout(w: BoardWorkout) {
+  function launchWorkout(w: BoardWorkout, start = false) {
     // w.id — the scheduled row — not w.dayId. openTarget() in WorkoutDaySheet
     // carries the full explanation; the short version is that the logger reads
     // the date off the scheduled row and has nothing to read from a bare day,
     // so opening a past session by its day id logged it against today.
-    router.push(`${basePath}/workout/${openTarget(w)}${forClient ? "?forClient=" + forClient : ""}`);
+    //
+    // `start=1` is the Start-vs-View split: without it the logger opens on its
+    // overview and waits for a tap, which is View. With it the logger enters the
+    // session on mount.
+    const q = new URLSearchParams();
+    if (forClient) q.set("forClient", forClient);
+    if (start) q.set("start", "1");
+    const qs = q.toString();
+    router.push(`${basePath}/workout/${openTarget(w)}${qs ? "?" + qs : ""}`);
   }
 
   function openMove(w: BoardWorkout) {
@@ -492,220 +538,183 @@ export default function ScheduleBoard({
     setPickDate(w0 && w0.date >= today ? w0.date : today);
   }
 
-  return (
-    <div style={{ marginBottom: 12 }}>
-      {pastDays.length > 0 && (
-        <button
-          onClick={() => setShowPast((s) => !s)}
-          style={{
-            width: "100%", marginBottom: 6, padding: "6px 10px", borderRadius: 10,
-            border: !showPast && missed.length > 0 ? "1px solid #f59e0b" : "1px dashed var(--brand-border)",
-            background: !showPast && missed.length > 0 ? "color-mix(in srgb, #f59e0b 12%, transparent)" : "transparent",
-            color: !showPast && missed.length > 0 ? "#b45309" : "var(--brand-text-secondary)",
-            fontSize: 11.5, fontWeight: 700, cursor: "pointer",
-          }}
-        >
-          {/* "Past workouts", never "missed". Dustin, 21 Aug: "same button but
-              just label it past workouts not missed sessions." A tile that
-              says you missed something is a telling-off; the same tile saying
-              it is in the past is information, and the client decides what to
-              do about it. The count is this week's only — see `missed`. */}
-          {showPast
-            ? "▴ Hide past workouts"
-            : missed.length > 0
-              ? "▾ " + missed.length + " past workout" + (missed.length === 1 ? "" : "s") + " this week — move " + (missed.length === 1 ? "it" : "them") + " forward"
-              : "▾ Show past workouts (" + pastDays.length + " days)"}
-        </button>
-      )}
-      <div>
-        {[...(showPast ? pastDays : []), ...upcomingDays].map((k) => {
-          const isToday = k === today;
-          const isPast = k < today;
-          // 6e90c584: `locked` used to be `isPast || isLockedDate(k)`, which froze
-          // every past tile — no drag handle, no Move, no Remove. A session you
-          // missed on Tuesday was stuck on Tuesday forever, which is the one case
-          // you MOST need to reschedule. Only Peak Week freezes a date now;
-          // `isPast` stays purely cosmetic (the dimming and the "past" label).
-          // The per-tile `movable` below still excludes completed workouts, so
-          // history is never editable.
-          const locked = isLockedDate(k);
-          const items = byDate[k] || [];
-          const empty = items.length === 0;
-          const isOver = overDate === k;
-          return (
-            <div
-              key={k}
-              data-board-date={k}
-              style={{
-                border: isOver ? "1.5px solid var(--brand-primary)" : isToday ? "2.5px solid var(--brand-primary)" : "1px solid var(--brand-border)",
-                borderRadius: 11,
-                marginBottom: 6,
-                background: isOver ? "color-mix(in srgb, var(--brand-primary) 10%, var(--brand-surface))" : "var(--brand-surface)",
-                // Today was a 1px border in the same colour as every other
-                // border — scrolling a month of days, nothing said "you are
-                // here". A thicker ring, a shadow and a lift make it findable
-                // without reading a single date.
-                boxShadow: isToday && !isOver
-                  ? "0 0 0 3px color-mix(in srgb, var(--brand-primary) 18%, transparent), 0 6px 18px rgba(0,0,0,.10)"
-                  : undefined,
-                transform: isToday && !isOver ? "scale(1.012)" : undefined,
-                // Past days still read as "behind you" even though they're now
-                // movable — the dimming is cosmetic, not a lock indicator.
-                opacity: (locked || isPast) && !isOver ? 0.7 : 1,
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: empty ? "6px 10px" : "5px 10px",
-                  // The date row is now a coloured band in the active scheme
-                  // rather than transparent. Reported while scrolling a month
-                  // of Peak Week days: every block looked the same, so the days
-                  // ran together and the date was the hardest thing on the card
-                  // to find. A tinted band with a stronger rule under it does
-                  // the separating, and it costs no vertical space.
-                  //
-                  // Derived from --brand-primary, so it is whatever scheme is
-                  // active — and it deepens with the depth level like every
-                  // other surface, instead of being a fixed colour that fights
-                  // the theme.
-                  borderBottom: empty
-                    ? "none"
-                    : "1.5px solid color-mix(in srgb, var(--brand-primary) 38%, var(--brand-border))",
-                  background: isToday
-                    ? "var(--brand-primary)"
-                    : "color-mix(in srgb, var(--brand-primary) 15%, var(--brand-surface))",
-                }}
-              >
-                <span style={{ fontWeight: 800, fontSize: isToday ? 12.5 : 12, letterSpacing: "-0.01em", color: isToday ? "#fff" : "var(--brand-text)" }}>
-                  {shortLabel(k)}
-                  {isToday ? <span style={{ color: "#fff", fontWeight: 900 }}> · TODAY</span> : null}
-                </span>
-                <span style={{ fontSize: 10.5, color: isToday ? "rgba(255,255,255,.85)" : "var(--brand-text-secondary)" }}>
-                  {isLockedDate(k)
-                    ? "🔒 Peak Week"
-                    : empty
-                      ? "Rest"
-                      : isPast
-                        ? items.some((w) => w.status !== "completed")
-                          ? "missed"
-                          : "past"
-                        : ""}
-                </span>
-              </div>
-              {!empty && (
-                <div style={{ padding: 6, display: "flex", flexDirection: "column", gap: 5 }}>
-                  {items.map((w) => {
-                    const t = typeOf(w.label);
-                    const done = w.status === "completed";
-                    // `!done` used to be part of this, on the reasoning that a
-                    // completed workout is history and history should not move.
-                    // In practice a session gets logged on the wrong day often
-                    // enough — logged today, actually trained yesterday — and
-                    // there was no way to correct it from here at all. Moving a
-                    // completed workout carries its log with it, so nothing is
-                    // lost. Peak Week is still the only genuine freeze.
-                    const movable = !locked;
-                    // A missed session's overwhelmingly common fix is "do it
-                    // today instead", so that gets a one-tap button rather than
-                    // making Dustin open the Move sheet and pick a date. Hidden
-                    // once today is already Peak Week (moveWorkout would refuse).
-                    const canPullForward = movable && isPast && !isLockedDate(today);
-                    return (
-                      <div
-                        key={w.id}
-                        onPointerDown={movable ? (e) => onTileDown(e, w) : undefined}
-                        onPointerMove={movable ? onTileMove : undefined}
-                        onPointerUp={movable ? onTileUp : undefined}
-                        onPointerCancel={movable ? () => cleanupDrag() : undefined}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                          gap: 7,
-                          // Each workout gets a full ring in its own type
-                          // colour, not just a left bar. On a day with a lift
-                          // AND a cardio session the two tiles sat on
-                          // near-identical backgrounds with a 1px neutral
-                          // border, so they read as one block with two lines of
-                          // text. The ring plus a tint of the same colour makes
-                          // each session a discrete object at a glance, and the
-                          // colour still says which kind it is.
-                          background: `color-mix(in srgb, ${TYPE_COLOR[t]} 9%, var(--brand-surface))`,
-                          border: `1.5px solid color-mix(in srgb, ${TYPE_COLOR[t]} 55%, transparent)`,
-                          borderLeft: `5px solid ${TYPE_COLOR[t]}`,
-                          borderRadius: 9,
-                          padding: "7px 8px",
-                          cursor: movable ? "grab" : "default",
-                          userSelect: "none",
-                          WebkitUserSelect: "none",
-                          WebkitTouchCallout: "none",
-                        } as any}
-                      >
-                        {movable ? (
-                          <span title="Press & hold, then drag" style={{ color: "var(--brand-text-secondary)", fontSize: 16, lineHeight: 1, letterSpacing: "-2px" }}>⠿</span>
-                        ) : (
-                          <span style={{ width: 10 }} />
-                        )}
-                        <span style={{ fontSize: 13.5 }}>{t === "car" ? "🏃" : t === "mob" ? "🧘" : "🏋️"}</span>
-                        <span style={{ flex: 1, fontWeight: 600, fontSize: 12.5, color: "var(--brand-text)", lineHeight: 1.25, minWidth: 96, wordBreak: "break-word" }}>
+  /**
+   * One day, as a tile. Extracted from the map so the order can be
+   * today · past strip · the rest, rather than strict chronology — see the
+   * comment at the call site.
+   */
+  function renderDayTile(k: string, rungIdx: number) {
+        const isToday = k === today;
+        const isPast = k < today;
+        // 6e90c584: `locked` used to be `isPast || isLockedDate(k)`, which froze
+        // every past tile — no drag handle, no Move, no Remove. A session you
+        // missed on Tuesday was stuck on Tuesday forever, which is the one case
+        // you MOST need to reschedule. Only Peak Week freezes a date now;
+        // `isPast` stays purely cosmetic. The per-tile `movable` below still
+        // excludes nothing but Peak Week, and history is protected by the
+        // copy-not-move rule in src/lib/moveWorkout.ts.
+        const locked = isLockedDate(k);
+        const items = byDate[k] || [];
+        const empty = items.length === 0;
+        const isOver = overDate === k;
+        // One rung of the ladder per day, six shades before it repeats.
+        const rung = RUNGS[rungIdx % RUNGS.length];
+        return (
+          <div
+            key={k}
+            data-board-date={k}
+            data-rung=""
+            className={"sym-tile" + (isToday ? " is-today" : "")}
+            style={{
+              ["--rung" as string]: rung,
+              // The drop target has to be unmistakable mid-drag, and it is the
+              // one state allowed to override the tile's own colour.
+              outline: isOver ? "2px solid var(--brand-primary)" : undefined,
+              outlineOffset: isOver ? "-2px" : undefined,
+              opacity: (locked || isPast) && !isOver && !isToday ? 0.82 : 1,
+            } as React.CSSProperties}
+          >
+            <div className="sym-tile-head">
+              <span className="sym-tile-lbl">
+                <i className={"ti " + (isToday ? "ti-sun-high" : "ti-calendar")} />
+                {isToday ? "Today · " : ""}{longLabel(k)}
+              </span>
+              <span className="sym-tile-meta">
+                {isLockedDate(k)
+                  ? "🔒 Peak Week"
+                  : empty
+                    ? "Rest"
+                    : items.length + (items.length === 1 ? " session" : " sessions")}
+              </span>
+            </div>
+            {empty ? (
+              <div className="sym-rest">Rest day</div>
+            ) : (
+              <div className="sym-body">
+                {items.map((w) => {
+                  const t = typeOf(w.label);
+                  const done = w.status === "completed";
+                  const movable = !locked;
+                  // A past session's overwhelmingly common fix is "do it today
+                  // instead", so that gets a one-tap button rather than making
+                  // anyone open the Move sheet and pick a date. Hidden once
+                  // today is already Peak Week (moveWorkout would refuse).
+                  const canPullForward = movable && isPast && !done && !isLockedDate(today);
+                  return (
+                    <div
+                      key={w.id}
+                      className={"sym-wo" + (done ? " is-done" : "")}
+                      onPointerDown={movable ? (e) => onTileDown(e, w) : undefined}
+                      onPointerMove={movable ? onTileMove : undefined}
+                      onPointerUp={movable ? onTileUp : undefined}
+                      onPointerCancel={movable ? () => cleanupDrag() : undefined}
+                      style={{
+                        cursor: movable ? "grab" : "default",
+                        userSelect: "none",
+                        WebkitUserSelect: "none",
+                        WebkitTouchCallout: "none",
+                      } as React.CSSProperties}
+                    >
+                      <div className="sym-wo-row">
+                        <span className="sym-wo-ic">
+                          <i className={"ti " + (t === "car" ? "ti-run" : t === "mob" ? "ti-yoga" : "ti-barbell")} />
+                        </span>
+                        <span className="sym-wo-name">
                           {w.label}
                           {done ? <span style={{ color: "#22c55e" }}> ✓</span> : null}
                         </span>
+                      </div>
+                      <div className="sym-acts">
+                        {/* START vs VIEW. Approved 3 Sep. View opens the
+                            overview the logger already lands on; Start carries
+                            ?start=1 and drops straight into the session. A
+                            finished session offers View only — there is
+                            nothing left to start. */}
+                        {!done && (
+                          <button
+                            className="sym-bt go"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); launchWorkout(w, true); }}
+                          >
+                            <i className="ti ti-player-play" /> Start
+                          </button>
+                        )}
                         <button
+                          className="sym-bt"
                           onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => { e.stopPropagation(); launchWorkout(w); }}
-                          style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, padding: "4px 9px", borderRadius: 8, border: "none", background: "var(--brand-primary)", color: "#fff", cursor: "pointer" }}
+                          onClick={(e) => { e.stopPropagation(); launchWorkout(w, false); }}
                         >
-                          {done ? "View" : "▶ Start"}
+                          <i className="ti ti-eye" /> View
                         </button>
                         {canPullForward ? (
                           <button
+                            className="sym-bt warn"
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); moveWorkout(w.id, today); }}
-                            title="Move this missed workout to today"
-                            style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, padding: "4px 9px", borderRadius: 8, border: "1px solid #f59e0b", background: "color-mix(in srgb, #f59e0b 14%, transparent)", color: "#b45309", cursor: "pointer" }}
+                            title="Move this workout to today"
                           >
                             → Today
                           </button>
                         ) : null}
                         {movable ? (
                           <button
+                            className="sym-bt ic"
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); openMove(w); }}
-                            style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, padding: "4px 9px", borderRadius: 8, border: "1px solid var(--brand-border)", background: "var(--brand-surface)", color: "var(--brand-primary)", cursor: "pointer" }}
+                            title="Move to another day, or replace from the library"
+                            aria-label="Move or replace"
                           >
-                            Move
+                            <i className="ti ti-calendar-event" />
                           </button>
                         ) : null}
+                        <span className="sym-sp" />
                         {movable ? (
                           <button
+                            className="sym-bt ic"
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); removeWorkout(w); }}
                             title="Remove from schedule"
                             aria-label="Remove from schedule"
-                            style={{ flexShrink: 0, fontSize: 13, padding: "4px 6px", borderRadius: 8, border: "1px solid var(--brand-border)", background: "var(--brand-surface)", color: "#ef4444", cursor: "pointer", lineHeight: 1 }}
+                            style={{ color: "#ef4444" }}
                           >
                             <i className="ti ti-trash" />
                           </button>
                         ) : null}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+  }
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      {/* TODAY FIRST, THEN THE PAST STRIP, THEN THE REST.
+          The board is chronological, so before this the past toggle sat above
+          everything and today was the second thing on the screen. Today is what
+          the client opened the app for; it goes first, and the way back to last
+          week sits under it. */}
+      {todayFirst && renderDayTile(today, 0)}
+      {pastDays.length > 0 && (
+        <button className="sym-past" onClick={() => setShowPast((s) => !s)}>
+          {/* "Past workouts", never "missed". Dustin, 21 Aug: "same button but
+              just label it past workouts not missed sessions." A tile that says
+              you missed something is a telling-off; the same tile saying it is
+              in the past is information, and the client decides what to do with
+              it. Nothing on this screen counts failures. */}
+          <span>Past {pastDays.length} day{pastDays.length === 1 ? "" : "s"}</span>
+          <span className="sym-sp" />
+          <span className="sym-past-go">{showPast ? "Hide ▴" : "Show ▾"}</span>
+        </button>
+      )}
+      <div>
+        {orderedDays.map((d) => renderDayTile(d.date, d.rung))}
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 10.5, color: "var(--brand-text-secondary)", marginTop: 3 }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><i style={{ width: 8, height: 8, borderRadius: 2, background: TYPE_COLOR.wk, display: "inline-block" }} />Workout</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><i style={{ width: 8, height: 8, borderRadius: 2, background: TYPE_COLOR.mob, display: "inline-block" }} />Mobility</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><i style={{ width: 8, height: 8, borderRadius: 2, background: TYPE_COLOR.car, display: "inline-block" }} />Cardio</span>
-        <span>Press &amp; hold a workout to drag · or tap Move</span>
+        <span>Press &amp; hold a workout to drag it onto another day · or tap the calendar button</span>
       </div>
       {notice ? <div style={{ fontSize: 11.5, color: "var(--brand-primary)", marginTop: 4, fontWeight: 600 }}>{notice}</div> : null}
 

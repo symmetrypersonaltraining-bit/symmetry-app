@@ -353,6 +353,35 @@ export const TUTORIAL: TutorialChapter[] = [
         audioUrl: null,
       },
       {
+        id: "around-workout-tile-format",
+        title: "The Workout tab, and the shape everything is moving to",
+        body: [
+          "Every day is a tile: a gradient bar across the top, the day written out with an icon on the left, the session count on the right. Inside it, each workout is the same shape at a smaller size.",
+          "Today is that same tile filled bright, and it sits first — above the past strip, not buried in date order. Its top bar is the only thing on the screen that moves.",
+          "Every workout has Start and View. View opens the overview and waits; Start drops straight into the session. A finished one offers View only.",
+          "Past workouts stay collapsed and never say missed. The shape comes from the Weekly Focus card on Home, and it is being rolled out screen by screen as each one is walked.",
+        ],
+        narration:
+          "The Workout tab is the first screen on the app's new shape, and the shape is not new. It is the Weekly Focus card on your Home screen. Every day is that tile now, and each workout inside it is the same object at a smaller size. Today is the same tile filled bright, and it sits first rather than buried in date order. Its top bar sweeps, and it is the only thing on the screen that moves. Past workouts stay collapsed, and nothing there uses the word missed.",
+        route: "/workout",
+        routeLabel: "Open Workout",
+        audioUrl: null,
+      },
+      {
+        id: "around-moving-a-logged-workout",
+        title: "Moving a workout you have already done",
+        body: [
+          "An unfinished workout moves. Drag it onto another day, or use the calendar button on the card.",
+          "One you have already logged does not move. It stays on the day you trained it, with its log, and a copy of the workout lands on the date you picked.",
+          "The app says so when it happens. There is no dialog, because there is only one right answer.",
+        ],
+        narration:
+          "Moving a workout works two ways, depending on whether it has been done. An unfinished one moves, and its log moves with it. A workout you have already logged does not move at all. It stays on the day you trained it, with its log, and a fresh copy lands on the date you picked. You cannot move history, and deleting the log to tidy it up is never the right answer. The app tells you which of the two happened, and there is no dialog, because there is only one correct outcome.",
+        route: "/workout",
+        routeLabel: "Open Workout",
+        audioUrl: null,
+      },
+      {
         id: "around-reprogramming-live",
         title: "Reprogramming somebody who is mid workout",
         body: [

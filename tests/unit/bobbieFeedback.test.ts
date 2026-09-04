@@ -66,14 +66,22 @@ describe("past workouts reset every week", () => {
   it("the button says past, not missed", () => {
     // Dustin, 21 Aug: "same button but just label it past workouts not missed
     // sessions." A tile that says you missed something is a telling-off.
-    const labels = code.match(/"▾[^"]*"|"▴[^"]*"/g) || [];
-    assert.ok(labels.length > 0, "the past-section button labels are gone — this test has stopped watching anything");
-    const scolding = labels.filter((l) => /missed/i.test(l));
-    assert.deepEqual(scolding, [], `the button tells the client they missed something:\n  ${scolding.join("\n  ")}`);
+    //
+    // REWRITTEN 4 Sep, and deliberately. The old version matched string
+    // literals that STARTED with an arrow, which is how the label happened to
+    // be written at the time rather than anything that mattered. The tile
+    // redesign put the arrow at the end and split the label across two spans,
+    // so a check that was still perfectly happy about the word "missed" failed
+    // over punctuation instead. It now reads the whole control and asserts the
+    // two things that are actually true requirements.
+    const m = code.match(/className="sym-past"[\s\S]*?<\/button>/);
+    assert.ok(m, "the past-workouts control is gone — this test has stopped watching anything");
+    const strip = m![0];
     assert.ok(
-      labels.some((l) => /past workout/i.test(l)),
-      "no label mentions past workouts any more",
+      !/missed/i.test(strip),
+      `the past control tells the client they missed something:\n  ${strip}`,
     );
+    assert.match(strip, /Past /, "the past control no longer says what it opens");
   });
 
   it("older sessions are still reachable, just not counted", () => {
