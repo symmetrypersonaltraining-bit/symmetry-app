@@ -129,6 +129,13 @@
       "words": 114
     },
     {
+      "id": "around-build-my-own",
+      "chapter": "around",
+      "title": "Build my own, and the movement library behind it",
+      "text": "Build my own has the movement library behind it now. Every exercise row has a Search button, and it opens the same shape as the workout search: filters for body part, type and equipment, an Ask button that sets those filters, and a View on every result so you can watch the demo before you commit. It opens over the builder, so a half-typed workout survives going to look something up. Typing a name still works, because the picker is an option and not a gate. And a movement you have excluded is never offered here.",
+      "words": 96
+    },
+    {
       "id": "around-moving-a-logged-workout",
       "chapter": "around",
       "title": "Moving a workout you have already done",

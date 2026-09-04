@@ -496,6 +496,35 @@ replace replaces what was named, on the day it was named.
 > and it is on the person to move or remove it. `src/lib/pullForward.ts` and its
 > tests are left in place; only this surface stopped calling it.
 
+### Build my own — rebuilt 4 Sep
+
+`MovementPicker.tsx`, reusable, opened from the Search button on every exercise
+row. The movement-level twin of the workout search:
+
+- **Filters** — body part, type (strength / power / functional / conditioning /
+  mobility), equipment. All normalised in code rather than in the data:
+  `muscle_group` is free text typed by hand over a year ("Chest" and "chest",
+  "Legs" and "Lower Body"), and equipment has drifted the same way
+  ("Lacrosse Ball" / "Lacrosse ball", "Cable rig" / "Cable Machine").
+- **Ask** — `/api/movement-search`, same contract as the workout one: a filter
+  over a closed vocabulary, never a named movement. Falls back to a name search
+  with no key.
+- **View** on every result — what it is, and its demo video.
+- **A layer, not a navigation.** A half-typed workout survives going to look
+  something up.
+- **Free text still works.** "red band pull-apart" is a real thing somebody
+  types and no library has to contain it. Picking from the library also
+  guarantees the exact stored name, which is what makes `/api/workout-manual`
+  resolve to the shared exercise instead of quietly creating a personal copy of
+  one that already exists.
+
+Two safety rules enforced here and tested:
+
+- **Excluded movements are never listed** (11 of them). Rule 13.
+- **`corrective_phase_tags` never reaches the screen.** Inhibit / Lengthen /
+  Activate / Integrate is the internal engine; it is on the row, which is
+  exactly why keeping it off the screen has to be deliberate.
+
 ### Still open on this screen
 
 - **The "modified from original" marker.** The link field exists but only 6 of 73

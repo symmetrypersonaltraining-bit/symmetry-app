@@ -76,6 +76,10 @@ are NOT bugs and must stop being re-reported.
 
 1. **Home, AI pass.** Every AI component on the home screen, against step 0
    above. Screen 1 was closed before that rule existed.
+   - **Also carry into that pass:** today's workout tile on Home needs the
+     **View** button, to match the Workout tab's Start / View split. Dustin,
+     4 Sep. It is the last place a workout can be opened that still offers only
+     one way in.
 2. **Workout, full walk.** The screen was rebuilt on 4 Sep and NOTHING on it has
    been tapped since. Every button, every path: add, edit, move, replace,
    remove, start, view, drag, past strip — manually and through Claude. Plus its

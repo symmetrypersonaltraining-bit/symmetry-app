@@ -14,6 +14,7 @@
 // with one thumb free is the whole audience.
 
 import { useState } from "react";
+import MovementPicker from "@/components/MovementPicker";
 
 interface Row {
   name: string;
@@ -43,6 +44,10 @@ export default function ManualWorkoutBuilder({
   const [markDone, setMarkDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Which row is choosing a movement. The picker is a LAYER over the builder —
+  // everything typed so far stays mounted behind it, so cancelling costs
+  // nothing and coming back lands exactly where you left.
+  const [picking, setPicking] = useState<number | null>(null);
 
   const named = rows.filter((r) => r.name.trim());
   const canSave = title.trim().length > 0 && named.length > 0 && !busy;
@@ -102,6 +107,25 @@ export default function ManualWorkoutBuilder({
     boxSizing: "border-box",
   };
 
+  // SEARCHING THE LIBRARY, NOT REMEMBERING IT.
+  //
+  // Dustin, 4 Sep: "it needs to function the same where we can search movements
+  // from movement library with filters, ai, etc."
+  //
+  // The name field is still free text — "red band pull-apart" is a real thing
+  // somebody types and no library has to contain it — but it no longer has to
+  // be. Picking from the library also guarantees the exact stored name, which
+  // is what makes /api/workout-manual resolve to the shared exercise rather
+  // than quietly creating a personal copy of one that already exists.
+  if (picking !== null) {
+    return (
+      <MovementPicker
+        onPick={(name) => { update(picking, { name }); setPicking(null); }}
+        onClose={() => setPicking(null)}
+      />
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <input
@@ -131,6 +155,19 @@ export default function ManualWorkoutBuilder({
               placeholder={`Exercise ${i + 1}`}
               style={input}
             />
+            <button
+              onClick={() => setPicking(i)}
+              aria-label={`Search the movement library for exercise ${i + 1}`}
+              title="Search the movement library"
+              style={{
+                flex: "0 0 auto", padding: "0 12px", height: 36, borderRadius: 9,
+                border: "1px solid var(--brand-border)", background: "var(--brand-surface)",
+                color: "var(--brand-text)", cursor: "pointer", fontSize: 12.5, fontWeight: 800,
+                fontFamily: "inherit", whiteSpace: "nowrap",
+              }}
+            >
+              Search
+            </button>
             {rows.length > 1 && (
               <button
                 onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}

@@ -384,6 +384,22 @@ export const TUTORIAL: TutorialChapter[] = [
         audioUrl: null,
       },
       {
+        id: "around-build-my-own",
+        title: "Build my own, and the movement library behind it",
+        body: [
+          "Every exercise row has a Search button that opens the movement library — the same shape as the workout search: filters, Ask, and View on every result.",
+          "Filters are body part, type and equipment, all read from the movements themselves.",
+          "View shows what a movement is and links its demo video before you commit to it.",
+          "Typing a name still works. The picker is an option, never a gate.",
+          "Excluded movements are never offered, from here or anywhere else.",
+        ],
+        narration:
+          "Build my own has the movement library behind it now. Every exercise row has a Search button, and it opens the same shape as the workout search: filters for body part, type and equipment, an Ask button that sets those filters, and a View on every result so you can watch the demo before you commit. It opens over the builder, so a half-typed workout survives going to look something up. Typing a name still works, because the picker is an option and not a gate. And a movement you have excluded is never offered here.",
+        route: "/workout",
+        routeLabel: "Open Workout",
+        audioUrl: null,
+      },
+      {
         id: "around-moving-a-logged-workout",
         title: "Moving a workout you have already done",
         body: [
