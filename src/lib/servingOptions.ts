@@ -27,6 +27,8 @@
 // is 15. Taking 30 would silently double every tablespoon logged from an Open
 // Food Facts row — the kind of wrong that never looks wrong on screen.
 
+import { preferredServing } from "@/lib/nutrition/foodResolve";
+
 export interface NamedServing {
   /** What the dropdown shows, e.g. "egg". */
   label: string;
@@ -156,5 +158,18 @@ export function defaultAmountFor(
   if (!named.length || !baseGrams || !isFinite(baseGrams) || baseGrams <= 0) return null;
   const base = (baseServing || "").trim().replace(/^\s*[\d.,/]+\s*/, "").toLowerCase();
   if (!PLAIN.has(base)) return null;
-  return { amount: 1, unit: named[0].label };
+  // ⚠️ THIS USED TO BE `named[0]`, AND IT WAS THE 26 AUG BUG STILL RUNNING.
+  //
+  // USDA stores serving_options alphabetically, so the first named one is a cup
+  // far more often than not: 93,752 of the 223,237 catalogue rows that carry a
+  // named serving, measured 4 Sep. "Bananas, raw" opened the amount box on
+  // "1 cup, mashed" — 225 g, ~200 cal for what a person calls a banana — with
+  // "1 small (101 g)" sitting two entries further down the same array.
+  //
+  // The AI path fixed this in foodResolve on 26 Aug. This copy never got it.
+  // Both now call the same chooser, so there is one answer to "which serving is
+  // one of them" instead of two that disagree.
+  const pick = preferredServing(named.map((n) => ({ label: n.label, gramsEach: n.gramsPerUnit })));
+  if (!pick) return null;
+  return { amount: 1, unit: pick.label };
 }

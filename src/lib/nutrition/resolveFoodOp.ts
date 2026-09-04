@@ -15,9 +15,10 @@
 
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import {
-  CatalogRow, ResolvedFood, macrosFromRow, describeCandidates, PICK_SYSTEM, validatePick,
-  TERMS_SYSTEM, validateTerms, householdServing,
+  CatalogRow, ResolvedFood, Serving, macrosFromRow, describeCandidates, PICK_SYSTEM, validatePick,
+  TERMS_SYSTEM, validateTerms, householdServing, servingByUnit,
   ESTIMATE_SYSTEM, validateEstimate, estimatedFood, toGrams, isGenericUnit,
+  PORTION_SYSTEM, validatePortion,
 } from "@/lib/nutrition/foodResolve";
 
 /** Enough rows to contain the right one; short enough that the whole list gets read. */
@@ -192,16 +193,63 @@ export async function resolveFood(
   let amt = amount ?? null;
   let un = unit ?? null;
   if (amt == null && un == null) {
-    if (hh) { amt = 1; un = hh.label; }
-    else { amt = Number(row.serving_grams) > 0 ? Number(row.serving_grams) : 100; un = "g"; }
+    // One of them. `null` unit rather than a made-up one — if the row has no
+    // countable serving, the portion question below is what answers this.
+    amt = 1;
+    un = hh ? hh.label : null;
   } else if (amt == null) {
     amt = 1;                       // "in grams" with no number is one of them
   } else if (un == null) {
     // A bare number. Count the row's own servings rather than reading it as
     // grams — "2" after "add 2 bagels" is two bagels, not two grams.
-    un = hh ? hh.label : "";
+    un = hh ? hh.label : null;
   }
-  const scaled = macrosFromRow(row, amt, un);
+
+  // ── AND WHEN THE ROW CANNOT EXPRESS THE MEASURE THEY USED ─────────────────
+  //
+  // Dustin, 4 Sep: *"its got all the same screw ups that we fixed on other
+  // features. these numbers r terrible."* — the Edit custom meal sheet, showing
+  // "2 100 g" of pancake (559 cal), "4 100 g" of egg (439 cal) and 100 g of
+  // butter (743 cal) for "2 5 inch pancakes, 4 scrambled eggs w butter n
+  // cheese". Every one of those resolved to the RIGHT USDA row; every one then
+  // got charged the row's base portion because the row carries only "100 g" and
+  // "1 oz" — as 574,372 of the 574,650 rows do.
+  //
+  // The one item that came out right, "3 link" of sausage, is the proof: its
+  // row happens to carry "1 link (28 g)". There is nothing else left in the
+  // column to read for the other four.
+  //
+  // So the missing number is asked for, and ONLY the missing number: what one
+  // of the thing they counted weighs. The macros still come from the row, per
+  // gram, exactly as written. See PORTION_SYSTEM for why this is the least-bad
+  // of the four available answers.
+  const askedUnit = isGenericUnit(un) ? null : un;
+  const rowKnowsIt =
+    toGrams(1, askedUnit) != null              // a weight — exact, no question needed
+    || !!servingByUnit(row, askedUnit)         // the row's own countable serving
+    || (!askedUnit && !!hh);                   // no measure named, and the row has one
+  let fallbackServing: Serving | null = null;
+  if (!rowKnowsIt) {
+    const portion = await callClaudeJson({
+      meter: { clientId: deps.clientId, feature: "food_parse" },
+      apiKey: deps.apiKey,
+      model: HAIKU_MODEL,
+      system: PORTION_SYSTEM,
+      maxTokens: 60,
+      messages: [{
+        role: "user",
+        content: `DATABASE ROW: ${row.name}\nTHEY SAID: ${term}\nTHEY COUNTED IN: ${askedUnit || "(no measure given)"}`,
+      }],
+      validate: (raw) => {
+        const v = validatePortion(raw);
+        return v === null ? null : { v };
+      },
+    });
+    const v = portion.value?.v;
+    if (v) fallbackServing = { label: v.serving, gramsEach: v.grams };
+  }
+
+  const scaled = macrosFromRow(row, amt, un, fallbackServing);
   if (!scaled) return null;
 
   // Micronutrients ride along from the same row. They were being recalled by a

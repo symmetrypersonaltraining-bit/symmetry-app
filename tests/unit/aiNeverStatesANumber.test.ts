@@ -224,12 +224,19 @@ test("an unstated amount falls back to the ROW's serving, not an invented one", 
   // he added carries "1 bagel (95 g)". Same rule, now reading the column that
   // actually holds the answer.
   assert.match(code(OP), /const hh = householdServing\(row\);/);
-  assert.match(code(OP), /if \(hh\) \{ amt = 1; un = hh\.label; \}/);
-  // And 100 g survives only where a row genuinely knows nothing but weights.
-  assert.match(
-    code(OP),
-    /amt = Number\(row\.serving_grams\) > 0 \? Number\(row\.serving_grams\) : 100; un = "g";/,
+  assert.match(code(OP), /un = hh \? hh\.label : null;/);
+  // 4 Sep: the last two lines of this test asserted the 100 g fallback, and
+  // that fallback was the bug Dustin reported the same day — "2 100 g" of
+  // pancake, 559 cal, on a meal that came to 2,314. The row's serving is still
+  // what wins; what changed is what happens when the row HAS NO serving, which
+  // is true of 574,372 of the 574,650 rows. It used to mean 100 g of the food.
+  // It now means one portion-weight question, macros still straight off the
+  // row. See aPancakeDoesNotWeigh100Grams.test.ts.
+  assert.ok(
+    !/Number\(row\.serving_grams\) > 0 \? Number\(row\.serving_grams\) : 100; un = "g";/.test(code(OP)),
+    "an unstated amount defaults to 100 g of the food again",
   );
+  assert.match(code(OP), /system: PORTION_SYSTEM/);
 });
 
 // ── the everyday logger, which is the bigger surface ─────────────────────────

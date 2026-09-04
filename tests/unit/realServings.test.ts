@@ -138,9 +138,21 @@ const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:]
 test("no stated amount means ONE of the thing, not 100 g", () => {
   const OP = code(read("src/lib/nutrition/resolveFoodOp.ts"));
   assert.match(OP, /const hh = householdServing\(row\);/);
-  assert.match(OP, /if \(hh\) \{ amt = 1; un = hh\.label; \}/);
-  // 100 g survives only as the fallback for a row with no countable serving.
-  assert.match(OP, /amt = Number\(row\.serving_grams\) > 0 \? Number\(row\.serving_grams\) : 100; un = "g";/);
+  assert.match(OP, /un = hh \? hh\.label : null;/);
+  // 4 Sep: the last line of this test used to require the 100 g fallback, and
+  // that fallback turned out to be the whole bug. 574,372 of the 574,650 rows
+  // carry no countable serving, so "the fallback for a row with no countable
+  // serving" was in practice the answer for nearly every food: 100 g of butter
+  // (743 cal) for the word "butter", 200 g of pancake for "2 pancakes".
+  //
+  // A row with no serving now gets ONE portion-weight question — a weight,
+  // never a macro — and the macros still come straight off the row. See
+  // aPancakeDoesNotWeigh100Grams.test.ts.
+  assert.ok(
+    !/Number\(row\.serving_grams\) > 0 \? Number\(row\.serving_grams\) : 100; un = "g";/.test(OP),
+    "an unstated amount means 100 g of the food again",
+  );
+  assert.match(OP, /system: PORTION_SYSTEM/);
 });
 
 test("the sheet offers the row's units and lets the number be typed", () => {

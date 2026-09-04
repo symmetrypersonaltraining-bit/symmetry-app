@@ -51,6 +51,13 @@ export interface MealEditOp {
   food_id?: string | null;
   /** True when the numbers came from the model because the catalogue had nothing. */
   estimated?: boolean;
+  /**
+   * True when the MACROS came from a real row but the portion weight did not.
+   * Not the same as `estimated`, and deliberately not shown as one: pointing a
+   * person away from a USDA row because the size of a pancake was estimated
+   * would send them away from the most reliable figure on the screen.
+   */
+  portion_estimated?: boolean;
   /** The row's own name, so a wrong CHOICE is visible on screen and fixable. */
   resolved_name?: string;
   verified?: boolean;
@@ -217,6 +224,7 @@ export async function POST(req: NextRequest) {
         if (!resolved) { op.unresolved = true; continue; }
         op.food_id = resolved.food_id;
         op.estimated = !!resolved.estimated;
+        op.portion_estimated = !!resolved.portion_estimated;
         op.resolved_name = resolved.name;
         op.verified = resolved.verified;
         op.p = resolved.p; op.c = resolved.c; op.f = resolved.f;

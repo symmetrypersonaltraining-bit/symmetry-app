@@ -198,12 +198,34 @@ const VOLUME_ISH = /^(cup|tbsp|tablespoon|tsp|teaspoon|quart|pint|gallon|fl\s?oz
  * not a bug fix. It is in the review list.
  */
 export function householdServing(row: CatalogRow): Serving | null {
+  return preferredServing((row.serving_options || []).map(parseServingOption));
+}
+
+/**
+ * THE ONE PLACE THAT DECIDES WHICH SERVING IS "ONE OF THEM".
+ *
+ * Split out of `householdServing` on 4 Sep because there was a SECOND copy of
+ * this decision in `lib/servingOptions.ts` — `defaultAmountFor` — and it was
+ * the un-fixed version, still taking the first option in the list. That is the
+ * 26 Aug bug, alive on the manual "Add from the food database" sheet the whole
+ * time the AI path was correct. Measured against the live catalogue the same
+ * day: 93,752 of the 223,237 rows carrying a named serving open on a VOLUME.
+ *
+ *   Bananas, raw     first named option -> "cup, mashed" 225 g   (200 cal)
+ *                    what it should be  -> "small"       101 g   ( 90 cal)
+ *   Nuts, almonds    first named option -> "cup, whole"  143 g   (828 cal)
+ *   Cheese, cheddar  first named option -> "cup, diced"  132 g   (533 cal)
+ *
+ * Two copies of "which serving is one of them" is two screens disagreeing
+ * about the same banana. There is now one, and both callers use it.
+ */
+export function preferredServing(list: (Serving | null)[]): Serving | null {
   let volume: Serving | null = null;
   let tiny: Serving | null = null;
-  for (const o of row.serving_options || []) {
-    const s = parseServingOption(o);
+  for (const s of list) {
     if (!s) continue;
     if (VOLUME_ISH.test(s.label)) { if (!volume) volume = s; continue; }
+    // "1 almond" is a genuine option and stays in the picker. Nobody logs one.
     if (s.gramsEach < 5) { if (!tiny) tiny = s; continue; }
     return s;
   }
@@ -291,6 +313,28 @@ export type ResolvedFood = {
    * meals himself — he did it here on 27 Aug for a plate of Texas barbecue.
    */
   estimated?: boolean;
+  /**
+   * TRUE WHEN THE MACROS CAME FROM A REAL ROW BUT THE PORTION WEIGHT DID NOT.
+   *
+   * A different thing from `estimated`, and the distinction is the whole point.
+   * `estimated` means no row existed and every number is recall. This means the
+   * row exists, its per-gram macros are USDA-checked and used exactly as
+   * written — and the only thing asked of a model is how much ONE of the thing
+   * a person counted weighs.
+   *
+   * That gap is real and it was silently wrong until 4 Sep. 574,372 of 574,650
+   * catalogue rows carry nothing but "100 g" and "1 oz", so a row can hold
+   * perfect numbers for pancakes and still not know what a pancake weighs.
+   * "2 pancakes" then fell to the last branch below, which counts the row's
+   * BASE portion — two hundred grams of pancake, 564 cal, on a screen reading
+   * "2 100 g". Same meal: four scrambled eggs became 400 g (439 cal) and an
+   * unstated amount of butter became 100 g (743 cal, 82 g of fat).
+   *
+   * Asking for one number nobody can look up, and multiplying it by figures
+   * that ARE looked up, is strictly better than pretending a pancake weighs
+   * 100 g because that is the column default.
+   */
+  portion_estimated?: boolean;
   /** Macros for `per_amount` of `unit`, straight off the row. */
   p: number;
   c: number;
@@ -317,6 +361,14 @@ export function macrosFromRow(
   row: CatalogRow,
   amount: number,
   unit: string | null,
+  /**
+   * What one of the thing they counted weighs, when the ROW cannot say.
+   *
+   * Only ever reached after `servingByUnit` and `householdServing` have both
+   * come back empty, so it can never override a real serving the row carries.
+   * The caller marks the result — see `portion_estimated`.
+   */
+  fallbackServing?: Serving | null,
 ): ResolvedFood | null {
   // NULL IS NOT ZERO, and Number(null) is 0 — so the null check has to come
   // first. Without it a catalogue row with a missing protein would log as a
@@ -361,26 +413,37 @@ export function macrosFromRow(
   // scale (amount / per_amount) is simply how many they had.
   // A placeholder unit is the same as no unit: one of whatever this row counts.
   const asked = isGenericUnit(unit) ? null : unit;
-  const named = servingByUnit(row, asked) || (asked ? null : householdServing(row));
+  const own = servingByUnit(row, asked) || (asked ? null : householdServing(row));
+  // The row's own serving always wins. The fallback is only consulted when the
+  // row has none — it is what a pancake weighs, not a correction to the row.
+  const named = own || fallbackServing || null;
   if (named) {
     return {
       food_id: row.id, name: row.name, verified: !!row.verified,
+      ...(own ? {} : { portion_estimated: true }),
       p: per1g.p * named.gramsEach,
       c: per1g.c * named.gramsEach,
       f: per1g.f * named.gramsEach,
       amount,
       unit: named.label,
       per_amount: 1,
-      options: choices,
+      // The estimated portion joins the picker, so the weight behind it is one
+      // tap away and correctable rather than buried in a payload.
+      options: own ? choices : [...choices, named],
     };
   }
 
-  // ── 3. A UNIT THE ROW HAS NEVER HEARD OF ──────────────────────────────────
+  // ── 3. LAST RESORT: NOBODY COULD SAY WHAT ONE WEIGHS ──────────────────────
   //
-  // "2 cups of rice" where the row lists no cup. There is no honest volume
-  // conversion without a density the catalogue does not carry, so this counts
-  // the row's own base portion rather than inventing one — and it says so in
-  // the unit, so nobody reads it as cups.
+  // "2 cups of rice" where the row lists no cup and no portion weight came
+  // back. This counts the row's own base portion rather than inventing one, and
+  // it says so in the unit, so nobody reads it as cups.
+  //
+  // ⚠️ THIS BRANCH IS NOT A GOOD ANSWER AND MUST STAY RARE. It is how "2
+  // pancakes" became 200 g on a screen reading "2 100 g": the label is honest
+  // and the number is nonsense. Before 4 Sep every countable food on a
+  // weight-only row landed here, which is most of the catalogue. The portion
+  // question above exists to keep it empty.
   return {
     food_id: row.id, name: row.name, verified: !!row.verified,
     p, c, f,
@@ -536,4 +599,75 @@ export function estimatedFood(name: string, est: FoodEstimate, amount: number): 
     per_amount: 1,
     options: [{ label: est.serving, gramsEach: est.grams }],
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE ROW HAS THE NUMBERS. IT DOES NOT KNOW WHAT ONE OF THEM WEIGHS.
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Dustin, 4 Sep, on the Edit custom meal sheet after typing "2 5 inch pancakes,
+// 4 scrambled eggs w butter n cheese, 3 maple sausage links":
+// *"its got all the same screw ups that we fixed on other features. these
+// numbers r terrible."*
+//
+// He was right and the meal totalled 2,314 cal. Four of the five foods resolved
+// to the correct USDA row and then got the wrong portion:
+//
+//   Pancakes, plain   "2 100 g"  559 cal   (two hundred grams of pancake)
+//   Scrambled Eggs    "4 100 g"  439 cal   (four hundred grams of egg)
+//   Butter, NFS       "100 g"    743 cal   (82 g of fat, for "w butter")
+//   Cheese, NFS       "100 g"    382 cal
+//   pork sausage      "3 link"   191 cal   ← correct, and the reason why
+//
+// The sausage row carries "1 link (28 g)" in serving_options. The other four
+// carry "100 g" and "1 oz" and nothing else — which is true of 574,372 of the
+// 574,650 rows. So the fix is not another row-reading trick; there is nothing
+// left in the column to read.
+//
+// This asks for exactly ONE number, the one the database is missing: what one
+// of the thing they counted weighs. Macros stay where they have always been —
+// on the row, per gram, USDA-checked. Compare the alternatives:
+//
+//   ask for macros        the failure this whole file was built to remove
+//   drop the food         a wrong total with nothing on screen saying why
+//   charge 100 g          what it did, and what he is complaining about
+//   ask for the weight    one checkable number against real per-gram macros
+//
+// The reply is validated the same way an estimate is, and the result is flagged
+// `portion_estimated` so nothing downstream mistakes it for a row's own serving.
+
+export const PORTION_SYSTEM = `A food database row has correct nutrition per gram but does not know what ONE of the thing a person counted weighs. Give that weight and nothing else.
+
+You are told the database row's name, the words the person used, and the measure they counted in.
+
+Respond with ONLY valid JSON — no markdown, no fences, no prose:
+{"serving":"<the measure, singular, lowercase>","grams":<what ONE of them weighs>}
+
+Rules:
+- "grams" is the edible weight of ONE, as it is served. One large egg is about 50 g. One 5-inch pancake is about 77 g. One slice of processed cheese is about 21 g. One pat of butter is about 5 g. One slice of bread is about 28 g.
+- Use the size they gave you. "5 inch pancake" and "silver dollar pancake" are not the same weight.
+- If they named no measure at all, answer for one ordinary portion of that food as a person actually takes it, and give that portion its normal name: butter -> "pat", cheese -> "slice", peanut butter -> "tbsp", rice -> "cup".
+- "serving" must be a countable word. Never "100 g". Never a weight.
+- Do NOT return calories, protein, carbs or fat. The app reads all of those from the database row. You are being asked for a weight and only a weight.
+- If you do not know what one of these weighs, return {"unknown":true}. Say so rather than inventing — a weight nobody can check is worse than no weight.`;
+
+export type FoodPortion = { serving: string; grams: number };
+
+/**
+ * Read the portion reply, and refuse anything that is not a countable weight.
+ *
+ * Deliberately narrower than `validateEstimate`: there are no macros to check
+ * against, so the only defences are that the word is countable and the weight
+ * is in the range of a thing a person picks up.
+ */
+export function validatePortion(raw: unknown): FoodPortion | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (r.unknown === true) return null;
+  const serving = typeof r.serving === "string" ? r.serving.trim().toLowerCase().slice(0, 24) : "";
+  // A weight is not an answer to "what does one weigh" — it is the question.
+  if (!serving || MASS_ONLY.test(serving)) return null;
+  const grams = Number(r.grams);
+  if (!Number.isFinite(grams) || !(grams > 0) || grams > 5000) return null;
+  return { serving, grams };
 }
