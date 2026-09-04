@@ -101,3 +101,67 @@ test("the conditions survive; the person does not", () => {
 test("the old names are kept", () => {
   assert.match(RENAME, /bak_day_labels_initials_20260904 and bak_program_names_20260904/);
 });
+
+// ── A FORK IS A FORK WHOEVER MADE IT ────────────────────────────────────────
+//
+// 4 Sep, after the guards went in: *"go ahead and take care of it here. i do
+// not want any of the modified librrary workouts to be saved in library, if
+// they are, get rid of them leave the originals."* Then, immediately:
+// *"leave them in scheduled sessoins for clients!!!"*
+//
+// Both halves. A modified copy comes out of the LIBRARY; it does not come out
+// of anybody's calendar.
+//
+// The correction this forced: 20260904d cleared the owner stamp on anything the
+// OWNER built, which is right for a new workout and wrong for a modified one.
+// Eleven modified copies were in the library because of it — every one forked
+// or AI-replaced from his own account.
+
+const PUBLISH = read("supabase/migrations/20260904g_the_library_gets_everything_he_built.sql");
+const publish = stmts(PUBLISH);
+
+test("the owner rule exempts a modified copy", () => {
+  // The exemption is on the ORIGIN, not the person, and it comes FIRST — before
+  // the owner check that would otherwise sweep it into the library.
+  const fn = publish.slice(publish.indexOf("owner_creations_are_library"));
+  const originGuard = fn.indexOf("'library_fork', 'forked_for_swap', 'ai_adjust', 'ai_replace'");
+  const ownerCheck = fn.indexOf("t.role = 'owner'");
+  assert.ok(originGuard > -1, "a fork made from his own account goes to the library again");
+  assert.ok(originGuard < ownerCheck, "the origin exemption must be reached before the owner check");
+});
+
+test("a modified copy that a client has scheduled is re-owned, never deleted", () => {
+  // "leave them in scheduled sessoins for clients!!!" — deleting a day that a
+  // scheduled_workouts row points at takes the session off the calendar and the
+  // log with it.
+  assert.match(publish, /set client_owner_id = \(\s*\n\s*select sw\.client_id from scheduled_workouts sw where sw\.day_id = d\.id/);
+  assert.match(publish, /and exists \(select 1 from scheduled_workouts sw where sw\.day_id = d\.id\)/);
+});
+
+test("only a stray with nothing pointing at it is deleted", () => {
+  // Both conditions, on both deletes: never scheduled AND never logged.
+  const deletes = publish.match(/delete from (sections|days)[\s\S]*?;/g) || [];
+  assert.equal(deletes.length, 2, "the delete statements moved — re-anchor this test");
+  for (const d of deletes) {
+    assert.match(d, /not exists \(select 1 from scheduled_workouts/);
+    assert.match(d, /not exists \(select 1 from workout_logs/);
+  }
+});
+
+test("the publish is row by row, so one refusal does not abort the batch", () => {
+  // Five of 419 were refused and every refusal was a guard working: four
+  // identical twins after the rename, one name in parentheses the rename missed.
+  // A single UPDATE would have rolled back all 419 on the first of them.
+  assert.match(publish, /for r in select id from bak_days_published_to_library_20260904 loop/);
+  assert.match(publish, /exception when others then/);
+});
+
+test("what a CLIENT makes is never published", () => {
+  assert.match(publish, /coalesce\(d\.created_by,''\) not in \('client_manual','client_ai','swap'\)/);
+  assert.match(publish, /'manual','ai_activity'/);
+});
+
+test("every batch is backed up before it runs", () => {
+  assert.match(publish, /create table if not exists bak_modified_in_library_20260904/);
+  assert.match(publish, /create table if not exists bak_days_published_to_library_20260904/);
+});

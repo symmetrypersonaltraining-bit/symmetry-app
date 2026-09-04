@@ -249,41 +249,36 @@ time, and he had a parallel session in those files on 4 Sep):
   is the link and it exists, but only 6 of 63 fork rows carry it — the routes
   that create a fork do not set it consistently. Fix the write, then surface it.
 
-## OPEN — the 485 days stamped to a client that HE built (4 Sep)
+## THE LIBRARY, AFTER 4 SEP — closed
 
-His rule, confirmed: *"if I created it under my account then it gets saved to my
-library for everyone. only ones that stay on client only are something they
-create themselves from their account."*
+He said: *"go ahead and take care of it here. i do not want any of the modified
+librrary workouts to be saved in library, if they are, get rid of them leave the
+originals."* Then, immediately: *"leave them in scheduled sessoins for
+clients!!!"* Both halves were honoured — a modified copy comes out of the
+LIBRARY, never out of a calendar.
 
-Applied to his own client record already — twelve days cleared, and a trigger
-(`trg_owner_creations_are_library`) stops the thirteenth. But `client_owner_id`
-turns out to mean "a client-owned COPY" and is set by four different routes, so
-the roster looks like this:
+**Published: 414 of 419.** Everything he built that was stuck as private is now
+library content. `client_owner_id` had come to mean "a client-owned COPY", set
+by four different routes, rather than "a client made this".
 
-| created_by / origin | days | clients | who really made it |
-|---|---|---|---|
-| `trainer` / — | 324 | 29 | him |
-| `symmetrypersonaltraining@gmail.com` / `claude` | 78 | 9 | him, through the Claude project |
-| `trainer` / `library_fork` | 60 | 17 | him, forking a library day for one client |
-| `claude` / `personal` | 16 | 2 | him |
-| `swap` + `forked_for_swap` + `trainer`/`claude` | 7 | — | him |
-| **`client_manual` / `manual`** | **12** | 6 | **the client** |
-| **`client_ai` / `ai_replace` + `ai_activity`** | **8** | 4 | **the client** |
+**Five refused, and every refusal was a guard working:**
 
-So by his rule only **20** should stay private, and ~**485** are his and belong
-in the library. NOT DONE, because two things need his word first:
+- Four hit `uq_days_no_identical_twin`. After the rename stripped "GG2 " and
+  "SG2 ", Gerard's and Sharon's backup days became identical twins and the
+  library already held one of each. Left client-owned; none is scheduled.
+- One hit the naming guard — "Cardio — 20 Min Walk (Todd)", a name in
+  parentheses the prefix rename did not reach. Renamed, then published.
 
-1. **Labels.** Many carry a client's initials and condition — "GG2 Mon — Lower &
-   Left-Leg Focus", "SG2 Backup 3 — Dizzy Day (lightheaded, everything seated)",
-   "SP — Thoracic & Scapular Corrective (Right Shoulder)". Publishing them puts
-   those names in front of every client who searches the library.
-2. **Duplicates.** The 60 `library_fork` rows are per-client tweaks of workouts
-   already IN the library. Publishing them adds 60 near-identical entries.
+**Eleven modified copies were already in the library** — all his own, forked or
+AI-replaced from his client account, swept in by 20260904d's owner rule. That
+rule is now corrected: the exemption is the ORIGIN, not the person. A fork is a
+fork whoever made it. Nine of the eleven were on his calendar and were re-owned
+to the client who has them scheduled (out of the library, session and history
+intact); two were never scheduled and never logged and were deleted. Zero
+orphaned sessions, zero orphaned logs — checked.
 
-Likely answer: publish the ones that are genuinely new workouts, leave the forks
-and per-client tweaks where they are, and rename anything carrying a person's
-initials first. **Ask before running it — it is ~485 rows and visible to
-everyone the moment it lands.**
+**Where it landed: 1,096 workouts in the library, 99 client-owned** — 73
+modified copies, 22 genuinely client-made, 4 duplicate twins.
 
 ## Also fixed 4 Sep
 
