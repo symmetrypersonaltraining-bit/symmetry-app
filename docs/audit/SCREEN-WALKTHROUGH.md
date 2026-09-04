@@ -429,6 +429,19 @@ an inline `background: var(--brand-surface)`, which is exactly what the
 Also: the today gradient is a tonal ramp of the primary **alone**. Mixing primary
 into accent lands on mud wherever the accent is complementary (Ocean Dusk).
 
+### Fixed on first live test, 4 Sep
+
+- **The screen opened onto last week.** Dustin: "app is opening to past days
+  expanded." An effect force-opened the past section whenever the current week
+  held an unlogged session. It was added 22 Aug for a real complaint — on a rest
+  day there was nothing above the board to look at — and that reason expired
+  when Today started rendering first on every day, rest day included. Removed,
+  along with the `missed` count that fed it and the week-scoping that count
+  needed. **Nothing on this screen counts or announces missed sessions now**,
+  which answers Bobbie Page's 20 Aug complaint more completely than a smaller
+  number did. The only thing that opens the past section is a tap on it.
+- **The past window is 14 days**, as agreed, not the 7 it shipped with.
+
 ### Still open on this screen
 
 - **The "modified from original" marker.** The link field exists but only 6 of 73

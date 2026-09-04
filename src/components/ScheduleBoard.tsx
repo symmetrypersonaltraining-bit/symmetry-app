@@ -44,14 +44,6 @@ function addDays(dateStr: string, n: number): string {
   const p = (x: number) => String(x).padStart(2, "0");
   return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
 }
-/**
- * The Sunday that starts `dateStr`'s week. Same Sunday-start convention the
- * rest of the app uses for a training week.
- */
-function weekStartOf(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return addDays(dateStr, -new Date(y, m - 1, d).getDay());
-}
 const DOW_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 /** "Saturday, Sep 5" — the day label written out, matching Weekly Focus. */
 function longLabel(dateStr: string): string {
@@ -96,12 +88,17 @@ export default function ScheduleBoard({
   basePath = "",
   forClient = "",
   ownerClientId = "",
-  daysBack = 7,
+  daysBack = 14,
   daysAhead = 20,
 }: {
   workouts: BoardWorkout[];
   basePath?: string;
   forClient?: string;
+  /**
+   * How far back the past section reaches when it is opened. Fourteen days,
+   * Dustin 4 Sep. It is opened deliberately or not at all, so the window costs
+   * nothing until somebody asks for it.
+   */
   /**
    * Whose schedule this board is showing. Needed because `forClient` is only
    * set when a TRAINER is viewing someone else — on a client's own /workout
@@ -127,70 +124,32 @@ export default function ScheduleBoard({
     (d: string) => isPeakWeekLocked(d, forClient || ownerClientId),
     [forClient, ownerClientId],
   );
+  /**
+   * THE PAST SECTION OPENS BECAUSE SOMEBODY OPENS IT. NOTHING ELSE.
+   *
+   * Dustin, 4 Sep, on the shipped screen: "app is opening to past days
+   * expanded." It was, and it had a reason that has since expired.
+   *
+   * The auto-open was added on 22 Aug for a real complaint — "it doesn't let me
+   * view full week on a rest day" — because on a rest day there was nothing
+   * above the board to look at and the session forgotten on Friday was folded
+   * away behind a muted toggle. That is no longer true of this screen. Today is
+   * rendered first, always, rest day or not, and the past strip sits directly
+   * under it. The thing the auto-open existed to reach is one tap away and
+   * visible without scrolling.
+   *
+   * What it cost, meanwhile, was the screen opening onto last week. Collapsed
+   * by default was the instruction from the start of the rebuild and this is
+   * the line that was quietly overriding it.
+   *
+   * Removed with it: the `missed` count and the week-scoping it needed. That
+   * scoping existed to make a NAG tolerable — Bobbie Page, 20 Aug, being told
+   * she had missed thirteen workouts. Nothing on this screen counts or
+   * announces missed sessions at all now, which is a stronger answer to her
+   * than a smaller number was.
+   */
   const [showPast, setShowPast] = useState(false);
-  // Opened automatically below when this week has an unlogged past session —
-  // see the effect under `missed`.
-  // Feedback 6e90c584: "ability to move past workouts forwards". A workout that
-  // sits on a past date used to be frozen — no drag handle, no Move button — so
-  // a session you missed on Tuesday was stuck on Tuesday forever. Only two
-  // things should actually freeze a tile: it's already COMPLETED (history), or
-  // it's Peak Week (locked by design). Being in the past just means you missed
-  // it, and missing it is exactly when you need to move it.
-  /**
-   * Past workouts THIS WEEK. It resets on Sunday, and that is the point.
-   *
-   * Bobbie Page, 20 Aug: "The app keeps telling me I missed 13 workouts and to
-   * move them forward... I would not be moving 13 workouts forward." She was
-   * right. Counting from the beginning of time turns a nudge into a debt
-   * nobody can clear — the only way out of thirteen was to reschedule
-   * thirteen sessions she was never going to do, so the number just grew and
-   * the prompt became noise she learned to scroll past.
-   *
-   * A week is the unit a training week is actually planned in. Miss Tuesday,
-   * you can still fit it in by Saturday, and that is a real prompt. Miss it
-   * three weeks ago and there is nothing to do about it — it stays in the past
-   * section, still movable if she wants it, but it stops asking.
-   */
-  const weekStart = useMemo(() => weekStartOf(today), [today]);
-  const missed = useMemo(
-    () =>
-      workouts.filter(
-        (w) =>
-          w.date >= weekStart && w.date < today && w.status !== "completed" && !isLockedDate(w.date),
-      ),
-    [workouts, weekStart, today, isLockedDate],
-  );
-  /**
-   * Open the past section when this week has an unlogged session in it.
-   *
-   * The old auto-open was removed for good reason: it triggered on ANYTHING
-   * outstanding since the beginning of time, so it was on almost always and
-   * the board opened onto last week instead of today. The count is scoped to
-   * the current week now, which makes the same behaviour rare and useful
-   * rather than constant and annoying.
-   *
-   * Dustin, 22 Aug: "it doesn't let me view full week on a rest day." On a
-   * rest day there is nothing above the board to look at, and the one thing he
-   * wanted — the session he forgot on Friday — was folded away behind a muted
-   * toggle. If there is something back there worth doing, show it.
-   *
-   * It only forces it OPEN, and only once per mount. Collapsing it stays a
-   * decision the client can make and keep.
-   */
-  const autoOpenedPast = useRef(false);
-  useEffect(() => {
-    if (autoOpenedPast.current) return;
-    if (missed.length === 0) return;
-    autoOpenedPast.current = true;
-    setShowPast(true);
-  }, [missed.length]);
 
-  // The past section used to auto-open whenever anything was missed, which meant
-  // the board almost always opened onto last week rather than today — you had to
-  // scroll down to find the day you were actually on. It stays collapsed now.
-  // Missed sessions are not hidden by that: the toggle itself turns amber and
-  // says how many there are and what to do with them, which is a louder signal
-  // than an expanded list you have to scroll past.
   // Full workout library for swap-in (Dustin 7/13: clients can move/add/swap from full library)
   const [libDays, setLibDays] = useState<{ id: string; label: string }[] | null>(null);
   const [libQ, setLibQ] = useState("");

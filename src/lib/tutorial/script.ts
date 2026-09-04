@@ -359,7 +359,7 @@ export const TUTORIAL: TutorialChapter[] = [
           "Every day is a tile: a gradient bar across the top, the day written out with an icon on the left, the session count on the right. Inside it, each workout is the same shape at a smaller size.",
           "Today is that same tile filled bright, and it sits first — above the past strip, not buried in date order. Its top bar is the only thing on the screen that moves.",
           "Every workout has Start and View. View opens the overview and waits; Start drops straight into the session. A finished one offers View only.",
-          "Past workouts stay collapsed and never say missed. The shape comes from the Weekly Focus card on Home, and it is being rolled out screen by screen as each one is walked.",
+          "Past workouts stay collapsed until you open them, reach back two weeks, and never say missed. The shape comes from the Weekly Focus card on Home, and it is being rolled out screen by screen as each one is walked.",
         ],
         narration:
           "The Workout tab is the first screen on the app's new shape, and the shape is not new. It is the Weekly Focus card on your Home screen. Every day is that tile now, and each workout inside it is the same object at a smaller size. Today is the same tile filled bright, and it sits first rather than buried in date order. Its top bar sweeps, and it is the only thing on the screen that moves. Past workouts stay collapsed, and nothing there uses the word missed.",

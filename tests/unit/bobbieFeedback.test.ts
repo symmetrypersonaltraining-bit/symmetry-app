@@ -54,13 +54,37 @@ describe("past workouts reset every week", () => {
 
   // "The app keeps telling me I missed 13 workouts... I would not be moving 13
   // workouts forward. Thinking it would be cool if it reset each week."
-  it("the count is scoped to this week, not all of history", () => {
-    assert.match(
-      code,
-      /w\.date >= weekStart/,
-      "the past-workout count is unbounded again. Counting from the beginning of time turns a nudge into a debt nobody can clear, and the number only ever grows.",
+  it("nothing counts or announces missed sessions", () => {
+    // REPLACED 4 Sep. This used to assert that the missed COUNT was scoped to
+    // the current week (`w.date >= weekStart`), which is how her complaint was
+    // answered at the time: keep the nag, make the number resettable.
+    //
+    // The count is gone entirely now, along with the auto-open it fed. That is
+    // a stronger answer than a smaller number, so this watches the stronger
+    // property instead — no tally of unlogged past sessions anywhere in the
+    // board, under any name.
+    const tally = code.match(/const\s+(missed|overdue|outstanding|behind)\s*=/);
+    assert.equal(
+      tally,
+      null,
+      `the board is counting unlogged past sessions again (${tally?.[1]}). Nothing on this screen tells a client what they failed to do.`,
     );
-    assert.match(code, /function weekStartOf/, "weekStartOf is gone — there is nothing to scope the week to");
+  });
+
+  it("the past section never opens itself", () => {
+    // Dustin, 4 Sep: "app is opening to past days expanded."
+    //
+    // An effect force-opened it whenever this week had an unlogged session. The
+    // reason it was added — on a rest day there was nothing above the board to
+    // look at — expired when Today started rendering first on every day. The
+    // only thing allowed to open this section is a tap on the toggle.
+    assert.match(code, /useState\(false\)/, "the past section no longer starts collapsed");
+    const forced = code.match(/setShowPast\(\s*true\s*\)/g) || [];
+    assert.deepEqual(
+      forced,
+      [],
+      "something opens the past section on its own again — the screen will land on last week instead of today",
+    );
   });
 
   it("the button says past, not missed", () => {

@@ -72,28 +72,49 @@ describe("both ways into the logger carry the date", () => {
 describe("the past is reachable when there is something in it", () => {
   const code = strip(read("src/components/ScheduleBoard.tsx"));
 
-  // "it doesn't let me view full week on a rest day" — on a rest day there is
-  // nothing above the board, and the session he wanted was folded away behind
-  // a muted toggle.
-  it("the past section opens itself when this week has an unlogged session", () => {
-    assert.match(code, /autoOpenedPast/, "the auto-open is gone — a forgotten session is invisible again on a rest day");
-    assert.match(code, /setShowPast\(true\)/, "nothing opens the past section");
+  // Dustin, 22 Aug: "it doesn't let me view full week on a rest day." On a rest
+  // day there was nothing above the board, and the session he wanted was folded
+  // away behind a muted toggle. The answer at the time was an auto-open.
+  //
+  // REPLACED 4 Sep, and the premise is what changed rather than the need. Since
+  // the tile rebuild, Today renders FIRST on every day — a rest day shows a
+  // today tile saying "Rest day" — and the past strip sits directly beneath it.
+  // There is now always something above the board, and the way back is one tap
+  // without scrolling, so the auto-open bought nothing and cost the screen
+  // opening onto last week:
+  //
+  //   Dustin, 4 Sep: "app is opening to past days expanded."
+  //
+  // These assert the mechanism that replaced it. If Today stops rendering
+  // unconditionally, or the strip stops rendering whenever there is a past to
+  // reach, the original complaint comes straight back.
+
+  it("today renders first, whether or not there is a workout on it", () => {
+    assert.match(
+      code,
+      /\{todayFirst && renderDayTile\(today, 0\)\}/,
+      "today is no longer rendered ahead of everything else — a rest day is a blank screen again",
+    );
+    // The tile itself handles the empty case rather than being skipped for it.
+    assert.match(
+      code,
+      /empty \? \(\s*<div className="sym-rest">/,
+      "an empty day no longer renders as a rest tile, so a rest day has nothing on it",
+    );
   });
 
-  it("but only once, so collapsing it sticks", () => {
-    // The old unbounded auto-open is why this was removed the first time: it
-    // fired on anything outstanding ever, so the board opened onto last week
-    // almost every time. Scoped to this week AND once per mount.
+  it("the way back is always on screen when there is a past to reach", () => {
     assert.match(
       code,
-      /if \(autoOpenedPast\.current\) return;/,
-      "the auto-open can re-fire and will fight the client trying to collapse it",
+      /\{pastDays\.length > 0 && \(/,
+      "the past control is conditional on something other than there being past days",
     );
-    assert.match(
-      code,
-      /if \(missed\.length === 0\) return;/,
-      "the auto-open is not gated on there being anything worth opening for",
-    );
+    // And it is directly under today, not below the whole upcoming list.
+    const todayAt = code.indexOf("todayFirst && renderDayTile");
+    const stripAt = code.indexOf('className="sym-past"');
+    const listAt = code.indexOf("orderedDays.map");
+    assert.ok(todayAt > -1 && stripAt > todayAt && listAt > stripAt,
+      "the past control is no longer between today and the rest of the list");
   });
 });
 
