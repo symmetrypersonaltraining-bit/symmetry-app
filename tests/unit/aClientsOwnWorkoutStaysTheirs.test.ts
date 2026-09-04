@@ -71,3 +71,47 @@ test("the library half of the rule is not touched", () => {
     "the policy that puts his library in front of every client was changed",
   );
 });
+
+// ── AND WHAT HE BUILDS IS THE LIBRARY, WHICHEVER ACCOUNT HE BUILT IT FROM ────
+//
+// 4 Sep: *"if I created it under my account then it gets saved to my library
+// for everyone. only ones that stay on client only are something they create
+// themselves from their account. i always create new workouts, those should
+// keep building my library bigger."*
+//
+// He has a client record of his own, so twelve workouts he built while signed
+// into the client app were stamped with his client id and went private to him.
+
+const OWNER = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260904d_the_owners_workouts_are_the_library.sql"),
+  "utf8",
+);
+const ownerSql = OWNER.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+
+test("the owner's stamp is cleared at the write, not just in the data", () => {
+  // A one-off UPDATE fixes the twelve that exist. The trigger is what makes it
+  // true of the thirteenth, on whichever route creates it — there are at least
+  // four that set client_owner_id.
+  assert.match(ownerSql, /create trigger trg_owner_creations_are_library/);
+  assert.match(ownerSql, /before insert or update of client_owner_id on public\.days/);
+  assert.match(ownerSql, /new\.client_owner_id := null;/);
+});
+
+test("only the OWNER's stamp is cleared", () => {
+  // Another trainer's client-side creation is left alone on purpose: the library
+  // is one shared pool with no per-trainer scoping, so clearing their stamp
+  // would publish their work to every client in the business.
+  assert.match(ownerSql, /t\.role = 'owner'/);
+  assert.match(ownerSql, /and t\.active/);
+});
+
+test("a client's own creation is never touched by it", () => {
+  // The guard is on client_owner_id belonging to a TRAINER, so an ordinary
+  // client's row cannot match. If this ever loosens, every client's private
+  // workout goes into the shared library at once.
+  assert.match(ownerSql, /join trainers t on \(t\.auth_user_id = c\.auth_user_id or lower\(t\.email\) = lower\(c\.email\)\)/);
+});
+
+test("the rows it clears are backed up first", () => {
+  assert.match(ownerSql, /create table if not exists bak_days_owner_stamp_20260904/);
+});

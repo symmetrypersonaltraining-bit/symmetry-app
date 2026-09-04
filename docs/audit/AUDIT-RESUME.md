@@ -210,6 +210,42 @@ NOT to be built until that screen is walked. Capture it, do not fix it.
   skip needs no button, because a past session nobody logged already counts
   against.
 
+## OPEN — the 485 days stamped to a client that HE built (4 Sep)
+
+His rule, confirmed: *"if I created it under my account then it gets saved to my
+library for everyone. only ones that stay on client only are something they
+create themselves from their account."*
+
+Applied to his own client record already — twelve days cleared, and a trigger
+(`trg_owner_creations_are_library`) stops the thirteenth. But `client_owner_id`
+turns out to mean "a client-owned COPY" and is set by four different routes, so
+the roster looks like this:
+
+| created_by / origin | days | clients | who really made it |
+|---|---|---|---|
+| `trainer` / — | 324 | 29 | him |
+| `symmetrypersonaltraining@gmail.com` / `claude` | 78 | 9 | him, through the Claude project |
+| `trainer` / `library_fork` | 60 | 17 | him, forking a library day for one client |
+| `claude` / `personal` | 16 | 2 | him |
+| `swap` + `forked_for_swap` + `trainer`/`claude` | 7 | — | him |
+| **`client_manual` / `manual`** | **12** | 6 | **the client** |
+| **`client_ai` / `ai_replace` + `ai_activity`** | **8** | 4 | **the client** |
+
+So by his rule only **20** should stay private, and ~**485** are his and belong
+in the library. NOT DONE, because two things need his word first:
+
+1. **Labels.** Many carry a client's initials and condition — "GG2 Mon — Lower &
+   Left-Leg Focus", "SG2 Backup 3 — Dizzy Day (lightheaded, everything seated)",
+   "SP — Thoracic & Scapular Corrective (Right Shoulder)". Publishing them puts
+   those names in front of every client who searches the library.
+2. **Duplicates.** The 60 `library_fork` rows are per-client tweaks of workouts
+   already IN the library. Publishing them adds 60 near-identical entries.
+
+Likely answer: publish the ones that are genuinely new workouts, leave the forks
+and per-client tweaks where they are, and rename anything carrying a person's
+initials first. **Ask before running it — it is ~485 rows and visible to
+everyone the moment it lands.**
+
 ## Also fixed 4 Sep
 
 - **The portion sweep** — every path that turned a food into a number was
@@ -219,6 +255,18 @@ NOT to be built until that screen is walked. Capture it, do not fix it.
   `recalc_pending_payment_reminders()` skips those rows. Hassan's $385
   back-charge had been silently replaced with $1,155 by the recalc while the
   note still described a back-charge.
+- **Erin Arit set up for billing.** She had no `billing_type` at all, which is
+  why her invoice read $0 — the DB held $700 and the screen recomputed it as
+  0 sessions x no rate. Now monthly, 2x/week, $700, $87.50/session (700 ÷ 8), 8
+  sessions, anchor day 8. Her due date was on the 2nd; her calendar holds 24
+  monthly $700 events on the **8th** and nothing on the 2nd, so it was moved to
+  match. `calendar_payments.cadence` was NULL for all 24 — **the sync does not
+  derive cadence or anchor day from a repeating payment series, and it should**.
+- **33 empty skeleton days deleted** (backed up). Not 35: a "Day 3" and a
+  "Day 4" in Female Aesthetics had each been scheduled once and were kept, per
+  his condition. The wider "empty day" list was left alone — pickleball, hot
+  yoga, Daily Reset Walk (scheduled 162 times) and the rest are off-plan
+  activity logs with no exercises BY DESIGN.
 - **Hassan** — `expected_sessions_per_cycle` 12 → 20 (1540 ÷ 77), and a
   duplicate 31 Aug appointment removed (same timestamp, both from gcal sync,
   inserted a day apart, no `google_event_id` to dedupe on). Backed up to
