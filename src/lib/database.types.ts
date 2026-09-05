@@ -9462,6 +9462,7 @@ export type Database = {
           deleted_at: string | null
           id: string
           moved_by: string | null
+          moved_at: string | null
           moved_from_date: string | null
           position: number | null
           published_workout_id: string | null
@@ -9481,6 +9482,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           moved_by?: string | null
+          moved_at?: string | null
           moved_from_date?: string | null
           position?: number | null
           published_workout_id?: string | null
@@ -9500,6 +9502,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           moved_by?: string | null
+          moved_at?: string | null
           moved_from_date?: string | null
           position?: number | null
           published_workout_id?: string | null

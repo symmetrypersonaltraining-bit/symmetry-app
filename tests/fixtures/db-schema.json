@@ -1209,7 +1209,8 @@
     "supervised",
     "deleted_at",
     "appointment_id",
-    "moved_by"
+    "moved_by",
+    "moved_at"
   ],
   "sections": [
     "id",
