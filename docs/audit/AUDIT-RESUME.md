@@ -180,12 +180,23 @@ PREVIEW: client-preview and its four sub-screens
 
 ---
 
-## The app's container shape — settled 4 Sep
+## The app's format — see docs/audit/APP-FORMAT.md
 
-Every screen is moving to one object, taken from the **Weekly Focus card on the
-client home screen**. Full spec in `SCREEN-WALKTHROUGH.md` under screen 2. It is
-scoped to a `.sym-page` wrapper so a screen opts in only when it is walked —
-rule 6 still holds. Each screen gets a mockup Dustin approves before it changes.
+**One object, thirty colour schemes, and it governs every screen.** The full and
+durable spec is now its own file: **`docs/audit/APP-FORMAT.md`**. It was buried
+inside the screen-2 section of SCREEN-WALKTHROUGH.md, where a new session would
+not have found it, and Dustin asked on 5 Sep for it to be recorded so it
+survives every session of this audit.
+
+In one paragraph: every screen is built from the Weekly Focus card on client
+home — surface, 1px border, radius 18, padding 14, a gradient cap on top and no
+side borders. Nesting is the same object smaller. Today renders first, filled
+bright, and is the only thing that moves. Ladder shading is one colour in six
+shades. Three contrast rules, each from a real failure. Thirty schemes driven by
+`data-theme`, nine tokens, nothing hard-coded, auto-dark on light schemes only,
+and depth & glow applies app-wide. It is scoped to `.sym-page` so a screen opts
+in only when it is walked — rule 6 still holds — and **each screen gets a mockup
+Dustin approves, showing all thirty schemes, before it changes.**
 
 **No "programme" language anywhere client-facing.** Most clients are not on a
 programme; each is programmed personally, day by day, in 6-week blocks, from the
