@@ -74,8 +74,12 @@ are NOT bugs and must stop being re-reported.
 
 ### Next — in this order
 
-1. **Home, AI pass.** Every AI component on the home screen, against step 0
-   above. Screen 1 was closed before that rule existed.
+1. **Home, AI pass.** IN PROGRESS. Every AI component on the home screen,
+   against step 0 above. Screen 1 was closed before that rule existed. The
+   inventory lives in **docs/audit/AI-COMPONENTS.md** — four AI elements on
+   home, of which only the Coach thinks while the client is on the screen.
+   Element 1 (the Coach) is written up and waiting on Dustin's answers to three
+   questions at the foot of that file.
    - **Also carry into that pass:** today's workout tile on Home needs the
      **View** button, to match the Workout tab's Start / View split. Dustin,
      4 Sep. It is the last place a workout can be opened that still offers only
