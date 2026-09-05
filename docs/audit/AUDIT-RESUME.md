@@ -116,6 +116,20 @@ general tips, the coach's read on screen, and sessions-with-him protected.
 
 ### Open, small
 
+- **Body-fat screen — three faults, none fixed.** The formula is correct and was
+  verified against stored values; the trouble is around it. Age defaults to 38
+  and sex to "male", both free text, neither read from the client — a wrong sex
+  would have read 21.1% instead of 27.8% for Claudine with nothing on screen to
+  say so. `metrics` does not record which method produced a reading, so 4-site
+  D&W and 7-site JP sit on one trend line as if they were the same ruler. And
+  nothing sanity-checks a fold: a 4 mm subscapular went through unremarked and
+  distorted a month of trend. Full write-up in
+  `docs/BODYFAT-SCREEN-2026-09-05.md`.
+- **The RLS-during-logging fix is designed but NOT applied** — see
+  `docs/RLS-DURING-LOGGING-2026-09-05.md`. Two of its three parts touch
+  `WorkoutLogger.tsx` and need Dustin's per-item permission. Also open there:
+  Greg Lennon has no login at all, so only a trainer session can log for him.
+
 - **Lauren Standefer's recurring Monday 11:00 in Google Calendar is a day out.**
   She has trained Tue/Wed for at least four weeks — six completed sessions, none
   on a Monday — while the calendar books her Mon/Wed. The sync kept dragging her
