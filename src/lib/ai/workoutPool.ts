@@ -146,7 +146,18 @@ export async function clearedPoolFor(db: Db, clientId: string | null | undefined
       sections: { position: number; prescribed_exercises: { position: number; exercise_id: string; exercises: { name: string } | null }[] }[] | null;
     };
 
-    const rows = (data as Row[] | null) || [];
+    // Through `unknown`, and not because the shape is unknown.
+    //
+    // PostgREST types a nested embed as an ARRAY whenever it cannot prove the
+    // relationship is to-one, so the generated type for `exercises` is
+    // `{ name: any }[]` while the row this query actually returns — and every
+    // line below — is a single object or null. The two do not overlap, so the
+    // direct cast stopped compiling and left main red on tsc.
+    //
+    // Not `any`: the local `Row` above still describes the shape and still
+    // checks every use of it. This only tells the compiler which of the two
+    // descriptions of the embed to believe.
+    const rows = (data as unknown as Row[] | null) || [];
     const exerciseIds = new Set<string>();
     const exerciseNames = new Set<string>();
     const workouts: PoolWorkout[] = [];

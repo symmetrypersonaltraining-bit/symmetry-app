@@ -331,9 +331,29 @@ overlap first, head noun required.
 | Raw Honey | tbsp 21 g · cup 339 g |
 | Cream Cheese | tbsp 14.5 g |
 
-The peanut butter row is the one that matters: the head-noun-plus-overlap rule
-is what stops it taking dairy butter's tablespoon, which would be an 11% error
-on every spoonful and invisible.
+The peanut butter row is the one that matters: the ranking is what stops it
+taking dairy butter's tablespoon, which would be an 11% error on every spoonful
+and invisible.
+
+**The rule took three attempts, and the two rejected ones are the useful part.**
+Matching on ANY shared word (v1, shipped and replaced within the hour) gave
+"Chicken Parmigiana & Penne" a tablespoon of chicken fat, "Zero Sugar Oatmilk"
+two tablespoons of peanut spread, and a goat cheese pizza a submarine sandwich.
+Requiring EVERY word of the source row to appear in the food's name (v2) was
+safe and nearly useless — USDA names carry qualifiers a package never does, so
+"Butter, salted" could not lend to "Pure Irish Butter" and four of the five
+butters on his screen came back empty. What works: the last significant word of
+the package name IS the food, so that word must appear in the source row, and
+the rest is ranking.
+
+**Nothing is backfilled, and that was a decision, not an omission.** 276,275 of
+the catalogue's 574,667 rows carry no countable portion. A set-based backfill
+was written, sampled and thrown away: the loose rule matched 162,286 and the
+strict rule 14,298, and hand-checking the strict sample still found about one in
+eight wrong ("Honey Wheat" taking Honey's 21 g tablespoon). Written into
+`serving_options` those are indistinguishable from real portions and wrong
+forever. As a lookup, the borrowed measure appears with its gram weight beside
+it and can be overridden.
 
 The sheet renders the food first and the units arrive a beat later, so a slow
 lookup never holds up what was tapped; a failed lookup leaves grams working.

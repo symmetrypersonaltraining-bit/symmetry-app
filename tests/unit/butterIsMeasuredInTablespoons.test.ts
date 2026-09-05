@@ -34,7 +34,7 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 const SHEET = read("src/app/(app)/nutrition/v3/FoodSearchSheet.tsx");
 const OP = read("src/lib/nutrition/resolveFoodOp.ts");
-const SQL = read("supabase/migrations/20260905a_borrowed_household_servings.sql");
+const SQL = read("supabase/migrations/20260905b_borrowed_servings_match_on_the_food_itself.sql");
 
 // The real answers the function gives, recorded from the live catalogue on
 // 5 Sep. These are what the borrow is FOR.
@@ -79,14 +79,36 @@ test("only a VERIFIED row may lend its measures", () => {
   assert.match(SQL, /fc\.verified is true/);
 });
 
-test("the lender must share the food's head noun", () => {
-  // Without it "Salted Irish Butter" could borrow from anything sharing any
-  // word — "salted" alone would reach salted peanuts.
+test("the FOOD ITSELF must appear on both sides", () => {
+  // The last significant word of a package name is the food, with the brand and
+  // the adjectives in front of it: "Salted Irish BUTTER". Requiring it in the
+  // lender's name is what rejects "Fat, chicken" for a plate of chicken
+  // parmigiana, and Honey's 21 g tablespoon for a loaf of Honey Wheat.
   assert.match(SQL, /toks\[array_length\(toks, 1\)\] from me\) as noun/);
-  assert.match(SQL, /lower\(fc\.name\) ~ \('\\y' \|\| head\.noun \|\| '\\y'\)/);
+  assert.match(SQL, /lower\(fc\.name\) ~ \('\\y' \|\| food\.noun \|\| '\\y'\)/);
+});
+
+test("the two rejected versions are recorded, with what they got wrong", () => {
+  // Both were built, measured against the whole catalogue, and thrown away. The
+  // next person to widen this rule needs to know what widening it costs.
+  assert.match(SQL, /"Chicken Parmigiana & Penne" -> "Fat, chicken", 1 tbsp = 12\.8 g/);
+  assert.match(SQL, /could not lend to "Pure Irish Butter"/);
+});
+
+test("nothing is backfilled into serving_options", () => {
+  // 276,275 rows carry no countable portion. A set-based backfill was written,
+  // sampled and thrown away: roughly one in eight of even the STRICT matches
+  // was wrong, and written into the column they would be indistinguishable from
+  // real portions and wrong forever.
+  assert.ok(!/update\s+food_catalog/i.test(SQL), "the borrow is being written into the catalogue");
+  assert.match(SQL, /NOTHING IS BACKFILLED, deliberately/);
 });
 
 test("the best overlap wins, then the plainest name", () => {
+  // This is the clause that keeps peanut butter honest. "Butter, salted" and
+  // "Peanut butter, smooth" both contain "butter" and are both candidates for
+  // "Peanut Butter"; the peanut row explains two of its words to the dairy
+  // row's one, so it wins, and a tablespoon stays 16 g rather than 14.2.
   assert.match(SQL, /order by overlap desc, length\(fc\.name\), fc\.name/);
 });
 
