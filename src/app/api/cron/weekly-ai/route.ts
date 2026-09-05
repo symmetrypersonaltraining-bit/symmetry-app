@@ -112,7 +112,7 @@ Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
 
 Rules:
 - "focus": ONE sentence, under 120 characters, no leading "Focus:".
-- "coachRead": 2-4 sentences, plain text, no question at the end.
+- "coachRead": 2-4 sentences, plain text, no question at the end. On a week where the context grants a GENERAL TIP, one extra sentence at the very end for it, and no more — the tip never replaces anything personal, it follows it. On every other week there is no general advice in here at all: nothing that would be equally true of a stranger.
 - "foodFocus": TWO sentences, plain text. The first states how last week actually went using the given numbers (averages, adherence, signed vs-target deltas) — a real figure, not an adjective. The second is the one thing to work on this week. It shares a screen with the nutrition coach card, so anything longer is a wall of text above their food logger.
 - "programmingQuestion": ONE short question — under 140 characters, one sentence, plain words, no jargon — about the TRAINING ITSELF.
 
