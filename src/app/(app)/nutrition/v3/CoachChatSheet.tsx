@@ -84,6 +84,15 @@ export type CoachActionAdherence = "Full" | "3/4" | "1/2" | "1/4" | "Skipped";
 export interface CoachActions {
   /** Replace a meal's contents for today (swap-for-custom write: unlogged, __custom.kind 'swap'). */
   swapMealCustom: (position: number, name: string, items: CoachActionItem[]) => Promise<void>;
+  /**
+   * ADD to a meal, keeping everything already in it — and keeping it logged.
+   *
+   * Optional so the two screens that mount the coach with no nutrition actions
+   * (WorkoutLogger, GlobalCoach) need no change. Where it is absent the sheet
+   * says it cannot add rather than falling back to a swap, because a swap is
+   * exactly the thing that loses the rest of the meal.
+   */
+  addToMealCustom?: (position: number, items: CoachActionItem[]) => Promise<void>;
   /** Reorder: place the meal at `from` where the meal at `to` currently sits (persistOrder path). */
   moveMeal: (from: number, to: number) => Promise<void>;
   /** Duplicate the meal at `from`; the copy lands after the meal at `to` (null → end of day), unlogged. */
@@ -537,6 +546,11 @@ export default function CoachChatSheet({
       case "swap_meal":
         if (!p.items?.length) throw new Error("the new meal came back empty");
         await actions.swapMealCustom(needPos(p.position), p.name || p.items.map((i2) => i2.name).join(" + "), p.items);
+        break;
+      case "add_to_meal":
+        if (!p.items?.length) throw new Error("there was nothing to add");
+        if (!actions.addToMealCustom) throw new Error("adding to a meal isn't available from here — open Nutrition");
+        await actions.addToMealCustom(needPos(p.position), p.items);
         break;
       case "move_meal":
         await actions.moveMeal(needPos(p.from), needPos(p.to));

@@ -501,6 +501,7 @@ export function validatePlanAcceptingDrift(raw: unknown): PlanDraft | null {
 
 export type ActIntent =
   | "swap_meal"
+  | "add_to_meal"
   | "move_meal"
   | "copy_meal"
   | "delete_meal"
@@ -509,7 +510,7 @@ export type ActIntent =
   | "unlog_meal"
   | "none";
 
-const ACT_INTENTS: ActIntent[] = ["swap_meal", "move_meal", "copy_meal", "delete_meal", "add_snack", "log_meal", "unlog_meal", "none"];
+const ACT_INTENTS: ActIntent[] = ["swap_meal", "add_to_meal", "move_meal", "copy_meal", "delete_meal", "add_snack", "log_meal", "unlog_meal", "none"];
 
 export type ActAdherence = "Full" | "3/4" | "1/2" | "1/4" | "Skipped";
 
@@ -525,7 +526,7 @@ export interface ActReply {
     meal?: ActMealRef;      // swap / delete / log / unlog target
     from?: ActMealRef;      // move / copy source
     to?: ActMealRef | null; // move target · copy insertion point (null = end of day)
-    items?: ParsedItem[];   // swap_meal / add_snack
+    items?: ParsedItem[];   // swap_meal / add_to_meal / add_snack
     name?: string | null;   // new meal / snack label
     adherence?: ActAdherence;
     clarify?: boolean;      // intent 'none': reply is a clarifying question, not a Q&A question
@@ -579,7 +580,7 @@ function actAdherence(v: unknown): ActAdherence {
   return "Full";
 }
 
-/** Items for swap_meal / add_snack — same normalization as the parse endpoint. */
+/** Items for swap_meal / add_to_meal / add_snack — same normalization as the parse endpoint. */
 function validateActItems(raw: unknown): ParsedItem[] | null {
   const r = validateParseResult({ items: raw });
   return r ? r.items : null;
@@ -628,6 +629,26 @@ export function validateActReply(raw: unknown): ActReply | null {
       if (!items) return null;
       const name = actStr(p.new_name) ?? actStr(p.name) ?? items.map((it) => it.name).join(" + ");
       return { intent, params: { meal, items, name }, confirmation, reply };
+    }
+    // ADDING TO A MEAL IS NOT SWAPPING IT.
+    //
+    // Dustin, 5 Sep: he swapped M4 for two bagels with cream cheese and 8 oz of
+    // egg whites, logged it, then asked the coach to "add the jam to that meal".
+    // There was no intent for that, so it came back as a SWAP — and the model,
+    // trying not to lose the meal, replaced all three items with one opaque
+    // line reading "Post-Workout (original) — 1 serving, est". The bagels, the
+    // cream cheese and the egg whites were gone from the screen and from the
+    // edit sheet, their real macros replaced by one recalled number, and the
+    // swap un-logged a meal he had already eaten.
+    //
+    // The items here are what is being ADDED. Everything already in the meal
+    // stays, with its own numbers, and the log stays logged.
+    case "add_to_meal": {
+      const meal = actRef(p, ["position", "meal_position"], ["meal_name", "meal", "target"]);
+      if (meal.position == null && !meal.name) return null;
+      const items = validateActItems(p.items);
+      if (!items) return null;
+      return { intent, params: { meal, items }, confirmation, reply };
     }
     case "move_meal":
     case "copy_meal": {
@@ -737,6 +758,7 @@ export function finalizeAct(act: ActReply, day: ActDayMeal[]): ActReply {
 
   switch (act.intent) {
     case "swap_meal":
+    case "add_to_meal":
     case "delete_meal":
     case "log_meal":
     case "unlog_meal": {

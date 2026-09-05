@@ -302,6 +302,69 @@ against adherence also penalises every swap.
 
 ---
 
+## Interlude — the coach could not ADD to a meal  ·  5 Sep 2026
+
+Not a walked screen. Recorded here because it changes what the coach chat can
+do, and this file is the record of what each screen is supposed to do.
+
+Dustin: *"I used the ai coach to replace my normal m4 w 2 bagels w cream cheese
+n egg whites 8 oz. that worked, i logged it. then I told ai to add the jam to
+that meal n now cant see or edit the rest of the meal."*
+
+### What happened
+
+The action extractor had no intent for adding to a meal — the list was
+swap_meal / move_meal / copy_meal / delete_meal / add_snack / log_meal /
+unlog_meal / none. So "add the jam to that meal" resolved to a **swap**, which
+replaces a meal's whole contents. The model, trying not to lose the meal it was
+replacing, invented one line to stand in for all of it:
+
+    Post-Workout (original) — 1 serving   640 cal  44P/94C/12F   est
+    Muscadine jam           — 1 tbsp       48 cal   0P/12C/0F    est
+
+Three failures in one write:
+
+- the bagels, the cream cheese and the egg whites were gone from the card **and
+  from the edit sheet**, so there was nothing to see or correct;
+- their numbers collapsed into a single recalled figure — three known items
+  became one estimate;
+- a swap lands unlogged by design, so a meal he had already eaten came back
+  unlogged with its macros off the day.
+
+The totals survived (688 / 44 / 106 / 12, exactly what the card showed). That is
+what makes this the dangerous shape: the number at the bottom looked right while
+the meal underneath it was gone.
+
+### What the coach does now
+
+| Say | Intent | What happens |
+|---|---|---|
+| "add jam to M4", "I also had a banana with lunch" | **add_to_meal** (new) | the new food is appended; every existing item keeps its own name, amount and numbers; a logged meal stays logged |
+| "swap M4 for X", "change M4 to X" | swap_meal | replaces the whole meal, lands unlogged — unchanged |
+| "I ate something extra" | add_snack | a new off-plan meal — unchanged |
+
+The extractor is told the difference in as many words, and forbidden by name
+from inventing a placeholder for a meal's existing contents — no "(original)",
+no "rest of meal", no "previous items".
+
+The executor seeds from what is ACTUALLY there — the custom items if the meal is
+already custom, otherwise the plan meal **with today's edits**, through the same
+`rowItemsForCopy` that "Copy to slot" uses — then appends.
+
+**His own M4 was rebuilt** from the copy that `saveMyMeal` had kept: 8 oz egg
+whites + 2 Thomas cinnamon swirl bagels with cream cheese + 1 tbsp muscadine
+jam, re-logged, same 688 / 44 / 106 / 12. The saved My Meals entry carried the
+same placeholder and was repaired too, or it would have come back. Backed up to
+`bak_m4_collapsed_20260905`.
+
+### Still open on this screen
+
+The coach's own items are still `est` — `/api/nutrition-ai/act` does not resolve
+food against `food_catalog` the way the parse and meal-edit paths do. Deferred
+by him to the Nutrition walkthrough; see AUDIT-RESUME.md.
+
+---
+
 ## Interlude — the portion sweep  ·  4 Sep 2026
 
 Not a walked screen. Recorded here because it changed what several screens

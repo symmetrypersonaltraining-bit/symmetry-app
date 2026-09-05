@@ -1243,6 +1243,48 @@ export default function NutritionV3Client(props: Props) {
       await saveMyMeal(name, meta.items);
       toast.success(`Swapped for “${name}” ✓ — tap the circle when eaten`);
     },
+    // ── ADD TO A MEAL, KEEPING WHAT IS ALREADY IN IT ──────────────────────
+    //
+    // Dustin, 5 Sep: he swapped M4 for two bagels with cream cheese and 8 oz of
+    // egg whites, logged it, then asked the coach to "add the jam to that
+    // meal". There was no intent for that, so it came back as a SWAP — and the
+    // model, trying not to lose the meal, replaced all three items with one
+    // opaque line reading "Post-Workout (original) — 1 serving". The bagels,
+    // the cream cheese and the egg whites were gone from the card and from the
+    // edit sheet, their real macros collapsed into one recalled number, and a
+    // meal he had already eaten came back unlogged.
+    //
+    // Three things this does that the swap could not:
+    //   * seeds from what is ACTUALLY there — the custom items if the meal is
+    //     already custom, otherwise the plan meal WITH today's edits, via the
+    //     same rowItemsForCopy that "Copy to slot" uses;
+    //   * appends rather than replaces, so every existing item keeps its own
+    //     name, amount and numbers;
+    //   * leaves the meal logged if it was logged. Adding a spoon of jam is not
+    //     a reason to un-log a meal that was eaten.
+    addToMealCustom: async (position, items) => {
+      const row = rowByPosition(position);
+      const added = aiItemsToCustom(items);
+      if (!added.length) return;
+      const base = rowItemsForCopy(row);
+      const wasLogged = row.kind === "custom" ? !row.meta?.unlogged : isLogged(row);
+      const meta: CustomMeta = row.kind === "custom" && row.meta
+        ? { ...row.meta, items: [...base, ...added], unlogged: !wasLogged }
+        : {
+            name: rowName(row) || "Meal",
+            time: rowTime(row),
+            items: [...base, ...added],
+            kind: "swap",
+            sourceMealId: row.chosen?.id ?? null,
+            unlogged: !wasLogged,
+          };
+      await patchCustom(row, meta);
+      toast.success(
+        added.length === 1
+          ? `Added ${added[0].n} ✓`
+          : `Added ${added.length} items ✓`,
+      );
+    },
     // Place the meal at `from` in the display slot the meal at `to` occupies
     // (same persistOrder path as drag / move up-down).
     moveMeal: async (from, to) => {

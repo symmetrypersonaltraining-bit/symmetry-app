@@ -43,6 +43,7 @@ Decide if the message is a REQUEST TO CHANGE THE VIEWED DAY'S LOG or just a ques
 
 Intents and their params:
 - swap_meal — replace one meal's contents with different food. params: {"position":number|null,"meal_name":string|null,"new_name":string,"items":[{"name":string,"amount":number|null,"unit":string|null,"p":number,"c":number,"f":number,"kcal":number}]}. Estimate realistic macros per item (grams protein/carbs/fat, kcal).
+- add_to_meal — the client wants to ADD something to a meal that already exists, keeping what is already in it. params: {"position":number|null,"meal_name":string|null,"items":[same item shape as swap_meal]}. "items" is ONLY the new food. Never restate or summarise what the meal already contains — the app keeps those items and their own numbers.
 - move_meal — reorder a meal to another meal's spot. params: {"from_position":number|null,"from_name":string|null,"to_position":number|null,"to_name":string|null}.
 - copy_meal — duplicate a meal; the copy lands right after the "to" meal, or at the end of the day when "to" is omitted. params: same keys as move_meal (to_* may be null).
 - delete_meal — remove a meal from today only. params: {"position":number|null,"meal_name":string|null}.
@@ -52,6 +53,8 @@ Intents and their params:
 - none — a question, general chat, or an action you cannot fill in yet. params: {"clarify":boolean}.
 
 Rules:
+- ADD VERSUS SWAP, and this one matters. "add X to M4", "put jam on that meal", "I also had a banana with lunch" → add_to_meal. "swap M4 for X", "make M4 X instead", "change M4 to X" → swap_meal. swap_meal REPLACES everything in the meal; if you use it when they meant add, the rest of their meal disappears from the screen and from the edit sheet, and a meal they already logged comes back unlogged.
+- NEVER invent an item that stands in for a meal's existing contents — no "(original)", no "rest of meal", no "previous items". If you are tempted to write one, the intent you want is add_to_meal.
 - Use "position" values EXACTLY as given in DAY CONTEXT. If the client names a meal instead, put their words in the *_name field and leave position null.
 - If the message asks for an action but the target meal is ambiguous (several plausible matches) or required details are missing (e.g. "swap a meal" with no food), respond intent "none" with params {"clarify":true} and ONE short clarifying question in "reply". Never guess.
 - If the message is a question or general chat, respond intent "none" with params {"clarify":false} and a brief placeholder in "reply" (a fuller coach answer is generated separately).
