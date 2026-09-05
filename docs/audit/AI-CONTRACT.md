@@ -162,6 +162,68 @@ and it does not fold and agree without checking either.
 
 ---
 
+## DUSTIN'S RULINGS — 5 Sep 2026
+
+Four questions put to him; his answers, which now bind every AI surface.
+
+### On pain and symptoms: **full corrective reasoning**
+
+Not "clarify and hand it over". When a client says a movement hurts, the AI asks
+up to two questions and then reasons the way he would — from the assessment,
+the root checkpoint, the compensation pattern — and gives them something to do
+about it.
+
+That is the most demanding of the four options and the most differentiated:
+no other product in this category has a real method to reason from. It raises
+the stakes on rules 1, 5 and 6 correspondingly. Everything it says must come
+from that client's own assessment rows, the clarifying questions are mandatory,
+and the red-flag list still short-circuits everything and routes to him.
+
+**Not yet built.** The client-facing AI has no access to `assessments` today.
+That is the single biggest gap between what the app does and what he has asked
+for.
+
+### On the method: **explain it simply, never name it**
+
+Rule 2 above, sharpened. The AI says *why* — "your ankle's stiff, and a stiff
+ankle makes your back work harder every time you walk" — and never exposes the
+internal structure: no phase names, no NASM language, no inhibit/lengthen/
+activate/integrate. The client understands the reasoning without seeing the
+system.
+
+This matches the standing guardrail that NASM language never appears in
+client-facing copy; the new part is that the REASONING must, in plain words.
+
+### On acting: **their schedule is theirs, sessions with him are his**
+
+> "I was referring to their scheduled sessions w me. Full control on their
+> schedule stays as is but I dictate scheduled sessions w me."
+
+So the 15 Aug ruling stands untouched — a client's own workouts move anywhere to
+anywhere, past or future, logged or not, no window, no status check. What they
+may not move is a **supervised** session: the app's half of an appointment whose
+other half is an event in his Google Calendar. Moving only one half leaves two
+people disagreeing about when they meet. 259 future sessions carry that flag.
+
+The refusal must name itself narrowly and say what they CAN still do, or the
+model generalises one refusal back into the "ask your coach" reflex that made
+Bobbie Page give up on the app. And it OFFERS to send the request; it never
+sends on its own, per the standing rule that only what a client deliberately
+sends reaches his inbox.
+
+### On disclosure: **his assistant, clearly and warmly**
+
+Not "the coach" wearing his name, and not a cold AI badge on everything.
+"Dustin's assistant — knows your programme, your logs and how he trains you.
+Anything real goes to him."
+
+Honest, and it survives the day it gets something wrong. The industry data says
+clients DISCOVERING they were talking to a bot is a top-three risk to trust —
+and an undisclosed assistant means that on the day it is discovered, every warm
+message he actually wrote gets re-read as generated.
+
+---
+
 ## WHAT WOULD MAKE IT UNLIKE ANYTHING ELSE
 
 The competitors are either generic AI wrapped around a workout database, or a

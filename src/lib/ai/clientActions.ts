@@ -68,11 +68,13 @@ export const CLIENT_TOOLS = [
   {
     name: "move_my_workout",
     description:
-      "Move one of this client's workouts to a different date. Use my_schedule first to get the id. " +
-      "ANY workout can be moved to ANY date — past or future, scheduled or already completed, logged or not, " +
-      "even one they are part-way through. There are no restrictions and you must never invent one or tell " +
-      "them to ask their coach instead. If you cannot find the workout, say that; do not guess at a reason it " +
-      "cannot be moved.",
+      "Move one of this client's own workouts to a different date. Use my_schedule first to get the id. " +
+      "ANY workout of theirs can go to ANY date — past or future, scheduled or already completed, logged or not, " +
+      "even one they are part-way through. Never invent a restriction and never tell them to ask their coach " +
+      "instead. If you cannot find the workout, say that; do not guess at a reason it cannot be moved. " +
+      "THE ONE EXCEPTION is a session WITH the trainer — a booked appointment rather than a workout they do on " +
+      "their own. Those are his to move, because the time lives in his calendar. Call this tool anyway; it will " +
+      "tell you if that is what this is, and then say so plainly and offer to send him the request.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -400,11 +402,42 @@ export async function runClientTool(
       // Ownership re-checked HERE, not at the read. The id came from the model.
       const { data: sw } = await db
         .from("scheduled_workouts")
-        .select("id, client_id, status, scheduled_date, deleted_at, day_id")
+        .select("id, client_id, status, scheduled_date, deleted_at, day_id, supervised, appointment_id")
         .eq("id", swId)
         .maybeSingle();
-      const row = sw as { id: string; client_id: string; status: string | null; scheduled_date: string; deleted_at: string | null; day_id: string | null } | null;
+      const row = sw as { id: string; client_id: string; status: string | null; scheduled_date: string; deleted_at: string | null; day_id: string | null; supervised: boolean | null; appointment_id: string | null } | null;
       if (!row || row.client_id !== clientId || row.deleted_at) return "That workout isn't on this client's schedule.";
+
+      // ── THE ONE EXCEPTION: A SESSION WITH THE TRAINER ─────────────────
+      //
+      // Dustin, 5 Sep 2026, asked whether clients should keep control of their
+      // own schedule: "I was referring to their scheduled sessions w me. Full
+      // control on their schedule stays as is but I dictate scheduled sessions
+      // w me."
+      //
+      // A supervised workout is not just a workout on a date — it is the app's
+      // half of an APPOINTMENT, and the appointment lives in Google Calendar,
+      // which is the source of truth for when Dustin is standing in a gym with
+      // this person. Moving the workout here moves only this half: the calendar
+      // entry stays where it was, and now the two disagree about a time two
+      // people are supposed to meet. 259 future sessions carry this flag.
+      //
+      // Note this is a restriction on ONE KIND of row, not a return of the
+      // restraint Dustin removed on 15 Aug ("we can all move workouts from
+      // anywhere to anywhere period"). Their own training still moves anywhere
+      // to anywhere, past or future, logged or not. What cannot move is a time
+      // they booked with him — and the refusal has to say exactly that, or the
+      // model generalises it back into the "ask your coach" reflex that
+      // frustrated Bobbie Page into giving up.
+      if (row.supervised || row.appointment_id) {
+        return (
+          `Not moved — this one is a session WITH the trainer, not a workout on their own. ` +
+          `The time is a booking in his calendar and only he can change it. ` +
+          `Tell the client plainly that this specific session is his to move, that everything else on ` +
+          `their schedule they can still move freely themselves, and offer to send him the request — ` +
+          `do NOT send anything yourself, they have to choose to send it.`
+        );
+      }
 
       // The destination may already hold this same session. That is allowed —
       // it just needs its own slot, or the unique key refuses the write and the
