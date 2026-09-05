@@ -73,26 +73,57 @@ are NOT bugs and must stop being re-reported.
 
 | # | screen | notes |
 |---|---|---|
-| 1 | **Client home** | ✅ closed. Adherence now counts only days due; This Week moved under the streak; second "This week" card renamed Weekly Focus; Add Workout removed; AI Insights placeholder deleted; header is a banner; payments sit above This Week; milestone Share now carries the message. |
+| 1 | **Client home** | ✅ closed, ◐ AI pass 5 Sep: both AI elements rebuilt (Coach's tool model, weekly writer). Two small items remain — the View button and the assistant framing. Original close: Adherence now counts only days due; This Week moved under the streak; second "This week" card renamed Weekly Focus; Add Workout removed; AI Insights placeholder deleted; header is a banner; payments sit above This Week; milestone Share now carries the message. |
 | 2 | **Workout tab** | ◐ REBUILT 4 Sep, not yet walked. New tile format, Start/View split, move-a-logged-workout copies forward, Add workout on the title row. Everything on it now needs testing button by button — including the AI components, which have never been reviewed. |
 
 ### Next — in this order
 
-1. **Home, AI pass.** IN PROGRESS. Every AI component on the home screen,
-   against step 0 above. Screen 1 was closed before that rule existed. The
-   inventory lives in **docs/audit/AI-COMPONENTS.md** — four AI elements on
-   home, of which only the Coach thinks while the client is on the screen.
-   Element 1 (the Coach) is written up and waiting on Dustin's answers to three
-   questions at the foot of that file.
-   - **Also carry into that pass:** today's workout tile on Home needs the
-     **View** button, to match the Workout tab's Start / View split. Dustin,
-     4 Sep. It is the last place a workout can be opened that still offers only
-     one way in.
-2. **Workout, full walk.** The screen was rebuilt on 4 Sep and NOTHING on it has
+1. **Give the client AI the assessment.** THE BIGGEST OPEN GAP IN THE APP.
+   Dustin ruled on 5 Sep that when a client says a movement hurts, the AI does
+   **full corrective reasoning** — his method, from that client's own
+   assessment. It cannot: `assessments` is invisible to every client-facing AI
+   surface. Everything else on this list is smaller than this.
+2. **Home, AI pass.** Elements 1 and 2 are DONE and shipped (see
+   docs/audit/AI-COMPONENTS.md). What remains on home:
+   - today's workout tile needs the **View** button, to match the Workout tab's
+     Start / View split. Dustin, 4 Sep. Last place a workout opens only one way.
+   - the "Dustin's assistant" framing on the coach entry points (his 5 Sep
+     disclosure ruling) — copy only, not built.
+3. **Workout, full walk.** The screen was rebuilt on 4 Sep and NOTHING on it has
    been tapped since. Every button, every path: add, edit, move, replace,
    remove, start, view, drag, past strip — manually and through Claude. Plus its
-   AI components.
-3. Screen 3 onward.
+   AI components against docs/audit/AI-CONTRACT.md.
+4. Screen 3 onward.
+
+### The AI programme — from docs/audit/AI-CONTRACT.md
+
+Ten rules, four rulings, set 5 Sep. Built so far: the tools model, the weekly
+writer's context and thinking order, the schedule guard, the food stance, the
+general tips, the coach's read on screen, and sessions-with-him protected.
+
+**Not built, in the order they are worth doing:**
+
+| | what | why it matters |
+|---|---|---|
+| A | **Assessment access for the client AI** | Ruling 1. Without it "full corrective reasoning" is impossible and the moat does not exist. |
+| B | **A corrections table + the self-correction sweep** | Rule 4. Detect the app's own errors against the database before the client does; when they correct it, MUTATE THE RECORD, not just the reply. Self-correction is worth ~0.6 SD of trust versus being caught. |
+| C | **Clarify-gate on pain / substitution / load** | Rule 5. Missing history-taking is the top documented LLM health failure and the thing a 21-year CES does that a chatbot does not. Two questions max. |
+| D | **Red-flag referral list as a TABLE** | Rule 6. NASM's refer-out list, matched deterministically, short-circuiting the model, offering to route to him. |
+| E | **Movement library access for the client coach** | So "why does my knee hurt on lunges" reaches a movement, not a nutrition coach. |
+| F | **Length cap + ban-the-obvious enforcement** | Rule 7. The modal complaint about AI coaching everywhere is walls of obvious text. |
+| G | **Bounded client adjustment on AI proposals** | Rule 8. Best-evidenced adoption lever there is, and cheap. |
+| H | **"Dustin's assistant" framing** | Ruling 4. Copy across the coach entry points. |
+
+### Still unanswered by Dustin
+
+- **Can a client swap the CONTENT of a session he is supervising?** He ruled on
+  moving those (his). Swapping what they do in a session he is personally
+  running is the same class of question and was not asked. Deliberately not
+  guessed.
+- **What must the AI never do**, beyond peptides, schedules-with-him and the
+  standing guardrails.
+- **`clients.ai_focus` is now shown** — but the fourth thing the weekly model
+  writes is still worth reviewing once he has read a few live ones.
 
 **Both 3-Sep changes are now built and shipped:**
 
