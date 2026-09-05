@@ -26,7 +26,11 @@ covered by a CI gate; see `CLAUDE.md` rule 1.
 
 ## How each screen goes
 
-0. **WALK EVERY AI COMPONENT ON THE SCREEN.** Added 4 Sep, at Dustin's
+0. **WALK EVERY AI COMPONENT ON THE SCREEN — AGAINST docs/audit/AI-CONTRACT.md.**
+   That file is the ten rules every AI surface in the app has to meet, set by
+   Dustin on 5 Sep ("I want all ai functions in the entire app to be extremely
+   accurate and advanced... I want it to feel like they're talking to me w my
+   knowledge"). Each screen's pass records which rules its AI fails. Added 4 Sep, at Dustin's
    instruction: "we need to go through the logic and thinking for each ai
    component on every screen... i want to make sure each ai function is doing
    exactly what i want it to do." So for each screen, before anything else:

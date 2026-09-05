@@ -55,11 +55,18 @@ So: the weekly challenge popup is **not** AI, and the birthday takeover is
 **not** AI. `MilestoneToast`, `MilestoneBadges`, `StreakFlame` and the rest-day
 slip are the same — written strings with the client's numbers dropped in.
 
-**There is no AI week-review popup for clients.** The one that existed,
-`SaturdayReview`, was the TRAINER's full-screen focus-approval takeover, it was
-AI (`focus_suggest`), and it is unmounted — still in the repo, rendered nowhere.
-What a client sees at the start of the week is the Weekly Focus line on their
-week card (element 2 below) and, if there was a challenge, the winner takeover.
+**CORRECTION, same day.** I first told Dustin clients have no week-review
+takeover. They do — I had grepped `ClientTakeovers` and it does not live there.
+`ClientWeekSummary` renders a full-screen **"Your week in review"** once a week,
+gated on a seen-key so it fires once per client per week. It shows last week's
+workouts done, nutrition adherence, weight change and streak — all computed, no
+model — plus **this week's Focus line, which IS the AI's**, and now the coach's
+read underneath it.
+
+So: the takeover's frame is templated; the coaching inside it is element 2.
+
+The trainer's own AI takeover, `SaturdayReview` (`focus_suggest`), is unmounted
+— still in the repo, rendered nowhere.
 
 The birthday bot IS a model — Haiku, `birthday_post` — but it writes a **group
 chat message** in Coach Bot's voice, not a takeover. It gets audited with
