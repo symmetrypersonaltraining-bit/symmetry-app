@@ -71,9 +71,20 @@ describe("the sweep route has no approval path left", () => {
     // Running late Saturday, weekStartOf(today) is the Sunday of the week now
     // ENDING. A focus stamped with it would be filtered out as stale by
     // ClientWeekSummary the instant it was published.
+    //
+    // 5 Sep: this used to require the bare `weekStartOf(nextDay(today))`. The
+    // route now has a second mode — a mid-week refresh of the coach's READ,
+    // added because the read was written once on a Saturday and then quoted a
+    // week-old weight for seven days. That mode runs DURING the week it
+    // describes, so its week is the one containing today; carrying the
+    // Saturday shift into it would tell a client on Wednesday how a week that
+    // has not started is going.
+    //
+    // The invariant this test exists for is unchanged and still checked: the
+    // WEEKLY branch derives its week from tomorrow.
     assert.ok(
-      /const week = weekStartOf\(nextDay\(today\)\)/.test(src),
-      "the target week is no longer derived from tomorrow. On a Saturday-night run that publishes every line already stale.",
+      /mode === "refresh" \? weekStartOf\(today\) : weekStartOf\(nextDay\(today\)\)/.test(src),
+      "the weekly branch no longer derives its week from tomorrow. On a Saturday-night run that publishes every line already stale.",
     );
   });
 

@@ -372,6 +372,46 @@ orphaned sessions, zero orphaned logs — checked.
 **Where it landed: 1,096 workouts in the library, 99 client-owned** — 73
 modified copies, 22 genuinely client-made, 4 duplicate twins.
 
+## The coach's read goes stale — fixed 5 Sep
+
+Dustin, looking at his own home screen: *"its reading weight from the wrong
+place. im at 205."*
+
+It was not. `clients.current_weight` said 205 and his latest weigh-in said 205 —
+both right. The paragraph said 207 because it had been **written on 29 August**,
+when 207.2 (17 Aug) was the most recent weigh-in that existed. Seven days later
+it was still on screen beside live tiles it now contradicted:
+
+| paragraph (29 Aug) | tile (live) |
+|---|---|
+| "5 of 8 done" | 4/8 |
+| "consistency jumped to 100%" | 61% |
+| "flat at 207 lb" | 205 |
+
+Every figure was true for the week it was written in and wrong for the week it
+was being read in. `currentWeekRead` deliberately admits a read written on the
+eve of the week, because that is when the Saturday sweep writes it — so a read
+is a week old by design and only stays true if something keeps it true.
+
+**Four options were put to him; he chose "rewrite on a new weigh-in."**
+
+`/api/cron/weekly-ai?mode=refresh`, daily at 12:00 UTC. It rewrites the READ and
+only the read, for the clients whose last weigh-in is later than their
+`ai_focus_date`. Five clients qualified the day it was built (him, Hassan,
+Jennifer, Robby, Tyler).
+
+Deliberately NOT touched by a refresh: `weekly_focus`, `ai_food_focus` and the
+fortnightly programming question. Those are the week's copy, chosen once —
+rewriting them because someone stepped on a scale would move the target a client
+is working towards, three days in. A refresh also uses the `"now"` windows and
+`weekStartOf(today)`, not the Saturday `"nextWeek"` shift, so it describes the
+week it is written in.
+
+The other three options, if this proves not enough: bar the writer from quoting
+any figure the card already shows live; rewrite daily (~7x the calls); or
+re-frame the paragraph under a "Last week" heading, which is what it actually
+is.
+
 ## Also fixed 4 Sep
 
 - **The portion sweep** — every path that turned a food into a number was

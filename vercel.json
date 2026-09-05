@@ -5,6 +5,10 @@
       "schedule": "0 3 * * 0"
     },
     {
+      "path": "/api/cron/weekly-ai?mode=refresh",
+      "schedule": "0 12 * * *"
+    },
+    {
       "path": "/api/cron/birthdays",
       "schedule": "0 13 * * *"
     },

@@ -46,6 +46,7 @@ import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { coachFirstNameForClient } from "@/lib/trainerResolve";
 import { trainerFeatureOn } from "@/lib/trainerFeatures";
 import * as roster from "@/lib/auth/roster";
+import { fetchAllRowsSafe } from "@/lib/fetchAllRows";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -57,6 +58,14 @@ function nextDay(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** ISO date shifted by n days, same calendar-only arithmetic as nextDay. */
+function addDays(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
   return dt.toISOString().slice(0, 10);
 }
 
@@ -203,6 +212,9 @@ interface ClientRow {
   weekly_focus_week: string | null;
   weekly_focus_source: string | null;
   trainer_id: string | null;
+  /** The coach's read, and the day it was written. Refresh mode needs both. */
+  ai_focus: string | null;
+  ai_focus_date: string | null;
 }
 
 interface RunResult {
@@ -212,9 +224,35 @@ interface RunResult {
   detail?: string;
 }
 
+/**
+ * WHY THERE ARE TWO MODES.
+ *
+ * Dustin, 5 Sep, looking at his own home screen: *"its reading weight from the
+ * wrong place. im at 205."* It was not. `clients.current_weight` said 205 and
+ * his latest weigh-in said 205. The coach's read said 207 because it had been
+ * WRITTEN ON 29 AUGUST, when 207.2 (17 Aug) was the most recent weigh-in he
+ * had. Seven days later it was still on screen, beside live tiles it now
+ * contradicted — the tiles said 4/8 and 61%, the paragraph said "5 of 8" and
+ * "100%". Every figure in it was true for the week it was written in and wrong
+ * for the week it was being read in.
+ *
+ * "weekly" is unchanged: the Saturday-night sweep that writes the week's focus,
+ * coach's read and food focus for the week beginning tomorrow.
+ *
+ * "refresh" is the fix he chose over rewriting daily: rewrite the READ, and
+ * only the read, for the clients whose numbers have actually moved since it was
+ * written. A weigh-in is the trigger, because a weigh-in is the number the
+ * paragraph quotes and the one that dates it. The week's focus, food focus and
+ * programming question are deliberately NOT touched — those are the week's
+ * copy, chosen once, and rewriting them mid-week would move the target a client
+ * is working towards.
+ */
+export type SweepMode = "weekly" | "refresh";
+
 async function runSweep(opts: {
   onlyClientId?: string | null;
   today?: string;
+  mode?: SweepMode;
 }): Promise<{
   week: string;
   today: string;
@@ -233,20 +271,54 @@ async function runSweep(opts: {
   // Deriving it from tomorrow is correct for both a late-Saturday run (tomorrow
   // is that Sunday) and an early-Sunday one (tomorrow is Monday, whose week
   // starts on the same Sunday), so the schedule can move without this breaking.
-  const week = weekStartOf(nextDay(today));
+  //
+  // A refresh runs DURING the week it is describing, so its week is the one
+  // containing today and its windows are "now" rather than "nextWeek". Reusing
+  // the Saturday shift here would tell a client on Wednesday how a week that
+  // has not started is going — the exact complaint that produced the shift.
+  const mode: SweepMode = opts.mode || "weekly";
+  const week = mode === "refresh" ? weekStartOf(today) : weekStartOf(nextDay(today));
   const db = createAdminClient();
 
   let q = db
     .from("clients")
-    .select("id, name, primary_goal, weekly_focus, weekly_focus_week, weekly_focus_source, trainer_id")
+    .select("id, name, primary_goal, weekly_focus, weekly_focus_week, weekly_focus_source, trainer_id, ai_focus, ai_focus_date")
     .is("archived_at", null);
   if (opts.onlyClientId) q = q.eq("id", opts.onlyClientId);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
 
-  const clients = (data as ClientRow[]) || [];
+  let clients = (data as ClientRow[]) || [];
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const results: RunResult[] = [];
+
+  if (mode === "refresh") {
+    // ONE query for the whole roster, not one per client. 60 days is well past
+    // any read worth refreshing and keeps this far under the 1,000-row cap that
+    // PostgREST applies whatever .limit() asks for — the cap that has silently
+    // truncated three other reads in this app.
+    const since = addDays(today, -60);
+    const rows = await fetchAllRowsSafe<{ client_id: string; metric_date: string }>(
+      () => db.from("metrics").select("client_id, metric_date")
+        .not("weight", "is", null).gte("metric_date", since)
+        .order("metric_date", { ascending: false }) as never,
+      { label: "weekly-ai refresh: recent weigh-ins" },
+    );
+    const lastWeighIn = new Map<string, string>();
+    for (const r of rows) {
+      const seen = lastWeighIn.get(r.client_id);
+      if (!seen || r.metric_date > seen) lastWeighIn.set(r.client_id, r.metric_date);
+    }
+    clients = clients.filter((c) => {
+      // Nothing written yet is the weekly sweep's job, not this one.
+      if (!c.ai_focus || !c.ai_focus_date) return false;
+      const w = lastWeighIn.get(c.id);
+      return !!w && w > c.ai_focus_date;
+    });
+    if (!clients.length) {
+      return { week, today, results: [{ clientId: "", name: "(roster)", status: "skipped", detail: "no read has been overtaken by a weigh-in" }] };
+    }
+  }
 
   // A trainer can decline the sweep for their own clients. Cached per trainer
   // rather than asked per client: 34 clients across a handful of trainers is
@@ -279,7 +351,7 @@ async function runSweep(opts: {
       // it the client is told how "this week" is going before their week has
       // begun — Dustin, Monday 31 Aug: "5 out of 8?? its Monday the week
       // starts today..."
-      const cmp = await fetchWeeklyComparison(db, c.id, today, "nextWeek");
+      const cmp = await fetchWeeklyComparison(db, c.id, today, mode === "refresh" ? "now" : "nextWeek");
 
       // Nothing to write about at all. Leaving last week's copy up would be
       // worse than leaving it blank — it would read as a comment on a week
@@ -348,10 +420,15 @@ async function runSweep(opts: {
       const update: Database["public"]["Tables"]["clients"]["Update"] = {
         ai_focus: result.value.coachRead,
         ai_focus_date: today,
-        ai_food_focus: result.value.foodFocus,
-        ai_food_focus_week: week,
       };
-      if (!trainerOwnsFocus) {
+      // The week's copy is chosen once and left alone. A refresh that also
+      // rewrote the focus would move the target a client is working towards,
+      // mid-week, because they stepped on a scale.
+      if (mode === "weekly") {
+        update.ai_food_focus = result.value.foodFocus;
+        update.ai_food_focus_week = week;
+      }
+      if (mode === "weekly" && !trainerOwnsFocus) {
         update.weekly_focus = result.value.focus;
         update.weekly_focus_week = week;
         update.weekly_focus_source = "ai";
@@ -365,7 +442,7 @@ async function runSweep(opts: {
       // upsert on (client_id, week_start) makes a replayed sweep a no-op
       // rather than a second question, and ignoreDuplicates means an answer
       // already given is never overwritten by a re-run.
-      if (result.value.programmingQuestion && isQuestionWeek(week)) {
+      if (mode === "weekly" && result.value.programmingQuestion && isQuestionWeek(week)) {
         try {
           // Still best-effort — the reasoning above holds. But it has to be
           // able to SAY so: a PostgREST call returns its error rather than
@@ -408,7 +485,10 @@ export async function GET(req: NextRequest) {
     // already paused — the cap meant nothing here.
     const paused = await enforceMeter(null, "weekly_sweep");
     if (paused) return paused;
-    const out = await runSweep({ onlyClientId: sp.get("clientId") });
+    const out = await runSweep({
+      onlyClientId: sp.get("clientId"),
+      mode: sp.get("mode") === "refresh" ? "refresh" : "weekly",
+    });
     return NextResponse.json({ ok: true, ...out });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
