@@ -113,7 +113,7 @@ its results do.
 
 You write THREE things:
 1. "focus" — the one thing this client should aim at this week. It appears as "Focus: ..." on their week card. It must come out of what actually happened last week: if adherence slipped, the focus addresses that; if they logged only two days, the focus is logging; if they crushed it, the focus protects the win and adds one notch. Concrete and doable in a week, not a slogan.
-2. "coachRead" — the training-side read for the home screen: consistency, sessions completed, weigh-in cadence, body-composition movement. Warm, specific, honest about slips without scolding, light humor when it fits.
+2. "coachRead" — the training-side read for the home screen: consistency, sessions completed, weigh-in cadence, body-composition movement. Warm, specific, honest about slips without scolding, light humor when it fits. ⛔ IT REVIEWS THE WEEK THAT HAS FINISHED, AND ONLY THAT WEEK. The card it sits on shows the client's CURRENT week live, in tiles, beside it — sessions done, nutrition adherence, streak — so a sentence from you about the week in progress is a second, staler answer to a question already answered accurately two inches above. Never write "this week", "so far this week" or "the week so far". Body weight is the exception and is present tense: it is the number as it stands now, not a number from that week.
 3. "foodFocus" — the nutrition read for their food logger. Start from how they actually ate last week (the given averages, adherence and the signed vs-target deltas), then say what to work on this week. Name real numbers from the context. Never set a new macro target — that is ${coachFirstName}'s call.
 
 Respond with ONLY valid JSON — no markdown, no fences — exactly this shape:
@@ -169,6 +169,22 @@ function validateWeekly(raw: unknown): WeeklyReply | null {
   const coachRead = s("coachRead");
   const foodFocus = s("foodFocus");
   if (!focus || !coachRead || !foodFocus) return null;
+  // THE READ IS ABOUT THE WEEK THAT FINISHED. THE CARD OWNS THE ONE IN PROGRESS.
+  //
+  // Dustin, 5 Sep: "reframe it last week as well since thats what it's reading."
+  // The block is now labelled LAST WEEK on the home card, so a sentence in here
+  // about the current week is mislabelled as well as stale — and it was already
+  // both. His read said "this week you've only gotten 5 of 8 done" beside a tile
+  // reading 4/8.
+  //
+  // Returning null here rather than dropping the sentence: callClaudeJson
+  // retries a failed validation, so the model gets a second go at writing the
+  // read it was asked for. If it fails twice nothing is written and last week's
+  // read stands, which is the safe end of that trade.
+  //
+  // CLAIMS_THIS_WEEK already guarded the programming question for exactly this
+  // reason. It was never applied to the read, which is the bigger surface.
+  if (CLAIMS_THIS_WEEK.test(coachRead)) return null;
   // A question is one sentence a person reads on a phone. 200 was tight enough
   // that the model's own overrun got chopped mid-word; the prompt asks for
   // under 140, so this is headroom for a long one rather than a licence.

@@ -413,6 +413,20 @@ export default function ClientWeekSummary() {
                   currentWeekRead. */}
               {s.coachRead && (
                 <div style={{ marginTop: 7, color: "var(--brand-text-secondary)", fontSize: 12, lineHeight: 1.55 }}>
+                  {/* LABELLED WITH THE WEEK IT IS ACTUALLY ABOUT.
+                      Dustin, 5 Sep: "reframe it last week as well since thats
+                      what it's reading." The read reviews the week that has
+                      FINISHED — that is what the sweep is asked for and what
+                      the numbers in it come from — but it sat directly under
+                      the current week's date range with current-week tiles
+                      above it, so it read as a comment on this week and lost
+                      every argument with the tiles. His said "5 of 8" beside a
+                      tile reading 4/8, and "flat at 207" when he was 205.
+                      The tiles own the week in progress; this owns the one
+                      that finished, and now says so. */}
+                  <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.7, textTransform: "uppercase", color: "var(--brand-text-secondary)", opacity: 0.75, marginBottom: 3 }}>
+                    Last week · {fmtRange(s.lastWkStart, s.lastWkEnd)}
+                  </div>
                   {s.coachRead}
                 </div>
               )}

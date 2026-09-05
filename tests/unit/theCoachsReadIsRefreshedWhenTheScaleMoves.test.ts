@@ -103,3 +103,59 @@ test("the mode comes off the URL and defaults to the weekly sweep", () => {
   // refresh — that would leave the whole roster without a focus for the week.
   assert.match(code, /mode: sp\.get\("mode"\) === "refresh" \? "refresh" : "weekly"/);
 });
+
+// ── AND IT SAYS WHICH WEEK IT IS ABOUT ──────────────────────────────────────
+//
+// Dustin, 5 Sep, after the refresh went in: *"reframe it last week as well
+// since thats what it's reading."*
+//
+// He is right, and it is the other half of the same bug. The read reviews the
+// week that has FINISHED — that is what the sweep asks for and where its
+// numbers come from — but it sat directly under the CURRENT week's date range
+// with current-week tiles above it. So it read as a comment on this week and
+// lost every argument with the tiles: "5 of 8" beside a tile reading 4/8,
+// "flat at 207 lb" when he was 205.
+//
+// Two halves: the block is labelled with the week it reviews, and the writer is
+// stopped from narrating the week in progress at all. The tiles own the week in
+// progress; the read owns the one that finished.
+
+const CARD = read("src/components/ClientWeekSummary.tsx");
+const cardCode = CARD.replace(/\{\/\*[\s\S]*?\*\/\}/g, " ");
+
+test("the read is labelled with the week it reviews", () => {
+  assert.match(cardCode, /Last week · \{fmtRange\(s\.lastWkStart, s\.lastWkEnd\)\}/,
+    "the read still sits under the current week's dates with nothing saying otherwise");
+});
+
+test("the label is on the read, not on the focus line", () => {
+  // The focus line IS about the week ahead. Labelling the whole panel "last
+  // week" would mislabel the one instruction the client is meant to act on.
+  const panel = cardCode.slice(cardCode.indexOf("<b>Focus:</b>"));
+  const label = panel.indexOf("Last week ·");
+  const readOpen = panel.indexOf("{s.coachRead &&");
+  assert.ok(readOpen > -1 && label > readOpen, "the label sits outside the coach's read block");
+});
+
+test("the writer may not narrate the week in progress", () => {
+  assert.match(ROUTE, /IT REVIEWS THE WEEK THAT HAS FINISHED, AND ONLY THAT WEEK/);
+  assert.match(ROUTE, /Never write "this week", "so far this week" or "the week so far"/);
+  // Body weight is the deliberate exception — it is the number as it stands
+  // now, which is the whole point of refreshing on a weigh-in.
+  assert.match(ROUTE, /Body weight is the exception and is present tense/);
+});
+
+test("and that is enforced, not merely asked for", () => {
+  // CLAIMS_THIS_WEEK guarded the programming question from 1 Sep for exactly
+  // this reason and was never applied to the read — the bigger surface.
+  assert.match(code, /if \(CLAIMS_THIS_WEEK\.test\(coachRead\)\) return null;/);
+});
+
+test("a read that claims this week is retried, not silently dropped", () => {
+  // Returning null from validateWeekly makes callClaudeJson retry. Dropping the
+  // sentence instead would publish a read the model did not write; dropping the
+  // whole reply without a retry would cost the client their focus too.
+  const v = code.slice(code.indexOf("function validateWeekly"), code.indexOf("function validateWeekly") + 1400);
+  assert.match(v, /CLAIMS_THIS_WEEK\.test\(coachRead\)/);
+  assert.ok(!/coachRead\.replace\(/.test(v), "the guard is editing the model's sentence rather than refusing it");
+});

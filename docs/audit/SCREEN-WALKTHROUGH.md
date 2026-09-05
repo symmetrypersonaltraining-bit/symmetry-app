@@ -302,6 +302,44 @@ against adherence also penalises every swap.
 
 ---
 
+## Interlude — the coach's read said 207 when he was 205  ·  5 Sep 2026
+
+Dustin: *"its reading weight from the wrong place. im at 205."*
+
+It was not. `clients.current_weight` said 205 and his latest weigh-in said 205.
+The paragraph said 207 because it had been **written on 29 August**, when 207.2
+(17 Aug) was the most recent weigh-in that existed.
+
+| paragraph (29 Aug) | tile beside it (live) |
+|---|---|
+| "5 of 8 done" | 4/8 |
+| "consistency jumped to 100%" | 61% |
+| "flat at 207 lb" | 205 |
+
+Two changes, and they are halves of one thing.
+
+**1. It is rewritten when the number moves.**
+`/api/cron/weekly-ai?mode=refresh`, daily at 12:00 UTC, for clients whose last
+weigh-in is later than their `ai_focus_date`. It rewrites the READ only — the
+weekly focus, food focus and fortnightly question are the week's copy, chosen
+once, and moving them because someone stepped on a scale would move the target
+a client is working towards three days in.
+
+**2. It says which week it is about.**
+The read reviews the week that FINISHED, and now carries **"LAST WEEK ·
+<range>"**. The label is on the read alone, not the panel: the focus line above
+it is about the week AHEAD, and labelling that "last week" would mislabel the
+one instruction the client acts on. The writer is also barred from narrating the
+week in progress — `CLAIMS_THIS_WEEK`, which has guarded the programming
+question since 1 Sep, now runs on the read too.
+
+**What the card means now, top to bottom:** the tiles own the week in progress.
+The focus line owns the week ahead. The read owns the week that finished. Body
+weight is the one present-tense figure in the read, which is why a weigh-in is
+what triggers the rewrite.
+
+---
+
 ## Interlude — the coach could not ADD to a meal  ·  5 Sep 2026
 
 Not a walked screen. Recorded here because it changes what the coach chat can

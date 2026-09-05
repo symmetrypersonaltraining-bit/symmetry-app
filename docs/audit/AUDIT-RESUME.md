@@ -407,10 +407,30 @@ is working towards, three days in. A refresh also uses the `"now"` windows and
 `weekStartOf(today)`, not the Saturday `"nextWeek"` shift, so it describes the
 week it is written in.
 
-The other three options, if this proves not enough: bar the writer from quoting
-any figure the card already shows live; rewrite daily (~7x the calls); or
-re-frame the paragraph under a "Last week" heading, which is what it actually
-is.
+**Then he took the fourth option too** — *"reframe it last week as well since
+thats what it's reading"* — and it is the other half of the same bug. The read
+reviews the week that FINISHED; it sat under the CURRENT week's date range with
+current-week tiles above it, so it read as a comment on this week and lost every
+argument with the tiles.
+
+Two halves shipped together:
+
+- The block on the home card now carries **"LAST WEEK · <range>"**, from
+  `s.lastWkStart`/`s.lastWkEnd`. Deliberately on the read only, not the whole
+  panel — the focus line above it IS about the week ahead, and labelling that
+  "last week" would mislabel the one instruction the client acts on.
+- The writer may no longer narrate the week in progress at all. The prompt says
+  so, and `CLAIMS_THIS_WEEK` — which has guarded the programming question since
+  1 Sep for this exact reason and was never applied to the read — now runs on
+  the read. It returns null from `validateWeekly` rather than editing the
+  sentence, so the model gets `callClaudeJson`'s retry; if it fails twice
+  nothing is written and the previous read stands.
+
+Body weight is the deliberate exception and stays present tense — it is the
+number as it stands now, which is the whole point of refreshing on a weigh-in.
+
+The one option not taken, if this still proves not enough: rewrite daily (~7x
+the calls).
 
 ## Also fixed 4 Sep
 
