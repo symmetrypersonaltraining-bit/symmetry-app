@@ -19,6 +19,7 @@ import {
 } from "@/lib/nutrition/nutrients";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 import { namedServings, multiplierForNamed, defaultAmountFor, type NamedServing } from "@/lib/servingOptions";
+import { preferredServing } from "@/lib/nutrition/foodResolve";
 import Sheet from "./Sheet";
 import BarcodeScanner from "./BarcodeScanner";
 
@@ -145,11 +146,47 @@ async function borrowUnits(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any, f: CatalogFood,
 ): Promise<NamedServing[]> {
+  // A PLAIN TABLE READ, NOT AN RPC, AND THAT IS THE POINT.
+  //
+  // The first attempt called a new `borrowed_household_servings` function. It
+  // returned the right answer to every test run against the database directly
+  // and NOTHING on Dustin's phone, twice, because a browser reaches Postgres
+  // through PostgREST and PostgREST serves functions from a cached schema. A
+  // function created minutes earlier is a 404 until that cache turns over —
+  // silently, into the catch below, so the screen just carried on showing
+  // grams while every check I could run said fixed.
+  //
+  // This reads food_catalog, which this sheet already reads on every keystroke.
+  // If the search results render, this works. There is no cache to wait for and
+  // no grant to get wrong.
+  //
+  // (The server-side resolver still uses the SQL function: it runs with the
+  //  service role over a direct connection, where none of the above applies.)
+  const toks = (f.name || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length >= 3);
+  const noun = toks[toks.length - 1];
+  if (!noun) return [];
   try {
-    const { data } = await db.rpc("borrowed_household_servings", {
-      p_name: f.name, p_brand: f.brand ?? null,
-    });
-    return namedServings(data);
+    const { data } = await db.from("food_catalog")
+      .select("name, serving_options")
+      .eq("verified", true)
+      .ilike("name", `%${noun}%`)          // uses food_catalog_name_trgm_idx
+      .limit(80);
+    const rows = (data || []) as { name: string; serving_options: unknown }[];
+    let best: { units: NamedServing[]; overlap: number; len: number } | null = null;
+    for (const r of rows) {
+      const units = namedServings(r.serving_options);
+      if (!units.length) continue;
+      const lender = (r.name || "").toLowerCase();
+      // How much of THIS food's name the candidate explains. That ranking is
+      // what keeps peanut butter off dairy butter's 14.2 g tablespoon:
+      // "Peanut butter, smooth" explains two of its words, "Butter, salted" one.
+      const overlap = toks.reduce((n, t) => n + (lender.includes(t) ? 1 : 0), 0);
+      const len = lender.length;
+      if (!best || overlap > best.overlap || (overlap === best.overlap && len < best.len)) {
+        best = { units, overlap, len };
+      }
+    }
+    return best ? best.units : [];
   } catch {
     // Grams still work. A failed borrow is the screen it was before.
     return [];
@@ -283,23 +320,36 @@ export default function FoodSearchSheet({
     const ps = parseServing(f.serving);
     setPicked(f);
     setShowNutrients(false);
+    // "100 g" is how the macros are STORED, not how anyone eats. When the food
+    // knows what one of itself weighs, open on one of those — Dustin, 17 Aug,
+    // opening HARD BOILED EGGS and being offered a hundred grams of egg.
+    //
+    // ⚠️ THIS RUNS BEFORE THE BORROW, AND IT HAS TO. It used to run after, so
+    // on a food with no serving of its own it recomputed the default from the
+    // EMPTY original list and overwrote the borrowed one a line later. The
+    // units were fetched and then thrown away.
+    const better = defaultAmountFor(f.serving, f.named, f.baseGrams);
+    setAmt(String(better ? better.amount : ps.amount));
+    setUnit(better ? better.unit : ps.unit);
+
     // The sheet is already on screen with grams by the time this returns, so a
     // slow borrow costs nothing but a late extra option.
     if (!f.named.length && f.baseGrams) {
       const borrowed = await borrowUnits(supabase, f);
       if (borrowed.length) {
-        const withUnits = { ...f, named: borrowed, borrowedUnits: true };
-        setPicked(withUnits);
+        setPicked({ ...f, named: borrowed, borrowedUnits: true });
+        // defaultAmountFor only opens on a named unit when the row's own base
+        // serving is a plain weight. A row whose serving string is missing or
+        // odd would keep grams even with a tablespoon now in the list, so the
+        // fallback picks the borrowed set's own best portion.
         const b = defaultAmountFor(f.serving, borrowed, f.baseGrams);
-        if (b) { setAmt(String(b.amount)); setUnit(b.unit); }
+        const pick = b || (() => {
+          const s2 = preferredServing(borrowed.map((n) => ({ label: n.label, gramsEach: n.gramsPerUnit })));
+          return s2 ? { amount: 1, unit: s2.label } : null;
+        })();
+        if (pick) { setAmt(String(pick.amount)); setUnit(pick.unit); }
       }
     }
-    // "100 g" is how the macros are STORED, not how anyone eats. When the food
-    // knows what one of itself weighs, open on one of those — Dustin, 17 Aug,
-    // opening HARD BOILED EGGS and being offered a hundred grams of egg.
-    const better = defaultAmountFor(f.serving, f.named, f.baseGrams);
-    setAmt(String(better ? better.amount : ps.amount));
-    setUnit(better ? better.unit : ps.unit);
   }
 
   // Step size that suits the unit: 5 for g/ml (nobody nudges oil by 0.25 g),

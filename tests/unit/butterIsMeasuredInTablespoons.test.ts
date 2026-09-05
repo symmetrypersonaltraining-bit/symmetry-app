@@ -130,13 +130,48 @@ test("nothing matched means nothing offered", () => {
 
 test("the food sheet borrows only when the row knows no portion", () => {
   assert.match(code(SHEET), /if \(!f\.named\.length && f\.baseGrams\) \{/);
-  assert.match(code(SHEET), /rpc\("borrowed_household_servings"/);
   // The sheet is on screen before the borrow returns — a slow lookup must not
   // hold up the food the client already tapped.
   const i = code(SHEET).indexOf("async function openPicked");
-  const body = code(SHEET).slice(i, i + 900);
+  const body = code(SHEET).slice(i, i + 1800);
   assert.ok(body.indexOf("setPicked(f);") < body.indexOf("borrowUnits("),
     "the sheet waits on the borrow before showing the food");
+});
+
+test("THE BROWSER USES A PLAIN TABLE READ, NOT A NEW RPC", () => {
+  // This is the one that cost two rounds. The first version called a brand-new
+  // SQL function. It returned the right answer to every check run against the
+  // database directly and NOTHING on his phone, twice — because a browser
+  // reaches Postgres through PostgREST, and PostgREST serves functions from a
+  // CACHED SCHEMA. A function created minutes earlier is a 404 until that cache
+  // turns over, and the 404 landed in the catch and became "no units", so the
+  // screen carried on showing grams while every test I could run said fixed.
+  //
+  // food_catalog is read by this sheet on every keystroke. If the search
+  // results render, this works.
+  assert.ok(!/rpc\("borrowed_household_servings"/.test(code(SHEET)),
+    "the browser is calling the RPC again — it is invisible when PostgREST has not reloaded");
+  assert.match(code(SHEET), /db\.from\("food_catalog"\)/);
+  assert.match(code(SHEET), /\.eq\("verified", true\)/);
+  assert.match(code(SHEET), /\.ilike\("name", `%\$\{noun\}%`\)/);
+});
+
+test("the borrowed default is not overwritten a line later", () => {
+  // It was. The plain default ran AFTER the await, recomputed from the food's
+  // own EMPTY unit list, and overwrote the borrowed one — so the units were
+  // fetched and then thrown away, which is exactly what he kept seeing.
+  const body = code(SHEET).slice(code(SHEET).indexOf("async function openPicked"));
+  const plainDefault = body.indexOf("const better = defaultAmountFor(f.serving, f.named, f.baseGrams);");
+  const borrow = body.indexOf("await borrowUnits(");
+  assert.ok(plainDefault > -1 && borrow > -1 && plainDefault < borrow,
+    "the plain default still runs after the borrow and overwrites it");
+});
+
+test("a food whose base serving is odd still opens on the borrowed portion", () => {
+  // defaultAmountFor only opens on a named unit when the row's own base serving
+  // is a plain weight. Without this fallback a row with a missing or unusual
+  // serving string keeps grams even with a tablespoon sitting in the list.
+  assert.match(code(SHEET), /preferredServing\(borrowed\.map/);
 });
 
 test("a failed borrow leaves grams working", () => {

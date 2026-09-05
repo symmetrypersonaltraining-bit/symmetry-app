@@ -346,6 +346,24 @@ butters on his screen came back empty. What works: the last significant word of
 the package name IS the food, so that word must appear in the source row, and
 the rest is ranking.
 
+**⚠️ AND IT WAS INVISIBLE ON THE PHONE FOR TWO ROUNDS, FOR A REASON WORTH
+REMEMBERING.** The lookup was first written as a new SQL function. It answered
+correctly against the database every single time — which is the layer that was
+being tested — and did nothing at all in the app, because a browser reaches
+Postgres through PostgREST and **PostgREST serves functions from a cached
+schema**. A function created minutes earlier is a 404 until that cache turns
+over, and the 404 landed in the catch and became "no units", so the screen
+carried on showing grams while every check said fixed.
+
+It now reads `food_catalog` directly — the table this sheet already queries on
+every keystroke. If the search results render, the units work. **A new RPC is
+not verifiable from a SQL console; a table read is.**
+
+The second bug was in the same function and would have hidden the fix anyway:
+the line setting the default portion ran AFTER the lookup, recomputed from the
+food's own empty unit list, and overwrote the borrowed portion a line later. The
+units were fetched and thrown away. It now runs before.
+
 **Nothing is backfilled, and that was a decision, not an omission.** 276,275 of
 the catalogue's 574,667 rows carry no countable portion. A set-based backfill
 was written, sampled and thrown away: the loose rule matched 162,286 and the
