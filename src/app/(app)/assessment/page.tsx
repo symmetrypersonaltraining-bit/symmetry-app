@@ -29,6 +29,9 @@ interface AssessmentData {
   pain_onset: string;
   hip_issues: boolean;
   prior_surgeries: string;
+  contraindication_flags: string[];
+  contraindicated_movements: string;
+  trainer_notes: string;
 
   // OHSA
   feet_turn_out: boolean;
@@ -72,6 +75,7 @@ const defaultData: AssessmentData = {
   medical_clearance: false, has_pain: false, current_injuries: '',
   chronic_conditions: '', medications: '', pain_location: '',
   pain_onset: '', hip_issues: false, prior_surgeries: '',
+  contraindication_flags: [], contraindicated_movements: '', trainer_notes: '',
   feet_turn_out: false, excessive_forward_lean: false, knees_cave_in: false,
   low_back_arch: false, arms_fall_forward: false, forward_head: false,
   lateral_asymmetry: false, balance_deficits: false, ohsa_notes: '',
@@ -82,6 +86,33 @@ const defaultData: AssessmentData = {
   target_weight: '', goal_notes: '',
   occupation_type: '', stress_level: 5, sleep_hours: '', nutrition_notes: '',
 };
+
+/**
+ * The recurring contraindications, as chips.
+ *
+ * Every one of these is taken FROM a real client's note, not invented — the
+ * eight that existed on 5 Sep between them cover all twelve. They are a fast
+ * index over the free-text box beside them, never a replacement for it.
+ *
+ * NOT HARD RULES. Dustin, 5 Sep: "they are not hard rules but ai needs to ask
+ * about contradictions w a mild warning before overriding them." So a chip is
+ * something the coach raises and asks about; it never refuses and never
+ * silently ignores.
+ */
+const CONTRA_FLAGS = [
+  'No spinal loading',
+  'No impact / jumping',
+  'No loaded overhead pressing',
+  'No horizontal pressing',
+  'Seated or supported only',
+  'No unstable-surface work',
+  'Balance work needs support in reach',
+  'Pain-free range only',
+  'No deep or loaded knee flexion',
+  'No loaded end-range spinal rotation or side bend',
+  'Cap lower-back / hinge loading',
+  'Machine-led, controlled range',
+] as const;
 
 const SECTIONS = [
   'Personal Info',
@@ -276,6 +307,9 @@ export default function AssessmentPage() {
         pain_onset: data.has_pain ? data.pain_onset : null,
         hip_issues: data.hip_issues,
         prior_surgeries: data.prior_surgeries,
+        contraindication_flags: data.contraindication_flags,
+        contraindicated_movements: data.contraindicated_movements,
+        trainer_notes: data.trainer_notes,
         feet_turn_out: data.feet_turn_out,
         excessive_forward_lean: data.excessive_forward_lean,
         knees_cave_in: data.knees_cave_in,
@@ -429,6 +463,50 @@ export default function AssessmentPage() {
             </Field>
             <Field label="Prior Surgeries">
               {VoiceInput({ field: "prior_surgeries", placeholder: "e.g., ACL repair 2019, hip replacement 2022...", multiline: true })}
+            </Field>
+
+            {/* ── WHAT TO WORK AROUND ────────────────────────────────────────
+                The single most important thing on this form, and until 5 Sep
+                there was nowhere to type it. Eight clients carried a
+                contraindication note written straight to the database, because
+                the column existed and the form did not know about it.
+
+                BOTH SHAPES, at Dustin's instruction. The chips are the ones
+                that actually recur across his eight real notes — none of them
+                invented — and the box underneath is where the judgement lives.
+                "Predictability is a clinical requirement for his cognitive
+                load, not a preference" is a sentence about Greg that no
+                checkbox can hold, and flattening it would lose the reason. */}
+            <div style={{ height: 6 }} />
+            <Field label="Work around — the ones that come up often">
+              <div className="flex flex-wrap gap-2">
+                {CONTRA_FLAGS.map((f) => {
+                  const on = data.contraindication_flags.includes(f);
+                  return (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => set('contraindication_flags', on
+                        ? data.contraindication_flags.filter((x) => x !== f)
+                        : [...data.contraindication_flags, f])}
+                      className="px-3 py-2 rounded-xl border text-xs font-semibold text-left transition-all card-hover"
+                      style={{
+                        backgroundColor: on ? 'rgba(239,68,68,0.12)' : 'var(--brand-bg)',
+                        borderColor: on ? 'rgba(239,68,68,0.4)' : 'var(--brand-border)',
+                        color: on ? '#f87171' : 'var(--brand-text-secondary)',
+                      }}
+                    >
+                      {f}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+            <Field label="Anything else to work around — in your words">
+              {VoiceInput({ field: "contraindicated_movements", placeholder: "e.g. zero spinal loading, lumbar fusion. Seated or supported only for strength. Balance work needs a rail within reach...", multiline: true })}
+            </Field>
+            <Field label="Trainer notes">
+              {VoiceInput({ field: "trainer_notes", placeholder: "Anything about how to coach this person that is not a movement restriction...", multiline: true })}
             </Field>
           </div>
         );

@@ -543,9 +543,10 @@ export const TUTORIAL: TutorialChapter[] = [
         body: [
           "The third step is an overhead squat assessment. You tick what you actually see: feet turning out, forward lean, knees caving, low back arching, arms falling forward, forward head, lateral shift, balance.",
           "This drives the recommendation at the end. Tick honestly and skip nothing — an assessment filled in from memory produces a program built on a guess.",
+          "The step before it, medical history, now ends with what to work around. Chips for the ones that recur — no spinal loading, no impact, seated only, pain-free range and the rest — then a box for anything those cannot hold, and one for trainer notes. Their coach reads all of it.",
         ],
         narration:
-          "The third step is an overhead squat assessment. You tick what you actually see. Feet turning out, forward lean, knees caving, low back arching, arms falling forward, forward head, a lateral shift, balance. This drives the recommendation at the end, so tick it honestly and skip nothing. An assessment filled in from memory produces a program built on a guess.",
+          "The third step is an overhead squat assessment. You tick what you actually see. Feet turning out, forward lean, knees caving, low back arching, arms falling forward, forward head, a lateral shift, balance. This drives the recommendation at the end, so tick it honestly. The step before it now ends with what to work around. Chips for the ones that recur, then a box for anything those cannot hold, and one for trainer notes. Their coach reads all of it.",
         audioUrl: null,
       },
       {
@@ -567,10 +568,10 @@ export const TUTORIAL: TutorialChapter[] = [
         title: "The client file",
         body: [
           "Six tabs. Overview is the summary — recent sessions, weight and body fat trends. Training is their calendar. Billing is their schedule and reminders. Assessment is the clinical record, including the contraindicated movements list. Progress is charts. Info is the editable profile.",
-          "Two fields on Info matter more than they look. Contraindicated movements is a hard never — put anything there that must not be programmed, ever. And trainer notes are internal; the client never sees them.",
+          "Two fields matter more than they look, and they are on the assessment as well as on Info. Contraindicated movements is what to work around — their coach reads it, warns them when something they ask for cuts across it, and asks before going ahead. It does not refuse them. And trainer notes are internal; the client never sees them.",
         ],
         narration:
-          "Six tabs. Overview is the summary, with recent sessions and their weight and body fat trends. Training is their calendar. Billing is their schedule and reminders. Assessment is the clinical record. Progress is charts. Info is the editable profile. Two fields matter more than they look. Contraindicated movements is a hard never. Put anything there that must not be programmed under any circumstances. And trainer notes are internal. The client never sees them.",
+          "Six tabs. Overview is the summary, with recent sessions and their weight and body fat trends. Training is their calendar. Billing is their schedule and reminders. Assessment is the clinical record. Progress is charts. Info is the editable profile. Two fields matter more than they look, and they sit on the assessment as well as on Info. Contraindicated movements is what to work around. Their coach reads it, warns them when something they ask for cuts across it, and asks before going ahead. It does not refuse them. And trainer notes are internal. The client never sees them.",
         audioUrl: null,
       },
       {

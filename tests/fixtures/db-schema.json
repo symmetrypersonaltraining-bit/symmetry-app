@@ -325,6 +325,7 @@
     "cardio_modality",
     "cardio_intensity",
     "contraindicated_movements",
+    "contraindication_flags",
     "block_length_weeks",
     "block_start_date",
     "source",

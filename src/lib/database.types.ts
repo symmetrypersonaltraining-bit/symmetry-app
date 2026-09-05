@@ -3825,6 +3825,7 @@ export type Database = {
           compensation_confidence: Json | null
           compensation_severity: Json | null
           contraindicated_movements: string | null
+          contraindication_flags: string[] | null
           created_at: string | null
           created_by_trainer_id: string | null
           current_injuries: string | null
@@ -3894,6 +3895,7 @@ export type Database = {
           compensation_confidence?: Json | null
           compensation_severity?: Json | null
           contraindicated_movements?: string | null
+          contraindication_flags?: string[] | null
           created_at?: string | null
           created_by_trainer_id?: string | null
           current_injuries?: string | null
@@ -3963,6 +3965,7 @@ export type Database = {
           compensation_confidence?: Json | null
           compensation_severity?: Json | null
           contraindicated_movements?: string | null
+          contraindication_flags?: string[] | null
           created_at?: string | null
           created_by_trainer_id?: string | null
           current_injuries?: string | null

@@ -195,8 +195,8 @@
       "id": "clients-screen",
       "chapter": "clients",
       "title": "The movement screen inside the assessment",
-      "text": "The third step is an overhead squat assessment. You tick what you actually see. Feet turning out, forward lean, knees caving, low back arching, arms falling forward, forward head, a lateral shift, balance. This drives the recommendation at the end, so tick it honestly and skip nothing. An assessment filled in from memory produces a program built on a guess.",
-      "words": 60
+      "text": "The third step is an overhead squat assessment. You tick what you actually see. Feet turning out, forward lean, knees caving, low back arching, arms falling forward, forward head, a lateral shift, balance. This drives the recommendation at the end, so tick it honestly. The step before it now ends with what to work around. Chips for the ones that recur, then a box for anything those cannot hold, and one for trainer notes. Their coach reads all of it.",
+      "words": 80
     },
     {
       "id": "clients-invite",
@@ -209,8 +209,8 @@
       "id": "clients-tabs",
       "chapter": "clients",
       "title": "The client file",
-      "text": "Six tabs. Overview is the summary, with recent sessions and their weight and body fat trends. Training is their calendar. Billing is their schedule and reminders. Assessment is the clinical record. Progress is charts. Info is the editable profile. Two fields matter more than they look. Contraindicated movements is a hard never. Put anything there that must not be programmed under any circumstances. And trainer notes are internal. The client never sees them.",
-      "words": 73
+      "text": "Six tabs. Overview is the summary, with recent sessions and their weight and body fat trends. Training is their calendar. Billing is their schedule and reminders. Assessment is the clinical record. Progress is charts. Info is the editable profile. Two fields matter more than they look, and they sit on the assessment as well as on Info. Contraindicated movements is what to work around. Their coach reads it, warns them when something they ask for cuts across it, and asks before going ahead. It does not refuse them. And trainer notes are internal. The client never sees them.",
+      "words": 98
     },
     {
       "id": "clients-ai-assist",
