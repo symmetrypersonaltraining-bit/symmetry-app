@@ -124,6 +124,19 @@ rule 6 still holds. Each screen gets a mockup Dustin approves before it changes.
 programme; each is programmed personally, day by day, in 6-week blocks, from the
 library. This applies to every screen and most of them have not been walked yet.
 
+## Waiting for the Nutrition screen
+
+- **The numbers are wrong.** Dustin, 4 Sep, from the Coach sheet on the
+  Nutrition page: "numbers are way off." The screenshot has Coach saying M6 as
+  written is 766 kcal (44P/61C/39F) and that the day lands at **4,573 kcal**
+  against a **4,462** target. Both the day total and the target need checking
+  against the meal plan and the logged rows before anything else on that screen
+  is touched — a coaching line built on a wrong total is worse than no line.
+  This is BOTH a Nutrition-screen item and an AI-component item, so it belongs
+  in step 0 of that screen's walk as well.
+- **Nutrition %** — he is unhappy with how it calculates. Rule to be captured at
+  that screen so both places change together.
+
 ## Carried decisions not yet built
 
 - **A light/dark toggle per colour scheme.** Requested 4 Sep. Today `AutoDark`
