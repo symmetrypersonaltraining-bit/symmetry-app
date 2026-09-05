@@ -38,6 +38,12 @@ export interface CatalogFood {
    * their corrected version rather than the wrong one again.
    */
   barcode?: string | null;
+  /**
+   * True when the unit list came from another row. The food's own numbers are
+   * untouched — only the household measures are borrowed, and their gram
+   * weights are shown in the picker so they can be checked.
+   */
+  borrowedUnits?: boolean;
   source?: string | null; // usda | brand | restaurant | client | ...
   client_id?: string | null;
   // food_catalog has carried these since the OFF/USDA import and nothing ever
@@ -111,6 +117,43 @@ function mapRow(raw: Record<string, unknown>, fromCatalog: boolean): CatalogFood
     named: namedServings(raw.serving_options),
     baseGrams: nOrNull(raw.serving_grams),
   };
+}
+
+/**
+ * BUTTER IS MEASURED IN TABLESPOONS, WHATEVER THE ROW SAYS.
+ *
+ * Dustin, 5 Sep: *"why are we still fighting this? butter shouod measure in
+ * tablespoons i thought we fixed all this."*
+ *
+ * What was fixed on 4 Sep was WHICH of a row's own servings gets picked. This
+ * is the case underneath it: a row with no countable serving at all. He
+ * searched his actual butter — Kerrygold Salted Irish Butter — and got it,
+ * correctly. That row comes from Open Food Facts and carries exactly two
+ * options, "100 g" and "1 oz", so grams was the only honest thing to offer.
+ *
+ * Not a rare shape. Of the catalogue's butter rows 7,218 are crowd-submitted
+ * and 318 are USDA-verified; only 31 carry a tablespoon. The foods it hurts are
+ * the ones nobody weighs — butter, oil, peanut butter, honey, mayonnaise, jam.
+ *
+ * The grams are borrowed from the best-matching VERIFIED row for the same food,
+ * never invented: USDA's "Butter, salted" has carried "1 tbsp (14.2 g)",
+ * "1 pat (5 g)", "1 stick (113 g)" all along. Matching is by shared name tokens
+ * with the head noun required, which is what stops peanut butter taking dairy
+ * butter's 14.2 g — see the migration for why.
+ */
+async function borrowUnits(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any, f: CatalogFood,
+): Promise<NamedServing[]> {
+  try {
+    const { data } = await db.rpc("borrowed_household_servings", {
+      p_name: f.name, p_brand: f.brand ?? null,
+    });
+    return namedServings(data);
+  } catch {
+    // Grams still work. A failed borrow is the screen it was before.
+    return [];
+  }
 }
 
 export default function FoodSearchSheet({
@@ -236,10 +279,21 @@ export default function FoodSearchSheet({
 
   // Open the amount picker for a food, seeded with its own base serving so the
   // default ("25 g") is what the trainer wrote — then it's freely editable.
-  function openPicked(f: CatalogFood) {
+  async function openPicked(f: CatalogFood) {
     const ps = parseServing(f.serving);
     setPicked(f);
     setShowNutrients(false);
+    // The sheet is already on screen with grams by the time this returns, so a
+    // slow borrow costs nothing but a late extra option.
+    if (!f.named.length && f.baseGrams) {
+      const borrowed = await borrowUnits(supabase, f);
+      if (borrowed.length) {
+        const withUnits = { ...f, named: borrowed, borrowedUnits: true };
+        setPicked(withUnits);
+        const b = defaultAmountFor(f.serving, borrowed, f.baseGrams);
+        if (b) { setAmt(String(b.amount)); setUnit(b.unit); }
+      }
+    }
     // "100 g" is how the macros are STORED, not how anyone eats. When the food
     // knows what one of itself weighs, open on one of those — Dustin, 17 Aug,
     // opening HARD BOILED EGGS and being offered a hundred grams of egg.

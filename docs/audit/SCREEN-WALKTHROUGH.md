@@ -302,6 +302,48 @@ against adherence also penalises every swap.
 
 ---
 
+## Interlude — butter had no tablespoon  ·  5 Sep 2026
+
+Dustin: *"why are we still fighting this? butter shouod measure in tablespoons i
+thought we fixed all this."*
+
+Fair question, and the answer is that 4 Sep fixed a different thing. That fixed
+WHICH of a row's own servings gets picked — a real piece over a cup. This is the
+case underneath: **a row with no countable serving at all.**
+
+He searched his actual butter, Kerrygold Salted Irish Butter, and got it,
+correctly. That row is Open Food Facts and carries exactly "100 g" and "1 oz",
+so grams was the only honest thing to offer. Of the catalogue's butter rows
+**7,218 are crowd-submitted and 318 are USDA-verified; only 31 carry a
+tablespoon.** The foods it hurts are the ones nobody weighs.
+
+**A weight-only row now borrows the household measures of the best-matching
+VERIFIED row for the same food.** No invented grams — USDA's "Butter, salted"
+has carried "1 tbsp (14.2 g)", "1 pat (5 g)", "1 stick (113 g)" all along.
+`borrowed_household_servings(name, brand)` matches on shared name tokens, most
+overlap first, head noun required.
+
+| search | now offers |
+|---|---|
+| Salted Irish Butter | pat 5 g · tbsp 14.2 g · stick 113 g · cup 227 g |
+| Peanut Butter | 2 tbsp (32 g) → **16 g each**, not dairy butter's 14.2 |
+| Extra Virgin Olive Oil | tablespoon 14 g · teaspoon 4.5 g |
+| Raw Honey | tbsp 21 g · cup 339 g |
+| Cream Cheese | tbsp 14.5 g |
+
+The peanut butter row is the one that matters: the head-noun-plus-overlap rule
+is what stops it taking dairy butter's tablespoon, which would be an 11% error
+on every spoonful and invisible.
+
+The sheet renders the food first and the units arrive a beat later, so a slow
+lookup never holds up what was tapped; a failed lookup leaves grams working.
+**The AI resolver also asks the catalogue before it asks a model** — 4 Sep's
+portion question costs a Haiku call and returns an estimate, and a borrowed
+serving is a real number from a real row, so the model is only asked when the
+catalogue has nothing.
+
+---
+
 ## Interlude — the coach's read said 207 when he was 205  ·  5 Sep 2026
 
 Dustin: *"its reading weight from the wrong place. im at 205."*

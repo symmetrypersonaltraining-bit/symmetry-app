@@ -17,6 +17,7 @@ import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import {
   CatalogRow, ResolvedFood, Serving, macrosFromRow, describeCandidates, PICK_SYSTEM, validatePick,
   TERMS_SYSTEM, validateTerms, householdServing, servingByUnit,
+  parseServingOption, preferredServing,
   ESTIMATE_SYSTEM, validateEstimate, estimatedFood, toGrams, isGenericUnit,
   PORTION_SYSTEM, validatePortion,
 } from "@/lib/nutrition/foodResolve";
@@ -229,7 +230,35 @@ export async function resolveFood(
     || !!servingByUnit(row, askedUnit)         // the row's own countable serving
     || (!askedUnit && !!hh);                   // no measure named, and the row has one
   let fallbackServing: Serving | null = null;
+
+  // ── THE CATALOGUE FIRST, EVEN FOR THE PORTION ─────────────────────────────
+  //
+  // Added 5 Sep, after Dustin: "butter shouod measure in tablespoons i thought
+  // we fixed all this." A row with no countable serving of its own can borrow
+  // the household measures of the best-matching VERIFIED row for the same food
+  // — USDA's "Butter, salted" has carried "1 tbsp (14.2 g)" all along. That is a
+  // real number from a real row, so it beats asking a model for the weight, and
+  // it costs a query instead of a call.
   if (!rowKnowsIt) {
+    try {
+      const { data } = await deps.db.rpc("borrowed_household_servings", {
+        p_name: row.name, p_brand: (row as CatalogRow & { brand?: string | null }).brand ?? null,
+      });
+      const opts = Array.isArray(data) ? (data as { desc: string; grams: number }[]) : [];
+      const parsed = opts.map(parseServingOption);
+      // The measure they NAMED, if the borrowed set has it; otherwise the one a
+      // person would reach for, through the same chooser as everywhere else.
+      const byName = askedUnit
+        ? parsed.find((p) => p && (p.label.replace(/s$/, "") === askedUnit.trim().toLowerCase().replace(/s$/, "")
+            || p.label.includes(askedUnit.trim().toLowerCase())))
+        : null;
+      fallbackServing = byName || preferredServing(parsed);
+    } catch {
+      // A failed borrow just means the question below gets asked.
+    }
+  }
+
+  if (!rowKnowsIt && !fallbackServing) {
     const portion = await callClaudeJson({
       meter: { clientId: deps.clientId, feature: "food_parse" },
       apiKey: deps.apiKey,
