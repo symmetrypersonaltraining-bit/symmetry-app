@@ -116,11 +116,16 @@ general tips, the coach's read on screen, and sessions-with-him protected.
 
 ### Open, small
 
-- **15 supervised workouts sit one day after their appointments** — Lauren
-  Standefer (6) and Sariah Duncan (9). They were stranded by the calendar-sync
-  bug fixed on 5 Sep (`docs/CALENDAR-WINS-WHEN-NEWER-2026-09-05.md`) and none
-  will move on their own. If the offset is not deliberate they want realigning
-  by hand.
+- **Lauren Standefer's recurring Monday 11:00 in Google Calendar is a day out.**
+  She has trained Tue/Wed for at least four weeks — six completed sessions, none
+  on a Monday — while the calendar books her Mon/Wed. The sync kept dragging her
+  Glute Dominant session onto Monday and somebody kept dragging it back. Now
+  that the calendar wins when it moved last, the next edit to that Monday
+  appointment WILL pull her session onto the wrong day. One edit in Google
+  Calendar fixes it: Monday 11:00 → Tuesday 11:00. Not an app change.
+  (Sariah Duncan's rows were also flagged and are fine — her Tue/Thu 5am
+  appointments and her workouts agree. See
+  `docs/CALENDAR-WINS-WHEN-NEWER-2026-09-05.md`.)
 
 ### Still unanswered by Dustin
 

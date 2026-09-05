@@ -86,17 +86,46 @@ rows.
 - The bump was reverted to its exact original timestamp, and the dry run
   returned to 0.
 
-## Still worth his eye
+## What the 15 stranded rows turned out to be
 
-The 15 stranded rows are two clients, and both sit exactly **one day after**
-their appointment:
+Chased down after the fix. Two clients, and only ONE of them is a problem.
 
-- **Lauren Standefer** — 6 future sessions, workouts on Mon/Tue, appointments
-  Sun/Mon. Her `moved_at` lands a fraction of a second after the appointment's
-  `updated_at`, so the manual move is treated as the later fact and they stay.
-- **Sariah Duncan** — 9 future sessions, `appointment_id` null (orphans), all
-  moved on 16 Aug.
+### Sariah Duncan — fine, nothing to do
 
-Neither will move on its own. If that one-day offset is not deliberate, they
-want realigning by hand — and once he next moves either client's appointment,
-the new guard will take over for that row anyway.
+Her appointments are **Tue 5:00am and Thu 5:00am**. Her supervised workouts sit
+on **Tue and Thu**. They agree. The manual moves on 16 Aug (Mon→Tue, Wed→Thu)
+were somebody putting them on the right days, and they have been right ever
+since.
+
+The only oddity is cosmetic: her supervised rows carry no `appointment_id`, so
+the sync sees them as orphans rather than linked sessions. Harmless while the
+dates agree — worth linking one day, not worth touching now.
+
+### Lauren Standefer — his Google Calendar is a day out
+
+This is the real finding, and it is about the calendar, not the app.
+
+| | |
+|---|---|
+| Google Calendar says | **Mon 11:00am** and **Wed 11:00am** |
+| The app schedules | **Tue — Glute Dominant** and **Wed — Quad Dominant** |
+| She has actually trained | Tue 11 Aug ✓ · Tue 18 Aug ✓ · Tue 25 Aug ✓ · Wed 26 Aug ✓ · Tue 1 Sep ✓ · Wed 2 Sep ✓ |
+
+Six completed sessions in four weeks, every one of them on a **Tuesday** or a
+Wednesday. Her Monday appointment has no completed session behind it, and her
+Monday in the app holds a *solo* workout — a day she is booked in with him at
+11am has her training alone.
+
+So the recurring Monday 11:00 event is wrong, and it has been quietly fighting
+the app: the sync keeps pulling Glute Dominant onto Monday and a human keeps
+dragging it back to Tuesday. `moved_from_date` shows exactly that on 31 Aug and
+again for every future week.
+
+**Why it matters more now.** Under the old guard those rows were frozen out of
+sync forever, so the fight had stopped. Under the new one, *the next time he
+touches Lauren's Monday appointment the calendar wins* — and it would pull her
+Glute Dominant session onto Monday, which is the day she does not train.
+
+**The fix is one edit in Google Calendar**, not in the app: move her recurring
+Monday 11:00 to Tuesday 11:00. The sync then agrees with reality, the weekly
+drag stops, and the new guard does the right thing rather than the wrong one.
