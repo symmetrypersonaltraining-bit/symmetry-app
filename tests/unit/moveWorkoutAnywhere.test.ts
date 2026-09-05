@@ -114,30 +114,28 @@ test("the tool descriptions tell the model there are no limits", () => {
   // The model refusing on its own is indistinguishable, to Bobbie, from the
   // app refusing. Both descriptions say so explicitly.
   //
-  // RE-ANCHORED 5 Sep 2026, and narrowed on purpose. The client description
-  // used to read "ANY workout can be moved to ANY date"; it now reads "ANY
-  // workout OF THEIRS", because Dustin drew a line that day: "Full control on
-  // their schedule stays as is but I dictate scheduled sessions w me." A
-  // supervised session is a booking in his calendar, and its other half is a
-  // Google event that a client move would leave behind.
-  //
-  // The claim this test makes is unchanged and is still the important one: on
-  // their OWN training there are no limits and the model must not invent any.
-  // The exception is asserted below rather than left implicit, so neither half
-  // can drift without a failure.
-  assert.match(CLIENT_ACTIONS, /ANY workout of theirs can go to ANY date/);
-  assert.match(CLIENT_ACTIONS, /Never invent a restriction/);
+  // This assertion was briefly narrowed on 5 Sep to "ANY workout OF THEIRS",
+  // when a supervised session was read as one a client could not move. Dustin
+  // reversed that the same night: "They can still move supervised sessions
+  // because sometimes if I'm not here, they have to do that workout on their
+  // own." So the original claim stands exactly as it was, and the supervised
+  // case is now a WORDING rule on the way out rather than a limit on the way
+  // in — asserted below.
+  assert.match(CLIENT_ACTIONS, /ANY workout can be moved to ANY date/);
+  assert.match(CLIENT_ACTIONS, /invent one or tell them to ask their coach instead/);
   assert.match(AGENT_TOOLS, /ANY workout can go to ANY date/);
   assert.match(AGENT_TOOLS, /There are NO restrictions/);
 });
 
-test("the client's tool names the one exception, and only that one", () => {
-  // A refusal the model has never been warned about is how one exception turns
-  // back into the "ask your coach" reflex across the board.
-  assert.match(CLIENT_ACTIONS, /THE ONE EXCEPTION is a session WITH the trainer/);
-  assert.match(CLIENT_ACTIONS, /Call this tool anyway/, "the model must still call it rather than pre-judging which sessions are his");
-  // The trainer's own tool keeps no such exception: it is HIS to move.
-  assert.doesNotMatch(AGENT_TOOLS, /EXCEPTION is a session WITH the trainer/);
+test("a supervised session is named as movable, not as an exception", () => {
+  // Left implicit, the model works out for itself that a session with the
+  // trainer is special and starts declining to move it — which is the exact
+  // reflex the description exists to suppress.
+  assert.match(CLIENT_ACTIONS, /INCLUDING a supervised session/);
+  assert.match(CLIENT_ACTIONS, /the trainer is away and they will do it on their own/);
+  // And the only thing that IS constrained is what the AI says afterwards.
+  assert.match(CLIENT_ACTIONS, /ONE WORDING RULE/);
+  assert.doesNotMatch(CLIENT_ACTIONS, /EXCEPTION is a session WITH the trainer/);
 });
 
 test("the model is told to admit it cannot see something, not to theorise", () => {

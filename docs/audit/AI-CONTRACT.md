@@ -194,22 +194,47 @@ system.
 This matches the standing guardrail that NASM language never appears in
 client-facing copy; the new part is that the REASONING must, in plain words.
 
-### On acting: **their schedule is theirs, sessions with him are his**
+### On acting: **everything moves — the AI just has to say what moved**
+
+First reading of this was wrong, and he corrected it the same night. Both halves
+of what he said are here so nobody re-derives the wrong one:
 
 > "I was referring to their scheduled sessions w me. Full control on their
 > schedule stays as is but I dictate scheduled sessions w me."
 
-So the 15 Aug ruling stands untouched — a client's own workouts move anywhere to
-anywhere, past or future, logged or not, no window, no status check. What they
-may not move is a **supervised** session: the app's half of an appointment whose
-other half is an event in his Google Calendar. Moving only one half leaves two
-people disagreeing about when they meet. 259 future sessions carry that flag.
+then, on being shown a build that blocked clients moving supervised sessions:
 
-The refusal must name itself narrowly and say what they CAN still do, or the
-model generalises one refusal back into the "ask your coach" reflex that made
-Bobbie Page give up on the app. And it OFFERS to send the request; it never
-sends on its own, per the standing rule that only what a client deliberately
-sends reaches his inbox.
+> "They can still move supervised sessions because sometimes if I'm not here,
+> they have to do that workout on their own... I just want to make sure the AI
+> does not word it in a way that sounds like they can move their actual sessions
+> with me. The days they train with me are part of my calendar, not the calendar
+> in the app... and, yes, they can swap movements within those workouts as
+> well."
+
+**TWO DIFFERENT THINGS SHARE ONE WORD.** A "session" in this app is a row in
+`scheduled_workouts`. A "session" to a client is a time they meet him in a gym,
+and that lives in **his own calendar**, which the app does not own.
+
+So the 15 Aug ruling stands completely untouched. Every workout moves anywhere
+to anywhere — past or future, logged or not, supervised or not — and moving a
+supervised one because he is away is the normal, intended use, not an edge case.
+Swapping movements inside one is fine too. **There is no permission to add
+here.**
+
+What is constrained is only the SENTENCE. "I've moved your session with Dustin
+to Thursday" is false in the one way that matters: the client turns up on
+Thursday and he is not there. So on a supervised move the tool result tells the
+model which kind it just moved and what to say — the workout moved, the time
+with him did not and is his to change — and forbids the words *moved*,
+*rescheduled* or *changed* applied to their session, appointment or time with
+him.
+
+The model cannot infer this. From its side a supervised row and an ordinary one
+look identical.
+
+⚠️ **Do not turn this back into a refusal.** A block here is the "ask your
+coach" reflex that made Bobbie Page give up on the app on 14 Aug — "i got
+frustrated because it wasnt working and stopped trying."
 
 ### On disclosure: **his assistant, clearly and warmly**
 

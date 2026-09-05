@@ -68,13 +68,15 @@ export const CLIENT_TOOLS = [
   {
     name: "move_my_workout",
     description:
-      "Move one of this client's own workouts to a different date. Use my_schedule first to get the id. " +
-      "ANY workout of theirs can go to ANY date — past or future, scheduled or already completed, logged or not, " +
-      "even one they are part-way through. Never invent a restriction and never tell them to ask their coach " +
-      "instead. If you cannot find the workout, say that; do not guess at a reason it cannot be moved. " +
-      "THE ONE EXCEPTION is a session WITH the trainer — a booked appointment rather than a workout they do on " +
-      "their own. Those are his to move, because the time lives in his calendar. Call this tool anyway; it will " +
-      "tell you if that is what this is, and then say so plainly and offer to send him the request.",
+      "Move one of this client's workouts to a different date. Use my_schedule first to get the id. " +
+      "ANY workout can be moved to ANY date — past or future, scheduled or already completed, logged or not, " +
+      "even one they are part-way through, and INCLUDING a supervised session, which they often move because " +
+      "the trainer is away and they will do it on their own. There are no restrictions and you must never " +
+      "invent one or tell them to ask their coach instead. If you cannot find the workout, say that; do not " +
+      "guess at a reason it cannot be moved. " +
+      "ONE WORDING RULE: moving a supervised workout moves the WORKOUT, not their appointment with the trainer " +
+      "— that time lives in his own calendar, which this app does not touch. The tool result will tell you when " +
+      "you have just moved one of those and exactly what to say.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -408,37 +410,6 @@ export async function runClientTool(
       const row = sw as { id: string; client_id: string; status: string | null; scheduled_date: string; deleted_at: string | null; day_id: string | null; supervised: boolean | null; appointment_id: string | null } | null;
       if (!row || row.client_id !== clientId || row.deleted_at) return "That workout isn't on this client's schedule.";
 
-      // ── THE ONE EXCEPTION: A SESSION WITH THE TRAINER ─────────────────
-      //
-      // Dustin, 5 Sep 2026, asked whether clients should keep control of their
-      // own schedule: "I was referring to their scheduled sessions w me. Full
-      // control on their schedule stays as is but I dictate scheduled sessions
-      // w me."
-      //
-      // A supervised workout is not just a workout on a date — it is the app's
-      // half of an APPOINTMENT, and the appointment lives in Google Calendar,
-      // which is the source of truth for when Dustin is standing in a gym with
-      // this person. Moving the workout here moves only this half: the calendar
-      // entry stays where it was, and now the two disagree about a time two
-      // people are supposed to meet. 259 future sessions carry this flag.
-      //
-      // Note this is a restriction on ONE KIND of row, not a return of the
-      // restraint Dustin removed on 15 Aug ("we can all move workouts from
-      // anywhere to anywhere period"). Their own training still moves anywhere
-      // to anywhere, past or future, logged or not. What cannot move is a time
-      // they booked with him — and the refusal has to say exactly that, or the
-      // model generalises it back into the "ask your coach" reflex that
-      // frustrated Bobbie Page into giving up.
-      if (row.supervised || row.appointment_id) {
-        return (
-          `Not moved — this one is a session WITH the trainer, not a workout on their own. ` +
-          `The time is a booking in his calendar and only he can change it. ` +
-          `Tell the client plainly that this specific session is his to move, that everything else on ` +
-          `their schedule they can still move freely themselves, and offer to send him the request — ` +
-          `do NOT send anything yourself, they have to choose to send it.`
-        );
-      }
-
       // The destination may already hold this same session. That is allowed —
       // it just needs its own slot, or the unique key refuses the write and the
       // client is told "the system doesn't allow duplicates", which is the
@@ -451,9 +422,55 @@ export async function runClientTool(
         .eq("id", swId)
         .eq("client_id", clientId);
       if (error) return `Couldn't move it: ${error.message}`;
-      return movePos > 1
+
+      // ── TWO DIFFERENT THINGS SHARE ONE WORD, AND ONLY ONE OF THEM MOVED ──
+      //
+      // Dustin, 5 Sep 2026, correcting an earlier reading of his own rule:
+      //
+      //   "They can still move supervised sessions because sometimes if I'm not
+      //    here, they have to do that workout on their own... I just want to
+      //    make sure the AI does not word it in a way that sounds like they can
+      //    move their actual sessions with me. The days they train with me are
+      //    part of my calendar, not the calendar in the app."
+      //
+      // and, on what the rule is actually protecting:
+      //
+      //   "I dont want them thinking they can change their schedule w me
+      //    training them through the ai."
+      //
+      // Which is a belief, not a permission. Nothing here is blocked; what is
+      // prevented is a client coming away from a sentence believing their next
+      // session with him is on a different day.
+      //
+      // So this is NOT a permission. The move goes through, for supervised
+      // sessions exactly like any other — if he is away, doing that workout
+      // alone on another day is the whole point, and blocking it would be the
+      // "ask your coach" refusal that made Bobbie Page give up on 14 Aug.
+      //
+      // What is wrong is only the SENTENCE. A supervised workout is the app's
+      // half of an appointment; the other half is an event in his own calendar,
+      // which the app does not own and this write does not touch. "I've moved
+      // your session with Dustin to Thursday" is therefore false in the one way
+      // that matters — the client turns up on Thursday and he is not there.
+      //
+      // The model cannot infer this: from its side both rows look identical.
+      // So the tool result says which kind it just moved, and what the client
+      // must be told about the half that did not move.
+      const moved = movePos > 1
         ? `Moved from ${row.scheduled_date} to ${to} — that day now has ${movePos} sessions.`
         : `Moved from ${row.scheduled_date} to ${to}.`;
+      if (row.supervised || row.appointment_id) {
+        return (
+          `${moved}\n\n` +
+          `⚠️ WORD THIS CAREFULLY. What moved is the WORKOUT in this app. This one was also a session ` +
+          `booked with the trainer, and that booking lives in HIS calendar, which this app does not ` +
+          `change — so their appointment with him has NOT moved. Say you have moved the workout, and ` +
+          `that the time they train with him is unchanged and his to change. Never say you have moved, ` +
+          `rescheduled or changed their session, their appointment, or their time with him. If moving it ` +
+          `is because he will not be there, that is fine and normal — they do that workout on their own.`
+        );
+      }
+      return moved;
     }
 
     if (name === "swap_my_workout") {

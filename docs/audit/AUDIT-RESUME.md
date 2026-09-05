@@ -116,10 +116,11 @@ general tips, the coach's read on screen, and sessions-with-him protected.
 
 ### Still unanswered by Dustin
 
-- **Can a client swap the CONTENT of a session he is supervising?** He ruled on
-  moving those (his). Swapping what they do in a session he is personally
-  running is the same class of question and was not asked. Deliberately not
-  guessed.
+- ~~Can a client swap the CONTENT of a session he is supervising?~~ **ANSWERED
+  5 Sep: yes.** "they can swap movements within those workouts as well." And
+  they can move supervised sessions too — see the acting ruling in
+  AI-CONTRACT.md, which was corrected the same night. Nothing is blocked; only
+  the AI's wording is constrained.
 - **What must the AI never do**, beyond peptides, schedules-with-him and the
   standing guardrails.
 - **`clients.ai_focus` is now shown** — but the fourth thing the weekly model
