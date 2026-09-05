@@ -56,13 +56,41 @@ function currentWeekFocus(row: { weekly_focus?: string | null; weekly_focus_week
   return row.weekly_focus || null;
 }
 
+/**
+ * THE COACH'S READ — the two or three sentences of *why* under the one-line
+ * focus.
+ *
+ * The weekly sweep has written this into `clients.ai_focus` every Saturday for
+ * months, describing it in its own prompt as "the training-side read for the
+ * home screen", and NOTHING HAS EVER DISPLAYED IT. Clean grep across the repo
+ * on 5 Sep: no component, no route. Its sibling ai_food_focus is read by the
+ * food logger; this one went straight in the bin. Jennifer Day's, sitting
+ * unread in her row: "the training turnaround this week was real — 5 of 5
+ * sessions after a tough week where only 1 got done."
+ *
+ * Dustin, 5 Sep: "yes I want to show the ai focus set that up ASAP."
+ *
+ * STALENESS IS THE WHOLE RISK. The focus line carries weekly_focus_week and is
+ * hidden the moment it belongs to another week; this column carries only the
+ * DATE it was written, and a paragraph of last week's coaching read as though
+ * it were this week's is worse than no paragraph. The sweep runs late Saturday
+ * for the week starting Sunday, so the read is current when it was written no
+ * earlier than the day before this week began.
+ */
+function currentWeekRead(row: { ai_focus?: string | null; ai_focus_date?: string | null }): string | null {
+  const text = (row.ai_focus || "").trim();
+  if (!text || !row.ai_focus_date) return null;
+  const eveOfThisWeek = addDays(weekStartOf(todayCT()), -1);
+  return row.ai_focus_date >= eveOfThisWeek ? text : null;
+}
+
 interface Summary {
   // THIS week (matches the header + top schedule widget)
   doneThis: number; totalThis: number;
   // LAST week (the once-weekly full-screen review only)
   doneLast: number; totalLast: number;
   weightDelta: number | null; streak: number;
-  focus: string | null; focusSource: string | null; firstName: string;
+  focus: string | null; focusSource: string | null; coachRead: string | null; firstName: string;
   lastWkStart: string; lastWkEnd: string; thisWk: string; thisWkEnd: string;
 }
 
@@ -121,12 +149,13 @@ export default function ClientWeekSummary() {
         let clientName = "";
         let focus: string | null = null;
         let focusSource: string | null = null;
+        let coachRead: string | null = null;
         try { cid = new URLSearchParams(window.location.search).get("forClient"); } catch { cid = null; }
         if (!cid) {
           const { data: userData } = await supabase.auth.getUser();
           const user = userData ? userData.user : null;
           if (!user) return;
-          const col = "id, name, weekly_focus, weekly_focus_week, weekly_focus_source";
+          const col = "id, name, weekly_focus, weekly_focus_week, weekly_focus_source, ai_focus, ai_focus_date";
           // One path for everyone. The trainer branch used to look for a client
           // literally named Dustin, which finds nothing on any other instance —
           // see src/lib/ownClient.ts.
@@ -134,11 +163,12 @@ export default function ClientWeekSummary() {
             id: string; name: string;
             weekly_focus?: string | null; weekly_focus_week?: string | null;
             weekly_focus_source: string | null;
+            ai_focus?: string | null; ai_focus_date?: string | null;
           }>(supabase, user, col);
-          if (own) { cid = own.id; clientName = own.name; focus = currentWeekFocus(own); focusSource = own.weekly_focus_source ?? null; }
+          if (own) { cid = own.id; clientName = own.name; focus = currentWeekFocus(own); focusSource = own.weekly_focus_source ?? null; coachRead = currentWeekRead(own); }
         } else {
-          const { data: c } = await supabase.from("clients").select("id, name, weekly_focus, weekly_focus_week, weekly_focus_source").eq("id", cid).limit(1);
-          if (c && c[0]) { clientName = c[0].name; focus = currentWeekFocus(c[0]); focusSource = c[0].weekly_focus_source ?? null; }
+          const { data: c } = await supabase.from("clients").select("id, name, weekly_focus, weekly_focus_week, weekly_focus_source, ai_focus, ai_focus_date").eq("id", cid).limit(1);
+          if (c && c[0]) { clientName = c[0].name; focus = currentWeekFocus(c[0]); focusSource = c[0].weekly_focus_source ?? null; coachRead = currentWeekRead(c[0]); }
         }
         if (!cid || !on) return;
         if (on) setClientId(cid);
@@ -233,7 +263,7 @@ export default function ClientWeekSummary() {
 
         const firstName = (clientName || "").split(" ")[0] || "there";
         if (!on) return;
-        setS({ doneThis, totalThis, doneLast, totalLast, weightDelta, streak, focus: focus || null, focusSource, firstName, lastWkStart, lastWkEnd, thisWk, thisWkEnd });
+        setS({ doneThis, totalThis, doneLast, totalLast, weightDelta, streak, focus: focus || null, focusSource, coachRead, firstName, lastWkStart, lastWkEnd, thisWk, thisWkEnd });
       } catch { /* fail silent -> render nothing */ }
     })();
     return () => { on = false; };
@@ -374,6 +404,18 @@ export default function ClientWeekSummary() {
             {focusIsAi ? <AiBadge size={30} mood="plan" /> : <CoachBadge size={30} />}
             <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
               <b>Focus:</b> {focusText || (s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " on the calendar this week — let's go.")}
+              {/* THE READ. The focus line is the one instruction; this is the
+                  two or three sentences of why, which the sweep has been
+                  writing every Saturday since long before anything displayed
+                  it. Same panel, not a second card: they are one thought, and
+                  splitting them would put the reasoning somewhere the client
+                  has to go and find. Hidden entirely when stale — see
+                  currentWeekRead. */}
+              {s.coachRead && (
+                <div style={{ marginTop: 7, color: "var(--brand-text-secondary)", fontSize: 12, lineHeight: 1.55 }}>
+                  {s.coachRead}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -400,6 +442,14 @@ export default function ClientWeekSummary() {
               {focusIsAi ? <AiBadge size={30} mood="plan" /> : <CoachBadge size={30} />}
               <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--brand-text)" }}>
                 <b>{focusIsAi ? "Your focus:" : `${coachFirstName}:`}</b> {focusText || ("You've got " + s.totalThis + " session" + (s.totalThis === 1 ? "" : "s") + " scheduled this week. Show up and stack another good one.")}
+                {/* The read belongs here more than anywhere: this takeover IS
+                    the week in review, and the read is the paragraph about the
+                    week that just finished. */}
+                {s.coachRead && (
+                  <div style={{ marginTop: 7, color: "var(--brand-text-secondary)", fontSize: 12, lineHeight: 1.55 }}>
+                    {s.coachRead}
+                  </div>
+                )}
               </div>
             </div>
             <button onClick={dismissBrief} style={{ display: "block", textAlign: "center", background: "var(--brand-primary)", color: "#fff", fontWeight: 800, padding: 14, borderRadius: 15, fontSize: 15, border: "none", width: "100%", cursor: "pointer", marginTop: "auto" }}>
