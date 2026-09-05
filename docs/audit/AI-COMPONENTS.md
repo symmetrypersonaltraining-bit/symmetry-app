@@ -38,11 +38,35 @@ celebration line and the off-plan macro estimates belong to the screens they
 run on (`WorkoutLogger` and the food logger), not here.
 
 **Nothing that pops up or takes over the screen on home uses AI.** Checked in
-code, all zero AI calls: `ClientTakeovers` (the first-run tour),
-`MilestoneToast`, `MilestoneBadges`, `StreakFlame`, `RestDaySlip` /
-`FunMoments`. Their copy is hard-written strings with the client's numbers
-interpolated. `CelebrationScreen` is the only takeover in the app that IS
-written by a model, and it renders inside `WorkoutLogger`, not on home.
+code, all zero AI calls. `ClientTakeovers` carries all seven of them and picks
+one by shelf life:
+
+| Takeover | AI? | Where its words come from |
+|---|---|---|
+| It's your birthday | **no** | written string + their first name |
+| Join the challenge | **no** | the challenge the trainer created, plus their own rank and score |
+| Last week's winner | **no** | the leaderboard row |
+| An announcement | **no** | typed by the trainer |
+| Payment past due | **no** | the invoice row |
+| You've been away | **no** | written string + the day count |
+| When's your birthday? | **no** | written string |
+
+So: the weekly challenge popup is **not** AI, and the birthday takeover is
+**not** AI. `MilestoneToast`, `MilestoneBadges`, `StreakFlame` and the rest-day
+slip are the same — written strings with the client's numbers dropped in.
+
+**There is no AI week-review popup for clients.** The one that existed,
+`SaturdayReview`, was the TRAINER's full-screen focus-approval takeover, it was
+AI (`focus_suggest`), and it is unmounted — still in the repo, rendered nowhere.
+What a client sees at the start of the week is the Weekly Focus line on their
+week card (element 2 below) and, if there was a challenge, the winner takeover.
+
+The birthday bot IS a model — Haiku, `birthday_post` — but it writes a **group
+chat message** in Coach Bot's voice, not a takeover. It gets audited with
+Messages.
+
+`CelebrationScreen` is the only takeover in the app a model writes, and it
+renders inside `WorkoutLogger`.
 
 Also not AI: `ProgrammingQuestion` (a form — though the QUESTION it asks is
 written by the same weekly cron, so it is really a display surface for
@@ -122,13 +146,20 @@ were paid for in bugs:
   invent numbers", and the meal plan is bounded to today so it cannot quote a
   plan that starts next week.
 
-### Open question for Dustin — element 1
+### Changed, 5 Sep — pass 2 is Sonnet for everyone
 
-**Pass 2 runs on Haiku for 33 of 35 clients.** That is the pass that decides
-whether to move a session, swap a workout, or log a weigh-in — the one that can
-do the wrong thing to somebody's week. Extraction was raised to Sonnet for
-Gerard and Sharon on exactly that argument. Should the workout tools go to
-Sonnet for the whole roster?
+Pass 2 ran on Haiku for 33 of 35 clients. It is the pass that can move a
+session, swap a workout or log a weigh-in. Dustin: "go."
+
+`modelFor` gained a `"tools"` job that returns Sonnet at any tier, and both
+routes that put those tools in a client's hands now ask for it — the Coach's
+tool pass, and `/api/ai-assistant` when (and only when) `canAct` is true. They
+run the same loop over the same seven tools, so raising one and not the other
+would have meant the same request answered by a different model depending on
+which door the client came through.
+
+Plain chat is untouched: thirty-five people typing whenever they like, metered
+by volume, still Haiku. Only the turns holding a tool moved.
 
 ---
 
@@ -179,22 +210,54 @@ coach three days ago. And it never reads **last week's focus** — so it cannot
 say "you held last week's focus, add one notch", cannot avoid repeating the same
 line four weeks running, and cannot notice it is contradicting itself.
 
-### Proposed fix — the thinking spec for element 2
+### Built, 5 Sep — the thinking spec for element 2
 
 Not a prompt reword. Give it the material the bar requires, then require it to
 reason in a fixed order:
 
-- add to the context: injuries/limitations, experience, secondary goals,
-  programmed frequency; the **per-session detail** for both weeks (which day,
-  which sections/region, completed or not) so "skipped legs twice" is knowable;
-  the client's memory block; and **last week's focus and whether it was met**.
-- require, before writing: name the one thing that changed most between the two
-  weeks and cite its number; state whether last week's focus was met; check the
-  new focus against the injuries; confirm the focus is not a repeat.
-- and where the data genuinely cannot support a grounded programming question,
-  write **no question** rather than a plausible one — the route already drops a
-  question that describes the coming week, so the machinery for dropping one
-  exists.
+`src/lib/ai/weekly-picture.ts` now builds a second context block, appended to
+the numbers, holding four things the writer never had:
 
-*(Status: element 1 awaiting Dustin's model call on pass 2. Element 2 gaps found
-and proposed; nothing changed in code yet.)*
+- **who they are** — goal, secondary goals, experience, programmed frequency
+  (labelled PLAN, never attendance), and injuries/limitations with the line
+  "anything you tell them to do this week has to be compatible with this".
+- **their sessions, one by one**, across both weeks: the date, the day's label,
+  its focus tags or region, and whether it was completed. This is what makes
+  "they skipped legs twice" a readable fact. 1,143 of 1,195 library days carry
+  focus tags, so the detail is genuinely there; a day that does not say so in
+  words — "not classified — do NOT guess what it worked" — because a silence in
+  a prompt is a space the model fills.
+- **what they have told the coach** — the `ai_client_memory` summary and facts,
+  so the week cannot contradict something they said three days ago.
+- **the focus they were given last week**, with an instruction to judge whether
+  it was met and not to hand them the same line twice.
+
+And the prompt now makes it think in a fixed order before writing: who is this →
+what actually changed (cite the number) → what were they actually programmed
+(and if the sessions show no pattern, THERE IS NO PATTERN) → what have they said
+→ what did you tell them last time, was it met → **now check yourself: could
+every sentence have been written about a different client?**
+
+The programming question changed shape entirely. It must now quote something in
+the session list, and — the part everything else depends on — **an empty string
+is a correct answer**. "A plausible-sounding question you had to invent is worse
+than no question at all: the client reads it as their coach having noticed
+something, and nobody noticed anything."
+
+Both halves are pinned by tests, and they only work together: give the model the
+detail without letting it decline, and it still invents; let it decline without
+giving it the detail, and it declines every week.
+
+---
+
+## Found on the way, not yet actioned
+
+`clients.ai_focus` — the `coachRead`, described in the prompt as "the
+training-side read for the home screen" — is written every week by the sweep and
+**read by nothing**. Clean grep across the repo: no component, no route. Its
+sibling `ai_food_focus` IS read, by the food logger. So one of the four things
+the weekly model is asked to write goes nowhere. Either the home screen should
+show it or the prompt should stop asking for it; the question is Dustin's.
+
+*(Status: elements 1 and 2 both built and shipped 5 Sep. The dead `ai_focus`
+awaits a ruling.)*

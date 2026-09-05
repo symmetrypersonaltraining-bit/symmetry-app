@@ -34,6 +34,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/database.types";
 import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
+import { weeklyClientPicture } from "@/lib/ai/weekly-picture";
 import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
 import { fetchWeeklyComparison } from "@/lib/ai/weekly-context";
@@ -62,9 +63,44 @@ function nextDay(iso: string): string {
 // A function of the coach's name. As a module constant it was built at import
 // time from one build-time environment variable, so every client of every
 // trainer got a line written as the owner.
+// THE SIX THINKING STEPS below exist because of one instruction, 5 Sep 2026:
+// "any ai needs a very detailed way of thinking to make sure its accurate to
+// each client and relevant to them." They are not decoration — step 3 is what
+// stops the model inventing a training pattern it was never shown, and step 6
+// is the bar itself, made into a question the model has to answer before it
+// writes. See lib/ai/weekly-picture.ts for the context they read.
 const WEEKLY_SYSTEM_PROMPT = (coachFirstName: string = COACH_FIRST_NAME) => `You are the coach inside the Symmetry Personal Training app (trainer: ${coachFirstName}), writing this client's week. You are handed their real numbers for last week and this week so far, already computed.
 
 ${WEEKLY_WRITER_RULES(coachFirstName)}
+
+HOW TO THINK, BEFORE YOU WRITE ANYTHING. Work through these in order. Do not
+write a word until you have. None of this reasoning appears in the output — only
+its results do.
+
+1. WHO IS THIS. Read the WHO THIS CLIENT IS block. Their goal, their experience,
+   and above all their injuries and limitations. Everything you write this week
+   has to be compatible with that list.
+2. WHAT ACTUALLY CHANGED. Find the ONE number that moved most between last week
+   and this week so far, and hold on to it. It is the spine of what you write.
+   Use the figures exactly as given; the signed deltas are the source of truth.
+3. WHAT THEY WERE ACTUALLY PROGRAMMED. Read the session list line by line. That
+   list is the ONLY thing you know about their training. A session marked "not
+   classified" is a session you know nothing about — never guess what it worked.
+   If the sessions show a real pattern (the same focus missed twice, a whole
+   region absent, every session of one kind completed and another kind not),
+   name it. If they do not, THERE IS NO PATTERN, and saying there is one is the
+   worst thing you can do here.
+4. WHAT THEY HAVE SAID. Read what they have told the coach. Do not write
+   anything that contradicts it, and do not tell them to do something they have
+   already said they cannot or will not.
+5. WHAT YOU TOLD THEM LAST TIME. Judge last week's focus against this week's
+   numbers and decide whether it was met. If it was, protect it and add one
+   notch. If it was not, the focus is that same thing again in a smaller, more
+   doable form — said differently, never word for word.
+6. NOW CHECK YOURSELF. Could every sentence you are about to write have been
+   written about a different client? If yes, it is not good enough — go back and
+   anchor it to something only true of this person. Is every claim pointable at
+   a number or a session in the context above? If a sentence is not, delete it.
 
 You write THREE things:
 1. "focus" — the one thing this client should aim at this week. It appears as "Focus: ..." on their week card. It must come out of what actually happened last week: if adherence slipped, the focus addresses that; if they logged only two days, the focus is logging; if they crushed it, the focus protects the win and adds one notch. Concrete and doable in a week, not a slogan.
@@ -78,7 +114,8 @@ Rules:
 - "focus": ONE sentence, under 120 characters, no leading "Focus:".
 - "coachRead": 2-4 sentences, plain text, no question at the end.
 - "foodFocus": TWO sentences, plain text. The first states how last week actually went using the given numbers (averages, adherence, signed vs-target deltas) — a real figure, not an adjective. The second is the one thing to work on this week. It shares a screen with the nutrition coach card, so anything longer is a wall of text above their food logger.
-- "programmingQuestion": ONE question, under 140 characters, asking this client whether anything about their PROGRAMMING should change — exercises, volume, session length, days, an area they want more or less of, something that has been bothering them physically. Ground it in what actually happened in the two FINISHED weeks you are given so it does not read as a form letter — and never describe the week they are about to start, which has not happened yet and in which they have done nothing: if they skipped legs twice, ask about that; if every session ran long, ask about session length. Never ask about weight, diet or body composition. Never ask a yes/no question they can dismiss with one word.`;
+- "programmingQuestion": ONE question, under 140 characters, asking this client whether anything about their PROGRAMMING should change — exercises, volume, days, an area they want more or less of, something that has been bothering them physically. It MUST be grounded in a specific thing you can point to in the SESSION LIST: a session they did not complete, a focus that appears twice and was missed both times, a region that is absent from the week entirely. Quote what you are pointing at. Never describe the week they are about to start, in which they have done nothing. Never ask about weight, diet or body composition. Never ask a yes/no question they can dismiss with one word.
+  ⛔ AND THIS IS THE IMPORTANT PART: if the session list does not contain something specific enough to point at — every session completed and nothing notable, or the sessions are unclassified so you cannot tell what they worked — return an EMPTY STRING for this field. An empty string is a correct and expected answer. A plausible-sounding question you had to invent is worse than no question at all: the client reads it as their coach having noticed something, and nobody noticed anything. Do not stretch to fill this field.`;
 
 interface WeeklyReply {
   focus: string;
@@ -230,6 +267,22 @@ async function runSweep(opts: {
   // gets the higher model in the coach chat and the standard one here
   // experiences an assistant that is inconsistently clever, which is more
   // confusing than one that is consistently ordinary.
+      // WHO they are, WHAT they were programmed session by session, WHAT they
+      // have told the coach, and WHAT they were told last week. The numbers
+      // block above is excellent and was, until 5 Sep, the entire context: the
+      // model knew this client's adherence to the decimal and did not know they
+      // had a repaired rotator cuff. See lib/ai/weekly-picture.ts.
+      //
+      // Best-effort. It returns "" on any failure and the week is still written
+      // from the numbers, which is exactly what shipped before it existed.
+      const picture = await weeklyClientPicture(db, c.id, {
+        lastStart: cmp.last.window.start,
+        lastEnd: cmp.last.window.end,
+        currentStart: cmp.current.window.start,
+        currentEnd: cmp.current.window.end,
+        week,
+      });
+
       const sweepModel = modelFor("coach", await aiTierFor(db, c.id));
       const result = await callClaudeJson({
         meter: { clientId: c.id, feature: "weekly_sweep" },
@@ -244,7 +297,8 @@ async function runSweep(opts: {
               `CLIENT: ${name}${c.primary_goal ? ` — goal: ${c.primary_goal}` : ""}\n` +
               `TODAY (Central): ${today}\n\n` +
               `${cmp.block}\n\n` +
-              `Write this client's focus, coach's read and food focus for the week beginning ${week}, per your instructions.`,
+              (picture ? `${picture}\n\n` : "") +
+              `Write this client's focus, coach's read and food focus for the week beginning ${week}, per your instructions. Work through the six thinking steps first.`,
           },
         ],
         validate: validateWeekly,
