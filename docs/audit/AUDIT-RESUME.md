@@ -114,6 +114,14 @@ general tips, the coach's read on screen, and sessions-with-him protected.
 | G | **Bounded client adjustment on AI proposals** | Rule 8. Best-evidenced adoption lever there is, and cheap. |
 | H | **"Dustin's assistant" framing** | Ruling 4. Copy across the coach entry points. |
 
+### Open, small
+
+- **15 supervised workouts sit one day after their appointments** — Lauren
+  Standefer (6) and Sariah Duncan (9). They were stranded by the calendar-sync
+  bug fixed on 5 Sep (`docs/CALENDAR-WINS-WHEN-NEWER-2026-09-05.md`) and none
+  will move on their own. If the offset is not deliberate they want realigning
+  by hand.
+
 ### Still unanswered by Dustin
 
 - ~~Can a client swap the CONTENT of a session he is supervising?~~ **ANSWERED
