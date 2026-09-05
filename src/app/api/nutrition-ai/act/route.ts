@@ -247,10 +247,13 @@ export async function POST(req: NextRequest) {
           `attendance is poor say so plainly and kindly rather than describing only the sessions they made.`;
 
         // Hoisted rather than inlined into logUsage below: the aiFeatures guard
-        // test scans metering calls for the retired catch-all labels, and
-        // `modelFor("chat", …)` sitting inside one reads as the old "chat"
-        // feature name. Computing it once is better anyway.
-        const toolModel = modelFor("chat", tier);
+        // test scans metering calls for the retired catch-all labels, and a
+        // modelFor(…) call sitting inside one reads as a feature name.
+        // Computing it once is better anyway.
+        //
+        // "tools", not "chat": this pass can move a session or log a weigh-in,
+        // and it is Sonnet for everyone. See modelFor() for why.
+        const toolModel = modelFor("tools", tier);
 
         const run = await runClientAssistant({
           apiKey,

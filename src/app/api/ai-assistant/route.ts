@@ -75,10 +75,25 @@ export async function POST(req: NextRequest) {
     systemPrompt += await assistantContext(supabase, scoped.scope.clientId);
     if (context) systemPrompt += `\n\nPage context:\n${context}`;
 
+    // Whether the action tools are actually going to be in this model's hands.
+    // Hoisted above the model choice because it now decides the model — see the
+    // next comment. Its own reasoning is unchanged and sits at THE TOOL LOOP.
+    const canAct = !isTrainer && !!scoped.scope.clientId;
+
     // Haiku for the roster, Sonnet for the clients who use this drawer AS the
     // app rather than as a side panel. The tier lookup fails to 'standard', so
     // an outage cannot quietly put thirty-five people on the expensive model.
-    const model = modelFor("chat", await aiTierFor(supabase, scoped.scope.clientId));
+    //
+    // UNLESS THE TOOLS ARE ON THE TABLE. A turn that can move a session, swap a
+    // workout or log a weigh-in is Sonnet for everybody — the same change made
+    // to the ✦ Coach's tool pass on 5 Sep, and made here in the same commit
+    // because this route and that one run the SAME loop over the SAME tools.
+    // Raising one and not the other would mean the identical request answered
+    // by a different model depending on which door the client came through,
+    // which is precisely the kind of split that goes unnoticed for a month.
+    const model = canAct
+      ? modelFor("tools", await aiTierFor(supabase, scoped.scope.clientId))
+      : modelFor("chat", await aiTierFor(supabase, scoped.scope.clientId));
 
     // ── THE TOOL LOOP ────────────────────────────────────────────────────────
     //
@@ -96,7 +111,6 @@ export async function POST(req: NextRequest) {
     // Four rounds, not unbounded. Every tool here is a single read or a single
     // write; a model still going at round five is looping, and the honest
     // outcome is the text it has rather than a bill.
-    const canAct = !isTrainer && !!scoped.scope.clientId;
     const today = CT_TODAY();
 
     // The loop itself now lives in lib/ai/clientAssistantRun so the ✦ Coach can

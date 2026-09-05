@@ -93,8 +93,26 @@ export type AiTier = "standard" | "advanced";
  * moves a job UP, and today it moves exactly one: extraction, from Haiku to
  * Sonnet, for clients who talk to the app instead of navigating it.
  */
-export function modelFor(kind: "extract" | "coach" | "chat", tier: AiTier = "standard"): string {
+export function modelFor(kind: "extract" | "coach" | "chat" | "tools", tier: AiTier = "standard"): string {
   if (kind === "extract") return tier === "advanced" ? SONNET_MODEL : HAIKU_MODEL;
+  // TOOLS — a client turn where the action tools are actually in the model's
+  // hands: move a session, swap a workout, add one, log a weigh-in.
+  //
+  // Dustin, 5 Sep, on finding this pass was Haiku for 33 of 35 clients: "go."
+  //
+  // The argument is the one that already moved EXTRACTION to Sonnet for Gerard
+  // and Sharon, and it turns out to apply to everybody. A wrong answer from the
+  // coach is a weak paragraph the client can push back on in the next message.
+  // A wrong TOOL CALL is the app doing something to their week — a session on
+  // the wrong day, the wrong workout swapped in, a weigh-in on the wrong date —
+  // and nobody re-reads their own schedule to check it happened correctly. The
+  // failure is silent and it is durable, which is exactly the profile that
+  // justified the tier in the first place.
+  //
+  // This does NOT put chat on Sonnet. Chat is thirty-five people typing
+  // whenever they like and is metered by volume; it stays where it was. Only
+  // the turns holding a tool move, and those are a small share of them.
+  if (kind === "tools") return SONNET_MODEL;
   // CHAT — the ✦ drawer, the free-text box on every screen.
   //
   // This one is metered by VOLUME rather than by importance, which is why it
