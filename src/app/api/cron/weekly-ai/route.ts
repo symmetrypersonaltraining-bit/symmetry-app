@@ -38,7 +38,7 @@ import { weeklyClientPicture } from "@/lib/ai/weekly-picture";
 import { aiTierFor } from "@/lib/ai/tier";
 import { logUsage } from "@/lib/ai/meter";
 import { fetchWeeklyComparison } from "@/lib/ai/weekly-context";
-import { CLAIMS_THIS_WEEK, trimToWord } from "@/lib/ai/weekly-copy-guards";
+import { ASKS_ABOUT_SCHEDULE, CLAIMS_THIS_WEEK, trimToWord } from "@/lib/ai/weekly-copy-guards";
 import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { isCronRequest } from "@/lib/cron-auth";
 import { WEEKLY_WRITER_RULES, weekStartOf } from "@/lib/ai/weekly-numbers";
@@ -114,7 +114,22 @@ Rules:
 - "focus": ONE sentence, under 120 characters, no leading "Focus:".
 - "coachRead": 2-4 sentences, plain text, no question at the end.
 - "foodFocus": TWO sentences, plain text. The first states how last week actually went using the given numbers (averages, adherence, signed vs-target deltas) — a real figure, not an adjective. The second is the one thing to work on this week. It shares a screen with the nutrition coach card, so anything longer is a wall of text above their food logger.
-- "programmingQuestion": ONE question, under 140 characters, asking this client whether anything about their PROGRAMMING should change — exercises, volume, days, an area they want more or less of, something that has been bothering them physically. It MUST be grounded in a specific thing you can point to in the SESSION LIST: a session they did not complete, a focus that appears twice and was missed both times, a region that is absent from the week entirely. Quote what you are pointing at. Never describe the week they are about to start, in which they have done nothing. Never ask about weight, diet or body composition. Never ask a yes/no question they can dismiss with one word.
+- "programmingQuestion": ONE short question — under 140 characters, one sentence, plain words, no jargon — about the TRAINING ITSELF.
+
+  ⛔ NEVER ASK ABOUT THE SCHEDULE. Not which days they train, not how many days, not whether a different day would suit them better, not session length or timing, not "would fewer days fit your life". ${coachFirstName} sets the schedule; it is not the client's to negotiate, and inviting them to renegotiate it creates a conversation he did not ask for. This is the single most important rule on this field — five of six questions written the week of 30 Aug were some version of "what's getting in the way of the other days", and that is exactly the question that must never be asked again.
+
+  ASK ABOUT THE WORK. Rotate the angle so a client is not asked the same shape of question twice in a row — pick whichever the session list actually supports:
+  • a movement or a session that keeps going unfinished — what about it
+  • something that felt off, tweaky or achy in a specific lift
+  • whether a lift is getting easier, or still feels like the same weight
+  • an exercise they would happily never see again, or one they want more of
+  • which part of a session they dread, and which they look forward to
+  • whether a body part is getting more or less than they want
+  • how a specific movement FEELS now compared with a month ago
+  • anything physical that has been bothering them that he should know about
+
+  It must be grounded in something you can point to in the SESSION LIST — a session not completed, a focus that appears twice, a region absent from the week entirely. Quote what you are pointing at, in their own everyday words. Never describe the week they are about to start, in which they have done nothing. Never ask about weight, diet, body composition or logging. Never ask a yes/no question they can dismiss with one word.
+
   ⛔ AND THIS IS THE IMPORTANT PART: if the session list does not contain something specific enough to point at — every session completed and nothing notable, or the sessions are unclassified so you cannot tell what they worked — return an EMPTY STRING for this field. An empty string is a correct and expected answer. A plausible-sounding question you had to invent is worse than no question at all: the client reads it as their coach having noticed something, and nobody noticed anything. Do not stretch to fill this field.`;
 
 interface WeeklyReply {
@@ -159,12 +174,23 @@ function validateWeekly(raw: unknown): WeeklyReply | null {
     // question at all beats one whose first clause the client can see is wrong.
     programmingQuestion: (() => {
       if (!question) return "";
-      if (!CLAIMS_THIS_WEEK.test(question)) return question;
-      // Loud, not silent. If this fires often the prompt needs work, and a
-      // question quietly disappearing is exactly the kind of thing that goes
+      // Two drops, both loud. If either fires often the prompt needs work, and
+      // a question quietly disappearing is exactly the kind of thing that goes
       // unnoticed for a month.
-      console.error("weekly-ai: dropped a question that described the coming week:", question);
-      return "";
+      if (CLAIMS_THIS_WEEK.test(question)) {
+        console.error("weekly-ai: dropped a question that described the coming week:", question);
+        return "";
+      }
+      // The schedule is the trainer's, not the client's — and "what's getting
+      // in the way of the other days?" is what the model reaches for whenever
+      // it has nothing specific to point at. Five of six questions written for
+      // the week of 30 Aug were that question. The prompt forbids it now; this
+      // is the check that does not depend on the prompt still saying so.
+      if (ASKS_ABOUT_SCHEDULE.test(question)) {
+        console.error("weekly-ai: dropped a question that invited a schedule change:", question);
+        return "";
+      }
+      return question;
     })(),
   };
 }

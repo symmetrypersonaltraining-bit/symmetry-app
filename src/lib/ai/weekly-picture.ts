@@ -32,6 +32,28 @@
 
 import type { Db } from "@/lib/ai/scope";
 
+/**
+ * How this client's relationship with the food logger actually stands — over
+ * their whole history, not over the fortnight the numbers block covers.
+ *
+ * Dustin, 5 Sep 2026: "make sure it does not mention nutrition if they have
+ * never logged food too much. every so often a soft nudge fine but don't keep
+ * on it if they have never logged. if they have logged n fell off push it."
+ *
+ * The reason he asked is sitting in the database. Jennifer Day's coach's read
+ * for the week of 30 Aug says "there's still nothing in the food logger two
+ * weeks running" — to a client who has NEVER logged a single day, ever. The
+ * numbers block only sees a fortnight, so an absence that is simply how this
+ * client uses the app is indistinguishable from an absence that is a slip. Told
+ * only "0 days logged", the model writes the same disappointed sentence to
+ * both, every week, forever.
+ *
+ * Live counts, 5 Sep 2026: 18 clients have never logged a day; ten logged
+ * properly and then stopped; seven are logging now. Three different situations
+ * that were getting one message.
+ */
+export type FoodStance = "never" | "starting" | "active" | "slipping" | "lapsed";
+
 export interface PictureWindows {
   lastStart: string;
   lastEnd: string;
@@ -39,6 +61,76 @@ export interface PictureWindows {
   currentEnd: string;
   /** The Sunday the copy being written is for. */
   week: string;
+}
+
+/**
+ * Which stance, from lifetime counts.
+ *
+ * Thresholds are deliberately generous at the bottom: two logged days ever is
+ * somebody who opened the screen once, not somebody who tracks food.
+ */
+export function foodStance(daysEver: number, days14: number): FoodStance {
+  if (daysEver <= 2) return "never";
+  if (days14 >= 5) return "active";
+  if (daysEver <= 4) return "starting";
+  return days14 === 0 ? "lapsed" : "slipping";
+}
+
+/**
+ * Whether a client who has never logged may be nudged AT ALL this week.
+ *
+ * "every so often a soft nudge fine but don't keep on it." Every so often has
+ * to be deterministic or it is not a rule — a model asked to nudge "sometimes"
+ * nudges every time. One week in four, anchored to a fixed Sunday so the
+ * cadence survives a missed or replayed run, exactly like isQuestionWeek.
+ */
+const NUDGE_ANCHOR = Date.parse("2026-08-02T00:00:00Z"); // a Sunday
+export function nudgeWeekFor(weekStart: string): boolean {
+  const wk = Date.parse(weekStart + "T00:00:00Z");
+  if (Number.isNaN(wk)) return false;
+  const weeks = Math.round((wk - NUDGE_ANCHOR) / (7 * 86400000));
+  return ((weeks % 4) + 4) % 4 === 0;
+}
+
+/** What the writer is allowed to say about food, given the stance. */
+function foodStanceBlock(stance: FoodStance, daysEver: number, days14: number, lastLog: string | null, nudgeOk: boolean): string {
+  const facts = `Logged food on ${daysEver} day${daysEver === 1 ? "" : "s"} in their entire history; ${days14} in the last 14 days${lastLog ? `; last logged ${lastLog}` : ""}.`;
+  switch (stance) {
+    case "never":
+      return (
+        `FOOD LOGGING — THEY HAVE NEVER USED IT. ${facts}
+` +
+        (nudgeOk
+          ? `This is a nudge week, so you may include ONE short, warm, no-pressure line inviting them to try the food logger — mention that it is a tap per meal now, and that they can photograph or just say what they ate. One line. Then move on and never return to it.`
+          : `⛔ DO NOT MENTION FOOD, MACROS, CALORIES, NUTRITION OR LOGGING AT ALL THIS WEEK. Not as an aside, not as a "one more thing", not as a gap. A client who has never tracked food does not need to be told every single week that they are not tracking food; it reads as nagging about a thing they have not chosen to do, and it crowds out the training coaching that is the whole point. Write about their TRAINING.`) +
+        `
+Never describe this absence as a slip, a lapse, "still nothing", "two weeks running" or anything implying they used to and stopped. They never did.`
+      );
+    case "lapsed":
+      return (
+        `FOOD LOGGING — THEY DID IT AND STOPPED. ${facts}
+` +
+        `PUSH THIS, warmly and specifically. They have already proved they can do it, so this is about restarting a habit they own, not selling them a new one. Say what it did for them while they were doing it if the numbers show it. Then remind them how little it now takes: one tap per planned meal, and for anything off-plan they can photograph it, scan a barcode, search it, or just tell the coach what they ate and it logs it for them. Do not scold, do not guilt, and do not ask why they stopped.`
+      );
+    case "slipping":
+      return (
+        `FOOD LOGGING — SLIPPING. ${facts}
+` +
+        `They are still logging, just thinly. One encouraging line pointing at the gap between what they logged and what they ate. Remind them the off-plan ones are a photo or a sentence to the coach, not a form.`
+      );
+    case "starting":
+      return (
+        `FOOD LOGGING — JUST STARTED. ${facts}
+` +
+        `Treat any logging at all as the win it is. Encourage the next few days; do not grade their macros yet on this little data.`
+      );
+    case "active":
+      return (
+        `FOOD LOGGING — ACTIVE. ${facts}
+` +
+        `Coach the actual numbers above. They are doing the work of logging; give them something worth the effort in return.`
+      );
+  }
 }
 
 interface SessionRow {
@@ -97,7 +189,7 @@ export async function weeklyClientPicture(
   w: PictureWindows,
 ): Promise<string> {
   try {
-    const [clientRes, swRes, memRes] = await Promise.all([
+    const [clientRes, swRes, memRes, foodRes] = await Promise.all([
       db
         .from("clients")
         .select(
@@ -114,6 +206,9 @@ export async function weeklyClientPicture(
         .lte("scheduled_date", w.currentEnd)
         .order("scheduled_date", { ascending: true }),
       db.from("ai_client_memory").select("summary, facts").eq("client_id", clientId).maybeSingle(),
+      // LIFETIME food logging, not the fortnight the numbers block covers.
+      // Distinct dates only — several rows land on one day.
+      db.from("meal_adherence_logs").select("log_date").eq("client_id", clientId),
     ]);
 
     const c = (clientRes.data || null) as Record<string, unknown> | null;
@@ -168,6 +263,24 @@ export async function weeklyClientPicture(
         `\n` +
         sessionsBlock(`This week so far (${w.currentStart} → ${w.currentEnd})`, curRows),
     );
+
+    // ── how they actually use the food logger, over their whole history ─────
+    //
+    // The fortnight in the numbers block cannot tell "never started" apart from
+    // "stopped last week", and those two need opposite messages. See FoodStance.
+    const foodDates = new Set(
+      (((foodRes.data as { log_date: string }[]) || [])
+        .map((r) => r?.log_date)
+        .filter((d): d is string => typeof d === "string")),
+    );
+    const daysEver = foodDates.size;
+    const fourteenAgo = new Date(Date.parse(w.currentEnd + "T00:00:00Z") - 13 * 86400000)
+      .toISOString()
+      .slice(0, 10);
+    const days14 = [...foodDates].filter((d) => d >= fourteenAgo).length;
+    const lastLog = daysEver ? [...foodDates].sort().slice(-1)[0] : null;
+    const stance = foodStance(daysEver, days14);
+    out.push(foodStanceBlock(stance, daysEver, days14, lastLog, nudgeWeekFor(w.week)));
 
     // ── what they have told the coach ───────────────────────────────────────
     //

@@ -22,6 +22,29 @@
 export const CLAIMS_THIS_WEEK = /\b(this|current)\s+week\b|\bso far this week\b|\bweek so far\b/i;
 
 /**
+ * A programming question that invites the client to renegotiate their SCHEDULE.
+ *
+ * Dustin, 5 Sep 2026: "stay away from asking about schedule changes. I dictate
+ * the schedule not clients."
+ *
+ * The prompt now forbids it in words, but a rule that lives only in a prompt is
+ * a rule the model may quietly stop following, and this one was the DEFAULT
+ * behaviour: five of the six questions written for the week of 30 Aug were some
+ * version of "what's getting in the way of the other days, and would a
+ * different schedule fit your life better?" — sent to five different clients.
+ * It is what the model falls back on whenever it has nothing specific to point
+ * at, which is exactly when this guard needs to catch it.
+ *
+ * Deliberately blunt. A question that merely mentions a day it can point at
+ * ("you've skipped Lower Body twice") does not match; a question that proposes
+ * moving, changing, adding or dropping days, or asks what would fit better,
+ * does. False positives cost one skipped fortnightly question. A false negative
+ * costs a client being invited to renegotiate something that is not theirs.
+ */
+export const ASKS_ABOUT_SCHEDULE =
+  /\b(sched\w*|reschedul\w*)\b|\b(different|another|better|easier|fewer|more)\s+(day|days|time|times)\b|\b(day|days|time|times)\s+(that\s+)?(would|might|could)\b|\bfit\s+(your|into your)\s+(life|week|schedule|routine)\b|\bwhat('?s| is)\s+getting\s+in\s+the\s+way\b|\b(session|workout)s?\s+(length|timing)\b|\bhow\s+many\s+days\b|\btrain(ing)?\s+days\b|\bmove\s+(a|the|your)\s+(session|workout|day)\b|\b(session|workout)\s+format\b|\b(easier|better)\s+to\s+(protect|stick|commit|manage|keep)\b|\b(day|days)\b[^.?!]{0,45}\b(would|might|could)\s+(be\s+)?(easier|better|work)\b/i;
+
+/**
  * Trim to a length without cutting a word in half.
  *
  * `.slice(0, 200)` chopped that same question at "actually fitting your
