@@ -5967,6 +5967,7 @@ export type Database = {
           created_at: string | null
           created_by_client_id: string | null
           fats: number | null
+          fdc_id: string | null
           fiber: number | null
           id: string
           kcal: number | null
@@ -5974,6 +5975,7 @@ export type Database = {
           micros_source: string | null
           name: string
           protein: number | null
+          quarantined: boolean
           sat_fat: number | null
           serving_desc: string | null
           serving_grams: number | null
@@ -5981,6 +5983,8 @@ export type Database = {
           sodium: number | null
           source: string | null
           sugar: number | null
+          usda_conflict: boolean
+          usda_ndb: string | null
           verified: boolean | null
         }
         Insert: {
@@ -5991,6 +5995,7 @@ export type Database = {
           created_at?: string | null
           created_by_client_id?: string | null
           fats?: number | null
+          fdc_id?: string | null
           fiber?: number | null
           id?: string
           kcal?: number | null
@@ -5998,6 +6003,7 @@ export type Database = {
           micros_source?: string | null
           name: string
           protein?: number | null
+          quarantined?: boolean
           sat_fat?: number | null
           serving_desc?: string | null
           serving_grams?: number | null
@@ -6005,6 +6011,8 @@ export type Database = {
           sodium?: number | null
           source?: string | null
           sugar?: number | null
+          usda_conflict?: boolean
+          usda_ndb?: string | null
           verified?: boolean | null
         }
         Update: {
@@ -6015,6 +6023,7 @@ export type Database = {
           created_at?: string | null
           created_by_client_id?: string | null
           fats?: number | null
+          fdc_id?: string | null
           fiber?: number | null
           id?: string
           kcal?: number | null
@@ -6022,6 +6031,7 @@ export type Database = {
           micros_source?: string | null
           name?: string
           protein?: number | null
+          quarantined?: boolean
           sat_fat?: number | null
           serving_desc?: string | null
           serving_grams?: number | null
@@ -6029,6 +6039,8 @@ export type Database = {
           sodium?: number | null
           source?: string | null
           sugar?: number | null
+          usda_conflict?: boolean
+          usda_ndb?: string | null
           verified?: boolean | null
         }
         Relationships: [

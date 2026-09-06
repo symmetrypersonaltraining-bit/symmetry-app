@@ -647,7 +647,11 @@
     "created_by_client_id",
     "created_at",
     "micros",
-    "micros_source"
+    "micros_source",
+    "usda_ndb",
+    "quarantined",
+    "usda_conflict",
+    "fdc_id"
   ],
   "food_import_state": [
     "source",

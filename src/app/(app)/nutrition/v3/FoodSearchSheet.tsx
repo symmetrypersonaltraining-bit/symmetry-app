@@ -20,6 +20,7 @@ import {
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 import { namedServings, multiplierForNamed, defaultAmountFor, type NamedServing } from "@/lib/servingOptions";
 import { unitHeUses } from "@/lib/nutrition/foodUnitDefaults";
+import { barcodeCandidates, normalizeBarcode } from "@/lib/nutrition/barcode";
 import Sheet from "./Sheet";
 import BarcodeScanner from "./BarcodeScanner";
 
@@ -509,10 +510,10 @@ export default function FoodSearchSheet({
   }
 
   // A barcode was scanned (or typed in the fallback). Stop the scanner, then
-  // look it up by EXACT barcode in food_catalog. Hit → straight to the serving
-  // picker; miss → offer the server-side Open Food Facts lookup.
+  // look it up in food_catalog. Hit → straight to the serving picker; miss →
+  // offer the server-side Open Food Facts lookup.
   async function handleBarcode(code: string) {
-    const barcode = code.replace(/\D/g, "");
+    const barcode = normalizeBarcode(code);
     setScanning(false);
     if (barcode.length < 6) return;
     setScanStage(null);
@@ -524,12 +525,18 @@ export default function FoodSearchSheet({
       // (see editPicked). Ordering by created_by_client_id descending puts a
       // row with an owner ahead of the shared one, and the .eq on client scopes
       // it to theirs — so a food they have already fixed never comes back wrong.
+      //
+      // The `.in` rather than an `.eq`: the same product sits in the catalogue
+      // under several zero-paddings of the one number (barcodeCandidates has
+      // the whole story). Quarantined last, because a barcode can land on both
+      // a good row and a bad twin — scanning an Oreo packet found the twin.
       const { data } = await supabase
         .from("food_catalog")
         .select("*")
-        .eq("barcode", barcode)
+        .in("barcode", barcodeCandidates(barcode))
         .or(`created_by_client_id.eq.${clientId},created_by_client_id.is.null`)
         .order("created_by_client_id", { ascending: false, nullsFirst: false })
+        .order("quarantined", { ascending: true, nullsFirst: true })
         .limit(1)
         .maybeSingle();
       if (data) {

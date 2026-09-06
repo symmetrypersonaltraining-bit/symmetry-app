@@ -16,14 +16,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database, Json } from "@/lib/database.types";
 import { resolveAiScope } from "@/lib/ai/scope";
 import { mapOffProduct, OffProductJson } from "@/lib/nutrition/off";
+import { barcodeCandidates, normalizeBarcode } from "@/lib/nutrition/barcode";
 
 const OFF_TIMEOUT_MS = 8000;
 const OFF_UA = "SymmetryPersonalTraining/1.0 (nutrition logger; symmetrypersonaltraining@gmail.com)";
-
-/** Barcodes are digits only; EAN-8 … EAN-13 / UPC land in 6–14 characters. */
-function normalizeBarcode(raw: unknown): string {
-  return typeof raw === "string" ? raw.replace(/\D/g, "") : "";
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,10 +36,16 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient();
 
     // 1) Already in the catalog?
+    //
+    // Matched across every zero-padding of the number, not on the scan exactly
+    // as it arrived — the catalogue stores one product at 8 to 14 characters
+    // depending on where the row came from. barcodeCandidates explains it.
+    // Quarantined rows sort last so a bad twin never wins the lookup.
     const { data: existing } = await admin
       .from("food_catalog")
       .select("*")
-      .eq("barcode", barcode)
+      .in("barcode", barcodeCandidates(barcode))
+      .order("quarantined", { ascending: true, nullsFirst: true })
       .limit(1)
       .maybeSingle();
     if (existing) return NextResponse.json({ found: true, source: "catalog", food: existing });
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
       const { data: after } = await admin
         .from("food_catalog")
         .select("*")
-        .eq("barcode", barcode)
+        .in("barcode", barcodeCandidates(barcode))
         .limit(1)
         .maybeSingle();
       if (after) return NextResponse.json({ found: true, source: "catalog", food: after });

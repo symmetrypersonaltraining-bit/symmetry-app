@@ -971,3 +971,32 @@ Ask is a deliberate tap.
 - **Group auto-posting** — nothing posts automatically; the rest lands at Messages.
 - **The AI components on this screen have not been reviewed yet** — see the
   process note in AUDIT-RESUME.md. Home comes first.
+
+---
+
+## Interlude — the rebuilt library, and three things left over  ·  6 Sep 2026
+
+The rebuild is in the migration
+`supabase/migrations/20260906b_the_rebuilt_food_library.sql`, which is the whole
+record: Open Food Facts deleted, USDA SR28 and USDA Branded imported by Postgres
+itself, the nightly quality gate, and the search ordering. This interlude is
+about the three things that were still wrong once it landed.
+
+### The barcode scanner could not find food that was sitting right there
+
+A USDA branded row's `fdc_id` **is** its GTIN, so setting `barcode = fdc_id` made
+442,775 packaged products scannable without another import. It did not work.
+
+USDA writes the number zero-padded — Apple Jacks is `00038000162367`. The scanner
+in his phone reads the box and emits the UPC-A printed on it, `038000162367`. The
+lookup was one exact match on the scan as it arrived, so the two never met. Scan
+an Oreo packet and the Oreos came back, because that row happened to be stored at
+12 characters; scan the Apple Jacks beside it and the app said it had never heard
+of the product. The catalogue holds barcodes at 8, 11, 12, 13 and 14 characters
+depending on which import wrote the row.
+
+`src/lib/nutrition/barcode.ts` now strips the leading zeros to get the number's
+identity and offers every padding of it back; both lookups — the sheet's and the
+server route's — match on that set. Quarantined rows sort last within it, because
+one number can land on a good row and a bad twin, and the Oreo scan found the
+twin.
