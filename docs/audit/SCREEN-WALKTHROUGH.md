@@ -1000,3 +1000,40 @@ identity and offers every padding of it back; both lookups — the sheet's and t
 server route's — match on that set. Quarantined rows sort last within it, because
 one number can land on a good row and a bad twin, and the Oreo scan found the
 twin.
+### Searching a brand led with its diet version
+
+Dustin typed **"kerrygold butter"**. First result: *Kerrygold, Reduced Fat Irish
+Butter*, 571 kcal. The butter he actually buys is 717.
+
+Nobody asks for reduced fat by typing the plain name. So a row that adds a
+qualifier the search did not contain now sorts below the row that does not add
+one, and a qualifier that changes the macros — reduced fat, sugar free, diet,
+imitation — costs more than one that only changes the form — whipped, unsalted,
+smoked. Ask for it by name and the penalty disappears: "reduced fat kerrygold"
+still finds reduced fat first. The word list is the `food_variant_qualifier`
+table, tunable without touching the query.
+
+Three words were deliberately left out of it: *extra*, because extra virgin olive
+oil **is** the plain product; *double*; and *soft*, because in soft taco and soft
+drink the word is the food's own name.
+
+The same ordering went into `match_food_for_ai`, so a food logged by talking to
+Claude and the same food logged by searching land on the same row.
+
+### Open Food Facts was still armed to come back
+
+Two cron jobs re-imported it every five minutes. They had last run on 16 August
+and their import state still said `running`, which means the next successful
+fetch would have refilled both the catalogue and the 1 GB disk. Unscheduled, and
+their import state set to `paused` with the reason written into it.
+
+### Still open from the rebuild
+
+- **A trainer row's default amount is 1 g.** Foods he programmes by weight —
+  chicken breast, rice, potatoes — are stored on a per-gram basis, which is
+  arithmetically right and opens the amount box on "1 g". He types the real
+  number anyway, but the box should start somewhere sensible.
+- **The Open Food Facts fallback** in `/api/nutrition-ai/barcode-lookup` still
+  fires when a scan misses the catalogue entirely. It is now the only path that
+  can write an `off` row, and the nightly gate hides whatever it writes, so a
+  scanned miss is offered once and never becomes searchable.
