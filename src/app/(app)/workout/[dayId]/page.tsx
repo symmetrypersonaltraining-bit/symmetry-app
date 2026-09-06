@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/serverUser";
 import { createClient } from "@/lib/supabase/server";
 import WorkoutLogger from "./WorkoutLogger";
+import AssessmentGate from "@/components/AssessmentGate";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { CLIENT_MODE_COOKIE, inClientModeFrom } from "@/lib/ai/trainerGate";
 import { cookies } from "next/headers";
@@ -175,7 +176,37 @@ export default async function WorkoutDayPage({
   const phase = (day as any).phases;
   const program = phase?.programs;
 
+  // ── ASSESS THEM BEFORE YOU TRAIN THEM ──────────────────────────────────
+  //
+  // Dustin, 5 Sep: "next time I open a session fir them, full screen takeover
+  // to do assessment before their session." Half the roster has no assessment,
+  // which stayed invisible until the coach started reading them — and a coach
+  // telling fourteen people it cannot see anything about their body looks
+  // broken to half the clients who try it.
+  //
+  // HERE, not in the logger. Both ways in — the trainer's home sessions list
+  // and the client's Training tab — end at this route, so one gate covers both
+  // and the logger itself is untouched (it is off limits without per-item
+  // permission, and this needs none of it).
+  //
+  // Trainer opening a CLIENT's session only: `forClient` is what distinguishes
+  // that from a client opening their own, and from him logging his own
+  // training. It renders nothing at all when there is no client to assess.
+  let needsAssessment = false;
+  if (trainerApp && forClient && clientId) {
+    const { data: existingAssessment } = await supabase
+      .from("client_assessments")
+      .select("id")
+      .eq("client_id", clientId)
+      .limit(1);
+    needsAssessment = !((existingAssessment as { id: string }[] | null)?.length);
+  }
+
   return (
+    <>
+    {needsAssessment && clientId && (
+      <AssessmentGate clientId={clientId} clientName={clientName || ""} sessionDate={sessionDate} />
+    )}
     <WorkoutLogger
       day={{ id: day.id, label: (day as any).label }}
       phase={{ id: phase?.id, label: phase?.label }}
@@ -190,5 +221,6 @@ export default async function WorkoutDayPage({
       scheduledWorkoutId={scheduledWorkoutId}
       sessionDate={sessionDate}
     />
+    </>
   );
 }

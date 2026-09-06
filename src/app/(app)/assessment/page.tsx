@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { startDictation } from '@/lib/dictation';
 import AiBadge from "@/components/AiBadge";
@@ -167,8 +167,9 @@ const inputClass = "w-full px-3 py-2 rounded-lg text-sm border focus:outline-non
 
 // \u2500\u2500\u2500 Main Component \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-export default function AssessmentPage() {
+function AssessmentForm() {
   const router = useRouter();
+  const params = useSearchParams();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<AssessmentData>(defaultData);
   const [aiResult, setAiResult] = useState<any>(null);
@@ -178,6 +179,58 @@ export default function AssessmentPage() {
 
   const set = (field: keyof AssessmentData, value: any) =>
     setData(prev => ({ ...prev, [field]: value }));
+
+  // ── ASSESSING SOMEBODY WHO IS ALREADY A CLIENT ──────────────────────────
+  //
+  // This form was built for a stranger: it either creates an account or
+  // archives the record with no client_id at all. So for the fourteen people on
+  // the roster with no assessment there was no way to give them one — running
+  // it would have produced a duplicate client or an orphan row.
+  //
+  // Dustin, 5 Sep: "lets get assessment done fir all." So /assessment?clientId=
+  // opens the same seven steps against an existing person: their known details
+  // filled in, the row written against them, and no account created because
+  // they already have one.
+  //
+  // Prefilled deliberately, at his instruction, so he corrects rather than
+  // types — but only from fields a person actually entered about them, never
+  // from anything derived. A form that shows you something nobody typed is a
+  // form you stop trusting.
+  const existingClientId = params.get("clientId");
+  const [existingName, setExistingName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!existingClientId) return;
+    let on = true;
+    (async () => {
+      const supabase = createClient();
+      const { data: c } = await supabase
+        .from("clients")
+        .select("name, email, phone, date_of_birth, injuries_limitations, injuries, primary_goal, secondary_goals, experience_level, days_per_week, training_frequency")
+        .eq("id", existingClientId)
+        .maybeSingle();
+      if (!on || !c) return;
+      const row = c as Record<string, unknown>;
+      const txt = (k: string) => (typeof row[k] === "string" ? (row[k] as string) : "");
+      const name = txt("name").trim();
+      const sp = name.indexOf(" ");
+      setExistingName(name || null);
+      setData((prev) => ({
+        ...prev,
+        first_name: sp > 0 ? name.slice(0, sp) : name,
+        last_name: sp > 0 ? name.slice(sp + 1) : "",
+        email: txt("email"),
+        phone: txt("phone"),
+        date_of_birth: txt("date_of_birth"),
+        current_injuries: txt("injuries_limitations") || txt("injuries"),
+        primary_goal: txt("primary_goal"),
+        secondary_goal: txt("secondary_goals"),
+        experience_level: txt("experience_level"),
+        days_per_week: Number(row.days_per_week) || Number(row.training_frequency) || prev.days_per_week,
+      }));
+    })();
+    return () => { on = false; };
+  }, [existingClientId]);
 
   // \u2500\u2500\u2500 Voice Input \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
@@ -335,13 +388,18 @@ export default function AssessmentPage() {
         nutrition_notes: data.nutrition_notes,
         ai_program_recommendation: aiResult ? JSON.stringify(aiResult) : null,
         ai_assessment_summary: aiResult?.assessment_summary || null,
-        status: 'pending_signup',
+        // An existing client's assessment is theirs and is active from the
+        // moment it is saved. 'pending_signup' is for a stranger whose account
+        // does not exist yet, and leaving it on a real client would hide the
+        // row from anything that filters on status.
+        client_id: existingClientId,
+        status: existingClientId ? 'active' : 'pending_signup',
       };
       const { error: assessErr } = await supabase
         .from('client_assessments')
         .insert(Object.fromEntries(Object.entries(assessmentPayload as any).map(([k, v]) => [k, v === '' ? null : v])) as any);
       if (assessErr) throw assessErr;
-      router.push('/clients');
+      router.push(existingClientId ? `/clients/${existingClientId}` : '/clients');
     } catch (e: any) {
       console.error('Save error:', e);
       alert(e?.message || 'Error saving assessment. Please try again.');
@@ -1078,28 +1136,50 @@ export default function AssessmentPage() {
             </div>
           ) : (
             <div className="flex gap-3">
+              {/* An existing client needs one button and only one. "Create
+                  Client" for somebody who already has an account is the wrong
+                  thing to offer at all, never mind by accident at the end of a
+                  seven-step form. */}
               <button
                 type="button"
                 onClick={() => saveAssessment(false)}
                 disabled={saving}
                 className="flex-1 py-3 rounded-xl font-semibold border transition-all"
-                style={{ borderColor: 'var(--brand-border)', color: 'var(--brand-text-secondary)' }}
+                style={existingClientId
+                  ? { background: 'var(--brand-primary)', borderColor: 'var(--brand-primary)', color: 'var(--brand-surface)' }
+                  : { borderColor: 'var(--brand-border)', color: 'var(--brand-text-secondary)' }}
               >
-                {saving ? 'Saving...' : 'Archive Records'}
+                {saving ? 'Saving...' : existingClientId ? `Save${existingName ? ' ' + existingName.split(' ')[0] + "'s" : ''} assessment` : 'Archive Records'}
               </button>
-              <button
-                type="button"
-                onClick={() => saveAssessment(true)}
-                disabled={saving}
-                className="flex-1 py-3 rounded-xl font-semibold text-white transition-all"
-                style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)' }}
-              >
-                {saving ? 'Creating...' : 'Create Client'}
-              </button>
+              {!existingClientId && (
+                <button
+                  type="button"
+                  onClick={() => saveAssessment(true)}
+                  disabled={saving}
+                  className="flex-1 py-3 rounded-xl font-semibold text-white transition-all"
+                  style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)' }}
+                >
+                  {saving ? 'Creating...' : 'Create Client'}
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * useSearchParams needs a Suspense boundary or the build refuses to prerender
+ * the route. The fallback is deliberately blank rather than a spinner: the form
+ * mounts immediately and a flash of loading state on a seven-step form reads as
+ * the app stalling.
+ */
+export default function AssessmentPage() {
+  return (
+    <Suspense fallback={null}>
+      <AssessmentForm />
+    </Suspense>
   );
 }

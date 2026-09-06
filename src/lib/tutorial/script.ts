@@ -544,9 +544,10 @@ export const TUTORIAL: TutorialChapter[] = [
           "The third step is an overhead squat assessment. You tick what you actually see: feet turning out, forward lean, knees caving, low back arching, arms falling forward, forward head, lateral shift, balance.",
           "This drives the recommendation at the end. Tick honestly and skip nothing — an assessment filled in from memory produces a program built on a guess.",
           "The step before it, medical history, now ends with what to work around. Chips for the ones that recur — no spinal loading, no impact, seated only, pain-free range and the rest — then a box for anything those cannot hold, and one for trainer notes. Their coach reads all of it.",
+          "Assessing somebody already on your roster: open their session and, if they have no assessment, the app stops you first and offers to do it. Their details are already filled in. Not now starts the session anyway and asks again next time. One button at the end, Save their assessment — no account is created, they have one.",
         ],
         narration:
-          "The third step is an overhead squat assessment. You tick what you actually see. Feet turning out, forward lean, knees caving, low back arching, arms falling forward, forward head, a lateral shift, balance. This drives the recommendation at the end, so tick it honestly. The step before it now ends with what to work around. Chips for the ones that recur, then a box for anything those cannot hold, and one for trainer notes. Their coach reads all of it.",
+          "The third step is an overhead squat assessment. You tick what you actually see. Feet turning out, forward lean, knees caving, arms falling forward, a lateral shift, balance. The step before it now ends with what to work around. Chips for the ones that recur, then a box for anything those cannot hold, and one for trainer notes. Their coach reads all of it. And for somebody already on your roster, open their session: if they have no assessment the app stops you first and offers to do it, with their details filled in. Not now starts the session and asks again next time.",
         audioUrl: null,
       },
       {
