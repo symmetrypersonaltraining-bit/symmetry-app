@@ -18,7 +18,7 @@ import {
   scaleNutrients,
 } from "@/lib/nutrition/nutrients";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
-import { namedServings, multiplierForNamed, defaultAmountFor, type NamedServing } from "@/lib/servingOptions";
+import { namedServings, multiplierForNamed, defaultAmountFor, weighedDefaultAmount, type NamedServing } from "@/lib/servingOptions";
 import { unitHeUses } from "@/lib/nutrition/foodUnitDefaults";
 import { barcodeCandidates, normalizeBarcode } from "@/lib/nutrition/barcode";
 import Sheet from "./Sheet";
@@ -334,8 +334,13 @@ export default function FoodSearchSheet({
     // on a food with no serving of its own it recomputed the default from the
     // EMPTY original list and overwrote the borrowed one a line later. The
     // units were fetched and then thrown away.
+    // ...and when it does not, a basis of "1 g" is not an opening amount either.
+    // The foods built from his own meal plans are stored per unit, so the ones
+    // he weighs are stored per GRAM, and the box opened on one gram of chicken
+    // breast. weighedDefaultAmount turns that one case into 100 g and leaves
+    // every real portion — 1 tbsp, 1 oz, 30 g — exactly as the row wrote it.
     const better = defaultAmountFor(f.serving, f.named, f.baseGrams);
-    setAmt(String(better ? better.amount : ps.amount));
+    setAmt(String(better ? better.amount : weighedDefaultAmount(ps.unit, ps.amount)));
     setUnit(better ? better.unit : ps.unit);
 
     // WHAT DUSTIN PROGRAMMES THIS FOOD IN BEATS ANYTHING DERIVED FROM THE ROW.

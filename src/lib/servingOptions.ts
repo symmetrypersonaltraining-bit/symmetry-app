@@ -173,3 +173,22 @@ export function defaultAmountFor(
   if (!pick) return null;
   return { amount: 1, unit: pick.label };
 }
+
+/**
+ * A gram is not a portion of anything.
+ *
+ * The foods built from Dustin's own meal plans are stored on a per-unit basis —
+ * "1 tbsp" for butter, "1 oz" for salmon, and for everything he weighs, "1 g".
+ * The macros are right at that basis and the unit is the one he programmes in,
+ * but the amount box then opened on **1 g of chicken breast**: 1.1 calories, and
+ * a number he has to clear before he can type the real one.
+ *
+ * Only grams and millilitres, and only when the basis is one of them. "1 oz" and
+ * "1 tbsp" are real portions and are left alone; so is a food whose row already
+ * says 30 g, because that is somebody's answer and not an artefact of the basis.
+ */
+export function weighedDefaultAmount(unit: string, amount: number): number {
+  const u = (unit || "").trim().toLowerCase();
+  if (u !== "g" && u !== "ml") return amount;
+  return amount > 0 && amount <= 2 ? 100 : amount;
+}

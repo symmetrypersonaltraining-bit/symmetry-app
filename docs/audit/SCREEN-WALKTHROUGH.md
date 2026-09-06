@@ -1029,10 +1029,13 @@ their import state set to `paused` with the reason written into it.
 
 ### Still open from the rebuild
 
-- **A trainer row's default amount is 1 g.** Foods he programmes by weight —
-  chicken breast, rice, potatoes — are stored on a per-gram basis, which is
-  arithmetically right and opens the amount box on "1 g". He types the real
-  number anyway, but the box should start somewhere sensible.
+- ~~A trainer row's default amount is 1 g.~~ **Fixed the same day.** Foods he
+  programmes by weight — chicken breast, rice, potatoes — are stored on a
+  per-gram basis, which is arithmetically right and opened the amount box on
+  1 g of chicken breast: 1.1 calories, and a number to clear before typing the
+  real one. That one case now opens on 100 g. Every real portion the row states
+  — 1 tbsp, 1 oz, 30 g of almonds — is left exactly as written, because those
+  are answers rather than artefacts of the basis.
 - **The Open Food Facts fallback** in `/api/nutrition-ai/barcode-lookup` still
   fires when a scan misses the catalogue entirely. It is now the only path that
   can write an `off` row, and the nightly gate hides whatever it writes, so a
