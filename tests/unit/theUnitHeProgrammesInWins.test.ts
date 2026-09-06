@@ -79,3 +79,20 @@ test("the unit he programmes wins — head-final still refuses the wrong food", 
   assert.equal(unitHeUses("Kerrygold Irish Cheddar"), null);
   assert.equal(unitHeUses("Chocolate Chip Cookies"), null);
 });
+
+test("the unit he programmes wins — a trailing qualifier does not hide the food", () => {
+  // Opened on "1 pat" in his own app: the catalogue row is called
+  // "PURE IRISH BUTTER SALTED", so a strict head-final rule read "salted".
+  assert.equal(unitHeUses("PURE IRISH BUTTER SALTED"), "tbsp");
+  assert.equal(unitHeUses("Pure Irish Butter Unsalted"), "tbsp");
+  assert.equal(unitHeUses("Organic Extra Virgin Olive Oil Cold Pressed"), "tsp");
+  assert.equal(unitHeUses("White Rice Cooked"), "cup");
+});
+
+test("the unit he programmes wins — a trailing FOOD still blocks the match", () => {
+  // The qualifier allowance must not reopen the hole it replaced. "pecan ice
+  // cream" are not qualifiers, so butter does not get to answer for them.
+  assert.equal(unitHeUses("Butter Pecan Ice Cream"), null);
+  assert.equal(unitHeUses("Butter Pecan Cookies"), null);
+  assert.equal(unitHeUses("Olive Oil Potato Chips"), null);
+});

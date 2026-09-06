@@ -19,6 +19,23 @@
 //
 // 251 foods, from 253 distinct (food, unit) pairs.
 
+/**
+ * Words that describe a food without changing what it is. Only these may
+ * follow the food name and still let it match - see unitHeUses.
+ */
+const QUALIFIER = new Set([
+  "salted","unsalted","organic","natural","pure","original","plain","light","lite",
+  "fresh","raw","cooked","uncooked","whole","half","sliced","shredded","chopped","diced",
+  "ground","roasted","smoked","grilled","baked","fried","boiled","steamed","dried","frozen",
+  "canned","sweet","sweetened","unsweetened","salt","free","low","reduced","fat","lean",
+  "extra","virgin","premium","classic","style","traditional","homemade","imported",
+  "mini","small","medium","large","jumbo","regular","thick","thin","creamy","crunchy",
+  "smooth","soft","hard","mild","sharp","aged","cold","hot","warm","new","old","real",
+  "brand","value","select","choice","grade","pack","size","each","spread","bulk",
+  "pressed","unfiltered","filtered","cured","brewed","toasted","seasoned","flavored",
+  "flavoured","sea","country","farm","pasture","grass","fed","best","fine","good",
+]);
+
 const HIS_UNIT = new Map<string, string>([
   ["2 milk", "oz"], // 2
   ["93 7 ground beef", "g"], // 1
@@ -307,15 +324,22 @@ export function unitHeUses(name: string): string | null {
   if (!head) return null;
   const byHead = HIS_UNIT.get(head);
   if (byHead) return byHead;
-  // Longest matching SUFFIX. One word is not enough: "Extra Virgin Olive Oil"
-  // ends in "oil", but the food he programmes is "olive oil" (teaspoons), and
-  // plain oil is not in his record at all. Longest wins, so the most specific
-  // food he actually uses is the one that answers.
+  // The food is rarely the very last word. "PURE IRISH BUTTER SALTED" ends in
+  // a qualifier, and a strict suffix rule read "salted" and found nothing -
+  // which is exactly how the picker opened his Kerrygold on "1 pat".
+  //
+  // So: find the longest known food anywhere in the name, latest first, and
+  // accept it only when every word AFTER it is a QUALIFIER. That is the line
+  // between a qualifier and a different food:
+  //   "pure irish butter salted"  -> after "butter" comes "salted"      -> yes
+  //   "butter pecan ice cream"    -> after "butter" comes "pecan ice.." -> no
   const words = head.split(" ").filter((w) => w.length >= 3);
-  for (let i = 0; i < words.length; i++) {
-    const suffix = words.slice(i).join(" ");
-    const hit = HIS_UNIT.get(suffix);
-    if (hit) return hit;
+  for (let end = words.length; end > 0; end--) {
+    if (!words.slice(end).every((w) => QUALIFIER.has(w))) continue;
+    for (let start = 0; start < end; start++) {
+      const hit = HIS_UNIT.get(words.slice(start, end).join(" "));
+      if (hit) return hit;
+    }
   }
   return null;
 }
