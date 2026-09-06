@@ -61,3 +61,21 @@ test("the unit he programmes wins — carries his whole roster of foods, not a h
   // fix nothing. This is the check that it is the real record.
   assert.ok(knownFoods().length > 200);
 });
+
+test("the unit he programmes wins — finds his unit inside a brand's own name", () => {
+  // The complaint that proved the first version useless: he searched his real
+  // butter and every result was a brand name. The catalogue almost never says
+  // just "Butter" — it says "Pure Irish Butter", "Salted Irish Butter".
+  assert.equal(unitHeUses("Pure Irish Butter"), "tbsp");
+  assert.equal(unitHeUses("Kerrygold Salted Irish Butter"), "tbsp");
+  assert.equal(unitHeUses("Extra Virgin Olive Oil"), "tsp");
+  assert.equal(unitHeUses("Organic Jasmine White Rice"), "cup");
+});
+
+test("the unit he programmes wins — head-final still refuses the wrong food", () => {
+  // Reading the END of the name is what makes brands work; it must not undo
+  // the guard. These end in a food he has never programmed, so: nothing.
+  assert.equal(unitHeUses("Butter Pecan Ice Cream"), null);
+  assert.equal(unitHeUses("Kerrygold Irish Cheddar"), null);
+  assert.equal(unitHeUses("Chocolate Chip Cookies"), null);
+});

@@ -281,20 +281,22 @@ export function unitKey(name: string): string {
 /**
  * The unit Dustin programmes this food in, or null if he never has.
  *
- * Two matches, in order, and deliberately nothing looser:
+ * Three matches, in order, each narrower than a plain substring search:
  *
- *  1. The whole name, normalised. "sweet potato (cooked)" is its own entry and
- *     is grams, while plain "sweet potato" is ounces — so the fuller name has
- *     to win before anything is trimmed off it.
+ *  1. The whole name. "sweet potato (cooked)" is its own entry and is grams,
+ *     while plain "sweet potato" is ounces, so the fuller name wins first.
+ *  2. The name up to its first comma or bracket. USDA writes a food head-first
+ *     as "<food>, <qualifier>", so "Butter, salted" reduces to "butter".
+ *  3. The LAST significant word of that head segment. English food names are
+ *     head-final, so a brand's "Kerrygold Pure Irish Butter" is butter. This is
+ *     the case that made the first version useless in practice: the catalogue
+ *     almost never calls a food by its bare name, and matching only the front
+ *     of the string found none of his real foods.
  *
- *  2. The name up to its first comma or bracket. The catalogue almost always
- *     writes a food as "<food>, <qualifier>" or "<food> (<qualifier>)", so
- *     "Butter, salted" and "Butter (unsalted)" both reduce to "butter".
- *
- * A plain word-prefix rule was tried first and was wrong: "Butter Pecan Ice
- * Cream" starts with "butter" and is not eaten by the tablespoon. Requiring the
- * food name to END at a comma or bracket is what separates a qualifier from a
- * different food that merely begins the same way.
+ * A word-PREFIX rule was tried before this and was wrong in the other
+ * direction: "Butter Pecan Ice Cream" starts with "butter" and is not eaten by
+ * the tablespoon. Head-final is what gets both right — that name ends in
+ * "cream", which he has never programmed, so it correctly answers nothing.
  */
 export function unitHeUses(name: string): string | null {
   const whole = unitKey(name);
@@ -302,8 +304,20 @@ export function unitHeUses(name: string): string | null {
   const exact = HIS_UNIT.get(whole);
   if (exact) return exact;
   const head = unitKey((name || "").split(/[,(\[]/)[0]);
-  if (!head || head === whole) return null;
-  return HIS_UNIT.get(head) ?? null;
+  if (!head) return null;
+  const byHead = HIS_UNIT.get(head);
+  if (byHead) return byHead;
+  // Longest matching SUFFIX. One word is not enough: "Extra Virgin Olive Oil"
+  // ends in "oil", but the food he programmes is "olive oil" (teaspoons), and
+  // plain oil is not in his record at all. Longest wins, so the most specific
+  // food he actually uses is the one that answers.
+  const words = head.split(" ").filter((w) => w.length >= 3);
+  for (let i = 0; i < words.length; i++) {
+    const suffix = words.slice(i).join(" ");
+    const hit = HIS_UNIT.get(suffix);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 /** Every food he programmes, for tests and for the catalogue audit. */

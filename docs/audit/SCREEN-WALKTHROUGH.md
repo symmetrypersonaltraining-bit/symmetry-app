@@ -302,6 +302,73 @@ against adherence also penalises every swap.
 
 ---
 
+## Interlude — the catalogue audit  ·  6 Sep 2026
+
+Dustin: *"if there are duplicates get rid of the ones w wrong units or fix them.
+we cannot release the app like this."*
+
+Then, when the first fix did not reach his own butter: *"are you fucking
+kidding!???"* — a search for "Kerrygold butter" returning four near-identical
+rows, every one of them grams-only.
+
+Both complaints were correct and had different causes.
+
+### What was actually wrong
+
+**1. The rows were duplicated.** `Pure Irish Butter` (Kerrygold) existed five
+times with fats of 78.6, 39.3, 85.7, 78.6 and 82.5 g, all claiming ~714 cal.
+Only some of those are arithmetically possible, and that is the objective test:
+**calories must equal 4P + 4C + 9F.**
+
+**2. The catalogue had no serving size for countable foods**, so something
+downstream always invented one — a borrow, then a model estimate. That is where
+"6 cookies = 2,148 cal" came from.
+
+### What was done
+
+| pass | rows | basis |
+|---|---|---|
+| exact duplicate rows removed | 34,331 | identical name, brand and macros; kept the copy with the most servings |
+| contradictory rows removed | 8,992 | calories disagree with the row's own macros AND a consistent row for the same food exists |
+| impossible volume servings stripped | 102 | a tablespoon cannot weigh 200 g |
+| household servings added | 61,275 | FDA RACC |
+
+All three are reversible: `bak_food_catalog_deleted_20260906` holds every
+deleted row whole with its reason, `bak_food_catalog_badservings_20260906` and
+`bak_food_catalog_racc_20260906` hold the old `serving_options` beside the new.
+**No food name lost all of its rows** — checked before the delete, and zero.
+
+### The reference layer
+
+`serving_kw` (224 food words) and `serving_phrase` (85 two-word names) hold
+**FDA Reference Amounts Customarily Consumed — 21 CFR 101.12** — the published
+table that decides what a package prints as one serving. That is the literal
+answer to "default to the normal serving size according to the packaging".
+
+Matching it to a name took four attempts, and each wrong one is worth keeping:
+
+- **Tier-first was wrong.** "tortilla chips" became a 49 g tortilla and
+  "olive oil" became a 4 g olive. English is head-final: the LAST food word is
+  the food. Position now wins; specificity is only the tie-break.
+- **Head-final alone was wrong** for USDA names, which are head-INITIAL:
+  "Pie, blueberry" became a cup of blueberries. The head noun is now taken from
+  the segment before the first comma.
+- **Substring phrase matching was wrong.** "pancake mix" matched the phrase
+  "cake mix". Phrases are word-bounded now.
+- **Fruit words are usually flavours.** "diet orange burst" is a soda, not a
+  182 g orange. Produce names only count when the food is essentially just that
+  food and the name carries no drink or confectionery word.
+
+**Foreign-language rows are left alone entirely.** French, Spanish and German
+food names are head-initial, so the English rule reads them backwards — it
+turned *beurre demi-sel* into a teaspoon of salt. A foreign product keeping
+grams is correct; one given the wrong unit is not.
+
+Verified by sampling the plan before any write, twice, and re-running the exact
+cases each earlier attempt got wrong.
+
+---
+
 ## Interlude — the unit was never the catalogue's to know  ·  6 Sep 2026
 
 Dustin, after the third attempt: *"now do a full audit on every singke food in
