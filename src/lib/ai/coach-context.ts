@@ -1,4 +1,5 @@
 import { COACH_FIRST_NAME } from "../trainer";
+import { assessmentBlock } from "@/lib/ai/assessmentContext";
 
 // The client's OWN coach, resolved per request. Every prompt in this file used
 // to bake COACH_FIRST_NAME in at import time, so the nutrition coach told a
@@ -714,5 +715,17 @@ export async function assembleCoachContext(db: Db, clientId: string): Promise<st
   // it when asked a specific question about a lift, not when forming its
   // general read of how someone is doing.
   if (trainingHistory) lines.push(trainingHistory);
+  // WHAT THEIR BODY CAN AND CANNOT DO — last, and deliberately.
+  //
+  // This builder is the nutrition coach's context, and most of what it holds is
+  // food. But every coach surface in the app funnels through the one route, so
+  // a question about a sore shoulder can and does land here — and until 5 Sep
+  // it would have been answered by something that had never seen an assessment.
+  //
+  // Last in the block because it carries its own instructions (see
+  // assessmentContext.ts) and those instructions are the last thing the model
+  // should read before it answers.
+  const assessment = await assessmentBlock(db, clientId);
+  if (assessment) lines.push(assessment);
   return lines.join("\n");
 }

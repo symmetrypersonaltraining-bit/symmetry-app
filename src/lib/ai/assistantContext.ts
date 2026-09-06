@@ -27,6 +27,7 @@
 // answers a bit more generally.
 
 import type { Db } from "@/lib/ai/scope";
+import { assessmentBlock } from "@/lib/ai/assessmentContext";
 import { CT_TODAY, ctShiftDays, coachNameForClient, coachingThemselvesLine, fetchClientProfile } from "@/lib/ai/coach-context";
 import { goalContextBlock } from "@/lib/ai/goalContext";
 import { clearedPoolFor } from "@/lib/ai/workoutPool";
@@ -210,6 +211,15 @@ export async function assistantContext(db: Db, clientId: string | null): Promise
       adherenceLine(db, clientId, today).catch(() => null),
     ]);
 
+    // WHAT THEIR BODY CAN AND CANNOT DO.
+    //
+    // Added 5 Sep 2026. Free-text questions come through THIS builder — "my
+    // shoulder hurts on incline press", "can I add squats" — and until now it
+    // could answer both without ever having seen an assessment. Fetched after
+    // the batch above rather than inside it only because it is the one block
+    // that carries its own instructions with it; see assessmentContext.ts.
+    const assessment = await assessmentBlock(db, clientId);
+
     const lines: string[] = [`Today's date: ${today}.`];
     if (profile?.line) lines.push(profile.line);
     // BEFORE anything else about them. This is the path free-text questions take
@@ -232,6 +242,9 @@ export async function assistantContext(db: Db, clientId: string | null): Promise
     // seen through.
     if (adherence) lines.push(adherence);
     if (history) lines.push(history);
+    // AFTER the numbers, before the gate. It is the frame for anything physical
+    // they ask, and it must be read before the model reaches for a movement.
+    if (assessment) lines.push(assessment);
 
     // ── THE GATE ────────────────────────────────────────────────────────────
     //

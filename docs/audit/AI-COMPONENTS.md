@@ -268,3 +268,49 @@ show it or the prompt should stop asking for it; the question is Dustin's.
 
 *(Status: elements 1 and 2 both built and shipped 5 Sep. The dead `ai_focus`
 awaits a ruling.)*
+
+
+---
+
+## The Coach can see an assessment — 5 Sep 2026
+
+Ruling 1 of the AI contract, built.
+
+Until this shipped, **no client-facing AI surface in the app had read a single
+line of an assessment.** It knew what somebody lifted, ate, weighed and had
+scheduled, and nothing about them physically. Asked "can I add some squats?" by
+a man whose lumbar spine is fused, it said yes.
+
+`src/lib/ai/assessmentContext.ts` builds one block, read by BOTH client-facing
+context builders — `assistantContext` (free text, the ✦ drawer and the tool
+pass) and `assembleCoachContext` (the coach answer). A question about a sore
+shoulder can land at either door, so both had to have it.
+
+**What it carries:** the movement screen ground-up (the lowest finding is
+usually the root, and the block says so), injuries, pain and onset, prior
+surgeries, conditions, the contraindication chips, the free-text work-arounds,
+and the trainer's notes.
+
+**What it does with them** — six rules that ship WITH the block every time,
+because a list of restrictions with no instruction attached is a list a model
+will enforce:
+
+1. **None of it is a hard rule and it must never refuse.** Name what the request
+   cuts across, say why for them specifically, offer an alternative, ask — then
+   do what they say. Dustin, 5 Sep: *"they are not hard rules but ai needs to
+   ask about contradictions w a mild warning before overriding them."*
+2. **Warn once, not every time.** Repeating a warning is how an app gets
+   ignored.
+3. **Explain in plain words, never name the method.** No phase names, no NASM
+   vocabulary, no inhibit/lengthen/activate/integrate.
+4. **Up to two clarifying questions on anything that hurts**, then answer. Not
+   three — interrogation is its own failure.
+5. **Stop and hand over** on numbness, radiating symptoms, coordination or
+   balance changes, dizziness, chest pain, unusual breathlessness, hot or sudden
+   swelling, or anything not settling despite backing off.
+6. **Never invent what is not there.**
+
+**And when there is no assessment it says so.** Half the roster has none. The
+block tells the model not to reason about their body from training history, goal
+or age — "an assessment you invented is worse than none." That is contract rule
+2, "no data" is not "zero".
