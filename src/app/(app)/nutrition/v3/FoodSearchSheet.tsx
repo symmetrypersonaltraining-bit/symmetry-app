@@ -309,6 +309,11 @@ export default function FoodSearchSheet({
   function badge(f: CatalogFood) {
     if (f.source === "client" || f.client_id === clientId)
       return <span style={{ color: "#42A5F5", fontSize: 9, fontWeight: 800 }}>MY FOOD</span>;
+    // Dustin's own foods, built from his plans: his macros, in the unit he
+    // programmes. They are verified, but calling them USDA would be a lie about
+    // where the numbers came from — and he is the better source for his foods.
+    if (f.source === "trainer")
+      return <span style={{ color: "#F5A623", fontSize: 9, fontWeight: 800 }}>SYMMETRY</span>;
     if (f.verified) return <span style={{ color: "#22c55e", fontSize: 9, fontWeight: 800 }}>✓ USDA</span>;
     // Not a warning. Just where it came from, for anyone who wants to know.
     return <span style={{ color: "var(--brand-text-secondary)", fontSize: 9, fontWeight: 700, opacity: 0.75 }}>community</span>;

@@ -302,6 +302,87 @@ against adherence also penalises every swap.
 
 ---
 
+## Interlude — the food quality gate  ·  6 Sep 2026 (overnight)
+
+Dustin: *"we need proper units on every food that calculate proper macros for
+each unit and defaults to standard serving... as of right now its useless."*
+
+Four attempts had tried to INFER serving sizes from the catalogue. The reason
+they kept failing is that **the catalogue cannot answer the question**: 511,555
+of its rows are Open Food Facts, and for 127,847 of them OFF holds no serving
+size at all. That was checked against the OFF API product by product, not
+assumed, and it cannot be re-fetched — it was never collected.
+
+So the answer is structural, in four parts.
+
+### 1. An authoritative core
+
+**USDA Standard Reference 28 — 8,789 foods**, with lab-measured macros and
+USDA's own household measures. `data/usda-sr28.tsv` lives in the repo and
+`import_usda_core()` fetches it over http straight from the public repo, so it
+re-imports on demand and no 1.1 MB of generated INSERTs sits in a migration.
+
+Searching "butter" answers **Butter, salted — 717 cal**, opening on
+**1 tbsp = 102 cal**.
+
+### 2. His own foods, ahead of everything
+
+`meal_items` already held the answer for the foods that matter most: the macros
+and the unit Dustin writes, every time he builds a meal. **155 foods** are now a
+`trainer` tier in the catalogue, ranked first — because for a food he
+programmes, his numbers *are* the answer.
+
+| search | answers |
+|---|---|
+| butter | **Butter · Symmetry · 1 tbsp · 104 cal** |
+| olive oil | Olive oil · 1 tsp · 36 cal |
+| homemade sourdough | 1 g · 2.4 cal |
+| SF greek yogurt | 1 cup · 132 cal |
+| boiled eggs | 1 each · 74.5 cal |
+
+They are badged **SYMMETRY**, not "✓ USDA" — they are verified, but the numbers
+are his, and claiming USDA would misattribute them.
+
+### 3. A gate: nothing wrong is offered
+
+`quarantined` — the calories disagree with 4P+4C+9F, the macros are physically
+impossible, or the row carries no real measure. **152,693 hidden, 387,596
+searchable.** Ranking bad rows to the bottom was not enough: they stayed
+pickable, and a pickable wrong row is a wrong log. Recomputed nightly, because
+the OFF import keeps adding rows.
+
+The gate was wrong twice before it was right, and both are worth keeping:
+
+- It called **an ounce "not a portion"** and hid 30 of his own foods. He
+  programmes meat and fish by the ounce.
+- It judged every row **as if macros were per 100 g**, so a cup of dry oats —
+  106 g of carbohydrate, because it is a cup — looked impossible. The limits now
+  scale with each row's own basis.
+
+### 4. Ranking that knows what a food is
+
+- **Authority beats an exact name.** A packet titled exactly "butter" claiming
+  428 kcal must not outrank USDA's 717.
+- **Whole words beat substrings.** "apple" is inside "applebee's", which is how
+  searching for an apple returned APPLEBEE'S chili.
+- **The food is what comes before the second comma.** USDA writes
+  "Oil, olive, salad or cooking"; judging relevance on the head alone is what
+  separates it from "Oil, corn, peanut, and olive".
+- **Authority only counts when the row is ABOUT the search.** USDA's only match
+  for "mixed berries" is a strained babyfood, so a real punnet wins.
+- **One product, one row.** Kerrygold's "Pure Irish Butter" appeared five times
+  with different fat figures; the copy closest to what its duplicates agree on
+  is kept, so a lone 748 loses to three near 714.
+
+### Caught by testing in the app, not by assuming
+
+Setting `serving_grams` to the pat weight while the macros were per 100 g made
+**a tablespoon of butter read 2,036 cal**. It looked right in every SQL check.
+`serving_desc`/`serving_grams` describe the BASIS of the macros, never a
+portion; the real measures live in `serving_options`.
+
+---
+
 ## Interlude — the catalogue audit  ·  6 Sep 2026
 
 Dustin: *"if there are duplicates get rid of the ones w wrong units or fix them.
