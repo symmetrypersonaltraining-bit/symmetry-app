@@ -150,7 +150,10 @@ test("the resolver asks only when the row cannot express the measure", () => {
   assert.match(code(OP), /const rowKnowsIt =/);
   assert.match(code(OP), /toGrams\(1, askedUnit\) != null/, "a stated weight must never trigger a question");
   assert.match(code(OP), /!!servingByUnit\(row, askedUnit\)/, "the row's own serving must win");
-  assert.match(code(OP), /if \(!rowKnowsIt\) \{/);
+  // Guarded further since 6 Sep: the borrow is also skipped for a food Dustin
+  // WEIGHS, because a borrowed cup on his sweet potato is the same mistake as
+  // the missing tablespoon on his butter.
+  assert.match(code(OP), /if \(!rowKnowsIt && !fallbackServing && !heWeighsIt\) \{/);
   assert.match(code(OP), /system: PORTION_SYSTEM/);
 });
 

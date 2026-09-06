@@ -21,6 +21,7 @@ import {
   ESTIMATE_SYSTEM, validateEstimate, estimatedFood, toGrams, isGenericUnit,
   PORTION_SYSTEM, validatePortion,
 } from "@/lib/nutrition/foodResolve";
+import { unitHeUses } from "@/lib/nutrition/foodUnitDefaults";
 
 /** Enough rows to contain the right one; short enough that the whole list gets read. */
 export const CANDIDATE_LIMIT = 10;
@@ -239,7 +240,20 @@ export async function resolveFood(
   // — USDA's "Butter, salted" has carried "1 tbsp (14.2 g)" all along. That is a
   // real number from a real row, so it beats asking a model for the weight, and
   // it costs a query instead of a call.
-  if (!rowKnowsIt) {
+  // ── WHAT HE PROGRAMMES IT IN, BEFORE ANYTHING IS DERIVED ──────────────────
+  //
+  // Same record the food sheet reads: meal_items.unit, the unit Dustin wrote
+  // down himself, once per food, every time he built a meal. If they named no
+  // measure and he has one for this food, that is the measure — no borrow, no
+  // model. And if he WEIGHS this food, a borrowed household unit would be the
+  // wrong answer, so the borrow is skipped and the portion question asked.
+  const hisUnit = unitHeUses(row.name);
+  const heWeighsIt = !!hisUnit && /^(g|oz|grams?|oz cooked|oz dry)$/.test(hisUnit);
+  if (!rowKnowsIt && !askedUnit && hisUnit && !heWeighsIt) {
+    fallbackServing = servingByUnit(row, hisUnit) ?? null;
+  }
+
+  if (!rowKnowsIt && !fallbackServing && !heWeighsIt) {
     try {
       const { data } = await deps.db.rpc("borrowed_household_servings", {
         p_name: row.name, p_brand: (row as CatalogRow & { brand?: string | null }).brand ?? null,
@@ -261,6 +275,8 @@ export async function resolveFood(
       // correct — the portion question below asks the model that exact thing
       // and gets ~35 g for a cookie.
       const wanted = (askedUnit
+        // He has a unit for this food; the borrow's one job is to find it.
+        || hisUnit
         // No unit named: the food itself is what they counted. "6 tiffs treats
         // COOKIES" — their own last word, not the catalogue row's.
         || term.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length >= 3).pop()

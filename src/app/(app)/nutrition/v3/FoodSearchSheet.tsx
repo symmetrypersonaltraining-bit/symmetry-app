@@ -19,6 +19,7 @@ import {
 } from "@/lib/nutrition/nutrients";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 import { namedServings, multiplierForNamed, defaultAmountFor, type NamedServing } from "@/lib/servingOptions";
+import { unitHeUses } from "@/lib/nutrition/foodUnitDefaults";
 import Sheet from "./Sheet";
 import BarcodeScanner from "./BarcodeScanner";
 
@@ -331,9 +332,24 @@ export default function FoodSearchSheet({
     setAmt(String(better ? better.amount : ps.amount));
     setUnit(better ? better.unit : ps.unit);
 
+    // WHAT DUSTIN PROGRAMMES THIS FOOD IN BEATS ANYTHING DERIVED FROM THE ROW.
+    //
+    // Butter is tablespoons. He wrote that down eight times in meal_items and
+    // the app spent three attempts trying to infer it from a catalogue that
+    // does not know. If he has a unit for this food, it is the answer, and the
+    // only question left is whether this row already carries that measure.
+    const his = unitHeUses(f.name);
+    const hisNamed = his ? f.named.find((n) => n.label === his) : undefined;
+    if (hisNamed) { setAmt("1"); setUnit(hisNamed.label); }
+
+    // A food he WEIGHS must not be handed a household unit by the borrow below.
+    // Sweet potato is grams, salmon is ounces; a borrowed "cup" on either is
+    // the same class of mistake as the tablespoon that was missing.
+    const heWeighsIt = !!his && /^(g|oz|grams?|oz cooked|oz dry)$/.test(his);
+
     // The sheet is already on screen with grams by the time this returns, so a
     // slow borrow costs nothing but a late extra option.
-    if (!f.named.length && f.baseGrams) {
+    if (!hisNamed && !heWeighsIt && !f.named.length && f.baseGrams) {
       const borrowed = await borrowUnits(supabase, f);
       if (borrowed.length) {
         setPicked({ ...f, named: borrowed, borrowedUnits: true });
@@ -351,12 +367,14 @@ export default function FoodSearchSheet({
         // this food, the box opens on grams and the units are there to pick.
         const food = (f.name || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ")
           .split(/\s+/).filter((w) => w.length >= 3).pop()?.replace(/s$/, "") || "";
-        const own = food
-          ? borrowed.find((n) => {
-              const l = n.label.replace(/s$/, "");
-              return l === food || l.includes(food) || food.includes(l);
-            })
-          : undefined;
+        // His unit first if the borrow turned it up, then the food's own name.
+        const own = (his ? borrowed.find((n) => n.label === his) : undefined)
+          || (food
+            ? borrowed.find((n) => {
+                const l = n.label.replace(/s$/, "");
+                return l === food || l.includes(food) || food.includes(l);
+              })
+            : undefined);
         const b = own
           ? { amount: 1, unit: own.label }
           : defaultAmountFor(f.serving, borrowed, f.baseGrams);

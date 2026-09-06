@@ -129,7 +129,10 @@ test("nothing matched means nothing offered", () => {
 // ── it is actually reached, on both doors ───────────────────────────────────
 
 test("the food sheet borrows only when the row knows no portion", () => {
-  assert.match(code(SHEET), /if \(!f\.named\.length && f\.baseGrams\) \{/);
+  // Since 6 Sep the guard also skips the borrow when Dustin's own record
+  // already answers — either with the row's own copy of his unit, or by saying
+  // he weighs this food and no household unit belongs on it.
+  assert.match(code(SHEET), /if \(!hisNamed && !heWeighsIt && !f\.named\.length && f\.baseGrams\) \{/);
   // The sheet is on screen before the borrow returns — a slow lookup must not
   // hold up the food the client already tapped.
   const i = code(SHEET).indexOf("async function openPicked");
@@ -204,7 +207,10 @@ test("a borrowed serving may only answer the unit it was actually asked about", 
 test("the sheet offers every borrowed unit but opens only on this food's own", () => {
   // Offering them is the point, and each shows its gram weight. Opening ON one
   // is the app choosing, and that is where the same shortcut does damage.
-  assert.match(code(SHEET), /const own = food/);
+  // His own unit is consulted first, then the food's own name. Neither is
+  // "whatever the borrowed set leads with", which is what put a bar on a cookie.
+  assert.match(code(SHEET), /borrowed\.find\(\(n\) => n\.label === his\)/);
+  assert.match(code(SHEET), /borrowed\.find\(\(n\) => \{/);
   assert.match(code(SHEET), /\? \{ amount: 1, unit: own\.label \}/);
   assert.ok(!/preferredServing/.test(code(SHEET)),
     "the sheet auto-selects whatever the borrowed set leads with again");
