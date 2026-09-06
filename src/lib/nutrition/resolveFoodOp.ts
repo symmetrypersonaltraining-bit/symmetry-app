@@ -17,7 +17,7 @@ import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import {
   CatalogRow, ResolvedFood, Serving, macrosFromRow, describeCandidates, PICK_SYSTEM, validatePick,
   TERMS_SYSTEM, validateTerms, householdServing, servingByUnit,
-  parseServingOption, preferredServing,
+  parseServingOption,
   ESTIMATE_SYSTEM, validateEstimate, estimatedFood, toGrams, isGenericUnit,
   PORTION_SYSTEM, validatePortion,
 } from "@/lib/nutrition/foodResolve";
@@ -246,13 +246,32 @@ export async function resolveFood(
       });
       const opts = Array.isArray(data) ? (data as { desc: string; grams: number }[]) : [];
       const parsed = opts.map(parseServingOption);
-      // The measure they NAMED, if the borrowed set has it; otherwise the one a
-      // person would reach for, through the same chooser as everywhere else.
-      const byName = askedUnit
-        ? parsed.find((p) => p && (p.label.replace(/s$/, "") === askedUnit.trim().toLowerCase().replace(/s$/, "")
-            || p.label.includes(askedUnit.trim().toLowerCase())))
+
+      // ⚠️ IT MAY ONLY ANSWER THE QUESTION IT WAS ASKED.
+      //
+      // The first version fell back to "whichever countable measure this
+      // borrowed set happens to lead with". Dustin typed "6 tiffs treats
+      // cookies" and got **6 bar — 1,815 cal**: the borrowed set for a
+      // chocolate chip cookie contained a "bar", nothing matched the word he
+      // used, and the chooser handed over the bar anyway. Six cookies became
+      // six protein bars, 300 calories each.
+      //
+      // A borrowed serving is only ever an answer to "what does one X weigh".
+      // If the set does not contain X, it does not know, and saying so is
+      // correct — the portion question below asks the model that exact thing
+      // and gets ~35 g for a cookie.
+      const wanted = (askedUnit
+        // No unit named: the food itself is what they counted. "6 tiffs treats
+        // COOKIES" — their own last word, not the catalogue row's.
+        || term.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length >= 3).pop()
+        || "").trim().toLowerCase().replace(/s$/, "");
+      fallbackServing = wanted
+        ? parsed.find((p) => {
+            if (!p) return false;
+            const l = p.label.replace(/s$/, "");
+            return l === wanted || l.includes(wanted) || wanted.includes(l);
+          }) || null
         : null;
-      fallbackServing = byName || preferredServing(parsed);
     } catch {
       // A failed borrow just means the question below gets asked.
     }

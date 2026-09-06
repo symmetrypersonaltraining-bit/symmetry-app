@@ -364,6 +364,23 @@ the line setting the default portion ran AFTER the lookup, recomputed from the
 food's own empty unit list, and overwrote the borrowed portion a line later. The
 units were fetched and thrown away. It now runs before.
 
+**⚠️ AND A BORROWED MEASURE MAY ONLY ANSWER THE UNIT IT WAS ASKED ABOUT.** The
+first rule fell back to "whichever countable measure the borrowed set leads
+with". Dustin typed *"6 tiffs treats cookies"* into Quick log and got
+**6 bar — 1,815 cal**: the row was right (*Cookie, chocolate chip*), its borrowed
+set contained a "bar", nothing matched the word he used, and it handed over the
+bar anyway. Six cookies became six protein bars at 300 cal each.
+
+A borrowed serving is only ever an answer to "what does one X weigh". No X in
+the set means it does not know, and the portion question — which asks a model
+that exact thing and returns ~35 g for a cookie — is the correct next step. When
+no unit is named, the food is taken from the CLIENT's own last word ("6 tiffs
+treats COOKIES"), not the catalogue row's name.
+
+The food sheet keeps offering every borrowed unit, each with its gram weight,
+but only OPENS on one named after the food itself. Offering is help; choosing
+silently is the failure.
+
 **Nothing is backfilled, and that was a decision, not an omission.** 276,275 of
 the catalogue's 574,667 rows carry no countable portion. A set-based backfill
 was written, sampled and thrown away: the loose rule matched 162,286 and the

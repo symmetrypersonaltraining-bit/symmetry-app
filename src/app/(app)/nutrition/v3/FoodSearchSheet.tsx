@@ -19,7 +19,6 @@ import {
 } from "@/lib/nutrition/nutrients";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
 import { namedServings, multiplierForNamed, defaultAmountFor, type NamedServing } from "@/lib/servingOptions";
-import { preferredServing } from "@/lib/nutrition/foodResolve";
 import Sheet from "./Sheet";
 import BarcodeScanner from "./BarcodeScanner";
 
@@ -342,12 +341,26 @@ export default function FoodSearchSheet({
         // serving is a plain weight. A row whose serving string is missing or
         // odd would keep grams even with a tablespoon now in the list, so the
         // fallback picks the borrowed set's own best portion.
-        const b = defaultAmountFor(f.serving, borrowed, f.baseGrams);
-        const pick = b || (() => {
-          const s2 = preferredServing(borrowed.map((n) => ({ label: n.label, gramsEach: n.gramsPerUnit })));
-          return s2 ? { amount: 1, unit: s2.label } : null;
-        })();
-        if (pick) { setAmt(String(pick.amount)); setUnit(pick.unit); }
+        // ⚠️ ONLY AUTO-SELECT A BORROWED UNIT THAT IS THIS FOOD'S OWN.
+        //
+        // Every borrowed unit is offered in the picker — that is the point, and
+        // each shows its gram weight. But opening ON one is the app making a
+        // choice, and the same "take whatever the set leads with" shortcut put
+        // six cookies into six protein BARS on the quick-log path the same
+        // evening. If the borrowed set does not contain a measure named after
+        // this food, the box opens on grams and the units are there to pick.
+        const food = (f.name || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ")
+          .split(/\s+/).filter((w) => w.length >= 3).pop()?.replace(/s$/, "") || "";
+        const own = food
+          ? borrowed.find((n) => {
+              const l = n.label.replace(/s$/, "");
+              return l === food || l.includes(food) || food.includes(l);
+            })
+          : undefined;
+        const b = own
+          ? { amount: 1, unit: own.label }
+          : defaultAmountFor(f.serving, borrowed, f.baseGrams);
+        if (b) { setAmt(String(b.amount)); setUnit(b.unit); }
       }
     }
   }

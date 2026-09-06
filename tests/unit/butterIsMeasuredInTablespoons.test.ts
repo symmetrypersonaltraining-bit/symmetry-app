@@ -169,13 +169,45 @@ test("the borrowed default is not overwritten a line later", () => {
 
 test("a food whose base serving is odd still opens on the borrowed portion", () => {
   // defaultAmountFor only opens on a named unit when the row's own base serving
-  // is a plain weight. Without this fallback a row with a missing or unusual
-  // serving string keeps grams even with a tablespoon sitting in the list.
-  assert.match(code(SHEET), /preferredServing\(borrowed\.map/);
+  // is a plain weight. When the borrowed set contains a measure named after the
+  // food itself, that wins outright and the base serving string stops mattering.
+  assert.match(code(SHEET), /const b = own\s*\n?\s*\? \{ amount: 1, unit: own\.label \}/);
 });
 
 test("a failed borrow leaves grams working", () => {
   assert.match(code(SHEET), /catch \{[\s\S]{0,120}return \[\];/);
+});
+
+test("a borrowed serving may only answer the unit it was actually asked about", () => {
+  // ⚠️ THE ONE THAT PUT SIX COOKIES INTO SIX PROTEIN BARS.
+  //
+  // Dustin typed "6 tiffs treats cookies" into Quick log and got
+  // **6 bar — 1,815 cal · 18P/235C/89F**. The catalogue row was right —
+  // "Cookie, chocolate chip" — and the borrowed set for it contained a "bar".
+  // Nothing in that set matched the word he used, and the first version handed
+  // over whichever countable measure the set led with anyway. Six cookies
+  // became six protein bars at 300 calories each.
+  //
+  // A borrowed serving is only ever an answer to "what does one X weigh". If
+  // the set has no X, it does not know — and the portion question below asks a
+  // model that exact thing and gets about 35 g for a cookie.
+  assert.match(code(OP), /const wanted = \(askedUnit/);
+  assert.ok(!/fallbackServing = byName \|\| preferredServing\(parsed\)/.test(code(OP)),
+    "the resolver takes whatever the borrowed set leads with again");
+  assert.ok(!/preferredServing/.test(code(OP)),
+    "the resolver must not choose a borrowed unit the person did not name");
+  // No unit named means the food itself is what they counted — their word for
+  // it, not the catalogue row's name.
+  assert.match(code(OP), /term\.toLowerCase\(\)\.replace/);
+});
+
+test("the sheet offers every borrowed unit but opens only on this food's own", () => {
+  // Offering them is the point, and each shows its gram weight. Opening ON one
+  // is the app choosing, and that is where the same shortcut does damage.
+  assert.match(code(SHEET), /const own = food/);
+  assert.match(code(SHEET), /\? \{ amount: 1, unit: own\.label \}/);
+  assert.ok(!/preferredServing/.test(code(SHEET)),
+    "the sheet auto-selects whatever the borrowed set leads with again");
 });
 
 test("the AI resolver asks the catalogue before it asks a model", () => {
