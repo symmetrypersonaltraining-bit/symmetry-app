@@ -36,258 +36,261 @@ const QUALIFIER = new Set([
   "flavoured","sea","country","farm","pasture","grass","fed","best","fine","good",
 ]);
 
-const HIS_UNIT = new Map<string, string>([
-  ["2 milk", "oz"], // 2
-  ["93 7 ground beef", "g"], // 1
-  ["93 7 ground beef cooked", "g"], // 1
-  ["93 7 lean ground beef burger patty", "oz"], // 2
-  ["almond butter", "tbsp"], // 8
-  ["almond butter level measured", "tbsp"], // 1
-  ["almond milk unsweetened", "cup"], // 4
-  ["almonds", "each"], // 33
-  ["animal isolate loaded whey", "scoop"], // 4
-  ["animal isolate loaded whey creamy vanilla", "scoop"], // 1
-  ["apple", "medium"], // 21
-  ["apple or orange", "medium"], // 6
-  ["asparagus", "oz"], // 5
-  ["avocado", "oz"], // 9
-  ["avocado oil", "tbsp"], // 10
-  ["avocado oil for cooking", "tbsp"], // 1
-  ["avocados", "oz"], // 1
-  ["baby spinach", "g"], // 6
-  ["bacon egg bites", "serving"], // 1
-  ["bagel", "whole"], // 2
-  ["baked or broiled fish", "oz"], // 2
-  ["banana", "medium"], // 1
-  ["banana medium", "each"], // 2
-  ["banana small", "medium"], // 7
-  ["basmati rice", "g"], // 2
-  ["beef gravy", "cup"], // 3
-  ["beef or pork", "oz"], // 1
-  ["beef stick", "stick"], // 1
-  ["beef stir fry noodles", "g"], // 2
-  ["bell peppers onion garlic", "serving"], // 6
-  ["bell peppers onion garlic unlimited", "serving"], // 6
-  ["bell peppers onion unlimited", "serving"], // 4
-  ["bell peppers onion zucchini unlimited", "serving"], // 6
-  ["blueberries", "cup"], // 14
-  ["blueberries fresh", "g"], // 2
-  ["blueberries optional blended", "cup"], // 2
-  ["bob evans liquid egg whites", "fl oz"], // 2
-  ["boiled egg whole", "each"], // 12
-  ["boiled eggs whole", "each"], // 26
-  ["broccoli", "cup"], // 2
-  ["broccoli asparagus green beans", "cup"], // 2
-  ["broccoli asparagus or green beans", "cup"], // 16
-  ["broccoli steamed", "g"], // 2
-  ["built puff protein bar", "bar"], // 2
-  ["bulgur cooked", "oz"], // 1
-  ["butter", "tbsp"], // 8
-  ["butternut squash cooked", "cup"], // 6
-  ["canned tuna in water", "oz"], // 12
-  ["carrots cooked", "g"], // 8
-  ["celery sticks", "serving"], // 14
-  ["celery sticks unlimited", "serving"], // 6
-  ["cherry tomatoes", "g"], // 6
-  ["chia seeds", "tbsp"], // 1
-  ["chicken breast", "oz"], // 7
-  ["chicken breast cold sliced", "oz"], // 1
-  ["chicken breast cooked", "oz"], // 15
-  ["chicken or white fish", "g"], // 2
-  ["chicken thigh", "oz"], // 1
-  ["chicken thigh boneless skinless cooked", "oz"], // 4
-  ["chicken thigh cooked", "oz"], // 6
-  ["chicken thigh pulled", "oz"], // 1
-  ["chicken thigh pulled cooked", "oz"], // 18
-  ["chicken thighs drumsticks", "oz"], // 1
-  ["chili crisp", "tsp"], // 4
-  ["chuck roast cooked", "g"], // 4
-  ["coffee", "cup"], // 2
-  ["cold salmon or tuna", "oz"], // 13
-  ["cooking oil or butter", "tbsp"], // 1
-  ["corn", "cup"], // 1
-  ["cream of rice", "g"], // 2
-  ["cream of rice dry", "cup"], // 1
-  ["cream of rice dry weight", "g"], // 2
-  ["cream of rice or rolled oats", "g"], // 2
-  ["cream of wheat dry", "g"], // 7
-  ["cucumber tomato salad", "cup"], // 6
-  ["dannon oikos triple zero strawberry", "container"], // 1
-  ["dave s killer bread plain bagel", "bagel"], // 2
-  ["egg white", "large"], // 5
-  ["egg whites", "g"], // 7
-  ["egg whites carton", "fl oz"], // 12
-  ["egg whites liquid", "cup"], // 2
-  ["egg whole", "large"], // 5
-  ["eggs large", "whole"], // 2
-  ["fage 2 greek yogurt", "g"], // 4
-  ["fiber one soft baked bars cinnamon coffee cake", "bar"], // 1
-  ["filipino beef mechado", "g"], // 1
-  ["free veggies", "serving"], // 12
-  ["fried eggs", "large"], // 6
-  ["frozen blueberries", "cup"], // 1
-  ["frozen mixed berries", "cup"], // 1
-  ["fruit", "g"], // 2
-  ["fuji apple", "g"], // 4
-  ["ghirardelli 60 cacao dark chocolate chips", "g"], // 2
-  ["goya coconut water", "oz"], // 6
-  ["granola", "cup"], // 1
-  ["grapes", "cup"], // 20
-  ["greek yogurt nonfat", "cup"], // 1
-  ["greek yogurt nonfat plain", "cup"], // 1
-  ["green beans", "g"], // 1
-  ["green bell pepper", "g"], // 1
-  ["green lentils cooked", "cup"], // 7
-  ["green string beans", "oz"], // 2
-  ["ground beef 85 15 cooked", "g"], // 1
-  ["ground beef 90 10", "oz cooked"], // 1
-  ["ground beef 90 lean 10 fat", "oz"], // 2
-  ["ground beef 93 7 cooked", "oz"], // 1
-  ["ground venison 93 7", "oz"], // 1
-  ["halo top caramel cookie crunch ice cream", "g"], // 4
-  ["ham whole cured", "oz"], // 1
-  ["hard boiled eggs", "large"], // 30
-  ["hillshire farms turkey breast", "g"], // 2
-  ["homemade sourdough", "g"], // 16
-  ["honey", "g"], // 1
-  ["infinis cream of rice", "scoop"], // 9
-  ["jasmine rice cooked", "g"], // 2
-  ["jif peanut butter", "tbsp"], // 2
-  ["jocko molk whey", "scoop"], // 4
-  ["kerrygold butter", "tsp"], // 1
-  ["kerrygold irish butter", "g"], // 2
-  ["kirkland thin sliced chicken breast", "g"], // 4
-  ["kirkland ultra filtered milk", "cup"], // 2
-  ["kirkland wild blueberries frozen", "g"], // 4
-  ["lean beef 93 7", "g"], // 4
-  ["lean ground beef 90 10", "oz"], // 1
-  ["lean ground beef 93 7", "oz"], // 3
-  ["lean ground beef 93 7 cooked", "oz"], // 31
-  ["lean turkey breakfast sausage", "oz"], // 2
-  ["light greens", "serving"], // 1
-  ["light mixed greens", "serving"], // 1
-  ["light mixed greens unlimited", "serving"], // 6
-  ["light vinaigrette", "tbsp"], // 2
-  ["liquid egg whites", "oz"], // 7
-  ["love crunch dark chocolate blueberry granola", "g"], // 6
-  ["low fat cottage cheese", "cup"], // 7
-  ["low fat greek yogurt", "cup"], // 13
-  ["lumpia", "piece"], // 1
-  ["matcha powder", "g"], // 2
-  ["meijer ground bison", "oz"], // 1
-  ["metagenics protein", "serving"], // 2
-  ["mini bagel", "mini bagel"], // 1
-  ["minute rice cooked", "cup"], // 2
-  ["mission spinach tortilla wrap", "tortilla"], // 4
-  ["mixed berries", "cup"], // 98
-  ["nature s own brioche hamburger bun", "bun"], // 2
-  ["nonfat greek yogurt", "cup"], // 1
-  ["now sports carbo gain", "cup"], // 2
-  ["nurri chocolate protein shake", "can"], // 4
-  ["nurri shake", "shake"], // 1
-  ["oats dry", "g"], // 1
-  ["oats dry weight", "g"], // 4
-  ["oikos triple zero", "cup"], // 3
-  ["oikos triple zero greek yogurt", "cup"], // 1
-  ["oikos triple zero greek yogurt plain", "g"], // 2
-  ["oikos triple zero vanilla yogurt", "g"], // 4
-  ["olive oil", "tsp"], // 52
-  ["olive oil for frying", "tsp"], // 1
-  ["onions", "oz"], // 2
-  ["organised nutrition pouch", "g"], // 2
-  ["pasta", "cup"], // 2
-  ["pasta cooked", "cup"], // 12
-  ["pasta sauce", "cup"], // 1
-  ["pe science protein powder", "g"], // 2
-  ["peanut butter", "tbsp"], // 1
-  ["peas", "cup"], // 1
-  ["philadelphia cream cheese spread", "g"], // 6
-  ["plant protein", "scoop"], // 1
-  ["pork tenderloin", "oz"], // 3
-  ["pork tenderloin cooked", "oz"], // 30
-  ["power crunch protein energy bar", "bar"], // 2
-  ["premier protein shake", "bottle"], // 1
-  ["pro jym whey protein", "scoop"], // 1
-  ["protein pasta", "oz dry"], // 1
-  ["protein powder", "scoop"], // 1
-  ["protein powder vanilla unflavored", "scoop"], // 1
-  ["pulled chicken thigh cold", "oz"], // 1
-  ["quaker chocolate rice cake", "cake"], // 2
-  ["quaker chocolate rice cakes", "each"], // 1
-  ["quaker white cheddar rice cakes", "cake"], // 1
-  ["quest protein chips loaded taco", "bag"], // 2
-  ["red kidney beans with salt cooked boiled", "oz"], // 3
-  ["rice cake", "cake"], // 1
-  ["rice cakes", "cakes"], // 1
-  ["rice cakes plain", "cakes"], // 1
-  ["rice cooked", "cup"], // 1
-  ["roasted asparagus or zucchini unlimited", "serving"], // 6
-  ["roasted beets", "cup"], // 7
-  ["roasted carrots and celery", "serving"], // 6
-  ["roasted carrots and green beans", "serving"], // 6
-  ["roasted carrots green beans unlimited", "serving"], // 12
-  ["roasted carrots zucchini unlimited", "serving"], // 12
-  ["roasted green beans carrots unlimited", "serving"], // 4
-  ["roasted veggies", "serving"], // 1
-  ["rolled oats dry", "g"], // 14
-  ["sabra roasted pepper hummus", "g"], // 4
-  ["salmon", "oz"], // 5
-  ["salmon cooked", "oz"], // 39
-  ["sardines in water canned", "cans"], // 6
-  ["sargento ultra thin sharp cheddar", "slice"], // 2
-  ["sf greek yogurt", "cup"], // 34
-  ["sfh whey", "scoop"], // 2
-  ["shrimp", "oz"], // 1
-  ["shrimp cooked", "oz"], // 6
-  ["side salad", "serving"], // 1
-  ["side salad unlimited", "serving"], // 6
-  ["sirloin steak cooked", "g"], // 1
-  ["sliced carrots", "serving"], // 1
-  ["sliced carrots unlimited", "serving"], // 6
-  ["sliced cucumber", "serving"], // 7
-  ["sliced cucumber side", "serving"], // 12
-  ["sliced cucumber unlimited", "serving"], // 6
-  ["sourdough bread", "g"], // 2
-  ["spinach", "cup"], // 2
-  ["steamed asparagus or broccoli", "serving"], // 6
-  ["steamed asparagus or broccoli unlimited", "serving"], // 6
-  ["steamed broccoli or asparagus", "serving"], // 6
-  ["steamed broccoli or asparagus unlimited", "serving"], // 6
-  ["steel cut oats dry", "cup"], // 2
-  ["strawberries", "oz"], // 3
-  ["sweet potato", "oz"], // 4
-  ["sweet potato cooked", "g"], // 38
-  ["sweet potato diced cooked", "g"], // 6
-  ["thai cucumber salad", "g"], // 2
-  ["thomas cinnamon swirl bagel", "bagel"], // 8
-  ["tilapia cooked", "oz cooked"], // 1
-  ["tomatoes", "oz"], // 2
-  ["top sirloin trimmed cooked", "oz"], // 4
-  ["turkey bacon", "slices"], // 7
-  ["unsweetened almond milk", "oz"], // 7
-  ["vegetables unlimited", "serving"], // 35
-  ["veggie", "cup"], // 1
-  ["walnuts", "halves"], // 14
-  ["water", "oz"], // 2
-  ["whey protein", "scoop"], // 12
-  ["whey protein shake", "scoop"], // 2
-  ["white fish tilapia cooked", "g"], // 1
-  ["white mushroom", "g"], // 1
-  ["white onion", "g"], // 1
-  ["white potato", "g"], // 2
-  ["white potato cooked", "g"], // 13
-  ["white potato roasted", "g"], // 28
-  ["white rice", "cup"], // 15
-  ["white rice cooked", "cup"], // 82
-  ["white rice long grain cooked", "oz"], // 5
-  ["whole eggs", "large"], // 28
-  ["whole eggs fried", "large"], // 6
-  ["whole eggs hard boiled", "whole"], // 1
-  ["whole wheat crackers", "crackers"], // 7
-  ["wilde smoked gouda protein crackers", "g"], // 6
-  ["yasso bar", "bar"], // 1
-  ["yasso greek yogurt bar", "bar"], // 2
-  ["zucchini", "oz"], // 2
+/** A unit he programmed, and how many times he programmed it that way. */
+interface HisUnit { unit: string; uses: number; }
+
+const HIS_UNIT = new Map<string, HisUnit>([
+  ["2 milk", { unit: "oz", uses: 2 }],
+  ["93 7 ground beef", { unit: "g", uses: 1 }],
+  ["93 7 ground beef cooked", { unit: "g", uses: 1 }],
+  ["93 7 lean ground beef burger patty", { unit: "oz", uses: 2 }],
+  ["almond butter", { unit: "tbsp", uses: 8 }],
+  ["almond butter level measured", { unit: "tbsp", uses: 1 }],
+  ["almond milk unsweetened", { unit: "cup", uses: 4 }],
+  ["almonds", { unit: "each", uses: 33 }],
+  ["animal isolate loaded whey", { unit: "scoop", uses: 4 }],
+  ["animal isolate loaded whey creamy vanilla", { unit: "scoop", uses: 1 }],
+  ["apple", { unit: "medium", uses: 21 }],
+  ["apple or orange", { unit: "medium", uses: 6 }],
+  ["asparagus", { unit: "oz", uses: 5 }],
+  ["avocado", { unit: "oz", uses: 9 }],
+  ["avocado oil", { unit: "tbsp", uses: 10 }],
+  ["avocado oil for cooking", { unit: "tbsp", uses: 1 }],
+  ["avocados", { unit: "oz", uses: 1 }],
+  ["baby spinach", { unit: "g", uses: 6 }],
+  ["bacon egg bites", { unit: "serving", uses: 1 }],
+  ["bagel", { unit: "whole", uses: 2 }],
+  ["baked or broiled fish", { unit: "oz", uses: 2 }],
+  ["banana", { unit: "medium", uses: 1 }],
+  ["banana medium", { unit: "each", uses: 2 }],
+  ["banana small", { unit: "medium", uses: 7 }],
+  ["basmati rice", { unit: "g", uses: 2 }],
+  ["beef gravy", { unit: "cup", uses: 3 }],
+  ["beef or pork", { unit: "oz", uses: 1 }],
+  ["beef stick", { unit: "stick", uses: 1 }],
+  ["beef stir fry noodles", { unit: "g", uses: 2 }],
+  ["bell peppers onion garlic", { unit: "serving", uses: 6 }],
+  ["bell peppers onion garlic unlimited", { unit: "serving", uses: 6 }],
+  ["bell peppers onion unlimited", { unit: "serving", uses: 4 }],
+  ["bell peppers onion zucchini unlimited", { unit: "serving", uses: 6 }],
+  ["blueberries", { unit: "cup", uses: 14 }],
+  ["blueberries fresh", { unit: "g", uses: 2 }],
+  ["blueberries optional blended", { unit: "cup", uses: 2 }],
+  ["bob evans liquid egg whites", { unit: "fl oz", uses: 2 }],
+  ["boiled egg whole", { unit: "each", uses: 12 }],
+  ["boiled eggs whole", { unit: "each", uses: 26 }],
+  ["broccoli", { unit: "cup", uses: 2 }],
+  ["broccoli asparagus green beans", { unit: "cup", uses: 2 }],
+  ["broccoli asparagus or green beans", { unit: "cup", uses: 16 }],
+  ["broccoli steamed", { unit: "g", uses: 2 }],
+  ["built puff protein bar", { unit: "bar", uses: 2 }],
+  ["bulgur cooked", { unit: "oz", uses: 1 }],
+  ["butter", { unit: "tbsp", uses: 8 }],
+  ["butternut squash cooked", { unit: "cup", uses: 6 }],
+  ["canned tuna in water", { unit: "oz", uses: 12 }],
+  ["carrots cooked", { unit: "g", uses: 8 }],
+  ["celery sticks", { unit: "serving", uses: 14 }],
+  ["celery sticks unlimited", { unit: "serving", uses: 6 }],
+  ["cherry tomatoes", { unit: "g", uses: 6 }],
+  ["chia seeds", { unit: "tbsp", uses: 1 }],
+  ["chicken breast", { unit: "oz", uses: 7 }],
+  ["chicken breast cold sliced", { unit: "oz", uses: 1 }],
+  ["chicken breast cooked", { unit: "oz", uses: 15 }],
+  ["chicken or white fish", { unit: "g", uses: 2 }],
+  ["chicken thigh", { unit: "oz", uses: 1 }],
+  ["chicken thigh boneless skinless cooked", { unit: "oz", uses: 4 }],
+  ["chicken thigh cooked", { unit: "oz", uses: 6 }],
+  ["chicken thigh pulled", { unit: "oz", uses: 1 }],
+  ["chicken thigh pulled cooked", { unit: "oz", uses: 18 }],
+  ["chicken thighs drumsticks", { unit: "oz", uses: 1 }],
+  ["chili crisp", { unit: "tsp", uses: 4 }],
+  ["chuck roast cooked", { unit: "g", uses: 4 }],
+  ["coffee", { unit: "cup", uses: 2 }],
+  ["cold salmon or tuna", { unit: "oz", uses: 13 }],
+  ["cooking oil or butter", { unit: "tbsp", uses: 1 }],
+  ["corn", { unit: "cup", uses: 1 }],
+  ["cream of rice", { unit: "g", uses: 2 }],
+  ["cream of rice dry", { unit: "cup", uses: 1 }],
+  ["cream of rice dry weight", { unit: "g", uses: 2 }],
+  ["cream of rice or rolled oats", { unit: "g", uses: 2 }],
+  ["cream of wheat dry", { unit: "g", uses: 7 }],
+  ["cucumber tomato salad", { unit: "cup", uses: 6 }],
+  ["dannon oikos triple zero strawberry", { unit: "container", uses: 1 }],
+  ["dave s killer bread plain bagel", { unit: "bagel", uses: 2 }],
+  ["egg white", { unit: "large", uses: 5 }],
+  ["egg whites", { unit: "g", uses: 7 }],
+  ["egg whites carton", { unit: "fl oz", uses: 12 }],
+  ["egg whites liquid", { unit: "cup", uses: 2 }],
+  ["egg whole", { unit: "large", uses: 5 }],
+  ["eggs large", { unit: "whole", uses: 2 }],
+  ["fage 2 greek yogurt", { unit: "g", uses: 4 }],
+  ["fiber one soft baked bars cinnamon coffee cake", { unit: "bar", uses: 1 }],
+  ["filipino beef mechado", { unit: "g", uses: 1 }],
+  ["free veggies", { unit: "serving", uses: 12 }],
+  ["fried eggs", { unit: "large", uses: 6 }],
+  ["frozen blueberries", { unit: "cup", uses: 1 }],
+  ["frozen mixed berries", { unit: "cup", uses: 1 }],
+  ["fruit", { unit: "g", uses: 2 }],
+  ["fuji apple", { unit: "g", uses: 4 }],
+  ["ghirardelli 60 cacao dark chocolate chips", { unit: "g", uses: 2 }],
+  ["goya coconut water", { unit: "oz", uses: 6 }],
+  ["granola", { unit: "cup", uses: 1 }],
+  ["grapes", { unit: "cup", uses: 20 }],
+  ["greek yogurt nonfat", { unit: "cup", uses: 1 }],
+  ["greek yogurt nonfat plain", { unit: "cup", uses: 1 }],
+  ["green beans", { unit: "g", uses: 1 }],
+  ["green bell pepper", { unit: "g", uses: 1 }],
+  ["green lentils cooked", { unit: "cup", uses: 7 }],
+  ["green string beans", { unit: "oz", uses: 2 }],
+  ["ground beef 85 15 cooked", { unit: "g", uses: 1 }],
+  ["ground beef 90 10", { unit: "oz cooked", uses: 1 }],
+  ["ground beef 90 lean 10 fat", { unit: "oz", uses: 2 }],
+  ["ground beef 93 7 cooked", { unit: "oz", uses: 1 }],
+  ["ground venison 93 7", { unit: "oz", uses: 1 }],
+  ["halo top caramel cookie crunch ice cream", { unit: "g", uses: 4 }],
+  ["ham whole cured", { unit: "oz", uses: 1 }],
+  ["hard boiled eggs", { unit: "large", uses: 30 }],
+  ["hillshire farms turkey breast", { unit: "g", uses: 2 }],
+  ["homemade sourdough", { unit: "g", uses: 16 }],
+  ["honey", { unit: "g", uses: 1 }],
+  ["infinis cream of rice", { unit: "scoop", uses: 9 }],
+  ["jasmine rice cooked", { unit: "g", uses: 2 }],
+  ["jif peanut butter", { unit: "tbsp", uses: 2 }],
+  ["jocko molk whey", { unit: "scoop", uses: 4 }],
+  ["kerrygold butter", { unit: "tsp", uses: 1 }],
+  ["kerrygold irish butter", { unit: "g", uses: 2 }],
+  ["kirkland thin sliced chicken breast", { unit: "g", uses: 4 }],
+  ["kirkland ultra filtered milk", { unit: "cup", uses: 2 }],
+  ["kirkland wild blueberries frozen", { unit: "g", uses: 4 }],
+  ["lean beef 93 7", { unit: "g", uses: 4 }],
+  ["lean ground beef 90 10", { unit: "oz", uses: 1 }],
+  ["lean ground beef 93 7", { unit: "oz", uses: 3 }],
+  ["lean ground beef 93 7 cooked", { unit: "oz", uses: 31 }],
+  ["lean turkey breakfast sausage", { unit: "oz", uses: 2 }],
+  ["light greens", { unit: "serving", uses: 1 }],
+  ["light mixed greens", { unit: "serving", uses: 1 }],
+  ["light mixed greens unlimited", { unit: "serving", uses: 6 }],
+  ["light vinaigrette", { unit: "tbsp", uses: 2 }],
+  ["liquid egg whites", { unit: "oz", uses: 7 }],
+  ["love crunch dark chocolate blueberry granola", { unit: "g", uses: 6 }],
+  ["low fat cottage cheese", { unit: "cup", uses: 7 }],
+  ["low fat greek yogurt", { unit: "cup", uses: 13 }],
+  ["lumpia", { unit: "piece", uses: 1 }],
+  ["matcha powder", { unit: "g", uses: 2 }],
+  ["meijer ground bison", { unit: "oz", uses: 1 }],
+  ["metagenics protein", { unit: "serving", uses: 2 }],
+  ["mini bagel", { unit: "mini bagel", uses: 1 }],
+  ["minute rice cooked", { unit: "cup", uses: 2 }],
+  ["mission spinach tortilla wrap", { unit: "tortilla", uses: 4 }],
+  ["mixed berries", { unit: "cup", uses: 98 }],
+  ["nature s own brioche hamburger bun", { unit: "bun", uses: 2 }],
+  ["nonfat greek yogurt", { unit: "cup", uses: 1 }],
+  ["now sports carbo gain", { unit: "cup", uses: 2 }],
+  ["nurri chocolate protein shake", { unit: "can", uses: 4 }],
+  ["nurri shake", { unit: "shake", uses: 1 }],
+  ["oats dry", { unit: "g", uses: 1 }],
+  ["oats dry weight", { unit: "g", uses: 4 }],
+  ["oikos triple zero", { unit: "cup", uses: 3 }],
+  ["oikos triple zero greek yogurt", { unit: "cup", uses: 1 }],
+  ["oikos triple zero greek yogurt plain", { unit: "g", uses: 2 }],
+  ["oikos triple zero vanilla yogurt", { unit: "g", uses: 4 }],
+  ["olive oil", { unit: "tsp", uses: 52 }],
+  ["olive oil for frying", { unit: "tsp", uses: 1 }],
+  ["onions", { unit: "oz", uses: 2 }],
+  ["organised nutrition pouch", { unit: "g", uses: 2 }],
+  ["pasta", { unit: "cup", uses: 2 }],
+  ["pasta cooked", { unit: "cup", uses: 12 }],
+  ["pasta sauce", { unit: "cup", uses: 1 }],
+  ["pe science protein powder", { unit: "g", uses: 2 }],
+  ["peanut butter", { unit: "tbsp", uses: 1 }],
+  ["peas", { unit: "cup", uses: 1 }],
+  ["philadelphia cream cheese spread", { unit: "g", uses: 6 }],
+  ["plant protein", { unit: "scoop", uses: 1 }],
+  ["pork tenderloin", { unit: "oz", uses: 3 }],
+  ["pork tenderloin cooked", { unit: "oz", uses: 30 }],
+  ["power crunch protein energy bar", { unit: "bar", uses: 2 }],
+  ["premier protein shake", { unit: "bottle", uses: 1 }],
+  ["pro jym whey protein", { unit: "scoop", uses: 1 }],
+  ["protein pasta", { unit: "oz dry", uses: 1 }],
+  ["protein powder", { unit: "scoop", uses: 1 }],
+  ["protein powder vanilla unflavored", { unit: "scoop", uses: 1 }],
+  ["pulled chicken thigh cold", { unit: "oz", uses: 1 }],
+  ["quaker chocolate rice cake", { unit: "cake", uses: 2 }],
+  ["quaker chocolate rice cakes", { unit: "each", uses: 1 }],
+  ["quaker white cheddar rice cakes", { unit: "cake", uses: 1 }],
+  ["quest protein chips loaded taco", { unit: "bag", uses: 2 }],
+  ["red kidney beans with salt cooked boiled", { unit: "oz", uses: 3 }],
+  ["rice cake", { unit: "cake", uses: 1 }],
+  ["rice cakes", { unit: "cakes", uses: 1 }],
+  ["rice cakes plain", { unit: "cakes", uses: 1 }],
+  ["rice cooked", { unit: "cup", uses: 1 }],
+  ["roasted asparagus or zucchini unlimited", { unit: "serving", uses: 6 }],
+  ["roasted beets", { unit: "cup", uses: 7 }],
+  ["roasted carrots and celery", { unit: "serving", uses: 6 }],
+  ["roasted carrots and green beans", { unit: "serving", uses: 6 }],
+  ["roasted carrots green beans unlimited", { unit: "serving", uses: 12 }],
+  ["roasted carrots zucchini unlimited", { unit: "serving", uses: 12 }],
+  ["roasted green beans carrots unlimited", { unit: "serving", uses: 4 }],
+  ["roasted veggies", { unit: "serving", uses: 1 }],
+  ["rolled oats dry", { unit: "g", uses: 14 }],
+  ["sabra roasted pepper hummus", { unit: "g", uses: 4 }],
+  ["salmon", { unit: "oz", uses: 5 }],
+  ["salmon cooked", { unit: "oz", uses: 39 }],
+  ["sardines in water canned", { unit: "cans", uses: 6 }],
+  ["sargento ultra thin sharp cheddar", { unit: "slice", uses: 2 }],
+  ["sf greek yogurt", { unit: "cup", uses: 34 }],
+  ["sfh whey", { unit: "scoop", uses: 2 }],
+  ["shrimp", { unit: "oz", uses: 1 }],
+  ["shrimp cooked", { unit: "oz", uses: 6 }],
+  ["side salad", { unit: "serving", uses: 1 }],
+  ["side salad unlimited", { unit: "serving", uses: 6 }],
+  ["sirloin steak cooked", { unit: "g", uses: 1 }],
+  ["sliced carrots", { unit: "serving", uses: 1 }],
+  ["sliced carrots unlimited", { unit: "serving", uses: 6 }],
+  ["sliced cucumber", { unit: "serving", uses: 7 }],
+  ["sliced cucumber side", { unit: "serving", uses: 12 }],
+  ["sliced cucumber unlimited", { unit: "serving", uses: 6 }],
+  ["sourdough bread", { unit: "g", uses: 2 }],
+  ["spinach", { unit: "cup", uses: 2 }],
+  ["steamed asparagus or broccoli", { unit: "serving", uses: 6 }],
+  ["steamed asparagus or broccoli unlimited", { unit: "serving", uses: 6 }],
+  ["steamed broccoli or asparagus", { unit: "serving", uses: 6 }],
+  ["steamed broccoli or asparagus unlimited", { unit: "serving", uses: 6 }],
+  ["steel cut oats dry", { unit: "cup", uses: 2 }],
+  ["strawberries", { unit: "oz", uses: 3 }],
+  ["sweet potato", { unit: "oz", uses: 4 }],
+  ["sweet potato cooked", { unit: "g", uses: 38 }],
+  ["sweet potato diced cooked", { unit: "g", uses: 6 }],
+  ["thai cucumber salad", { unit: "g", uses: 2 }],
+  ["thomas cinnamon swirl bagel", { unit: "bagel", uses: 8 }],
+  ["tilapia cooked", { unit: "oz cooked", uses: 1 }],
+  ["tomatoes", { unit: "oz", uses: 2 }],
+  ["top sirloin trimmed cooked", { unit: "oz", uses: 4 }],
+  ["turkey bacon", { unit: "slices", uses: 7 }],
+  ["unsweetened almond milk", { unit: "oz", uses: 7 }],
+  ["vegetables unlimited", { unit: "serving", uses: 35 }],
+  ["veggie", { unit: "cup", uses: 1 }],
+  ["walnuts", { unit: "halves", uses: 14 }],
+  ["water", { unit: "oz", uses: 2 }],
+  ["whey protein", { unit: "scoop", uses: 12 }],
+  ["whey protein shake", { unit: "scoop", uses: 2 }],
+  ["white fish tilapia cooked", { unit: "g", uses: 1 }],
+  ["white mushroom", { unit: "g", uses: 1 }],
+  ["white onion", { unit: "g", uses: 1 }],
+  ["white potato", { unit: "g", uses: 2 }],
+  ["white potato cooked", { unit: "g", uses: 13 }],
+  ["white potato roasted", { unit: "g", uses: 28 }],
+  ["white rice", { unit: "cup", uses: 15 }],
+  ["white rice cooked", { unit: "cup", uses: 82 }],
+  ["white rice long grain cooked", { unit: "oz", uses: 5 }],
+  ["whole eggs", { unit: "large", uses: 28 }],
+  ["whole eggs fried", { unit: "large", uses: 6 }],
+  ["whole eggs hard boiled", { unit: "whole", uses: 1 }],
+  ["whole wheat crackers", { unit: "crackers", uses: 7 }],
+  ["wilde smoked gouda protein crackers", { unit: "g", uses: 6 }],
+  ["yasso bar", { unit: "bar", uses: 1 }],
+  ["yasso greek yogurt bar", { unit: "bar", uses: 2 }],
+  ["zucchini", { unit: "oz", uses: 2 }],
 ]);
 
 /** Normalises a food name to the key shape used above. */
@@ -315,33 +318,80 @@ export function unitKey(name: string): string {
  * the tablespoon. Head-final is what gets both right — that name ends in
  * "cream", which he has never programmed, so it correctly answers nothing.
  */
+/** g, oz, ml and friends: a weight, not a measure anybody serves with. */
+const WEIGHT_ONLY = /^(m?g|kg|grams?|oz|ounces?|lbs?|pounds?|ml|l|litres?|liters?|fl oz|oz cooked|oz dry)$/;
+
+/**
+ * The family answer: the same search, with the whole-name entry excluded so a
+ * food cannot be its own family, and over BOTH readings of a comma.
+ *
+ * USDA writes a generic food head-first - "Butter, salted" - so the segment
+ * before the comma is the food. A BRANDED row is the other way round:
+ * "Kerrygold, Naturally Softer Pure Irish Butter" is a brand, then the food.
+ * Reading only the head found "kerrygold" and stopped, which is why a row that
+ * plainly says butter came back with no unit at all. Head first, then the whole
+ * string, so both spellings land on the food.
+ */
+function familyUnit(name: string, skipKey: string): HisUnit | null {
+  const readings = [unitKey((name || "").split(/[,(\[]/)[0]), unitKey(name)];
+  for (const head of readings) {
+    if (!head) continue;
+    if (head !== skipKey) {
+      const byHead = HIS_UNIT.get(head);
+      if (byHead) return byHead;
+    }
+    // The food is rarely the very last word. "PURE IRISH BUTTER SALTED" ends in
+    // a qualifier, and a strict suffix rule read "salted" and found nothing -
+    // which is exactly how the picker opened his Kerrygold on "1 pat".
+    //
+    // So: find the longest known food anywhere in the name, latest first, and
+    // accept it only when every word AFTER it is a QUALIFIER. That is the line
+    // between a qualifier and a different food:
+    //   "pure irish butter salted"  -> after "butter" comes "salted"      -> yes
+    //   "butter pecan ice cream"    -> after "butter" comes "pecan ice.." -> no
+    const words = head.split(" ").filter((w) => w.length >= 3);
+    for (let end = words.length; end > 0; end--) {
+      if (!words.slice(end).every((w) => QUALIFIER.has(w))) continue;
+      for (let start = 0; start < end; start++) {
+        const key = words.slice(start, end).join(" ");
+        if (key === skipKey) continue;
+        const hit = HIS_UNIT.get(key);
+        if (hit) return hit;
+      }
+    }
+  }
+  return null;
+}
+
 export function unitHeUses(name: string): string | null {
   const whole = unitKey(name);
   if (!whole) return null;
   const exact = HIS_UNIT.get(whole);
-  if (exact) return exact;
-  const head = unitKey((name || "").split(/[,(\[]/)[0]);
-  if (!head) return null;
-  const byHead = HIS_UNIT.get(head);
-  if (byHead) return byHead;
-  // The food is rarely the very last word. "PURE IRISH BUTTER SALTED" ends in
-  // a qualifier, and a strict suffix rule read "salted" and found nothing -
-  // which is exactly how the picker opened his Kerrygold on "1 pat".
+  const family = familyUnit(name, whole);
+  if (!exact) return family ? family.unit : null;
+  if (!family || family.unit === exact.unit) return exact.unit;
+
+  // THE LONGER NAME IS NOT AUTOMATICALLY THE BETTER ANSWER. HIS OWN COUNT IS.
   //
-  // So: find the longest known food anywhere in the name, latest first, and
-  // accept it only when every word AFTER it is a QUALIFIER. That is the line
-  // between a qualifier and a different food:
-  //   "pure irish butter salted"  -> after "butter" comes "salted"      -> yes
-  //   "butter pecan ice cream"    -> after "butter" comes "pecan ice.." -> no
-  const words = head.split(" ").filter((w) => w.length >= 3);
-  for (let end = words.length; end > 0; end--) {
-    if (!words.slice(end).every((w) => QUALIFIER.has(w))) continue;
-    for (let start = 0; start < end; start++) {
-      const hit = HIS_UNIT.get(words.slice(start, end).join(" "));
-      if (hit) return hit;
-    }
-  }
-  return null;
+  // Dustin, 7 Sep, opening Kerrygold in the food sheet and finding grams and no
+  // tablespoon anywhere in the picker: *"I still can log my fucking butter!!!!
+  // no tbsp."*
+  //
+  // He typed "Kerrygold Irish butter - 6 g" into a meal plan twice. He has
+  // written butter as a TABLESPOON eight times. The whole-name match won purely
+  // for being longer, so two entries beat eight and took the tablespoon off the
+  // screen entirely - because a weight also sets heWeighsIt in the sheet, which
+  // skips the borrow that would have found one.
+  //
+  // Specific still beats general on equal evidence, and where he really does
+  // weigh a variant the count says so and nothing changes: "sweet potato
+  // (cooked)" is grams 38 times against "sweet potato" ounces 4 times. What
+  // changes is only the case where a household measure is better attested than
+  // the weight, and there the household measure is the honest answer.
+  const exactIsWeight = WEIGHT_ONLY.test(exact.unit);
+  const familyIsWeight = WEIGHT_ONLY.test(family.unit);
+  if (exactIsWeight && !familyIsWeight && family.uses > exact.uses) return family.unit;
+  return exact.unit;
 }
 
 /** Every food he programmes, for tests and for the catalogue audit. */

@@ -1207,3 +1207,73 @@ the plan that day. That is the feature working, not a miss.
 That query is now the `completed_session_not_credited` integrity check, running
 twice a day at `critical`. It reads zero today, so anything it ever reports is
 real.
+
+---
+
+## Interlude — two entries outvoted eight  ·  7 Sep 2026
+
+Dustin, opening Kerrygold in the food sheet and getting grams, no tablespoon
+anywhere in the picker, and 750 cal per 100 g: *"I still can log my fucking
+butter!!!! no tbsp, multiple wrong numbers. you rebuilt the full fucking
+database how are we still here?"*
+
+Fair question. **This row never came from the catalogue.** The 6 Sep rebuild
+replaced 322,000 catalogue rows and did not touch `refresh_trainer_foods`, which
+generates his own foods from his own meal plans, weekly. Kerrygold is one of
+those. So the rebuild was never going to fix it, and I had already written
+"a trainer row's default amount is 1 g" into this document that morning as
+*still open* — then fixed only the opening amount, not the missing unit. That
+was the miss.
+
+### Two entries beat eight
+
+| in `meal_items` | |
+|---|---|
+| `butter` → **tbsp** | 8 entries, his own plans |
+| `kerrygold irish butter` → **g** | 2 entries, both in Claudine's plan |
+
+`unitHeUses` matched the whole name first and returned on the first hit, so the
+longer name won on principle rather than on evidence. Worse, the answer was a
+*weight*, which sets `heWeighsIt` in the sheet — and that skips the unit borrow.
+The tablespoon was not merely unselected. It was absent from the list.
+
+The rule is now his own count, with the more specific name winning ties. Every
+case where he really does weigh a variant is untouched, because there the count
+says so: sweet potato (cooked) is grams 38 times against sweet potato ounces 4
+times. What changes is only the case where a household measure is better
+attested than the weight.
+
+A second bug fell out of the same function. USDA writes a generic food
+head-first — "Butter, salted" — but a *branded* row is the other way round:
+"Kerrygold, Naturally Softer Pure Irish Butter". Reading only the segment before
+the comma found "kerrygold" and stopped, so a row that plainly says butter came
+back with no unit at all. It now reads the head and then the whole string.
+
+### And the row itself now carries the measure
+
+The app-side rule is not enough on its own: the borrow that would have found a
+tablespoon searches the catalogue by name overlap, and the nearest Kerrygold row
+offers "1 serving", not "1 tbsp". So a weight-based trainer row now also borrows
+the household measure from **his own row for the same food** — Butter, 1 tbsp,
+15 g — longest matching name first. Ten rows had this shape; every match reads
+as it should, blueberries' cup to the frozen ones, an almond's weight to the
+sliced ones.
+
+**It only adds an option.** The basis, the macros and `serving_grams` are
+untouched, so no number moves as a result — there is simply a measure a person
+can use next to the grams. And the same rule went into the weekly generator,
+proven by deleting the tablespoon, running the job, and watching it come back;
+without that, Monday 08:50 would have undone all of it.
+
+### The numbers, honestly
+
+750 cal / 100 g is wrong — real butter is 717, and Kerrygold's own label is 100
+cal per 14 g tablespoon. It is wrong because of two lines in Claudine's plan:
+**"Kerrygold Irish butter — 6 g — 5 g fat"**. Five over six is 0.833 g of fat
+per gram, which is 83 g per 100 rather than 81, and the row is generated from
+exactly that.
+
+That is his programming, not catalogue data, so it has not been silently
+rewritten — and it could not be fixed in the row anyway, because the generator
+would rebuild it from those two lines next week. The fix is those two entries.
+The client row already in the catalogue has it right: 99 cal, 11 g fat, 14 g.
