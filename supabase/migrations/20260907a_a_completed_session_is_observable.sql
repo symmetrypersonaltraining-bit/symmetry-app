@@ -46,4 +46,58 @@ create trigger scheduled_workouts_touch_updated_at
 -- writes a day.
 alter table public.scheduled_workouts replica identity full;
 
+-- 3. AND SOMETHING WATCHES FOR THE SHAPE WHERE IT IS ACTUALLY BROKEN.
+--
+-- Today was a stale screen; the data was right. It took a database query to
+-- know that, because nothing was watching. This check runs with the rest of
+-- the scheduling integrity checks, twice a day.
+--
+-- Deliberately narrow: the log is for THIS day, on THIS date, and finished.
+-- Not "any completed log with no scheduled row" - that is every off-plan and
+-- extra session a client does, and it would make the alarm meaningless.
+-- Measured across 60 days and every active client when it was written: zero
+-- rows. So anything that appears here is real, and it is a workout somebody
+-- did that their adherence does not count.
+--
+-- Written as a text edit of the live function so the two checks already in it
+-- are carried forward verbatim rather than retyped.
+do $do$
+declare src text; out text;
+begin
+  select pg_get_functiondef(oid) into src from pg_proc
+   where proname='run_scheduling_integrity_checks' and pronamespace='public'::regnamespace;
+  if src is null then return; end if;
+  if position('completed_session_not_credited' in src) > 0 then return; end if;
+
+  out := replace(src,
+$old$    group by c.name, p.name
+    having count(*) > 1
+  ) t;$old$,
+$new$    group by c.name, p.name
+    having count(*) > 1
+  ) t
+
+  union all
+
+  select 'completed_session_not_credited', 'critical', count(*),
+         jsonb_agg(jsonb_build_object('client', t.name, 'date', t.scheduled_date,
+                                      'label', t.label, 'logged_at', t.logged_at))
+  from (
+    select c.name, sw.scheduled_date, d.label, wl.completed_at as logged_at
+    from scheduled_workouts sw
+    join clients c on c.id = sw.client_id
+    join days d on d.id = sw.day_id
+    join workout_logs wl
+      on wl.client_id = sw.client_id and wl.day_id = sw.day_id
+     and wl.log_date = sw.scheduled_date and wl.completed
+    where sw.deleted_at is null
+      and sw.status <> 'completed'
+      and sw.scheduled_date >= v_today_ct - 30
+      and c.archived_at is null
+  ) t;$new$);
+
+  if out = src then raise exception 'run_scheduling_integrity_checks: anchor not found'; end if;
+  execute out;
+end $do$;
+
 commit;

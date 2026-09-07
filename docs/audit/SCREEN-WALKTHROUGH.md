@@ -1169,3 +1169,41 @@ silently when realtime gives it nothing. Set to `FULL`; the table takes a few
 hundred writes a day, so the extra WAL is nothing.
 
 Both are in `supabase/migrations/20260907a_a_completed_session_is_observable.sql`.
+
+### Why now — this was fixed once already, and the fix was removed
+
+Dustin: *"something recently caused that bc we've fixed it before more than
+once."* He is right, and it is dated.
+
+| | |
+|---|---|
+| **26 Jun** `1b60f66a` | *"Global bfcache buster: reload when page restored from back-forward cache (**stops phones serving stale workout screens**)"* — a `pageshow` handler in `HapticTap` that reloaded on every bfcache restore. |
+| **1 Aug** `f55a7135` | *"Fix the hardware Back button. Two bugs, and they compounded"* — removed it. Correctly: reloading on a restore threw away the page Back had just restored and re-armed the sentinel entry, so every press went one level deeper. |
+| **1 Aug → 7 Sep** | Nothing replaced the freshness it had been providing as a side effect. Five weeks unguarded. |
+
+The removal note said it out loud — *"Whatever staleness this was guarding
+against, the fix is not to defeat the browser's own back navigation"* — and then
+nothing was built. `RefreshOnReturn` is what should have gone in that day: the
+same protection, without the cost.
+
+**What makes it stick this time is the test, not the component.** Nothing went
+red when the 26 Jun protection was deleted, which is the only reason it could be
+quietly gone for five weeks. Now: delete the file and the suite fails to read
+it; unmount it from either shell and the mount count fails; swap `refresh()` for
+`reload()` and the Back-button assertion fails. Mutation-tested in both
+directions.
+
+### And the write path was checked, not assumed
+
+The obvious worry is that the save itself is flaky and the screen was telling
+the truth. It is not. Across 60 days and every active client, the number of
+sessions logged and completed on their own scheduled date whose scheduled row
+was **not** credited: **zero**.
+
+Five completed logs in 45 days have no scheduled row at all, and every one is an
+off-plan or extra session — a client logging something other than what was on
+the plan that day. That is the feature working, not a miss.
+
+That query is now the `completed_session_not_credited` integrity check, running
+twice a day at `critical`. It reads zero today, so anything it ever reports is
+real.
