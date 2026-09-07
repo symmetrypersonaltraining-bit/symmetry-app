@@ -6,6 +6,7 @@ import InstallPrompt from "@/components/InstallPrompt";
 import SessionDock from "@/components/SessionDock";
 import HeaderAssist from "@/components/HeaderAssist";
 import RealtimeScheduleSync from "@/components/RealtimeScheduleSync";
+import RefreshOnReturn from "@/components/RefreshOnReturn";
 import PushRegister from "@/components/PushRegister";
 // Web Push reaches the installed web app; PushRegister only ever reached the
 // Android APK, which on 16 Aug was 2 of 29 clients. Both are mounted: a person
@@ -72,6 +73,7 @@ export default async function AppLayout({
       <CoachProvider value={coach}>
       <NotificationProvider>
         <RealtimeScheduleSync />
+        <RefreshOnReturn />
         <PushRegister />
         <WebPushRegister />
         <MessageNotifier />
@@ -86,6 +88,7 @@ export default async function AppLayout({
     <NotificationProvider>
     <div className="min-h-screen app-bg">
       <RealtimeScheduleSync />
+      <RefreshOnReturn />
       {/* Clients register for push AND get the in-app new-message banner too. */}
       <PushRegister />
       <WebPushRegister />

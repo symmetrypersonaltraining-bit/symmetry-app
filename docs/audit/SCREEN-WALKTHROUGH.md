@@ -1098,3 +1098,74 @@ not one swipe behind you.
 
 Mutation-tested both ways: unguarding either return, or dropping `/clients` from
 the list, turns the tests red.
+
+---
+
+## Interlude — the work saved, the screen did not know  ·  7 Sep 2026
+
+Dustin, home screen showing both of today's sessions on Start and the week at
+0% adherence: *"I logged my workout earlier... I just relogged n completed it
+and still won't save. huge fuck up."*
+
+### It saved
+
+| | |
+|---|---|
+| `workout_logs` 2026-09-07, Bulk — Chest + Triceps | `completed = true`, `completed_at` 2:04pm Central, **31 set logs** |
+| `scheduled_workouts` for that day | `status = 'completed'`, `workout_log_id` pointing at that log |
+
+The card that draws either a green **Done** chip or a **Start** button reads
+exactly that `status` column, and reads it correctly. The screenshot was taken
+at 2:51pm — forty-seven minutes after the session was marked complete — and was
+still showing the render made before he finished.
+
+This is the second time the same symptom has been reported, and the first time
+had a different cause. On 17 Aug it was the completion crediting the wrong
+scheduled row when a day was forked mid-session; that is fixed and is why
+`src/lib/completionTarget.ts` exists. Checked first this time, and the right row
+was credited.
+
+### Why a screen goes stale and stays that way
+
+A page put aside and returned to is the whole problem: tap Done, swipe Back,
+switch apps mid-set, lock the phone. The React tree is restored exactly as it
+was left, server data and all, and nothing goes and asks whether any of it is
+still true.
+
+`RealtimeScheduleSync` exists and is mounted in the app layout, but it answers a
+different question — somebody else moving a session while you sit on the screen.
+It does nothing for a screen that was away.
+
+### The fix
+
+`RefreshOnReturn`, mounted in both shells beside the realtime sync: when the
+screen comes back — `visibilitychange` to visible, or a `pageshow` with
+`persisted` set, which is what a hardware Back produces — it asks the server
+again.
+
+**It refreshes; it never reloads.** That distinction is the whole safety of it.
+A `pageshow` handler that called `location.reload()` broke the hardware Back
+button on 1 Aug (the note is still in `HapticTap`): reloading on a bfcache
+restore throws away the page Back has just restored and re-arms
+`BackButtonGuard`'s sentinel entry, so every press went one level deeper and
+Back could never win. `router.refresh()` re-runs the server components and
+patches the tree in place — no history entry, nothing unmounted.
+
+Two guards against a refetch on every flick between apps: a quiet period before
+firing, and a minimum time away before it counts as a return. If the screen has
+gone away again by the time the timer fires, nothing is spent.
+
+### Two things found underneath it
+
+**`scheduled_workouts.updated_at` was dead.** The row that completed today still
+read 12 August on it, identical to `created_at`, because nothing maintained the
+column. That is the first thing you reach for when the screen and the data
+disagree, and it could not answer. It has a trigger now.
+
+**The table was on `REPLICA IDENTITY DEFAULT` with RLS on.** Supabase's own
+requirement for `postgres_changes` on an RLS table is `FULL`, without which
+`old_record` cannot be sent — and `RealtimeScheduleSync` is written to no-op
+silently when realtime gives it nothing. Set to `FULL`; the table takes a few
+hundred writes a day, so the extra WAL is nothing.
+
+Both are in `supabase/migrations/20260907a_a_completed_session_is_observable.sql`.
