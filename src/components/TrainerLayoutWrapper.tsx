@@ -73,7 +73,14 @@ export default function TrainerLayoutWrapper({ children }: Props) {
     // BOTH directions carry a marker now. A bare /home let a stale cookie —
     // or a payload prefetched while in the other mode — decide, which is how
     // "hit trainer toggle, get client view" happened.
-    router.push(next ? "/home?as=client" : "/home?as=trainer");
+    // REPLACE, NOT PUSH. Dustin, 7 Sep, looking at another client's profile
+    // page inside Client View: "why am I seeing this while signed into my
+    // client view?" He had been on that page, toggled to client view, and swiped
+    // Back — which returned him to the trainer page he had just left, now
+    // wearing the client shell. Replacing the history entry means the page you
+    // toggled away from is not one gesture behind you. The middleware guard is
+    // the real boundary; this stops the most likely way of testing it.
+    router.replace(next ? "/home?as=client" : "/home?as=trainer");
     router.refresh();
   }
 

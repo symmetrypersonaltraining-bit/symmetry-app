@@ -31,6 +31,52 @@ function redirectKeepingSession(url: URL, carrying: NextResponse): NextResponse 
   return res;
 }
 
+/**
+ * TRAINER-ONLY ROUTES ARE NOT REACHABLE FROM CLIENT VIEW.
+ *
+ * Dustin, 7 Sep, with another client's profile page on his screen: *"why am I
+ * seeing this while signed into my client view?"*
+ *
+ * Client View was only ever CHROME. The toggle swaps the header and the bottom
+ * nav and sets `symmetry_client_mode=1`, and the pages that are shared between
+ * the two audiences — /home, /settings, /schedule, /movement — read that cookie
+ * and render their client branch. The trainer-only pages never read it. They
+ * gate on WHO THE ACCOUNT IS (viewerIsTrainer), which is still true in client
+ * view, so any way of arriving at one of those URLs rendered the full trainer
+ * page inside the client shell: browser Back after toggling (the toggle used
+ * router.push, so the trainer page it left was one swipe away), a bookmark, a
+ * deep link, a payload prefetched in the other mode.
+ *
+ * No client could ever see this — /clients/[clientId] redirects a non-trainer
+ * to /home before it reads a row, and RLS on `clients` gives a client exactly
+ * one row, their own. This is a mode boundary, not a data leak. But "client
+ * view" has to mean what it says, or it is no use for checking what a client
+ * actually sees.
+ *
+ * The guard lives here, once, rather than as a line added to each page: it runs
+ * before the route does, so a prefetched payload cannot get around it, and it
+ * covers pages nobody has written yet.
+ *
+ * NOT in the list: /workout. A trainer logs a client's session at
+ * /workout?forClient=<id>, and both workout loggers are off limits without
+ * Dustin's per-item say-so. Blocking that would break real work to fix a
+ * cosmetic boundary.
+ */
+export const TRAINER_ONLY_PREFIXES = [
+  "/clients",
+  "/payments",
+  "/library",
+  "/assessment",
+  "/settings/data-health",
+  "/settings/ai-health",
+];
+
+export function isTrainerOnlyPath(pathname: string): boolean {
+  return TRAINER_ONLY_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(p + "/") || pathname.startsWith(p + "?"),
+  );
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -149,6 +195,13 @@ export async function middleware(request: NextRequest) {
   // STARTED here and fires alongside the clients lookup further down, which
   // this path was already paying for. Both are network-bound; in parallel the
   // pair costs about what the clients query alone used to.
+  // Settled before either trainer early-return below, because both of them are
+  // a way out of this function and the guard has to cover both.
+  const inClientView = request.cookies.get("symmetry_client_mode")?.value === "1";
+  const blockedInClientView = inClientView && isTrainerOnlyPath(pathname);
+  const backToClientHome = () =>
+    redirectKeepingSession(new URL("/home?as=client", request.url), supabaseResponse);
+
   const bakedIn = isTrainerEmail(user.email);
   // BY AUTH ID *OR* EMAIL. viewer.ts has always resolved a trainer both ways;
   // this only ever asked for auth_user_id. A trainers row whose auth link was
@@ -170,7 +223,7 @@ export async function middleware(request: NextRequest) {
           )
           .limit(1)
       );
-  if (bakedIn) return supabaseResponse;
+  if (bakedIn) return blockedInClientView ? backToClientHome() : supabaseResponse;
 
   // Skip onboarding check on these pages to prevent redirect loops / flow interruption.
   //
@@ -198,7 +251,7 @@ export async function middleware(request: NextRequest) {
     // isTrainerEmail() checks inside the pages themselves agree with what was
     // just read from the table.
     noteTrainerEmail(trainerRow.email || user.email);
-    return supabaseResponse;
+    return blockedInClientView ? backToClientHome() : supabaseResponse;
   }
 
   // For clients: first run, then the intake wizard, then the app.

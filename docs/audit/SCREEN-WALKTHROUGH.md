@@ -1040,3 +1040,61 @@ their import state set to `paused` with the reason written into it.
   fires when a scan misses the catalogue entirely. It is now the only path that
   can write an `off` row, and the nightly gate hides whatever it writes, so a
   scanned miss is offered once and never becomes searchable.
+
+---
+
+## Interlude — Client View was chrome, not a boundary  ·  7 Sep 2026
+
+Dustin, with another client's full profile page on his screen while signed into
+Client View: *"why am I seeing this while signed into my client view?"*
+
+### It was never visible to a client
+
+Two independent guards, both checked before anything was changed.
+`/clients/[clientId]` calls `viewerIsTrainer()` and redirects a non-trainer to
+`/home` before it reads a single row — and that answer comes from the `trainers`
+table, not a UI flag. Underneath it, RLS on `clients` gives a logged-in client
+exactly one policy, `auth_user_id = auth.uid()`: their own row. A client who
+somehow reached the URL would get an empty result and a 404.
+
+So this was a mode boundary, not a data leak. But a preview mode that shows you
+things a client cannot see is no use for the thing it exists to do.
+
+### What it actually was
+
+The toggle swapped the header and the bottom nav and set
+`symmetry_client_mode=1`. The pages shared between both audiences read that
+cookie and render their client branch — `/home`, `/settings`, `/schedule`,
+`/movement` all do. **The trainer-only pages never read it.** They gate on who
+the account is, which is still a trainer in client view, so any way of arriving
+at one of those URLs rendered the whole trainer page inside the client shell.
+
+The likeliest way, and the one that matches the screenshot: he was on that page,
+toggled into Client View, and swiped Back. `handleToggleMode` used
+`router.push`, so the trainer page he had just left was one gesture behind him.
+
+### The fix
+
+One guard in `src/middleware.ts`, which already runs on every route. In client
+mode, a trainer-only path redirects to `/home?as=client`. It sits there rather
+than as a line added to each page for two reasons: it runs before the route
+does, so a payload prefetched in the other mode cannot get around it, and it
+covers pages nobody has written yet.
+
+Blocked: `/clients`, `/payments`, `/library`, `/assessment`,
+`/settings/data-health`, `/settings/ai-health`.
+
+**Not blocked: `/workout`.** A trainer logs a client's session at
+`/workout?forClient=<id>`, and both workout loggers are off limits without
+per-item permission. Blocking that would break real work to fix a cosmetic
+boundary.
+
+The middleware has two ways out for a trainer — the build-time list and the
+`trainers` table — and both now go through the guard. A source-order test holds
+that, in the spirit of `middlewareAsksAuthLast`: the property is "no exit skips
+the check", and a third early return is exactly what would quietly undo it.
+The toggle also uses `router.replace` now, so the page you toggled away from is
+not one swipe behind you.
+
+Mutation-tested both ways: unguarding either return, or dropping `/clients` from
+the list, turns the tests red.

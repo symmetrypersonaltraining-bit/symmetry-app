@@ -288,10 +288,11 @@ export const TUTORIAL: TutorialChapter[] = [
         body: [
           "At the bottom of the sidebar there is a Client View toggle. Tap it and the whole app becomes what your clients see, running against your own client record.",
           "Use it constantly. Before you tell somebody where a button is, go look at their app and check that it is where you think.",
+          "While you are in it the trainer side is closed. A client's profile, Payments, the Library, Assessment and the health screens all send you back to Home, so what you are looking at is only ever what a client can reach. Logging a client's session from a workout link still works — that is real work, not a preview.",
           "Tap it again to come back. It survives a refresh, so if the app looks wrong one morning, check whether you left yourself in client mode.",
         ],
         narration:
-          "At the bottom of the sidebar there is a Client View toggle. Tap it, and the whole app becomes what your clients see, running against your own client record. Use it constantly. Before you tell somebody where a button is, go and look at their app and check that it is where you think it is. Tap it again to come back. It survives a refresh, so if the app looks wrong one morning, check whether you left yourself in client mode.",
+          "At the bottom of the sidebar there is a Client View toggle. Tap it, and the whole app becomes what your clients see, running against your own client record. Use it constantly. Before you tell somebody where a button is, go and look at their app and check that it is where you think it is. While you are in it the trainer side is closed, so what you see is only ever what a client can reach. Tap it again to come back. It survives a refresh, so if the app looks wrong one morning, check whether you left yourself in client mode.",
         route: "/home",
         routeLabel: "Open Home",
         audioUrl: null,
