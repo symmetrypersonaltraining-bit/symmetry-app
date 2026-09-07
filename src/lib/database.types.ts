@@ -7357,6 +7357,33 @@ export type Database = {
           },
         ]
       }
+      symptom_flags: {
+        Row: {
+          id: string
+          phrase: string
+          tier: string
+          note: string | null
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          phrase: string
+          tier: string
+          note?: string | null
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          phrase?: string
+          tier?: string
+          note?: string | null
+          active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           body: string
@@ -7370,6 +7397,7 @@ export type Database = {
           is_broadcast: boolean
           is_group: boolean
           read_at: string | null
+          urgent: boolean
           sender_kind: string | null
           to_id: string
         }
@@ -7385,6 +7413,7 @@ export type Database = {
           is_broadcast?: boolean
           is_group?: boolean
           read_at?: string | null
+          urgent?: boolean
           sender_kind?: string | null
           to_id: string
         }
@@ -7400,6 +7429,7 @@ export type Database = {
           is_broadcast?: boolean
           is_group?: boolean
           read_at?: string | null
+          urgent?: boolean
           sender_kind?: string | null
           to_id?: string
         }

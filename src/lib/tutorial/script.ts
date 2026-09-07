@@ -582,6 +582,7 @@ export const TUTORIAL: TutorialChapter[] = [
         body: [
           "On the client's page there is a chat that knows this client — their assessment, their history, their limits. Ask it for a workout or a change and it comes back with a proposed change you tap Apply on.",
           "Their own coach reads the assessment too. It warns them when something they ask for cuts across what you wrote to work around, and asks before going ahead rather than refusing. And if it has a session down as missed and they say they did it, it believes them and marks it done — every one of those is recorded so you can see what the app keeps getting wrong.",
+          "Symptoms are sorted before it answers. Sore, tight, tweaked and the rest get up to two questions and then a real answer. Numbness, anything radiating, dizziness, chest pain, breathlessness, hot or sudden swelling, a joint giving way — it stops, offers no exercises at all, and asks whether to send it to you. If they say yes it reaches your phone straight away and the notification opens their thread.",
           "Nothing happens until you tap Apply. When you do, it makes a copy of the library day for this client rather than editing the shared one, so you cannot accidentally change a workout for everybody.",
         ],
         narration:

@@ -23,6 +23,7 @@ import {
 } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
+import { triageSymptoms, triageBlock } from "@/lib/ai/symptomTriage";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
 import { coachFirstNameForClient } from "@/lib/trainerResolve";
@@ -162,6 +163,21 @@ export async function POST(req: NextRequest) {
     // schedule rather than merely a weak answer.
     const tier = await aiTierFor(supabase, clientId);
 
+    // ── WHAT IS IN THIS MESSAGE ────────────────────────────────────────────
+    //
+    // Deterministic, from `symptom_flags`, before any model sees the text. A
+    // safety list a model is asked to remember is a list it will eventually
+    // forget one item from, on a turn nobody is watching — so the classification
+    // happens in code and the model is TOLD the answer rather than asked for it.
+    //
+    // Red beats ordinary: "my knee is sore and my foot went numb" is a red flag
+    // with a sore knee in it, not a sore knee with a detail.
+    const triage = await triageSymptoms(message);
+    const triageNote = triageBlock(
+      triage,
+      await coachFirstNameForClient(supabase, clientId, COACH_FIRST_NAME),
+    );
+
     // ---- pass 1: intent extraction against the day context -----------------
     const extraction = await callClaudeJson({
       meter: { clientId: clientId, feature: "coach_action" },
@@ -247,7 +263,9 @@ export async function POST(req: NextRequest) {
           `session list in your context and do not estimate. That list is only what they DID; it cannot ` +
           `show what they missed, so reading consistency off it makes every client look good and the ` +
           `worst attenders look best. Report the period you were asked for, not a different one, and if ` +
-          `attendance is poor say so plainly and kindly rather than describing only the sessions they made.`;
+          `attendance is poor say so plainly and kindly rather than describing only the sessions they made.` +
+          // LAST, so it is the instruction still in view when it starts writing.
+          (triageNote ? `\n\n${triageNote}` : "");
 
         // Hoisted rather than inlined into logUsage below: the aiFeatures guard
         // test scans metering calls for the retired catch-all labels, and a
@@ -384,7 +402,10 @@ export async function POST(req: NextRequest) {
           role: "user",
           content:
             (remembered ? remembered + "\n\n" : "") +
-            `CONTEXT (server-assembled, trusted):\n${context}\n\nMEALS ON ${logDate} (${dayName}):\n${JSON.stringify(day)}\n\nCLIENT QUESTION:\n${message}`,
+            `CONTEXT (server-assembled, trusted):\n${context}\n\nMEALS ON ${logDate} (${dayName}):\n${JSON.stringify(day)}\n\nCLIENT QUESTION:\n${message}` +
+            // AFTER the question, deliberately. It is about THIS message rather
+            // than about this person, and it has to be the last thing read.
+            (triageNote ? `\n\n${triageNote}` : ""),
         },
       ],
       validate: validateCoachReply,

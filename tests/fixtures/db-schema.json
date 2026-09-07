@@ -890,7 +890,8 @@
     "deleted_at",
     "image_url",
     "sender_kind",
-    "group_trainer_id"
+    "group_trainer_id",
+    "urgent"
   ],
   "metrics": [
     "id",
@@ -1280,6 +1281,14 @@
     "body_fat_pct",
     "age",
     "sex",
+    "created_at"
+  ],
+  "symptom_flags": [
+    "id",
+    "phrase",
+    "tier",
+    "note",
+    "active",
     "created_at"
   ],
   "trainer_face_variants": [

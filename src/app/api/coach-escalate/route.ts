@@ -30,6 +30,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { inboxAuthUidForClient } from "@/lib/trainerResolve";
+import { sendPushToUser } from "@/lib/push";
+import { NOTIFICATION_EVENTS } from "@/lib/notificationEvents";
+import { triageSymptoms } from "@/lib/ai/symptomTriage";
 
 export const dynamic = "force-dynamic";
 
@@ -91,11 +94,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not reach your coach right now" }, { status: 500 });
   }
 
+  // ── IS THIS THE ONE HE NEEDS NOW? ──────────────────────────────────────
+  //
+  // Dustin, 5 Sep, choosing that a red flag OFFERS to send rather than sending
+  // itself — and then, in the same breath: "make sure there is a route built in
+  // for me to respond to them quickly."
+  //
+  // It was not built. This route wrote straight into `messages` and pushed
+  // NOTHING, so an escalation landed in his thread and he found out when he
+  // next looked. For "my hand went numb" that is the whole problem.
+  //
+  // Re-triaged HERE rather than trusted from the body. The client's app sends
+  // this, and a flag a browser can set is a flag anything can set — either to
+  // mark a routine question urgent, or to strip the mark off a real one.
+  const triage = await triageSymptoms(`${question}\n${answer}`);
+  const urgent = triage.tier === "red_flag";
+
   const where = body.surface ? ` · from ${clip(body.surface, 40)}` : "";
   // Marked as a forward rather than dressed up as the client's own words. He
   // needs to know at a glance that they had already been given an answer, and
   // WHAT that answer was — otherwise he repeats it, or worse, contradicts it.
   const text =
+    (urgent ? `⚠️ POSSIBLE REFER-OUT — ${triage.matched.slice(0, 3).join(", ")}\n\n` : "") +
     `✦ Sent from the coach chat${where}\n\n` +
     (question ? `They asked:\n“${question}”\n\n` : "") +
     (answer ? `The app answered:\n${answer}` : "");
@@ -107,8 +127,34 @@ export async function POST(req: NextRequest) {
     body: text,
     is_group: false,
     is_broadcast: false,
+    urgent,
   });
   if (error) return NextResponse.json({ error: "Could not send that" }, { status: 500 });
 
-  return NextResponse.json({ ok: true });
+  // THE FAST ROUTE BACK.
+  //
+  // Every OTHER client-to-trainer message already pushes — see
+  // home/messageActions.ts. This one, the only kind that can carry a symptom
+  // the coach refused to answer, was the one that did not.
+  //
+  // Awaited rather than fired off: a serverless function is frozen the moment
+  // it returns, so a detached promise here would simply never run. Its failure
+  // is swallowed on purpose — the message is already written, and a push that
+  // could not be sent must not be reported to the client as a send that failed.
+  const who = (me.name || "A client").split(" ")[0];
+  try {
+    await sendPushToUser(
+      trainerUid,
+      NOTIFICATION_EVENTS.MESSAGE_FROM_CLIENT,
+      urgent ? `⚠️ ${who} — possible refer-out` : `${who} sent this from the coach`,
+      clip(question || answer, 140),
+      // Straight into their thread, not the inbox. One tap from the
+      // notification to a reply box is the route he asked for.
+      { url: `/messages?client=${me.id}` },
+    );
+  } catch (e) {
+    console.error("escalation push failed (the message itself was sent)", e);
+  }
+
+  return NextResponse.json({ ok: true, urgent });
 }
