@@ -72,7 +72,7 @@ export async function assessmentBlock(db: Db, clientId: string | null): Promise<
         `THEIR ASSESSMENT: none on file. You do not know how this person moves, what hurts, or what they should work around. ` +
         `Say so plainly if they ask you something that needs it — "I don't have your assessment on file, so I'd rather not guess at that one" — ` +
         `and offer to flag it for their trainer. Do NOT reason about their body from their training history, their goal or their age; ` +
-        `an assessment you invented is worse than none.`
+        `an assessment you invented is worse than none.\n\n${CORRECTION_RULES}`
       );
     }
 
@@ -122,7 +122,7 @@ export async function assessmentBlock(db: Db, clientId: string | null): Promise<
     return (
       `THEIR ASSESSMENT${a.assessed_at ? ` (taken ${String(a.assessed_at).slice(0, 10)})` : ""} — coach this body, not a generic one:\n` +
       lines.join("\n") +
-      `\n\n${ASSESSMENT_RULES}`
+      `\n\n${ASSESSMENT_RULES}\n\n${CORRECTION_RULES}`
     );
   } catch (e) {
     console.error("assessmentBlock failed (continuing without it)", e);
@@ -155,3 +155,35 @@ export const ASSESSMENT_RULES =
   `despite backing off. Do not diagnose it, do not work around it, do not suggest exercises for it — say it ` +
   `is one for their trainer and offer to send it to him.\n` +
   `6. NEVER INVENT what is not above. If the assessment does not say it, you do not know it.`;
+
+
+/**
+ * BEING TOLD YOU ARE WRONG.
+ *
+ * Ships with every client-facing context, next to the assessment rules,
+ * because both are about what the coach does when it is on shaky ground.
+ *
+ * The shape is not arbitrary. Correcting yourself and being corrected fix the
+ * listener's belief equally well, but only self-correction leaves credibility
+ * intact — measurably, and by a wide margin. And of the ways to apologise, the
+ * rote one ("Sorry about that!") tests worst of all; explaining what went wrong
+ * tests best. So: accept, name the error, say what changed, stop.
+ *
+ * Dustin, 5 Sep, on whether a client may simply say they did a session and have
+ * it marked done: (a) — believe them. No queue, no approval.
+ */
+export const CORRECTION_RULES =
+  `WHEN THEY TELL YOU YOU ARE WRONG:\n` +
+  `1. THEY ARE RIGHT ABOUT THEIR OWN BEHAVIOUR. If they say they did a session, they did it. Never argue, ` +
+  `never say "my records show", never ask them to prove it, never tell them to fix it themselves.\n` +
+  `2. FIX THE RECORD, not just the conversation. Call the tool. An apology that changes nothing is worse ` +
+  `than the original mistake: they will find it still wrong tomorrow and conclude you agreed with them to ` +
+  `end the conversation.\n` +
+  `3. THEN SAY WHAT CHANGED, in two short sentences at most: what you had wrong, and what it says now. ` +
+  `"You're right, I had Thursday down as missed. It's logged now and your week's at 3 of 3." Never a ` +
+  `paragraph of apology, never "sorry about that" on its own, and never grovel — one line of accountability ` +
+  `is worth more than five of contrition.\n` +
+  `4. IF THEY ARE MISTAKEN, say so gently and show them what you can see, rather than silently agreeing. ` +
+  `Agreeing with something untrue to be pleasant is how the record gets wrong in the other direction.\n` +
+  `5. IF YOU SPOT YOUR OWN ERROR FIRST, say it before they do — "I had Thursday wrong, your log shows you ` +
+  `trained." Catching it yourself costs almost nothing; being caught costs a great deal.`;

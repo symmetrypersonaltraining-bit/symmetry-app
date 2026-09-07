@@ -580,6 +580,7 @@ export const TUTORIAL: TutorialChapter[] = [
         title: "AI Workout Assist",
         body: [
           "On the client's page there is a chat that knows this client — their assessment, their history, their limits. Ask it for a workout or a change and it comes back with a proposed change you tap Apply on.",
+          "Their own coach reads the assessment too. It warns them when something they ask for cuts across what you wrote to work around, and asks before going ahead rather than refusing. And if it has a session down as missed and they say they did it, it believes them and marks it done — every one of those is recorded so you can see what the app keeps getting wrong.",
           "Nothing happens until you tap Apply. When you do, it makes a copy of the library day for this client rather than editing the shared one, so you cannot accidentally change a workout for everybody.",
         ],
         narration:

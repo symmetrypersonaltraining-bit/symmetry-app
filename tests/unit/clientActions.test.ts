@@ -61,7 +61,22 @@ test("the trainer's tools are not reachable from here", () => {
   // "consistency is solid" — from a context that listed only completed sessions
   // and no denominator. A read-only counter is the smallest thing that fixes
   // that; the alternative was letting the model estimate.
-  assert.equal(names.length, 7, `the client toolset grew to ${names.length}: ${names.join(", ")}`);
+  // Raised 7 -> 8 on 5 Sep for i_did_do_that, and here is the thought:
+  //
+  // It writes, so it carries the write-time re-check — asserted below, where
+  // the count of that guard went 2 -> 3 in the same commit. It does NOT carry
+  // the cleared-pool filter, and does not need it: the pool governs which DAY
+  // may be swapped IN, and this tool changes no day. It flips the status of a
+  // session already on their own schedule, which the pool never had a view on.
+  //
+  // What it widens is narrow and was chosen deliberately. Dustin, 5 Sep, asked
+  // whether a client saying "I did do that" should be believed, believed-and-
+  // flagged, or refused: (a), believed. So the worst a client can do with it is
+  // mark their own session done when they did not — which shows in their own
+  // adherence, is reversible with done=false, and leaves a row in
+  // ai_corrections either way. Against that: without it the AI could agree it
+  // was wrong and change nothing, which is the worse failure by a distance.
+  assert.equal(names.length, 8, `the client toolset grew to ${names.length}: ${names.join(", ")}`);
 });
 
 test("every write re-checks ownership at the moment of writing", () => {
@@ -73,8 +88,9 @@ test("every write re-checks ownership at the moment of writing", () => {
   ]) {
     assert.match(SRC, guard);
   }
-  // Both mutating tools carry it, not just one.
-  assert.equal((SRC.match(/row\.client_id !== clientId/g) || []).length, 2);
+  // Every mutating tool carries it, not just some. 2 -> 3 on 5 Sep with
+  // i_did_do_that, which writes to scheduled_workouts.status.
+  assert.equal((SRC.match(/row\.client_id !== clientId/g) || []).length, 3);
 });
 
 test("a gated client's swap is checked against the pool at write time", () => {

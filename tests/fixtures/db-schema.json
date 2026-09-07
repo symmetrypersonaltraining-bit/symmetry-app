@@ -43,6 +43,20 @@
     "turn_count",
     "updated_at"
   ],
+  "ai_corrections": [
+    "id",
+    "client_id",
+    "claim",
+    "client_said",
+    "outcome",
+    "target_table",
+    "target_id",
+    "field",
+    "old_value",
+    "new_value",
+    "source",
+    "created_at"
+  ],
   "ai_nudge_log": [
     "id",
     "client_id",

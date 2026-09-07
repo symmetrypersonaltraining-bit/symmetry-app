@@ -115,6 +115,37 @@ export const CLIENT_TOOLS = [
     },
   },
   {
+    // ── I DID DO THAT ──────────────────────────────────────────────────────
+    //
+    // The most damaging thing this app can do is state something false, be
+    // corrected, agree — and change nothing. Until 5 Sep that was the only
+    // option available: nothing in this list could mark a session done, so
+    // "you're right, sorry" was the whole of it and the app still showed the
+    // session missed the next morning.
+    //
+    // Dustin, 5 Sep, choosing between believing them, believing-and-flagging,
+    // and not letting them: (a). They say they did it, it is marked done. No
+    // queue, no approval. Contract rule 3 without a hedge.
+    name: "i_did_do_that",
+    description:
+      "The client says they DID a session the app has down as not done. Believe them and mark it done. " +
+      "Call this the moment they say it — do not ask them to prove it, do not tell them to log it manually, " +
+      "and never say your records show otherwise. Use my_schedule for the id. " +
+      "It is reversible: if they say they did NOT do one you have down as done, call it with done=false. " +
+      "After it returns, say what changed in one short sentence — what you had wrong, and what it says now. " +
+      "One line of accountability, one line of state. Never a paragraph of apology, and never 'sorry about that' on its own.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        scheduled_workout_id: { type: "string" },
+        done: { type: "boolean", description: "true = they did it (default). false = they did not, undo it." },
+        claim: { type: "string", description: "What you had said that was wrong, in your own words, for the record." },
+        their_words: { type: "string", description: "What they told you, in THEIR words." },
+      },
+      required: ["scheduled_workout_id"],
+    },
+  },
+  {
     name: "log_my_weight",
     description:
       "Record a weigh-in for this client. Only ever call this with a number the client has actually told you in this conversation — never a guess, never one carried over from their history.",
@@ -582,6 +613,77 @@ export async function runClientTool(
       return pos > 1
         ? `Added — ${date} now has ${pos} sessions.`
         : `Added to ${date}.`;
+    }
+
+    if (name === "i_did_do_that") {
+      const swId = str("scheduled_workout_id");
+      if (!swId) return "Error: need the scheduled workout id — call my_schedule first.";
+      // Default true: "I did do that" is what the client says nine times in ten,
+      // and an absent flag must not read as an undo.
+      const done = input.done === false ? false : true;
+
+      // Ownership re-checked here, not at the read: the id came from the model.
+      const { data: sw } = await db
+        .from("scheduled_workouts")
+        .select("id, client_id, status, scheduled_date, day_id, deleted_at, days(label)")
+        .eq("id", swId)
+        .maybeSingle();
+      const row = sw as {
+        id: string; client_id: string; status: string | null; scheduled_date: string;
+        day_id: string | null; deleted_at: string | null; days?: { label?: string | null } | null;
+      } | null;
+      if (!row || row.client_id !== clientId || row.deleted_at) return "That session isn't on this client's schedule.";
+
+      const was = row.status ?? "scheduled";
+      const now = done ? "completed" : "scheduled";
+      if (was === now) {
+        // Not an error, and worth saying plainly rather than reporting success.
+        // The app was already right; telling them it "fixed" something it did
+        // not touch is its own small lie.
+        return `No change needed — that session is already marked ${done ? "done" : "not done"}. Say so plainly rather than claiming you changed it.`;
+      }
+
+      const { error } = await db
+        .from("scheduled_workouts")
+        .update({ status: now, updated_at: new Date().toISOString() })
+        .eq("id", swId)
+        .eq("client_id", clientId);
+      if (error) return `Couldn't change it: ${error.message}`;
+
+      // THE RECORD OF BEING WRONG.
+      //
+      // Best-effort and deliberately after the write: a failure to log the
+      // correction must never cost the client the correction itself. What it
+      // earns is a list of what the app keeps getting wrong, an early warning
+      // that one client's data is drifting, and a number that should fall.
+      // CHECKED, not fire-and-forget. supabase-js RESOLVES with { data, error }
+      // rather than throwing, so the try/catch below catches nothing on its own
+      // and an unchecked insert here would fail in total silence — which is the
+      // exact shape of every incident in the unchecked-writes inventory. The
+      // row is worth having: it is the eval set and the drift warning.
+      try {
+        const { error: logErr } = await db.from("ai_corrections").insert({
+          client_id: clientId,
+          claim: str("claim") || null,
+          client_said: str("their_words") || (done ? "said they did it" : "said they did not do it"),
+          outcome: "workout_status_changed",
+          target_table: "scheduled_workouts",
+          target_id: swId,
+          field: "status",
+          old_value: was,
+          new_value: now,
+          source: "client",
+        });
+        if (logErr) console.error("ai_corrections insert refused (the correction itself stands)", logErr.message);
+      } catch (e) {
+        console.error("ai_corrections insert threw (the correction itself stands)", e);
+      }
+
+      const label = row.days?.label?.trim() || "that session";
+      return (
+        `Done — ${label} on ${row.scheduled_date} is now marked ${done ? "completed" : "not done"} (was ${was}). ` +
+        `Tell them what you had wrong and what it says now, in one short sentence each. No apology paragraph.`
+      );
     }
 
     if (name === "log_my_weight") {
