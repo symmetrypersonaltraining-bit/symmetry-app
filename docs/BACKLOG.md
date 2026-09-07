@@ -1,5 +1,45 @@
 # Backlog — the single work queue
 
+## 2026-09-07 — Client View is a boundary (SHIPPED, 9464505a)
+
+Dustin, with another client's full profile page on his screen while signed into
+Client View: *"why am I seeing this while signed into my client view?"*
+
+**It was never visible to a client, and that was checked first.**
+`/clients/[clientId]` redirects a non-trainer to `/home` before it reads a row,
+and RLS on `clients` gives a logged-in client exactly one policy — their own
+row. A mode boundary, not a data leak.
+
+Client View was chrome: the toggle swapped the header and bottom nav and set
+`symmetry_client_mode=1`, and only the pages shared between both audiences read
+that cookie. The trainer-only pages gate on who the account is, which is still a
+trainer in client view. One guard in middleware now redirects a trainer-only
+path to `/home?as=client` while the cookie is set — before the route runs, so a
+payload prefetched in the other mode cannot get round it.
+
+Blocked: `/clients`, `/payments`, `/library`, `/assessment`,
+`/settings/data-health`, `/settings/ai-health`. **Not `/workout`** — a trainer
+logs a client's session at `/workout?forClient=<id>` and both loggers are off
+limits without per-item permission.
+
+Full write-up: the **Client View was chrome** interlude in
+`docs/audit/SCREEN-WALKTHROUGH.md`.
+
+### Also 7 Sep — Erin Arlt removed
+
+Never signed up (`last_sign_in_at` null). Removed completely: the client row and
+everything that cascaded from it, 184 appointments, 24 calendar payments, 49
+schedule proposals, 1 payment reminder, the intake form, app settings, her login
+account, and her name from one nudge-preview message that listed twenty clients.
+Her Google Calendar entries are gone too.
+
+Everything is recoverable from `bak_erin_arit_20260907_*` (eight tables,
+including the auth row and the original message).
+
+**Worth knowing:** her calendar and email spell her **Arlt**; the client record
+said "Arit". That typo is why the calendar sync matched her on first name alone
+rather than on a full name — see the roster-matching note in `gcal-sync`.
+
 ## 2026-09-06/07 — The food library rebuilt (SHIPPED, 7639ea9b → f0bcc2b8)
 
 Dustin, after a weekend of the same wrong butter: *"you can and you will verify
