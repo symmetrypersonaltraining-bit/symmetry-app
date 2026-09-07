@@ -1,5 +1,66 @@
 # Backlog — the single work queue
 
+## 2026-09-06/07 — The food library rebuilt (SHIPPED, 7639ea9b → f0bcc2b8)
+
+Dustin, after a weekend of the same wrong butter: *"you can and you will verify
+the full library or you will rebuild the entire thing. not just the item 'at the
+top'. all of them. there will be zero wrong ones in this app period."*
+
+Rebuilt. Full write-up: the **food quality gate**, **catalogue audit** and
+**rebuilt library** interludes in `docs/audit/SCREEN-WALKTHROUGH.md`. The whole
+schema side is now one migration,
+`supabase/migrations/20260906b_the_rebuilt_food_library.sql`, verified by running
+it from an empty Postgres 16 twice and hashing every function it creates against
+the one live in production.
+
+WHERE THE LIBRARY LANDED — 322,227 searchable rows, and of those: zero
+unverifiable, zero with arithmetic that does not hold, zero without a measure a
+person would use.
+
+| source | searchable | total |
+|---|---|---|
+| usda_branded | 297,817 | 442,891 |
+| usda_generic | 8,560 | 11,732 |
+| usda_core (SR28) | 8,155 | 8,789 |
+| usda | 7,309 | 7,766 |
+| trainer (his own plans) | 148 | 152 |
+| restaurant | 103 | 103 |
+| client | 96 | 149 |
+| brand | 39 | 40 |
+| off | 0 | 3 |
+
+- **Open Food Facts deleted** — 511,552 rows, crowd-typed and unverifiable; one
+  of them had Kerrygold butter at 100 kcal per 100 g, internally consistent and
+  completely wrong. Rows still referenced by a logged meal or a recipe were kept
+  and hidden. Its two import cron jobs were still armed to re-import it every
+  five minutes; unscheduled.
+- **An authoritative core imported by Postgres itself** through the `http`
+  extension — both the sandbox and his laptop are egress-blocked from USDA, the
+  database is not.
+- **A nightly quality gate** hides anything whose numbers trace to no lab or
+  label, whose arithmetic does not hold against the row's own basis, or that has
+  no measure a person uses.
+- **Barcodes** — a USDA branded row's `fdc_id` IS its GTIN, so 442,775 products
+  became scannable. The lookup then could not find them: USDA zero-pads the
+  number, the scanner does not. Both lookups now match across every padding.
+- **Ranking** — "kerrygold butter" led with *Reduced Fat Irish Butter*, 571 kcal,
+  where the butter he buys is 717. A qualifier the search did not ask for now
+  sorts the row down, more so when it changes the macros. Same ordering in the
+  AI resolver.
+- **A gram is not a portion** — his weighed foods are stored per gram, so the
+  amount box opened on 1 g of chicken breast. That one case opens on 100 g;
+  every real portion a row states is left as written.
+
+### Still open from this work
+
+- **The Open Food Facts fallback** in `/api/nutrition-ai/barcode-lookup` is now
+  the only path that can write an `off` row. The nightly gate hides whatever it
+  writes, so a scanned miss is offered once and never becomes searchable. Decide
+  whether that is the behaviour we want or whether the fallback should go.
+- **`usda_conflict` is advisory only.** It sorts a row down, never hides it —
+  sampling put the false-positive rate near 50% (shirataki noodles really are
+  5 cal). Revisit if a better signal appears.
+
 ## 2026-09-04 — Portion accuracy sweep (SHIPPED, 5e20d7e1 → 794b1b1c)
 
 Dustin, on the Edit custom meal sheet: *"its got all the same screw ups that we
