@@ -114,6 +114,30 @@ general tips, the coach's read on screen, and sessions-with-him protected.
 | G | **Bounded client adjustment on AI proposals** | Rule 8. Best-evidenced adoption lever there is, and cheap. |
 | H | **"Dustin's assistant" framing** | Ruling 4. Copy across the coach entry points. |
 
+### THE WORKOUT LOGGER — its own screen, and it has never been walked
+
+Dustin, 5 Sep: *"we need to go over the actual workout logger if thats not
+already in the audit."* It was in the not-yet-walked list as a parenthesis,
+which is not the same as being scheduled. It is now its own entry, because it
+is not an ordinary screen:
+
+- **It is the screen clients spend the most time in**, and the only one they use
+  while standing up, mid-set, with a phone in one hand.
+- **It is off limits without per-item permission** — so its walk has to be
+  agreed control by control rather than swept.
+- **It has produced more real incidents than anything else in this app**:
+  Lauren's duplicate-log refusal (11 Aug), Bobbie giving up on a move (14 Aug),
+  Madeleine's cardio logged to the wrong day (6 Aug), Jennifer locked out by a
+  mid-session reprogram (3 Sep), Tyler's 160 lb lat pulldown lost to a race on
+  the open log, Dustin's own typed sets vanishing after switching to Nutrition
+  (20 Aug), and the RLS error Greg hit mid-workout (5 Sep, fix designed and
+  NOT applied — `docs/RLS-DURING-LOGGING-2026-09-05.md`).
+- **Two of the three parts of the RLS fix are already waiting on it.**
+
+So it wants its own pass, not a paragraph inside the Workout tab's. When it
+comes up: inventory every control from the code first as usual, then agree
+which ones may be touched before touching any of them.
+
 ### Open, small
 
 - **Body-fat screen — three faults, none fixed.** The formula is correct and was
@@ -166,8 +190,7 @@ general tips, the coach's read on screen, and sessions-with-him protected.
 
 ### Not yet walked
 
-CLIENT: `workout/[dayId]` (the logger — off limits without per-item permission) ·
-nutrition · recipes · progress · schedule · messages · log · log-bodyfat ·
+CLIENT: nutrition · recipes · progress · schedule · messages · log · log-bodyfat ·
 profile · settings · onboarding · welcome · tutorial · assessment · movement
 
 TRAINER: clients · clients/[clientId] · clients/[clientId]/program ·
