@@ -589,8 +589,33 @@ Read alongside the "STOP RE-REPORTING THESE" section of
 
 ## Live state
 
-`origin/main` = **`bfe0bd67`** (8 Sep). tsc 0 errors in `src/`,
-**2,935 unit tests passing**, build compiles. The `/login` prerender error in the
+`origin/main` = **`d7d7f92`** (8 Sep), plus four food-database fixes on
+`claude/symmetry-audit-resume-ws695t` (`612874a` → `dc186b5`). tsc 0 errors in
+`src/`, **2,951 unit tests passing**, build compiles.
+
+**The food database, 8 Sep evening — the default-serving work is BUILT and then
+debugged.** He answered both open questions ("A AND fix the names now"; his unit
+map always wins), so 322,232 of 322,232 searchable rows now carry a default and
+only 10 open on "100 g". Four faults were then found IN that work and fixed, each
+by reading the diff before keeping it:
+
+- `612874a` — 494 foods rendered "**1 .5 cup**". USDA writes a half cup with no
+  leading zero and both SQL parsers required a digit first. TypeScript was right
+  all along: two parsers, one format.
+- `5397ceb` — his own programmed foods opened on **a cup weighing 240 g, which is
+  water**. Spinach +700%, oats +196%, rice +52%. "Canned tuna in water" matched
+  `water` over `tuna`. 28 rows corrected.
+- `9acc316` — **"Chicken breast" logged 1 oz.** The catalogue cannot answer this
+  (median "1 breast" = 863 g, because USDA means bone-in), so `food_piece_sizes`
+  holds the standard and the picker offers small/medium/large in ounces. USDA's
+  own plain raw cut says 174 g against the seeded 170 g, which is the check.
+- `dc186b5` — 26 rules labelled `each` when their keyword was the noun. 3,623
+  rows renamed, **0 weights moved**.
+
+**Biggest number left: 68,778 rows still say "1 serving"** and 73,453 carry a
+vague word. Every one is a missing keyword, not a missing mechanism. It wants its
+own measured pass. The four `SCREEN-WALKTHROUGH.md` interludes dated 8 Sep carry
+the reasoning, the guards, and the cases that had to be excluded. The `/login` prerender error in the
 sandbox is the missing Supabase env vars, not a fault.
 
 Everything in the BUILT table above is on main and live. Nothing is sitting in
