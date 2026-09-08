@@ -5,7 +5,7 @@ session reads it first and updates it before finishing.** The `HANDOFF-*.md`
 files with dates in the name are history — do not read them for current state,
 and do not create another one.
 
-Last updated: **8 Sep 2026, 17:15 CDT** · `origin/main` at **`aca92e75`**
+Last updated: **8 Sep 2026, 13:10 CDT** · `origin/main` at **`aefc0cec`**
 
 > **His other Claude session pushes to this repo while you work.** It is not a
 > mistake and it is not to be reverted — check `git log origin/main` before you
@@ -149,6 +149,91 @@ sandbox (no env vars). Vercel has them. Ignore it.
 ## 4. WHAT JUST HAPPENED — 6-8 Sep
 
 Every item below is shipped and on `origin/main`.
+
+### THE FOOD DATABASE IS THE ONLY PRIORITY — 8 Sep
+
+Dustin, 8 Sep, and this outranks everything else in this file:
+
+> *"the biggest problem I've had for the last two weeks is that when I use AI or
+> manually search any items in the food database, ninety nine percent of them
+> have been wrong with the wrong measurements, the wrong info, and they don't
+> default to the standard serving size for that particular food... that part of
+> the app has to work properly, and we need everything to be accurate. If it's
+> not, it gets rebuilt until it is."*
+
+**His "ninety nine percent" is not an exaggeration — it is 99.9%, and the cause
+is one field.**
+
+    searchable USDA rows                                    321,841
+    ...whose serving_desc is '100 g'                        321,841   (100%)
+    ...that already carry a real serving in serving_options 321,841   (100%)
+    ...that have no other serving to offer                        0
+
+Every row opens on 100 g, and every row has something better sitting unused in
+its own `serving_options`:
+
+| row | opens on | already has |
+|---|---|---|
+| Butter, salted | 100 g — 717 cal | `1 tbsp = 14.2 g` |
+| Egg, whole, raw | 100 g — 143 cal | `1 large = 50 g` |
+| White rice, cooked | 100 g | `1 cup = 158 g` |
+| Bananas, raw | 100 g | `1 cup sliced = 150 g`, `1 small = 101 g` |
+
+The 6 Sep rebuild imported the servings correctly. What it did not do is make
+one of them the DEFAULT, so the whole library answers "100 g" to everything.
+`weighedDefaultAmount` and the unit map are both patches over this — they were
+fixing the symptom one food at a time.
+
+**NOT STARTED, AND IT NEEDS HIS RULE FIRST.** Picking the default is a judgement
+call across 321,841 rows and getting it wrong is the same complaint again: a
+banana must not open on "1 cup, mashed". The question put to him is which
+serving wins when a row offers several, and whether his own unit map
+(`meal_items.unit`, 299 foods) should override the row for foods he programmes.
+Do not run a bulk update before he answers.
+
+
+### The unit map was two weeks stale, and answering with fragments (`89d991fa` → `aefc0cec`)
+
+Three commits, each proven red against the unfixed code first.
+
+- **`89d991fa` — three foods filed under keys nothing could look up.** The map
+  is generated from `meal_items`; `unitKey` is what turns a name into a key at
+  runtime. They disagreed about accents: the file folds them (`jocko molk whey`),
+  `unitKey` stripped them (`jocko m lk whey`). "Jocko Mölk Whey" and both Núrri
+  shakes answered for nothing. `unitKey` now folds before stripping — which also
+  beats stripping on its own terms, since stripping breaks one word into two
+  fragments too short for the family matcher to see.
+- **`d998ca03` — the map held 251 foods, `meal_items` held 305.** A missing food
+  does not fail quietly: the family matcher finds any known food inside the name
+  and answers with it. `"Animal Isolate Loaded Whey — shake with water"` was
+  **oz, from the word WATER**; so was `"Infinis Cream of Rice — mixed with
+  water"`. `"Roasted carrots & green beans"` was grams, borrowed from green
+  beans. 12 answers corrected, 34 gained, none lost.
+  **The generator is now one implementation instead of two**:
+  `scripts/food-unit-defaults.sql` only counts raw pairs, and
+  `scripts/emit-food-unit-defaults.ts` imports the app's own `unitKey`, sums the
+  counts AFTER normalising, and splices the marked region. That is what stops
+  the accent class of drift recurring.
+- **`aefc0cec` — a unit has to be one he can pick.** `meal_items.unit` is free
+  text and some of it is a portion DESCRIPTION: `large (8" to 8-7/8" long)`,
+  `each or 6 oz`, `servings of 1 slice`, `serving (2 softgels)`, `to taste`.
+  Seven went in as units; none can be displayed, and the AI resolver is worse
+  off with one than with nothing because it hunts the borrowed serving set for
+  that string. One was a regression from `d998ca03` — Jennie-O turkey bacon lost
+  SLICES to "servings of 1 slice". Foods whose only unit is a description are
+  now left out (299 keys). **Measured against the map as it stood at the start
+  of the day: 284 unchanged, 39 improved, zero lost an answer.**
+
+### Data health showed three checks out of twenty-three (`9fa169b6`)
+
+`/settings/data-health` showed the rows whose `ran_at` equalled the newest.
+That is the whole board on a cron run — all eight functions share one
+transaction — but **not after anyone runs a single check function by hand.** On
+7 Sep at 3:20pm one wrote three rows; for three hours the page showed 3 checks
+and hid 20, including all five criticals, and would have printed *"Everything
+passed"* had the third been clean. It now shows the latest result of each check
+(`src/lib/dataHealth.ts`), inside a 36-hour window measured from the newest row
+so a retired check cannot come back and a stopped checker cannot look clean.
 
 ### The food library was rebuilt (`7639ea9b` → `f0bcc2b8`)
 
