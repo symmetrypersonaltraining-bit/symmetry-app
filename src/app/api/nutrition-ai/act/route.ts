@@ -254,9 +254,24 @@ export async function POST(req: NextRequest) {
           `\n\nCurrent user: Client` +
           (await assistantContext(supabase, clientId)) +
           `\n\nTODAY IS ${logDate}. Only reach for a tool when the client is asking about their ` +
-          `TRAINING — their schedule, moving or swapping a session, what to do today, or logging a ` +
-          `weigh-in. If they are asking about food, meals, macros or their plan, answer nothing here ` +
-          `and call no tool: a different part of the coach handles nutrition and will answer them properly.` +
+          `TRAINING — their schedule, moving or swapping a session, what to do today, logging a ` +
+          `weigh-in, or ANY question that names a MOVEMENT. If they are asking about food, meals, macros ` +
+          `or their plan, answer nothing here and call no tool: a different part of the coach handles ` +
+          `nutrition and will answer them properly.` +
+          // ── ITEM E, and the reason the tool alone was not enough. ─────────
+          //
+          // The line above used to end at "logging a weigh-in", and a movement
+          // question is none of those things — so "why does my knee hurt on
+          // lunges" reached for no tool, came back with toolsUsed 0, and fell
+          // through to the nutrition coach, which answered it about lunges in
+          // general. Adding look_up_movement to the toolset without widening
+          // this sentence would have left that path exactly as it was.
+          `\n\nANY QUESTION THAT NAMES A MOVEMENT, or asks what one does, whether there is a video of it, ` +
+          `whether they should swap it, or why one hurts, MUST be answered from look_up_movement — called ` +
+          `first, before you say anything about the movement. What comes back is filtered to what this ` +
+          `client may be shown, so a movement missing from it is one they must not be coached on. Never ` +
+          `describe a movement from your own general knowledge: theirs may be a different variation, it may ` +
+          `not be in their programme at all, and it may be one their body has been told to stay off.` +
           `\n\nANY QUESTION ABOUT A PERIOD OF TIME — "last 3 weeks", "this month", "since I started", ` +
           `"how have I been doing", "am I being consistent", "progress lately" — MUST be answered from ` +
           `my_training_summary, called with that exact period resolved to dates. Do not answer it from the ` +

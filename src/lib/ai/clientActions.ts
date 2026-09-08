@@ -41,6 +41,7 @@
 
 import type { Db } from "@/lib/ai/scope";
 import { isDayInPool, clearedPoolFor } from "@/lib/ai/workoutPool";
+import { lookUpMovements } from "@/lib/ai/movementContext";
 
 export const CLIENT_TOOLS = [
   {
@@ -176,6 +177,30 @@ export const CLIENT_TOOLS = [
         to: { type: "string", description: "YYYY-MM-DD, last day, inclusive. Defaults to today." },
       },
       required: ["from"],
+    },
+  },
+  {
+    name: "look_up_movement",
+    description:
+      "THE ONLY WAY TO ANSWER A QUESTION ABOUT A MOVEMENT. Looks the movement up in this client's own library " +
+      "and returns what it works, what it needs, whether there is a demo video, and which of THEIR sessions it " +
+      "appears in. " +
+      "Call this for ANY question that names a movement or asks about one — 'why does my knee hurt on lunges', " +
+      "'what does this one actually do', 'is there a video', 'can I do something else instead of X', 'am I doing " +
+      "it right' — BEFORE answering, every time. " +
+      "Never describe a movement from your own general knowledge: what comes back is filtered to what this " +
+      "client is allowed to be shown, and a movement missing from it is a movement they must not be coached on.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description:
+            "The movement as they said it, or what they are after — a name ('reverse lunge'), a muscle group " +
+            "('glutes'), or a piece of equipment ('cable'). One lookup per movement; call it again for a second one.",
+        },
+      },
+      required: ["query"],
     },
   },
 ];
@@ -405,6 +430,16 @@ export async function runClientTool(
         out.push(`[day_id ${d.id}] ${d.label || "Workout"} — ${names.join(", ")}`);
       }
       return out.join("\n");
+    }
+
+    if (name === "look_up_movement") {
+      // ── ITEM E. The library, reachable from a client's chat. ────────────
+      //
+      // Everything that makes this safe lives in movementContext.ts, not here:
+      // excluded movements never selected, another client's own movements never
+      // selected, and a gated client seeing only their cleared pool — all in the
+      // candidate set rather than in the prompt.
+      return await lookUpMovements(db, clientId, str("query"));
     }
 
     if (name === "move_my_workout") {

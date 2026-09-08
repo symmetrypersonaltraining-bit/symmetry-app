@@ -76,7 +76,16 @@ test("the trainer's tools are not reachable from here", () => {
   // adherence, is reversible with done=false, and leaves a row in
   // ai_corrections either way. Against that: without it the AI could agree it
   // was wrong and change nothing, which is the worse failure by a distance.
-  assert.equal(names.length, 8, `the client toolset grew to ${names.length}: ${names.join(", ")}`);
+  // Raised 8 -> 9 on 8 Sep for look_up_movement, item E, and the thought is
+  // shorter than the last one: it WRITES NOTHING. It is a read over the
+  // exercise library, filtered before the model ever sees it — excluded
+  // movements gone (rule 13), other clients' own movements never selected (the
+  // library-visibility rule), and a gated client's candidates narrowed to their
+  // cleared pool, which is the same filter their workout options already run
+  // through. It widens what the box can SAY, not what it can DO: what it
+  // replaces is the coach describing a movement from general knowledge, which
+  // is the one answer here that can put a barbell on a fused spine.
+  assert.equal(names.length, 9, `the client toolset grew to ${names.length}: ${names.join(", ")}`);
 });
 
 test("every write re-checks ownership at the moment of writing", () => {
