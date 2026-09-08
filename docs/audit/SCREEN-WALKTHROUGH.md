@@ -1641,3 +1641,89 @@ should not.
 
 Migration `20260908e_a_unit_is_not_a_name.sql`. Reversible:
 `bak_food_serving_rules_20260908e`, `bak_food_default_serving_20260908e`.
+
+---
+
+## Interlude — a small banana is 101 grams, and the app should know that  ·  8 Sep 2026
+
+Dustin, 8 Sep: *"these decisions are not mine to say. I'm not gonna go through
+half a million different foods and figure out the macros and the grams... You
+can go online as AI and figure out how many grams a small banana is. That needs
+to happen for all of these foods."*
+
+**He is right and the session before this one got it wrong.** It found that his
+three banana rows all said 100 g, reported it, and called it "his to say". How
+much a small banana weighs is a fact with a source. It is not a programming
+decision and he must never be asked for it again. That reflex — handing a
+knowable fact back to him as a question — is the thing to stop.
+
+### The root cause of two weeks of this
+
+He asked the right question: *"Where are those numbers coming from?"*
+
+Every nutrition app — MyFitnessPal, Cronometer, LoseIt — gets "1 small" /
+"1 medium" / "1 large" from **one** place: the `food_portion` file of USDA
+FoodData Central. It is free, public and definitive. **Our import took the
+nutrients and a handful of cup measures and left that file behind:**
+
+    rows carrying ANY size portion        706
+    searchable rows                   322,232        0.2%
+
+So the app was never given the data that answers "how big is a small banana".
+**Every workaround in the food code — the keyword map, the RACC pass, the
+piece-size table, `weighedDefaultAmount` — is a substitute for a missing
+import.** That is why this kept coming back no matter what got patched.
+
+**His own rows show it exactly.** "Bananas" carried USDA's own description,
+`1 large (8" to 8-7/8" long)`, with the weight overwritten to **100 g**. The
+label came from USDA and the number did not.
+
+| row | was | now |
+|---|---|---|
+| Banana (small) | 1 medium — 100 g | **1 small — 101 g** |
+| Banana (medium) | 1 each — 100 g | **1 medium — 118 g** |
+| Bananas | 1 large — 100 g | **1 medium — 118 g** |
+| banana | 1 medium — 118 g | unchanged |
+
+Every banana row now offers `1 small 101 · 1 medium 118 · 1 large 136`, and a
+row whose NAME says a size opens on that size — "Banana (small)" was the one row
+already carrying the answer, and it was the one being ignored.
+
+### What was built
+
+- **`food_portion_reference`** — what one small/medium/large of a food weighs,
+  every row recording the FDC id it came from. The app's answer, not the
+  trainer's. This is the landing table for the full import.
+- **`food_size_in_name()`** — a row that names its size gets that size.
+- **`scripts/import-usda-portions.mjs`** — the importer, written and ready.
+
+`serving_grams` is deliberately untouched: it is the weight the macros are
+QUOTED for, and moving it to 101 would declare a banana's per-100 g macros to be
+the value of one small banana. Same rule as `20260908a`, and it nearly broke
+again here.
+
+### ⚠️ The one thing blocking the other 322,000 rows
+
+**This session cannot reach USDA.** The environment's network policy blocks it:
+
+    api.nal.usda.gov       connect_rejected (organization policy)
+    fdc.nal.usda.gov       blocked by the egress proxy
+    data.gov, huggingface  blocked
+    github.com             reachable — but nobody mirrors food_portion.csv
+
+Checked, not assumed: every host above was probed. Web *search* works, which is
+how the banana numbers were confirmed, but searching one food at a time is not
+an import.
+
+**To finish the database, allow `api.nal.usda.gov` in the environment's network
+policy and add a free FDC key** (a minute at `fdc.nal.usda.gov/api-key-signup.html`).
+Then:
+
+    USDA_FDC_API_KEY=xxxx node scripts/import-usda-portions.mjs
+
+It reads SR Legacy and Foundation — the whole foods, the ones with sizes —
+and fills `food_portion_reference` with a traceable source per number. Branded
+products already carry their label serving and are not the problem.
+
+Migration `20260908f_a_small_banana_is_101_grams.sql`. Reversible:
+`bak_food_catalog_banana_20260908f`.
