@@ -1579,3 +1579,65 @@ Each also gained its three sizes in the picker, e.g.
 
 Migration `20260908d_one_chicken_breast_is_an_answer.sql`. Reversible:
 `bak_food_catalog_pieces_20260908d`.
+
+---
+
+## Interlude — a unit is not a name  ·  8 Sep 2026
+
+Dustin, 8 Sep: *"I want real unit names based on serving sizes for those."*
+
+68,853 rows opened on **"1 serving"** and 7,165 on **"1 unit"** or **"1 each"**.
+The weight was right — it comes off the label — but the word tells a client
+nothing. "1 each" is what a database says when it does not know what the food
+is. A person says "1 bun".
+
+**Where the vague words came from.** Twenty-six rules carried the label `each`
+while their own keyword WAS the noun all along — avocado, bun, burrito,
+croissant, donut, egg roll, grilled cheese, lemon, lime, nugget, olive, pancake,
+pickle, roll, sandwich, string cheese, waffle. Every food matching them was told
+it came in "eaches". The keyword, singularised, is the name.
+
+| before | after |
+|---|---|
+| 1 each — 28 g | **1 pickle** — 28 g |
+| 1 each — 28 g | **1 string cheese** — 28 g |
+| 1 each — 43 g | **1 bun** — 43 g |
+| 1 each — 57 g | **1 donut** — 57 g |
+| 2 each — 117 g | **2 pancake** — 117 g |
+| 1 each — 217 g | **1 burrito** — 217 g |
+
+### ⚠️ Why this renamed 3,623 rows and not 45,283
+
+45,283 could have been touched. Reading the diff first found two ways it went
+wrong, and both are **worse than the vague word they replace** — wrong beats
+vague only in the bad direction, and that is the whole complaint:
+
+    All-Natural Unsweet Tea, Lemon & Lime   ->  "6 lemon"      a soda
+    Gourmet Black Olive Pate                ->  "8 olive"      a pate
+    Cookie, oatmeal sandwich, creme filled  ->  "1 sandwich"   a biscuit
+    Pork, cured, ham, slice, pan-broiled    ->  85 g becomes 28 g
+
+Three guards, one per failure:
+
+1. **A flavour is not a food.** When a name carries "flavor", "tea", "soda",
+   "juice", "candy", "pate" and the rest, a whole-food keyword is describing the
+   flavour. A lemon-flavoured soda is not lemons.
+2. **Manufactured forms only** — bun, roll, burrito, pickle, donut. Produce
+   words stay out until a fruit can tell food from flavour, which is a bigger
+   job than a rename.
+3. **The grams may not move.** A row is renamed only when the new answer weighs
+   exactly what the old one did. Verified after the run: **0 weights moved.** So
+   nothing a client has logged can regress on this commit.
+
+### Still open — and it is the biggest number left in the food work
+
+**68,778 rows still say "1 serving" and 73,453 still carry a vague word.** Every
+one is a missing keyword, not a missing mechanism: the machinery now names a
+food the moment the map has a word for it. Closing them is keyword coverage, and
+each keyword needs a real piece weight — which is the same care the piece-size
+table took, at a hundred times the scale. It should be its own pass, measured
+the same way: propose, read the diff, keep only what does not move a gram it
+should not.
+
+Migration `20260908e_a_unit_is_not_a_name.sql`. Reversible:
+`bak_food_serving_rules_20260908e`, `bak_food_default_serving_20260908e`.

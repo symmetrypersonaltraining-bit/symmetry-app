@@ -256,3 +256,38 @@ test("a piece stands aside for a volume and for its own measured twin", () => {
   assert.match(PIECES, /not food_serving_is_volume\(own_label\)/);
   assert.match(PIECES, /own_label !~ \('\^' \|\| piece\.unit/);
 });
+
+// ── a unit is not a name ───────────────────────────────────────────────────
+//
+// 68,853 rows opened on "1 serving" and 7,165 on "1 unit" or "1 each". The
+// weight was right — it comes off the label — but the word tells a client
+// nothing. Twenty-six rules carried the label 'each' while their own keyword
+// WAS the noun: bun, burrito, donut, pickle, waffle. A person says "1 bun".
+
+const NAMES = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260908e_a_unit_is_not_a_name.sql"), "utf8");
+
+test("the vague words are named, and the keyword supplies the noun", () => {
+  assert.match(NAMES, /food_serving_label_is_vague/);
+  for (const vague of ["each", "unit", "item", "piece", "serving", "portion"]) {
+    assert.ok(NAMES.includes(vague), `"${vague}" names nothing and must be treated as vague`);
+  }
+  assert.match(NAMES, /left\(keyword, length\(keyword\) - 1\)/, "plural keywords singularise");
+});
+
+test("a lemon-flavoured soda is not lemons", () => {
+  // Reading the diff first caught "All-Natural Unsweet Tea, Lemon & Lime" being
+  // renamed "6 lemon", and an olive pate becoming "8 olive". Wrong is worse
+  // than vague, which is the entire complaint being fixed here.
+  assert.match(NAMES, /food_name_is_flavoured/);
+  for (const marker of ["flavou?r", "tea", "soda", "juice", "candy", "pate"]) {
+    assert.ok(NAMES.includes(marker), `"${marker}" must mark a name as flavoured`);
+  }
+});
+
+test("the rename may not move a single gram", () => {
+  // The one guarantee that makes this commit safe to ship without re-checking
+  // every row: it changes words, so no logged portion can regress on it.
+  assert.match(NAMES, /\(s\.d->>'grams'\)::numeric = s\.old_g/,
+    "a row is renamed only when the new answer weighs exactly what the old one did");
+});
