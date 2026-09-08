@@ -1,17 +1,25 @@
--- Regenerates src/lib/nutrition/foodUnitDefaults.ts
+-- Step 1 of regenerating src/lib/nutrition/foodUnitDefaults.ts.
 --
 -- The unit a food should default to is not a thing to guess, borrow or ask a
 -- model for. Dustin has already written it down, once per food, every time he
 -- programmed a meal. This query is that record.
 --
--- Run against the Symmetry project, paste the array into the generated file.
+-- IT HANDS OVER RAW NAMES AND DOES NOT NORMALISE THEM. That is the whole point
+-- of the split. The map's keys have to be exactly what unitKey() produces at
+-- runtime, and a second normalisation written in SQL drifts from the first: it
+-- did, over accents, and "Jocko Mölk Whey" ended up filed as `jocko molk whey`
+-- while the lookup asked for `jocko m lk whey`. Three of his foods answered for
+-- nothing. So the normalising now happens in exactly one place — unitKey, via
+-- scripts/emit-food-unit-defaults.ts. All this query does is count.
+--
+-- Step 1: run this through the Supabase MCP tool, save the single returned
+--         string to a file (one row per line: food <TAB> unit <TAB> count).
+-- Step 2: npx tsx scripts/emit-food-unit-defaults.ts <that file>
 with his as (
-  select lower(trim(food)) f, lower(trim(unit)) u, count(*) n
+  select btrim(food) f, btrim(lower(unit)) u, count(*) n
   from meal_items
-  where unit is not null and food is not null and trim(food) <> ''
+  where unit is not null and food is not null
+    and btrim(food) <> '' and btrim(unit) <> ''
   group by 1, 2
-),
-top as (
-  select distinct on (f) f, u, n from his order by f, n desc, u
 )
-select json_agg(json_build_array(f, u, n) order by f)::text from top;
+select string_agg(f || E'\t' || u || E'\t' || n, E'\n' order by f, u) from his;
