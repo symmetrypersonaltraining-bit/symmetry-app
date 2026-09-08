@@ -77,8 +77,19 @@ C:\Users\dusti\Claude\Projects\Trainer App\outbox\            (the mailbox)
    and `device_commit_files` refuses anything over 20 MB.
 3. `git rev-parse HEAD > SHIP-NOW`
 4. Write both into the outbox — **bundle first, `SHIP-NOW` second.**
-   `device_commit_files` will not take a bare `stagedPath`; call `SendUserFile`
-   on each file first and pass the returned `fileUuid`.
+   A bare `stagedPath` under `/mnt/user-data/outputs/` does work; `force: true`
+   is needed because the watcher's own writes move the file's mtime.
+   **USE A NEW LOCAL FILENAME FOR EVERY ATTEMPT.** Overwriting
+   `outputs/ship.bundle` and re-committing it to the same device path sends the
+   PREVIOUS content — twice on 8 Sep the bridge answered `bundle tip <old sha>
+   does not match requested <new sha>` after a rebase, with the correct bundle
+   sitting in the sandbox. `ship-2.bundle`, `ship-3.bundle` and so on cost
+   nothing and skip the round trip. Stage the file back and check its header
+   (`head -c 200 <file> | strings`) if a tip mismatch ever appears again: the
+   second line of a bundle is the ref it carries.
+   Also: `git bundle create` fails writing directly into
+   `/mnt/user-data/outputs/` ("sha1 file '<stdout>' write error"). Build it in
+   `/tmp` and copy it across.
 5. Wait ~50s, then `git fetch origin main` and confirm it landed. On failure read
    `outbox\SHIP-RESULT.txt`; a non-fast-forward means rebase and resend.
 6. **Never end a session with work only in the sandbox.** The container is
