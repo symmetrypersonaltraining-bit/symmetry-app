@@ -3,6 +3,12 @@
 **This file is the state of the walkthrough. Read it, then continue. Do not ask
 Dustin what we are doing or how it works — it is all here.**
 
+> **Not here for the audit?** `docs/SESSION-HANDOFF.md` is the entry point for
+> everything else — bug repairs, feature work, how code ships, what shipped in
+> the last few days, and the gotchas that have already cost time. It routes back
+> here for the audit thread, and this file stays the owner of the audit's own
+> state. Two files, one each, neither a copy of the other.
+
 Read in this order, every session, before anything else:
 
 1. **this file** — where we are, what is agreed, what is open

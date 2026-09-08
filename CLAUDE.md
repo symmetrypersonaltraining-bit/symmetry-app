@@ -3,6 +3,19 @@
 Read this before touching anything. These are not suggestions; each one exists
 because breaking it cost real time or real money.
 
+## 0. READ `docs/SESSION-HANDOFF.md` FIRST, AND UPDATE IT BEFORE YOU FINISH
+
+That file is the living handoff: current state, how shipping works, what just
+shipped, what is open, and the gotchas that have already cost time. It is not
+dated and it is not archived — there is one of it. The `docs/HANDOFF-*.md` files
+with dates in the name are history; do not read them for current state and do
+not create another one.
+
+**Every session ends by updating it.** The bar Dustin set: a brand-new session
+reading only that file, this one, `docs/BACKLOG.md` and
+`docs/audit/AUDIT-RESUME.md` picks up with nothing lost, and without asking him
+a single question he has already answered.
+
 Deeper background lives in `docs/audit/` and in the project's
 `claude/STANDING-RULE-INVARIANTS.md`.
 
