@@ -1384,3 +1384,47 @@ portion having its own column rather than a convention everyone has to remember.
   keyword, not a missing mechanism.
 - **His own 155 foods are untouched** — 28 of them carry a wrong weight for the
   right unit, and he asked to see the list first.
+
+---
+
+## Interlude — a half cup has no leading zero  ·  8 Sep 2026
+
+**494 foods opened on "1 .5 cup".** Broccoli read `1 .5 cup, chopped`,
+grapefruit `1 .5 fruit`, oats `1 .333 cup`, a Campbell's soup
+`1 .5 cup, condensed`. It is not a measurement, it is a parser talking to
+itself, and a client who reads it stops trusting the screen — correctly.
+
+**The cause.** USDA writes a half cup as `.5 cup`, with no leading zero. Both
+Postgres parsers opened with `[0-9]+`, which requires a digit BEFORE the point,
+so neither matched:
+
+    food_serving_count_in('.5 cup')  ->  1          should be 0.5
+    food_serving_label_of('.5 cup')  ->  '.5 cup'   should be 'cup'
+
+The count fell back to its default of 1 and the `.5` stayed glued to the front
+of the label, so `food_serving_fmt(1, '.5 cup')` rendered `1 .5 cup`.
+
+**Why it survived a whole build.** `foodResolve.ts` parses the count with
+`([\d.]+)?`, which *does* match a bare `.5`. TypeScript was right and Postgres
+was wrong about the same three characters, and nothing compared them — until
+Postgres started WRITING a default for TypeScript to read back. Two parsers for
+one format is the underlying fault; they now agree.
+
+**What a client sees now.** The row's own duplicate had the answer all along,
+which is how the fix was checked:
+
+| food | before | after |
+|---|---|---|
+| Abiyuch, raw | 1 .5 cup — 114 g | **1 cup — 228 g** |
+| Grapefruit, raw | 1 .5 fruit — 123 g | **1 fruit — 246 g** |
+| Broccoli, boiled | 1 .5 cup, chopped — 78 g | **1 stalk, small — 140 g** |
+
+Zero garbled rows remain. `1.5`, `1/2` and `1 large` all still read as before.
+
+**The guard.** A `check` constraint — `food_default_serving_is_readable` —
+refuses any default containing a digit followed by a lone decimal point. This
+shape arrived twice (the 6 Sep pass wrote it, the 8 Sep pass rendered it), so it
+is now a constraint rather than a comment.
+
+Migration `20260908b_a_half_cup_has_no_leading_zero.sql`. Reversible:
+`bak_food_default_serving_20260908b`.

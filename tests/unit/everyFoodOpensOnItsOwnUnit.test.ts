@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { householdServing, storedDefaultServing, type CatalogRow } from "../../src/lib/nutrition/foodResolve";
+import { householdServing, storedDefaultServing, parseServingOption, type CatalogRow } from "../../src/lib/nutrition/foodResolve";
 
 /**
  * EVERY FOOD OPENS ON A UNIT A PERSON WOULD SAY.
@@ -98,4 +98,48 @@ test("HIS unit still wins over the stored default", () => {
 
 test("the borrow only runs when nothing else answered", () => {
   assert.match(SHEET, /if \(!hisNamed && !f\.defaultServing && !heWeighsIt && !f\.named\.length && f\.baseGrams\)/);
+});
+
+// ── a half cup has no leading zero ─────────────────────────────────────────
+//
+// 494 foods opened on "1 .5 cup" — broccoli as "1 .5 cup, chopped", grapefruit
+// as "1 .5 fruit". USDA writes a half cup as ".5 cup" with no leading zero, and
+// BOTH Postgres parsers opened with `[0-9]+`, which needs a digit before the
+// point. So the count fell back to 1 and the ".5" stayed glued to the label.
+//
+// TypeScript was never wrong here — `([\d.]+)?` matches a bare ".5" — and that
+// is exactly why it lasted: the two parsers disagreed about three characters
+// and nothing compared them until Postgres began writing a default for
+// TypeScript to read back. These pin both halves to the same reading.
+
+test("a bare leading decimal is a count, not part of the unit", () => {
+  const s = parseServingOption({ desc: ".5 cup", grams: 114 });
+  assert.equal(s?.label, "cup", 'USDA\'s ".5 cup" names a cup, not a ".5 cup"');
+  assert.equal(s?.gramsEach, 228, "half a cup at 114 g makes a cup 228 g");
+});
+
+test("the leading zero is optional, and 1.5 is still one number", () => {
+  assert.equal(parseServingOption({ desc: "0.5 cup", grams: 114 })?.gramsEach, 228);
+  assert.equal(parseServingOption({ desc: "1.5 cup", grams: 342 })?.gramsEach, 228);
+  assert.equal(parseServingOption({ desc: "1 large", grams: 50 })?.gramsEach, 50);
+});
+
+// ── and the Postgres half, which is the half that was broken ───────────────
+
+const HALF_CUP_FIX = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260908b_a_half_cup_has_no_leading_zero.sql"), "utf8");
+
+test("both SQL parsers accept a bare leading decimal", () => {
+  // `[0-9]*\.?[0-9]+` reads "1", "1.5" and ".5" alike. The old
+  // `[0-9]+(?:\.[0-9]+)?` required the digit first and is what wrote "1 .5 cup".
+  const fixed = HALF_CUP_FIX.match(/\[0-9\]\*\\\.\?\[0-9\]\+/g) ?? [];
+  assert.ok(fixed.length >= 2,
+    "food_serving_count_in AND food_serving_label_of both need the bare-decimal form");
+  assert.doesNotMatch(HALF_CUP_FIX.replace(/^--.*$/gm, ""), /\[0-9\]\+\(\?:\\\.\[0-9\]\+\)\?/,
+    "the old digit-first pattern must not survive in the executed SQL");
+});
+
+test("a garbled default can no longer be written", () => {
+  assert.match(HALF_CUP_FIX, /food_default_serving_is_readable/);
+  assert.match(HALF_CUP_FIX, /check \(default_serving_desc is null or default_serving_desc !~/);
 });
