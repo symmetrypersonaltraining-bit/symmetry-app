@@ -58,10 +58,11 @@ test("the map keeps up — foods he added after the file was generated are in it
 });
 
 test("the map keeps up — it carries the whole record, not the part that was true in August", () => {
-  // 305 foods as of 8 Sep. The floor is deliberately just under it: this is a
-  // guard against the file falling behind again, not a number to edit whenever
-  // he programmes a meal.
-  assert.ok(knownFoods().length >= 300, `only ${knownFoods().length} foods — regenerate the map`);
+  // 305 foods in meal_items as of 8 Sep, of which 299 are in the map: six have
+  // no unit that can appear on a picker (see aUnitHasToBeOneHeCanPick) and are
+  // deliberately left out. The floor is a guard against the file falling behind
+  // again, not a number to edit whenever he programmes a meal.
+  assert.ok(knownFoods().length >= 295, `only ${knownFoods().length} foods — regenerate the map`);
 });
 
 test("the map keeps up — the foods that already worked still work", () => {

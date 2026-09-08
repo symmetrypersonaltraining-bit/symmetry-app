@@ -51,6 +51,27 @@ for (const line of fs.readFileSync(tsvPath, "utf8").split("\n")) {
 }
 if (!rows.length) throw new Error("no rows — did the query return anything?");
 
+// ── A UNIT HAS TO BE SOMETHING HE CAN PICK OFF A LIST ─────────────────────
+//
+// meal_items.unit is free text, and some of what he has typed into it is a
+// PORTION DESCRIPTION rather than a measure: `large (8" to 8-7/8" long)` from a
+// USDA row, `each or 6 oz` on a day that offers eggs or steak, `servings of 1
+// slice`, `serving (2 softgels)`, `to taste`.
+//
+// None of those is a unit the amount picker can show or a person can choose, so
+// putting one in the map is worse than having no entry at all. The picker finds
+// nothing matching and the AI resolver is worse off still: it uses his unit as
+// the thing to look for in a borrowed serving set, so a description crowds out
+// the food's own name and the borrow — which would have found "1 slice" — comes
+// back empty.
+//
+// A food whose only unit is a description is left OUT, which puts it back where
+// it was before this map existed: the family matcher and the catalogue answer.
+// "Jennie-O Extra Lean Turkey Bacon" is exactly that case — its own row says
+// "servings of 1 slice", and dropping it lets "turkey bacon" say SLICES, which
+// is what he wrote seven times and what the picker can actually show.
+const NOT_A_MEASURE = /[()"]| or | of |^to taste$/;
+
 // ── Normalise with the app's own key, and add the counts up ───────────────
 //
 // The counts are summed AFTER normalising, because that is the number the
@@ -69,9 +90,12 @@ for (const r of rows) {
 // stable across runs rather than depending on row order.
 const entries = [...byKey.entries()]
   .map(([key, units]) => {
-    const [unit, uses] = [...units.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
-    return { key, unit, uses };
+    const usable = [...units.entries()]
+      .filter(([u]) => !NOT_A_MEASURE.test(u))
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+    return usable ? { key, unit: usable[0], uses: usable[1] } : null;
   })
+  .filter((e): e is { key: string; unit: string; uses: number } => e !== null)
   .sort((a, b) => a.key.localeCompare(b.key));
 
 const pairs = [...byKey.values()].reduce((t, u) => t + u.size, 0);

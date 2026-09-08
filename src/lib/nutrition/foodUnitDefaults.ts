@@ -40,7 +40,7 @@ const QUALIFIER = new Set([
 interface HisUnit { unit: string; uses: number; }
 
 // ─── GENERATED FROM meal_items — START ───────────────────────
-// 305 foods, from 352 distinct (food, unit) pairs, 366 raw rows.
+// 299 foods, from 352 distinct (food, unit) pairs, 366 raw rows.
 //
 // Regenerate with scripts/emit-food-unit-defaults.ts — never by hand. The keys
 // are whatever unitKey() makes of the food name, because that is what the
@@ -75,7 +75,7 @@ const HIS_UNIT = new Map<string, HisUnit>([
   ["banana medium", { unit: "each", uses: 2 }],
   ["banana or fruit", { unit: "g", uses: 2 }],
   ["banana small", { unit: "medium", uses: 7 }],
-  ["bananas", { unit: "large (8\" to 8-7/8\" long)", uses: 3 }],
+  ["bananas", { unit: "oz", uses: 2 }],
   ["basmati rice", { unit: "g", uses: 2 }],
   ["beef gravy", { unit: "cup", uses: 3 }],
   ["beef or pork", { unit: "oz", uses: 1 }],
@@ -93,7 +93,6 @@ const HIS_UNIT = new Map<string, HisUnit>([
   ["bob evans liquid egg whites carton drink straight", { unit: "fl oz", uses: 2 }],
   ["boiled egg whole", { unit: "each", uses: 12 }],
   ["boiled eggs whole", { unit: "each", uses: 26 }],
-  ["boiled eggs whole or steak ribeye sirloin", { unit: "each or 6 oz", uses: 36 }],
   ["breakfast log what you eat", { unit: "serving", uses: 2 }],
   ["broccoli", { unit: "cup", uses: 2 }],
   ["broccoli asparagus green beans", { unit: "cup", uses: 2 }],
@@ -124,11 +123,8 @@ const HIS_UNIT = new Map<string, HisUnit>([
   ["chicken thigh pulled cooked", { unit: "oz", uses: 21 }],
   ["chicken thighs drumsticks", { unit: "oz", uses: 1 }],
   ["chili crisp", { unit: "tsp", uses: 4 }],
-  ["chobani 0 plain greek yogurt 8 oz", { unit: "serving of 8 oz", uses: 1 }],
   ["chuck roast cooked", { unit: "g", uses: 4 }],
-  ["cinnamon stevia", { unit: "to taste", uses: 1 }],
   ["coffee", { unit: "cup", uses: 2 }],
-  ["coffee mate sugar free french vanilla liquid coffee creamer", { unit: "servings of 1 tbsp", uses: 2 }],
   ["cold salmon or tuna", { unit: "oz", uses: 14 }],
   ["cooking oil or butter", { unit: "tbsp", uses: 1 }],
   ["corn", { unit: "cup", uses: 1 }],
@@ -189,7 +185,6 @@ const HIS_UNIT = new Map<string, HisUnit>([
   ["infinis cream of rice mixed into egg whites", { unit: "scoop", uses: 2 }],
   ["infinis cream of rice mixed with water", { unit: "scoop", uses: 2 }],
   ["jasmine rice cooked", { unit: "g", uses: 2 }],
-  ["jennie o extra lean turkey bacon", { unit: "servings of 1 slice", uses: 2 }],
   ["jif peanut butter", { unit: "tbsp", uses: 2 }],
   ["jocko molk whey", { unit: "scoop", uses: 4 }],
   ["kerrygold butter", { unit: "tsp", uses: 1 }],
@@ -223,7 +218,6 @@ const HIS_UNIT = new Map<string, HisUnit>([
   ["minute rice cooked", { unit: "cup", uses: 2 }],
   ["mission spinach tortilla wrap", { unit: "tortilla", uses: 4 }],
   ["mixed berries", { unit: "cup", uses: 107 }],
-  ["nature made fish oil 1200mg", { unit: "serving (2 softgels)", uses: 3 }],
   ["nature s own brioche hamburger bun", { unit: "bun", uses: 2 }],
   ["nonfat greek yogurt", { unit: "cup", uses: 1 }],
   ["now sports carbo gain", { unit: "cup", uses: 2 }],
