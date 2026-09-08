@@ -1,5 +1,32 @@
 # Backlog — the single work queue
 
+## 2026-09-08 — The coach can look a movement up (SHIPPED, eeb98b19)
+
+Item E of the AI programme — the last of the four big ones from 5 Sep, and the
+one that decided how a movement question gets answered.
+
+A client asking about a MOVEMENT was answered by a coach that had never been
+able to reach the movement library. It knew what they ate, weighed and had
+scheduled, and since 5 Sep how they move — but "why does my knee hurt on
+lunges" was answered about lunges in general: not their variation, not the one
+in their session, with no way to say the movement is not in their programme at
+all.
+
+`look_up_movement` returns what a movement works, what it needs, whether there
+is a demo video, and which of THEIR sessions it appears in. Three filters live
+in the candidate set rather than the prompt: excluded movements (rule 13),
+another client's own movements (the library-visibility rule), and a gated
+client's cleared pool — which it fails closed with, the same as their workout
+options.
+
+The half that would have been missed: the ✦ Coach's tool pass is told when to
+reach for a tool at all, and that sentence ended at "logging a weigh-in". A
+movement question matched none of it, so the tool alone would have left the
+behaviour exactly as it was.
+
+Next in the AI programme: **F** — the length cap and ban-the-obvious
+enforcement (rule 7).
+
 ## 2026-09-07 — Client View is a boundary (SHIPPED, 9464505a)
 
 Dustin, with another client's full profile page on his screen while signed into

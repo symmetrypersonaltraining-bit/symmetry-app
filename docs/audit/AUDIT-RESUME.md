@@ -119,23 +119,19 @@ are NOT bugs and must stop being re-reported.
 
 ### Next — in this order
 
-1. **AI programme item E — movement library access for the client coach.** The
-   biggest of the four left. Today a question about a MOVEMENT ("why does my
-   knee hurt on lunges", "what does this one actually do") is answered by a
-   coach whose context is nutrition, an assessment and a schedule — it has never
-   been able to look a movement up.
-2. **F, G, H** — see the AI programme table below.
-3. **Home, the two leftovers.**
+1. **F, G, H** — see the AI programme table below. E shipped 8 Sep (`eeb98b19`);
+   F is next: the length cap and ban-the-obvious enforcement, rule 7.
+2. **Home, the two leftovers.**
    - today's workout tile needs the **View** button, to match the Workout tab's
      Start / View split. Dustin, 4 Sep. Last place a workout opens only one way.
    - the "Dustin's assistant" framing on the coach entry points (ruling 4) —
      this is item H, and lands with it.
-4. **Workout, full walk.** The screen was rebuilt on 4 Sep and NOTHING on it has
+3. **Workout, full walk.** The screen was rebuilt on 4 Sep and NOTHING on it has
    been tapped since. Every button, every path: add, edit, move, replace,
    remove, start, view, drag, past strip — manually and through Claude. Plus its
    AI components against docs/audit/AI-CONTRACT.md.
-5. **The workout logger** — its own pass, see its section below.
-6. Screen 3 onward.
+4. **The workout logger** — its own pass, see its section below.
+5. Screen 3 onward.
 
 ### The AI programme — from docs/audit/AI-CONTRACT.md
 
@@ -157,12 +153,12 @@ AI in this app.** Half of the programme is now built.
 | **A+** | **The takeover.** Trainer opens a client's session, client has no assessment → full screen, "Not now" dismisses for that session date only | `2e84ea97` |
 | **B** | **Corrections.** `i_did_do_that` marks it done on their word alone — Dustin chose (a), believed, no queue. Reversible. `ai_corrections` records claim / their words / field / old / new / whether the app caught itself. Wording rules ship with every context. | `3b7cc259` |
 | **C+D** | **Sore is not numb.** `symptom_flags`, two tiers. Ordinary → up to two questions then a real answer. Red flag → stop, no exercises, no speculation, offer to send. `RED_FLOOR` compiled in so the gate cannot silently disarm. Escalations now **push**, deep-linked to the client's thread. Urgency re-derived server-side. | `19cf1c30` |
+| **E** | **Movement library access for the client coach.** `look_up_movement`: what it works, what it needs, whether there is a demo video, and which of THEIR sessions it is in. Excluded movements never selected, another client's own movements never selected, a gated client narrowed to their cleared pool and failing closed with it — all in the candidate set, not the prompt. The wiring mattered as much as the tool: the coach's tool pass ended at "logging a weigh-in", so a movement question reached for nothing and fell through to the nutrition coach. | `eeb98b19` |
 
 **NOT BUILT, in the order they are worth doing:**
 
 | | what | why it matters |
 |---|---|---|
-| E | **Movement library access for the client coach** | So "why does my knee hurt on lunges" reaches a movement, not a nutrition coach. Biggest of the four left. |
 | F | **Length cap + ban-the-obvious enforcement** | Rule 7. The modal complaint about AI coaching everywhere is walls of obvious text. |
 | G | **Bounded client adjustment on AI proposals** | Rule 8. Best-evidenced adoption lever there is, and cheap. |
 | H | **"Dustin's assistant" framing** | Ruling 4. Copy across the coach entry points. |
@@ -586,8 +582,9 @@ Read alongside the "STOP RE-REPORTING THESE" section of
 
 ## Live state
 
-`origin/main` = **`19cf1c30`**, `unpushed: 0`. tsc 0 errors in `src/`,
-**2,883 unit tests passing**, build compiles.
+`origin/main` = **`eeb98b19`** (8 Sep). tsc 0 errors in `src/`,
+**2,910 unit tests passing**, build compiles. The `/login` prerender error in the
+sandbox is the missing Supabase env vars, not a fault.
 
 Everything in the BUILT table above is on main and live. Nothing is sitting in
 a sandbox, a patch or a branch.
