@@ -293,9 +293,26 @@ const HIS_UNIT = new Map<string, HisUnit>([
   ["zucchini", { unit: "oz", uses: 2 }],
 ]);
 
-/** Normalises a food name to the key shape used above. */
+/**
+ * Normalises a food name to the key shape used above.
+ *
+ * AN ACCENT IS A SPELLING, NOT A DIFFERENT FOOD. The accent is folded to its
+ * plain letter BEFORE anything is stripped, because stripping it breaks one
+ * word into two: "Mölk" became "m lk", and both halves are shorter than the
+ * three letters the family matcher counts as a word, so the word disappeared
+ * entirely. Folding keeps "molk" — and it is what the generated map above was
+ * already built with, so for "Jocko Mölk Whey" and both Núrri shakes the
+ * lookup was asking for keys the file does not contain and getting nothing
+ * back for three foods he had written down himself.
+ */
 export function unitKey(name: string): string {
-  return (name || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  return (name || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
