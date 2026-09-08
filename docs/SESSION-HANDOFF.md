@@ -14,11 +14,34 @@ Last updated: **8 Sep 2026, 13:10 CDT** · `origin/main` at **`aefc0cec`**
 
 ---
 
-## 0. THE FIRST FIVE MINUTES
+## 0. WHICH SURFACE ARE YOU IN — ANSWER THIS BEFORE ANYTHING ELSE
+
+Two kinds of session work on this repo, and **they ship differently**. Work out
+which one you are before you commit anything, because following the wrong half
+of this file wastes twenty minutes building a bundle nobody needs.
+
+| | **Claude Code** | **Cowork cloud session** |
+|---|---|---|
+| How you can tell | You have the repo on disk with git credentials; `git push --dry-run` succeeds | `git push` 403s, and you have `device_*` tools for his laptop |
+| Shipping | **`git push`. That is the whole procedure.** Ignore section 2 entirely. | The ship bridge, section 2 |
+| Database | Needs the Supabase MCP connected, or `SUPABASE_SERVICE_ROLE_KEY` in the environment. **If neither is there, say so rather than guessing at data** | Supabase MCP is already connected |
+| His laptop's files | Not reachable | `device_bash`, `device_list_dir` |
+
+**Claude Code is the preferred surface for code work as of 8 Sep 2026.** The
+old rule — *"run in the cloud always, local sessions are invisible on his
+phone"* — is dead: he uses Claude Code from the Claude mobile app, so those
+sessions are visible on his phone too, and they push directly. The ship bridge
+exists only for Cowork sessions now.
+
+Cloud sessions are still right for database work (the Supabase MCP is there) and
+for anything that needs files on his laptop.
+
+## 0b. THE FIRST FIVE MINUTES
 
 1. Read this file.
-2. Check the ship bridge: `device_list_dir` on
-   `C:\Users\dusti\Claude\Projects\Trainer App\outbox` and look at
+2. **Claude Code:** `git push --dry-run` to prove auth, and skip to step 3.
+   **Cowork:** check the ship bridge — `device_list_dir` on
+   `C:\Users\dusti\Claude\Projects\Trainer App\outbox`, look at
    `watcher-alive.txt`. Fresh → say *"Ship bridge is up."* and carry on. Missing
    or stale → say *"Double-click SHIP-WATCHER.bat in the Trainer App folder and
    leave the window open. Tell me when it's running."* and WAIT. Never open a
@@ -53,7 +76,7 @@ He runs his whole business on it. Every bug is a real client's real day.
 
 ---
 
-## 2. HOW CODE SHIPS — READ BEFORE YOU COMMIT
+## 2. HOW CODE SHIPS FROM A COWORK SESSION — SKIP THIS IN CLAUDE CODE
 
 **A cloud session cannot push to GitHub.** Verified repeatedly, two ways: the
 sandbox git proxy returns 403 ("not in this session's authorized repository

@@ -18,8 +18,15 @@ Read in this order, every session, before anything else:
    screen adopts it
 4. **`CLAUDE.md`** — the standing rules for all work in this repo
 
-Then check the ship bridge, then `git rev-list --count origin/main..main`, and
+Then work out which surface you are in — `docs/SESSION-HANDOFF.md` section 0,
+and it decides how you ship — then `git rev-list --count origin/main..main`, and
 ship anything unpushed before starting new work.
+
+**This audit runs well in Claude Code**, and from 8 Sep that is where the code
+half belongs: the four files above are on disk, the gates run locally, and a fix
+pushes without the bridge. What does not change is the method — the walk is a
+conversation with Dustin, control by control, and no tooling substitutes for
+him tapping a button and saying what happened.
 
 ---
 
@@ -582,8 +589,8 @@ Read alongside the "STOP RE-REPORTING THESE" section of
 
 ## Live state
 
-`origin/main` = **`eeb98b19`** (8 Sep). tsc 0 errors in `src/`,
-**2,910 unit tests passing**, build compiles. The `/login` prerender error in the
+`origin/main` = **`bfe0bd67`** (8 Sep). tsc 0 errors in `src/`,
+**2,935 unit tests passing**, build compiles. The `/login` prerender error in the
 sandbox is the missing Supabase env vars, not a fault.
 
 Everything in the BUILT table above is on main and live. Nothing is sitting in

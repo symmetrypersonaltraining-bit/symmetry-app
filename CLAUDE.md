@@ -101,6 +101,21 @@ behaviour changes its row.
   watch it fail. A check that cannot fail is not a check.
 - **Never leave main red.**
 
+## 4b. WHICH SURFACE YOU ARE IN DECIDES HOW YOU SHIP
+
+**Claude Code:** you have the repo and credentials — `git push`, and that is
+all. Do not build a bundle, do not look for an outbox, do not investigate auth.
+For database work you need the Supabase MCP or a service-role key; if you have
+neither, say so rather than reasoning about data you cannot read.
+
+**Cowork cloud session:** you cannot push. Commit, bundle incrementally, and
+send it through the ship bridge — `docs/SESSION-HANDOFF.md` section 2 has the
+sequence and the two traps that waste a round trip.
+
+The old rule that everything must run in the cloud so he can watch from his
+phone retired on 8 Sep 2026: he runs Claude Code from the Claude mobile app, so
+it is just as visible and it ships without the bridge.
+
 ## 5. GATES BEFORE EVERY PUSH
 
     npx tsc --noEmit      # 0 errors in src/
