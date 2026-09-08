@@ -3,7 +3,42 @@
 **This file is the state of the walkthrough. Read it, then continue. Do not ask
 Dustin what we are doing or how it works — it is all here.**
 
-Last updated: 4 Sep 2026.
+Read in this order, every session, before anything else:
+
+1. **this file** — where we are, what is agreed, what is open
+2. **`docs/audit/AI-CONTRACT.md`** — the ten rules and four rulings every AI
+   surface in the app must meet. Non-negotiable, and half-built.
+3. **`docs/audit/APP-FORMAT.md`** — one object, thirty colour schemes, and how a
+   screen adopts it
+4. **`CLAUDE.md`** — the standing rules for all work in this repo
+
+Then check the ship bridge, then `git rev-list --count origin/main..main`, and
+ship anything unpushed before starting new work.
+
+---
+
+## ⚠️ KEEP THIS FILE TRUE
+
+Dustin, 5 Sep: *"DO NOT LOSE anything on what we've done, what we r doing n how
+we are doing it. new one starts as if I never left here and keep it updated so
+we continue session to session without losing anything."*
+
+So this file is not a log that gets appended to and left. **Every session
+updates it before it ends**, and the bar is: a session that has read nothing but
+these four files can pick up mid-sentence.
+
+What that means in practice:
+
+- A decision he makes gets written down **in his words**, in the session it is
+  made, not summarised later.
+- Anything BUILT moves out of the not-built list and into the built one, with
+  its commit, so nobody re-derives it or quietly undoes it.
+- A dated handoff file (`HANDOFF-2026-09-05.md` and its kind) is a snapshot of
+  one night, and goes stale the next morning. **This file is the live one.**
+  Snapshots are fine to keep; nothing should ever depend on reading one.
+- Anything he ruled on and I got wrong the first time keeps BOTH halves —
+  see the acting ruling in AI-CONTRACT.md — so the wrong reading cannot be
+  re-derived from the first half of what he said.
 
 ---
 
@@ -73,43 +108,55 @@ are NOT bugs and must stop being re-reported.
 
 | # | screen | notes |
 |---|---|---|
-| 1 | **Client home** | ✅ closed, ◐ AI pass 5 Sep: both AI elements rebuilt (Coach's tool model, weekly writer). Two small items remain — the View button and the assistant framing. Original close: Adherence now counts only days due; This Week moved under the streak; second "This week" card renamed Weekly Focus; Add Workout removed; AI Insights placeholder deleted; header is a banner; payments sit above This Week; milestone Share now carries the message. |
+| 1 | **Client home** | ✅ closed. ✅ AI pass done 5 Sep — both its AI elements (the Coach, the Weekly Focus) rebuilt; inventory in `docs/audit/AI-COMPONENTS.md`. Two small items remain: the **View** button on today's tile, and the assistant framing (item H). Original close: Adherence now counts only days due; This Week moved under the streak; second "This week" card renamed Weekly Focus; Add Workout removed; AI Insights placeholder deleted; header is a banner; payments sit above This Week; milestone Share now carries the message. |
 | 2 | **Workout tab** | ◐ REBUILT 4 Sep, not yet walked. New tile format, Start/View split, move-a-logged-workout copies forward, Add workout on the title row. Everything on it now needs testing button by button — including the AI components, which have never been reviewed. |
 
 ### Next — in this order
 
-1. **Give the client AI the assessment.** THE BIGGEST OPEN GAP IN THE APP.
-   Dustin ruled on 5 Sep that when a client says a movement hurts, the AI does
-   **full corrective reasoning** — his method, from that client's own
-   assessment. It cannot: `assessments` is invisible to every client-facing AI
-   surface. Everything else on this list is smaller than this.
-2. **Home, AI pass.** Elements 1 and 2 are DONE and shipped (see
-   docs/audit/AI-COMPONENTS.md). What remains on home:
+1. **AI programme item E — movement library access for the client coach.** The
+   biggest of the four left. Today a question about a MOVEMENT ("why does my
+   knee hurt on lunges", "what does this one actually do") is answered by a
+   coach whose context is nutrition, an assessment and a schedule — it has never
+   been able to look a movement up.
+2. **F, G, H** — see the AI programme table below.
+3. **Home, the two leftovers.**
    - today's workout tile needs the **View** button, to match the Workout tab's
      Start / View split. Dustin, 4 Sep. Last place a workout opens only one way.
-   - the "Dustin's assistant" framing on the coach entry points (his 5 Sep
-     disclosure ruling) — copy only, not built.
-3. **Workout, full walk.** The screen was rebuilt on 4 Sep and NOTHING on it has
+   - the "Dustin's assistant" framing on the coach entry points (ruling 4) —
+     this is item H, and lands with it.
+4. **Workout, full walk.** The screen was rebuilt on 4 Sep and NOTHING on it has
    been tapped since. Every button, every path: add, edit, move, replace,
    remove, start, view, drag, past strip — manually and through Claude. Plus its
    AI components against docs/audit/AI-CONTRACT.md.
-4. Screen 3 onward.
+5. **The workout logger** — its own pass, see its section below.
+6. Screen 3 onward.
 
 ### The AI programme — from docs/audit/AI-CONTRACT.md
 
-Ten rules, four rulings, set 5 Sep. Built so far: the tools model, the weekly
-writer's context and thinking order, the schedule guard, the food stance, the
-general tips, the coach's read on screen, and sessions-with-him protected.
+Ten rules and four rulings, set 5 Sep. **Read AI-CONTRACT.md before touching any
+AI in this app.** Half of the programme is now built.
 
-**Not built, in the order they are worth doing:**
+**BUILT — do not re-derive, do not undo:**
+
+| | what | shipped |
+|---|---|---|
+| — | Any client turn holding the action tools is **Sonnet**, whole roster, both doors | `005e753a` |
+| — | The weekly writer knows who it is writing to — injuries, sessions one by one, client memory, last week's focus, six required thinking steps | `9c7b4e8c` |
+| — | The weekly question stopped renegotiating his schedule; the food-logging stance (never-logged / lapsed / slipping / starting / active) | `5c115fa5` |
+| — | `clients.ai_focus` shown at last, staleness-guarded — written weekly for months and displayed by nothing | `cec1a4c9` |
+| — | A general tip every third week, on a computed cadence, never on a food-nudge week | `d9f9a7c3` |
+| — | Supervised sessions move like any other; only the AI's **wording** is constrained | `00c5514c` |
+| **A** | **Assessment access for the client AI.** One block, read by BOTH client-facing context builders. Movement screen ground-up, injuries, pain, surgeries, chips, work-arounds, trainer notes. Six rules ship with it: never refuse, warn once, plain words never the method, two questions max on pain, stop on red flags, invent nothing. Says so plainly when there is no assessment. | `234619c8` |
+| **A+** | The assessment form gained the contraindication chips + free text + trainer notes, and an **existing-client mode** (`/assessment?clientId=`) it never had | `bf7d3a1e` |
+| **A+** | **The takeover.** Trainer opens a client's session, client has no assessment → full screen, "Not now" dismisses for that session date only | `2e84ea97` |
+| **B** | **Corrections.** `i_did_do_that` marks it done on their word alone — Dustin chose (a), believed, no queue. Reversible. `ai_corrections` records claim / their words / field / old / new / whether the app caught itself. Wording rules ship with every context. | `3b7cc259` |
+| **C+D** | **Sore is not numb.** `symptom_flags`, two tiers. Ordinary → up to two questions then a real answer. Red flag → stop, no exercises, no speculation, offer to send. `RED_FLOOR` compiled in so the gate cannot silently disarm. Escalations now **push**, deep-linked to the client's thread. Urgency re-derived server-side. | `19cf1c30` |
+
+**NOT BUILT, in the order they are worth doing:**
 
 | | what | why it matters |
 |---|---|---|
-| A | **Assessment access for the client AI** | Ruling 1. Without it "full corrective reasoning" is impossible and the moat does not exist. |
-| B | **A corrections table + the self-correction sweep** | Rule 4. Detect the app's own errors against the database before the client does; when they correct it, MUTATE THE RECORD, not just the reply. Self-correction is worth ~0.6 SD of trust versus being caught. |
-| C | **Clarify-gate on pain / substitution / load** | Rule 5. Missing history-taking is the top documented LLM health failure and the thing a 21-year CES does that a chatbot does not. Two questions max. |
-| D | **Red-flag referral list as a TABLE** | Rule 6. NASM's refer-out list, matched deterministically, short-circuiting the model, offering to route to him. |
-| E | **Movement library access for the client coach** | So "why does my knee hurt on lunges" reaches a movement, not a nutrition coach. |
+| E | **Movement library access for the client coach** | So "why does my knee hurt on lunges" reaches a movement, not a nutrition coach. Biggest of the four left. |
 | F | **Length cap + ban-the-obvious enforcement** | Rule 7. The modal complaint about AI coaching everywhere is walls of obvious text. |
 | G | **Bounded client adjustment on AI proposals** | Rule 8. Best-evidenced adoption lever there is, and cheap. |
 | H | **"Dustin's assistant" framing** | Ruling 4. Copy across the coach entry points. |
@@ -531,11 +578,21 @@ Read alongside the "STOP RE-REPORTING THESE" section of
 - **Sessions above the monthly plan are not charged.** That is the rule, not a
   missing feature. The monthly rate caps the month.
 
-## Live state, 4 Sep
+## Live state
 
-`origin/main` — everything shipped, `unpushed: 0`. tsc 0 errors in src/,
-2,693 unit tests passing, build compiles.
+`origin/main` = **`19cf1c30`**, `unpushed: 0`. tsc 0 errors in `src/`,
+**2,883 unit tests passing**, build compiles.
 
-**Dustin is running a PARALLEL session on the workout screen (4 Sep).** Do not
-edit workout-screen files from here without checking with him — two sessions in
-the same files is how a fix gets lost.
+Everything in the BUILT table above is on main and live. Nothing is sitting in
+a sandbox, a patch or a branch.
+
+**Ship discipline:** cloud sessions cannot push. Commit → `git bundle create f
+origin/main..main main` (THIN — the full bundle is 24 MB and the bridge caps at
+20 MB) → `device_commit_files` the bundle, THEN `SHIP-NOW` → poll
+`SHIP-RESULT.txt` → confirm `unpushed: 0`. On "not a fast-forward", rebase onto
+`origin/main` and resend; never force. His laptop must stay awake for the bridge.
+
+**He sometimes runs a second session.** Two pushes landed mid-work on 5 Sep
+(`c5faeb7b`, `defea95d`, `1db88cf4`) while this one was building. Rebase rather
+than assume; if a change is in workout-screen or nutrition files, check with him
+before editing them.
