@@ -1482,3 +1482,100 @@ pasta, white rice, egg whites and both potatoes each resolve to one answer.
 
 Migration `20260908c_a_cup_of_rice_is_not_a_cup_of_water.sql`. Reversible:
 `bak_food_default_serving_20260908c`.
+
+---
+
+## Interlude — one chicken breast is an answer  ·  8 Sep 2026
+
+Dustin, 8 Sep: *"for chicken breast this should be logical, this is where I need
+you to build in a 'brain' for the database n all features that use it. if i say
+I ate 1 chicken breast without any measurements, it needs to log the average
+size chicken breast in oz. or give me small med large options w oz."*
+
+His own row logged **1 oz — 28 g** for "Chicken breast". Saying you ate a chicken
+breast recorded an ounce of one.
+
+### Why this one is different from every other fix this week
+
+Every other fix found the right number already sitting in the row. Here the
+number is absent, and the number that IS there is worse than nothing. Across
+every row in the catalogue naming a breast:
+
+    median "1 breast"   863 g       p25 384 g       p75 1171 g
+
+Because USDA's "breast" is a whole bone-in breast — both lobes, skin and bone:
+
+| row | its "1 breast" |
+|---|---|
+| Chicken, rotisserie, breast, meat only | 483 g, with skin and bone |
+| Chicken, broiler, rotisserie, BBQ | 384 g |
+
+Nobody means 483 g. **Reading harder gives the wrong answer more confidently**,
+so the size is a judgement written down as data — `food_piece_sizes` — marked as
+a standard rather than a measurement, and changeable in one row.
+
+**And the data agrees with the standard.** The one USDA row that measures what a
+person actually buys says `1 breast, bone removed = 174 g`, against the 170 g
+(6 oz) seeded here. That row is deliberately left alone — it measured it, we only
+assumed it — but it is the check that the assumption is right.
+
+### The rule
+
+| he says | it logs |
+|---|---|
+| "1 chicken breast", no measurement | the **medium** — 1 breast (6 oz), 170 g |
+| wants to be exact | small / medium / large, each with its ounces, in the unit picker |
+
+Sizes are stored in grams because that is what the app logs; each description
+carries its ounces because that is how he and his clients talk about meat. Both
+parsers already discard a trailing `(...)`, so `1 breast (6 oz)` reads as one
+breast to the app and as six ounces to a person. Small/medium/large are three
+DISTINCT labels — "small breast", not "breast (small)" — because the parenthesis
+is discarded and all three would otherwise collapse onto one unit.
+
+### ⚠️ Why this applies to six rows and not five thousand
+
+The first cut matched on the keyword alone. It touched 5,000 rows and it made
+the database worse. Caught by reading the diff before keeping it:
+
+| row | what the keyword did to it |
+|---|---|
+| Shrimp Soup Base | → 1 shrimp |
+| Hillshire Farms turkey breast | → 1 breast (a deli pack) |
+| Beef, bottom sirloin, tri-tip roast | → 1 steak (a roast is not a steak) |
+| Chicken breast tenders, breaded | → 1 breast (a tender is not a breast) |
+| Chicken breast, oven-roasted, sliced | → 1 breast (deli slices) |
+| Shrimp (cooked) | → 1 shrimp, 10 g — nobody logs one shrimp |
+
+Every one of those is the exact complaint this work exists to end. So the rule
+now demands the food **be** the cut: the name, once parentheses and one leading
+qualifier are stripped, must START with the keyword and must carry no
+processed-form word. `shrimp` and `turkey breast` came out of the table
+altogether — a shrimp is too small to be a portion, and a turkey breast is a
+roast.
+
+### What changed — all six, all his
+
+| food | before | after |
+|---|---|---|
+| Chicken breast | 1 oz — 28 g | **1 breast (6 oz) — 170 g** |
+| Chicken breast (cooked) | 1 oz — 28 g | **1 breast (6 oz) — 170 g** |
+| Chicken thigh (cooked) | 1 oz — 28 g | **1 thigh (3.5 oz) — 99 g** |
+| Chicken thigh (pulled, cooked) | 1 oz — 28 g | **1 thigh (3.5 oz) — 99 g** |
+| Chicken thigh, boneless skinless (cooked) | 1 oz — 28 g | **1 thigh (3.5 oz) — 99 g** |
+| Top sirloin, trimmed (cooked) | 1 oz — 28 g | **1 steak (8 oz) — 227 g** |
+
+Each also gained its three sizes in the picker, e.g.
+`1 small breast (4 oz) · 1 breast (6 oz) · 1 large breast (8 oz)`.
+
+### Still open, and deliberately not done here
+
+- **The picker shows the unit name, not the ounces.** "(6 oz)" lives in the
+  stored description; showing it in the dropdown is a Nutrition-screen change and
+  that screen has not been walked. Rule 6 — it waits.
+- **The table has twelve keywords.** Chicken breast/thigh/tender/drumstick/wing,
+  salmon, tilapia, pork chop, ribeye, sirloin, filet mignon, burger patty. Adding
+  a food is one row; the list should grow as he names them.
+
+Migration `20260908d_one_chicken_breast_is_an_answer.sql`. Reversible:
+`bak_food_catalog_pieces_20260908d`.

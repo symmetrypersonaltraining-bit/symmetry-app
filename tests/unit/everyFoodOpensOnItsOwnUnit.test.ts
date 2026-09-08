@@ -186,3 +186,73 @@ test("water density is the generic weight of a volume, not of a food", () => {
       `a ${unit.split("|").pop()} of water must be ${grams} g`);
   }
 });
+
+// ── one chicken breast is an answer ────────────────────────────────────────
+//
+// Dustin, 8 Sep: *"if i say I ate 1 chicken breast without any measurements, it
+// needs to log the average size chicken breast in oz. or give me small med
+// large options w oz."* His own row logged 1 oz — 28 g for "Chicken breast".
+//
+// The catalogue cannot answer this and that is the point: USDA's "1 breast" is
+// a bone-in whole breast, median 863 g across every row that names one. So the
+// size is a STANDARD, held in food_piece_sizes, not a measurement read off a
+// row. The one USDA row that measures what a person buys — "breast, meat and
+// skin, raw, 1 breast bone removed = 174 g" — agrees with the seeded 170 g,
+// and is deliberately left alone.
+
+test("a piece size carries its ounces and still reads as one piece", () => {
+  const s = parseServingOption({ desc: "1 breast (6 oz)", grams: 170 });
+  assert.equal(s?.label, "breast", "the ounces are for the person, not the parser");
+  assert.equal(s?.gramsEach, 170);
+});
+
+test("small, medium and large stay three different units", () => {
+  // "breast (small)" would collapse: the parenthesis is discarded and all three
+  // would land on the same label, so the size goes in front of the noun.
+  const labels = [
+    { desc: "1 small breast (4 oz)", grams: 113 },
+    { desc: "1 breast (6 oz)", grams: 170 },
+    { desc: "1 large breast (8 oz)", grams: 227 },
+  ].map((o) => parseServingOption(o)?.label);
+  assert.deepEqual(labels, ["small breast", "breast", "large breast"]);
+  assert.equal(new Set(labels).size, 3, "three sizes must be three units in the picker");
+});
+
+test("the stored piece size is what a bare 'chicken breast' logs", () => {
+  const row: CatalogRow = {
+    ...base, name: "Chicken breast",
+    serving_options: [{ desc: "100 g", grams: 100 }, { desc: "1 oz", grams: 28.35 }],
+    default_serving_desc: "1 breast (6 oz)", default_serving_grams: 170,
+  };
+  const s = householdServing(row);
+  assert.equal(s?.gramsEach, 170, "not 28 g, which is what it logged before");
+  assert.equal(s?.label, "breast");
+});
+
+// ── and the guard that kept it to six rows ─────────────────────────────────
+
+const PIECES = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260908d_one_chicken_breast_is_an_answer.sql"), "utf8");
+
+test("a food has to BE the cut, not merely mention it", () => {
+  // The first cut of this matched on the keyword alone and made the database
+  // worse: a shrimp soup base became one shrimp, a tri-tip roast became a
+  // steak, breaded tenders became a whole breast.
+  assert.match(PIECES, /food_is_the_plain_cut/);
+  for (const form of ["tender", "nugget", "breaded", "sliced", "deli", "soup", "jerky"]) {
+    assert.ok(PIECES.includes(form), `"${form}" must disqualify a row from being one of anything`);
+  }
+});
+
+test("shrimp and turkey breast are deliberately not piece foods", () => {
+  // Nobody logs one shrimp — the same reason "1 almond" is not a default — and
+  // a turkey breast is a roast, not a serving.
+  const seeded = PIECES.slice(PIECES.indexOf("insert into food_piece_sizes"));
+  assert.doesNotMatch(seeded, /'shrimp'/);
+  assert.doesNotMatch(seeded, /'turkey breast'/);
+});
+
+test("a piece stands aside for a volume and for its own measured twin", () => {
+  assert.match(PIECES, /not food_serving_is_volume\(own_label\)/);
+  assert.match(PIECES, /own_label !~ \('\^' \|\| piece\.unit/);
+});
