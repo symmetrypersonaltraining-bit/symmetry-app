@@ -1428,3 +1428,57 @@ is now a constraint rather than a comment.
 
 Migration `20260908b_a_half_cup_has_no_leading_zero.sql`. Reversible:
 `bak_food_default_serving_20260908b`.
+
+---
+
+## Interlude — a cup of rice is not a cup of water  ·  8 Sep 2026
+
+**His own programmed foods opened on a cup weighing 240 g.** 240 g is a cup of
+*water* — the number you get when nothing knew what the food was. These are the
+foods in his clients' meal plans, so a client logging the rice in their own plan
+was charged half a meal again.
+
+| food | opened on | a cup really is | over by |
+|---|---|---|---|
+| Spinach | 240 g | 30 g | **+700%** |
+| Steel-cut oats (dry) | 240 g | 81 g | +196% |
+| Broccoli | 240 g | 91 g | +164% |
+| Pasta (cooked) | 240 g | 140 g | +71% |
+| Blueberries | 240 g | 148 g | +62% |
+| White rice | 240 g | 158 g | +52% |
+
+**Fault 1 — the row's own wrong number beat a map that knew better.** The brain
+trusts a row's own named serving first, which is right when the row knows
+something. These rows did not: they carried the generic volume weight while
+`food_serving_rules` held the real one. The map now wins one narrow case — same
+unit, water's weight, and a map that actually disagrees. Deliberately narrow: a
+cup of milk really is 244 g and a smoothie really is 240, so those moved by 4 g
+and by nothing.
+
+**Fault 2 — "in water" was the keyword.**
+
+    Canned tuna in water   ->  matched 'water'  ->  1 cup = 240 g
+    Sardines in water      ->  matched 'water'  ->  1 cup = 240 g
+
+Longest keyword wins and `water` (5) is longer than `tuna` (4). This is the same
+failure as `89d991fa` earlier the same day, where the word "water" answered for
+his protein shakes — fixed there for one food, and here in the matcher. How a
+tin is *packed* is not what is *in* the tin, so the packing medium now comes off
+the name before any keyword is looked up. "Goya coconut water" keeps its water,
+because there it is the food.
+
+**28 rows corrected**, and his duplicates now agree with each other — blueberries,
+pasta, white rice, egg whites and both potatoes each resolve to one answer.
+
+### Still his call
+
+- **Banana still disagrees with itself**: `banana` 1 medium 118 g,
+  `Banana (medium)` 1 each 100 g, `Banana (small)` 1 medium 100 g. Those weights
+  are his own entries, not the catalogue's, so they were left alone. A small and
+  a medium banana cannot both be 100 g — but which is wrong is his to say.
+- **The USDA half is untouched.** Most of its 1-cup-240-g rows are drinks, where
+  240 is correct. A 322,232-row sweep is its own measured pass, not something to
+  ride along on a fix to his own foods.
+
+Migration `20260908c_a_cup_of_rice_is_not_a_cup_of_water.sql`. Reversible:
+`bak_food_default_serving_20260908c`.

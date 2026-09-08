@@ -143,3 +143,46 @@ test("a garbled default can no longer be written", () => {
   assert.match(HALF_CUP_FIX, /food_default_serving_is_readable/);
   assert.match(HALF_CUP_FIX, /check \(default_serving_desc is null or default_serving_desc !~/);
 });
+
+// ── a cup of rice is not a cup of water ────────────────────────────────────
+//
+// His own programmed foods opened on a cup weighing 240 g, which is a cup of
+// WATER — the number you get when nobody knew what the food was. Spinach was
+// 700% over, oats 196%, rice 52%. Two faults fed it:
+//
+//   1. the row's own generic weight beat a map that held the real one;
+//   2. "Canned tuna in water" matched the keyword 'water' (5 letters) over
+//      'tuna' (4), because longest keyword wins.
+//
+// (2) is the same failure as 89d991fa — the word "water" answering for his
+// protein shakes — fixed there for one food and here in the matcher.
+
+const WATER_FIX = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260908c_a_cup_of_rice_is_not_a_cup_of_water.sql"), "utf8");
+
+test("how a tin is packed is not what is in the tin", () => {
+  assert.match(WATER_FIX, /in\\s\+\(water\|oil\|brine\|juice\|syrup\)/,
+    "the packing medium must come off the name before any keyword is looked up");
+  // Stripped BEFORE the split, or 'water' is still a word to match on.
+  const strip = WATER_FIX.indexOf("packed\\s+)?in\\s+");
+  const split = WATER_FIX.indexOf("regexp_split_to_array");
+  assert.ok(strip > 0 && strip < split, "the strip has to run before the name is cut into words");
+});
+
+test("the map wins only when the row is quoting water", () => {
+  assert.match(WATER_FIX, /food_serving_water_density/);
+  // Narrow on purpose: same unit, generic weight, and a map that disagrees.
+  // A cup of milk is really ~244 g and must not be dragged to a rule's number
+  // just for being close to 240.
+  assert.match(WATER_FIX, /rule\.label = own_label/);
+  assert.match(WATER_FIX, /abs\(own_per - generic\) < 0\.51/);
+});
+
+test("water density is the generic weight of a volume, not of a food", () => {
+  // Plain string matching: these are literal SQL fragments, and treating
+  // "cups?" as a pattern makes the "s?" optional and the check meaningless.
+  for (const [unit, grams] of [["cups?", "240"], ["tbsp|tablespoons?", "15"], ["tsp|teaspoons?", "5"]] as const) {
+    assert.ok(WATER_FIX.includes(`when label ~ '^(${unit})($|[^a-z])' then ${grams}`),
+      `a ${unit.split("|").pop()} of water must be ${grams} g`);
+  }
+});
