@@ -132,7 +132,13 @@ test("the food sheet borrows only when the row knows no portion", () => {
   // Since 6 Sep the guard also skips the borrow when Dustin's own record
   // already answers — either with the row's own copy of his unit, or by saying
   // he weighs this food and no household unit belongs on it.
-  assert.match(code(SHEET), /if \(!hisNamed && !heWeighsIt && !f\.named\.length && f\.baseGrams\) \{/);
+  //
+  // And since 8 Sep it skips when the ROW answers: every catalogue row now
+  // carries a stored default serving, decided by food_default_serving() in
+  // Postgres. The borrow was built for rows that knew no portion at all, and
+  // there are now 10 of those instead of 471,633. It stays for them, and for
+  // the legacy `foods` table, which has no such column.
+  assert.match(code(SHEET), /if \(!hisNamed && !f\.defaultServing && !heWeighsIt && !f\.named\.length && f\.baseGrams\) \{/);
   // The sheet is on screen before the borrow returns — a slow lookup must not
   // hold up the food the client already tapped.
   const i = code(SHEET).indexOf("async function openPicked");

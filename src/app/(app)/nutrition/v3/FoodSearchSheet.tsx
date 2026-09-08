@@ -18,7 +18,7 @@ import {
   scaleNutrients,
 } from "@/lib/nutrition/nutrients";
 import { parseServing, servingsFor, unitsForServing } from "@/lib/units";
-import { namedServings, multiplierForNamed, defaultAmountFor, weighedDefaultAmount, type NamedServing } from "@/lib/servingOptions";
+import { namedServings, multiplierForNamed, defaultAmountFor, weighedDefaultAmount, unitLabelOf, countIn, type NamedServing } from "@/lib/servingOptions";
 import { unitHeUses } from "@/lib/nutrition/foodUnitDefaults";
 import { barcodeCandidates, normalizeBarcode } from "@/lib/nutrition/barcode";
 import Sheet from "./Sheet";
@@ -77,6 +77,18 @@ export interface CatalogFood {
   named: NamedServing[];
   /** food_catalog.serving_grams — what the stored macros are per. */
   baseGrams: number | null;
+  /**
+   * WHAT THIS FOOD OPENS ON, decided in the database for every row on 8 Sep.
+   *
+   * Dustin: *"default should be the logical unit"* — and the three attempts
+   * before this one all tried to work it out here, on the phone, from whatever
+   * the row happened to carry. This is the same answer for the sheet, the AI
+   * and anything else that ever reads a food, because it is stored rather than
+   * derived. The unit picker still offers everything else.
+   */
+  defaultServing?: NamedServing | null;
+  /** How many of it, when the stored default counts more than one ("2 tbsp"). */
+  defaultAmount?: number | null;
 }
 
 function n(v: unknown): number { const x = Number(v); return isFinite(x) ? x : 0; }
@@ -118,7 +130,25 @@ function mapRow(raw: Record<string, unknown>, fromCatalog: boolean): CatalogFood
     // {desc: "1 EGG (44 g)", grams: 44} the whole time; nothing read it.
     named: namedServings(raw.serving_options),
     baseGrams: nOrNull(raw.serving_grams),
+    ...readStoredDefault(raw),
   };
+}
+
+/**
+ * `default_serving_desc` / `default_serving_grams`, parsed the same way the
+ * options list is. "2 tbsp" with 32 g means one tablespoon is 16 g and they had
+ * two of them, which is what the jar says.
+ */
+function readStoredDefault(raw: Record<string, unknown>): { defaultServing: NamedServing | null; defaultAmount: number | null } {
+  const desc = typeof raw.default_serving_desc === "string" ? raw.default_serving_desc : null;
+  const grams = nOrNull(raw.default_serving_grams);
+  if (!desc || !grams || grams <= 0) return { defaultServing: null, defaultAmount: null };
+  const label = unitLabelOf(desc);
+  const count = countIn(desc);
+  if (!label || !(count > 0)) return { defaultServing: null, defaultAmount: null };
+  const per = grams / count;
+  if (!isFinite(per) || per <= 0) return { defaultServing: null, defaultAmount: null };
+  return { defaultServing: { label, gramsPerUnit: per }, defaultAmount: count };
 }
 
 /**
@@ -353,6 +383,27 @@ export default function FoodSearchSheet({
     const hisNamed = his ? f.named.find((n) => n.label === his) : undefined;
     if (hisNamed) { setAmt("1"); setUnit(hisNamed.label); }
 
+    // THEN THE STORED DEFAULT, WHICH IS NOW ON EVERY ROW.
+    //
+    // Dustin, 8 Sep, on his own unit map: *"A"* — his unit always wins for the
+    // foods he programmes. It just did, above. For every other food in the
+    // catalogue this is the answer, and it is the same answer the AI gets,
+    // because both read the column instead of working it out again.
+    //
+    // The unit is added to the picker if the row's own options did not already
+    // carry it, so "1 tbsp" can still be changed to grams, ounces or anything
+    // else the food offers. He asked for exactly that: *"we should be able to
+    // change the units on anything and it should still be accurate but default
+    // should be the logical unit."*
+    if (!hisNamed && f.defaultServing) {
+      const d = f.defaultServing;
+      if (!f.named.some((n) => n.label === d.label)) {
+        setPicked({ ...f, named: [d, ...f.named] });
+      }
+      setAmt(String(f.defaultAmount ?? 1));
+      setUnit(d.label);
+    }
+
     // A food he WEIGHS must not be handed a household unit by the borrow below.
     // Sweet potato is grams, salmon is ounces; a borrowed "cup" on either is
     // the same class of mistake as the tablespoon that was missing.
@@ -360,7 +411,7 @@ export default function FoodSearchSheet({
 
     // The sheet is already on screen with grams by the time this returns, so a
     // slow borrow costs nothing but a late extra option.
-    if (!hisNamed && !heWeighsIt && !f.named.length && f.baseGrams) {
+    if (!hisNamed && !f.defaultServing && !heWeighsIt && !f.named.length && f.baseGrams) {
       const borrowed = await borrowUnits(supabase, f);
       if (borrowed.length) {
         setPicked({ ...f, named: borrowed, borrowedUnits: true });

@@ -1316,3 +1316,71 @@ Two details worth keeping:
 - **A check that missed the last run now says so**, with the date its result
   came from. That is how a check quietly dropping out of the rotation becomes
   visible on the screen rather than only in the table.
+
+---
+
+## Interlude — every food opens on its own unit  ·  8 Sep 2026
+
+Dustin, on the two weeks before this: *"i want it to open to the correct grams
+for 1 serving, not '1 serving' so butter should open to 1 tbsp and you can edit
+it if you had more than that. every single food in that database needs to be set
+up like that ive been trying to explain that for 2 weeks now... there are
+hundreds of other apps out there to log food that dont have this problem."*
+
+He is right that it should not have taken two weeks, and the reason it did is
+worth writing down plainly.
+
+### The work was already done. Nothing pointed at it.
+
+The 6 Sep RACC pass named 78,266 foods correctly. `Rice, white, cooked` has
+carried `1 cup = 158 g` since that night; `Bread, Cuban` has carried
+`1 slice = 28 g`. **Every one of those rows still opened on "100 g"**, because
+the naming went into `serving_options` and nothing ever chose from it. Four
+attempts at "infer the unit" were built on top of a shelf that was already
+stocked.
+
+### What changed
+
+| | |
+|---|---|
+| `food_serving_rules` | The 307-keyword RACC map, lifted out of a one-off script into a table, plus 20 produce keywords it never had. Widening it is now data entry. |
+| `food_default_serving(name, options)` | One function, in Postgres, that decides what a food opens on. The app calls it through the column below; nothing re-derives it. |
+| `food_catalog.default_serving_desc` / `_grams` | The answer, stored per row. 322,232 rows filled. |
+| `householdServing()` | Reads the stored answer first, falls back to the old ladder for rows that predate it. |
+| `FoodSearchSheet` | Opens on it — after his own unit map, which still wins. |
+
+Before: **100%** of rows opened on "100 g". After: **10 rows** do. 79% carry a
+real unit name; the remaining 21% have the right weight under a plain "1
+serving" because no keyword matched them yet.
+
+### The mistake that nearly shipped
+
+The obvious move was to write 14 into `serving_grams` so butter would open on a
+tablespoon. **`serving_grams` is the weight the macros are QUOTED for** —
+`foodResolve` divides by it — so that would have declared 717 calories to be the
+value of one tablespoon of butter. A 7× error on 471,633 rows, behind a label
+that finally read correctly.
+
+This exact rule is already written down twice in this file, from 5 and 6 Sep:
+*"serving_desc/serving_grams describe the BASIS of the macros, never a
+portion."* It was still nearly broken again, which is the argument for the
+portion having its own column rather than a convention everyone has to remember.
+
+### Decisions he made, recorded verbatim
+
+- On adopting the real serving everywhere: *"A AND fix the names now."*
+- On rows offering nothing but grams and ounces: *"whatever the average size of
+  1 chicken breast is, that's your answer unless we give the acual oz or grams."*
+- On his own 28 rows: *"B"* — see them before they change.
+- On his unit map versus the row: *"A"* — his always wins.
+- And the standing requirement: *"we should be able to change the units on
+  anything and it should still be accurate but defualt should b ethe logical
+  unit."* The stored default is added to the picker when the row's own options
+  do not already carry it, so it is always changeable.
+
+### Still open
+
+- **68,594 rows read "1 serving"** with the right weight. Every one is a missing
+  keyword, not a missing mechanism.
+- **His own 155 foods are untouched** — 28 of them carry a wrong weight for the
+  right unit, and he asked to see the list first.

@@ -76,6 +76,22 @@ export interface CatalogRow {
    * offer exactly one portion size for every food in the world.
    */
   serving_options?: ServingOption[] | null;
+  /**
+   * WHAT THIS FOOD OPENS ON — decided once, in the database, for every row.
+   *
+   * Dustin, 8 Sep: *"every single food in that database needs to be set up like
+   * that ive been trying to explain that for 2 weeks now."* Butter opens on a
+   * tablespoon, a banana on a banana, chicken on ounces, and the unit is still
+   * changeable to anything else the row offers.
+   *
+   * Written by `food_default_serving()` in Postgres — the one place that
+   * decision is made, so this file, the search sheet and the AI cannot drift
+   * apart again the way two copies of it did on 4 Sep. `serving_grams` remains
+   * the weight the MACROS are quoted for and is not this; conflating the two
+   * would have made butter 717 calories a tablespoon.
+   */
+  default_serving_desc?: string | null;
+  default_serving_grams?: number | null;
 }
 
 export interface ServingOption {
@@ -198,7 +214,29 @@ const VOLUME_ISH = /^(cup|tbsp|tablespoon|tsp|teaspoon|quart|pint|gallon|fl\s?oz
  * not a bug fix. It is in the review list.
  */
 export function householdServing(row: CatalogRow): Serving | null {
+  // The stored default first. It was decided against the whole row -- its own
+  // options, the product's label weight, and the keyword map -- rather than
+  // against the options list alone, so it knows things this list cannot: that a
+  // banana is a banana and not a cup of mashed banana, and that the 30 g on the
+  // jar is two tablespoons.
+  const stored = storedDefaultServing(row);
+  if (stored) return stored;
   return preferredServing((row.serving_options || []).map(parseServingOption));
+}
+
+/** The row's `default_serving_desc` / `default_serving_grams`, as a Serving. */
+export function storedDefaultServing(row: CatalogRow): Serving | null {
+  const desc = row.default_serving_desc;
+  const grams = Number(row.default_serving_grams);
+  if (!desc || !Number.isFinite(grams) || grams <= 0) return null;
+  // "100 g" is not a portion, it is the quoting basis. A row that still opens
+  // on it has nothing better to say, and the old path may yet find something.
+  if (MASS_ONLY.test(desc)) return null;
+  // parseServingOption, not a second parser: "2 tbsp" here has to mean exactly
+  // what "2 tbsp" means in the options list, or the picker and the default
+  // disagree about the same words. servingOptions.ts already imports from this
+  // file, so the parsing stays here and nothing imports in a circle.
+  return parseServingOption({ desc, grams });
 }
 
 /**
