@@ -612,6 +612,37 @@ by reading the diff before keeping it:
 - `dc186b5` — 26 rules labelled `each` when their keyword was the noun. 3,623
   rows renamed, **0 weights moved**.
 
+### ⚠️ THE ROOT CAUSE, FOUND 8 SEP — READ THIS BEFORE TOUCHING FOOD AGAIN
+
+Dustin: *"these decisions are not mine to say... You can go online as AI and
+figure out how many grams a small banana is."* He is right, and the reflex of
+handing a knowable fact back to him as a question is the thing to stop.
+
+**Where the numbers come from — his question, answered.** Every nutrition app
+gets "1 small / 1 medium / 1 large" from ONE place: the `food_portion` file of
+USDA FoodData Central. Our import took the nutrients and a few cup measures and
+left that file behind:
+
+    rows carrying ANY size portion        706
+    searchable rows                   322,232        0.2%
+
+**Every workaround in the food code — the keyword map, the RACC pass, the
+piece-size table, `weighedDefaultAmount` — is a substitute for that one missing
+import.** That is why this kept coming back no matter what got patched. Stop
+patching symptoms; land the import.
+
+**BLOCKED ON ONE NETWORK PERMISSION.** Probed, not assumed:
+`api.nal.usda.gov` and `fdc.nal.usda.gov` are `connect_rejected` by the
+environment's egress policy, as are data.gov and huggingface; only github.com is
+reachable and nobody mirrors `food_portion.csv`. Web *search* works (it is how
+the banana numbers were confirmed) but one food at a time is not an import.
+**Allow `api.nal.usda.gov` and add a free FDC key, then run
+`scripts/import-usda-portions.mjs`** — written, syntax-checked, waiting.
+
+`food_portion_reference` is the landing table; `20260908f` seeded banana from
+USDA 173944 (small 101 / medium 118 / large 136) and fixed his three rows, which
+all said 100 g regardless of size.
+
 **Biggest number left: 68,778 rows still say "1 serving"** and 73,453 carry a
 vague word. Every one is a missing keyword, not a missing mechanism. It wants its
 own measured pass. The four `SCREEN-WALKTHROUGH.md` interludes dated 8 Sep carry
