@@ -57,13 +57,17 @@ test("the integrity row opens the checker's own page", () => {
   assert.match(ADMIN, /href: "\/settings\/data-health", cta: "Look"/);
 });
 
-test("that page exists, is trainer-gated, and reads the latest run only", () => {
+test("that page exists, is trainer-gated, and reads the latest result of each check", () => {
   const PAGE = read("src/app/(app)/settings/data-health/page.tsx");
   assert.match(code(PAGE), /viewerIsTrainer/);
   assert.match(code(PAGE), /redirect\("\/home"\)/);
   assert.match(code(PAGE), /from\("integrity_checks"\)/);
-  // Latest run only — the table keeps history and every run repeats the faults.
-  assert.match(code(PAGE), /c\.ran_at === newest/);
+  // NOT "the rows sharing the newest timestamp", which this used to pin. A
+  // single check run by hand writes rows with a newer timestamp of its own, and
+  // on 7 Sep that left the page showing three checks out of twenty-three with
+  // every critical hidden. The selection is in src/lib/dataHealth.ts, tested in
+  // dataHealthShowsTheWholeBoard.test.ts.
+  assert.match(code(PAGE), /liveChecks\(all\)/);
   // The names inside detail are the actionable half, so they have to be drawn.
   assert.match(code(PAGE), /Array\.isArray\(c\.detail\)/);
   assert.match(code(PAGE), /href=\{`\/clients\/\$\{id\}`\}/);

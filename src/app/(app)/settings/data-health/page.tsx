@@ -12,8 +12,9 @@
 // nothing in the app had ever read. The dashboard row was the first reader; it
 // just had no second page to hand over to.
 //
-// This is that page. Latest run only — the table keeps history, and showing
-// every run would report the same fault a dozen times over.
+// This is that page. The latest result of each check — see src/lib/dataHealth.ts
+// for why it is not "the rows from the newest run", which showed three checks
+// out of twenty-three for three hours on 7 Sep and hid every critical.
 //
 // ── WHY THE DETAIL IS THE POINT ──────────────────────────────────────────────
 //
@@ -30,24 +31,17 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/serverUser";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
+import { liveChecks, lastCheckedAt, IntegrityRow } from "@/lib/dataHealth";
 
 export const dynamic = "force-dynamic";
 
-type Check = {
-  check_name: string;
-  severity: string;
-  count: number;
-  detail: unknown;
-  ran_at: string;
-};
+type Check = IntegrityRow;
 
 const TONE: Record<string, { color: string; label: string }> = {
   critical: { color: "#ef4444", label: "Critical" },
   warn: { color: "#f59e0b", label: "Warning" },
   info: { color: "#64748b", label: "Info" },
 };
-
-const ORDER: Record<string, number> = { critical: 0, warn: 1, info: 2 };
 
 /** snake_case check names are how the database talks. This is for people. */
 const humanise = (s: string) => {
@@ -68,13 +62,13 @@ export default async function DataHealthPage() {
     .from("integrity_checks")
     .select("check_name, severity, count, detail, ran_at")
     .order("ran_at", { ascending: false })
-    .limit(120);
+    .limit(400);
 
+  // 400 rows is a few days of a twenty-three-check board — enough for every
+  // check inside the window below to be present even after a run is missed.
   const all = (rows || []) as Check[];
-  const newest = all.length ? all[0].ran_at : null;
-  const live = all
-    .filter((c) => c.ran_at === newest)
-    .sort((a, b) => (ORDER[a.severity] ?? 3) - (ORDER[b.severity] ?? 3) || b.count - a.count);
+  const newest = lastCheckedAt(all);
+  const live = liveChecks(all);
 
   // Names → ids, so a client mentioned in a detail blob is one tap from their
   // page. Matched on the name the check wrote, which is the name in the clients
@@ -107,7 +101,7 @@ export default async function DataHealthPage() {
         <div style={{ padding: 16, borderRadius: 12, border: "1px solid rgba(34,197,94,0.35)", background: "rgba(34,197,94,0.08)" }}>
           <div style={{ fontWeight: 700, color: "#22c55e" }}>Everything passed</div>
           <div style={{ fontSize: 13, color: "var(--brand-text-secondary)", marginTop: 4 }}>
-            All {live.length} checks came back clean on the last run.
+            All {live.length} checks came back clean.
           </div>
         </div>
       )}
@@ -138,6 +132,21 @@ export default async function DataHealthPage() {
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
               <span style={{ fontWeight: 700, fontSize: 15 }}>{humanise(c.check_name)}</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: tone.color }}>{tone.label}</span>
+              {/* A check whose newest result predates the newest run did not
+                  report this time. Saying so is how a check quietly falling out
+                  of the rotation becomes visible instead of just looking current. */}
+              {c.ran_at !== newest && (
+                <span style={{ fontSize: 12, color: "var(--brand-text-secondary)" }}>
+                  from{" "}
+                  {new Date(c.ran_at).toLocaleString("en-US", {
+                    timeZone: "America/Chicago",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
               <span style={{ marginLeft: "auto", fontSize: 18, fontWeight: 800, color: tone.color }}>{c.count}</span>
             </div>
 

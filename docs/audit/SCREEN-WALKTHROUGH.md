@@ -1277,3 +1277,42 @@ That is his programming, not catalogue data, so it has not been silently
 rewritten — and it could not be fixed in the row anyway, because the generator
 would rebuild it from those two lines next week. The fix is those two entries.
 The client row already in the catalogue has it right: 99 cal, 11 g fat, 14 g.
+
+---
+
+## Interlude — the all-clear that was not looking at the criticals (8 Sep)
+
+`/settings/data-health` showed the rows whose `ran_at` equalled the newest
+`ran_at`. On a nightly run that is the whole board: pg_cron runs all eight check
+functions in one transaction, so every one of the twenty-three checks carries an
+identical timestamp.
+
+It is not the whole board after anyone runs a single check function by hand.
+That has happened at least six times, and it happened on **7 Sep at 3:20pm
+Central**: three rows written, three hours after the 6:25am cron had written
+twenty-three. The page fetches `order("ran_at", { ascending: false })` and took
+row zero as "the latest run", so until the 6:25pm cron it showed **three checks
+out of twenty-three, and all five criticals were among the twenty it hid.** Had
+those three been clean — two of the three were — it would have printed
+*"Everything passed — all 3 checks came back clean on the last run"* over an
+unread critical.
+
+**What the screen shows now:** the latest result of each check, not the rows
+sharing the latest timestamp. The selection lives in `src/lib/dataHealth.ts` so
+it can be tested; `tests/unit/dataHealthShowsTheWholeBoard.test.ts` is that
+afternoon, and six of its seven assertions fail against the old filter.
+
+Two details worth keeping:
+
+- **A window, measured from the newest row rather than from the clock.** A check
+  the runners no longer emit keeps its last row in `integrity_checks` for ever —
+  `scheduled_workout_null_assignment_id` still has 493 against its name from
+  3 Sep, retired that morning because all 493 were the standard shape. Showing
+  the latest row per check without a window would re-raise a fault that was
+  deliberately closed. Thirty-six hours clears a missed run and nothing older.
+  Measuring from the data rather than from `now()` means the page keeps showing
+  the last board it had if the checker itself ever stops, instead of emptying
+  out and looking clean.
+- **A check that missed the last run now says so**, with the date its result
+  came from. That is how a check quietly dropping out of the rotation becomes
+  visible on the screen rather than only in the table.
