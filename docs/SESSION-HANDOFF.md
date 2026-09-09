@@ -5,7 +5,15 @@ session reads it first and updates it before finishing.** The `HANDOFF-*.md`
 files with dates in the name are history — do not read them for current state,
 and do not create another one.
 
-Last updated: **8 Sep 2026, 13:10 CDT** · `origin/main` at **`aefc0cec`**
+> 🔴 **PICK UP HERE (9 Sep):** the catalogue is 11 of 16 batches through a
+> recompute — branded ids starting `b` `c` `d` `e` `f` still open on multiples.
+> Five queries, listed at the bottom of
+> `supabase/migrations/20260909a_a_measure_opens_on_one.sql` and in
+> `docs/audit/AUDIT-RESUME.md`. Then the food work is caught up with the code.
+
+Last updated: **9 Sep 2026** · six food-database fixes on
+`claude/symmetry-audit-resume-ws695t` (`612874a` → `dc186b5`), gates green:
+0 errors in `src/`, 2,951 unit tests passing, build compiles.
 
 > **His other Claude session pushes to this repo while you work.** It is not a
 > mistake and it is not to be reverted — check `git log origin/main` before you
@@ -218,12 +226,32 @@ one of them the DEFAULT, so the whole library answers "100 g" to everything.
 `weighedDefaultAmount` and the unit map are both patches over this — they were
 fixing the symptom one food at a time.
 
-**NOT STARTED, AND IT NEEDS HIS RULE FIRST.** Picking the default is a judgement
-call across 321,841 rows and getting it wrong is the same complaint again: a
-banana must not open on "1 cup, mashed". The question put to him is which
-serving wins when a row offers several, and whether his own unit map
-(`meal_items.unit`, 299 foods) should override the row for foods he programmes.
-Do not run a bulk update before he answers.
+**BUILT — and then four faults were found in it and fixed the same night.** He
+answered the two open questions on 8 Sep: the row's own named serving wins, a
+real piece before a volume ("A AND fix the names now"), and his unit map always
+beats the row for the foods he programmes ("A"). `bfe0bd6` shipped the code half
+and `food_default_serving()` the Postgres half. **322,232 of 322,232 searchable
+rows now carry a default; 10 still open on "100 g".**
+
+### The four faults found in it afterwards — 8 Sep, all shipped
+
+Each was found by reading the diff BEFORE keeping it. That is the method this
+work runs on now, and three of the four would have made the database worse.
+
+| | what was wrong | commit |
+|---|---|---|
+| **b** | USDA writes a half cup as `.5 cup` with no leading zero. Both SQL parsers opened with `[0-9]+`, so 494 foods rendered as **"1 .5 cup"**. TypeScript parsed it correctly all along — two parsers, one format. | `612874a` |
+| **c** | His own programmed foods opened on **a cup weighing 240 g, which is water**. Spinach +700%, oats +196%, rice +52%. Plus "Canned tuna in water" matched the keyword `water` over `tuna`. 28 rows corrected. | `5397ceb` |
+| **d** | **"Chicken breast" logged 1 oz — 28 g.** The catalogue cannot answer this: median "1 breast" is 863 g because USDA means bone-in. `food_piece_sizes` holds the standard; small/med/large in the picker. 6 rows, all his. | `9acc316` |
+| **e** | 26 rules carried the label `each` while their keyword WAS the noun. 3,623 rows renamed, **0 weights moved**. | `dc186b5` |
+
+**Still the biggest number left in the food work: 68,778 rows say "1 serving"**
+and 73,453 carry a vague word. Every one is a missing keyword, not a missing
+mechanism — the machinery names a food the moment the map has a word for it.
+Closing them is keyword coverage at scale and wants its own measured pass:
+propose, read the diff, keep only what does not move a gram it should not.
+Details and the guards already built are in the four `SCREEN-WALKTHROUGH.md`
+interludes dated 8 Sep.
 
 
 ### The unit map was two weeks stale, and answering with fragments (`89d991fa` → `aefc0cec`)
@@ -384,10 +412,11 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 ### The audit thread
 
 `docs/audit/AUDIT-RESUME.md` owns its own state and is the file to read for it.
-In short: 2 of 39 screens closed, **the client AI still cannot see the
-assessment** (his biggest open gap — Ruling 1, 5 Sep), the Workout tab was
-rebuilt 4 Sep and has never been tapped button-by-button, and the workout logger
-has never been walked at all.
+In short: 2 of 39 screens closed, the Workout tab was rebuilt 4 Sep and has
+never been tapped button-by-button, and the workout logger has never been walked
+at all. (The line that used to stand here — "the client AI still cannot see the
+assessment" — was already wrong when it was written: that is item A and it
+shipped as `234619c8`.)
 
 ---
 

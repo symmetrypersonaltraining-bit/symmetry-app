@@ -589,8 +589,103 @@ Read alongside the "STOP RE-REPORTING THESE" section of
 
 ## Live state
 
-`origin/main` = **`bfe0bd67`** (8 Sep). tsc 0 errors in `src/`,
-**2,935 unit tests passing**, build compiles. The `/login` prerender error in the
+`origin/main` = **`d7d7f92`** (8 Sep), plus four food-database fixes on
+`claude/symmetry-audit-resume-ws695t` (`612874a` → `dc186b5`). tsc 0 errors in
+`src/`, **2,951 unit tests passing**, build compiles.
+
+**The food database, 8 Sep evening — the default-serving work is BUILT and then
+debugged.** He answered both open questions ("A AND fix the names now"; his unit
+map always wins), so 322,232 of 322,232 searchable rows now carry a default and
+only 10 open on "100 g". Four faults were then found IN that work and fixed, each
+by reading the diff before keeping it:
+
+- `612874a` — 494 foods rendered "**1 .5 cup**". USDA writes a half cup with no
+  leading zero and both SQL parsers required a digit first. TypeScript was right
+  all along: two parsers, one format.
+- `5397ceb` — his own programmed foods opened on **a cup weighing 240 g, which is
+  water**. Spinach +700%, oats +196%, rice +52%. "Canned tuna in water" matched
+  `water` over `tuna`. 28 rows corrected.
+- `9acc316` — **"Chicken breast" logged 1 oz.** The catalogue cannot answer this
+  (median "1 breast" = 863 g, because USDA means bone-in), so `food_piece_sizes`
+  holds the standard and the picker offers small/medium/large in ounces. USDA's
+  own plain raw cut says 174 g against the seeded 170 g, which is the check.
+- `dc186b5` — 26 rules labelled `each` when their keyword was the noun. 3,623
+  rows renamed, **0 weights moved**.
+
+### 🔴 UNFINISHED, 9 SEP — FIVE QUERIES, DO THIS FIRST
+
+**The catalogue is 11 of 16 batches through a recompute.** The session was
+stopped mid-run. Branded rows whose id starts with **`b`, `c`, `d`, `e` or `f`**
+still open on multiples ("6 tbsp" of butter); everything else is done. The code
+is committed and the function is live — only the data pass is part-finished.
+
+Run the five remaining batches from the bottom of
+`supabase/migrations/20260909a_a_measure_opens_on_one.sql`, one at a time,
+changing the hex character on the last line. Each takes a few seconds; the whole
+catalogue in one statement exceeds the 60-second timeout, which is why it is
+batched. **Re-running a finished batch is harmless** — the update is a no-op
+when the answer has not changed. Then confirm:
+
+    select count(*) from food_catalog
+    where quarantined is not true and default_serving_desc is not null
+      and food_serving_count_in(default_serving_desc) > 1
+      and food_serving_is_divisible(food_serving_label_of(default_serving_desc));
+    -- was 83,478 before the pass; should end near zero
+
+### A MEASURE OPENS ON ONE — 9 Sep, `20260909a`
+
+His original sentence was still unmet five migrations later: *"butter should
+open to 1 tbsp and you can edit it if you had more than that."* **Butter opened
+on 6 tbsp.** Found by listing the 314 foods he actually programmes and reading
+what the catalogue gives each one — baby spinach opened on 3 cups, almonds on
+2.5 oz (~420 cal), hard boiled eggs on 2 large.
+
+The brain was restating the package's serving weight as a count of household
+units. True of the label, never what a person wants first. Now: a MEASURE or a
+SIZE opens on ONE; a NAMED PIECE keeps the label's count, because "8 crackers"
+is how the box is eaten. **Downwards only** — the first cut rounded a 0.75-cup
+serving UP to a cup, the same fault reversed. In a 40,000-row sample, 12,327
+portions shrank and 4 grew.
+
+Also fixed there: `20260908e` treated "1 serving, 1/2 cup" as a meaningless
+label and threw the half cup away, doubling an ice cream. A vague word only
+counts when it is the whole label.
+
+### ⚠️ THE ROOT CAUSE, FOUND 8 SEP — READ THIS BEFORE TOUCHING FOOD AGAIN
+
+Dustin: *"these decisions are not mine to say... You can go online as AI and
+figure out how many grams a small banana is."* He is right, and the reflex of
+handing a knowable fact back to him as a question is the thing to stop.
+
+**Where the numbers come from — his question, answered.** Every nutrition app
+gets "1 small / 1 medium / 1 large" from ONE place: the `food_portion` file of
+USDA FoodData Central. Our import took the nutrients and a few cup measures and
+left that file behind:
+
+    rows carrying ANY size portion        706
+    searchable rows                   322,232        0.2%
+
+**Every workaround in the food code — the keyword map, the RACC pass, the
+piece-size table, `weighedDefaultAmount` — is a substitute for that one missing
+import.** That is why this kept coming back no matter what got patched. Stop
+patching symptoms; land the import.
+
+**BLOCKED ON ONE NETWORK PERMISSION.** Probed, not assumed:
+`api.nal.usda.gov` and `fdc.nal.usda.gov` are `connect_rejected` by the
+environment's egress policy, as are data.gov and huggingface; only github.com is
+reachable and nobody mirrors `food_portion.csv`. Web *search* works (it is how
+the banana numbers were confirmed) but one food at a time is not an import.
+**Allow `api.nal.usda.gov` and add a free FDC key, then run
+`scripts/import-usda-portions.mjs`** — written, syntax-checked, waiting.
+
+`food_portion_reference` is the landing table; `20260908f` seeded banana from
+USDA 173944 (small 101 / medium 118 / large 136) and fixed his three rows, which
+all said 100 g regardless of size.
+
+**Biggest number left: 68,778 rows still say "1 serving"** and 73,453 carry a
+vague word. Every one is a missing keyword, not a missing mechanism. It wants its
+own measured pass. The four `SCREEN-WALKTHROUGH.md` interludes dated 8 Sep carry
+the reasoning, the guards, and the cases that had to be excluded. The `/login` prerender error in the
 sandbox is the missing Supabase env vars, not a fault.
 
 Everything in the BUILT table above is on main and live. Nothing is sitting in

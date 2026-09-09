@@ -1384,3 +1384,346 @@ portion having its own column rather than a convention everyone has to remember.
   keyword, not a missing mechanism.
 - **His own 155 foods are untouched** — 28 of them carry a wrong weight for the
   right unit, and he asked to see the list first.
+
+---
+
+## Interlude — a half cup has no leading zero  ·  8 Sep 2026
+
+**494 foods opened on "1 .5 cup".** Broccoli read `1 .5 cup, chopped`,
+grapefruit `1 .5 fruit`, oats `1 .333 cup`, a Campbell's soup
+`1 .5 cup, condensed`. It is not a measurement, it is a parser talking to
+itself, and a client who reads it stops trusting the screen — correctly.
+
+**The cause.** USDA writes a half cup as `.5 cup`, with no leading zero. Both
+Postgres parsers opened with `[0-9]+`, which requires a digit BEFORE the point,
+so neither matched:
+
+    food_serving_count_in('.5 cup')  ->  1          should be 0.5
+    food_serving_label_of('.5 cup')  ->  '.5 cup'   should be 'cup'
+
+The count fell back to its default of 1 and the `.5` stayed glued to the front
+of the label, so `food_serving_fmt(1, '.5 cup')` rendered `1 .5 cup`.
+
+**Why it survived a whole build.** `foodResolve.ts` parses the count with
+`([\d.]+)?`, which *does* match a bare `.5`. TypeScript was right and Postgres
+was wrong about the same three characters, and nothing compared them — until
+Postgres started WRITING a default for TypeScript to read back. Two parsers for
+one format is the underlying fault; they now agree.
+
+**What a client sees now.** The row's own duplicate had the answer all along,
+which is how the fix was checked:
+
+| food | before | after |
+|---|---|---|
+| Abiyuch, raw | 1 .5 cup — 114 g | **1 cup — 228 g** |
+| Grapefruit, raw | 1 .5 fruit — 123 g | **1 fruit — 246 g** |
+| Broccoli, boiled | 1 .5 cup, chopped — 78 g | **1 stalk, small — 140 g** |
+
+Zero garbled rows remain. `1.5`, `1/2` and `1 large` all still read as before.
+
+**The guard.** A `check` constraint — `food_default_serving_is_readable` —
+refuses any default containing a digit followed by a lone decimal point. This
+shape arrived twice (the 6 Sep pass wrote it, the 8 Sep pass rendered it), so it
+is now a constraint rather than a comment.
+
+Migration `20260908b_a_half_cup_has_no_leading_zero.sql`. Reversible:
+`bak_food_default_serving_20260908b`.
+
+---
+
+## Interlude — a cup of rice is not a cup of water  ·  8 Sep 2026
+
+**His own programmed foods opened on a cup weighing 240 g.** 240 g is a cup of
+*water* — the number you get when nothing knew what the food was. These are the
+foods in his clients' meal plans, so a client logging the rice in their own plan
+was charged half a meal again.
+
+| food | opened on | a cup really is | over by |
+|---|---|---|---|
+| Spinach | 240 g | 30 g | **+700%** |
+| Steel-cut oats (dry) | 240 g | 81 g | +196% |
+| Broccoli | 240 g | 91 g | +164% |
+| Pasta (cooked) | 240 g | 140 g | +71% |
+| Blueberries | 240 g | 148 g | +62% |
+| White rice | 240 g | 158 g | +52% |
+
+**Fault 1 — the row's own wrong number beat a map that knew better.** The brain
+trusts a row's own named serving first, which is right when the row knows
+something. These rows did not: they carried the generic volume weight while
+`food_serving_rules` held the real one. The map now wins one narrow case — same
+unit, water's weight, and a map that actually disagrees. Deliberately narrow: a
+cup of milk really is 244 g and a smoothie really is 240, so those moved by 4 g
+and by nothing.
+
+**Fault 2 — "in water" was the keyword.**
+
+    Canned tuna in water   ->  matched 'water'  ->  1 cup = 240 g
+    Sardines in water      ->  matched 'water'  ->  1 cup = 240 g
+
+Longest keyword wins and `water` (5) is longer than `tuna` (4). This is the same
+failure as `89d991fa` earlier the same day, where the word "water" answered for
+his protein shakes — fixed there for one food, and here in the matcher. How a
+tin is *packed* is not what is *in* the tin, so the packing medium now comes off
+the name before any keyword is looked up. "Goya coconut water" keeps its water,
+because there it is the food.
+
+**28 rows corrected**, and his duplicates now agree with each other — blueberries,
+pasta, white rice, egg whites and both potatoes each resolve to one answer.
+
+### Still his call
+
+- **Banana still disagrees with itself**: `banana` 1 medium 118 g,
+  `Banana (medium)` 1 each 100 g, `Banana (small)` 1 medium 100 g. Those weights
+  are his own entries, not the catalogue's, so they were left alone. A small and
+  a medium banana cannot both be 100 g — but which is wrong is his to say.
+- **The USDA half is untouched.** Most of its 1-cup-240-g rows are drinks, where
+  240 is correct. A 322,232-row sweep is its own measured pass, not something to
+  ride along on a fix to his own foods.
+
+Migration `20260908c_a_cup_of_rice_is_not_a_cup_of_water.sql`. Reversible:
+`bak_food_default_serving_20260908c`.
+
+---
+
+## Interlude — one chicken breast is an answer  ·  8 Sep 2026
+
+Dustin, 8 Sep: *"for chicken breast this should be logical, this is where I need
+you to build in a 'brain' for the database n all features that use it. if i say
+I ate 1 chicken breast without any measurements, it needs to log the average
+size chicken breast in oz. or give me small med large options w oz."*
+
+His own row logged **1 oz — 28 g** for "Chicken breast". Saying you ate a chicken
+breast recorded an ounce of one.
+
+### Why this one is different from every other fix this week
+
+Every other fix found the right number already sitting in the row. Here the
+number is absent, and the number that IS there is worse than nothing. Across
+every row in the catalogue naming a breast:
+
+    median "1 breast"   863 g       p25 384 g       p75 1171 g
+
+Because USDA's "breast" is a whole bone-in breast — both lobes, skin and bone:
+
+| row | its "1 breast" |
+|---|---|
+| Chicken, rotisserie, breast, meat only | 483 g, with skin and bone |
+| Chicken, broiler, rotisserie, BBQ | 384 g |
+
+Nobody means 483 g. **Reading harder gives the wrong answer more confidently**,
+so the size is a judgement written down as data — `food_piece_sizes` — marked as
+a standard rather than a measurement, and changeable in one row.
+
+**And the data agrees with the standard.** The one USDA row that measures what a
+person actually buys says `1 breast, bone removed = 174 g`, against the 170 g
+(6 oz) seeded here. That row is deliberately left alone — it measured it, we only
+assumed it — but it is the check that the assumption is right.
+
+### The rule
+
+| he says | it logs |
+|---|---|
+| "1 chicken breast", no measurement | the **medium** — 1 breast (6 oz), 170 g |
+| wants to be exact | small / medium / large, each with its ounces, in the unit picker |
+
+Sizes are stored in grams because that is what the app logs; each description
+carries its ounces because that is how he and his clients talk about meat. Both
+parsers already discard a trailing `(...)`, so `1 breast (6 oz)` reads as one
+breast to the app and as six ounces to a person. Small/medium/large are three
+DISTINCT labels — "small breast", not "breast (small)" — because the parenthesis
+is discarded and all three would otherwise collapse onto one unit.
+
+### ⚠️ Why this applies to six rows and not five thousand
+
+The first cut matched on the keyword alone. It touched 5,000 rows and it made
+the database worse. Caught by reading the diff before keeping it:
+
+| row | what the keyword did to it |
+|---|---|
+| Shrimp Soup Base | → 1 shrimp |
+| Hillshire Farms turkey breast | → 1 breast (a deli pack) |
+| Beef, bottom sirloin, tri-tip roast | → 1 steak (a roast is not a steak) |
+| Chicken breast tenders, breaded | → 1 breast (a tender is not a breast) |
+| Chicken breast, oven-roasted, sliced | → 1 breast (deli slices) |
+| Shrimp (cooked) | → 1 shrimp, 10 g — nobody logs one shrimp |
+
+Every one of those is the exact complaint this work exists to end. So the rule
+now demands the food **be** the cut: the name, once parentheses and one leading
+qualifier are stripped, must START with the keyword and must carry no
+processed-form word. `shrimp` and `turkey breast` came out of the table
+altogether — a shrimp is too small to be a portion, and a turkey breast is a
+roast.
+
+### What changed — all six, all his
+
+| food | before | after |
+|---|---|---|
+| Chicken breast | 1 oz — 28 g | **1 breast (6 oz) — 170 g** |
+| Chicken breast (cooked) | 1 oz — 28 g | **1 breast (6 oz) — 170 g** |
+| Chicken thigh (cooked) | 1 oz — 28 g | **1 thigh (3.5 oz) — 99 g** |
+| Chicken thigh (pulled, cooked) | 1 oz — 28 g | **1 thigh (3.5 oz) — 99 g** |
+| Chicken thigh, boneless skinless (cooked) | 1 oz — 28 g | **1 thigh (3.5 oz) — 99 g** |
+| Top sirloin, trimmed (cooked) | 1 oz — 28 g | **1 steak (8 oz) — 227 g** |
+
+Each also gained its three sizes in the picker, e.g.
+`1 small breast (4 oz) · 1 breast (6 oz) · 1 large breast (8 oz)`.
+
+### Still open, and deliberately not done here
+
+- **The picker shows the unit name, not the ounces.** "(6 oz)" lives in the
+  stored description; showing it in the dropdown is a Nutrition-screen change and
+  that screen has not been walked. Rule 6 — it waits.
+- **The table has twelve keywords.** Chicken breast/thigh/tender/drumstick/wing,
+  salmon, tilapia, pork chop, ribeye, sirloin, filet mignon, burger patty. Adding
+  a food is one row; the list should grow as he names them.
+
+Migration `20260908d_one_chicken_breast_is_an_answer.sql`. Reversible:
+`bak_food_catalog_pieces_20260908d`.
+
+---
+
+## Interlude — a unit is not a name  ·  8 Sep 2026
+
+Dustin, 8 Sep: *"I want real unit names based on serving sizes for those."*
+
+68,853 rows opened on **"1 serving"** and 7,165 on **"1 unit"** or **"1 each"**.
+The weight was right — it comes off the label — but the word tells a client
+nothing. "1 each" is what a database says when it does not know what the food
+is. A person says "1 bun".
+
+**Where the vague words came from.** Twenty-six rules carried the label `each`
+while their own keyword WAS the noun all along — avocado, bun, burrito,
+croissant, donut, egg roll, grilled cheese, lemon, lime, nugget, olive, pancake,
+pickle, roll, sandwich, string cheese, waffle. Every food matching them was told
+it came in "eaches". The keyword, singularised, is the name.
+
+| before | after |
+|---|---|
+| 1 each — 28 g | **1 pickle** — 28 g |
+| 1 each — 28 g | **1 string cheese** — 28 g |
+| 1 each — 43 g | **1 bun** — 43 g |
+| 1 each — 57 g | **1 donut** — 57 g |
+| 2 each — 117 g | **2 pancake** — 117 g |
+| 1 each — 217 g | **1 burrito** — 217 g |
+
+### ⚠️ Why this renamed 3,623 rows and not 45,283
+
+45,283 could have been touched. Reading the diff first found two ways it went
+wrong, and both are **worse than the vague word they replace** — wrong beats
+vague only in the bad direction, and that is the whole complaint:
+
+    All-Natural Unsweet Tea, Lemon & Lime   ->  "6 lemon"      a soda
+    Gourmet Black Olive Pate                ->  "8 olive"      a pate
+    Cookie, oatmeal sandwich, creme filled  ->  "1 sandwich"   a biscuit
+    Pork, cured, ham, slice, pan-broiled    ->  85 g becomes 28 g
+
+Three guards, one per failure:
+
+1. **A flavour is not a food.** When a name carries "flavor", "tea", "soda",
+   "juice", "candy", "pate" and the rest, a whole-food keyword is describing the
+   flavour. A lemon-flavoured soda is not lemons.
+2. **Manufactured forms only** — bun, roll, burrito, pickle, donut. Produce
+   words stay out until a fruit can tell food from flavour, which is a bigger
+   job than a rename.
+3. **The grams may not move.** A row is renamed only when the new answer weighs
+   exactly what the old one did. Verified after the run: **0 weights moved.** So
+   nothing a client has logged can regress on this commit.
+
+### Still open — and it is the biggest number left in the food work
+
+**68,778 rows still say "1 serving" and 73,453 still carry a vague word.** Every
+one is a missing keyword, not a missing mechanism: the machinery now names a
+food the moment the map has a word for it. Closing them is keyword coverage, and
+each keyword needs a real piece weight — which is the same care the piece-size
+table took, at a hundred times the scale. It should be its own pass, measured
+the same way: propose, read the diff, keep only what does not move a gram it
+should not.
+
+Migration `20260908e_a_unit_is_not_a_name.sql`. Reversible:
+`bak_food_serving_rules_20260908e`, `bak_food_default_serving_20260908e`.
+
+---
+
+## Interlude — a small banana is 101 grams, and the app should know that  ·  8 Sep 2026
+
+Dustin, 8 Sep: *"these decisions are not mine to say. I'm not gonna go through
+half a million different foods and figure out the macros and the grams... You
+can go online as AI and figure out how many grams a small banana is. That needs
+to happen for all of these foods."*
+
+**He is right and the session before this one got it wrong.** It found that his
+three banana rows all said 100 g, reported it, and called it "his to say". How
+much a small banana weighs is a fact with a source. It is not a programming
+decision and he must never be asked for it again. That reflex — handing a
+knowable fact back to him as a question — is the thing to stop.
+
+### The root cause of two weeks of this
+
+He asked the right question: *"Where are those numbers coming from?"*
+
+Every nutrition app — MyFitnessPal, Cronometer, LoseIt — gets "1 small" /
+"1 medium" / "1 large" from **one** place: the `food_portion` file of USDA
+FoodData Central. It is free, public and definitive. **Our import took the
+nutrients and a handful of cup measures and left that file behind:**
+
+    rows carrying ANY size portion        706
+    searchable rows                   322,232        0.2%
+
+So the app was never given the data that answers "how big is a small banana".
+**Every workaround in the food code — the keyword map, the RACC pass, the
+piece-size table, `weighedDefaultAmount` — is a substitute for a missing
+import.** That is why this kept coming back no matter what got patched.
+
+**His own rows show it exactly.** "Bananas" carried USDA's own description,
+`1 large (8" to 8-7/8" long)`, with the weight overwritten to **100 g**. The
+label came from USDA and the number did not.
+
+| row | was | now |
+|---|---|---|
+| Banana (small) | 1 medium — 100 g | **1 small — 101 g** |
+| Banana (medium) | 1 each — 100 g | **1 medium — 118 g** |
+| Bananas | 1 large — 100 g | **1 medium — 118 g** |
+| banana | 1 medium — 118 g | unchanged |
+
+Every banana row now offers `1 small 101 · 1 medium 118 · 1 large 136`, and a
+row whose NAME says a size opens on that size — "Banana (small)" was the one row
+already carrying the answer, and it was the one being ignored.
+
+### What was built
+
+- **`food_portion_reference`** — what one small/medium/large of a food weighs,
+  every row recording the FDC id it came from. The app's answer, not the
+  trainer's. This is the landing table for the full import.
+- **`food_size_in_name()`** — a row that names its size gets that size.
+- **`scripts/import-usda-portions.mjs`** — the importer, written and ready.
+
+`serving_grams` is deliberately untouched: it is the weight the macros are
+QUOTED for, and moving it to 101 would declare a banana's per-100 g macros to be
+the value of one small banana. Same rule as `20260908a`, and it nearly broke
+again here.
+
+### ⚠️ The one thing blocking the other 322,000 rows
+
+**This session cannot reach USDA.** The environment's network policy blocks it:
+
+    api.nal.usda.gov       connect_rejected (organization policy)
+    fdc.nal.usda.gov       blocked by the egress proxy
+    data.gov, huggingface  blocked
+    github.com             reachable — but nobody mirrors food_portion.csv
+
+Checked, not assumed: every host above was probed. Web *search* works, which is
+how the banana numbers were confirmed, but searching one food at a time is not
+an import.
+
+**To finish the database, allow `api.nal.usda.gov` in the environment's network
+policy and add a free FDC key** (a minute at `fdc.nal.usda.gov/api-key-signup.html`).
+Then:
+
+    USDA_FDC_API_KEY=xxxx node scripts/import-usda-portions.mjs
+
+It reads SR Legacy and Foundation — the whole foods, the ones with sizes —
+and fills `food_portion_reference` with a traceable source per number. Branded
+products already carry their label serving and are not the problem.
+
+Migration `20260908f_a_small_banana_is_101_grams.sql`. Reversible:
+`bak_food_catalog_banana_20260908f`.
