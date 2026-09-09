@@ -206,6 +206,13 @@
       "words": 76
     },
     {
+      "id": "clients-access-ends",
+      "chapter": "clients",
+      "title": "When an archived client loses the app",
+      "text": "Archiving takes somebody off your roster. On its own it never removed their app access. There is now a rule for that. An archived client keeps the app until thirty days after their last paid invoice, then loses it automatically overnight. They see a screen saying their access has ended and that nothing they logged has been deleted. It ships switched off, and the owner turns it on once. It never touches an active client, and it never deletes anything. Their whole history stays. To keep somebody longer, set an override date. An override can only extend access, never shorten it.",
+      "words": 101
+    },
+    {
       "id": "clients-tabs",
       "chapter": "clients",
       "title": "The client file",

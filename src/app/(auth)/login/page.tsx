@@ -31,6 +31,27 @@ export default function LoginPage() {
     }
   }, []);
 
+  /**
+   * A revoked client gets a sentence, not GoTrue's wording.
+   *
+   * `/api/cron/revoke-access` BANS the auth user 30 days after an archived
+   * client's last payment — that ban is the real gate, since the middleware
+   * says of itself that it is "a convenience, not a gate". The cost is that
+   * Supabase then answers a perfectly correct password with `user_banned` and
+   * the literal string "User is banned", which lands on this screen looking
+   * like an accusation and explains nothing.
+   *
+   * The spec asks for "a clear message, not a silent failure", and this is the
+   * screen where that promise is actually kept.
+   */
+  function messageFor(err: { code?: string; message: string }): string {
+    if (err.code === "user_banned" || /banned/i.test(err.message)) {
+      return "Your app access has ended — it runs for 30 days after your last payment. "
+        + "Nothing you logged has been deleted. Talk to your trainer to pick back up.";
+    }
+    return err.message;
+  }
+
   async function handlePasswordLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -42,7 +63,7 @@ export default function LoginPage() {
     });
 
     if (error) {
-      setError(error.message);
+      setError(messageFor(error));
       setLoading(false);
     } else {
       // Check if this is a client with a temporary password
@@ -86,7 +107,7 @@ export default function LoginPage() {
     });
 
     if (error) {
-      setError(error.message);
+      setError(messageFor(error));
       setLoading(false);
     } else {
       setMagicSent(true);

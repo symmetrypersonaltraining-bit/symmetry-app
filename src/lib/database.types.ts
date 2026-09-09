@@ -4658,6 +4658,8 @@ export type Database = {
       }
       clients: {
         Row: {
+          access_override_until: string | null
+          access_revoked_at: string | null
           ai_focus: string | null
           ai_focus_date: string | null
           ai_focus_question: string | null
@@ -4719,6 +4721,8 @@ export type Database = {
           weekly_focus_week: string | null
         }
         Insert: {
+          access_override_until?: string | null
+          access_revoked_at?: string | null
           ai_focus?: string | null
           ai_focus_date?: string | null
           ai_focus_question?: string | null
@@ -4780,6 +4784,8 @@ export type Database = {
           weekly_focus_week?: string | null
         }
         Update: {
+          access_override_until?: string | null
+          access_revoked_at?: string | null
           ai_focus?: string | null
           ai_focus_date?: string | null
           ai_focus_question?: string | null

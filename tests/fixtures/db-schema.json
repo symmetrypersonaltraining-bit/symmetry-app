@@ -483,7 +483,12 @@
     "trainer_id",
     "nutrition_only",
     "online_only",
-    "plan_locked"
+    "plan_locked",
+    "archive_effective_on",
+    "is_test_account",
+    "schedules_week_to_week",
+    "access_revoked_at",
+    "access_override_until"
   ],
   "daily_logs": [
     "id",

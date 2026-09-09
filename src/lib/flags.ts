@@ -9,7 +9,14 @@
  * appear because a query failed.
  */
 
-export type FlagKey = "nudges_live" | "coachbot_live" | "birthday_bot_live" | "trainer_tutorial_live";
+export type FlagKey =
+  | "nudges_live"
+  | "coachbot_live"
+  | "birthday_bot_live"
+  | "trainer_tutorial_live"
+  // Ships FALSE. /api/cron/revoke-access reads this before it does anything at
+  // all, and turning it on cuts real archived clients off the app.
+  | "access_revoke_live";
 
 interface FlagDb {
   from: (t: string) => {

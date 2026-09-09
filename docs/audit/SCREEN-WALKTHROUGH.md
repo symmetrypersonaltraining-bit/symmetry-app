@@ -2663,3 +2663,121 @@ Two rules kept deliberately:
 
 Still only presentation either way: `/api/agent` authorizes on its own against
 an ACTIVE `trainers` row and refuses client mode.
+
+## Interlude — access is not the same thing as archived  ·  9 Sep 2026
+
+Dustin set a new rule: **an archived client loses app access 30 days after their
+last payment, automatically.**
+
+    access_ends_on = last PAID payment_reminders.due_date + 30 days
+
+### What was actually wrong
+
+`clients.archived_at` never gated sign-in. Not partially — not at all. **Bobbie
+Page was archived on 31 Aug and had full app access on 9 Sep**, nine days later,
+and would have kept it indefinitely. Archiving was a roster and billing state
+that the app's front door had never been told about.
+
+So the two states are now two columns, deliberately:
+
+| | what it means | who writes it |
+|---|---|---|
+| `archived_at` | a ROSTER state — who shows up in his lists | him, when he archives |
+| `access_revoked_at` | an ACCESS state — who can open the app | the nightly job, only |
+
+Conflating them is what produced the confusion in the first place. Keeping them
+apart means archiving stays a reversible bookkeeping act with no effect on
+anyone's phone, and losing the app is a separate event with a date on it.
+
+### The screen a revoked client sees
+
+`/access-ended`. It says three things, in this order: your access has ended and
+here is the rule; **nothing you logged has been deleted**; talk to your trainer.
+It does not say "subscription expired" and it does not imply they did anything
+wrong. These are people who trained with him for months and some of them come
+back.
+
+The login screen learned the same sentence. A banned auth user gets `user_banned`
+from Supabase and the literal words **"User is banned"**, which is an accusation
+and an explanation of nothing. That string never reaches a client now.
+
+### Two gates, and only one of them is real
+
+- **The ban is the gate.** The job bans the auth user, so a revoked client
+  cannot obtain a session at all.
+- **The middleware check is not**, and is not pretending to be. That file says
+  of itself, in its own comments, *"This middleware is a convenience, not a
+  gate"* — it passes through whenever auth does not answer. It exists here for
+  exactly one case: a session minted **before** the job ran, still sitting in a
+  phone that has not been asked to refresh. Without it they keep the app until
+  the token expires.
+
+The order inside the job matters for the same reason: **the ban goes first and
+the column is only written if it took.** The reverse leaves a client the app
+believes is revoked who can still sign in — which is precisely the `archived_at`
+gap this whole rule exists to close.
+
+### The off switch is the first thing the job touches
+
+`app_flags.access_revoke_live`, read before a single client is looked up, and it
+**ships false**.
+
+That is the nudge job's lesson paid forward. Its flag gates *delivery* rather
+than whether the job *runs*, so with nudges off it still woke every night, still
+called the model, and still posted a preview into Dustin's own inbox — eleven
+consecutive nights after he set the flag false, and by his count he had turned it
+off about ten times. Three tests fail if that shape is ever reintroduced here.
+
+### Five people, not one
+
+He flagged Bobbie Page. Read off the live database on 9 Sep, the first run would
+have taken **five**:
+
+| | archived | last paid | access ends | first run |
+|---|---|---|---|---|
+| Tina Haley | 13 Aug | 12 Jul | **11 Aug** | cut off |
+| Christine Latham | 31 Aug | 22 Jul | **21 Aug** | cut off |
+| Brooke Reynolds | 31 Jul | never | **30 Aug** | cut off, no login to ban |
+| Robert Miller | 1 Sep | 1 Aug | **31 Aug** | cut off — *before he was archived* |
+| Bobbie Page | 31 Aug | 1 Aug | 31 Aug → **1 Oct** | his override |
+| Jada Cook | 13 Aug | never | 12 Sep | keeps it |
+| Tania Millan | 13 Aug | never | 12 Sep | keeps it |
+| Test Client | 13 Aug | never | 12 Sep | keeps it |
+
+**Robert Miller is the case worth his ruling.** He was archived on 1 Sep, his
+last paid invoice was due 1 Aug, so the rule ends his access on 31 Aug — *the day
+before he was archived at all*. Read literally, as it is built, a client archived
+more than thirty days after their last payment gets **no grace period whatsoever**;
+archiving them cuts them off that night. That may be exactly right. It is not
+something to decide on his behalf, so it is built literally and flagged.
+
+### Brooke Reynolds is a one-day timezone bug that the tests caught
+
+Her `archived_at` is `2026-08-01T00:23:27Z` — which is **19:23 Central on 31
+July**. `select archived_at::date` says 1 Aug and is wrong by a day. The rule
+reads it in Central and gets 31 July, so her thirty days end on 30 Aug rather
+than 31 Aug.
+
+It changes nobody's outcome today, because both dates are long past. It changes
+one the first time somebody is archived in the evening — CLAUDE.md's *"after 7pm
+Central the UTC date is already tomorrow"*, sitting in the live data, found by a
+test and not by reasoning.
+
+### Never delete history
+
+His words, and the tests hold it: revoking access is not deleting the client.
+`workout_logs`, `set_logs`, `meal_adherence_logs` and `metrics` are untouched.
+Restoring somebody is two reversible writes — clear `access_revoked_at`, and
+unban their auth user.
+
+### Not built, and deliberately
+
+**The trainer-facing override control.** `access_override_until` exists and
+works, and Bobbie's is set. What does not exist is a button for it on the client
+profile — because `/clients/[clientId]` has not been walked yet, and audit rule 6
+is *never edit a screen that has not been walked*. It lands when that screen
+comes up. Until then the override is set directly.
+
+Migration `20260910a_access_is_not_the_same_as_archived.sql`. Rule:
+`src/lib/access/archivedAccess.ts`. Job: `/api/cron/revoke-access`, daily at
+06:30 Central.

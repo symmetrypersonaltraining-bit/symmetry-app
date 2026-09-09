@@ -126,6 +126,9 @@ export async function middleware(request: NextRequest) {
     // /install is the QR target. A client scans it while signed OUT — that is
     // the entire scenario — so a login redirect here defeats the purpose.
     pathname === "/install" ||
+    // Where a revoked client lands. Redirecting to it from below and then
+    // gating it here is a loop with a sad message in it.
+    pathname === "/access-ended" ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js" ||
     pathname.startsWith("/icons/") ||
@@ -264,12 +267,30 @@ export async function middleware(request: NextRequest) {
     const clientLookup = await withAuthTimeout(
       supabase
         .from("clients")
-        .select("onboarding_complete, client_app_settings(first_login_completed)")
+        .select("onboarding_complete, access_revoked_at, client_app_settings(first_login_completed)")
         .eq("email", user.email!)
         .maybeSingle()
     );
     if (clientLookup.degraded) return supabaseResponse;
     const clientRow = clientLookup.value?.data ?? null;
+
+    // ACCESS REVOKED — 30 days after an archived client's last payment.
+    //
+    // This is the SECOND of two gates and deliberately the weaker one. The real
+    // stop is the ban `/api/cron/revoke-access` puts on the auth user, which
+    // means a revoked client cannot obtain a session at all; this file says of
+    // itself, a few lines up, that it is "a convenience, not a gate" and passes
+    // through whenever auth does not answer. So it is not load-bearing, and it
+    // is here for the one case the ban does not cover: a session minted BEFORE
+    // the nightly job ran and still sitting in a phone that has not been asked
+    // to refresh. Without this they keep the app until their token expires.
+    //
+    // It sits above the onboarding redirects on purpose. A revoked client
+    // pushed into /welcome or the intake questionnaire is being asked to set up
+    // an app they can no longer use.
+    if (clientRow?.access_revoked_at) {
+      return redirectKeepingSession(new URL("/access-ended", request.url), supabaseResponse);
+    }
 
     if (clientRow) {
       // /welcome is where the one-tap invite link lands. But links expire, and
