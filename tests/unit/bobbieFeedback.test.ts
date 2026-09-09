@@ -112,6 +112,12 @@ describe("past workouts reset every week", () => {
     // Resetting the count must not hide the sessions themselves. The past
     // section still lists them and they are still movable — the change is that
     // they stop asking to be dealt with.
-    assert.match(code, /showPast \? pastDays : \[\]/, "the past section no longer lists past days at all");
+    // Asserts the BEHAVIOUR -- past days appear in the run when the strip is
+    // open -- rather than one exact expression. The old regex pinned
+    // `showPast ? pastDays : []`, which broke on 9 Sep when today was put back
+    // into the sequence as a pointer so the week stopped reading Mon → Tue →
+    // Thu with a hole in it. The past section was never at risk; the test just
+    // could not tell the difference.
+    assert.match(code, /showPast \? \[\.\.\.pastDays/, "the past section no longer lists past days at all");
   });
 });

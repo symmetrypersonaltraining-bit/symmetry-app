@@ -1822,3 +1822,51 @@ Five tests in `tests/unit/todayOpensTwoWays.test.ts`. The load-bearing one is an
 invariant rather than a snapshot: **every control that says "Start" must carry
 `?start=1`.** Against the pre-change file that reads 2 Starts and 0 flags, which
 is the bug stated as a number.
+
+---
+
+## Workout tab — today left a hole in the week  ·  9 Sep 2026
+
+Dustin, 9 Sep, having moved two sessions onto today and then opened the past
+strip: *"wed is missing."*
+
+**It was not missing.** The data was right the whole time — both sessions sat on
+Wednesday 9 Sep, carrying `moved_from_date` 7 Sep and 8 Sep exactly as he had
+moved them, and today's tile rendered them correctly at the top of both Home and
+the Workout tab.
+
+**The board was telling him otherwise.** Today is hoisted to the top — right,
+and it stays — but it was then *filtered out* of the chronological run below.
+With the past strip open that list read:
+
+    Monday, Sep 7   →   Tuesday, Sep 8   →   Thursday, Sep 10
+
+A gap in a date sequence does not read as "moved to the top". It reads as **lost
+data** — and he had just moved two sessions onto that exact date, so the first
+thing it looked like was the move having failed. He was right to report it and
+right about what he saw; only the diagnosis was different.
+
+### The fix — a pointer, not a hole
+
+Today keeps its slot in the sequence, filled with a single line rather than a
+tile:
+
+> ☀ **Today · Wednesday, Sep 9** — 2 sessions · at the top ↑
+
+Tapping it scrolls back to the real tile. It carries the **session count** for
+the same reason the gap was a problem: the number is what says *your two moved
+sessions are on this date*, right where the eye is looking for them.
+
+One line and not a tile on purpose — it must not compete with the real today
+tile, and it must not look like a second copy of the same day on one screen.
+
+### The lesson worth keeping
+
+The board's reading order is deliberately not chronological, and that is
+documented and correct. What was missing is that **a deliberate reordering has
+to leave a mark where it moved something from.** Silence in a numbered sequence
+is indistinguishable from a bug — and the client it looks like a bug to is the
+one who just made the change.
+
+Five tests in `tests/unit/todayLeavesNoHole.test.ts`; three of them fail against
+the pre-change file.
