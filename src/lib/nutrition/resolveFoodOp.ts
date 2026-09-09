@@ -22,6 +22,7 @@ import {
   PORTION_SYSTEM, validatePortion,
 } from "@/lib/nutrition/foodResolve";
 import { unitHeUses } from "@/lib/nutrition/foodUnitDefaults";
+import { searchUsdaOnline, cacheUsdaFood, usdaOnlineAvailable } from "@/lib/nutrition/usdaOnline";
 
 /** Enough rows to contain the right one; short enough that the whole list gets read. */
 export const CANDIDATE_LIMIT = 10;
@@ -139,7 +140,62 @@ export async function resolveFood(
     }
   }
 
-  // ── THE CATALOGUE DOES NOT HAVE IT. ASK ANYWAY. ───────────────────────────
+  // ── THE CATALOGUE DOES NOT HAVE IT. GO AND GET IT. ────────────────────────
+  //
+  // Dustin, 9 Sep 2026: *"if it's not in the data base they need a way to
+  // search in online through ai and get real numbers. again this is the whole
+  // point of having a 'brain' in the app."*
+  //
+  // The brain is not the model reciting macros — that is the failure this
+  // module exists to end, and it is undetectable, because a recited number is
+  // self-consistent by construction. The brain is: go to USDA FoodData Central,
+  // pull the real measured rows for this food, and let the model do here what
+  // it does everywhere else in this file — CHOOSE between rows it can see.
+  //
+  // What comes back is written into food_catalog carrying its FDC id, so the
+  // second client to eat the same thing gets it out of the catalogue with no
+  // network at all. The database teaches itself, one miss at a time.
+  if (!row && usdaOnlineAvailable()) {
+    const online = await searchUsdaOnline(term, CANDIDATE_LIMIT);
+    if (online.length) {
+      // Shaped as candidate rows so the SAME pick prompt judges them, with the
+      // same rule: the numbers are IN the list and the model picks one or says
+      // none of these. Nothing here asks it for a figure.
+      const asRows: CatalogRow[] = online.map((f) => ({
+        id: `usda:${f.fdcId}`,
+        name: f.description,
+        brand: f.brand,
+        kcal: f.kcal,
+        protein: f.protein,
+        carbs: f.carbs,
+        fats: f.fats,
+        serving_desc: "100 g",
+        serving_grams: 100,
+        // Branded is the manufacturer-submitted half of FDC and is not
+        // measured. Saying so in the candidate list is what lets the model
+        // prefer the laboratory row when both are offered.
+        verified: f.dataType !== "Branded",
+        source: `USDA ${f.dataType}`,
+        serving_options:
+          f.servingGrams && f.servingGrams > 0
+            ? [{ desc: "100 g", grams: 100 }, { desc: f.servingLabel || "1 serving", grams: f.servingGrams }]
+            : [{ desc: "100 g", grams: 100 }],
+      }));
+      const chosen = await pick(asRows);
+      if (chosen) {
+        const hit = online[asRows.indexOf(chosen)];
+        // Only the CHOSEN row is written. Caching all ten would fill the
+        // catalogue with near-misses that the next search then has to reject.
+        const cached = hit ? await cacheUsdaFood(deps.db, hit) : null;
+        if (cached) {
+          row = cached as unknown as CatalogRow;
+          rows = [row];
+        }
+      }
+    }
+  }
+
+  // ── STILL NOTHING. ASK ANYWAY, AND MARK IT AS A GUESS. ────────────────────
   //
   // Dustin, 28 Aug: "That function needs to function as AI. It does not pull
   // foods just from my database... If I say I ate one Thomas cinnamon swirl
@@ -168,8 +224,10 @@ export async function resolveFood(
         return e === null ? null : { e };
       },
     });
-    // Still nothing. NOT ADDED — the model saying "I don't know this food" is
-    // an answer, and a better one than a number nobody can check.
+    // Still nothing — the catalogue missed it, the alternate names missed it,
+    // and USDA has no row for it either (or the network was down). NOT ADDED:
+    // the model saying "I don't know this food" is an answer, and a better one
+    // than a number nobody can check.
     if (!est.value) return null;
     const e = est.value.e;
 
