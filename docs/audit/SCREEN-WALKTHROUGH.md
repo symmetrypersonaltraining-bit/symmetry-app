@@ -2104,3 +2104,217 @@ why the change is one function and the tests are on that function.
 
 The AI's briefing now states both figures and is told, in the prompt, never to
 merge them or describe one as the other.
+
+---
+
+## SCREEN 3 — NUTRITION · MY OWN AUDIT, BEFORE THE WALK (9 Sep)
+
+Dustin: *"go ahead and fully audit the nutrition log yourself first to find any
+obvious issues to report. then lets do the walk through button by button... take
+your time here this one has to be perfect."*
+
+**Readable version, with the six decisions:**
+<https://claude.ai/code/artifact/d76b5285-7578-4ca5-a428-dcf507448ad3>
+
+Everything below was read out of the code and then **checked against the live
+database**, so each item carries a count rather than a suspicion. Nothing here
+has been changed — these are for him to rule on before the walk.
+
+### ⚠️ ONE FALSE POSITIVE, CAUGHT AND KILLED BEFORE IT REACHED HIM
+
+The first pass reported *"Claudine's plan is 4,869 kcal against a 1,650
+target — 195% over."* **That was my bug, not hers.** Her plan offers 15 meals
+across 7 positions (options A/B/C), and my query summed every meal instead of
+one per position. Re-run properly her plan is 1,467 kcal — 11% under, which is
+an ordinary drift. Recorded here because the standing rule exists for exactly
+this: a query that double-counts options looks identical to a broken plan.
+
+---
+
+### 1 · THREE PLACES A FOOD'S MACROS COME FROM, AND TWO OF THEM LET THE MODEL INVENT THE NUMBER
+
+| Path | Where the numbers come from |
+|---|---|
+| Typed · "describe it loosely" · voice | `/api/nutrition-ai/parse` — the model says **what** was eaten, every number is read off a `food_catalog` row, and a food that matches nothing is **excluded and named** so it can be searched by hand |
+| **Photo** | `/api/analyze-meal-photo` — the model states `calories`, `protein_g`, `carbs_g`, `fat_g` itself. No catalogue lookup anywhere in the route |
+| **The AI chat — "I ate a banana", "swap M4 for wings"** | `/api/nutrition-ai/act`, whose prompt says, in these words: *"Estimate realistic macros per item (grams protein/carbs/fat, kcal)."* No catalogue lookup |
+
+The parse route's own header records why it was rebuilt: *"The parse prompt used
+to ask it to estimate macros using USDA / nutrition-label knowledge, which is
+recall plus arithmetic, and it got both wrong in ways that looked right."* **That
+prompt is still live in the other two paths**, and the chat one is the path he
+asked about.
+
+**And the chat path keeps the invented number.** `swapMealCustom` calls
+`saveMyMeal(name, items)`, so a macro the model made up is written into the
+client's My Meals library and re-used every time they pick it again.
+
+**Why no arithmetic check will ever catch this.** All 154 client-saved foods are
+internally consistent — kcal agrees with 4/4/9 of their own macros, every one.
+The `banana` row reading **242 kcal · 2P · 27C · 14F** is perfectly
+self-consistent. It is simply not a banana. A fabricated macro is consistent *by
+construction*; only sourcing it from a row can catch it.
+
+**149 of those 154 rows have no `serving_grams` at all**, so "1 serving" of a
+client-saved food has no weight behind it and can never be scaled or converted.
+
+### 2 · THE `verified` BADGE MEANS NOTHING
+
+| Source | Rows | Marked verified |
+|---|---:|---:|
+| `usda_branded` | 442,891 | **100%** |
+| `usda_generic` | 11,732 | 100% |
+| `usda_core` | 8,789 | 100% |
+| `usda` | 7,766 | 100% |
+| `trainer` | 155 | 100% |
+| `restaurant` / `brand` | 143 | 100% |
+| `client` | 154 | 0% |
+
+Everything that is not client-created is stamped verified — and `usda_branded`
+is the **manufacturer-submitted label** half of FoodData Central, which is the
+crowd-sourced part. Two live examples, both `verified: true`:
+
+- `Banana` — **336 kcal, 0 g protein, 78.6 C, 1.1 F per 100 g** (a raw banana is 89)
+- `Banana` — **312 kcal, 12.5 P, 40.6 C, 6.3 F per 100 g**
+
+This is the same failure MyFitnessPal has: their own help page says *"even
+verified entries can sometimes have mistakes"*, and a published analysis found
+**~30% of the top 1,000 most-logged foods carried a >20% error in at least one
+macro**. Cronometer's answer is the opposite — no crowd row enters the main
+database at all, and each entry is labelled with its actual origin (USDA, NCCDB,
+CRDB) instead of a badge.
+
+### 3 · 23,385 CATALOGUE ROWS DISAGREE WITH THEMSELVES
+
+Out of 471,633 rows carrying full macros, **23,385 (5.0%)** have a `kcal` that
+differs from 4/4/9 of their own protein/carbs/fat by more than 25 cal or 15%.
+**900** rows over 100 kcal declare zero carbs *and* zero fat. 11 are physically
+impossible per serving.
+
+### 4 · THE BANANA HE COMPLAINED ABOUT IS STILL WRONG — IN THE TRAINER ROWS
+
+Search "banana" today and the top three are his own:
+
+| Name | Serving says | kcal | P / C / F |
+|---|---|---:|---|
+| Bananas | 1 large (8"–8-7/8") — **but `serving_grams` = 100** | 128 | 1 / 31 / 0 |
+| Banana (small) | **"1 medium"** | 112 | 2 / 26 / 0 |
+| Banana (medium) | "1 each" | 112 | 1 / 27 / 0 |
+
+The name and the serving description contradict each other on two of the three,
+and **small and medium are the same 112 kcal** — the exact complaint from 8 Sep.
+The `food_portion_reference` work fixed `food_default_serving()`; these three
+rows carry their own hard-coded numbers and were never touched by it.
+
+### 5 · HIS OWN PLAN CANNOT REACH HIS OWN TARGET
+
+Plan v7, one meal per position:
+
+| | Plan | Target | Off by |
+|---|---:|---:|---:|
+| Calories | 4,213 | 4,462 | **−5.6%** |
+| Protein | 254 | 267 | −4.7% |
+| Carbs | 381 | 381 | 0.0% |
+| Fat | 186 | 208 | **−10.7%** |
+
+Eat the plan perfectly and the card reads 4,213 against 4,462, every day. And
+because fat lands 10.7% off, a **flawless day scores less than 100% adherence** —
+the full-credit band is ±10%.
+
+He is not alone, and **fat is the macro that drifts everywhere**:
+
+| Client | kcal | protein | fat |
+|---|---:|---:|---:|
+| Madeleine Coker | −19% | **−34%** | **+53%** |
+| Gerard Gautreaux | +17% | −5% | **+52%** |
+| Sharon Gautreaux | +6% | +11% | **+55%** |
+| Brooke Orton | −1% | +24% | **−36%** |
+| Jerry Bourgeois | +4% | −6% | **+32%** |
+| Dustin | −6% | −5% | −11% |
+
+The AI plan builder already enforces 3% on calories and 5 g on each macro and
+prints the drift in orange when it misses. **Hand-built plans are never
+checked**, and nothing on the trainer's plan screen or the client's card says
+the plan does not add up to the target it is graded against.
+
+*Confirmed clean, so it is not the cause:* his M6 really is 766 kcal in the
+plan, so the number he questioned on 4 Sep was the app telling the truth.
+
+### 6 · 95 LOG ROWS CARRY A CALORIE THAT DISAGREES WITH THEIR OWN MACROS
+
+Up to **731 cal** apart, and they are still inside every average and every
+adherence figure. The pattern is photo-era rows at the legacy 101/102 band with
+**`est_fats` = 0**:
+
+- "4 slices of sausage pizza" — 1,120 kcal, 52P / 98C / **0F** (macros say 600)
+- "Bowl of yogurt" — 520 kcal, 18P / 52C / **0F** (macros say 280)
+- "3/4 cup egg whites, green beans" — 95 kcal but **203 g protein**
+
+Also 9 off-plan rows saved with details and **zero calories**.
+
+### 7 · "MACROS TONIGHT" IS A PROMISE NOTHING KEEPS
+
+The off-plan sheet offers *"save it as pending — macros get filled in tonight"*
+and the summary card prints *"totals update tonight"*. **There is no job.**
+`vercel.json` runs four crons — weekly-ai, weekly-ai refresh, birthdays, goals —
+and none of them touches `macros_pending`. Nothing anywhere flips a pending row
+to resolved.
+
+Live impact today is **zero rows**, so this is a dead promise rather than a live
+wrong number — but the button is on the screen.
+
+### 8 · WHAT THE AI CAN ACTUALLY DO, AND WHAT IT ASKS FIRST
+
+Worth writing down plainly because it is better than it looks:
+
+- Eight actions: `swap_meal`, `add_to_meal`, `move_meal`, `copy_meal`,
+  `delete_meal`, `add_snack`, `log_meal`, `unlog_meal`.
+- **Nothing mutates until Confirm.** The reply renders as a bubble plus a
+  confirmation card; the write only runs on tap, and a failure says so and
+  changes nothing.
+- Any meal reference it cannot resolve — missing, or two plausible matches —
+  **downgrades the whole action to a clarifying question**. It never guesses
+  which meal you meant.
+- Every write goes to the **day on screen**, and every label names that date
+  when it is not today.
+
+The gap is not the control flow. It is item 1: what it confirms can contain a
+number nobody sourced.
+
+### THE SIX CALLS PUT TO HIM — none of these are decided
+
+Recorded so a later session does not read a recommendation back to him as his
+own instruction. **Nothing below is his yet.**
+
+1. **Route photo and chat macros through the food database** (recommended). Same
+   shape as typed: the model identifies *what*, the database supplies the
+   numbers, anything unmatched is shown by name. Photo keeps the model for
+   identification and restaurant detection.
+2. **Stop saving unsourced foods into My Meals** (recommended). A food enters the
+   library only once it resolves to a real row.
+3. **Make `verified` mean something.** Drop it from the 442,891 manufacturer-label
+   rows, keep it for USDA core/generic and trainer rows — or take Cronometer's
+   stronger line and show the *origin* instead of a tick. Design pass, so it is
+   his to pick.
+4. **Check a hand-built plan against the target** (recommended). The same 3% / 5 g
+   check the AI builder already runs, printed on the trainer's plan screen. Six
+   live plans would flag today, five of them on fat.
+5. **"Macros tonight" — build the nightly job, or take the button off.**
+6. **The 95 bad history rows — recompute, flag, or leave as history.**
+
+### Research consulted, so the recommendations are not invented
+
+- Cronometer curates every submission and labels entries by origin (USDA, NCCDB,
+  CRDB, Nutritionix) rather than by badge; crowd rows never enter the main
+  database.
+- MyFitnessPal's own help page says a verified entry can still be wrong and an
+  unverified one can be right. A published analysis found ~30% of their
+  top-1,000 most-logged foods carried a >20% error in at least one macro.
+- On off-plan logging, the consistent finding across app reviews is that
+  **friction, not accuracy, decides whether a meal gets logged at all** — which
+  is the argument for keeping the photo and chat paths fast and fixing where
+  their numbers come from, rather than making them slower.
+
+Sources: [Cronometer vs MyFitnessPal](https://feastgood.com/cronometer-vs-myfitnesspal/) ·
+[Verified vs community food data](https://nutriscan.app/blog/posts/verified-vs-community-food-entries-accuracy-2026-044a380ccd) ·
+[The fastest ways to log food](https://www.intakenutrition.io/blog/fastest-ways-to-log-food-less-friction)
