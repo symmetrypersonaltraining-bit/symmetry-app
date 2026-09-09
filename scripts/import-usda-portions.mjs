@@ -81,8 +81,20 @@ function fail(msg) { console.error(`\n  ${msg}\n`); process.exit(1); }
  * inch", "1 yield from...", anything per-pound.
  */
 const SIZE = /\b(extra small|small|medium|large|extra large|jumbo)\b/i;
-const MEASURE = /\b(cup|tbsp|tablespoon|tsp|teaspoon|slice|piece|fillet|breast|thigh|link|patty|oz|fl oz)\b/i;
 const REJECT = /(yield from|cubic inch|per pound|refuse|as purchased|not further specified)/i;
+
+// ⚠️ SIZES ONLY, AND THAT IS THE WHOLE POINT.
+//
+// The first run pulled cups and tablespoons too, and two things went wrong at
+// once. It duplicated work already done — `food_serving_rules` holds the RACC
+// map and every row carries its own serving_options — and it COLLIDED: the key
+// is the food's name before the first comma, so "Amaranth grain, cooked" and
+// "Amaranth grain, uncooked" both key to "amaranth grain" and the second
+// silently overwrote the first at 193 g against 246 g. A cooked/raw mix-up is
+// exactly the class of wrong number this work exists to end.
+//
+// Sizes do not have that problem — a small banana is a small banana — and they
+// are the gap nothing else can fill: 706 of 322,232 rows carried one.
 
 function portionsOf(food) {
   const out = [];
@@ -91,9 +103,9 @@ function portionsOf(food) {
       .filter((s) => s && s !== "undetermined").join(" ").trim();
     const grams = Number(p.gramWeight);
     if (!desc || !(grams > 0) || REJECT.test(desc)) continue;
-    if (!SIZE.test(desc) && !MEASURE.test(desc)) continue;
     const size = (desc.match(SIZE) || [])[0]?.toLowerCase();
-    out.push({ portion: size ?? desc.toLowerCase().slice(0, 60), grams, size: Boolean(size) });
+    if (!size) continue;
+    out.push({ portion: size, grams });
   }
   // One weight per portion name: USDA lists several for some foods and the
   // median is the honest single answer.
@@ -138,7 +150,7 @@ async function main() {
 
   // SR Legacy and Foundation are the whole foods: the ones with sizes. Branded
   // products already carry their label serving and are not the problem.
-  let page = 1, seen = 0, kept = 0;
+  let page = 1, seen = 0, kept = 0, skipped = 0;
   for (;;) {
     const res = await fdcJson(
       `/foods/search?query=*&dataType=SR%20Legacy,Foundation&pageSize=200&pageNumber=${page}`);
@@ -149,7 +161,19 @@ async function main() {
     for (const hit of foods) {
       if (seen >= LIMIT) break;
       seen++;
-      const full = await fdcJson(`/food/${hit.fdcId}`);
+      // ⚠️ ONE BAD ID MUST NOT LOSE THE RUN. The first full pass died on
+      // `FDC 404 on /food/1105314` -- an id the SEARCH endpoint returns and the
+      // DETAIL endpoint does not have -- and because the throw reached
+      // main().catch() it exited having written nothing after ~40 minutes of
+      // fetching. A food we cannot read is a food we skip.
+      let full;
+      try {
+        full = await fdcJson(`/food/${hit.fdcId}`);
+      } catch (e) {
+        skipped++;
+        await sleep(120);
+        continue;
+      }
       const key = String(full.description || "").toLowerCase().split(",")[0].trim();
       for (const p of portionsOf(full)) {
         kept++;
@@ -161,7 +185,12 @@ async function main() {
       await sleep(120);            // stay under the 3,600/hour key limit
     }
     await upsert(batch);
-    console.log(`page ${page}: ${seen} foods read, ${kept} portions kept`);
+    // Checkpoint: the file is rewritten after every page, so whatever the run
+    // has found so far survives an interruption.
+    if (OUT && !DRY) {
+      await (await import("node:fs/promises")).writeFile(OUT, JSON.stringify(collected, null, 2));
+    }
+    console.log(`page ${page}: ${seen} read, ${kept} portions, ${skipped} skipped`);
     if (seen >= LIMIT) break;
     page++;
   }
