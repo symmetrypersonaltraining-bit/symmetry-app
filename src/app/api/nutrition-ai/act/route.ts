@@ -25,6 +25,7 @@ import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { triageSymptoms, triageBlock } from "@/lib/ai/symptomTriage";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { priceNamedFoods, type PricedItem } from "@/lib/nutrition/resolveFoodOp";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
 import { coachFirstNameForClient } from "@/lib/trainerResolve";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
@@ -39,11 +40,13 @@ import {
 
 const ACT_SYSTEM_PROMPT = `You are the action extractor for the nutrition coach chat inside the Symmetry Personal Training app. The client sends a free-text message plus DAY CONTEXT: the viewed day's meals as JSON [{position, label, name, logged, kcal, p, c, f}] ("label" is the on-screen name like "M2"; "position" is the stable id you must use in params).
 
+YOU NEVER STATE A NUTRITION FIGURE. No calories, no protein, no carbs, no fat — not for any food, not even if you are certain. The app reads every number from its own food database, and looks the food up online when the database is short one. Your job is to say WHAT they ate and HOW MUCH.
+
 Decide if the message is a REQUEST TO CHANGE THE VIEWED DAY'S LOG or just a question/chat. Respond with ONLY valid JSON — no markdown, no fences — exactly:
 {"intent":"swap_meal"|"move_meal"|"copy_meal"|"delete_meal"|"add_snack"|"log_meal"|"unlog_meal"|"none","params":{...},"confirmation":string|null,"reply":string}
 
 Intents and their params:
-- swap_meal — replace one meal's contents with different food. params: {"position":number|null,"meal_name":string|null,"new_name":string,"items":[{"name":string,"amount":number|null,"unit":string|null,"p":number,"c":number,"f":number,"kcal":number}]}. Estimate realistic macros per item (grams protein/carbs/fat, kcal).
+- swap_meal — replace one meal's contents with different food. params: {"position":number|null,"meal_name":string|null,"new_name":string,"items":[{"name":string,"amount":number|null,"unit":string|null}]}. amount is the quantity they stated (null if none); unit is its unit ("oz","cup","tbsp","g","slice",...) or null — do NOT convert it. NAME THE FOOD THE WAY A FOOD DATABASE WOULD, including the preparation they implied: "chicken breast, cooked", "white rice, cooked". Do not put the amount in the name.
 - add_to_meal — the client wants to ADD something to a meal that already exists, keeping what is already in it. params: {"position":number|null,"meal_name":string|null,"items":[same item shape as swap_meal]}. "items" is ONLY the new food. Never restate or summarise what the meal already contains — the app keeps those items and their own numbers.
 - move_meal — reorder a meal to another meal's spot. params: {"from_position":number|null,"from_name":string|null,"to_position":number|null,"to_name":string|null}.
 - copy_meal — duplicate a meal; the copy lands right after the "to" meal, or at the end of the day when "to" is omitted. params: same keys as move_meal (to_* may be null).
@@ -89,17 +92,31 @@ function sanitizeDayContext(raw: unknown): ActDayMeal[] {
   return out;
 }
 
-/** Flatten resolved params into the wire shape the confirmation card executes. */
-function wireParams(act: ActReply): Record<string, unknown> {
+/**
+ * Flatten resolved params into the wire shape the confirmation card executes.
+ *
+ * `priced` is passed in rather than read off the act: what the model returned is
+ * names and amounts, and the numbers come from the food database. Nothing that
+ * reaches the confirmation card carries a figure the model made up.
+ */
+function wireParams(act: ActReply, priced: PricedItem[]): Record<string, unknown> {
   const p = act.params;
   switch (act.intent) {
-    case "swap_meal": return { position: p.meal!.position, name: p.name, items: p.items };
+    case "swap_meal": return { position: p.meal!.position, name: p.name, items: priced };
+    // ⚠️ add_to_meal HAD NO CASE HERE AND FELL THROUGH TO `default: {}`.
+    //
+    // The intent was built on 5 Sep for "add the jam to that meal", is
+    // extracted correctly by the model, and is validated and resolved by
+    // finalizeAct — and then arrived at the confirmation card with EMPTY
+    // params, so tapping Confirm threw "that meal isn't on today's list
+    // anymore" every single time. The feature has never once worked.
+    case "add_to_meal": return { position: p.meal!.position, items: priced };
     case "move_meal": return { from: p.from!.position, to: p.to!.position };
     case "copy_meal": return { from: p.from!.position, to: p.to ? p.to.position : null };
     case "delete_meal":
     case "unlog_meal": return { position: p.meal!.position };
     case "log_meal": return { position: p.meal!.position, adherence: p.adherence ?? "Full" };
-    case "add_snack": return { name: p.name, items: p.items };
+    case "add_snack": return { name: p.name, items: priced };
     default: return {};
   }
 }
@@ -204,9 +221,49 @@ export async function POST(req: NextRequest) {
       : { intent: "none", params: { clarify: false }, confirmation: null, reply: "" };
 
     if (act.intent !== "none") {
+      // ── EVERY NUMBER COMES FROM A ROW ───────────────────────────────────
+      //
+      // Dustin, 9 Sep 2026: "def stop saving foods that are not accurate."
+      //
+      // The model named the food and the amount. The food database says what
+      // it contains, and when the database has never heard of it the brain
+      // goes to USDA FoodData Central and gets a real row (see usdaOnline.ts).
+      // A food that resolves to nothing is NOT priced, NOT guessed at and NOT
+      // silently dropped: it is named back to the client so they can find it.
+      //
+      // This is the same loop /nutrition-ai/parse has run since 26 Aug, now
+      // shared rather than copied — two versions of "how a described food
+      // becomes a number" is how two screens disagree about the same dinner.
+      let priced: PricedItem[] = [];
+      if (act.params.items?.length) {
+        const priceDb = createAdminClient();
+        const { items, unresolved } = await priceNamedFoods(
+          { db: priceDb, apiKey, clientId }, act.params.items,
+        );
+        // Nothing landed. Say which foods, rather than confirming a change
+        // that would put an empty meal on the day.
+        if (!items.length) {
+          return NextResponse.json({
+            intent: "none",
+            message:
+              `I couldn't find ${unresolved.slice(0, 3).join(", ")} in the food database, ` +
+              `and I won't guess the numbers. Search for ${unresolved.length > 1 ? "them" : "it"} ` +
+              `in the food search and I'll add ${unresolved.length > 1 ? "them" : "it"} from there.`,
+          });
+        }
+        priced = items;
+        // Some landed and some did not. The confirmation has to say so BEFORE
+        // the tap, not after — a total quietly missing one food is exactly the
+        // kind of wrong number this path exists to stop.
+        if (unresolved.length) {
+          act.confirmation =
+            `${act.confirmation} (I couldn't find ${unresolved.slice(0, 3).join(", ")}, ` +
+            `so ${unresolved.length > 1 ? "they are" : "it is"} not counted.)`;
+        }
+      }
       return NextResponse.json({
         intent: act.intent,
-        params: wireParams(act),
+        params: wireParams(act, priced),
         confirmation: act.confirmation,
         reply: act.reply,
       });

@@ -2318,3 +2318,62 @@ own instruction. **Nothing below is his yet.**
 Sources: [Cronometer vs MyFitnessPal](https://feastgood.com/cronometer-vs-myfitnesspal/) ·
 [Verified vs community food data](https://nutriscan.app/blog/posts/verified-vs-community-food-entries-accuracy-2026-044a380ccd) ·
 [The fastest ways to log food](https://www.intakenutrition.io/blog/fastest-ways-to-log-food-less-friction)
+
+### SHIPPED — the chat stops inventing macros, and the brain goes online (9 Sep)
+
+Dustin's rulings on the audit, in his words:
+
+> **1** — *"thats fine but also ai needs to be involved here, if it's not in the
+> data base they need a way to search in online through ai and get real numbers.
+> again this is the whole point of having a 'brain' in the app."*
+> **2** — *"def stop saving foods that are not accurate."*
+
+| | Before | Now |
+|---|---|---|
+| The chat's prompt | *"Estimate realistic macros per item (grams protein/carbs/fat, kcal)"* | *"YOU NEVER STATE A NUTRITION FIGURE"* — names and amounts only, same rule the parse prompt has carried since 26 Aug |
+| Where a chat food's numbers come from | whatever the model said | `food_catalog`, then **USDA FoodData Central over the network** when the catalogue is short one |
+| A food nothing can price | priced anyway, from recall | named back: *"I couldn't find X, and I won't guess"* |
+| A partly-resolved meal | silently short | the confirmation says which food is missing, **before** the tap |
+| Saving to My Meals | always | **only when every item resolved to a real row** |
+| The pricing loop | inline in the parse route | one function, `priceNamedFoods`, called by both |
+
+**The brain's online step.** On a catalogue miss the app queries FoodData
+Central for the real measured rows and hands them to the *same* pick prompt
+every other path uses — the model chooses between rows it can see and is never
+asked for a figure. What it picks is written into `food_catalog` with its FDC
+id, so the next client to eat it reads it from the catalogue with no network at
+all. The catalogue teaches itself, one miss at a time. Foundation, SR Legacy and
+Survey are written verified; **Branded is not** — that is the
+manufacturer-submitted half, and the source of the 336 kcal "Banana".
+
+Verified live: *"thomas cinnamon swirl bagel"* returns THOMAS' own row at 279
+kcal **and its label serving, 1 BAGEL at 43 g** — a real countable portion,
+which is the thing the catalogue has been short of all along.
+
+### ⚠️ A feature that had never once worked
+
+`add_to_meal` — built 5 Sep for *"add the jam to that meal"* — is extracted by
+the model, validated, and resolved against the day correctly. Then
+`wireParams()` had **no case for it** and fell through to `default: {}`, so the
+confirmation card received empty params and tapping Confirm threw *"that meal
+isn't on today's list anymore"*, every single time. Found while rewiring the
+route. Fixed in the same commit.
+
+### ⚠️ CORRECTION TO FINDING 3 OF MY OWN AUDIT
+
+I reported **23,385 catalogue rows disagree with themselves** and **900 rows
+over 100 kcal with no carbs and no fat**. Those counts included rows that
+**`quarantined = true` already keeps out of every search** — 149,401 of them,
+a third of the table, and a mechanism I had not found when I wrote the finding.
+
+Against rows a search can actually return:
+
+| | Reported | Actually reachable |
+|---|---:|---:|
+| Rows whose kcal disagrees with their own macros | 23,385 | **831** |
+| Rows over 100 kcal with zero carbs and zero fat | 900 | **78** |
+| Rows flagged as contradicting USDA | — | 122 |
+
+**28× overstated.** The other findings stand as written and were re-checked:
+the three bad `Banana` rows are *not* quarantined and *are* reachable, and
+297,817 reachable `usda_branded` rows are still all stamped `verified`.

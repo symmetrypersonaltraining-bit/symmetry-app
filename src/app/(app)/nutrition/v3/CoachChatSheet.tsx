@@ -59,6 +59,23 @@ export interface CoachActionItem {
   c: number;
   f: number;
   /**
+   * THE ROW EVERY FIGURE ABOVE CAME FROM.
+   *
+   * Added 9 Sep 2026 with the ruling that ended the chat inventing macros. The
+   * route prices each named food against food_catalog (reaching USDA
+   * FoodData Central when the catalogue is short one) before anything gets to
+   * the confirmation card, so this is set on every item that resolved.
+   *
+   * Null means the last-resort estimate produced it and no row exists. That is
+   * allowed on a plate — it is marked "est" there — and NOT allowed into the
+   * My Meals library, where it would be re-used forever.
+   */
+  food_id?: string | null;
+  /** True when the row is measured (USDA core/lab, or the trainer's own). */
+  verified?: boolean;
+  /** True when nothing was found anywhere and this is the model's own guess. */
+  estimated?: boolean;
+  /**
    * Nutrients keyed by the registry (fiber, sugar, sodium, sat_fat, …).
    *
    * The parse route has asked the model for these since `da30c87`, and

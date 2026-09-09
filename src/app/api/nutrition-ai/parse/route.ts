@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { validateParsedNames, type ParsedItem } from "@/lib/ai/nutrition-json";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resolveFood } from "@/lib/nutrition/resolveFoodOp";
+import { priceNamedFoods } from "@/lib/nutrition/resolveFoodOp";
 import { readNutrients, scaleNutrients, addNutrients, roundNutrients } from "@/lib/nutrition/nutrients";
 import { kcalOf as kcalFromMacros } from "@/lib/nutrition/dailyTotals";
 import { logUsage } from "@/lib/ai/meter";
@@ -81,35 +81,22 @@ export async function POST(req: NextRequest) {
     // hand. A fabricated food looks exactly like a real one on the screen that
     // follows, which is the failure being designed out.
     const admin = createAdminClient();
-    const deps = { db: admin, apiKey, clientId };
-    const items: ParsedItem[] = [];
-    const unresolved: string[] = [];
-
-    for (const named of result.value.items) {
-      let got = null;
-      try {
-        got = await resolveFood(deps, named.name, named.amount, named.unit);
-      } catch {
-        // A lookup that fell over is not licence to invent one.
-        got = null;
-      }
-      if (!got) { unresolved.push(named.name); continue; }
-      const scale = got.per_amount > 0 ? got.amount / got.per_amount : 1;
-      items.push({
-        // The ROW's name, so a wrong choice is visible and correctable. A wrong
-        // name you can see beats a wrong number you cannot.
-        name: got.name,
-        amount: got.amount,
-        unit: got.unit,
-        p: round1(got.p * scale),
-        c: round1(got.c * scale),
-        f: round1(got.f * scale),
-        kcal: Math.round(kcalFromMacros(got.p * scale, got.c * scale, got.f * scale)),
-        ...(got.micros ? { micros: scaleNutrients(readNutrients(got.micros), scale) } : {}),
-        food_id: got.food_id,
-        verified: got.verified,
-      } as ParsedItem);
-    }
+    // ONE IMPLEMENTATION, SHARED. This loop used to live here. The coach chat
+    // needed exactly the same thing on 9 Sep, and two copies of "how a described
+    // food becomes a number" is how two screens end up disagreeing about the
+    // same dinner — the reason resolveFood is not in a route either.
+    const { items: priced, unresolved } = await priceNamedFoods(
+      { db: admin, apiKey, clientId }, result.value.items,
+    );
+    const items: ParsedItem[] = priced.map((it) => ({
+      name: it.name,
+      amount: it.amount,
+      unit: it.unit,
+      p: it.p, c: it.c, f: it.f, kcal: it.kcal,
+      ...(it.micros ? { micros: readNutrients(it.micros) } : {}),
+      food_id: it.food_id ?? undefined,
+      verified: it.verified,
+    } as ParsedItem));
 
     if (!items.length) {
       return NextResponse.json(

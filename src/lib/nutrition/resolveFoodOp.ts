@@ -22,6 +22,7 @@ import {
   PORTION_SYSTEM, validatePortion,
 } from "@/lib/nutrition/foodResolve";
 import { unitHeUses } from "@/lib/nutrition/foodUnitDefaults";
+import { readNutrients, scaleNutrients } from "@/lib/nutrition/nutrients";
 import { searchUsdaOnline, cacheUsdaFood, usdaOnlineAvailable } from "@/lib/nutrition/usdaOnline";
 
 /** Enough rows to contain the right one; short enough that the whole list gets read. */
@@ -378,4 +379,75 @@ export async function resolveFood(
   // model too — thirty-three of them per food, which is thirty-three more
   // chances to be confidently wrong.
   return { ...scaled, micros: (row as CatalogRow & { micros?: unknown }).micros ?? null };
+}
+
+/**
+ * A LIST OF NAMES IN, A LIST OF PRICED FOODS OUT — the one implementation.
+ *
+ * /nutrition-ai/parse had this loop inline. When the coach chat was made to
+ * stop inventing macros (9 Sep 2026) it needed exactly the same loop, and two
+ * copies of "how a described food becomes a number" is how two screens end up
+ * disagreeing about the same dinner — the reason resolveFood itself lives in
+ * this file rather than in a route.
+ *
+ * A name that resolves to nothing is RETURNED SEPARATELY and contributes
+ * nothing to any total. It is not zeroed, not guessed at, and not silently
+ * dropped: the caller shows it by name so the person can find it themselves.
+ * A fabricated food looks identical to a real one on the screen that follows,
+ * and that is the failure this whole module exists to design out.
+ */
+export async function priceNamedFoods(
+  deps: ResolveDeps,
+  named: { name: string; amount: number | null; unit: string | null }[],
+): Promise<{ items: PricedItem[]; unresolved: string[] }> {
+  const items: PricedItem[] = [];
+  const unresolved: string[] = [];
+  for (const n of named) {
+    let got: Awaited<ReturnType<typeof resolveFood>> = null;
+    try {
+      got = await resolveFood(deps, n.name, n.amount, n.unit);
+    } catch {
+      // A lookup that fell over is not licence to invent one.
+      got = null;
+    }
+    if (!got) { unresolved.push(n.name); continue; }
+    const scale = got.per_amount > 0 ? got.amount / got.per_amount : 1;
+    const r1 = (x: number) => Math.round(x * 10) / 10;
+    items.push({
+      // The ROW's name, so a wrong choice is visible and correctable. A wrong
+      // name you can see beats a wrong number you cannot.
+      name: got.name,
+      amount: got.amount,
+      unit: got.unit,
+      p: r1(got.p * scale),
+      c: r1(got.c * scale),
+      f: r1(got.f * scale),
+      kcal: Math.round(got.p * scale * 4 + got.c * scale * 4 + got.f * scale * 9),
+      // SCALED, like every other number on the row. The loop this replaced
+      // did `scaleNutrients(readNutrients(...), scale)`; returning the row's
+      // raw micros would quote 100 g of sodium for 30 g of cheese, and the
+      // whole nutrient panel is built on those totals.
+      micros: got.micros ? scaleNutrients(readNutrients(got.micros), scale) : null,
+      food_id: got.food_id,
+      verified: got.verified,
+      estimated: got.estimated === true,
+    });
+  }
+  return { items, unresolved };
+}
+
+export interface PricedItem {
+  name: string;
+  amount: number | null;
+  unit: string | null;
+  p: number;
+  c: number;
+  f: number;
+  kcal: number;
+  micros: unknown;
+  /** The food_catalog row every figure came from. Null only for an estimate. */
+  food_id: string | null;
+  verified: boolean;
+  /** True when no row existed anywhere and the last-resort estimate produced it. */
+  estimated: boolean;
 }

@@ -1240,8 +1240,25 @@ export default function NutritionV3Client(props: Props) {
         off_plan_details: name, macros_pending: false,
         item_overrides: keepOv(row, { __custom: meta }),
       });
-      await saveMyMeal(name, meta.items);
-      toast.success(`Swapped for “${name}” ✓ — tap the circle when eaten`);
+      // ── ONLY SOURCED FOOD ENTERS THE LIBRARY ──────────────────────────
+      //
+      // Dustin, 9 Sep 2026: *"def stop saving foods that are not accurate."*
+      //
+      // My Meals is permanent and one-tap: whatever lands here is re-logged
+      // for months. Before today the chat handed this function macros the
+      // model had made up, and saving them turned one bad guess into a
+      // standing number. Every item now carries the food_catalog row it was
+      // priced from; an item with no row is the last-resort estimate, which is
+      // honest enough for one plate and must never become a saved meal.
+      const allSourced = items.every((it) => !!it.food_id && !it.estimated);
+      if (allSourced) {
+        await saveMyMeal(name, meta.items);
+      }
+      toast.success(
+        allSourced
+          ? `Swapped for “${name}” ✓ — tap the circle when eaten`
+          : `Swapped for “${name}” ✓ — tap the circle when eaten. Not saved to My Meals: some of it is an estimate.`,
+      );
     },
     // ── ADD TO A MEAL, KEEPING WHAT IS ALREADY IN IT ──────────────────────
     //
