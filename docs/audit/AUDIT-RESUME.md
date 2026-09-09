@@ -127,22 +127,41 @@ are NOT bugs and must stop being re-reported.
 
 ### Next — in this order
 
-1. **F and G** — the last two unbuilt items of the AI programme. H shipped
-   9 Sep (`5cd796a`), E on 8 Sep (`eeb98b19`).
-   - **F — the length cap, rule 7.** Default 2–4 sentences, and never the
-     obvious. Not yet enforced anywhere.
-   - **G — bounded client adjustment, rule 8.** A client can NUDGE what the AI
-     proposes rather than only accept or reject it, and the nudge is logged and
-     visible to Dustin.
-2. **The workout logger** — its own pass, see its section below. Off limits
-   without per-item permission, and it holds nearly all the client-facing AI
-   that is not the shared coach sheet.
-3. Screen 3 onward — nutrition first, where "the numbers are way off" is still
-   open and is both a screen item and an AI item.
+1. **Screen 3 — NUTRITION.** The next client screen, and the one with the most
+   of his own words already against it:
+   - *"numbers are way off"* (4 Sep, from the Coach sheet: M6 read 766 kcal and
+     the day landed at 4,573 against a 4,462 target). **Both the day total and
+     the target need checking against the meal plan and the logged rows before
+     anything else on that screen is touched.**
+   - *"there are tons of screwed up details in the nutrition page we need to
+     deal with"* — his reason for deferring the coach-chat snack path here.
+   - **Nutrition %** — he is unhappy with how it calculates. Capture the rule at
+     this screen so both places change together.
+2. **The workout logger** — its own pass, see its section below. OFF LIMITS
+   without per-item permission; agree which controls may be touched first.
+3. Screen 4 onward.
 
-**Closed since this list was written:** Home (both leftovers built 9 Sep), and
-the Workout tab, which he had already walked on 4 Sep — the entry saying
-otherwise was wrong.
+### ⚠️ F AND G ARE NOT HIS, AND WERE PRESENTED AS IF THEY WERE
+
+Dustin, 9 Sep, on being asked to decide item F: *"i dont remember ever even
+talking about this so im not real sure where all that is even coming from."*
+
+He was right. **Not one of the ten rules in AI-CONTRACT.md quotes him** —
+checked, zero direct quotes in that section. Rule 7's evidence is industry
+complaints about OTHER apps; rule 8's is a *Management Science* paper from 2016.
+They are a previous session's proposals, written in his voice under a header
+that quotes him on the overall goal.
+
+**His actual decisions are the four RULINGS**, which are quoted. Ruling 4
+shipped 9 Sep as item H.
+
+So F is parked (he ruled: *"leave the length as is for now"*) and **G must be
+put to him as a proposal, not read back to him as his own instruction.** Before
+raising anything else from that file, check whether he said it.
+
+**Closed since this list was written:** Home (both leftovers built 9 Sep), the
+Workout tab (he had already walked it on 4 Sep), and the Client View / real
+client mismatch — one shared top bar, locked by a test.
 
 ### The AI programme — from docs/audit/AI-CONTRACT.md
 
