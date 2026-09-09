@@ -159,6 +159,13 @@ sandbox (no env vars). Vercel has them. Ignore it.
 
 ## 3. HARD RULES — these are his, and they cost real time when broken
 
+### Session names start with the date — added 9 Sep 2026
+
+He asked for it directly: *"start the session name with 9/10"*. So a session
+created for him is titled **`M/D — what it is for`**, e.g.
+`9/10 — Nutrition, button-by-button walk (screen 3)`. He works across several
+sessions at once and the date is what tells them apart in the list on a phone.
+
 ### ⚡ CONFIRMED MEANS SHIPPED — added 9 Sep 2026
 
 > *"i want everything pushed upon confirmation every time not leave it for me
