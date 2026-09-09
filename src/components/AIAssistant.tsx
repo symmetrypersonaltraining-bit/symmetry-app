@@ -1,11 +1,10 @@
 "use client";
-import { createClient } from "@/lib/supabase/client";
-import { CLIENT_MODE_COOKIE } from "@/lib/ai/trainerGate";
 import MicButton from "@/components/MicButton";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { viewerIsTrainer } from "@/lib/auth/viewer";
+import { watchTrainerMode } from "@/lib/auth/trainerMode";
+import { browserTrainerModeDeps } from "@/lib/auth/trainerModeBrowser";
 import AiBadge from "@/components/AiBadge";
 import { centralToday, centralFormat, centralFormatDate } from "@/lib/central-time";
 
@@ -63,35 +62,18 @@ function prettyDate(iso: string): string {
 // exactly what NutritionV3Client had done.
 
 export default function AIAssistant() {
-  // One question, asked once. There were two states here computing the same
-  // thing from the same build-time list: `_ok`, which gated whether this
-  // component renders AT ALL, and `isTrainer`, which picks /api/agent over
-  // /api/ai-assistant. Both are now the database's answer, so a trainer added
-  // from inside the app gets the assistant, and gets the TRAINER one.
+  // ONE ANSWER, AND IT KEEPS ASKING. See src/lib/auth/trainerMode.ts.
   //
-  // AND NOT IN CLIENT VIEW. This is mounted in the ROOT layout, so it exists on
-  // every screen a client ever sees, and "renders nothing for a client" has to
-  // include a trainer looking at the client app — that is what Client View is.
-  // Dustin, 22 Aug, adding three trainers the same day: "no clients can have
-  // this function. So there needs to be a very strong guard up for that."
+  // This used to be a lone effect that asked once and latched, while
+  // HeaderAssist — which draws the AI BUTTON — re-read the client-mode cookie
+  // every two seconds. So the button recovered on leaving Client View and this
+  // drawer did not: `if (!isTrainer) return null`, and tapping AI did nothing
+  // until a full reload. That is the screen Dustin sent on 9 Sep.
   //
-  // The cookie constant is shared with the server gate, so the drawer and
-  // /api/agent cannot drift about what "the trainer app" means. This is still
-  // only presentation: /api/agent authorizes on its own against an ACTIVE
+  // Still only presentation: /api/agent authorizes on its own against an ACTIVE
   // trainers row and refuses client mode. See src/lib/ai/trainerGate.ts.
   const [isTrainer, setIsTrainer] = useState(false);
-  useEffect(() => {
-    (async () => {
-      try {
-        const sb: any = createClient();
-        const { data } = await sb.auth.getUser();
-        const inClientMode =
-          typeof document !== "undefined" &&
-          document.cookie.split("; ").some((c) => c === CLIENT_MODE_COOKIE + "=1");
-        if (!inClientMode && (await viewerIsTrainer(sb, data?.user))) setIsTrainer(true);
-      } catch { /* stays false: this drawer opens for nobody it is unsure about */ }
-    })();
-  }, []);
+  useEffect(() => watchTrainerMode(browserTrainerModeDeps(), setIsTrainer), []);
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const h = () => setOpen(true);

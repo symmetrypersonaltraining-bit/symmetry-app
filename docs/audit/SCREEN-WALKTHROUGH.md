@@ -1727,3 +1727,49 @@ products already carry their label serving and are not the problem.
 
 Migration `20260908f_a_small_banana_is_101_grams.sql`. Reversible:
 `bak_food_catalog_banana_20260908f`.
+
+---
+
+## Interlude — the AI button was there and nothing opened (9 Sep)
+
+Dustin, on Todd Prine's client page, with the header **AI** button plainly
+visible in the screenshot: *"trainer ai assistant is gone!!"*
+
+Both halves of that were true, because two components answered the same question
+separately and only one of them could change its mind:
+
+| | asks | recovers? |
+|---|---|---|
+| `HeaderAssist` — draws the **AI button** | `viewerIsTrainer` once at mount; re-read the client-mode cookie **every 2s** | the button comes back |
+| `AIAssistant` — **is** the assistant | both, once at mount, folded into one latched boolean | never, until a full reload |
+
+`AIAssistant` ends in `if (!isTrainer) return null`. So leaving Client View
+clears the cookie, the button reappears within two seconds over a drawer that is
+still shut, and tapping AI does nothing at all.
+
+The same latch had a second way in. `viewerIsTrainer` documents that it **fails
+open to the build-time list** so a database blip cannot demote the owner in his
+own app — but that only holds once it knows the email. On a cold start
+`supabase.auth.getUser()` can resolve before the session is restored, and with
+no user at all it returns false on its first line, before the fail-open is ever
+reached. One unlucky moment at mount, assistant gone for the life of the page.
+Nothing in the app called `onAuthStateChange`, so nothing was listening for the
+session arriving late.
+
+**What the screen does now:** both surfaces read one watcher,
+`src/lib/auth/trainerMode.ts`, which keeps asking — client mode on the same 2s
+timer the button already used, and the trainer answer again whenever the session
+changes. Three of the six tests in `theAssistantComesBack.test.ts` fail against
+ask-once-and-latch.
+
+Two rules kept deliberately:
+
+- **Client View still closes it, on the same timer.** Dustin, 22 Aug: *"no
+  clients can have this function. So there needs to be a very strong guard up
+  for that."* Recovering must not weaken the guard, and that is its own test.
+- **A "yes" is never withdrawn by a failed re-check.** A dropped request is not
+  a logout — the same lesson as `d95879cf` — and the drawer must not shut
+  underneath him mid-sentence. Signing out unmounts the app.
+
+Still only presentation either way: `/api/agent` authorizes on its own against
+an ACTIVE `trainers` row and refuses client mode.

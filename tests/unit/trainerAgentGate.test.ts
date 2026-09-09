@@ -184,6 +184,10 @@ describe("the UI cannot offer it where the route would refuse", () => {
   const logger = strip(read("src/app/(app)/workout/[dayId]/WorkoutLogger.tsx"));
   const page = strip(read("src/app/(app)/workout/[dayId]/page.tsx"));
   const drawer = strip(read("src/components/AIAssistant.tsx"));
+  // The gate moved out of the component on 9 Sep so the button and the drawer
+  // could stop answering separately. Both halves still have to be here.
+  const gate = strip(read("src/lib/auth/trainerMode.ts"));
+  const gateWiring = strip(read("src/lib/auth/trainerModeBrowser.ts"));
 
   it("the logger's AI button routes on trainerApp", () => {
     assert.match(logger, /function openAssistant\(\)/, "the button no longer chooses which assistant to open");
@@ -199,19 +203,29 @@ describe("the UI cannot offer it where the route would refuse", () => {
   it("the drawer itself refuses to render in client view", () => {
     // It is mounted in the ROOT layout, so it exists on every screen a client
     // ever sees. Rendering nothing for them has to include Client View.
-    assert.match(drawer, /CLIENT_MODE_COOKIE/, "the trainer drawer does not check client mode");
-    // Trainer-ness is the database's answer since 37bbc0a (viewerIsTrainer), so
-    // a trainer invited from inside the app gets the drawer. The client-mode
-    // half is what has to survive on top of that.
-    assert.match(
-      drawer,
-      /if \(!inClientMode && \(await viewerIsTrainer\(sb, data\?\.user\)\)\) setIsTrainer\(true\)/,
-      "the drawer's gate dropped the client-mode half, or stopped asking the database who is a trainer",
-    );
+    //
+    // The gate is no longer written inline here. It moved to watchTrainerMode
+    // on 9 Sep, because this component asked ONCE and latched while
+    // HeaderAssist re-read the cookie on a timer — so leaving Client View
+    // brought the AI button back over an assistant that stayed shut, and
+    // tapping it did nothing until a full reload. Both surfaces now answer from
+    // the one watcher. Its behaviour is tested in theAssistantComesBack, which
+    // includes client view closing it again.
+    assert.match(drawer, /watchTrainerMode\(browserTrainerModeDeps\(\), setIsTrainer\)/,
+      "the drawer stopped using the shared gate — it will drift from the button again");
+    assert.match(drawer, /if \(!isTrainer\) return null;/,
+      "the drawer no longer refuses to render when the gate says no");
+    // Both halves of the question, in the one place that now answers it.
+    assert.match(gate, /trainer && !deps\.inClientMode\(\)/,
+      "the gate dropped the client-mode half");
+    assert.match(gateWiring, /viewerIsTrainer/,
+      "the gate stopped asking the database who is a trainer");
+    assert.match(gateWiring, /CLIENT_MODE_COOKIE/,
+      "the gate does not check client mode");
   });
 
   it("the cookie name is shared, so the two halves cannot drift", () => {
-    for (const [file, code] of [["page", page], ["drawer", drawer]] as const) {
+    for (const [file, code] of [["page", page], ["drawer", drawer], ["gate wiring", gateWiring]] as const) {
       assert.ok(
         !/"symmetry_client_mode"/.test(code),
         `${file} hardcodes the cookie name instead of importing CLIENT_MODE_COOKIE — rename it once and the guard silently stops matching`,
