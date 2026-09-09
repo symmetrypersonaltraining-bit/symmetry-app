@@ -127,8 +127,16 @@ are NOT bugs and must stop being re-reported.
 
 ### Next — in this order
 
-1. **Screen 3 — NUTRITION.** IN PROGRESS. The format mock-up is built and
-   **waiting on him** before any code moves — `docs/mockups/nutrition-format.html`
+1. **Screen 3 — NUTRITION.** ⚠️ **THE WALK IS THE NEXT SESSION'S JOB.** The
+   format is shipped, adherence is rebuilt, the food brain now goes online, and
+   **the control inventory is DONE** — six batches at the end of
+   `SCREEN-WALKTHROUGH.md` under "SCREEN 3 — NUTRITION · THE CONTROL INVENTORY".
+   Do not re-derive it. Walk it with him one batch at a time.
+   Everything from 9 Sep is on **PR #3** and NOT on `main`, so ask whether to
+   merge before anything else. Open items and their specs are in
+   `docs/SESSION-HANDOFF.md` §5.
+
+   *(Historical note: the format mock-up was built and approved first)* — `docs/mockups/nutrition-format.html`
    (regenerate with `python3 scripts/gen-nutrition-mockup.py`), published at
    <https://claude.ai/code/artifact/c52d0283-f009-4946-8fbb-1ae34c719c6b>. It
    inlines the app's real `globals.css`, so it cannot drift from what ships, and

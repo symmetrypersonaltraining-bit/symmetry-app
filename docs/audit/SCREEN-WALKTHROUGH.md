@@ -2411,3 +2411,102 @@ plan was never checked by anything.
 **It sums the CHOSEN meal per slot**, one per position, the way the day actually
 renders. Summing every meal double-counts any slot offering A/B — the exact
 mistake that made an ordinary plan look 195% over when this was first measured.
+
+---
+
+## SCREEN 3 — NUTRITION · THE CONTROL INVENTORY
+
+Built from the code on 9 Sep 2026, after the format landed. **This is audit step
+1 and it is done — the next session does not re-derive it.** Walk it in this
+order, one batch at a time, and fill the last column in with his words.
+
+Everything below is on `/nutrition` and `/client-preview/nutrition`, which mount
+the same component. A row marked **T** is trainer-only.
+
+### Batch 1 — the top of the screen
+
+| # | Control | What it should do | What it actually does |
+|---|---|---|---|
+| 1 | **Recipes** strip | opens `/recipes` | link, no state |
+| 2 | **‹** | back one day | `setSelectedDate(-1)`; every write follows the date on screen |
+| 3 | The date | shows Today, or the date + "past day" / "upcoming day" / "scheduled — plan vN" | display only |
+| 4 | **›** | forward one day | `setSelectedDate(+1)`; **future days are reachable** |
+| 5 | **⋯** | the plan menu sheet | `openSheet({kind:"menu"})` |
+| 6 | Incoming-plan banner | "plan vN starts <date> — tap for the version timeline" | `openVersions()`; only when a plan is dated ahead |
+
+### Batch 2 — the day tile (the bright one)
+
+| # | Control | What it should do | What it actually does |
+|---|---|---|---|
+| 7 | **Today / 1W / 2W / 4W / 8W / Custom** | switch the tile between today's live totals and a range average | `setSummaryRange`; "Today" maps to the **week-to-date** range for adherence and logging rate |
+| 8 | Custom **start** / **end** dates | set the range | both capped at today |
+| 9 | Calorie hero + "N left" / "N over" | today's eaten against target | `totals.kcal` vs `macro_targets` |
+| 10 | The bar | share of the calorie target | capped at 100%, turns warn-coloured over |
+| 11 | **PROTEIN / CARBS / FAT** | eaten of target | over-target turns orange; no per-macro hue by design |
+| 12 | **ALL NUTRIENTS ⌄** | expand the full nutrient registry | `setShowNutrients`; today only, not on a range |
+| 13 | The nutrient grid | every nutrient anything knew | unknown nutrients are **hidden**, not shown as dashes |
+| 14 | The coverage line | "from N of M logged meals" | says out loud when it is a floor, not a total |
+| 15 | **ADHERENCE** | hitting the numbers, this week so far | **changed 9 Sep** — accuracy alone, in-progress day excluded |
+| 16 | **LOGGING RATE** | days logged of days in the window | in-progress day still counts as logged |
+| 17 | ⚠ plan-vs-target strip **T** | says when the plan cannot reach the target | trainer only, today only, 3% / 5 g |
+
+### Batch 3 — the AI tiles
+
+| # | Control | What it should do | What it actually does |
+|---|---|---|---|
+| 18 | **YOUR WEEK** tile | last week vs this week | dismissed per week in `sessionStorage` |
+| 19 | its **✕** | dismiss | |
+| 20 | **`<COACH>`'S ASSISTANT** tile | the nudge for today | ruling 4 — named, never impersonating |
+| 21 | its **✕** | dismiss for the session | |
+| 22 | **Save my built day as the plan** | open-plan only | `saveplan` sheet |
+| 23 | **✦ Build me a plan from targets** | open-plan only | `aiplan` sheet, mode `targets` |
+| 24 | **✦ Recommend my targets** | open-plan only | `aiplan` sheet, mode `consult` |
+
+### Batch 4 — a meal
+
+| # | Control | What it should do | What it actually does |
+|---|---|---|---|
+| 25 | The **＋** on the line between meals | insert a meal at that point | `addmeal` sheet |
+| 26 | The tile **head** | open the meal sheet | whole head is the button |
+| 27 | The food list | every item, one per line | struck through when removed, badged FREE / ADDED |
+| 28 | **Choose A / Choose B** | switch which option is planned | **was nested buttons, fixed 9 Sep**; re-logs if already logged |
+| 29 | **＋ Build this meal** | an empty slot | the rest-day shape; food database · photo · typed |
+| 30 | The **ring** | log the meal full | 44px; colour carries Full / part / Skipped / Off-plan |
+| 31 | **✎ Edit** | the meal sheet | same target as the head |
+| 32 | **⋯** | the meal sheet | same target again — **worth asking him whether three doors to one sheet is right** |
+| 33 | **⠿** | hold to reorder | pointer-driven; `persistOrder` |
+
+### Batch 5 — extras
+
+| # | Control | What it should do | What it actually does |
+|---|---|---|---|
+| 34 | An extra's name | what was eaten | **no longer truncated** (fixed 9 Sep) |
+| 35 | PENDING / EST badge | says the number is not final | see the "macros tonight" question |
+| 36 | **✕** | remove, with undo | `deleteLogRow` + undo toast |
+| 37 | **Quick-add an extra** | the extra picker | `extrapick` sheet |
+
+### Batch 6 — the sheets, each its own pass
+
+Not yet inventoried control by control. There are **27 sheet kinds**:
+`menu`, `meal`, `addmeal`, `adjust`, `composer`, `copyto`, `copy`, `foodsearch`,
+`mymeals`, `offplan`, `replace`, `extrapick`, `extra`, `aiplan`, `saveplan`,
+`buildplan`, `versions`, `trends`, `forward`, `custom`, `openslot`, `slot`,
+`swap`, `plan`, `good`, `push`, `insert`.
+
+The ones that carry real risk and should be walked first: **`offplan`** (photo /
+typed / voice — the path whose macros are still the model's), **`foodsearch`**,
+**`composer`**, **`adjust`**, **`aiplan`**.
+
+### The three questions to put to him before the walk
+
+1. What is this screen **for**, in his words?
+2. What on it does he **never** use?
+3. What does he expect to be **wrong** before we start?
+
+### Already answered, do not ask again
+
+- **"numbers are way off"** — traced. His M6 really is 766 kcal; the plan itself
+  is 249 cal and 22 g of fat short of the target. See the plan-vs-target finding.
+- **Nutrition %** — ruled on 9 Sep: hitting the numbers alone, week to date,
+  in-progress day excluded. Shipped.
+- **Whether meals get lifted** — ruled: they do not.
