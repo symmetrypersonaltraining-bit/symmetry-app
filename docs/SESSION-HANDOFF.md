@@ -10,8 +10,9 @@ and do not create another one.
 > a can of ginger ale opened on **1 tsp** — fixed and recomputed as `20260909b`.
 > There is no half-finished data pass anywhere in the food work now.
 >
-> 🔵 **PICK UP HERE:** the biggest number left is keyword coverage — 68,778 rows
-> still say "1 serving". See section 5 and the 9 Sep walkthrough interlude.
+> 🔵 **PICK UP HERE:** the biggest number left is keyword coverage — **68,383
+> rows still say "1 serving"** (counted 9 Sep, after the recompute). See section 5
+> and the 9 Sep walkthrough interlude.
 
 Last updated: **9 Sep 2026** · the food recompute finished and `20260909b`
 shipped on `claude/food-database-completion-q8qb37`, gates green: 0 errors in
@@ -415,8 +416,11 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 
 ### Known gaps, nobody blocked
 
-3. **Keyword coverage is the biggest number left in the food work.** 68,778 rows
-   still say "1 serving" and 73,453 carry a vague word. Every one is a missing
+3. **Keyword coverage is the biggest number left in the food work.** Counted
+   after the 9 Sep recompute: **68,383 rows say "1 serving"** and 68,490 carry a
+   vague label. (The 8 Sep figures of 68,778 and 73,453 predate the recompute —
+   `20260909b` moved ~8,484 rows INTO "1 serving" on purpose, trading an unnamed
+   unit at the right weight for a named one at the wrong weight.) Every one is a missing
    keyword, not a missing mechanism — the machinery names a food the moment the
    map has a word for it. `20260909b` made a *missed* keyword fail safely (back
    to the package's own serving weight rather than to a teaspoon), but it adds no

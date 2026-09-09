@@ -1823,8 +1823,11 @@ The corrected query is at the bottom of the migration. Use that one.
 
 ### Still open — unchanged by this
 
-The keyword coverage problem underneath is the same size it was: **68,778 rows
-still say "1 serving"** and 73,453 carry a vague word. This fix makes a missed
+The keyword coverage problem underneath is the same shape it was: **68,383 rows
+say "1 serving"** and 68,490 carry a vague label, counted after this pass. It is
+slightly larger than the 8 Sep figure would suggest *because* of this fix, which
+moved ~8,484 rows into "1 serving" deliberately — an unnamed unit at the right
+weight beats a named one at the wrong weight. This fix makes a missed
 keyword fail *safely* — back to the package's own serving weight instead of to a
 teaspoon — but it does not add a keyword. "Lemon Lime Soda" still reads `6 lemon`,
 and a granola bar with "peanut butter" in its name still borrows a tablespoon.
