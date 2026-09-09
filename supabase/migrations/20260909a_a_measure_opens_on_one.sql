@@ -182,11 +182,22 @@ $$;
 -- branded rows go one leading hex character of the id at a time, sixteen
 -- batches, each of which completes comfortably.
 --
--- On 9 Sep the non-branded pass and branded batches '0' through 'a' were
--- applied. **Batches 'b', 'c', 'd', 'e' and 'f' were NOT** — the session was
--- stopped mid-run. Until they are, those rows still open on multiples. Running
--- an already-applied batch again is harmless: the update is a no-op when the
--- answer has not changed.
+-- ✅ COMPLETE. The non-branded pass and branded batches '0' through 'a' ran on
+-- 9 Sep; the session was stopped mid-run and 'b' through 'f' were finished the
+-- same day. ('b' turned out to have landed already — it changed 0 rows on the
+-- re-run, which is the point of the no-op predicate.) Across the last four
+-- batches, 24,522 rows changed: **23,604 portions shrank and 0 grew**, and the
+-- catalogue-wide count of rows opening on a multiple of a divisible unit went
+-- from 83,478 to 8. Those 8 are the known "100 g" residue, not multiples.
+--
+-- Running an already-applied batch again is harmless: the update is a no-op
+-- when the answer has not changed.
+--
+-- ⚠️ Reading that batch diff before keeping it found a fault IN THIS FILE: the
+-- opens-on-one return sits before the cap check, so a food whose label serving
+-- is 296 teaspoons returned "1 tsp" instead of falling through. Fixed in
+-- 20260909b_a_unit_that_cannot_fit_is_not_the_unit.sql — read that before
+-- treating this function as the current one.
 
 -- Pass 1: everything except branded.
 with r as (

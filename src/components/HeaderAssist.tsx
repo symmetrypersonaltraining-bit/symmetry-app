@@ -4,7 +4,8 @@ import { startDictation, type DictationHandle } from "@/lib/dictation";
 import { createClient } from "@/lib/supabase/client";
 import { submitFeedback } from "@/lib/feedback";
 import NotificationCenter from "@/components/NotificationCenter";
-import { viewerIsTrainer } from "@/lib/auth/viewer";
+import { watchTrainerMode } from "@/lib/auth/trainerMode";
+import { browserTrainerModeDeps } from "@/lib/auth/trainerModeBrowser";
 import { useCoach } from "@/lib/useCoach";
 /**
  * HeaderAssist — feedback (all users) + AI assistant (trainer only) buttons
@@ -44,8 +45,7 @@ export function looksLikeAMealLog(text: string): boolean {
 
 export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
   const { firstName: coachFirstName } = useCoach();
-  const [isTrainer, setIsTrainer] = useState(false);
-  const [clientMode, setClientMode] = useState(false);
+  const [available, setAvailable] = useState(false);
   const [open, setOpen] = useState(false);
   const [sentiment, setSentiment] = useState<"like" | "change" | null>(null);
   const [msg, setMsg] = useState("");
@@ -57,19 +57,12 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
 
   const buzz = (m: number | number[]) => { try { (navigator as any).vibrate && (navigator as any).vibrate(m as any); } catch {} };
 
-  useEffect(() => {
-    (async () => { try { const sb: any = createClient(); const { data } = await sb.auth.getUser(); if (await viewerIsTrainer(sb, data?.user)) setIsTrainer(true); } catch {} })();
-    const checkClientMode = () => {
-      try {
-        const cookieOn = document.cookie.includes("symmetry_client_mode=1");
-        const previewPath = window.location.pathname.startsWith("/client-preview");
-        setClientMode(cookieOn || previewPath);
-      } catch {}
-    };
-    checkClientMode();
-    const t = setInterval(checkClientMode, 2000);
-    return () => clearInterval(t);
-  }, []);
+  // The BUTTON and the DRAWER now answer from one watcher, because they used to
+  // answer separately and disagreed: this component re-read the client-mode
+  // cookie on a timer while AIAssistant asked once and latched, so leaving
+  // Client View brought the button back over an assistant that stayed shut.
+  // See src/lib/auth/trainerMode.ts.
+  useEffect(() => watchTrainerMode(browserTrainerModeDeps(), setAvailable), []);
 
   function startVoice() {
     if (listening) { dictRef.current?.stop(); setListening(false); return; }
@@ -113,7 +106,7 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
     <>
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <NotificationCenter solid={solid} />
-        {isTrainer && !clientMode && (
+        {available && (
           <button aria-label="AI assistant" style={{ ...hBtn, fontSize: 11, fontWeight: 700 }}
             onClick={() => { buzz(12); window.dispatchEvent(new CustomEvent("symmetry:open-ai")); }}>AI</button>
         )}

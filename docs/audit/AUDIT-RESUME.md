@@ -632,9 +632,35 @@ Read alongside the "STOP RE-REPORTING THESE" section of
 
 ## Live state
 
-`origin/main` = **`d7d7f92`** (8 Sep), plus four food-database fixes on
-`claude/symmetry-audit-resume-ws695t` (`612874a` → `dc186b5`). tsc 0 errors in
-`src/`, **2,951 unit tests passing**, build compiles.
+`origin/main` = **`3c694ed`** (9 Sep — the AI assistant fix) plus the food
+recompute and `20260909b` merged behind it. tsc 0 errors in `src/`, **2,960 unit
+tests passing**, build compiles. **Nothing is unpushed and no branch is
+outstanding** — the food work and the AI fix are both on main.
+
+### ▶ START HERE NEXT SESSION — the Workout tab, full walk
+
+Screen 2 was **rebuilt on 4 Sep and has never been tapped button-by-button.**
+That is the next screen, and it is the largest single block of unwalked surface
+in the audit.
+
+Before asking Dustin anything, do step 1 of "How each screen goes": inventory
+the controls **from the code**, not from memory. Grep the page and its
+components for `onClick`, `href`, `router.push` and put them in a table in
+`SCREEN-WALKTHROUGH.md`. Then step 0 — list every AI component on the screen and
+reconcile it against `docs/audit/AI-CONTRACT.md`, because the Workout tab's AI
+has never been reviewed at all.
+
+What is known to need tapping, from the 4 Sep rebuild: the new tile format, the
+Start / View split, moving a logged workout (it copies forward rather than
+moving), Add workout on the title row, edit, replace, remove, drag, and the past
+strip — manually and through Claude.
+
+Then, in order: the two Home leftovers (the **View** button on today's tile, and
+the "Dustin's assistant" framing, item H), the workout logger's own pass, and
+screen 3 onward.
+
+⚠️ **Both workout loggers are OFF LIMITS** without per-item permission from him.
+Walking and recording what a logger does is fine; changing it is not.
 
 **The food database, 8 Sep evening — the default-serving work is BUILT and then
 debugged.** He answered both open questions ("A AND fix the names now"; his unit
@@ -655,36 +681,43 @@ by reading the diff before keeping it:
 - `dc186b5` — 26 rules labelled `each` when their keyword was the noun. 3,623
   rows renamed, **0 weights moved**.
 
-### ✅ DONE, 9 SEP — and one lesson worth keeping
+### ✅ FINISHED, 9 SEP — and the batch diff found a fifth fault
 
-All 16 batches ran. Rows opening on more than one household unit: **83,478 → 8.**
+The recompute is complete. All 16 batches ran; `b` had in fact already landed
+and changed 0 rows on the re-run, and `c` `d` `e` `f` changed 24,522 rows between
+them — **23,604 portions shrank, 0 grew.** Rows opening on a multiple of a
+divisible unit went from **83,478 to 8**, and those 8 are the known "100 g"
+residue rather than multiples. There is no half-finished data pass left in the
+food work.
 
-**The lesson:** `20260908f` fixed the banana rows with a direct UPDATE, and the
-`20260909a` recompute wiped it hours later — "Banana (small)" went back to
-1 medium. A number written into rows is only as durable as the next pass over
-those rows. `food_default_serving()` is the one place that decides, so anything
-the answer depends on must be reachable FROM it. `20260909b` moves the portion
-reference inside the brain, where it now wins ahead of everything inferred.
+**Then reading that diff before keeping it found the fault, in the migration
+that had just shipped.** A can of ginger ale opened on **1 tsp — 2 g** against a
+real 591 g serving, and so did 9,128 other rows: `20260909a` put the
+opens-on-one return BEFORE the cap check. See the next section.
 
-### ~~UNFINISHED, 9 SEP — FIVE QUERIES, DO THIS FIRST~~ (done)
+### A UNIT THAT CANNOT FIT IS NOT THE UNIT — 9 Sep, `20260909b`
 
-**The catalogue is 11 of 16 batches through a recompute.** The session was
-stopped mid-run. Branded rows whose id starts with **`b`, `c`, `d`, `e` or `f`**
-still open on multiples ("6 tbsp" of butter); everything else is done. The code
-is committed and the function is live — only the data pass is part-finished.
+The cap is the sanity check that says *this unit does not belong to this food*.
+591 g of ginger ale is 296 teaspoons; nothing is 296 teaspoons, and the count
+blowing past the cap is exactly how the brain knew the keyword `ginger` had
+matched a **flavour** rather than the food. `20260909a` returned "one of the
+unit" before that check ran, so a missed keyword became a 296× understated
+portion instead of falling back to the package's own serving.
 
-Run the five remaining batches from the bottom of
-`supabase/migrations/20260909a_a_measure_opens_on_one.sql`, one at a time,
-changing the hex character on the last line. Each takes a few seconds; the whole
-catalogue in one statement exceeds the 60-second timeout, which is why it is
-batched. **Re-running a finished batch is harmless** — the update is a no-op
-when the answer has not changed. Then confirm:
+**9,128 rows, understating by 31× on average and 430× at worst** — all branded,
+which is what a client hits when they scan a barcode. The cap now comes first at
+both call sites. 8,484 rows corrected.
 
-    select count(*) from food_catalog
-    where quarantined is not true and default_serving_desc is not null
-      and food_serving_count_in(default_serving_desc) > 1
-      and food_serving_is_divisible(food_serving_label_of(default_serving_desc));
-    -- was 83,478 before the pass; should end near zero
+Measured before applying, through a shadow function on the live catalogue:
+539 of 539 sample changes **grew**, none shrank, and **0 of his own 249 trainer
+and client foods moved** — butter still opens on 1 tbsp, spinach on 1 cup,
+almonds on 1 oz, chicken breast on 1 breast (6 oz). None of them was ever near
+its cap, which is why the cap can come first without undoing `20260909a`.
+
+⚠️ **A confirmation query here must round the way the function rounds.** The raw
+ratio reports 644 phantom failures: a 33 g bag of popcorn is 4.125 cups, which
+rounds to 4, which is exactly the cup cap. The corrected query is at the bottom
+of the migration.
 
 ### A MEASURE OPENS ON ONE — 9 Sep, `20260909a`
 
