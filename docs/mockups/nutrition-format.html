@@ -1,0 +1,3604 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="navy" data-deep="20">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Symmetry — Nutrition in the Tile Format (mock-up)</title>
+</head>
+<body class="mk">
+
+<style>
+
+/* ===== THEME: Navy Blue (default) ===== */
+:root,
+[data-theme="navy"] {
+  --brand-bg: #EDF2F7;
+  --brand-surface: #FFFFFF;
+  --brand-card: #DDEEFF;
+  --brand-primary: #0F4C81;
+  --brand-accent: #0EA5E9;
+  --brand-text: #0D1B2E;
+  --brand-text-secondary: #4E6080;
+  --brand-border: #C8D8EC;
+  --brand-sidebar: #0F4C81;
+}
+
+/* ===== THEME: Charcoal ===== */
+[data-theme="charcoal"] {
+  --brand-bg: #F0F0F0;
+  --brand-surface: #FFFFFF;
+  --brand-card: #E8E8E8;
+  --brand-primary: #2D2D2D;
+  --brand-accent: #555555;
+  --brand-text: #111111;
+  --brand-text-secondary: #666666;
+  --brand-border: #D0D0D0;
+  --brand-sidebar: #1A1A1A;
+}
+
+/* ===== THEME: Forest Green ===== */
+[data-theme="forest"] {
+  --brand-bg: #F0F7F0;
+  --brand-surface: #FFFFFF;
+  --brand-card: #D6EDDB;
+  --brand-primary: #1B5E20;
+  --brand-accent: #43A047;
+  --brand-text: #0A1F0A;
+  --brand-text-secondary: #3D6142;
+  --brand-border: #B2D8B6;
+  --brand-sidebar: #1B5E20;
+}
+
+/* ===== THEME: Gunmetal ===== */
+[data-theme="gunmetal"] {
+  --brand-bg: #EAEEF2;
+  --brand-surface: #FFFFFF;
+  --brand-card: #D8DFE8;
+  --brand-primary: #37474F;
+  --brand-accent: #607D8B;
+  --brand-text: #1C2B33;
+  --brand-text-secondary: #546E7A;
+  --brand-border: #B0BEC5;
+  --brand-sidebar: #263238;
+}
+
+/* ===== THEME: Deep Purple ===== */
+[data-theme="purple"] {
+  --brand-bg: #F3F0F8;
+  --brand-surface: #FFFFFF;
+  --brand-card: #E8DCFF;
+  --brand-primary: #4A148C;
+  --brand-accent: #7B1FA2;
+  --brand-text: #1A0533;
+  --brand-text-secondary: #6A3D8A;
+  --brand-border: #CE93D8;
+  --brand-sidebar: #4A148C;
+}
+
+/* ===== THEME: Burnt Orange ===== */
+[data-theme="orange"] {
+  --brand-bg: #FFF3E0;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FFE0B2;
+  --brand-primary: #BF360C;
+  --brand-accent: #E64A19;
+  --brand-text: #1F0A00;
+  --brand-text-secondary: #7D4E37;
+  --brand-border: #FFAB91;
+  --brand-sidebar: #BF360C;
+}
+
+/* ===== THEME: Rose ===== */
+[data-theme="rose"] {
+  --brand-bg: #FFF0F3;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FFD6DF;
+  --brand-primary: #880E4F;
+  --brand-accent: #E91E63;
+  --brand-text: #2A0011;
+  --brand-text-secondary: #7B3A5A;
+  --brand-border: #F48FB1;
+  --brand-sidebar: #880E4F;
+}
+
+[data-theme="pastel"] {
+  --brand-bg: #f4f6fb;
+  --brand-surface: #ffffff;
+  --brand-card: #ffffff;
+  --brand-primary: #7c9cf5;
+  --brand-accent: #5ec9a3;
+  --brand-text: #2a3147;
+  --brand-text-secondary: #6E7994;
+  --brand-border: #e3e9f3;
+  --brand-sidebar: #eef2fa;
+}
+
+[data-theme="blush"] {
+  --brand-bg: #FFF0F5;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FCE0EA;
+  --brand-primary: #C2185B;
+  --brand-accent: #FF4D8D;
+  --brand-text: #4B1528;
+  --brand-text-secondary: #A83A63;
+  --brand-border: #F8C2D6;
+  --brand-sidebar: #C2185B;
+}
+
+/* ===== THEME: Midnight (dark) ===== */
+[data-theme="midnight"] {
+  --brand-bg: #0D1117;
+  --brand-surface: #161B22;
+  --brand-card: #1E2A3A;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #79C0FF;
+  --brand-text: #E6EDF3;
+  --brand-text-secondary: #8B949E;
+  --brand-border: #30363D;
+  --brand-sidebar: #010409;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  max-width: 100vw;
+  background-color: var(--brand-bg);
+  color: var(--brand-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Remove tap high
+/* ===== UTILITY & ACCENT STYLES ===== */
+
+/* Scrollbar hide */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Cards */
+.card {
+  background: var(--brand-card);
+  border: 1px solid var(--brand-border);
+  border-radius: 16px;
+  padding: 16px;
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+.card-hover:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+  transform: translateY(-1px);
+}
+.card-accent {
+  border-top: 3px solid var(--brand-primary);
+}
+.card-glow {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-primary) 20%, transparent), 0 4px 24px color-mix(in srgb, var(--brand-primary) 13%, transparent);
+}
+
+/* Gradient header backgrounds */
+.gradient-header {
+  background: linear-gradient(135deg, var(--brand-sidebar) 0%, color-mix(in srgb, var(--brand-sidebar) 70%, #1565C0) 100%);
+}
+.gradient-primary {
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-accent) 100%);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Buttons */
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-accent) 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s, box-shadow 0.2s;
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--brand-primary) 27%, transparent);
+}
+.btn-primary:hover { opacity: 0.92; transform: translateY(-1px); box-shadow: 0 4px 16px color-mix(in srgb, var(--brand-primary) 33%, transparent); }
+.btn-primary:active { transform: translateY(0); }
+
+/* Tags / badges */
+.tag-green {
+  background: rgba(34,197,94,0.15);
+  color: #16a34a;
+  border: 1px solid rgba(34,197,94,0.3);
+}
+.tag-blue {
+  background: rgba(59,130,246,0.12);
+  color: #1d4ed8;
+  border: 1px solid rgba(59,130,246,0.25);
+}
+.tag-orange {
+  background: rgba(249,115,22,0.12);
+  color: #c2410c;
+  border: 1px solid rgba(249,115,22,0.25);
+}
+.tag-red {
+  background: rgba(239,68,68,0.12);
+  color: #b91c1c;
+  border: 1px solid rgba(239,68,68,0.25);
+}
+.tag-gray {
+  background: rgba(107,114,128,0.12);
+  color: #4b5563;
+  border: 1px solid rgba(107,114,128,0.25);
+}
+.tag-purple {
+  background: rgba(139,92,246,0.12);
+  color: #6d28d9;
+  border: 1px solid rgba(139,92,246,0.25);
+}
+
+/* Accent left border strip */
+.accent-left {
+  border-left: 3px solid var(--brand-primary);
+}
+
+/* Stat number highlight */
+.stat-number {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Pulse dot (live / active indicator) */
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34,197,94,0.6);
+  animation: pulse-ring 2s infinite;
+}
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+  100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+}
+
+/* Shimmer skeleton */
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, var(--brand-surface) 25%, var(--brand-card) 50%, var(--brand-surface) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+/* Hover lift */
+.hover-lift { transition: transform 0.15s, box-shadow 0.15s; }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.10); }
+
+/* Divider with label */
+.divider-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--brand-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.divider-label::before, .divider-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--brand-border);
+}
+
+/* Metric card */
+.metric-card {
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-border);
+  border-radius: 16px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+.metric-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-accent));
+}
+.metric-card:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.09);
+  transform: translateY(-1px);
+}
+
+/* Input focus glow */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 27%, transparent);
+  border-color: var(--brand-primary) !important;
+}
+
+/* ================================================================
+   SYMMETRY VISUAL OVERHAUL — Animations, Depth, Polish
+   ================================================================ */
+
+/* ── Keyframes ── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.88); }
+  70%  { transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(14, 165, 233, 0); }
+}
+@keyframes shimmerSlide {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes progressFill {
+  from { width: 0%; }
+  to   { width: var(--progress-width, 100%); }
+}
+@keyframes badgePop {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Animation Utilities ── */
+.animate-slide-up   { animation: slideUp 0.35s cubic-bezier(0.16,1,0.3,1) both; }
+.animate-fade-in    { animation: fadeIn 0.25s ease both; }
+.animate-pop-in     { animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+.animate-slide-down { animation: slideDown 0.3s cubic-bezier(0.16,1,0.3,1) both; }
+.animate-count-up   { animation: countUp 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+.animate-badge-pop  { animation: badgePop 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+.animate-spin       { animation: spin 1s linear infinite; }
+
+/* Stagger delays */
+.delay-100 { animation-delay: 0.1s; }
+.delay-150 { animation-delay: 0.15s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+
+/* ── Enhanced Cards ── */
+.card {
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.card-hover:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1), 0 8px 24px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+.card-accent {
+  border-left: 3px solid var(--brand-accent);
+  background: var(--brand-surface);
+}
+.card-glow {
+  box-shadow: 0 0 0 1px var(--brand-primary), 0 4px 20px rgba(15,76,129,0.15);
+}
+.card-elevated {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08), 0 12px 32px rgba(0,0,0,0.1);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 10px;
+  padding: 10px 18px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
+  user-select: none;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+}
+.btn:active { transform: scale(0.96); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; pointer-events: none; }
+
+/* Ripple effect on buttons */
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.btn:active::after { opacity: 1; }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-primary) 0%, color-mix(in srgb, var(--brand-primary) 80%, #000) 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(15,76,129,0.3), 0 1px 2px rgba(0,0,0,0.15);
+}
+.btn-primary:hover {
+  box-shadow: 0 4px 16px rgba(15,76,129,0.4), 0 2px 4px rgba(0,0,0,0.1);
+  transform: translateY(-1px);
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, var(--brand-accent) 0%, color-mix(in srgb, var(--brand-accent) 80%, #000) 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(14,165,233,0.3);
+}
+.btn-accent:hover {
+  box-shadow: 0 4px 16px rgba(14,165,233,0.4);
+  transform: translateY(-1px);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #16a34a 0%, #166534 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(22,163,74,0.3);
+}
+.btn-success:hover { box-shadow: 0 4px 16px rgba(22,163,74,0.4); transform: translateY(-1px); }
+
+.btn-danger {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(220,38,38,0.3);
+}
+.btn-danger:hover { box-shadow: 0 4px 16px rgba(220,38,38,0.4); transform: translateY(-1px); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--brand-text);
+  border: 1.5px solid var(--brand-border);
+}
+.btn-ghost:hover {
+  background: var(--brand-card);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
+
+.btn-sm { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
+.btn-lg { padding: 14px 24px; font-size: 16px; border-radius: 12px; }
+.btn-icon { padding: 8px; border-radius: 10px; width: 38px; height: 38px; }
+
+/* ── FAB (Floating Action Button) ── */
+.fab {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand-accent) 0%, var(--brand-primary) 100%);
+  color: #fff;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(15,76,129,0.4), 0 2px 6px rgba(0,0,0,0.2);
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
+  z-index: 40;
+}
+.fab:hover {
+  transform: scale(1.1) translateY(-2px);
+  box-shadow: 0 8px 24px rgba(15,76,129,0.5);
+}
+.fab:active { transform: scale(0.95); }
+
+/* ── Input Fields ── */
+.input-field {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--brand-border);
+  background: var(--brand-surface);
+  color: var(--brand-text);
+  font-size: 15px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+.input-field:focus {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(15,76,129,0.12);
+}
+.input-field::placeholder { color: var(--brand-text-secondary); opacity: 0.7; }
+
+/* ── Progress Bars ── */
+.progress-track {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--brand-card);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-accent));
+  animation: progressFill 0.8s cubic-bezier(0.4,0,0.2,1) both;
+  transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ── Stat Cards ── */
+.stat-card {
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-border);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.05);
+}
+.stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--brand-primary);
+  line-height: 1;
+  animation: countUp 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-text-secondary);
+  margin-top: 4px;
+}
+.stat-change-up   { color: #16a34a; font-size: 13px; font-weight: 600; }
+.stat-change-down { color: #dc2626; font-size: 13px; font-weight: 600; }
+
+/* ── Badges / Tags ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-primary  { background: color-mix(in srgb, var(--brand-primary) 15%, transparent); color: var(--brand-primary); }
+.badge-accent   { background: color-mix(in srgb, var(--brand-accent) 15%, transparent); color: var(--brand-accent); }
+.badge-green    { background: #dcfce7; color: #15803d; }
+.badge-red      { background: #fee2e2; color: #b91c1c; }
+.badge-amber    { background: #fef3c7; color: #b45309; }
+.badge-gray     { background: var(--brand-card); color: var(--brand-text-secondary); }
+.badge-purple   { background: #f3e8ff; color: #7c3aed; }
+
+/* ── Gradient Utilities ── */
+.gradient-header {
+  background: linear-gradient(135deg, var(--brand-sidebar) 0%, color-mix(in srgb, var(--brand-sidebar) 80%, #000) 100%);
+}
+.gradient-primary {
+  background: linear-gradient(135deg, var(--brand-primary) 0%, color-mix(in srgb, var(--brand-primary) 75%, #000) 100%);
+}
+.gradient-surface {
+  background: linear-gradient(160deg, var(--brand-surface) 0%, var(--brand-card) 100%);
+}
+.gradient-text {
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Dividers ── */
+.divider {
+  height: 1px;
+  background: var(--brand-border);
+  margin: 12px 0;
+}
+.divider-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-text-secondary);
+}
+.divider-label::before,
+.divider-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--brand-border);
+}
+
+/* ── Pulse dot ── */
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  position: relative;
+  display: inline-block;
+}
+.pulse-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: rgba(34,197,94,0.3);
+  animation: pulseGlow 2s ease infinite;
+}
+
+/* ── Hover effects ── */
+.hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+}
+
+/* ── Shimmer loading skeleton ── */
+.shimmer {
+  background: linear-gradient(90deg, var(--brand-card) 25%, var(--brand-border) 50%, var(--brand-card) 75%);
+  background-size: 600px 100%;
+  animation: shimmerSlide 1.6s ease infinite;
+  border-radius: 8px;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--brand-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--brand-text-secondary); }
+
+/* ── Safe area / Mobile ── */
+.safe-bottom { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.safe-top    { padding-top: max(0px, env(safe-area-inset-top)); }
+
+/* ── Bottom nav visual polish ── */
+nav.bottom-nav-bar {
+  background: var(--brand-surface);
+  border-top: 1px solid var(--brand-border);
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+  backdrop-filter: blur(12px);
+}
+
+/* ── Modal/Sheet overlay ── */
+.modal-overlay {
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease both;
+}
+.modal-sheet {
+  background: var(--brand-surface);
+  border-radius: 20px 20px 0 0;
+  animation: slideUp 0.35s cubic-bezier(0.16,1,0.3,1) both;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.15);
+}
+
+/* ── Accent left border ── */
+.accent-left {
+  border-left: 3px solid var(--brand-accent);
+  padding-left: 12px;
+}
+
+/* ── Page section header ── */
+.section-header {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brand-text-secondary);
+  margin-bottom: 8px;
+}
+
+/* ── Metric card ── */
+.metric-card {
+  /* background-COLOR plus background-IMAGE, not the shorthand. The shorthand
+     sets background-color to transparent, so the card's entire fill lived in
+     the gradient — and the depth layer replaces background-image with its own
+     overlay, which left the card see-through. Keeping the colour separate
+     means anything that swaps the image can never remove the fill. */
+  background-color: var(--brand-surface);
+  background-image: linear-gradient(135deg, var(--brand-surface) 0%, var(--brand-card) 100%);
+  border: 1px solid var(--brand-border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s ease;
+}
+.metric-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.09);
+}
+
+/* ── Exercise set row ── */
+.set-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.set-row:hover { background: var(--brand-card); }
+.set-row.completed { opacity: 0.6; }
+.set-row.completed .set-number { background: #16a34a; color: #fff; }
+
+/* ── Checkbox animated ── */
+.check-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--brand-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.check-circle.checked {
+  background: #16a34a;
+  border-color: #16a34a;
+  animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+.check-circle.checked::after {
+  content: '';
+  width: 8px;
+  height: 5px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) translate(1px, -1px);
+  display: block;
+}
+
+/* ── Calendar event color dots ── */
+.cal-event {
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.15s;
+}
+.cal-event:hover { filter: brightness(1.1); transform: scale(1.02); }
+
+/* ── Client avatar ── */
+.client-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+/* ── Notification dot ── */
+.notification-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid var(--brand-surface);
+  animation: badgePop 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+/* Shimmer animation for SYMMETRY title */
+@keyframes symmetry-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.symmetry-title {
+  background: linear-gradient(90deg, currentColor 0%, #93c5fd 30%, currentColor 50%, #93c5fd 70%, currentColor 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: symmetry-shimmer 3s linear infinite;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+.symmetry-title-dark {
+  background: linear-gradient(90deg, #fff 0%, #93c5fd 30%, #fff 50%, #93c5fd 70%, #fff 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: symmetry-shimmer 3s linear infinite;
+  font-weight: 900;
+}
+.page-header { padding: 14px 16px; color: white; display: flex; align-items: center; gap: 10px; }
+.page-header-home { background: linear-gradient(135deg, #0D3F6E, #0F4C81); }
+.page-header-workout { background: linear-gradient(135deg, #14532d, #16a34a); }
+.page-header-progress { background: linear-gradient(135deg, #92400e, #d97706); }
+.page-header-nutrition { background: linear-gradient(135deg, #1e3a5f, #2563eb); }
+.page-header-payments { background: linear-gradient(135deg, #7f1d1d, #dc2626); }
+.page-header-clients { background: linear-gradient(135deg, #4c1d95, #7c3aed); }
+.page-header-settings { background: linear-gradient(135deg, #374151, #6b7280); }
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-primary), color-mix(in srgb, var(--brand-primary) 70%, white));
+  color: white; border: none; border-radius: 10px; padding: 9px 18px;
+  font-weight: 600; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px color-mix(in srgb, var(--brand-primary) 40%, transparent); }
+.card-hover { transition: transform 0.15s, box-shadow 0.15s; }
+.card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+@keyframes card-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.card-animate { animation: card-in 0.3s ease both; }
+.fab-feedback {
+  position: fixed; bottom: 80px; right: 16px; width: 44px; height: 44px;
+  border-radius: 50%; background: var(--brand-primary); color: white;
+  border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); z-index: 100;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.fab-feedback:hover { transform: scale(1.1); box-shadow: 0 6px 24px rgba(0,0,0,0.25); }
+
+/* ===== Symmetry polish layer: animations + micro-interactions ===== */
+@keyframes symm-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes symm-pop{0%{transform:scale(.85)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+@keyframes symm-pulse{0%{box-shadow:0 0 0 0 rgba(125,125,125,.25)}70%{box-shadow:0 0 0 9px rgba(125,125,125,0)}100%{box-shadow:0 0 0 0 rgba(125,125,125,0)}}
+@keyframes symm-buzz{0%,100%{transform:translateX(0)}20%{transform:translateX(-2px)}40%{transform:translateX(2px)}60%{transform:translateX(-1px)}80%{transform:translateX(1px)}}
+.symm-rise{animation:symm-rise .45s cubic-bezier(.22,1,.36,1) both}
+.symm-pop{animation:symm-pop .28s ease both}
+.symm-buzz{animation:symm-buzz .3s ease}
+.symm-stagger>*{animation:symm-rise .45s cubic-bezier(.22,1,.36,1) both}
+.symm-stagger>*:nth-child(2){animation-delay:.05s}
+.symm-stagger>*:nth-child(3){animation-delay:.1s}
+.symm-stagger>*:nth-child(4){animation-delay:.15s}
+.symm-stagger>*:nth-child(5){animation-delay:.2s}
+.symm-stagger>*:nth-child(6){animation-delay:.25s}
+button,[role="button"],a[class*="btn"],.tap{transition:transform .09s ease,filter .2s ease,background-color .2s ease,border-color .2s ease}
+button:active,[role="button"]:active,a[class*="btn"]:active,.tap:active{transform:scale(.97)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+
+/* ===== Workout session screen: dark surface tinted by the active color scheme (distinct from rest of app) ===== */
+:root{ --session-bg:#0D1117; --session-surface:#161B22; --session-border:rgba(255,255,255,.10); }
+@supports (background: color-mix(in srgb, white, black)){
+  :root,[data-theme]{
+    --session-bg: color-mix(in srgb, var(--brand-primary) 20%, #0a0c10);
+    --session-surface: color-mix(in srgb, var(--brand-primary) 26%, #11141a);
+    --session-border: color-mix(in srgb, var(--brand-primary) 45%, transparent);
+  }
+}
+
+[data-theme="lagoon"] {
+  --brand-bg: #EEF8F8;
+  --brand-surface: #FFFFFF;
+  --brand-card: #DBF0F0;
+  --brand-primary: #0E7C86;
+  --brand-accent: #FF7A59;
+  --brand-text: #0B3A3E;
+  --brand-text-secondary: #4E8A8F;
+  --brand-border: #C2E4E5;
+  --brand-sidebar: #0E7C86;
+}
+
+[data-theme="orchid"] {
+  --brand-bg: #FAF4FB;
+  --brand-surface: #FFFFFF;
+  --brand-card: #F3E6F7;
+  --brand-primary: #8E2DAF;
+  --brand-accent: #00B295;
+  --brand-text: #3B1B47;
+  --brand-text-secondary: #8A6796;
+  --brand-border: #E4D2EC;
+  --brand-sidebar: #8E2DAF;
+}
+
+[data-theme="berry"] {
+  --brand-bg: #FBF1F5;
+  --brand-surface: #FFFFFF;
+  --brand-card: #F8DEE9;
+  --brand-primary: #B0306A;
+  --brand-accent: #5A4FCF;
+  --brand-text: #4A1730;
+  --brand-text-secondary: #9A5E78;
+  --brand-border: #F0CEDD;
+  --brand-sidebar: #B0306A;
+}
+
+[data-theme="slatepop"] {
+  --brand-bg: #F2F4F8;
+  --brand-surface: #FFFFFF;
+  --brand-card: #E3E8F2;
+  --brand-primary: #2E4374;
+  --brand-accent: #FF6B6B;
+  --brand-text: #1B2541;
+  --brand-text-secondary: #5C6788;
+  --brand-border: #D5DCEA;
+  --brand-sidebar: #2E4374;
+}
+
+[data-theme="plumdusk"] {
+  --brand-bg: #F6F2F8;
+  --brand-surface: #FFFFFF;
+  --brand-card: #E9DEF0;
+  --brand-primary: #5E3A87;
+  --brand-accent: #E0568A;
+  --brand-text: #2E1B42;
+  --brand-text-secondary: #7C648E;
+  --brand-border: #DECEEC;
+  --brand-sidebar: #5E3A87;
+}
+
+[data-theme="carbonneon"] {
+  --brand-bg: #14161C;
+  --brand-surface: #1E222B;
+  --brand-card: #262B36;
+  --brand-primary: #00C2A8;
+  --brand-accent: #FF5DA2;
+  --brand-text: #EAF0F6;
+  --brand-text-secondary: #9AA6B5;
+  --brand-border: #333A47;
+  --brand-sidebar: #1E222B;
+}
+
+
+/* Redesign: airy card polish (Soft Pastel direction) */
+.card, .metric-card { border-radius: 20px; box-shadow: 0 8px 26px rgba(20, 30, 55, 0.07); }
+.stat-card { border-radius: 18px; }
+.card-elevated { border-radius: 20px; }
+
+
+/* ===== REDESIGN-POLISH-V2 (appended safe global layer — visual only) ===== */
+:root{
+  --rd-radius-lg:24px;
+  --rd-shadow:0 6px 22px rgba(20,30,55,0.08);
+  --rd-shadow-hover:0 12px 34px rgba(20,30,55,0.13);
+  --rd-ring:rgba(124,156,245,0.38);
+}
+body{ -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+.card, .metric-card{
+  border-radius:var(--rd-radius-lg);
+  box-shadow:var(--rd-shadow);
+  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+@media (hover:hover){
+  .card:hover, .metric-card:hover{ transform:translateY(-2px); box-shadow:var(--rd-shadow-hover); }
+}
+.btn, .btn-primary{
+  border-radius:14px;
+  transition:transform .12s ease, box-shadow .12s ease, filter .12s ease;
+}
+.btn:active, .btn-primary:active{ transform:translateY(1px) scale(.99); }
+.btn-primary{ box-shadow:0 6px 16px -5px var(--brand-primary); }
+.btn-primary:hover{ filter:brightness(1.05); box-shadow:0 10px 22px -6px var(--brand-primary); }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible{
+  outline:none; box-shadow:0 0 0 3px var(--rd-ring);
+}
+input, textarea, select{ border-radius:12px; transition:border-color .15s ease, box-shadow .15s ease; }
+/* ===== end REDESIGN-POLISH-V2 ===== */
+
+/* ============ Visual polish utilities (Cowork) ============ */
+@keyframes cw-fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes cw-slide-down { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes cw-bell-swing { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(14deg); } 30% { transform: rotate(-12deg); } 45% { transform: rotate(8deg); } 60% { transform: rotate(-6deg); } 75% { transform: rotate(3deg); } }
+@keyframes cw-shimmer { to { background-position: -200% 0; } }
+@keyframes cw-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+/* cw-alert — the LOUD one, for unread that somebody needs to notice.
+ *
+ * Dustin, 16 Aug: "lets make mine flash the notification bell more
+ * aggressively and flash message tab".
+ *
+ * cw-pulse is scale(1.05). That is a 5% size change on a 34px button and it is
+ * genuinely easy to look straight past — which had not mattered much, because
+ * until tonight 27 of 29 clients could not be notified at all, so almost nobody
+ * ever saw it fire.
+ *
+ * This one moves three things at once — size, a red glow ring, and opacity —
+ * because motion alone reads as decoration while a colour that appears and
+ * disappears reads as an alert. It stops at 1.35s per cycle rather than going
+ * faster: past about 1Hz a pulse stops looking urgent and starts looking
+ * broken, and a UI that looks broken gets ignored just as thoroughly as one
+ * that is too quiet.
+ */
+@keyframes cw-alert {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); }
+  35%      { transform: scale(1.16); box-shadow: 0 0 0 7px rgba(239, 68, 68, 0); }
+  70%      { transform: scale(1.04); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* The same idea for a small badge, which is too small to carry a glow ring. */
+@keyframes cw-alert-badge {
+  0%, 100% { transform: scale(1); }
+  30%      { transform: scale(1.3); }
+  60%      { transform: scale(1); }
+}
+@keyframes cw-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+/* Unread trainer-inbox thread: gentle full-row background pulse so an unseen
+   client message can't be missed. */
+@keyframes sym-unread-row {
+  0%, 100% { background: color-mix(in srgb, var(--brand-primary) 5%, transparent); }
+  50%      { background: color-mix(in srgb, var(--brand-primary) 15%, transparent); }
+}
+/* Unread dot with an expanding ripple. */
+@keyframes sym-unread-dot {
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(239,68,68,0.55); }
+  50%      { transform: scale(1.18); box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+}
+@keyframes cw-pop { 0% { transform: scale(1); } 40% { transform: scale(1.3); } 100% { transform: scale(1); } }
+@keyframes cw-flame-flicker { 0%, 100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.12) rotate(2deg); } }
+@keyframes cw-ring-pulse { 0%, 100% { stroke-width: 7; } 50% { stroke-width: 10; } }
+@keyframes cw-tick-in { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+
+/* Staggered entrance: add class to a container; direct children fade+rise in sequence */
+.cw-reveal > * { animation: cw-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.cw-reveal > *:nth-child(1) { animation-delay: 0s; }
+.cw-reveal > *:nth-child(2) { animation-delay: 0.06s; }
+.cw-reveal > *:nth-child(3) { animation-delay: 0.12s; }
+.cw-reveal > *:nth-child(4) { animation-delay: 0.18s; }
+.cw-reveal > *:nth-child(5) { animation-delay: 0.24s; }
+.cw-reveal > *:nth-child(6) { animation-delay: 0.3s; }
+.cw-reveal > *:nth-child(7) { animation-delay: 0.36s; }
+.cw-reveal > *:nth-child(8) { animation-delay: 0.42s; }
+
+/* Shimmer skeleton placeholder */
+.cw-skeleton { background: linear-gradient(100deg, var(--brand-card, #eef2fb) 30%, rgba(255,255,255,0.65) 50%, var(--brand-card, #eef2fb) 70%); background-size: 200% 100%; animation: cw-shimmer 1.3s linear infinite; border-radius: 10px; }
+
+/* Opt-in press feedback for tappable elements */
+.cw-press { transition: transform 0.08s ease; }
+.cw-press:active { transform: scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cw-reveal > *, .cw-skeleton { animation: none !important; }
+}
+
+[data-theme="sunsetcoral"] {
+  --brand-bg: #fff6f3;
+  --brand-surface: #ffffff;
+  --brand-card: #ffe0d8;
+  --brand-primary: #ff6b6b;
+  --brand-accent: #ff9f5a;
+  --brand-text: #2a1f26;
+  --brand-text-secondary: #8a6a63;
+  --brand-border: #f6e2dc;
+  --brand-sidebar: #7c3048;
+}
+[data-theme="aurora"] {
+  --brand-bg: #f3f7fb;
+  --brand-surface: #ffffff;
+  --brand-card: #dcefff;
+  --brand-primary: #3aa8c1;
+  --brand-accent: #8b6ff0;
+  --brand-text: #182233;
+  --brand-text-secondary: #5f7488;
+  --brand-border: #e2ecf3;
+  --brand-sidebar: #26506e;
+}
+[data-theme="citrus"] {
+  --brand-bg: #fbfdf3;
+  --brand-surface: #ffffff;
+  --brand-card: #e8f6d6;
+  --brand-primary: #5bbf3a;
+  --brand-accent: #ff8f3f;
+  --brand-text: #232a17;
+  --brand-text-secondary: #5f7a52;
+  --brand-border: #eaf0d8;
+  --brand-sidebar: #2f5d1e;
+}
+[data-theme="berrynoir"] {
+  --brand-bg: #f7f4fb;
+  --brand-surface: #ffffff;
+  --brand-card: #f3ddf0;
+  --brand-primary: #b5379a;
+  --brand-accent: #5b52e0;
+  --brand-text: #241a2e;
+  --brand-text-secondary: #8b7d9b;
+  --brand-border: #ece3f3;
+  --brand-sidebar: #3a2159;
+}
+[data-theme="oceandusk"] {
+  --brand-bg: #f2f6f8;
+  --brand-surface: #ffffff;
+  --brand-card: #d6eaee;
+  --brand-primary: #1f7a8c;
+  --brand-accent: #ff7a59;
+  --brand-text: #132330;
+  --brand-text-secondary: #6f8494;
+  --brand-border: #e0eaef;
+  --brand-sidebar: #0f4c81;
+}
+
+/* Card hover-lift + shine (additive utility) */
+.cw-lift { transition: transform .18s ease, box-shadow .18s ease; }
+.cw-lift:hover, .cw-lift:active { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(20,30,55,0.12); }
+@media (prefers-reduced-motion: reduce){ .cw-lift, .cw-lift:hover, .cw-lift:active { transform:none; transition:none; } }
+
+/* Branded logo loader (additive) */
+@keyframes cw-brand-breathe { 0%,100%{ transform:scale(.9); opacity:.55 } 50%{ transform:scale(1.05); opacity:1 } }
+.cw-brand-loader { animation: cw-brand-breathe 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce){ .cw-brand-loader{ animation:none; opacity:.85 } }
+
+/* Confetti (additive, used by milestone badges + celebrations) */
+@keyframes cw-confetti-fall {
+  0% { transform: translate(0,0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--cx), var(--cy)) rotate(var(--cr)); opacity: 0; }
+}
+
+/* Empty-state float (additive) */
+@keyframes cw-float { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-6px) } }
+.cw-float { animation: cw-float 3s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce){ .cw-float{ animation:none } }
+
+/* Chip pop (payment READY/BLOCKED/AWAITING state changes) */
+@keyframes cw-pop { 0%{ transform: scale(.7); opacity:.4 } 60%{ transform: scale(1.12) } 100%{ transform: scale(1); opacity:1 } }
+.cw-pop { animation: cw-pop .45s cubic-bezier(.2,1.5,.4,1); display: inline-block; }
+/* Global button press micro-interaction */
+button { transition: transform .1s ease; }
+button:active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce){ .cw-pop{ animation:none } button, button:active{ transform:none; transition:none } }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   POLISH LAYER — 2026-07-25
+   Additive only. Everything below is derived from the existing --brand-* tokens
+   with color-mix(), so all 21 themes gain the new tokens without editing a
+   single theme block. Revert = delete from this banner to the end of the file.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Interaction states — buttons finally respond to press/hover per theme */
+  --brand-primary-hover: color-mix(in srgb, var(--brand-primary) 88%, white);
+  --brand-primary-press: color-mix(in srgb, var(--brand-primary) 78%, black);
+  --brand-accent-soft:   color-mix(in srgb, var(--brand-accent) 16%, transparent);
+
+  /* Elevation — three levels so cards have depth instead of flat borders */
+  --brand-elev-1: color-mix(in srgb, var(--brand-surface) 97%, var(--brand-text));
+  --brand-elev-2: color-mix(in srgb, var(--brand-surface) 93%, var(--brand-text));
+  --brand-elev-3: color-mix(in srgb, var(--brand-surface) 88%, var(--brand-text));
+  --shadow-1: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.08);
+  --shadow-2: 0 4px 10px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.06);
+  --shadow-3: 0 12px 32px rgba(0,0,0,.16), 0 4px 8px rgba(0,0,0,.08);
+
+  /* Semantic states, tinted toward the active theme so a red error on Forest
+     no longer looks like a broken element pasted in from another app */
+  --brand-success: color-mix(in srgb, #3fb950 82%, var(--brand-primary));
+  --brand-warn:    color-mix(in srgb, #e0a83e 86%, var(--brand-primary));
+  --brand-danger:  color-mix(in srgb, #e5534b 88%, var(--brand-primary));
+  --brand-success-bg: color-mix(in srgb, var(--brand-success) 13%, transparent);
+  --brand-warn-bg:    color-mix(in srgb, var(--brand-warn) 13%, transparent);
+  --brand-danger-bg:  color-mix(in srgb, var(--brand-danger) 13%, transparent);
+
+  /* Chart series ramp — multi-line charts were reusing primary/accent only */
+  --chart-1: var(--brand-primary);
+  --chart-2: var(--brand-accent);
+  --chart-3: color-mix(in srgb, var(--brand-primary) 50%, var(--brand-accent));
+  --chart-4: color-mix(in srgb, var(--brand-accent) 62%, white);
+  --chart-5: color-mix(in srgb, var(--brand-primary) 62%, white);
+
+  /* Gradients — the single biggest "this looks expensive" change */
+  --grad-hero: linear-gradient(135deg, var(--brand-primary), color-mix(in srgb, var(--brand-primary) 62%, var(--brand-accent)));
+  --grad-cta:  linear-gradient(135deg, var(--brand-primary), color-mix(in srgb, var(--brand-primary) 72%, var(--brand-accent)));
+  --glow: color-mix(in srgb, var(--brand-accent) 55%, transparent);
+}
+
+/* ── Press feedback ─────────────────────────────────────────────────────────
+   Springier than the old flat scale(.97), and applied to anything tappable. */
+button, [role="button"], .cw-tap {
+  transition: transform .12s cubic-bezier(.34,1.56,.64,1), filter .12s ease;
+}
+button:active, [role="button"]:active, .cw-tap:active { transform: scale(.94); }
+button:disabled:active { transform: none; }
+
+/* ── Ripple (mounted by InteractionFX) ─────────────────────────────────── */
+/* Two classes, not one. `overflow` is safe on anything; `position` is NOT —
+   see InteractionFX for the floating button it threw off-screen mid-press.
+   Never merge these back together. */
+.cw-ripple-clip { overflow: hidden; }
+.cw-ripple-host { position: relative; }
+.cw-ripple {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  background: currentColor; opacity: .28; transform: scale(0);
+  animation: cw-ripple .55s cubic-bezier(.2,.8,.2,1) forwards;
+}
+@keyframes cw-ripple { to { transform: scale(2.6); opacity: 0; } }
+
+/* ── Reusable polish utilities ─────────────────────────────────────────── */
+.cw-grad-hero { background: var(--grad-hero); }
+.cw-grad-cta  { background: var(--grad-cta); }
+.cw-elev-1 { box-shadow: var(--shadow-1); }
+.cw-elev-2 { box-shadow: var(--shadow-2); }
+.cw-elev-3 { box-shadow: var(--shadow-3); }
+.cw-glow   { box-shadow: 0 0 24px var(--glow); }
+
+@keyframes cw-check-circle { to { stroke-dashoffset: 0; } }
+@keyframes cw-check-tick   { to { stroke-dashoffset: 0; } }
+.cw-check circle { stroke-dasharray: 151; stroke-dashoffset: 151; animation: cw-check-circle .42s ease-out forwards; }
+.cw-check path   { stroke-dasharray: 36;  stroke-dashoffset: 36;  animation: cw-check-tick .28s .34s ease-out forwards; }
+
+@keyframes cw-shake {
+  10%,90%{transform:translateX(-2px)} 20%,80%{transform:translateX(3px)}
+  30%,50%,70%{transform:translateX(-6px)} 40%,60%{transform:translateX(6px)}
+}
+.cw-shake { animation: cw-shake .42s; }
+
+@keyframes cw-sheen { to { transform: translateX(130%); } }
+.cw-sheen { position: relative; overflow: hidden; }
+.cw-sheen::after {
+  content:''; position:absolute; inset:0; transform: translateX(-130%);
+  background: linear-gradient(105deg, transparent 32%, color-mix(in srgb, white 55%, transparent) 50%, transparent 68%);
+  animation: cw-sheen .75s ease-out;
+}
+
+/* ── Accessibility: honour reduce-motion for everything above ───────────── */
+@media (prefers-reduced-motion: reduce) {
+  button, [role="button"], .cw-tap,
+  button:active, [role="button"]:active, .cw-tap:active { transform: none; transition: none; }
+  .cw-ripple, .cw-check circle, .cw-check path, .cw-shake, .cw-sheen::after { animation: none; }
+  .cw-check circle, .cw-check path { stroke-dashoffset: 0; }
+  .cw-ripple { display: none; }
+}
+/* MOVED HERE 2026-08-01, and the position is load-bearing.
+
+   These nine were appended at the END of the file, after the auto-dark block.
+   `[data-theme="blushcloud"]` and `[data-appearance="dark"]` are both single
+   attribute selectors on <html> — identical specificity — so the tie is broken
+   by SOURCE ORDER, and whichever comes last wins. The original 21 are declared
+   up here, before auto-dark, so auto-dark correctly overrides their surfaces on
+   a dark phone. The nine appended ones won the tie instead, which meant Violet
+   Dawn, Sunset Drift, Blush Cloud and Hot Pink kept WHITE cards on a dark phone
+   while the text tokens went near-white on top of them.
+
+   Found by the full-app audit: primary-coloured text at 1.2:1 on those four
+   under dark appearance. Not a colour-choice problem — a cascade-order one.
+   Anything added below the auto-dark block will break the same way. */
+
+/* ════════════════════════════════════════════════════════════════════════════
+   NINE SCHEMES ADDED 2026-08-01 — seven multicolour, two pink.
+   Revert = delete this block and the matching entries in ThemeProvider THEMES.
+
+   These are the first schemes with a THIRD colour. --brand-accent-2 is optional
+   everywhere: every derived token falls back to --brand-accent when it is
+   absent, so the original 21 two-colour schemes render byte-identically and
+   nothing had to be touched to add this.
+
+   Declared at the SAME specificity as the other themes ([data-theme="x"]) and
+   NOT under :root, for the reason written at the top of the visual-layer block:
+   a trailing :root that redefines a base token beats every theme on the tie and
+   collapses all of them into one palette.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ===== THEME: Midnight Aurora — midnight blue, cyan, violet ===== */
+[data-theme="midnightaurora"] {
+  --brand-bg: #0D1117;
+  --brand-surface: #161C26;
+  --brand-card: #1B2430;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #22D3EE;
+  --brand-accent-2: #A78BFA;
+  --brand-text: #E6EDF3;
+  --brand-text-secondary: #8B98A9;
+  --brand-border: #26303D;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Midnight Ember — midnight blue, coral, amber ===== */
+[data-theme="midnightember"] {
+  --brand-bg: #0B0E14;
+  --brand-surface: #151A22;
+  --brand-card: #1A212B;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #FB7185;
+  --brand-accent-2: #FBBF24;
+  --brand-text: #EDF1F7;
+  --brand-text-secondary: #94A0B0;
+  --brand-border: #242D3A;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Midnight Citrus — midnight blue, sky, lime ===== */
+[data-theme="midnightcitrus"] {
+  --brand-bg: #0D1117;
+  --brand-surface: #151B24;
+  --brand-card: #1A2230;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #38BDF8;
+  --brand-accent-2: #A3E635;
+  --brand-text: #E6EDF3;
+  --brand-text-secondary: #8D9AAB;
+  --brand-border: #253040;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Midnight Orchid — midnight blue, deep purple, orchid ===== */
+[data-theme="midnightorchid"] {
+  --brand-bg: #0C0F17;
+  --brand-surface: #151A24;
+  --brand-card: #1B2130;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #7C3AED;
+  --brand-accent-2: #E879F9;
+  --brand-text: #EDEFF7;
+  --brand-text-secondary: #939CB2;
+  --brand-border: #262E40;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Violet Dawn — midnight blue, deep purple, lilac — the light one ===== */
+[data-theme="violetdawn"] {
+  --brand-bg: #F4F3FC;
+  --brand-surface: #FFFFFF;
+  --brand-card: #E7E4FA;
+  --brand-primary: #1D4ED8;
+  --brand-accent: #6D28D9;
+  --brand-accent-2: #C4B5FD;
+  --brand-text: #14102B;
+  --brand-text-secondary: #5F5B85;
+  --brand-border: #D5D0F2;
+  --brand-sidebar: #1D4ED8;
+}
+
+/* ===== THEME: Sunset Drift — magenta, orange, gold ===== */
+[data-theme="sunsetdrift"] {
+  --brand-bg: #FFF6F2;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FFE8DC;
+  --brand-primary: #BE185D;
+  --brand-accent: #F97316;
+  --brand-accent-2: #FBBF24;
+  --brand-text: #2A0B14;
+  --brand-text-secondary: #8A5A61;
+  --brand-border: #F8CDB8;
+  --brand-sidebar: #BE185D;
+}
+
+/* ===== THEME: Deep Reef — teal, jade, purple ===== */
+[data-theme="deepreef"] {
+  --brand-bg: #0A1418;
+  --brand-surface: #121E24;
+  --brand-card: #17272E;
+  --brand-primary: #0E7490;
+  --brand-accent: #14B8A6;
+  --brand-accent-2: #A855F7;
+  --brand-text: #E4F2F5;
+  --brand-text-secondary: #86A3AC;
+  --brand-border: #1E323A;
+  --brand-sidebar: #0E7490;
+}
+
+/* ===== THEME: Blush Cloud — baby pink ===== */
+[data-theme="blushcloud"] {
+  --brand-bg: #FFF5F8;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FDE7EF;
+  --brand-primary: #E1789F;
+  --brand-accent: #F9A8D4;
+  --brand-accent-2: #FBCFE8;
+  --brand-text: #3A1225;
+  --brand-text-secondary: #9A6478;
+  --brand-border: #F7CEDD;
+  --brand-sidebar: #E1789F;
+}
+
+/* ===== THEME: Hot Pink — hot pink with a violet third ===== */
+[data-theme="hotpink"] {
+  --brand-bg: #FFF0F7;
+  --brand-surface: #FFFFFF;
+  --brand-card: #FFD9EC;
+  --brand-primary: #FF1F8F;
+  --brand-accent: #FF6FB5;
+  --brand-accent-2: #7C3AED;
+  --brand-text: #2E0418;
+  --brand-text-secondary: #8E3563;
+  --brand-border: #FFC2DE;
+  --brand-sidebar: #FF1F8F;
+}
+
+
+
+/* ── Auto dark mode (2026-07-25) ───────────────────────────────────────────
+   Applied by <AutoDark/> ONLY when the active theme is genuinely light — it
+   measures --brand-bg luminance at runtime, so already-dark themes (midnight,
+   carbonneon, berry…) are never double-darkened, and a new theme needs no
+   change here. Surfaces are derived from the theme's own primary so each
+   theme keeps its character instead of collapsing to the same grey.
+   Revert = delete this block + the AutoDark mount. */
+[data-appearance="dark"] {
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 14%, #0c0f14);
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 18%, #141922);
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 24%, #1b212c);
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 34%, #2a3140);
+  --brand-text:           #E6EDF3;
+  --brand-text-secondary: #93A1B1;
+  --brand-sidebar: color-mix(in srgb, var(--brand-primary) 22%, #0a0d12);
+
+  /* Elevation reads as lift, not shadow, on a dark surface */
+  --brand-elev-1: color-mix(in srgb, var(--brand-surface) 94%, white);
+  --brand-elev-2: color-mix(in srgb, var(--brand-surface) 88%, white);
+  --brand-elev-3: color-mix(in srgb, var(--brand-surface) 82%, white);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.5);
+  --shadow-2: 0 4px 12px rgba(0,0,0,.55);
+  --shadow-3: 0 14px 34px rgba(0,0,0,.65);
+}
+/* Native controls (date pickers, scrollbars) follow too */
+[data-appearance="dark"] { color-scheme: dark; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   VISUAL LAYER 2 — 2026-07-25
+   Additive only, appended last so it wins on equal specificity without editing
+   any rule above. Revert = delete from this banner to the end of the file.
+
+   Note on #47/#48: the --shadow-* and --chart-* tokens were already defined in
+   the polish layer above but nothing ever USED them — .card still carried
+   hardcoded shadows and charts still had hardcoded hex. This block is the
+   wiring, which is where the visible difference actually comes from.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── #48 Elevation, applied ────────────────────────────────────────────────
+   Three deliberate levels instead of every card carrying the same flat pair of
+   shadows. The tokens are theme-aware and already have dark-mode variants, so
+   this follows the appearance setting for free. */
+.card            { box-shadow: var(--shadow-1); }
+.card-hover:hover{ box-shadow: var(--shadow-2); transform: translateY(-2px); }
+.card-elevated   { box-shadow: var(--shadow-3); }
+
+.elev-0 { box-shadow: none; }
+.elev-1 { box-shadow: var(--shadow-1); }
+.elev-2 { box-shadow: var(--shadow-2); }
+.elev-3 { box-shadow: var(--shadow-3); }
+
+/* Anything that floats over the page sits at the top level, so a sheet reads
+   as being above the content rather than pasted onto it. */
+[role="dialog"], .cw-sheet { box-shadow: var(--shadow-3); }
+
+/* ── #5 Gold sweep on success ──────────────────────────────────────────────
+   A Symmetry-gold shine crosses the control when an action actually lands.
+   Opt-in per element: add .cw-sweep, then toggle .is-success when it succeeds.
+   The sweep is a pseudo-element, so it never disturbs layout or the label. */
+.cw-sweep { position: relative; overflow: hidden; }
+.cw-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-130%);
+  background: linear-gradient(
+    105deg,
+    transparent 32%,
+    rgba(255, 214, 138, 0.62) 50%,
+    transparent 68%
+  );
+}
+.cw-sweep.is-success::after { animation: cw-sweep 0.8s cubic-bezier(.25,.8,.3,1) 1; }
+@keyframes cw-sweep { to { transform: translateX(130%); } }
+
+/* ── #6 Error shake ────────────────────────────────────────────────────────
+   A failed save used to do nothing at all, which reads as "the button is
+   broken". A short shake says the tap registered and the action didn't. */
+@keyframes cw-shake {
+  10%, 90% { transform: translateX(-1.5px); }
+  20%, 80% { transform: translateX(3px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
+.cw-shake { animation: cw-shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+
+/* ── #61 Streak flame ──────────────────────────────────────────────────────
+   Flicker speed and glow scale with the streak; the tiers are set inline by
+   <StreakFlame/>. Kept here so the keyframes exist once, not per element. */
+@keyframes cw-flame-rise {
+  0%, 100% { transform: scale(1) translateY(0) rotate(-1.5deg); }
+  35%      { transform: scale(1.09) translateY(-1px) rotate(1.5deg); }
+  70%      { transform: scale(0.97) translateY(0.5px) rotate(-1deg); }
+}
+
+/* ── Accessibility ─────────────────────────────────────────────────────────
+   Every effect above is decoration. Someone who asked their device for less
+   motion gets the end state instantly, not a softened version of the animation. */
+@media (prefers-reduced-motion: reduce) {
+  .cw-sweep.is-success::after,
+  .cw-shake,
+  [style*="cw-flame-rise"],
+  [style*="cw-flame-flicker"] {
+    animation: none !important;
+  }
+  .card-hover:hover { transform: none; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   VISUAL LAYER 3 — 2026-07-25 · the "expensive" pass
+   Additive, appended last. Revert = delete from this banner to the end.
+
+   IMPORTANT — why nothing here redefines --brand-bg / --brand-surface:
+   the 21 themes are declared as `:root, [data-theme="navy"]` and
+   `[data-theme="…"]`, all at the SAME specificity. A trailing `:root` block
+   redefining a base token would win the tie against EVERY theme and collapse
+   all 21 to one palette. So depth is added by DERIVING new tokens with
+   color-mix() and applying them at the point of use, where var(--brand-*)
+   still resolves per-theme.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Deeper scheme, derived per theme ───────────────────────────────────
+     Each of these reads the theme's OWN primary, so every scheme gains the
+     same depth while keeping its character. */
+
+  /* Page: a soft column of the theme's colour falling from the top, instead of
+     one flat fill. This is most of the "it has depth now" feeling. */
+  --brand-bg-deep:
+    radial-gradient(1100px 620px at 50% -12%,
+      color-mix(in srgb, var(--brand-primary) 13%, var(--brand-bg)) 0%,
+      color-mix(in srgb, var(--brand-primary) 4%, var(--brand-bg)) 46%,
+      var(--brand-bg) 78%);
+
+  /* Surfaces: a barely-there vertical grade so a card isn't a flat rectangle. */
+  --surface-deep:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--brand-surface) 99%, white) 0%,
+      color-mix(in srgb, var(--brand-surface) 96%, var(--brand-primary)) 100%);
+
+  /* Borders tinted toward the theme rather than a neutral grey line. */
+  --hairline: color-mix(in srgb, var(--brand-border) 72%, var(--brand-primary));
+  --hairline-soft: color-mix(in srgb, var(--brand-border) 86%, transparent);
+
+  /* Frosted chrome */
+  --glass-bg: color-mix(in srgb, var(--brand-surface) 72%, transparent);
+  --glass-edge: color-mix(in srgb, white 26%, transparent);
+}
+
+/* ── UPGRADE 1 · Frosted glass chrome ──────────────────────────────────────
+   Headers, bottom nav and sheets stop being opaque slabs and let the content
+   blur through them. This is the single strongest "premium mobile app" signal
+   there is, and it costs one property.
+
+   Guarded by @supports: a browser without backdrop-filter keeps the solid
+   background it has today rather than getting a see-through bar.
+
+   DELIBERATELY NOT ON THE STICKY HEADERS. backdrop-filter makes an element a
+   containing block for position:fixed descendants, and both headers contain
+   fixed popovers — HeaderAssist's tip panel and the NotificationCenter
+   dropdown. Frosting them would anchor those panels to a ~40px-tall bar
+   instead of the viewport and clip them. The bottom nav has no fixed children,
+   so it takes the effect safely. Anything frosted in future must be checked
+   for fixed descendants first. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .cw-glass {
+    background: var(--glass-bg) !important;
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
+    backdrop-filter: saturate(180%) blur(18px);
+  }
+  /* A hairline of light on the edge facing the content — what sells it as
+     glass rather than just transparency. */
+  .cw-glass-top { box-shadow: inset 0 1px 0 var(--glass-edge); }
+  .cw-glass-bottom { box-shadow: inset 0 -1px 0 var(--glass-edge); }
+}
+
+/* ── UPGRADE 2 · Numeric typography ────────────────────────────────────────
+   tabular-nums is the difference between a dashboard and a spreadsheet-shaped
+   web page. Digits get identical widths, so a counting-up number stops
+   jittering, columns of stats line up, and a weight going 197.0 -> 198.0 no
+   longer nudges the layout sideways.
+
+   Applied app-wide because this product is mostly numbers. */
+body {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Large type gets optical tightening. Display sizes set at default tracking
+   always read slightly loose — the bigger the text, the tighter it wants to be. */
+h1, .text-2xl, .text-3xl, .text-4xl { letter-spacing: -0.021em; }
+h2, .text-xl { letter-spacing: -0.014em; }
+h3, .text-lg { letter-spacing: -0.008em; }
+
+/* Headings break across lines evenly instead of leaving one orphan word. */
+h1, h2, h3 { text-wrap: balance; }
+
+/* ── UPGRADE 3 · Specular card edge ────────────────────────────────────────
+   The detail that separates expensive UI from adequate UI: a 1px highlight
+   along the top edge, as if a light source sits above the screen. Combined
+   with the elevation shadows already in place, a card reads as a physical
+   surface catching light rather than a div with a border.
+
+   Layered as inset box-shadows so it composes with the elevation tokens
+   instead of replacing them. */
+.card,
+.cw-surface {
+  background-image: var(--surface-deep);
+  border-color: var(--hairline-soft);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    var(--shadow-1);
+}
+.card-hover:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    var(--shadow-2);
+}
+.card-elevated {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    var(--shadow-3);
+}
+
+/* On a dark appearance a white highlight is wrong — light catches an edge far
+   more faintly, and the border does more of the work. */
+[data-appearance="dark"] .card,
+[data-appearance="dark"] .cw-surface {
+  background-image: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    var(--shadow-1);
+}
+[data-appearance="dark"] .card-hover:hover {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.09), var(--shadow-2);
+}
+[data-appearance="dark"] .card-elevated {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), var(--shadow-3);
+}
+[data-appearance="dark"] .cw-glass { --glass-edge: rgba(255,255,255,0.09); }
+
+/* Selection and focus follow the theme instead of the browser default blue. */
+::selection {
+  background: color-mix(in srgb, var(--brand-primary) 28%, transparent);
+  color: var(--brand-text);
+}
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand-primary) 70%, transparent);
+  outline-offset: 2px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   NATIVE CONTROLS IN DARK THEMES — feedback f6d884cd, 2026-07-31
+   "Dark mode issue, white background with white text" (reported from /home).
+
+   The culprit was never app CSS — it was the browser's own widgets. A <select>
+   is styled by us (dark background, --brand-text foreground), but the DROPDOWN
+   the OS opens is drawn by the UA: white background, colour INHERITED from the
+   select. In a dark theme that inherited colour is #E6EDF3, so the client list
+   on /home opened as white text on a white sheet. Same story for the native
+   date/time picker panels and the scrollbars.
+
+   `color-scheme` is the real switch for that, and it was only ever set under
+   [data-appearance="dark"] — the override AutoDark applies to LIGHT themes on a
+   dark phone. Themes that are dark by design (midnight, carbonneon, berry,
+   plumdusk, lagoon, orchid, slatepop) never got it, so they were the only ones
+   showing the bug. AutoDark now sets color-scheme from the measured --brand-bg
+   luminance, so every dark theme gets it with no hardcoded theme list.
+
+   The option/optgroup rules below are the belt-and-braces half: some Android
+   WebView builds ignore color-scheme for the select popup specifically.
+   ════════════════════════════════════════════════════════════════════════════ */
+option,
+optgroup {
+  background-color: var(--brand-surface);
+  color: var(--brand-text);
+}
+option:checked,
+option:hover {
+  background-color: color-mix(in srgb, var(--brand-primary) 30%, var(--brand-surface));
+  color: var(--brand-text);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TRAINER TOP STRIP — the row holding Client View + the notification bell.
+
+   It was `position: sticky; top: 0` inside `.flex-1.overflow-y-auto`. Sticky
+   resolves against the nearest SCROLLPORT, and that wrapper is one (overflow-y
+   is auto), but it has no height cap, so it never scrolls internally — the
+   strip therefore never stuck to anything. It just scrolled with the page and
+   slid up into the `fixed` mobile top bar, which is why the bell came back
+   half-cut after navigating to a notification and returning: the restored
+   scroll position parked it right through the header.
+
+   We cannot simply drop the wrapper's overflow to repair sticky, because that
+   would let wide children overflow the page horizontally. So on mobile the
+   strip becomes `fixed` and lives INSIDE the blue header bar, using the empty
+   space to the right of the logo. It can no longer collide with the header
+   because it is now part of it, and the bell is always on screen.
+
+   Desktop (>=1024px) has no fixed bar and no collision, so it keeps the
+   original in-flow sticky row.
+   ════════════════════════════════════════════════════════════════════════════ */
+.trainer-top-strip {
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 6px;
+  background: var(--brand-bg);
+}
+/* No mobile rule any more, on purpose.
+   This used to go `position: fixed` under 1024px so it could sit inside the
+   blue top bar. That made TWO independently positioned fixed elements aim at
+   the same corner, which depends on z-index, on safe-area insets resolving
+   identically in both, and on neither inheriting a stacking context from an
+   ancestor. It came back as "the bell is partially hidden" twice.
+   On mobile the bell now renders INSIDE the bar as a normal flex child
+   (TrainerSidebar's mobileActions), where overlap is not expressible. The
+   element above is desktop-only — the JSX carries `hidden lg:flex`, which is
+   also why `display` is no longer set here. */
+
+/* ════════════════════════════════════════════════════════════════════════════
+   APP BACKGROUND — and why it is not `background-attachment: fixed` on touch.
+
+   All three layout shells painted the page background with
+   `background-attachment: fixed` inline. On a desktop that is free. On a phone
+   it is one of the most reliable ways to make scrolling feel sticky: a fixed
+   background cannot be scrolled by the compositor, so every frame of every
+   scroll needs a full-viewport repaint on the main thread. Android WebViews
+   drop off the fast scrolling path entirely.
+
+   Desktop keeps the fixed background because that is where it looks best and
+   costs nothing. Touch devices get a normal scrolling background — the visual
+   difference on a mostly-flat colour is almost nothing, and the scroll goes
+   back to feeling native.
+   ════════════════════════════════════════════════════════════════════════════ */
+.app-bg {
+  background: var(--brand-bg-deep, var(--brand-bg));
+  background-attachment: fixed;
+}
+@media (hover: none) and (pointer: coarse) {
+  .app-bg { background-attachment: scroll; }
+}
+
+/* Bottom nav glass: cheaper on phones.
+   A full-width `position: fixed` bar with `saturate(180%) blur(18px)` has to
+   re-sample and re-blur everything behind it on every scroll frame. That is
+   real per-frame GPU work on a mid-range Android WebView and it shows up as
+   scroll that catches. Desktop keeps the full effect; touch devices get a
+   smaller radius, which reads almost identically at this size and costs a
+   fraction as much. */
+@media (hover: none) and (pointer: coarse) {
+  .cw-glass {
+    -webkit-backdrop-filter: saturate(140%) blur(8px);
+    backdrop-filter: saturate(140%) blur(8px);
+  }
+  nav.bottom-nav-bar {
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TRAINER CHROME FOLLOWS THE SCHEME — 2026-08-01
+   Additive. Revert = delete from this banner to the end of the file, and put
+   the three literal gradients back in TrainerSidebar/AppHeader.
+
+   THE BUG. The trainer sidebar and the trainer mobile top bar painted
+   themselves with a literal `linear-gradient(#0D3F6E, #0F4C81)` — the navy
+   theme's colours, frozen as hex. Client View's top bar used
+   `var(--brand-primary)` and always followed the scheme correctly. So picking
+   Forest or Rose recoloured the whole client side and left trainer chrome navy,
+   which is exactly how it was reported: "the top bar should be colour scheme,
+   client view is fine."
+
+   WHY THESE ARE TOKENS AND NOT INLINE color-mix() AT EACH SITE. Three separate
+   components were each carrying their own copy of the same navy. One token
+   means the next person recolours chrome in one place, and a literal hex
+   reappearing anywhere is now visibly the odd one out.
+
+   WHY NOT --brand-sidebar. Every theme declares it and NOTHING reads it, so it
+   has drifted: pastel's is #eef2fa, a near-white. The chrome it would paint
+   carries white text and white icons, so honouring that token would render the
+   trainer sidebar unreadable in at least one shipped theme. Deriving from
+   --brand-primary guarantees a dark enough field in all 21, because every
+   primary is already a colour we put white text on elsewhere.
+
+   The mix toward black is what keeps this from looking like a flat fill: it
+   gives the bar its own top-to-bottom fall of light, which is what the hand-
+   picked navy pair was doing. Deriving it reproduces that per theme. */
+/* WHY EVERY STOP IS MIXED TOWARD BLACK, INCLUDING THE MIDDLE ONE.
+   Chrome carries white text and white icons. Navy could afford a pure fill —
+   white on #0F4C81 is 8.9:1 — but nine of the 21 primaries cannot: pastel
+   #7c9cf5 is 2.7:1, carbonneon #00C2A8 is 2.3:1, citrus #5bbf3a is 2.3:1.
+   Those are unreadable, and a theme-derived bar that is unreadable in nine
+   themes is worse than the hardcoded navy it replaced.
+
+   CSS has no way to branch on luminance (color-contrast() is not shipped
+   broadly enough to rely on in a WebView), so instead of choosing an ink
+   colour per theme — a 21-entry list nobody would maintain, which is the exact
+   failure mode that produced this bug — every stop is floored by mixing toward
+   black. Measured across all 21 primaries the worst case is now 5.4:1
+   (carbonneon), and dark schemes simply get deeper rather than different.
+   Which is also what was asked for: "we went much deeper all around the app."
+
+   If you change these percentages, re-run the contrast check. Raising the
+   primary share above ~66% puts carbonneon, citrus and pastel back under 4.5:1. */
+:root {
+  /* Horizontal — top bars. Ends on a lean toward the theme's accent so the bar
+     carries two of the scheme's colours rather than one. */
+  --chrome-grad: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary) 46%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 62%, #000) 58%,
+    color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 42%, var(--brand-primary)) 62%, #000) 100%);
+
+  /* Vertical — the full-height desktop sidebar. Darker at both ends so the nav
+     items in the middle sit on the brightest part of the field. */
+  --chrome-grad-v: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-primary) 46%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 62%, #000) 40%,
+    color-mix(in srgb, var(--brand-primary) 54%, #000) 100%);
+}
+
+/* The sidebar's secondary label ("Trainer", under the name) was
+   rgba(255,255,255,0.5). Against navy that reads; against the lighter primaries
+   it disappears even with the floor above, because 50% white on a 5.4:1 field
+   is about 2:1. Raised to 0.72, which holds in every scheme and is still
+   clearly secondary to the name above it. */
+.chrome-subtle { color: rgba(255, 255, 255, 0.72); }
+
+/* Was `linear-gradient(135deg, #0D3F6E, #0F4C81)`. Currently unreferenced by
+   any component, but left correct so it cannot reintroduce the literal if
+   something starts using it again. */
+.page-header-home { background: var(--chrome-grad); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   THE THIRD COLOUR, AND THE DEPTH + GLOW OPTION — 2026-08-01
+   Additive. Revert = delete from this banner to the end of the file.
+
+   ── PART 1 · --brand-accent-2 ───────────────────────────────────────────────
+   Nine schemes now carry a third colour. Rather than add a parallel set of
+   rules for them, the gradients that already ran primary → accent gain a third
+   stop that falls back to the accent when the theme has no third colour. So
+   the 21 two-colour schemes render EXACTLY as before — the fallback resolves
+   the new stop to the same colour as the one before it, which is a no-op
+   gradient stop — and the multicolour schemes get their full run for free.
+
+   This is deliberately a small number of high-visibility surfaces rather than
+   everything: a third colour applied everywhere stops reading as a scheme and
+   starts reading as a bug. */
+/* background-IMAGE, not the `background` shorthand. Both of these clip their
+   gradient to the glyphs (`background-clip: text` + transparent text fill), and
+   the shorthand RESETS background-clip to border-box. Overriding with the
+   shorthand here painted the gradient across the whole box and left the text
+   invisible — a solid coloured bar where the client's name should be. Caught in
+   a render against the compiled CSS, not in review. */
+.gradient-text,
+.stat-number {
+  background-image: linear-gradient(135deg,
+    var(--brand-primary),
+    var(--brand-accent) 58%,
+    var(--brand-accent-2, var(--brand-accent)));
+}
+.progress-fill {
+  background-image: linear-gradient(90deg,
+    var(--brand-primary),
+    var(--brand-accent) 62%,
+    var(--brand-accent-2, var(--brand-accent)));
+}
+
+/* ── PART 2 · Depth & glow, opt-in ──────────────────────────────────────────
+   Dustin, 2026-08-01: "lets leave a toggle for plp to add the 20% glow. I love
+   it but some may not." So it is a per-person setting, OFF by default —
+   nobody's app changes appearance until they choose it.
+
+   Driven by data-deep on <html> (ThemeProvider), for the same reason as
+   data-theme: one attribute, one CSS block, and no component in the app needs
+   to know the setting exists.
+
+   RETUNED 2026-08-01 (second pass, after Dustin tested the first): "reset it to
+   about thirty five percent more deeper and also more of a distinct glow, maybe
+   just a little bit darker glow and a little more contrast on all of the
+   gradient boxes, a little more contrast where it switches colors."
+
+   So three things changed and the toggle itself did not — same setting, same
+   default, same attribute. Retuning constants beats adding a second switch:
+   nobody wants to choose between four glow intensities.
+
+   1. DEEPER: the visual-layer-3 mix shares now scale by 1.35 instead of 1.2.
+      Still literal, still one multiplier applied to every scheme, so no scheme
+      is hand-tuned and none of them drift apart.
+
+   2. DARKER, MORE DISTINCT GLOW: the halo colour is mixed toward black before
+      it is faded out, and the blur is tighter with a harder negative spread.
+      Blur radius is what makes a shadow read as vague; pulling it in while
+      raising opacity is what makes it read as deliberate. A 1px ring of the
+      primary was added underneath, which is what actually gives a block a
+      defined edge rather than a soft cloud around it.
+
+   3. GRADIENT CONTRAST: the three-colour runs now HOLD each colour for a
+      stretch before switching, instead of blending continuously across the
+      whole box. Two stops per colour rather than one. The ends are also pushed
+      apart — the primary end mixes toward black, the far end toward white — so
+      there is more range for the transition to happen across. This is what
+      makes a gradient read as three colours instead of one long smear.
+
+   WHY THE GLOW SELECTOR IS SHAPED LIKE THAT. Only 38 places in the app use the
+   .card class; the dashboard blocks are inline-styled divs with Tailwind's
+   rounded-2xl, which is this codebase's de-facto card radius. Buttons and
+   links are excluded because a glowing button reads as a focus state, which
+   would be actively misleading. */
+[data-deep="off"] { --block-glow: 0 0 0 transparent; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DEPTH & GLOW — off / 20 / 35 / 50.
+
+   TWO ROUNDS OF THIS WERE INVISIBLE ON A REAL PHONE, for two different reasons,
+   and both times my verification was softer than reality.
+
+   Round one only styled .card / .cw-surface / .rounded-2xl. The app's surfaces
+   are mostly inline `background: var(--brand-surface)` with a numeric
+   borderRadius and no class, so nothing on screen moved.
+
+   Round two deepened the tokens — right idea — but at 5/9/14% primary into the
+   surface. That reads clearly in a side-by-side render and not at all when you
+   flip between screens on a phone a minute apart. Colour vision is comparative,
+   not absolute: an effect that needs an A/B to notice does not exist in normal
+   use. And .metric-card, which draws the whole Progress grid, is a <button>,
+   caught by the blanket button exclusion that stops buttons glowing like a
+   focus ring.
+
+   So the steps are 10/20/30% now, and the selector names the surfaces this app
+   is actually built from, .metric-card by name.
+
+   THE CEILING IS SET BY CONTRAST, NOT TASTE. Text sits on these surfaces and
+   mixing the primary in moves their luminance. Measured across all 30 schemes,
+   natively and under auto-dark, 30% leaves the worst case at 6.2:1 (carbon
+   neon) against a 4.5:1 floor. Do not raise these without re-running that.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Level 20% ───────────────────────────────────────────────────────────── */
+/* ── CAPTURE THE THEME VALUE FIRST, ON html ─────────────────────────────────
+   `--brand-surface: color-mix(..., var(--brand-surface))` on `body` is a CYCLE,
+   not a re-derivation. I assumed the var() on the right would resolve against
+   the value inherited from html; it does not — a custom property that
+   references ITSELF on the SAME element is cyclic per spec, and the browser
+   makes it guaranteed-invalid. --brand-surface therefore computed to the EMPTY
+   STRING on body, and `.card { background: var(--brand-surface) }` resolved to
+   transparent. Cards had NO BACKGROUND AT ALL whenever depth was on, and it
+   read as "deeper" only because the tinted page showed straight through them.
+
+   Caught by probing getComputedStyle, not by looking at a screenshot — a
+   transparent card over a tinted page looks exactly like a tinted card, which
+   is why three rounds of eyeballing renders missed it.
+
+   The fix is one indirection: html captures the theme's value under a DIFFERENT
+   name, body derives the real token from that name. No property references
+   itself, so nothing is cyclic. */
+[data-deep="20"] {
+  --secondary-base: var(--brand-text-secondary);
+  --surface-base: var(--brand-surface);
+  --bg-base:      var(--brand-bg);
+  --card-base:    var(--brand-card);
+  --border-base:  var(--brand-border);
+}
+
+[data-deep="20"] body {
+  /* THE BRAND COLOUR HAS TO MOVE TOO. Reported after testing 20 vs off: "I
+     don't see any difference in the main color... the deep blue on this one
+     looks exactly the same on all settings." He was looking at the top bar,
+     which is the single largest block of scheme colour on any screen, and it
+     was not in the deepening at all — only surfaces were.
+
+     Only the CHROME gradient deepens, not --brand-primary itself. Primary is
+     also the colour of links, labels and icons sitting ON dark backgrounds in
+     the dark schemes; darkening the token would quietly cut the contrast of
+     every one of those. The chrome gradient carries white text, so mixing it
+     further toward black only ever improves its contrast. */
+  --chrome-grad: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary) 40%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 56%, #000) 55%,
+    color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 42%, var(--brand-primary)) 56%, #000) 100%);
+  --chrome-grad-v: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-primary) 40%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 56%, #000) 46%,
+    color-mix(in srgb, var(--brand-primary) 48%, #000) 100%);
+
+  /* On `body`, not `html`: the right-hand side reads the token it defines, and
+     on the same element that is a cycle and CSS drops the declaration. One
+     level down it resolves against the value inherited from the theme. */
+  /* Secondary text has to keep up with the surface it sits on. As the
+     card deepens toward the primary, #8893ab-style greys close the gap
+     with it — Soft Pastel drops to 2.4:1 at level 50. Pulling secondary
+     toward the main text colour by the same rule keeps the hierarchy
+     (still visibly quieter than the heading) without letting it fade
+     into the card. */
+  --brand-text-secondary: color-mix(in srgb, var(--brand-text) 12%, var(--secondary-base));
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 10%, var(--surface-base));
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 8%, var(--bg-base));
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 12%, var(--card-base));
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 28%, var(--border-base));
+  --hairline: color-mix(in srgb, var(--brand-border) 60%, var(--brand-primary));
+  --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
+  /* A gradient you can actually see. The first version ran from the surface
+     colour to a primary tint — same hue at both ends, so it read as "very
+     slightly uneven" rather than as a gradient. This runs ACROSS the scheme:
+     the accent in one corner, the surface through the middle, the primary in
+     the other. Two different hues is what makes a gradient legible.
+
+     Capped at 20%. Text sits on these; measured across all 30 schemes at
+     level 50, 20% leaves the worst corner at 4.8:1 and 26% drops carbon neon
+     to 4.4:1, under the floor. */
+  /* The top-edge gradient strip. The Challenge and Group cards had one and
+     nothing else did — "see how there is a top border gradient? I want that on
+     all boxes app wide."
+
+     Drawn as a BACKGROUND LAYER, not a ::before. A pseudo-element would need
+     position:relative on every card, and adding that globally changes the
+     containing block for any position:absolute child — which several of these
+     cards have. A background layer cannot break layout, and border-radius
+     clips it for free.
+
+     Runs primary -> accent -> the third colour, so multicolour schemes show
+     all three in the strip. */
+  --card-topbar: linear-gradient(90deg,
+    var(--brand-primary) 0%,
+    var(--brand-accent) 58%,
+    var(--brand-accent-2, var(--brand-accent)) 100%);
+  --card-topbar-h: 2.5px;
+
+  /* TRANSPARENT STOPS, NOT SURFACE-COLOURED ONES. This gradient is painted
+     over every card, and the first version mixed toward --brand-surface — an
+     opaque colour. On a card whose background is NOT the surface it simply
+     covered it: "Today's Workouts" is `background: var(--brand-primary)`, a
+     solid navy block, and the grade painted a grey sheet across it. Reported
+     as "why r these grey on all color schemes".
+
+     Mixing toward `transparent` instead makes it a TINT. It reads identically
+     on a normal surface card and leaves a coloured card its colour, which is
+     what an overlay should have been from the start. */
+  --surface-grade: linear-gradient(150deg,
+    color-mix(in srgb, var(--brand-accent) 5%, transparent) 0%,
+    transparent 46%,
+    color-mix(in srgb, var(--brand-primary) 8%, transparent) 100%);
+  --block-glow:
+    0 12px 26px -10px color-mix(in srgb, var(--glow-ink) 55%, transparent),
+    0 3px 10px -3px color-mix(in srgb, var(--brand-accent) 30%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-primary) 14%, transparent);
+}
+[data-deep="20"][data-appearance="dark"] body,
+[data-deep="20"][data-theme="midnight"] body,
+[data-deep="20"][data-theme="carbonneon"] body,
+[data-deep="20"][data-theme="midnightaurora"] body,
+[data-deep="20"][data-theme="midnightember"] body,
+[data-deep="20"][data-theme="midnightcitrus"] body,
+[data-deep="20"][data-theme="midnightorchid"] body,
+[data-deep="20"][data-theme="deepreef"] body {
+  --block-glow:
+    0 12px 28px -10px color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 62%, #000) 52%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 18%, transparent);
+}
+
+/* The strip is the raw scheme colours, which read fine against a light card
+   and disappear against a dark one — Deep Purple's primary is #4A148C, barely
+   separable from a dark surface. On dark the same gradient is lifted toward
+   white so the edge still reads. Light schemes keep the true colours, where
+   lifting them would wash the strip out instead. */
+[data-deep="20"][data-appearance="dark"] body,
+[data-deep="20"][data-theme="midnight"] body,
+[data-deep="20"][data-theme="carbonneon"] body,
+[data-deep="20"][data-theme="midnightaurora"] body,
+[data-deep="20"][data-theme="midnightember"] body,
+[data-deep="20"][data-theme="midnightcitrus"] body,
+[data-deep="20"][data-theme="midnightorchid"] body,
+[data-deep="20"][data-theme="deepreef"] body {
+  --card-topbar: linear-gradient(90deg,
+    color-mix(in srgb, var(--brand-primary) 55%, white) 0%,
+    color-mix(in srgb, var(--brand-accent) 72%, white) 58%,
+    color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 72%, white) 100%);
+}
+[data-deep="20"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="20"] [style*="var(--brand-card)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="20"] .card,
+[data-deep="20"] .metric-card,
+[data-deep="20"] .cw-surface,
+[data-deep="20"] .focus-panel,
+[data-deep="20"] .rounded-2xl:not(button):not(a):not([role="button"]) {
+  background-image: var(--card-topbar), var(--surface-grade) !important;
+  background-repeat: no-repeat, no-repeat !important;
+  background-size: 100% var(--card-topbar-h), 100% 100% !important;
+  background-position: top left, center !important;
+  box-shadow: var(--block-glow), var(--shadow-1);
+}
+[data-deep="20"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
+[data-deep="20"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
+
+/* ── Level 35% ───────────────────────────────────────────────────────────── */
+[data-deep="35"] {
+  --secondary-base: var(--brand-text-secondary);
+  --surface-base: var(--brand-surface);
+  --bg-base:      var(--brand-bg);
+  --card-base:    var(--brand-card);
+  --border-base:  var(--brand-border);
+}
+
+[data-deep="35"] body {
+  /* THE BRAND COLOUR HAS TO MOVE TOO. Reported after testing 20 vs off: "I
+     don't see any difference in the main color... the deep blue on this one
+     looks exactly the same on all settings." He was looking at the top bar,
+     which is the single largest block of scheme colour on any screen, and it
+     was not in the deepening at all — only surfaces were.
+
+     Only the CHROME gradient deepens, not --brand-primary itself. Primary is
+     also the colour of links, labels and icons sitting ON dark backgrounds in
+     the dark schemes; darkening the token would quietly cut the contrast of
+     every one of those. The chrome gradient carries white text, so mixing it
+     further toward black only ever improves its contrast. */
+  --chrome-grad: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary) 32%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 48%, #000) 55%,
+    color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 42%, var(--brand-primary)) 48%, #000) 100%);
+  --chrome-grad-v: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-primary) 32%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 48%, #000) 46%,
+    color-mix(in srgb, var(--brand-primary) 40%, #000) 100%);
+
+  /* On `body`, not `html`: the right-hand side reads the token it defines, and
+     on the same element that is a cycle and CSS drops the declaration. One
+     level down it resolves against the value inherited from the theme. */
+  /* Secondary text has to keep up with the surface it sits on. As the
+     card deepens toward the primary, #8893ab-style greys close the gap
+     with it — Soft Pastel drops to 2.4:1 at level 50. Pulling secondary
+     toward the main text colour by the same rule keeps the hierarchy
+     (still visibly quieter than the heading) without letting it fade
+     into the card. */
+  --brand-text-secondary: color-mix(in srgb, var(--brand-text) 22%, var(--secondary-base));
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 20%, var(--surface-base));
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 16%, var(--bg-base));
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 22%, var(--card-base));
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 48%, var(--border-base));
+  --hairline: color-mix(in srgb, var(--brand-border) 60%, var(--brand-primary));
+  --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
+  /* A gradient you can actually see. The first version ran from the surface
+     colour to a primary tint — same hue at both ends, so it read as "very
+     slightly uneven" rather than as a gradient. This runs ACROSS the scheme:
+     the accent in one corner, the surface through the middle, the primary in
+     the other. Two different hues is what makes a gradient legible.
+
+     Capped at 20%. Text sits on these; measured across all 30 schemes at
+     level 50, 20% leaves the worst corner at 4.8:1 and 26% drops carbon neon
+     to 4.4:1, under the floor. */
+  /* The top-edge gradient strip. The Challenge and Group cards had one and
+     nothing else did — "see how there is a top border gradient? I want that on
+     all boxes app wide."
+
+     Drawn as a BACKGROUND LAYER, not a ::before. A pseudo-element would need
+     position:relative on every card, and adding that globally changes the
+     containing block for any position:absolute child — which several of these
+     cards have. A background layer cannot break layout, and border-radius
+     clips it for free.
+
+     Runs primary -> accent -> the third colour, so multicolour schemes show
+     all three in the strip. */
+  --card-topbar: linear-gradient(90deg,
+    var(--brand-primary) 0%,
+    var(--brand-accent) 58%,
+    var(--brand-accent-2, var(--brand-accent)) 100%);
+  --card-topbar-h: 3px;
+
+  /* TRANSPARENT STOPS, NOT SURFACE-COLOURED ONES. This gradient is painted
+     over every card, and the first version mixed toward --brand-surface — an
+     opaque colour. On a card whose background is NOT the surface it simply
+     covered it: "Today's Workouts" is `background: var(--brand-primary)`, a
+     solid navy block, and the grade painted a grey sheet across it. Reported
+     as "why r these grey on all color schemes".
+
+     Mixing toward `transparent` instead makes it a TINT. It reads identically
+     on a normal surface card and leaves a coloured card its colour, which is
+     what an overlay should have been from the start. */
+  --surface-grade: linear-gradient(150deg,
+    color-mix(in srgb, var(--brand-accent) 8%, transparent) 0%,
+    transparent 46%,
+    color-mix(in srgb, var(--brand-primary) 14%, transparent) 100%);
+  --block-glow:
+    0 12px 26px -10px color-mix(in srgb, var(--glow-ink) 72%, transparent),
+    0 3px 10px -3px color-mix(in srgb, var(--brand-accent) 44%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-primary) 22%, transparent);
+}
+[data-deep="35"][data-appearance="dark"] body,
+[data-deep="35"][data-theme="midnight"] body,
+[data-deep="35"][data-theme="carbonneon"] body,
+[data-deep="35"][data-theme="midnightaurora"] body,
+[data-deep="35"][data-theme="midnightember"] body,
+[data-deep="35"][data-theme="midnightcitrus"] body,
+[data-deep="35"][data-theme="midnightorchid"] body,
+[data-deep="35"][data-theme="deepreef"] body {
+  --block-glow:
+    0 12px 28px -10px color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 62%, #000) 68%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 28%, transparent);
+}
+
+/* The strip is the raw scheme colours, which read fine against a light card
+   and disappear against a dark one — Deep Purple's primary is #4A148C, barely
+   separable from a dark surface. On dark the same gradient is lifted toward
+   white so the edge still reads. Light schemes keep the true colours, where
+   lifting them would wash the strip out instead. */
+[data-deep="35"][data-appearance="dark"] body,
+[data-deep="35"][data-theme="midnight"] body,
+[data-deep="35"][data-theme="carbonneon"] body,
+[data-deep="35"][data-theme="midnightaurora"] body,
+[data-deep="35"][data-theme="midnightember"] body,
+[data-deep="35"][data-theme="midnightcitrus"] body,
+[data-deep="35"][data-theme="midnightorchid"] body,
+[data-deep="35"][data-theme="deepreef"] body {
+  --card-topbar: linear-gradient(90deg,
+    color-mix(in srgb, var(--brand-primary) 55%, white) 0%,
+    color-mix(in srgb, var(--brand-accent) 72%, white) 58%,
+    color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 72%, white) 100%);
+}
+[data-deep="35"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="35"] [style*="var(--brand-card)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="35"] .card,
+[data-deep="35"] .metric-card,
+[data-deep="35"] .cw-surface,
+[data-deep="35"] .focus-panel,
+[data-deep="35"] .rounded-2xl:not(button):not(a):not([role="button"]) {
+  background-image: var(--card-topbar), var(--surface-grade) !important;
+  background-repeat: no-repeat, no-repeat !important;
+  background-size: 100% var(--card-topbar-h), 100% 100% !important;
+  background-position: top left, center !important;
+  box-shadow: var(--block-glow), var(--shadow-1);
+}
+[data-deep="35"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
+[data-deep="35"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
+
+/* ── Level 50% ───────────────────────────────────────────────────────────── */
+[data-deep="50"] {
+  --secondary-base: var(--brand-text-secondary);
+  --surface-base: var(--brand-surface);
+  --bg-base:      var(--brand-bg);
+  --card-base:    var(--brand-card);
+  --border-base:  var(--brand-border);
+}
+
+[data-deep="50"] body {
+  /* THE BRAND COLOUR HAS TO MOVE TOO. Reported after testing 20 vs off: "I
+     don't see any difference in the main color... the deep blue on this one
+     looks exactly the same on all settings." He was looking at the top bar,
+     which is the single largest block of scheme colour on any screen, and it
+     was not in the deepening at all — only surfaces were.
+
+     Only the CHROME gradient deepens, not --brand-primary itself. Primary is
+     also the colour of links, labels and icons sitting ON dark backgrounds in
+     the dark schemes; darkening the token would quietly cut the contrast of
+     every one of those. The chrome gradient carries white text, so mixing it
+     further toward black only ever improves its contrast. */
+  --chrome-grad: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary) 24%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 40%, #000) 55%,
+    color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 42%, var(--brand-primary)) 40%, #000) 100%);
+  --chrome-grad-v: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-primary) 24%, #000) 0%,
+    color-mix(in srgb, var(--brand-primary) 40%, #000) 46%,
+    color-mix(in srgb, var(--brand-primary) 32%, #000) 100%);
+
+  /* On `body`, not `html`: the right-hand side reads the token it defines, and
+     on the same element that is a cycle and CSS drops the declaration. One
+     level down it resolves against the value inherited from the theme. */
+  /* Secondary text has to keep up with the surface it sits on. As the
+     card deepens toward the primary, #8893ab-style greys close the gap
+     with it — Soft Pastel drops to 2.4:1 at level 50. Pulling secondary
+     toward the main text colour by the same rule keeps the hierarchy
+     (still visibly quieter than the heading) without letting it fade
+     into the card. */
+  --brand-text-secondary: color-mix(in srgb, var(--brand-text) 32%, var(--secondary-base));
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 30%, var(--surface-base));
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 24%, var(--bg-base));
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 32%, var(--card-base));
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 68%, var(--border-base));
+  --hairline: color-mix(in srgb, var(--brand-border) 60%, var(--brand-primary));
+  --glow-ink: color-mix(in srgb, var(--brand-primary) 74%, #000);
+  /* A gradient you can actually see. The first version ran from the surface
+     colour to a primary tint — same hue at both ends, so it read as "very
+     slightly uneven" rather than as a gradient. This runs ACROSS the scheme:
+     the accent in one corner, the surface through the middle, the primary in
+     the other. Two different hues is what makes a gradient legible.
+
+     Capped at 20%. Text sits on these; measured across all 30 schemes at
+     level 50, 20% leaves the worst corner at 4.8:1 and 26% drops carbon neon
+     to 4.4:1, under the floor. */
+  /* The top-edge gradient strip. The Challenge and Group cards had one and
+     nothing else did — "see how there is a top border gradient? I want that on
+     all boxes app wide."
+
+     Drawn as a BACKGROUND LAYER, not a ::before. A pseudo-element would need
+     position:relative on every card, and adding that globally changes the
+     containing block for any position:absolute child — which several of these
+     cards have. A background layer cannot break layout, and border-radius
+     clips it for free.
+
+     Runs primary -> accent -> the third colour, so multicolour schemes show
+     all three in the strip. */
+  --card-topbar: linear-gradient(90deg,
+    var(--brand-primary) 0%,
+    var(--brand-accent) 58%,
+    var(--brand-accent-2, var(--brand-accent)) 100%);
+  --card-topbar-h: 3.5px;
+
+  /* TRANSPARENT STOPS, NOT SURFACE-COLOURED ONES. This gradient is painted
+     over every card, and the first version mixed toward --brand-surface — an
+     opaque colour. On a card whose background is NOT the surface it simply
+     covered it: "Today's Workouts" is `background: var(--brand-primary)`, a
+     solid navy block, and the grade painted a grey sheet across it. Reported
+     as "why r these grey on all color schemes".
+
+     Mixing toward `transparent` instead makes it a TINT. It reads identically
+     on a normal surface card and leaves a coloured card its colour, which is
+     what an overlay should have been from the start. */
+  --surface-grade: linear-gradient(150deg,
+    color-mix(in srgb, var(--brand-accent) 12%, transparent) 0%,
+    transparent 46%,
+    color-mix(in srgb, var(--brand-primary) 20%, transparent) 100%);
+  --block-glow:
+    0 12px 26px -10px color-mix(in srgb, var(--glow-ink) 90%, transparent),
+    0 3px 10px -3px color-mix(in srgb, var(--brand-accent) 58%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-primary) 32%, transparent);
+}
+[data-deep="50"][data-appearance="dark"] body,
+[data-deep="50"][data-theme="midnight"] body,
+[data-deep="50"][data-theme="carbonneon"] body,
+[data-deep="50"][data-theme="midnightaurora"] body,
+[data-deep="50"][data-theme="midnightember"] body,
+[data-deep="50"][data-theme="midnightcitrus"] body,
+[data-deep="50"][data-theme="midnightorchid"] body,
+[data-deep="50"][data-theme="deepreef"] body {
+  --block-glow:
+    0 12px 28px -10px color-mix(in srgb,
+      color-mix(in srgb, var(--brand-accent) 62%, #000) 85%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 40%, transparent);
+}
+
+/* The strip is the raw scheme colours, which read fine against a light card
+   and disappear against a dark one — Deep Purple's primary is #4A148C, barely
+   separable from a dark surface. On dark the same gradient is lifted toward
+   white so the edge still reads. Light schemes keep the true colours, where
+   lifting them would wash the strip out instead. */
+[data-deep="50"][data-appearance="dark"] body,
+[data-deep="50"][data-theme="midnight"] body,
+[data-deep="50"][data-theme="carbonneon"] body,
+[data-deep="50"][data-theme="midnightaurora"] body,
+[data-deep="50"][data-theme="midnightember"] body,
+[data-deep="50"][data-theme="midnightcitrus"] body,
+[data-deep="50"][data-theme="midnightorchid"] body,
+[data-deep="50"][data-theme="deepreef"] body {
+  --card-topbar: linear-gradient(90deg,
+    color-mix(in srgb, var(--brand-primary) 55%, white) 0%,
+    color-mix(in srgb, var(--brand-accent) 72%, white) 58%,
+    color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 72%, white) 100%);
+}
+[data-deep="50"] [style*="var(--brand-surface)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="50"] [style*="var(--brand-card)"]:not(input):not(select):not(textarea):not(button):not(a):not([role="button"]),
+[data-deep="50"] .card,
+[data-deep="50"] .metric-card,
+[data-deep="50"] .cw-surface,
+[data-deep="50"] .focus-panel,
+[data-deep="50"] .rounded-2xl:not(button):not(a):not([role="button"]) {
+  background-image: var(--card-topbar), var(--surface-grade) !important;
+  background-repeat: no-repeat, no-repeat !important;
+  background-size: 100% var(--card-topbar-h), 100% 100% !important;
+  background-position: top left, center !important;
+  box-shadow: var(--block-glow), var(--shadow-1);
+}
+[data-deep="50"] .card-elevated { box-shadow: var(--block-glow), var(--shadow-3); }
+[data-deep="50"] .card-hover:hover { box-shadow: var(--block-glow), var(--shadow-2); }
+
+/* ── Gradient contrast — every level above off ──────────────────────────────
+   Each colour is held across a span before switching, instead of blending the
+   whole way. With --brand-accent-2 absent the fallback makes stops 3 and 4 the
+   same colour, so two-colour schemes get a hold-then-switch run rather than a
+   broken one.
+
+   This does NOT scale with the level. The level controls depth and glow; the
+   colour-switch contrast is a separate thing Dustin asked for once, and making
+   it a fourth axis would mean the 20% setting quietly also had weaker
+   gradients, which is not what "20% deeper" says on the tin. */
+[data-deep="20"] .gradient-text,
+[data-deep="35"] .gradient-text,
+[data-deep="50"] .gradient-text,
+[data-deep="20"] .stat-number,
+[data-deep="35"] .stat-number,
+[data-deep="50"] .stat-number {
+  background-image: linear-gradient(135deg,
+    color-mix(in srgb, var(--brand-primary) 88%, #000) 0%,
+    var(--brand-primary) 26%,
+    var(--brand-accent) 52%,
+    var(--brand-accent) 64%,
+    color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 88%, white) 100%);
+}
+[data-deep="20"] .progress-fill,
+[data-deep="35"] .progress-fill,
+[data-deep="50"] .progress-fill {
+  background-image: linear-gradient(90deg,
+    color-mix(in srgb, var(--brand-primary) 90%, #000) 0%,
+    var(--brand-primary) 30%,
+    var(--brand-accent) 58%,
+    var(--brand-accent) 70%,
+    color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 90%, white) 100%);
+}
+
+/* Motion-sensitive users get the colour, not an animated bloom. Matches any
+   on-level: [data-deep] is only ever "off" or a number. */
+@media (prefers-reduced-motion: reduce) {
+  [data-deep]:not([data-deep="off"]) .card,
+  [data-deep]:not([data-deep="off"]) .cw-surface,
+  [data-deep]:not([data-deep="off"]) .rounded-2xl:not(button):not(a):not([role="button"]) {
+    transition: none;
+  }
+}
+
+/* ── The focus panel — 2026-08-01 ───────────────────────────────────────────
+   Reported: "need to fix that can't read text." The weekly-focus card was
+   `background: #eef2ff` — a literal pale lavender — with its text set to
+   `color: var(--brand-text)`. Those two are fine together in a light theme and
+   catastrophic in a dark one, because --brand-text is #E6EDF3 there: near-white
+   text on a near-white panel, which is what the screenshot showed.
+
+   It also meant the panel was lavender in all 30 schemes, so Forest and Rose
+   had a blue box sitting in the middle of the dashboard.
+
+   Deriving it from --brand-surface fixes both at once: the panel is light on
+   light themes and dark on dark ones, always tinted toward the scheme, and
+   --brand-text is by definition readable on --brand-surface. Three components
+   had their own copy of the literal; they share this now. */
+.focus-panel {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--brand-primary) 9%, var(--brand-surface));
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 22%, var(--brand-border));
+  color: var(--brand-text);
+}
+
+/* ── Boxes must not touch — 2026-08-01 ──────────────────────────────────────
+   "need to fix spacing issue here where boxes touch."
+
+   Two cards with no gap were survivable when both were flat white on grey. The
+   moment each one gained a tinted fill, a coloured ring and a gradient strip
+   along its top edge, a zero gap reads as one malformed box rather than two
+   cards — the strip of the lower card sits directly against the border of the
+   upper one.
+
+   So the depth layer, which caused it, also pays for it: a floor on the gap
+   between stacked cards. `+` rather than a blanket margin so it only applies
+   between siblings that are actually adjacent, and nothing gains trailing space
+   at the bottom of a container. */
+/* The `+` version of this only caught cards that share a parent, and on the
+   Progress screen they mostly do not — MetricCards renders its own grid, the
+   Consistency card is a separate component, and nothing sat between them. A
+   bottom margin on the card itself does not care who its parent is.
+
+   Cards inside a grid pick up 12px of extra space below each row as well.
+   That is a slightly roomier grid, not a broken one, and it is the right trade
+   against two boxes with a gradient strip each sharing an edge. */
+[data-deep]:not([data-deep="off"]) .card,
+[data-deep]:not([data-deep="off"]) .metric-card {
+  margin-bottom: 12px;
+}
+/* Grid and flex containers set their own gap, which margin cannot fix from the
+   child. A minimum gap on the containers that hold cards covers those. */
+[data-deep]:not([data-deep="off"]) .grid:has(> .metric-card),
+[data-deep]:not([data-deep="off"]) .grid:has(> .card) {
+  gap: 12px;
+}
+
+/* ── The rows inside cards, app-wide ────────────────────────────────────────
+   "anywhere that has these long wide tabs, boarders around them app wide."
+
+   The pattern repeats everywhere: a list of rows inside a card, each row
+   painted `background: var(--brand-bg)` — 255 of them. On a flat white app
+   that was enough separation, because --brand-bg is visibly greyer than
+   --brand-surface. Once BOTH deepen toward the same primary they converge, and
+   a list of six lifts or three sessions reads as one slab of text.
+
+   One rule rather than 255 edits, matched the same way as the card surfaces —
+   on the inline style's own text. It uses an INSET box-shadow rather than a
+   border because these elements set their border inline and nothing in a
+   stylesheet outranks that; an inset ring lands just inside it and gives the
+   same edge. Controls are excluded — a ring on an input reads as focus.
+
+   Off is off: this whole block is inside the depth layer, so anyone who has
+   not opted in sees none of it. */
+[data-deep]:not([data-deep="off"]) [style*="var(--brand-bg)"]:not(input):not(select):not(textarea):not(a):not(.app-bg) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 26%, transparent);
+}
+/* A button that IS a row (the Personal Bests entries, saved-workout pickers)
+   still wants the edge; a button that is a control does not. Rows are wide, so
+   this only reinstates it where the element fills its container. */
+[data-deep]:not([data-deep="off"]) button[style*="var(--brand-bg)"][style*="width: 100%"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 26%, transparent);
+}
+
+/* ── Primary-coloured text, everywhere ─────────────────────────────────────
+   Found by the full-app audit, and it PRE-DATES the depth work — it fails with
+   depth off too. 141 places set `color: var(--brand-primary)` for a link or a
+   label, and the primary is chosen to look good as a FILL, not as text:
+
+     Deep Purple  #4A148C on a dark card   1.4:1
+     Charcoal     #2D2D2D on a dark card   1.2:1
+     Soft Pastel  #7c9cf5 on a white card  2.7:1
+     Citrus       #5bbf3a on a white card  2.3:1
+
+   Both directions are broken, and they need opposite corrections: on a dark
+   surface the primary has to be lifted toward white, on a light one pushed
+   toward black. CSS cannot branch on luminance, so the split is by appearance,
+   which is the thing that actually determines which way is wrong.
+
+   Matched on the inline style's own text so only the COLOUR property moves —
+   every place using the primary as a BACKGROUND keeps it exactly, buttons
+   included, which still need white text on the true primary. Both spellings of
+   the declaration are matched because the DOM serialises `color: var(...)` with
+   a space and hand-written markup often has none; missing one silently covers
+   half the cases, which is how the first attempt at this did nothing.
+
+   The result is still recognisably the scheme's colour — Forest reads as green,
+   Rose as pink — just at a weight you can actually read. */
+[style*="color: var(--brand-primary)"],
+[style*="color:var(--brand-primary)"] {
+  color: color-mix(in srgb, var(--brand-primary) 56%, #000) !important;
+}
+[data-appearance="dark"] [style*="color: var(--brand-primary)"],
+[data-appearance="dark"] [style*="color:var(--brand-primary)"],
+[data-theme="midnight"] [style*="color: var(--brand-primary)"],
+[data-theme="midnight"] [style*="color:var(--brand-primary)"],
+[data-theme="carbonneon"] [style*="color: var(--brand-primary)"],
+[data-theme="carbonneon"] [style*="color:var(--brand-primary)"],
+[data-theme="midnightaurora"] [style*="color: var(--brand-primary)"],
+[data-theme="midnightaurora"] [style*="color:var(--brand-primary)"],
+[data-theme="midnightember"] [style*="color: var(--brand-primary)"],
+[data-theme="midnightember"] [style*="color:var(--brand-primary)"],
+[data-theme="midnightcitrus"] [style*="color: var(--brand-primary)"],
+[data-theme="midnightcitrus"] [style*="color:var(--brand-primary)"],
+[data-theme="midnightorchid"] [style*="color: var(--brand-primary)"],
+[data-theme="midnightorchid"] [style*="color:var(--brand-primary)"],
+[data-theme="deepreef"] [style*="color: var(--brand-primary)"],
+[data-theme="deepreef"] [style*="color:var(--brand-primary)"] {
+  color: color-mix(in srgb, var(--brand-primary) 42%, white) !important;
+}
+
+/* Cards inside a grid or flex row already have `gap` doing the spacing, so the
+   bottom margin above is both redundant and harmful there: it eats into a
+   stretched grid item's height, and an item whose height is reduced no longer
+   matches its neighbour — which is why the top-left Progress tile came out
+   taller than the one beside it. Inside a grid the gap owns the spacing and the
+   item takes the full row height. */
+[data-deep]:not([data-deep="off"]) .grid > .card,
+[data-deep]:not([data-deep="off"]) .grid > .metric-card,
+[data-deep]:not([data-deep="off"]) .flex > .card,
+[data-deep]:not([data-deep="off"]) .flex > .metric-card {
+  margin-bottom: 0;
+  height: 100%;
+}
+
+/* ==========================================================================
+   MIC — RECORDING ANIMATION
+   Dustin, 14 Aug, after testing on the phone: "mic seems to work but needs
+   animation while recording."
+
+   A red button with a stop icon is a STATE. It does not tell you the app is
+   still listening to you, and standing in a gym holding a phone at arm's
+   length, "did that actually start?" is the only question that matters. So
+   while dictation is live the button shows moving sound bars inside a pulsing
+   halo — the bars say "hearing you", the halo says "still going" and is
+   readable from across the room.
+
+   Pure CSS, no JS timers: the Capacitor WebView drives these on the compositor
+   and a dropped frame costs nothing. Honoured by prefers-reduced-motion below.
+   ========================================================================== */
+
+@keyframes mic-halo {
+  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); }
+  70%  { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+@keyframes mic-bar {
+  0%, 100% { transform: scaleY(0.32); }
+  50%      { transform: scaleY(1); }
+}
+
+.mic-live {
+  animation: mic-halo 1.5s ease-out infinite;
+}
+
+.mic-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 100%;
+}
+
+.mic-wave > span {
+  display: block;
+  width: 2px;
+  height: 100%;
+  border-radius: 2px;
+  background: currentColor;
+  transform-origin: center;
+  animation: mic-bar 0.85s ease-in-out infinite;
+}
+
+/* Staggered so it reads as a waveform rather than four things blinking at
+   once. The middle bars lead, which is roughly how a level meter behaves. */
+.mic-wave > span:nth-child(1) { animation-delay: 0s;    }
+.mic-wave > span:nth-child(2) { animation-delay: 0.18s; }
+.mic-wave > span:nth-child(3) { animation-delay: 0.09s; }
+.mic-wave > span:nth-child(4) { animation-delay: 0.27s; }
+
+/* Someone who has asked their phone to stop moving things still needs to know
+   the mic is on, so the bars hold at full height and the halo sits static
+   rather than disappearing. */
+@media (prefers-reduced-motion: reduce) {
+  .mic-live { animation: none; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35); }
+  .mic-wave > span { animation: none; transform: scaleY(0.7); }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   THE TILE — the app's container shape.            Added 2026-09-04, screen 2.
+
+   Dustin, 4 Sep: "lets get the layout locked in and match it on every page so
+   it flows better." The shape is not new — it is the Weekly Focus card on the
+   client home screen (ClientWeekSummary.tsx): --brand-surface, a 1px border,
+   radius 18, padding 14, a soft shadow, and a bold 14px label with an icon
+   opposite a small meta.
+
+   Its gradient top edge was not designed either. That card carries an inline
+   `background: var(--brand-surface)`, which is exactly what the [data-deep]
+   blanket selector matches, so depth paints --card-topbar across its top. This
+   block makes that shape deliberate rather than incidental, and draws the cap
+   at EVERY depth level so the format does not depend on a setting.
+
+   NO SIDE BORDERS. A tile is capped, and the things inside it are capped.
+
+   SCOPED TO .sym-page ON PURPOSE. This is the Workout screen's format today
+   and it will become every screen's, but rule 6 of the audit is that a screen
+   is not edited before it is walked. Wrapping the page opts one screen in at a
+   time; when a screen is walked, it gets the wrapper and nothing else changes.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.sym-page {
+  /* RAISING IS A RELATIONSHIP, NOT A PROPERTY.
+     The first pass gave tiles a shadow and left the page where it was; between
+     two surfaces half a step apart that reads as a smudge, not as lift. So the
+     page sinks and the tile deepens toward the primary at the same time.
+     The amounts are split light/dark below: mixing near-black 30% into a light
+     page turns it grey, while the same 30% on a dark page is exactly what makes
+     a tile read as a slab sitting on top of it. */
+  --sink: 6%;
+  --tile-deep: 4%;
+  --tile-edge: color-mix(in srgb, #FFFFFF 70%, transparent);
+  --tile-shadow: 0 12px 28px -8px rgba(20, 30, 55, .20), 0 2px 6px rgba(20, 30, 55, .10);
+
+  --tile-bg: color-mix(in srgb, var(--brand-primary) var(--tile-deep), var(--brand-surface));
+  /* Everything a tile contains derives from the TILE, not from the raw token,
+     so the inside stays separable however far the outside has deepened. */
+  --in-tile: color-mix(in srgb, var(--brand-text) 7%, var(--tile-bg));
+  --tile-ctrl: color-mix(in srgb, var(--brand-text) 9%, var(--tile-bg));
+  --tile-ctrl-bd: color-mix(in srgb, var(--brand-text) 22%, var(--tile-bg));
+
+  /* The cap. Raw scheme colours read on a light card and vanish on a dark one —
+     Deep Purple's primary is #4A148C against a near-black surface — so the dark
+     block below lifts them, the same way [data-deep] already does for
+     --card-topbar. */
+  --tile-cap: linear-gradient(100deg,
+    var(--brand-primary) 0%,
+    var(--brand-accent) 46%,
+    var(--brand-accent-2, var(--brand-accent)) 78%,
+    var(--brand-primary) 100%);
+  --tile-cap-h: 3px;
+
+  background: color-mix(in srgb, #070A10 var(--sink), var(--brand-bg));
+  min-height: 100vh;
+}
+
+[data-appearance="dark"] .sym-page,
+[data-theme="midnight"] .sym-page,
+[data-theme="carbonneon"] .sym-page,
+[data-theme="midnightaurora"] .sym-page,
+[data-theme="midnightember"] .sym-page,
+[data-theme="midnightcitrus"] .sym-page,
+[data-theme="midnightorchid"] .sym-page,
+[data-theme="deepreef"] .sym-page {
+  --sink: 32%;
+  --tile-deep: 13%;
+  --tile-edge: color-mix(in srgb, #FFFFFF 9%, transparent);
+  --tile-shadow: 0 14px 30px -10px rgba(0, 0, 0, .62), 0 2px 6px rgba(0, 0, 0, .45);
+  --tile-cap: linear-gradient(100deg,
+    color-mix(in srgb, var(--brand-primary) 55%, white) 0%,
+    color-mix(in srgb, var(--brand-accent) 72%, white) 46%,
+    color-mix(in srgb, var(--brand-accent-2, var(--brand-accent)) 72%, white) 78%,
+    color-mix(in srgb, var(--brand-primary) 55%, white) 100%);
+}
+
+/* With depth on, the cap IS the app-wide strip — one gradient, whole app —
+   and it thickens with the level exactly as it does everywhere else. */
+[data-deep] .sym-page { --tile-cap: var(--card-topbar); --tile-cap-h: var(--card-topbar-h); }
+
+/* ── the tile ─────────────────────────────────────────────────────────────── */
+.sym-tile {
+  position: relative;
+  overflow: hidden;
+  background: var(--tile-bg);
+  border: 1px solid var(--brand-border);
+  border-radius: 18px;
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: var(--tile-shadow), inset 0 1px 0 var(--tile-edge);
+}
+.sym-tile::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  z-index: 1;
+  height: var(--tile-cap-h);
+  background: var(--tile-cap);
+}
+/* One rung of the ladder per day: one colour, six shades down the week.
+   The rung must step in LIGHTNESS, not by mixing primary into the surface —
+   auto-dark DERIVES the surface from the primary, so on a dark scheme that is
+   teal into teal and every rung comes out identical. --tile-ladder is the
+   primary already pushed toward light (dark schemes) or dark (light ones);
+   stepping THAT is what makes six visible shades on all thirty schemes. */
+.sym-page { --tile-ladder: color-mix(in srgb, var(--brand-primary) 58%, #0A0E16); }
+[data-appearance="dark"] .sym-page,
+[data-theme="midnight"] .sym-page,
+[data-theme="carbonneon"] .sym-page,
+[data-theme="midnightaurora"] .sym-page,
+[data-theme="midnightember"] .sym-page,
+[data-theme="midnightcitrus"] .sym-page,
+[data-theme="midnightorchid"] .sym-page,
+[data-theme="deepreef"] .sym-page { --tile-ladder: color-mix(in srgb, var(--brand-primary) 58%, #FFFFFF); }
+.sym-tile[data-rung] { background: color-mix(in srgb, var(--tile-ladder) var(--rung), var(--tile-bg)); }
+
+.sym-tile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 11px;
+}
+.sym-tile-lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--brand-text);
+}
+.sym-tile-lbl i { font-size: 15px; color: var(--brand-primary); line-height: 1; }
+.sym-tile-meta { font-size: 11px; color: var(--brand-text-secondary); white-space: nowrap; }
+
+/* ── today ────────────────────────────────────────────────────────────────
+   Same tile, same label position, same cap — filled with the scheme gradient
+   so it stays far lighter than every other tile. Shape carries the system;
+   brightness carries "you are here". Everything inside inverts onto white, so
+   none of it depends on the dark-tile tokens. */
+.sym-tile.is-today {
+  background: linear-gradient(140deg,
+    color-mix(in srgb, var(--brand-primary) 90%, #000),
+    color-mix(in srgb, var(--brand-primary) 66%, #fff));
+  border-color: transparent;
+  box-shadow: var(--tile-shadow), inset 0 1px 0 rgba(255, 255, 255, .28),
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 26%, transparent);
+}
+.sym-tile.is-today::before {
+  height: calc(var(--tile-cap-h) + 1px);
+  background-image: linear-gradient(100deg, rgba(255,255,255,.5), #fff 38%, rgba(255,255,255,.6) 72%, #fff);
+  background-size: 200% 100%;
+  animation: sym-cap-sweep 3s linear infinite;
+}
+@keyframes sym-cap-sweep { to { background-position: 200% 50%; } }
+@media (prefers-reduced-motion: reduce) { .sym-tile.is-today::before { animation: none; } }
+.sym-tile.is-today .sym-tile-lbl,
+.sym-tile.is-today .sym-wo-name { color: #fff; }
+.sym-tile.is-today .sym-tile-lbl i { color: #fff; }
+.sym-tile.is-today .sym-tile-meta { color: rgba(255, 255, 255, .86); }
+.sym-tile.is-today .sym-wo { background: rgba(255, 255, 255, .16); }
+.sym-tile.is-today .sym-wo::before { background: rgba(255, 255, 255, .75); }
+.sym-tile.is-today .sym-wo-ic { background: rgba(255, 255, 255, .24); color: #fff; }
+.sym-tile.is-today .sym-badge { color: rgba(255, 255, 255, .9); border-color: rgba(255, 255, 255, .36); }
+.sym-tile.is-today .sym-bt { background: rgba(255, 255, 255, .18); border-color: rgba(255, 255, 255, .36); color: #fff; }
+.sym-tile.is-today .sym-bt.go { background: #fff; color: var(--brand-primary); border-color: transparent; }
+.sym-tile.is-today .sym-rest { background: rgba(255, 255, 255, .14); color: rgba(255, 255, 255, .85); }
+.sym-tile.is-today .sym-rest::before { background: rgba(255, 255, 255, .4); }
+
+/* ── a workout inside a tile ──────────────────────────────────────────────── */
+.sym-body { display: flex; flex-direction: column; gap: 9px; }
+.sym-wo {
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  border-radius: 13px;
+  padding: 13px 10px 10px;
+  background: var(--in-tile);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sym-wo::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 3px;
+  z-index: 1;
+  background: var(--tile-cap);
+}
+.sym-wo-row { display: flex; align-items: flex-start; gap: 8px; }
+.sym-wo-ic {
+  width: 23px; height: 23px; border-radius: 7px; flex: 0 0 auto;
+  display: grid; place-items: center; font-size: 13px; line-height: 1;
+  background: color-mix(in srgb, var(--brand-primary) 24%, var(--tile-bg));
+  color: var(--brand-primary);
+}
+/* THE NAME GETS BOTH ROWS AND IS NEVER CUT.
+   Dustin, 4 Sep: "all workout need to be readable... no more than 2 rows of
+   text per card." Two lines is the cap, so the name has the whole row to
+   itself and the count sits on the button strip instead of stealing width. */
+.sym-wo-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.32;
+  color: var(--brand-text);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sym-wo.is-done { opacity: .72; }
+.sym-acts { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.sym-acts .sym-sp { flex: 1; }
+.sym-badge {
+  font-size: 9.5px; font-weight: 800; color: var(--brand-text-secondary);
+  padding: 4px 6px; border-radius: 6px; white-space: nowrap;
+  border: 1px solid var(--tile-ctrl-bd);
+}
+.sym-rest {
+  position: relative; overflow: hidden; border-radius: 13px;
+  padding: 14px 11px 12px; text-align: center;
+  background: var(--in-tile);
+  font-size: 11.5px; font-weight: 700; color: var(--brand-text-secondary);
+}
+.sym-rest::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  background: var(--brand-border);
+}
+
+/* ── controls ─────────────────────────────────────────────────────────────
+   TWO CONTRAST RULES, BOTH FROM REAL FAILURES ON REAL SCHEMES.
+
+   1. A button fill is a fixed step off the surface it sits on, never the same
+      token — taking it from --brand-surface made buttons invisible wherever the
+      surface had been tinted.
+   2. A FILLED button pushes toward the scheme's own TEXT colour and labels
+      itself with the SURFACE colour. White-on-hue measured ~2:1 on Carbon Neon.
+      Mixing toward the text colour lands high-contrast on light and dark alike,
+      whatever hue the scheme uses. */
+.sym-bt {
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1;
+  padding: 7px 9px;
+  border: 1px solid var(--tile-ctrl-bd);
+  background: var(--tile-ctrl);
+  color: var(--brand-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sym-bt i { font-size: 12px; line-height: 1; }
+.sym-bt.ic { padding: 7px 8px; }
+.sym-bt.go {
+  padding: 7px 11px;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--brand-primary) 55%, var(--brand-text));
+  color: var(--brand-surface);
+}
+.sym-bt.warn {
+  border-color: color-mix(in srgb, var(--brand-warn) 60%, transparent);
+  background: color-mix(in srgb, var(--brand-warn) 14%, transparent);
+  color: color-mix(in srgb, var(--brand-warn) 55%, var(--brand-text));
+}
+.sym-bt:disabled { opacity: .5; cursor: default; }
+
+/* ── page title row + the past strip ──────────────────────────────────────── */
+.sym-title { display: flex; align-items: flex-start; gap: 10px; padding: 14px 0 12px; }
+.sym-title .sym-sp { flex: 1; }
+.sym-title h1 { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -.02em; color: var(--brand-text); }
+.sym-title p { margin: 2px 0 0; font-size: 12px; color: var(--brand-text-secondary); }
+
+.sym-past {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 13px 11px;
+  border-radius: 18px;
+  margin-bottom: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  border: 1px solid var(--brand-border);
+  background: var(--tile-bg);
+  color: var(--brand-text);
+  box-shadow: var(--tile-shadow), inset 0 1px 0 var(--tile-edge);
+}
+.sym-past::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  background: var(--brand-border);
+}
+.sym-past .sym-sp { flex: 1; }
+
+/* The pointer standing in today's chronological slot when today is hoisted to
+   the top. Shaped like the past control because it does the same job -- one
+   line, tappable, moves you somewhere -- but a SEPARATE class: it is not a past
+   control, and sharing the class made the board's own guards find this element
+   instead of the real one. */
+.sym-jump {
+  width: 100%; position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 8px;
+  padding: 13px 13px 11px; border-radius: 18px; margin-bottom: 14px;
+  cursor: pointer; font-family: inherit; font-size: 12px;
+  background: color-mix(in srgb, var(--brand-primary) 7%, var(--brand-surface));
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 30%, var(--brand-border));
+  color: var(--brand-text); text-align: left;
+}
+.sym-jump::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  background: color-mix(in srgb, var(--brand-primary) 55%, var(--brand-border));
+}
+.sym-jump .sym-jump-sp { flex: 1; }
+.sym-jump-go { font-size: 11px; font-weight: 800; color: color-mix(in srgb, var(--brand-primary) 70%, var(--brand-text)); }
+.sym-past-go { font-size: 11px; font-weight: 800; color: color-mix(in srgb, var(--brand-accent) 62%, var(--brand-text)); }
+
+/* Glow follows the tiles when depth is on, and never lands on a button —
+   a glowing button reads as a focus state. */
+[data-deep] .sym-tile,
+[data-deep] .sym-past { box-shadow: var(--block-glow), var(--tile-shadow), inset 0 1px 0 var(--tile-edge); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   THE OVERVIEW IS LIGHT, THE SESSION IS DARK.        Added 2026-09-04.
+
+   Dustin, on the shipped Start-vs-View split: "when we click on that view/edit
+   the screen it opens should be light/white like it was before. workout logger
+   (start) opens to dark so they are diff."
+
+   The session view has always pinned itself to a fixed dark ground
+   (--session-bg) whatever scheme is active, because that is the screen you hold
+   between sets. The overview followed the theme, so on any dark scheme the two
+   screens looked identical and View and Start landed somewhere that felt the
+   same. Pinning the overview light is the mirror of what the session already
+   does, and it makes the two destinations tell each other apart before you have
+   read a word.
+
+   NOT a hardcoded palette. The surfaces are neutral, but the primary and accent
+   still come from the active scheme, so a client on Forest gets green controls
+   on white rather than somebody else's blue. That matters on the natively dark
+   schemes especially — Midnight and Carbon Neon have no light variant to fall
+   back to, and deriving one from their own primary is what keeps this from
+   looking like a different app.
+   ════════════════════════════════════════════════════════════════════════════ */
+.sym-light {
+  --brand-bg: #F4F6F9;
+  --brand-surface: #FFFFFF;
+  --brand-card: color-mix(in srgb, var(--brand-primary) 9%, #FFFFFF);
+  --brand-border: color-mix(in srgb, var(--brand-primary) 16%, #DCE3EC);
+  --brand-text: #101923;
+  --brand-text-secondary: #53637A;
+  /* Elevation reads as shadow again, not as lift — the dark-mode variants would
+     be invisible on white. */
+  --shadow-1: 0 1px 2px rgba(16, 25, 35, .06), 0 1px 3px rgba(16, 25, 35, .08);
+  --shadow-2: 0 4px 10px rgba(16, 25, 35, .08), 0 2px 4px rgba(16, 25, 35, .06);
+  --shadow-3: 0 12px 32px rgba(16, 25, 35, .16), 0 4px 8px rgba(16, 25, 35, .08);
+  color-scheme: light;
+  color: var(--brand-text);
+}
+
+
+/* ═══ the mock-up's own chrome — none of this ships ═══════════════════════ */
+body.mk {
+  background: #0F1319 !important;
+  color: #DDE5F0 !important;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.mk-wrap { max-width: 1240px; margin: 0 auto; padding-block: 22px 80px; padding-left: 18px; padding-right: 18px; }
+.mk-wrap h1 { font-size: 22px; margin: 0 0 6px; color: #fff; letter-spacing: -.02em; }
+.mk-lede { color: #93A4BC; font-size: 13.5px; line-height: 1.7; max-width: 74ch; margin: 0 0 16px; }
+.mk-lede b { color: #DDE5F0; }
+.mk-cols { display: grid; grid-template-columns: 404px 1fr; gap: 28px; align-items: start; }
+@media (max-width: 940px) { .mk-cols { grid-template-columns: 1fr; } }
+
+.mk-stage { position: sticky; top: 16px; }
+@media (max-width: 940px) { .mk-stage { position: static; } }
+.mk-phone {
+  width: 100%; max-width: 392px; border-radius: 26px; overflow: hidden;
+  border: 1px solid #2A3444; box-shadow: 0 18px 50px rgba(0,0,0,.55);
+  background: var(--brand-bg);
+}
+/* The real client top bar: --chrome-grad, white text, bell + feedback. */
+.mk-top {
+  display: flex; align-items: center; gap: 10px; padding: 13px 14px 12px;
+  background: var(--chrome-grad, var(--brand-primary));
+}
+.mk-top .mk-mark { width: 24px; height: 24px; border-radius: 7px; background: rgba(255,255,255,.22);
+  display: grid; place-items: center; font-size: 12px; color: #fff; font-weight: 800; }
+.mk-top .mk-nm { flex: 1; color: #fff; font-weight: 600; font-size: 13.5px; }
+.mk-top .mk-nm span { color: rgba(255,255,255,.5); font-weight: 500; margin-left: 6px; font-size: 11.5px; }
+.mk-top .mk-ic { width: 27px; height: 27px; border-radius: 50%; background: rgba(255,255,255,.16);
+  display: grid; place-items: center; font-size: 12px; color: #fff; }
+.mk-scr { height: 690px; overflow-y: auto; }
+.mk-scr::-webkit-scrollbar { width: 0; }
+.mk-pad { padding: 0 14px 26px; }
+/* bottom nav, drawn only so the screen is judged at its real height */
+.mk-nav { display: flex; background: var(--brand-surface); border-top: 1px solid var(--brand-border); }
+.mk-nav div { flex: 1; text-align: center; padding: 9px 0 11px; font-size: 9.5px; font-weight: 700;
+  color: var(--brand-text-secondary); }
+.mk-nav div b { display: block; font-size: 16px; font-weight: 400; margin-bottom: 2px; }
+.mk-nav div.on { color: var(--brand-primary); }
+
+.mk-ctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; }
+.mk-seg { display: inline-flex; background: #19202B; border: 1px solid #2A3444; border-radius: 10px; padding: 3px; gap: 3px; }
+.mk-seg button { font: inherit; font-size: 11.5px; font-weight: 700; color: #93A4BC; background: none;
+  border: 0; border-radius: 7px; padding: 6px 11px; cursor: pointer; }
+.mk-seg button[aria-pressed="true"] { background: #2E3A4D; color: #fff; }
+.mk-seg span { font-size: 10px; font-weight: 800; letter-spacing: .9px; color: #6C7C94;
+  align-self: center; padding: 0 7px 0 9px; }
+
+.mk-schemes { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 7px; margin: 0 0 18px; }
+.mk-sw { display: flex; align-items: center; gap: 8px; text-align: left; font: inherit; font-size: 11.5px;
+  font-weight: 600; color: #B6C4D8; background: #161C25; border: 1px solid #262F3C; border-radius: 9px;
+  padding: 7px 9px; cursor: pointer; }
+.mk-sw[aria-pressed="true"] { border-color: #6E8BB5; background: #1E2938; color: #fff; }
+.mk-sw i { width: 26px; height: 18px; border-radius: 5px; flex: 0 0 auto; border: 1px solid rgba(255,255,255,.14); }
+.mk-sw u { text-decoration: none; font-size: 8.5px; font-weight: 800; letter-spacing: .7px; color: #6C7C94; }
+
+.mk-note { background: #151B24; border: 1px solid #262F3C; border-radius: 14px; padding: 15px 16px; margin-bottom: 13px; }
+.mk-note h2 { margin: 0 0 8px; font-size: 14px; color: #fff; letter-spacing: -.01em; }
+.mk-note h3 { margin: 13px 0 5px; font-size: 11px; letter-spacing: 1.1px; text-transform: uppercase; color: #7E92AE; }
+.mk-note p, .mk-note li { font-size: 13px; line-height: 1.65; color: #A9B8CD; margin: 0 0 7px; }
+.mk-note ul { margin: 0 0 4px; padding-left: 18px; }
+.mk-note b { color: #E6EDF5; }
+.mk-note em { color: #C6D3E4; }
+.mk-decide { border-color: #7A6320; background: #1E1A0F; }
+.mk-decide h2 { color: #F0C64E; }
+.mk-decide h2::before { content: "◆ "; }
+.mk-tag { display: inline-block; font-size: 9.5px; font-weight: 800; letter-spacing: .9px; padding: 3px 7px;
+  border-radius: 5px; background: #223046; color: #9FC0EA; margin-left: 6px; vertical-align: middle; }
+
+
+/* ── the "before" screen: today's Nutrition, drawn from its own markup ──── */
+.mk-old { padding: 12px 0 0; display: flex; flex-direction: column; gap: 9px; }
+.mk-old .oc { background: var(--brand-surface); border: 1px solid var(--brand-border); border-radius: 16px; padding: 13px; }
+.mk-old .row { display: flex; align-items: center; gap: 11px; }
+.mk-old .ring { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--brand-border); flex: 0 0 auto; }
+.mk-old .ring.on { border-color: rgba(34,197,94,.7); background: rgba(34,197,94,.16); }
+.mk-old .nm { font-size: 13px; font-weight: 700; color: var(--brand-text); }
+.mk-old .it { font-size: 12px; color: var(--brand-text-secondary); line-height: 1.35; }
+.mk-old .mc { font-size: 11.5px; font-weight: 600; color: var(--brand-text-secondary); margin-top: 2px; }
+.mk-old .mc b { color: var(--brand-text); }
+.mk-old .hero { font-size: 34px; font-weight: 800; color: var(--brand-text); line-height: 1; }
+.mk-old .bar { height: 7px; border-radius: 99px; background: var(--brand-bg); overflow: hidden; margin: 9px 0 10px; }
+.mk-old .bar i { display: block; height: 100%; background: var(--brand-primary); }
+.mk-old .chips { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 11px; }
+.mk-old .chips span { font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 99px;
+  border: 1px solid var(--brand-border); color: var(--brand-text-secondary); }
+.mk-old .chips span.on { background: var(--brand-primary); color: #fff; border-color: transparent; }
+.mk-old .pills { display: flex; gap: 8px; }
+.mk-old .pills div { flex: 1; background: var(--brand-bg); border-radius: 11px; padding: 8px 9px; }
+.mk-old .pills p { margin: 0; font-size: 9px; font-weight: 800; letter-spacing: .8px; color: var(--brand-text-secondary); }
+.mk-old .pills b { font-size: 14px; color: var(--brand-text); }
+.mk-old .sec { font-size: 10.5px; font-weight: 700; letter-spacing: 1.2px; color: var(--brand-text-secondary); margin: 6px 0 0; }
+
+/* ── nutrition's own additions to the tile system ───────────────────────── */
+/* Every one of these is the existing object at a different size. Nothing new
+   is invented: .sym-num is a number inside a tile, .sym-mac is .sym-wo without
+   the icon column, .sym-chip is .sym-bt at chip weight. */
+.sym-num { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 8px; }
+.sym-num b { font-size: 34px; font-weight: 800; line-height: 1; color: var(--brand-text);
+  font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.sym-num i { font-style: normal; font-size: 12.5px; font-weight: 700; color: var(--brand-text-secondary); }
+.sym-num u { text-decoration: none; margin-left: auto; font-size: 12px; font-weight: 800;
+  color: var(--brand-text-secondary); font-variant-numeric: tabular-nums; }
+.sym-bar { height: 8px; border-radius: 99px; background: var(--in-tile); overflow: hidden; margin-bottom: 11px; }
+.sym-bar i { display: block; height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-accent)); }
+.sym-macs { display: flex; gap: 8px; }
+.sym-mac { position: relative; overflow: hidden; flex: 1; border-radius: 13px; padding: 11px 10px 9px; background: var(--in-tile); }
+.sym-mac::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--tile-cap); }
+.sym-mac p { margin: 0; font-size: 9px; font-weight: 800; letter-spacing: .85px; color: var(--brand-text-secondary); }
+.sym-mac b { display: block; font-size: 15px; font-weight: 800; color: var(--brand-text); line-height: 1.15;
+  font-variant-numeric: tabular-nums; margin-top: 1px; }
+.sym-mac s { text-decoration: none; font-size: 10.5px; font-weight: 600; color: var(--brand-text-secondary); }
+.sym-chips { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 11px; }
+.sym-chip { font: inherit; font-size: 11px; font-weight: 800; padding: 6px 11px; border-radius: 99px;
+  border: 1px solid var(--tile-ctrl-bd); background: var(--tile-ctrl); color: var(--brand-text-secondary); cursor: pointer; }
+.sym-chip[aria-pressed="true"] { background: color-mix(in srgb, var(--brand-primary) 55%, var(--brand-text));
+  color: var(--brand-surface); border-color: transparent; }
+.sym-split { display: flex; gap: 8px; margin-top: 9px; }
+.sym-split > div { position: relative; overflow: hidden; flex: 1; text-align: center;
+  border-radius: 13px; padding: 11px 8px 9px; background: var(--in-tile); }
+.sym-split > div::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--brand-border); }
+.sym-split b { display: block; font-size: 15px; font-weight: 800; color: var(--brand-text); font-variant-numeric: tabular-nums; }
+.sym-split p { margin: 1px 0 0; font-size: 9px; font-weight: 800; letter-spacing: .8px; color: var(--brand-text-secondary); }
+.sym-split s { text-decoration: none; font-size: 9px; color: var(--brand-text-secondary); }
+.sym-more { width: 100%; margin-top: 9px; font: inherit; font-size: 10px; font-weight: 800; letter-spacing: .8px;
+  color: var(--brand-text-secondary); background: none; border: 0; padding: 5px 0; cursor: pointer; }
+/* the ring that logs a meal — the one control a client uses most */
+.sym-ring { width: 27px; height: 27px; border-radius: 50%; flex: 0 0 auto; cursor: pointer;
+  border: 2px solid var(--tile-ctrl-bd); background: transparent; display: grid; place-items: center;
+  font-size: 12px; line-height: 1; color: transparent; }
+.sym-ring.on { border-color: transparent; background: color-mix(in srgb, var(--brand-primary) 55%, var(--brand-text));
+  color: var(--brand-surface); }
+.sym-tile.is-today .sym-ring { border-color: rgba(255,255,255,.6); }
+.sym-food { font-size: 12.5px; line-height: 1.4; color: var(--brand-text-secondary); }
+.sym-tile.is-today .sym-food { color: rgba(255,255,255,.88); }
+.sym-food em { font-style: normal; font-size: 8.5px; font-weight: 800; letter-spacing: .6px;
+  padding: 1px 5px; border-radius: 4px; margin-left: 5px; vertical-align: middle;
+  background: color-mix(in srgb, var(--brand-accent) 22%, transparent); color: var(--brand-text); }
+.sym-kcal { font-size: 12px; font-weight: 700; color: var(--brand-text-secondary); margin-top: 5px;
+  font-variant-numeric: tabular-nums; }
+.sym-kcal b { color: var(--brand-text); }
+.sym-tile.is-today .sym-kcal, .sym-tile.is-today .sym-kcal b { color: #fff; }
+.sym-sec { font-size: 10.5px; font-weight: 800; letter-spacing: 1.15px;
+  color: var(--brand-text-secondary); margin: 16px 0 9px; }
+/* ── the same objects on the bright tile ────────────────────────────────────
+   THE INVERSION IS NOT OPTIONAL AND IT IS EASY TO FORGET. Everything inside a
+   tile derives from --in-tile / --brand-text, which are computed from the
+   NORMAL tile background; .sym-tile.is-today replaces the background and leaves
+   those tokens alone. globals.css already inverts .sym-wo, .sym-badge, .sym-bt
+   and .sym-rest for exactly this reason. Every object added here needs the same
+   treatment or the day summary — the brightest thing on the screen — renders
+   dark text on a dark fill. */
+.sym-tile.is-today .sym-num b { color: #fff; }
+.sym-tile.is-today .sym-num i, .sym-tile.is-today .sym-num u { color: rgba(255,255,255,.86); }
+.sym-tile.is-today .sym-bar { background: rgba(255,255,255,.18); }
+.sym-tile.is-today .sym-bar i { background: #fff; }
+.sym-tile.is-today .sym-mac,
+.sym-tile.is-today .sym-split > div { background: rgba(255,255,255,.16); }
+.sym-tile.is-today .sym-mac::before { background: rgba(255,255,255,.75); }
+.sym-tile.is-today .sym-split > div::before { background: rgba(255,255,255,.4); }
+.sym-tile.is-today .sym-mac b, .sym-tile.is-today .sym-split b { color: #fff; }
+.sym-tile.is-today .sym-mac p, .sym-tile.is-today .sym-mac s,
+.sym-tile.is-today .sym-split p, .sym-tile.is-today .sym-split s,
+.sym-tile.is-today .sym-more { color: rgba(255,255,255,.86); }
+.sym-tile.is-today .sym-chip { background: rgba(255,255,255,.18);
+  border-color: rgba(255,255,255,.36); color: rgba(255,255,255,.9); }
+.sym-tile.is-today .sym-chip[aria-pressed="true"] { background: #fff;
+  color: color-mix(in srgb, var(--brand-primary) 82%, #000); border-color: transparent; }
+.sym-tile.is-today .sym-food em { background: rgba(255,255,255,.24); color: #fff; }
+.sym-grip { font-size: 15px; color: var(--brand-text-secondary); opacity: .7; cursor: grab; padding: 0 2px; }
+.sym-tile.is-today .sym-grip { color: rgba(255,255,255,.8); }
+
+</style>
+
+<div class="mk-wrap">
+  <h1>Nutrition, in the app's format<span class="mk-tag">MOCK-UP · NOTHING SHIPPED</span></h1>
+  <p class="mk-lede">The same object the Home and Workout screens use, applied to
+  the Nutrition screen — <b>your Client View and the clients' app together</b>.
+  Every control that is on the screen today is still here. Pick any of the
+  thirty schemes and any depth level; this page uses the app's real stylesheet,
+  so nothing here can look better than it will.</p>
+
+  
+<div class="mk-ctl">
+  <div class="mk-seg"><span>VIEW</span>
+    <button data-v="new" aria-pressed="true">Proposed</button>
+    <button data-v="old" aria-pressed="false">As it is today</button>
+  </div>
+  <div class="mk-seg"><span>DEPTH</span>
+    <button data-d="off" aria-pressed="false">Off</button>
+    <button data-d="20" aria-pressed="true">20</button>
+    <button data-d="35" aria-pressed="false">35</button>
+    <button data-d="50" aria-pressed="false">50</button>
+  </div>
+</div>
+
+  <div class="mk-schemes"><button class="mk-sw" data-t="pastel" aria-pressed="false"><i style="background:linear-gradient(120deg,#7c9cf5 0 45%,#5ec9a3 45% 100%)"></i><span>Soft Pastel</span></button><button class="mk-sw" data-t="navy" aria-pressed="false"><i style="background:linear-gradient(120deg,#0F4C81 0 45%,#0EA5E9 45% 100%)"></i><span>Navy Blue</span></button><button class="mk-sw" data-t="charcoal" aria-pressed="false"><i style="background:linear-gradient(120deg,#2D2D2D 0 45%,#555555 45% 100%)"></i><span>Charcoal</span></button><button class="mk-sw" data-t="forest" aria-pressed="false"><i style="background:linear-gradient(120deg,#1B5E20 0 45%,#43A047 45% 100%)"></i><span>Forest Green</span></button><button class="mk-sw" data-t="gunmetal" aria-pressed="false"><i style="background:linear-gradient(120deg,#37474F 0 45%,#607D8B 45% 100%)"></i><span>Gunmetal</span></button><button class="mk-sw" data-t="purple" aria-pressed="false"><i style="background:linear-gradient(120deg,#4A148C 0 45%,#7B1FA2 45% 100%)"></i><span>Deep Purple</span></button><button class="mk-sw" data-t="orange" aria-pressed="false"><i style="background:linear-gradient(120deg,#BF360C 0 45%,#E64A19 45% 100%)"></i><span>Burnt Orange</span></button><button class="mk-sw" data-t="rose" aria-pressed="false"><i style="background:linear-gradient(120deg,#880E4F 0 45%,#E91E63 45% 100%)"></i><span>Rose</span></button><button class="mk-sw" data-t="blush" aria-pressed="false"><i style="background:linear-gradient(120deg,#C2185B 0 45%,#FF4D8D 45% 100%)"></i><span>Blush</span></button><button class="mk-sw" data-t="lagoon" aria-pressed="false"><i style="background:linear-gradient(120deg,#0E7C86 0 45%,#FF7A59 45% 100%)"></i><span>Lagoon</span></button><button class="mk-sw" data-t="orchid" aria-pressed="false"><i style="background:linear-gradient(120deg,#8E2DAF 0 45%,#00B295 45% 100%)"></i><span>Orchid</span></button><button class="mk-sw" data-t="berry" aria-pressed="false"><i style="background:linear-gradient(120deg,#B0306A 0 45%,#5A4FCF 45% 100%)"></i><span>Berry</span></button><button class="mk-sw" data-t="slatepop" aria-pressed="false"><i style="background:linear-gradient(120deg,#2E4374 0 45%,#FF6B6B 45% 100%)"></i><span>Slate Pop</span></button><button class="mk-sw" data-t="plumdusk" aria-pressed="false"><i style="background:linear-gradient(120deg,#5E3A87 0 45%,#E0568A 45% 100%)"></i><span>Plum Dusk</span></button><button class="mk-sw" data-t="carbonneon" aria-pressed="false"><i style="background:linear-gradient(120deg,#00C2A8 0 45%,#FF5DA2 45% 100%)"></i><span>Carbon Neon</span><u>DARK</u></button><button class="mk-sw" data-t="midnight" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#79C0FF 45% 100%)"></i><span>Midnight</span><u>DARK</u></button><button class="mk-sw" data-t="sunsetcoral" aria-pressed="false"><i style="background:linear-gradient(120deg,#ff6b6b 0 45%,#ff9f5a 45% 100%)"></i><span>Sunset Coral</span></button><button class="mk-sw" data-t="aurora" aria-pressed="false"><i style="background:linear-gradient(120deg,#3aa8c1 0 45%,#8b6ff0 45% 100%)"></i><span>Aurora</span></button><button class="mk-sw" data-t="citrus" aria-pressed="false"><i style="background:linear-gradient(120deg,#5bbf3a 0 45%,#ff8f3f 45% 100%)"></i><span>Citrus Punch</span></button><button class="mk-sw" data-t="berrynoir" aria-pressed="false"><i style="background:linear-gradient(120deg,#b5379a 0 45%,#5b52e0 45% 100%)"></i><span>Berry Noir</span></button><button class="mk-sw" data-t="oceandusk" aria-pressed="false"><i style="background:linear-gradient(120deg,#1f7a8c 0 45%,#ff7a59 45% 100%)"></i><span>Ocean Dusk</span></button><button class="mk-sw" data-t="midnightaurora" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#22D3EE 45% 72%,#A78BFA 72% 100%)"></i><span>Midnight Aurora</span><u>DARK</u></button><button class="mk-sw" data-t="midnightember" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#FB7185 45% 72%,#FBBF24 72% 100%)"></i><span>Midnight Ember</span><u>DARK</u></button><button class="mk-sw" data-t="midnightcitrus" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#38BDF8 45% 72%,#A3E635 72% 100%)"></i><span>Midnight Citrus</span><u>DARK</u></button><button class="mk-sw" data-t="midnightorchid" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#7C3AED 45% 72%,#E879F9 72% 100%)"></i><span>Midnight Orchid</span><u>DARK</u></button><button class="mk-sw" data-t="violetdawn" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#6D28D9 45% 72%,#C4B5FD 72% 100%)"></i><span>Violet Dawn</span></button><button class="mk-sw" data-t="sunsetdrift" aria-pressed="false"><i style="background:linear-gradient(120deg,#BE185D 0 45%,#F97316 45% 72%,#FBBF24 72% 100%)"></i><span>Sunset Drift</span></button><button class="mk-sw" data-t="deepreef" aria-pressed="false"><i style="background:linear-gradient(120deg,#0E7490 0 45%,#14B8A6 45% 72%,#A855F7 72% 100%)"></i><span>Deep Reef</span><u>DARK</u></button><button class="mk-sw" data-t="blushcloud" aria-pressed="false"><i style="background:linear-gradient(120deg,#E1789F 0 45%,#F9A8D4 45% 72%,#FBCFE8 72% 100%)"></i><span>Blush Cloud</span></button><button class="mk-sw" data-t="hotpink" aria-pressed="false"><i style="background:linear-gradient(120deg,#FF1F8F 0 45%,#FF6FB5 45% 72%,#7C3AED 72% 100%)"></i><span>Hot Pink</span></button></div>
+
+  <div class="mk-cols">
+    <div class="mk-stage">
+      <div class="mk-phone">
+        <div class="mk-top">
+          <span class="mk-mark">S</span>
+          <span class="mk-nm">Symmetry<span>· My Training</span></span>
+          <span class="mk-ic">🔔</span><span class="mk-ic">✎</span>
+        </div>
+        <div class="mk-scr">
+          <div id="mk-new">
+<div class="sym-page">
+  <div style="padding:0 14px 26px">
+
+    <div class="sym-title">
+      <button class="sym-bt ic" aria-label="previous day">‹</button>
+      <div class="sym-sp" style="text-align:center">
+        <h1>Tuesday 9 Sep</h1>
+        <p>Plan A · 6 meals</p>
+      </div>
+      <button class="sym-bt ic" aria-label="next day">›</button>
+      <button class="sym-bt ic" aria-label="menu">⋯</button>
+    </div>
+
+    <!-- THE DAY. Same tile, filled bright, first on the screen — exactly what
+         "today" does on the Workout tab. -->
+    <div class="sym-tile is-today">
+      <div class="sym-tile-head">
+        <span class="sym-tile-lbl"><i>◎</i>TODAY</span>
+        <span class="sym-tile-meta">558 cal left</span>
+      </div>
+      <div class="sym-chips">
+        <button class="sym-chip" aria-pressed="true">Today</button>
+        <button class="sym-chip">1W</button><button class="sym-chip">2W</button>
+        <button class="sym-chip">4W</button><button class="sym-chip">8W</button>
+        <button class="sym-chip">Custom</button>
+      </div>
+      <div class="sym-num"><b>1,842</b><i>cal</i><u>of 2,400</u></div>
+      <div class="sym-bar"><i style="width:77%"></i></div>
+      <div class="sym-macs">
+        <div class="sym-mac"><p>PROTEIN</p><b>146</b><s>of 190 g</s></div>
+        <div class="sym-mac"><p>CARBS</p><b>178</b><s>of 240 g</s></div>
+        <div class="sym-mac"><p>FAT</p><b>52</b><s>of 70 g</s></div>
+      </div>
+      <button class="sym-more">MORE NUTRIENTS ⌄</button>
+      <div class="sym-split">
+        <div><b>86%</b><p>ADHERENCE</p><s>logging × macros · this week</s></div>
+        <div><b>71%</b><p>LOGGING RATE</p><s>5 of 7 days</s></div>
+      </div>
+    </div>
+
+    <!-- The assistant. Named, never impersonating — ruling 4, already shipped
+         in the coach sheet; the tile carries the same wording. -->
+    <div class="sym-tile">
+      <div class="sym-tile-head">
+        <span class="sym-tile-lbl"><i>✦</i>DUSTIN'S ASSISTANT</span>
+        <span class="sym-tile-meta">✕</span>
+      </div>
+      <div class="sym-body"><div class="sym-wo"><div class="sym-wo-row">
+        <span class="sym-wo-ic">✦</span>
+        <span class="sym-food" style="flex:1">Protein is 44 g short with two meals to go —
+          lunch as planned covers most of it. Anything real goes to Dustin.</span>
+      </div></div></div>
+    </div>
+
+    <p class="sym-sec">MEALS — TAP THE RING TO LOG · ⋯ FOR MORE · HOLD ⠿ TO MOVE</p>
+
+    <div class="sym-tile" data-rung style="--rung:0%"><div class="sym-tile-head"><span class="sym-tile-lbl"><i>◍</i>M1 · Breakfast</span><span class="sym-tile-meta">7:00am</span></div><div class="sym-body"><div class="sym-wo"><div class="sym-food">Egg whites — 8 oz<br>Oats — 1 cup cooked<br>Blueberries — 1 cup</div><div class="sym-kcal"><b>486</b> cal · 42P / 48C / 12F</div></div></div><div class="sym-acts" style="margin-top:9px"><button class="sym-ring on" aria-label="logged">✓</button><span class="sym-badge">logged</span><span class="sym-sp"></span><button class="sym-bt">✎ Edit</button><button class="sym-bt ic" aria-label="more">⋯</button><span class="sym-grip" title="hold to move">⠿</span></div></div>
+    <div class="sym-tile" data-rung style="--rung:5%"><div class="sym-tile-head"><span class="sym-tile-lbl"><i>◍</i>M2 · Snack</span><span class="sym-tile-meta">10:00am</span></div><div class="sym-body"><div class="sym-wo"><div class="sym-food">Greek yoghurt — 1 container<br>Almonds — 1 oz</div><div class="sym-kcal"><b>244</b> cal · 26P / 18C / 7F</div></div></div><div class="sym-acts" style="margin-top:9px"><button class="sym-ring on" aria-label="logged">✓</button><span class="sym-badge">logged</span><span class="sym-sp"></span><button class="sym-bt">✎ Edit</button><button class="sym-bt ic" aria-label="more">⋯</button><span class="sym-grip" title="hold to move">⠿</span></div></div>
+    <div class="sym-tile is-today"><div class="sym-tile-head"><span class="sym-tile-lbl"><i>◍</i>M3 · Lunch</span><span class="sym-tile-meta">12:30pm · NEXT</span></div><div class="sym-body"><div class="sym-wo"><div class="sym-food">Chicken breast — 1 medium (6 oz)<br>Jasmine rice — 1 cup cooked<br>Broccoli<em>FREE</em></div><div class="sym-kcal"><b>612</b> cal · 58P / 62C / 16F</div></div><div class="sym-food" style="margin-top:8px">1 medium chicken breast = 6 oz — from the food database's piece sizes, not a guess.</div></div><div class="sym-acts" style="margin-top:9px"><button class="sym-ring" aria-label="log this meal">✓</button><span class="sym-sp"></span><button class="sym-bt">✎ Edit</button><button class="sym-bt ic" aria-label="more">⋯</button><span class="sym-grip" title="hold to move">⠿</span></div></div>
+    <div class="sym-tile" data-rung style="--rung:15%"><div class="sym-tile-head"><span class="sym-tile-lbl"><i>◍</i>M4 · Snack</span><span class="sym-tile-meta">3:30pm</span></div><div class="sym-body"><div class="sym-wo"><div class="sym-wo-row"><span class="sym-wo-ic">A</span><span class="sym-wo-name">Protein shake + banana</span></div><div class="sym-food">Whey — 1 scoop · Banana — 1 medium (118 g)</div><div class="sym-acts"><span class="sym-badge">268 cal</span><span class="sym-sp"></span><button class="sym-bt">Choose</button></div></div><div class="sym-wo"><div class="sym-wo-row"><span class="sym-wo-ic">B</span><span class="sym-wo-name">Turkey wrap</span></div><div class="sym-food">Turkey — 4 oz · Tortilla — 1 medium</div><div class="sym-acts"><span class="sym-badge">302 cal</span><span class="sym-sp"></span><button class="sym-bt">Choose</button></div></div></div><div class="sym-acts" style="margin-top:9px"><button class="sym-ring" aria-label="log this meal">✓</button><span class="sym-sp"></span><button class="sym-bt">✎ Edit</button><button class="sym-bt ic" aria-label="more">⋯</button><span class="sym-grip" title="hold to move">⠿</span></div></div>
+    <div class="sym-tile" data-rung style="--rung:20%"><div class="sym-tile-head"><span class="sym-tile-lbl"><i>◍</i>M5 · Dinner</span><span class="sym-tile-meta">6:30pm</span></div><div class="sym-body"><div class="sym-wo"><div class="sym-food">Sirloin — 6 oz<br>Sweet potato — 1 large<br>Green beans<em>FREE</em></div><div class="sym-kcal"><b>584</b> cal · 52P / 54C / 18F</div></div></div><div class="sym-acts" style="margin-top:9px"><button class="sym-ring" aria-label="log this meal">✓</button><span class="sym-sp"></span><button class="sym-bt">✎ Edit</button><button class="sym-bt ic" aria-label="more">⋯</button><span class="sym-grip" title="hold to move">⠿</span></div></div>
+    <div class="sym-tile" data-rung style="--rung:25%"><div class="sym-tile-head"><span class="sym-tile-lbl"><i>◌</i>M6 · Snack</span><span class="sym-tile-meta">9:00pm</span></div><div class="sym-body"><div class="sym-rest">＋ Build this meal<br><span style="font-weight:600">food search · 📷 photo · ⌨ typed</span></div></div><div class="sym-acts" style="margin-top:9px"><button class="sym-ring" aria-label="log this meal">✓</button><span class="sym-sp"></span><button class="sym-bt">✎ Edit</button><button class="sym-bt ic" aria-label="more">⋯</button><span class="sym-grip" title="hold to move">⠿</span></div></div>
+
+    <p class="sym-sec">EXTRAS</p>
+    <div class="sym-tile" data-rung style="--rung:8%">
+      <div class="sym-tile-head">
+        <span class="sym-tile-lbl"><i>＋</i>Coffee with cream</span>
+        <span class="sym-tile-meta">added 2:10pm</span>
+      </div>
+      <div class="sym-body"><div class="sym-wo">
+        <div class="sym-food">Cream — 2 tbsp</div>
+        <div class="sym-kcal"><b>62</b> cal · 1P / 1C / 6F</div>
+      </div></div>
+      <div class="sym-acts" style="margin-top:9px"><span class="sym-badge">estimated</span>
+        <span class="sym-sp"></span><button class="sym-bt">✎ Edit</button>
+        <button class="sym-bt ic" aria-label="remove">✕</button></div>
+    </div>
+
+    <button class="sym-past"><span>＋</span><span class="sym-sp">Add an extra</span>
+      <span class="sym-past-go">OPEN</span></button>
+  </div>
+</div>
+</div>
+          <div id="mk-old" hidden>
+<div class="mk-old" style="padding:12px 14px 26px">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="color:var(--brand-text-secondary);font-size:19px">‹</span>
+    <div style="flex:1;text-align:center">
+      <p style="margin:0;font-size:15px;font-weight:800;color:var(--brand-text)">Tuesday 9 Sep</p>
+      <p style="margin:0;font-size:11px;color:var(--brand-text-secondary)">Plan A</p>
+    </div>
+    <span style="color:var(--brand-text-secondary);font-size:19px">›</span>
+    <span style="color:var(--brand-text);font-size:19px">⋯</span>
+  </div>
+
+  <div class="oc">
+    <div class="chips"><span class="on">Today</span><span>1W</span><span>2W</span><span>4W</span><span>8W</span><span>Custom</span></div>
+    <p class="hero">1,842 <span style="font-size:12px;font-weight:600;color:var(--brand-text-secondary)">of 2,400 cal</span></p>
+    <div class="bar"><i style="width:77%"></i></div>
+    <div class="pills">
+      <div><p>PROTEIN</p><b>146</b> <span style="font-size:10px;color:var(--brand-text-secondary)">/190</span></div>
+      <div><p>CARBS</p><b>178</b> <span style="font-size:10px;color:var(--brand-text-secondary)">/240</span></div>
+      <div><p>FAT</p><b>52</b> <span style="font-size:10px;color:var(--brand-text-secondary)">/70</span></div>
+    </div>
+    <p style="text-align:center;font-size:10px;font-weight:700;letter-spacing:.6px;color:var(--brand-text-secondary);margin:9px 0 0">MORE NUTRIENTS ⌄</p>
+    <div style="display:flex;margin-top:9px">
+      <div style="flex:1;text-align:center"><p style="margin:0;font-size:16px;font-weight:800;color:var(--brand-text)">86%</p>
+        <p style="margin:0;font-size:9px;font-weight:700;letter-spacing:.8px;color:var(--brand-text-secondary)">ADHERENCE</p></div>
+      <div style="flex:1;text-align:center"><p style="margin:0;font-size:16px;font-weight:800;color:var(--brand-text)">71%</p>
+        <p style="margin:0;font-size:9px;font-weight:700;letter-spacing:.8px;color:var(--brand-text-secondary)">LOGGING RATE</p></div>
+    </div>
+  </div>
+
+  <div class="oc" style="border-left:3px solid #22c55e;display:flex;gap:10px;align-items:flex-start">
+    <span style="width:26px;height:26px;border-radius:50%;background:var(--brand-bg);display:grid;place-items:center;font-size:13px">✦</span>
+    <p class="it" style="flex:1;margin:0">Protein is 44 g short with two meals to go — lunch as planned covers most of it.</p>
+    <span style="color:var(--brand-text-secondary);font-size:11px">✕</span>
+  </div>
+
+  <p class="sec">MEALS — TAP CIRCLE TO LOG FULL · ⋯ FOR MORE · HOLD ⠿ TO MOVE</p>
+
+  <div class="oc" style="border-color:rgba(34,197,94,.45)"><div class="row">
+    <span class="ring on"></span><div style="flex:1">
+      <p class="nm">M1 <span style="font-weight:600;color:var(--brand-text-secondary)">Breakfast</span></p>
+      <p class="it">Egg whites — 8 oz<br>Oats — 1 cup cooked<br>Blueberries — 1 cup</p>
+      <p class="mc"><b>486</b> cal · 42P / 48C / 12F</p></div>
+    <span style="color:var(--brand-text-secondary)">⠿</span><span style="color:var(--brand-text-secondary);font-size:17px">⋯</span>
+  </div></div>
+
+  <div class="oc" style="border-color:rgba(34,197,94,.45)"><div class="row">
+    <span class="ring on"></span><div style="flex:1">
+      <p class="nm">M2 <span style="font-weight:600;color:var(--brand-text-secondary)">Snack</span></p>
+      <p class="it">Greek yoghurt — 1 container<br>Almonds — 1 oz</p>
+      <p class="mc"><b>244</b> cal · 26P / 18C / 7F</p></div>
+    <span style="color:var(--brand-text-secondary)">⠿</span><span style="color:var(--brand-text-secondary);font-size:17px">⋯</span>
+  </div></div>
+
+  <div class="oc"><div class="row">
+    <span class="ring"></span><div style="flex:1">
+      <p class="nm">M3 <span style="font-weight:600;color:var(--brand-text-secondary)">Lunch</span>
+        <span style="font-size:10px;font-weight:600;color:var(--brand-text-secondary);background:var(--brand-bg);padding:2px 7px;border-radius:6px">12:30pm</span></p>
+      <p class="it">Chicken breast — 1 medium (6 oz)<br>Jasmine rice — 1 cup cooked<br>Broccoli</p>
+      <p class="mc"><b>612</b> cal · 58P / 62C / 16F</p></div>
+    <span style="color:var(--brand-text-secondary)">⠿</span><span style="color:var(--brand-text-secondary);font-size:17px">⋯</span>
+  </div></div>
+
+  <div class="oc"><div class="row">
+    <span class="ring"></span><div style="flex:1">
+      <p class="nm">M4 <span style="font-weight:600;color:var(--brand-text-secondary)">Snack</span></p>
+      <p class="it">Protein shake + banana</p>
+      <p class="mc"><b>268</b> cal · 30P / 28C / 4F</p>
+      <span style="display:inline-flex;gap:6px;margin-top:6px">
+        <span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:8px;border:1px solid var(--brand-primary);color:var(--brand-text)">A</span>
+        <span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:8px;border:1px solid var(--brand-border);color:var(--brand-text-secondary)">B</span>
+      </span></div>
+    <span style="color:var(--brand-text-secondary)">⠿</span><span style="color:var(--brand-text-secondary);font-size:17px">⋯</span>
+  </div></div>
+
+  <div class="oc"><div class="row">
+    <span class="ring"></span><div style="flex:1">
+      <p class="nm">M5 <span style="font-weight:600;color:var(--brand-text-secondary)">Dinner</span></p>
+      <p class="it">Sirloin — 6 oz<br>Sweet potato — 1 large<br>Green beans</p>
+      <p class="mc"><b>584</b> cal · 52P / 54C / 18F</p></div>
+    <span style="color:var(--brand-text-secondary)">⠿</span><span style="color:var(--brand-text-secondary);font-size:17px">⋯</span>
+  </div></div>
+
+  <div class="oc"><div class="row">
+    <span class="ring"></span><div style="flex:1">
+      <p class="nm">M6 <span style="font-weight:600;color:var(--brand-text-secondary)">Snack</span></p>
+      <p class="mc" style="color:var(--brand-primary);font-weight:700">＋ Build this meal
+        <span style="font-weight:500;font-size:10px;color:var(--brand-text-secondary)">food DB · 📷 photo · ⌨ typed</span></p></div>
+    <span style="color:var(--brand-text-secondary)">⠿</span><span style="color:var(--brand-text-secondary);font-size:17px">⋯</span>
+  </div></div>
+
+  <p class="sec">EXTRAS</p>
+  <div class="oc"><div class="row">
+    <span style="width:32px;height:32px;border-radius:10px;background:var(--brand-bg);display:grid;place-items:center;font-size:14px">＋</span>
+    <div style="flex:1"><p class="nm">Coffee with cream</p>
+      <p class="mc"><b>62</b> cal · 1P / 1C / 6F</p></div>
+    <span style="color:var(--brand-text-secondary);font-size:13px">✕</span>
+  </div></div>
+</div>
+</div>
+        </div>
+        <div class="mk-nav">
+          <div><b>⌂</b>Home</div><div><b>▤</b>Workouts</div>
+          <div class="on"><b>◍</b>Nutrition</div><div><b>◔</b>Progress</div><div><b>☰</b>More</div>
+        </div>
+      </div>
+    </div>
+    <div>
+<div class="mk-note">
+  <h2>What this is</h2>
+  <p>The Nutrition screen in the same object the Home and Workout screens are
+  built from — one tile, thirty schemes. Nothing about <b>what</b> the screen
+  does changes here: every control on it today is still on it, in the same
+  place, doing the same thing. This is the wrapper and the shapes only.</p>
+  <p>It is drawn with the app's <em>real</em> stylesheet, not a copy — the same
+  <code>.sym-*</code> rules and the same thirty palettes the app ships. Flip
+  through the schemes and the depth levels: what you see is what renders.</p>
+
+  <h3>What carries over from the Workout tab</h3>
+  <ul>
+    <li><b>The cap.</b> Every tile gets the gradient strip across its top and no
+    side borders. With Depth on it thickens, app-wide, exactly as it does now.</li>
+    <li><b>Nesting is the same object, smaller.</b> A meal is a tile; the food
+    inside it is that tile at a smaller size.</li>
+    <li><b>Today is filled bright and renders first.</b> Here that is the day
+    summary — it is the "today" of this screen, so it takes the bright fill and
+    the sweeping cap, and it sits at the top where it already is.</li>
+    <li><b>Ladder shading</b> — one colour, six shades — runs M1 down to M6.
+    Six meals, six shades: it fits this screen better than it fits the week.</li>
+    <li><b>Max two rows of text per card</b>, and the meal name is never cut.</li>
+  </ul>
+
+  <h3>What it fixes on the way past</h3>
+  <ul>
+    <li>A meal's <b>food list and its actions stop competing</b> for one row.
+    Today the ring, the name, the foods, the macros, the ⠿ handle and the ⋯ are
+    all on a single line, which is why the row gets tall and the handle ends up
+    next to the text. In the tile the foods sit in the body and the controls sit
+    on their own strip underneath.</li>
+    <li><b>Meal options A / B become real objects</b> instead of two small
+    letters. That is the same shape as two workouts inside one day.</li>
+    <li><b>An empty slot reads as empty</b> — the rest-day shape, not a normal
+    card with a line of blue text in it.</li>
+    <li>Buttons follow the three contrast rules, so they stop disappearing on
+    the tinted schemes. Check Carbon Neon and Blush Cloud.</li>
+  </ul>
+
+  <h3>Where it goes</h3>
+  <p>One screen, one component — so it lands in <b>your Client View and in the
+  clients' app together</b>, the way the top bar now does. There is no second
+  copy to keep in step.</p>
+</div>
+
+<div class="mk-note mk-decide">
+  <h2>One thing I need you to rule on</h2>
+  <p><b>The next meal due: bright in place, or hoisted to the top?</b></p>
+  <p>On the Workout tab, today is lifted out of date order and drawn first,
+  because a week is a list you scan and the one you want is buried in it.</p>
+  <p>A day of meals is not that. M1 → M6 <em>is</em> the order you eat in, and
+  hoisting M3 above M1 would break the only thing that makes the list readable —
+  and it would move as the day went on.</p>
+  <p><b>So the mock-up leaves the next meal in place</b> and marks it another
+  way: the bright fill goes to the day summary at the top (the real "now" of
+  this screen), and M3 carries a <em>NEXT</em> label in its meta line.</p>
+  <p>Say the word and I will hoist it instead — but that is the one place this
+  screen deliberately does not copy the Workout tab, and I would rather you
+  decided that than assumed it.</p>
+</div>
+
+<div class="mk-note">
+  <h2>Not in this change</h2>
+  <p>Deliberately left alone until the Nutrition walk itself, because they are
+  behaviour and not format:</p>
+  <ul>
+    <li><em>"numbers are way off"</em> — the day total against the target. That
+    gets checked against the plan and the logged rows first, before anything on
+    this screen is touched.</li>
+    <li><b>Nutrition %</b> — how adherence calculates. The rule gets captured at
+    this screen so both places change together.</li>
+    <li>The logging sheets, the food search and the photo path. Same screen,
+    separate pass.</li>
+  </ul>
+</div>
+</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement, body = document.body;
+  var DARK = ["midnight", "carbonneon", "midnightaurora", "midnightember", "midnightcitrus", "midnightorchid", "deepreef"];
+  var PAL = {"pastel": {"--brand-bg": "#f4f6fb"}, "navy": {"--brand-bg": "#EDF2F7"}, "charcoal": {"--brand-bg": "#F0F0F0"}, "forest": {"--brand-bg": "#F0F7F0"}, "gunmetal": {"--brand-bg": "#EAEEF2"}, "purple": {"--brand-bg": "#F3F0F8"}, "orange": {"--brand-bg": "#FFF3E0"}, "rose": {"--brand-bg": "#FFF0F3"}, "blush": {"--brand-bg": "#FFF0F5"}, "lagoon": {"--brand-bg": "#EEF8F8"}, "orchid": {"--brand-bg": "#FAF4FB"}, "berry": {"--brand-bg": "#FBF1F5"}, "slatepop": {"--brand-bg": "#F2F4F8"}, "plumdusk": {"--brand-bg": "#F6F2F8"}, "carbonneon": {"--brand-bg": "#14161C"}, "midnight": {"--brand-bg": "#0D1117"}, "sunsetcoral": {"--brand-bg": "#fff6f3"}, "aurora": {"--brand-bg": "#f3f7fb"}, "citrus": {"--brand-bg": "#fbfdf3"}, "berrynoir": {"--brand-bg": "#f7f4fb"}, "oceandusk": {"--brand-bg": "#f2f6f8"}, "midnightaurora": {"--brand-bg": "#0D1117"}, "midnightember": {"--brand-bg": "#0B0E14"}, "midnightcitrus": {"--brand-bg": "#0D1117"}, "midnightorchid": {"--brand-bg": "#0C0F17"}, "violetdawn": {"--brand-bg": "#F4F3FC"}, "sunsetdrift": {"--brand-bg": "#FFF6F2"}, "deepreef": {"--brand-bg": "#0A1418"}, "blushcloud": {"--brand-bg": "#FFF5F8"}, "hotpink": {"--brand-bg": "#FFF0F7"}};
+
+  function lum(hex) {
+    hex = String(hex || '').trim().replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+    if (hex.length !== 6) return 1;
+    var v = [0, 2, 4].map(function (i) {
+      var c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+  }
+
+  function setTheme(t) {
+    root.setAttribute('data-theme', t);
+    // AutoDark, replayed: it stamps data-appearance on genuinely light-token
+    // schemes that are being shown dark. Without it the tile system picks the
+    // wrong --sink and the whole ladder collapses on the dark schemes.
+    var isDark = DARK.indexOf(t) >= 0 || lum((PAL[t] || {})['--brand-bg']) < 0.18;
+    if (isDark) root.setAttribute('data-appearance', 'dark');
+    else root.removeAttribute('data-appearance');
+    [].forEach.call(document.querySelectorAll('.mk-sw'), function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.t === t));
+    });
+    try { localStorage.setItem('mk-theme', t); } catch (e) {}
+  }
+
+  function seg(sel, attr, apply) {
+    [].forEach.call(document.querySelectorAll(sel), function (b) {
+      b.addEventListener('click', function () {
+        [].forEach.call(document.querySelectorAll(sel), function (o) {
+          o.setAttribute('aria-pressed', String(o === b));
+        });
+        apply(b.dataset[attr]);
+      });
+    });
+  }
+
+  [].forEach.call(document.querySelectorAll('.mk-sw'), function (b) {
+    b.addEventListener('click', function () { setTheme(b.dataset.t); });
+  });
+  seg('[data-d]', 'd', function (v) {
+    root.setAttribute('data-deep', v);
+    try { localStorage.setItem('mk-deep', v); } catch (e) {}
+  });
+  seg('[data-v]', 'v', function (v) {
+    document.getElementById('mk-new').hidden = v !== 'new';
+    document.getElementById('mk-old').hidden = v !== 'old';
+  });
+
+  var t0 = 'navy', d0 = '20';
+  try { t0 = localStorage.getItem('mk-theme') || t0; d0 = localStorage.getItem('mk-deep') || d0; } catch (e) {}
+  if (!PAL[t0]) t0 = 'navy';
+  setTheme(t0);
+  root.setAttribute('data-deep', d0);
+  [].forEach.call(document.querySelectorAll('[data-d]'), function (b) {
+    b.setAttribute('aria-pressed', String(b.dataset.d === d0));
+  });
+  body.classList.add('mk');
+})();
+</script>
+
+</body>
+</html>

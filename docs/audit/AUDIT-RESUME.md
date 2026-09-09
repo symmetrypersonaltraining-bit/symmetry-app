@@ -127,8 +127,17 @@ are NOT bugs and must stop being re-reported.
 
 ### Next — in this order
 
-1. **Screen 3 — NUTRITION.** The next client screen, and the one with the most
-   of his own words already against it:
+1. **Screen 3 — NUTRITION.** IN PROGRESS. The format mock-up is built and
+   **waiting on him** before any code moves — `docs/mockups/nutrition-format.html`
+   (regenerate with `python3 scripts/gen-nutrition-mockup.py`), published at
+   <https://claude.ai/code/artifact/c52d0283-f009-4946-8fbb-1ae34c719c6b>. It
+   inlines the app's real `globals.css`, so it cannot drift from what ships, and
+   it flips to the current screen for comparison. **One decision is open:**
+   whether the next meal due is filled bright *in place* (what the mock-up does)
+   or hoisted to the top the way today is on the Workout tab. Full write-up:
+   the Nutrition interlude at the end of `SCREEN-WALKTHROUGH.md`.
+   Then the control inventory and the three questions. His words already against
+   this screen:
    - *"numbers are way off"* (4 Sep, from the Coach sheet: M6 read 766 kcal and
      the day landed at 4,573 against a 4,462 target). **Both the day total and
      the target need checking against the meal plan and the logged rows before
@@ -137,7 +146,10 @@ are NOT bugs and must stop being re-reported.
      deal with"* — his reason for deferring the coach-chat snack path here.
    - **Nutrition %** — he is unhappy with how it calculates. Capture the rule at
      this screen so both places change together.
-2. **The workout logger** — its own pass, see its section below. OFF LIMITS
+2. **The workout logger** — **pinned here by him.** Dustin, 9 Sep, mid-session:
+   *"side note, we need to put workout logger next on the list to audit."* It
+   comes straight after Nutrition and ahead of every remaining screen; do not
+   let screen 4 jump it. Its own pass, see its section below. OFF LIMITS
    without per-item permission; agree which controls may be touched first.
 3. Screen 4 onward.
 
