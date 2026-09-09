@@ -18,7 +18,13 @@ and do not create another one.
 > because it was pushed to a branch and never merged, and that is what
 > section 3's push rule now exists to stop.
 >
-> 🔵 **PICK UP HERE: the Nutrition walk is OPEN and waiting on him.** The three
+> 🔴 **FIRST: the access rule is built and SWITCHED OFF, waiting on his word.**
+> An archived client losing the app 30 days after their last payment shipped as
+> `cf32c88`. The first run would cut off **five** people and he flagged one;
+> `app_flags.access_revoke_live` is false until he has read the list. Section 5
+> leads with it, including the Robert Miller ruling it needs.
+>
+> 🔵 **THEN: the Nutrition walk is OPEN and waiting on him.** The three
 > opening questions have been put to him and are **unanswered** — he went out for
 > the night on 9 Sep before answering. **Re-ask those three, then go straight to
 > Batch 1.** Do not re-derive the control inventory; it is done, six batches at
@@ -28,9 +34,11 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **9 Sep 2026, evening** · `main` = `547a544`. Gates green as of the
+Last updated: **9 Sep 2026, evening** · `main` = `cf32c88`. Gates green as of the
 PR #3 merge: 0 errors in `src/`, **2,960 unit tests passing**, build compiles.
-Nothing has been committed since but documentation.
+Since then: the access rule (`cf32c88`) — 3,031 unit tests pass, 0 fail, and
+two PRE-EXISTING failures in `scripts/test-nutrition-ai.cjs` that are red on
+clean `main` too. Section 5 has them.
 
 > **His other Claude session pushes to this repo while you work.** It is not a
 > mistake and it is not to be reverted — check `git log origin/main` before you
@@ -548,6 +556,59 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 that keeps biting: his other session pushes to this repo while you work, so find
 out where `main` actually is before you write a line. On the evening of 9 Sep it
 landed `547a544` mid-session, while this one was reading.
+
+### 🔴 WAITING ON HIM — the access rule is BUILT and SWITCHED OFF
+
+Shipped 9 Sep as `cf32c88` (PR #6). An archived client loses the app 30 days
+after their last paid invoice. **`app_flags.access_revoke_live` is FALSE**, so
+nothing has happened to anybody and nothing will until he says so.
+
+Three things need his word, in this order:
+
+1. **The first run takes FIVE people, and he flagged one.** Tina Haley (ends
+   11 Aug), Christine Latham (21 Aug), Brooke Reynolds (30 Aug) and Robert
+   Miller (31 Aug) are all past their date alongside Bobbie Page — whose
+   override to **1 Oct is already set**, per his instruction. Show him the list
+   before flipping the switch:
+
+       update app_flags set enabled = true where key = 'access_revoke_live';
+
+   A dry run answers "who would go" without writing anything or banning anyone:
+   `GET /api/cron/revoke-access?dry=1`.
+
+2. **Robert Miller wants a ruling.** Archived 1 Sep, last paid invoice due
+   1 Aug, so the rule ends his access on **31 Aug — the day before he was
+   archived**. Read literally, as built, anyone archived more than thirty days
+   after their last payment gets **no grace period at all**: archiving them cuts
+   them off that night. That may be exactly what he wants. It was built
+   literally rather than softened with a floor, because inventing a grace period
+   he did not ask for is not a decision to make on his behalf.
+
+3. **The trainer-facing override control is NOT built**, deliberately.
+   `access_override_until` works and Bobbie's is set, but the button belongs on
+   `/clients/[clientId]`, which has not been walked, and audit rule 6 is never
+   edit a screen that has not been walked. Until then an override is set
+   directly:
+
+       update clients set access_override_until = date '2026-11-01' where id = '<id>';
+
+The rule is `src/lib/access/archivedAccess.ts` — one implementation, called by
+both the job and the middleware. The full write-up, including the one-day
+timezone bug the tests found in Brooke Reynolds' row, is the interlude
+"access is not the same thing as archived" at the end of
+`docs/audit/SCREEN-WALKTHROUGH.md`.
+
+### 🟠 FOUND, NOT FIXED — two nutrition-AI tests are red on `main`
+
+`node scripts/test-nutrition-ai.cjs` reports **41 passed, 2 failed**:
+`valid swap_meal: items normalized, kcal derived, name defaulted from new_name`
+and `add_snack: items required + normalized, name defaults to item join`.
+
+**They were already failing on clean `main`** — verified by stashing and
+re-running, so they predate the access work and were not caused by it. They were
+left alone rather than folded into an unrelated commit. `npm run test:unit` runs
+this script after the node tests, so the gate is not fully green until they are
+fixed. Nobody has looked at why yet.
 
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
 
