@@ -1784,3 +1784,41 @@ null there, the logger mounts its own coach, and that screen is off limits
 without per-item permission. It gets this when the logger is walked.
 
 Four tests in `tests/unit/hisAssistantNotHim.test.ts`.
+
+---
+
+## Home — today's workout opens two ways  ·  9 Sep 2026
+
+Dustin, 4 Sep and again 9 Sep: *"that today's workouts section... we need to add
+the view button. So we have the start and the view button just like on the
+workout page."* The resume had it as the last place a workout opened only one
+way.
+
+**It was worse than a missing button.** Both branches of the tile — the single
+branded card and each row of the multi-workout list — wrapped the *whole card*
+in a link to the **overview**, while the pill sitting on it read **"Start
+Workout"**. The one control was labelled Start and did View. A client who tapped
+Start landed on the overview and had to find another button to actually begin.
+
+Counted in the code before the change: the word "Start" appeared twice in that
+region and `?start=1` appeared **zero** times.
+
+### What a client sees now
+
+| | Start | View |
+|---|---|---|
+| Single card | white pill → `?start=1`, enters the session | outlined pill → the overview |
+| Each row of a multi day | primary pill → `?start=1` | tinted pill in the row's own colour → the overview |
+
+- **A completed session keeps View** and loses Start — it is how a client reads
+  back what they actually lifted.
+- The card wrapper is gone. Two destinations cannot live inside one anchor, and
+  a nested `<a>` is invalid HTML, so the card is a container and the two buttons
+  are the links.
+- Same split, same words and same order as the Workout tab, so the pair means
+  the same thing in both places.
+
+Five tests in `tests/unit/todayOpensTwoWays.test.ts`. The load-bearing one is an
+invariant rather than a snapshot: **every control that says "Start" must carry
+`?start=1`.** Against the pre-change file that reads 2 Starts and 0 flags, which
+is the bug stated as a number.

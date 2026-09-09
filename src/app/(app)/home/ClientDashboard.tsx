@@ -797,28 +797,57 @@ export default function ClientDashboard({
           // feel prescribed rather than skipped, and it's shareable to the group.
           <RestDaySlip firstName={firstName} />
         ) : _todayWorkouts.length === 1 ? (
-          // Single workout — original branded card
-          <Link href={`${basePath}/workout/${_todayWorkouts[0].id}`}>
-            <div className="rounded-2xl p-5 relative overflow-hidden cursor-pointer cw-lift" style={{ background: "var(--brand-primary)" }}>
-              <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ background: "white", transform: "translate(30%, -30%)" }} />
-              <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full opacity-5" style={{ background: "white", transform: "translate(-30%, 30%)" }} />
-              <div className="relative">
-                <p className="text-xs font-semibold text-white/70 mb-1 uppercase tracking-widest">Today&apos;s Workout</p>
-                <h2 className="text-xl font-bold text-white mb-3">{_todayWorkouts[0].days?.label || "Today's Workout"}</h2>
+          // Single workout — original branded card.
+          //
+          // START AND VIEW, the same split as the Workout tab. Dustin, 4 Sep,
+          // and re-raised 9 Sep: this was "the last place a workout opens only
+          // one way."
+          //
+          // ⚠️ It was worse than a missing button. The whole card was wrapped in
+          // a Link to the overview while the pill on it read "Start Workout" —
+          // so the one control here was LABELLED Start and DID View. The card
+          // wrapper is gone (two destinations cannot live inside one anchor,
+          // and nested <a> is invalid), and the two are now separate controls
+          // that each do what they say.
+          //
+          // `?start=1` is what enters the session; the bare id opens the
+          // overview. See the Workout tab's Start/View split for why the flag
+          // is read on mount after hydration rather than checked earlier.
+          <div className="rounded-2xl p-5 relative overflow-hidden" style={{ background: "var(--brand-primary)" }}>
+            <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ background: "white", transform: "translate(30%, -30%)" }} />
+            <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full opacity-5" style={{ background: "white", transform: "translate(-30%, 30%)" }} />
+            <div className="relative">
+              <p className="text-xs font-semibold text-white/70 mb-1 uppercase tracking-widest">Today&apos;s Workout</p>
+              <h2 className="text-xl font-bold text-white mb-3">{_todayWorkouts[0].days?.label || "Today's Workout"}</h2>
+              <div className="flex items-center gap-2 flex-wrap">
                 {_todayWorkouts[0].status === "completed" ? (
                   <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5">
                     <i className="ti ti-check text-sm text-white" />
                     <span className="text-xs text-white font-medium">Completed ✓</span>
                   </div>
                 ) : (
-                  <div className="inline-flex items-center gap-2 bg-white text-sm font-semibold rounded-full px-4 py-2" style={{ color: "var(--brand-primary)" }}>
+                  <Link
+                    href={`${basePath}/workout/${_todayWorkouts[0].id}?start=1`}
+                    className="inline-flex items-center gap-2 bg-white text-sm font-semibold rounded-full px-4 py-2 cw-lift"
+                    style={{ color: "var(--brand-primary)" }}
+                  >
                     <i className="ti ti-player-play" />
-                    Start Workout
-                  </div>
+                    Start
+                  </Link>
                 )}
+                {/* View is offered on a completed session too — it is how a
+                    client reads back what they lifted. */}
+                <Link
+                  href={`${basePath}/workout/${_todayWorkouts[0].id}`}
+                  className="inline-flex items-center gap-2 text-sm font-semibold rounded-full px-4 py-2 text-white cw-lift"
+                  style={{ background: "rgba(255,255,255,0.18)", border: "1.5px solid rgba(255,255,255,0.55)" }}
+                >
+                  <i className="ti ti-eye" />
+                  View
+                </Link>
               </div>
             </div>
-          </Link>
+          </div>
         ) : (
           // Multiple workouts today — branded header + individual clickable rows
           // A SURFACE CARD LIKE EVERY OTHER CARD ON THIS SCREEN.
@@ -856,7 +885,7 @@ export default function ClientDashboard({
                 // wherever you meet it.
                 const twColor = twIsCardio ? "#5ec9a3" : "var(--brand-primary)";
                 return (
-                  <Link key={tw.id} href={`${basePath}/workout/${tw.id}`} className="block">
+                  <div key={tw.id} className="block">
                     <div
                       className="flex items-center gap-3 px-3 py-3 rounded-xl"
                       style={{
@@ -874,21 +903,38 @@ export default function ClientDashboard({
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate" style={{ color: "var(--brand-text)" }}>{twLabel}</p>
                       </div>
-                      {twDone ? (
-                        <div className="inline-flex items-center gap-1 rounded-full px-2 py-1 flex-shrink-0"
-                          style={{ background: "color-mix(in srgb, #22c55e 16%, transparent)", color: "#16a34a" }}>
-                          <i className="ti ti-check text-xs" />
-                          <span className="text-xs font-semibold">Done</span>
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 flex-shrink-0"
-                          style={{ background: "var(--brand-primary)", color: "#fff" }}>
-                          <i className="ti ti-player-play text-xs" />
-                          <span className="text-xs font-semibold">Start</span>
-                        </div>
-                      )}
+                      {/* Start and View per row, the same split as the single
+                          card above and as the Workout tab. The row used to be
+                          one link to the overview with a pill reading "Start"
+                          on it. */}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {twDone ? (
+                          <div className="inline-flex items-center gap-1 rounded-full px-2 py-1"
+                            style={{ background: "color-mix(in srgb, #22c55e 16%, transparent)", color: "#16a34a" }}>
+                            <i className="ti ti-check text-xs" />
+                            <span className="text-xs font-semibold">Done</span>
+                          </div>
+                        ) : (
+                          <Link href={`${basePath}/workout/${tw.id}?start=1`}
+                            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 cw-lift"
+                            style={{ background: "var(--brand-primary)", color: "#fff" }}>
+                            <i className="ti ti-player-play text-xs" />
+                            <span className="text-xs font-semibold">Start</span>
+                          </Link>
+                        )}
+                        <Link href={`${basePath}/workout/${tw.id}`}
+                          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 cw-lift"
+                          style={{
+                            background: `color-mix(in srgb, ${twColor} 14%, transparent)`,
+                            border: `1.5px solid color-mix(in srgb, ${twColor} 45%, transparent)`,
+                            color: "var(--brand-text)",
+                          }}>
+                          <i className="ti ti-eye text-xs" />
+                          <span className="text-xs font-semibold">View</span>
+                        </Link>
+                      </div>
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
