@@ -34,10 +34,14 @@
  * network permission. Allow `api.nal.usda.gov` in the environment's network
  * policy, put a free FDC key in the environment, and run it.
  *
- *   USDA_FDC_API_KEY=xxxx  SUPABASE_URL=...  SUPABASE_SERVICE_ROLE_KEY=...  \
- *     node scripts/import-usda-portions.mjs [--limit N] [--dry-run]
+ *   USDA_FDC_API_KEY=xxxx node scripts/import-usda-portions.mjs
  *
- * A key takes a minute: https://fdc.nal.usda.gov/api-key-signup.html
+ * By default it writes `usda-portions.json` and Claude loads that through the
+ * Supabase connection it already has -- so the only secret anyone has to handle
+ * is the free USDA key. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY instead
+ * if you want it to write to the database directly.
+ *
+ * A key takes a minute: https://fdc.nal.usda.gov/api-key-signup/
  *
  * ── WHAT IT WRITES ─────────────────────────────────────────────────────────
  *
@@ -57,8 +61,14 @@ const DRY = args.has("--dry-run");
 const limitArg = process.argv.find((a) => a.startsWith("--limit="));
 const LIMIT = limitArg ? Number(limitArg.split("=")[1]) : Infinity;
 
-if (!KEY) fail("USDA_FDC_API_KEY is not set. https://fdc.nal.usda.gov/api-key-signup.html");
-if (!DRY && (!SUPABASE_URL || !SERVICE_KEY)) fail("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required unless --dry-run.");
+// Default: write the portions to a file, which Claude then loads through the
+// Supabase connection it already has. That way the only secret Dustin has to
+// handle is the free USDA key -- no service-role key pasted into an
+// environment variable that "anyone who uses the environment can read".
+const outArg = process.argv.find((a) => a.startsWith("--out="));
+const OUT = outArg ? outArg.split("=")[1] : (SUPABASE_URL && SERVICE_KEY ? null : "usda-portions.json");
+
+if (!KEY) fail("USDA_FDC_API_KEY is not set. Free key: https://fdc.nal.usda.gov/api-key-signup/");
 
 function fail(msg) { console.error(`\n  ${msg}\n`); process.exit(1); }
 
@@ -107,8 +117,11 @@ async function fdcJson(path) {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const collected = [];
+
 async function upsert(rows) {
   if (DRY || !rows.length) return;
+  if (OUT) { collected.push(...rows); return; }
   const r = await fetch(`${SUPABASE_URL}/rest/v1/food_portion_reference?on_conflict=food_key,portion`, {
     method: "POST",
     headers: {
@@ -152,7 +165,13 @@ async function main() {
     if (seen >= LIMIT) break;
     page++;
   }
-  console.log(`\ndone — ${seen} foods, ${kept} portions into food_portion_reference`);
+  if (OUT && !DRY) {
+    await (await import("node:fs/promises")).writeFile(OUT, JSON.stringify(collected, null, 2));
+    console.log(`\ndone — ${seen} foods, ${kept} portions written to ${OUT}`);
+    console.log("Tell Claude: \"load usda-portions.json into food_portion_reference\".");
+  } else {
+    console.log(`\ndone — ${seen} foods, ${kept} portions into food_portion_reference`);
+  }
 }
 
 main().catch((e) => fail(e.message));
