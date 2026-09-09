@@ -36,6 +36,9 @@
  *
  *   USDA_FDC_API_KEY=xxxx node scripts/import-usda-portions.mjs
  *
+ * Add --resume to continue a run that was interrupted: it reads the page cursor
+ * written beside the output file and carries on from there.
+ *
  * By default it writes `usda-portions.json` and Claude loads that through the
  * Supabase connection it already has -- so the only secret anyone has to handle
  * is the free USDA key. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY instead
@@ -131,6 +134,29 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const collected = [];
 
+// ── RESUMING, BECAUSE THE RUN OUTLIVES NOTHING ─────────────────────────────
+//
+// The first full pass died on a 404 after ~40 minutes. The second died with
+// the container it was running in, at page 9 of a walk that starts at page 1
+// every time. Per-page checkpointing already saved the ROWS; what it did not
+// save was the PLACE, so every restart re-fetched everything it had already
+// read and then stopped in the same wall-clock window as the last one.
+//
+// The cursor is one number next to the output file. It is written after every
+// page, alongside the rows, so a run that is killed picks up on the next page
+// instead of the first one.
+const CURSOR = OUT ? `${OUT}.cursor` : null;
+const RESUME = args.has("--resume");
+let startPage = 1;
+if (RESUME && CURSOR) {
+  const fs = await import("node:fs/promises");
+  try {
+    startPage = Number(JSON.parse(await fs.readFile(CURSOR, "utf8")).nextPage) || 1;
+    collected.push(...JSON.parse(await fs.readFile(OUT, "utf8")));
+    console.log(`resuming at page ${startPage} with ${collected.length} portions already found`);
+  } catch { startPage = 1; }
+}
+
 async function upsert(rows) {
   if (DRY || !rows.length) return;
   if (OUT) { collected.push(...rows); return; }
@@ -150,7 +176,7 @@ async function main() {
 
   // SR Legacy and Foundation are the whole foods: the ones with sizes. Branded
   // products already carry their label serving and are not the problem.
-  let page = 1, seen = 0, kept = 0, skipped = 0;
+  let page = startPage, seen = 0, kept = collected.length, skipped = 0;
   for (;;) {
     const res = await fdcJson(
       `/foods/search?query=*&dataType=SR%20Legacy,Foundation&pageSize=200&pageNumber=${page}`);
@@ -188,7 +214,9 @@ async function main() {
     // Checkpoint: the file is rewritten after every page, so whatever the run
     // has found so far survives an interruption.
     if (OUT && !DRY) {
-      await (await import("node:fs/promises")).writeFile(OUT, JSON.stringify(collected, null, 2));
+      const fs = await import("node:fs/promises");
+      await fs.writeFile(OUT, JSON.stringify(collected, null, 2));
+      await fs.writeFile(CURSOR, JSON.stringify({ nextPage: page + 1 }));
     }
     console.log(`page ${page}: ${seen} read, ${kept} portions, ${skipped} skipped`);
     if (seen >= LIMIT) break;
