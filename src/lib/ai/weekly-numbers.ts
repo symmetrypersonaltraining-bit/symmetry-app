@@ -83,10 +83,12 @@ export interface WeekFacts {
   /** Average per averaged day, or null when nothing was logged. */
   avg: MacroSet | null;
   /**
-   * Adherence, 0-100. Dustin, 2026-07-31: "adherence should be based on
-   * consistently logging and hitting macros n calories." So it is
-   * consistency × accuracy — see rangeAverages.ts for the full definition.
-   * Falls back to the old meal-status average when there's no target on file.
+   * Adherence, 0-100 — HITTING THE NUMBERS, and nothing else. Dustin,
+   * 2026-09-09: *"the adherence i want to be based on hitting numbers alone so
+   * cal and macros, not logging since we have the logging rate."* So it is the
+   * daily accuracy averaged over the window; see rangeAverages.ts. Logging is
+   * reported separately as `consistency`. Falls back to the old meal-status
+   * average when there's no target on file.
    */
   adherence: number | null;
   /** Days logged ÷ days in the window, 0-100. */
@@ -194,18 +196,22 @@ export function weekFactsLines(f: WeekFacts, label: string, target: MacroTarget 
         `  vs targets (${target.calories} kcal / ${target.protein}P / ${target.carbs}C / ${target.fats}F) — these signed deltas are the SOURCE OF TRUTH, do NOT recompute the direction: calories ${d(f.avg.kcal, target.calories)}, protein ${d(f.avg.p, target.protein)}, carbs ${d(f.avg.c, target.carbs)}, fat ${d(f.avg.f, target.fats)}.`,
       );
     }
-    // Adherence is no longer "how did they tag their meals" — it is logging
-    // consistency × macro accuracy. The model has to be told what the number
-    // MEANS or it will keep calling it meal-plan adherence and coach the wrong
-    // behaviour off it.
+    // Adherence is neither "how did they tag their meals" nor "how often did
+    // they log". It is how close they landed to their numbers on the days that
+    // finished. The model has to be told exactly that, and told that logging is
+    // a SEPARATE figure, or it coaches the wrong behaviour off it — and it will
+    // reach for "adherence" when it means consistency.
     if (f.adherence != null) {
       if (f.adherenceBasis === "logging+macros" && f.consistency != null && f.accuracy != null) {
         const caveat =
           f.avgDays !== f.loggedDays
-            ? " (the in-progress day is left out of both sides of consistency)"
+            ? " The in-progress day is left out of both figures — a day that is not over is not a data point."
             : "";
         out.push(
-          `- Adherence: ${r0(f.adherence)}%. This is logging consistency × macro accuracy, NOT a meal checkbox score: consistency ${r0(f.consistency)}% — how much of the window they logged at all${caveat} — times accuracy ${r0(f.accuracy)}% — how close the days they did log landed to target across ALL FOUR of calories, protein, carbs and fat. A day nobody logged counts as a miss. Within 10% of a target is a full hit.`,
+          `- Adherence: ${r0(f.adherence)}%. This is HITTING THE NUMBERS and nothing else: how close the days they logged landed to target across ALL FOUR of calories, protein, carbs and fat, averaged per day. Within 10% of a target is a full hit; credit falls to zero at 50% off. It is NOT a meal checkbox score and it is NOT how often they logged.${caveat}`,
+        );
+        out.push(
+          `- Logging rate: ${r0(f.consistency)}% — how much of the window they logged at all. SEPARATE from adherence: someone can log every day and miss every target, or log twice and nail both. Never merge these two numbers or describe one as the other.`,
         );
       } else {
         out.push(

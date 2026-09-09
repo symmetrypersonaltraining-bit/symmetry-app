@@ -303,9 +303,15 @@ test("dayHitScore scores ALL FOUR macros, not just calories and protein", () => 
   assert.equal(dayHitScore({ kcal: 2000, protein: 1, carbs: 1, fats: 1 }, null), null);
 });
 
-test("adherence is consistency MULTIPLIED by accuracy — an unlogged day is a miss", () => {
-  // Two perfect days inside a seven-day window. Nailing what you log does not
-  // erase the five days you didn't: 2/7 × 100% = 29%, not 100%.
+test("ADHERENCE IS HITTING THE NUMBERS — logging is a separate figure", () => {
+  // Dustin, 9 Sep 2026: *"the adherence i want to be based on hitting numbers
+  // alone so cal and macros, not logging since we have the logging rate."*
+  //
+  // This REPLACES his 31 Jul ruling, which multiplied the two. Two perfect days
+  // inside a seven-day window: they hit their numbers on every day they ate, so
+  // adherence is 100. That they only logged two of seven days is true, is worth
+  // saying, and is said by the OTHER number — the card prints both side by side,
+  // and multiplying them in charged a missed day twice.
   const logs = [
     planLog("2026-07-20", 1, "m1", "Full"),
     planLog("2026-07-20", 2, "m2", "Full"),
@@ -315,8 +321,36 @@ test("adherence is consistency MULTIPLIED by accuracy — an unlogged day is a m
   const s = summariseLogRange(logs, PLAN, { target: ON_TARGET, windowDays: 7 });
   assert.equal(s.adherenceBasis, "logging+macros");
   assert.equal(Math.round(s.accuracy!), 100, "both logged days landed on target");
-  assert.equal(Math.round(s.consistency!), 29, "2 of 7 days");
-  assert.equal(Math.round(s.adherence!), 29);
+  assert.equal(Math.round(s.consistency!), 29, "2 of 7 days — reported, not multiplied in");
+  assert.equal(Math.round(s.adherence!), 100, "they hit their numbers every day they ate");
+});
+
+test("a target with no window still scores adherence", () => {
+  // The old gate required BOTH consistency and accuracy, so a caller that
+  // handed over a perfectly good target but no windowDays silently got the
+  // meal-status average instead — a different measure wearing the same label.
+  const logs = [planLog("2026-07-20", 1, "m1", "Full"), planLog("2026-07-20", 2, "m2", "Full")];
+  const s = summariseLogRange(logs, PLAN, { target: ON_TARGET });
+  assert.equal(s.consistency, null, "no window given, so there is no honest logging rate");
+  assert.equal(s.adherenceBasis, "logging+macros");
+  assert.equal(Math.round(s.adherence!), 100);
+});
+
+test("the in-progress day is kept out of the average but still counts as logged", () => {
+  // What the client's card never passed and the AI's context always did. At 8am
+  // today's totals are near zero against a full day's target, which would score
+  // ~0% and drag the week down until dinner.
+  const logs = [
+    planLog("2026-07-20", 1, "m1", "Full"),
+    planLog("2026-07-20", 2, "m2", "Full"),
+    planLog("2026-07-21", 1, "m1", "Full"),   // today, one meal in
+  ];
+  const s = summariseLogRange(logs, PLAN, {
+    target: ON_TARGET, windowDays: 7, excludeDates: ["2026-07-21"],
+  });
+  assert.equal(s.loggedDays, 2, "they did log today — it counts toward the logging rate");
+  assert.equal(s.avgDays, 1, "but only the finished day is averaged");
+  assert.equal(Math.round(s.adherence!), 100, "a half-eaten day does not score as a miss");
 });
 
 test("logging every day but eating well off target does not read as adherence", () => {

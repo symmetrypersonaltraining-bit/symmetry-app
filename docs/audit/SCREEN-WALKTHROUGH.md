@@ -2057,3 +2057,50 @@ and the photo path are all untouched and are the walk itself.
 **Both surfaces at once.** `/nutrition` and `/client-preview/nutrition` mount the
 same component, so this landed on his Client View and on real clients together —
 asserted, so it stays that way.
+
+### SHIPPED — adherence is hitting the numbers (9 Sep)
+
+Dustin, 9 Sep: *"the adherence i want to be based on hitting numbers alone so
+cal and macros, not logging since we have the logging rate. the adherence needs
+to be based on hitting the numbers on daily average for that week up to that day
+within that week."*
+
+**This supersedes his 31 Jul ruling** (*"adherence should be based on
+consistently logging and hitting macros n calories"*), which made it
+`consistency × accuracy`. The reason the old one had to go is visible on the
+card itself: adherence and logging rate sit **side by side**, so folding logging
+into adherence charged a missed day twice, once in each column. A client who
+logged 5 of 7 days and hit target on all five read **71% adherence** — a number
+that says they missed their numbers when they missed none.
+
+| | Before | Now |
+|---|---|---|
+| Formula | `consistency × accuracy` | `accuracy` — the daily hit score, averaged |
+| What one day scores | mean of cal / P / C / F against that day's target, ±10% = full credit, zero at 50% off | **unchanged** |
+| The window on the card | Sunday → today | **unchanged** |
+| The day in progress | **counted in the average** | left out of the average, still counted as logged |
+| Card copy | "logging × macros" | "hitting the numbers · this week so far" |
+| No target on file | meal-status average, labelled "plan meals" | **unchanged** — nothing else can be computed |
+
+### Two defects found while doing it
+
+1. **The client and the coach were shown different numbers for the same week.**
+   `excludeDates` — the option that keeps a half-eaten day out of an average —
+   has existed since the module was written, and `weekly-context.ts` (what the
+   AI is briefed with) always passed it. `useNutritionAverages`, which draws the
+   number the **client** reads, never did. Now both do. It matters more under
+   the new formula: at 8am today's totals are near zero against a whole day's
+   target, which scores ~0% and drags the week down until dinner.
+2. **A caller with a target but no window silently got the wrong measure.** The
+   old gate required *both* `consistency` and `accuracy` before it would score,
+   so handing over a perfectly good target with no `windowDays` fell back to the
+   meal-status average — a different measurement wearing the same label.
+
+### One implementation, four readers
+
+`summariseLogRange` is the only place this is computed. The client card, the
+averages strip, the home tile and the AI's weekly context all read it, which is
+why the change is one function and the tests are on that function.
+
+The AI's briefing now states both figures and is told, in the prompt, never to
+merge them or describe one as the other.

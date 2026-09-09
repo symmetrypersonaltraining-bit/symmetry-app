@@ -339,7 +339,7 @@ NEW_SCREEN = f"""
       </div>
       <button class="sym-more">MORE NUTRIENTS ⌄</button>
       <div class="sym-split">
-        <div><b>86%</b><p>ADHERENCE</p><s>logging × macros · this week</s></div>
+        <div><b>86%</b><p>ADHERENCE</p><s>hitting the numbers · this week so far</s></div>
         <div><b>71%</b><p>LOGGING RATE</p><s>5 of 7 days</s></div>
       </div>
     </div>

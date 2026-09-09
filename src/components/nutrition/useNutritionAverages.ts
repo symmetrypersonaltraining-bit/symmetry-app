@@ -32,9 +32,10 @@ export interface AveragesResult {
   totalDays: number;
   kcal: number; p: number; c: number; f: number;
   /**
-   * Logging consistency × macro accuracy, 0-100. Dustin, 2026-07-31:
-   * "adherence should be based on consistently logging and hitting macros n
-   * calories." Falls back to the old meal-status average when the client has no
+   * How well they hit the numbers, 0-100 — daily accuracy averaged over the
+   * window. Dustin, 2026-09-09: *"the adherence i want to be based on hitting
+   * numbers alone so cal and macros, not logging since we have the logging
+   * rate."* Falls back to the old meal-status average when the client has no
    * macro target on file — `adherenceBasis` says which one ran.
    */
   adherence: number | null;
@@ -144,7 +145,7 @@ export function useNutritionAverages(
     // Averages + adherence come from the single canonical implementation so
     // this strip, the week card and the weekly AI context can never disagree.
     // The target and the window length go in because adherence is now
-    // consistency × accuracy, not a meal-status average.
+    // the daily accuracy average, not a meal-status average.
     const targetRows = ((targetRes.data as TargetRow[] | null) || []);
     const tRow = targetRows[0] ?? null;
     const asMacro = (r: TargetRow | null) =>
@@ -165,6 +166,22 @@ export function useNutritionAverages(
       target: asMacro(tRow),
       targetForDate,
       windowDays: totalDays,
+      // A DAY THAT IS NOT OVER IS NOT A DATA POINT.
+      //
+      // `excludeDates` has existed for this since the module was written, and
+      // the AI's weekly context has always passed it (weekly-context.ts) — but
+      // this hook, which draws the number the CLIENT reads, never did. So the
+      // coach was briefed on one adherence figure and the client was shown a
+      // different one for the same week.
+      //
+      // It matters more now that adherence is accuracy alone: at 8am today's
+      // totals are near zero against a full day's target, which scores close to
+      // 0% and drags the week down until dinner. The client's live day is the
+      // hero number at the top of this card; the week is the record of the days
+      // that finished. summariseLogRange ignores the exclusion when honouring
+      // it would leave nothing to average, so the first day of a week still
+      // reads.
+      excludeDates: [today],
     });
     setResult({
       loggedDays: sum.loggedDays,

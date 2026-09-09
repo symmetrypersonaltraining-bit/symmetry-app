@@ -55,9 +55,10 @@ export default function AveragesStrip({ clientId, today }: { clientId: string; t
             {stat(
               "ADHERENCE",
               result.adherence != null ? Math.round(result.adherence) + "%" : "—",
-              // Logging consistency × macro accuracy. Only reads "plan meals"
-              // when there's no target on file and the old average had to run.
-              result.adherenceBasis === "meal-status" ? "plan meals" : "logging × macros",
+              // Hitting the numbers — cals and all three macros. Only reads
+              // "plan meals" when there's no target on file and the old
+              // meal-status average had to run.
+              result.adherenceBasis === "meal-status" ? "plan meals" : "hitting the numbers",
             )}
             {stat("LOGGING RATE", Math.round((result.loggedDays / result.totalDays) * 100) + "%", `${result.loggedDays} of ${result.totalDays} days`)}
           </div>

@@ -3051,6 +3051,157 @@ option:hover {
   color: var(--brand-text);
 }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   NUTRITION'S OWN OBJECTS.                              Added 2026-09-09.
+
+   Dustin approved the mock-up (`docs/mockups/nutrition-format.html`) with two
+   rulings written into it: *"do not lift meals, leave them in order we eat them
+   in"* and *"bright fill on today block as in the mock up is correct."*
+
+   So the Nutrition screen breaks with the Workout tab in exactly one place, on
+   purpose: nothing is hoisted. M1 -> M6 IS the order you eat in, and lifting
+   the next meal above the first one destroys the only thing that makes the list
+   readable — and it would move again as the day went on. "You are here" is
+   carried by the DAY tile instead, which is the real "now" of this screen.
+
+   Nothing below is a new component. .sym-mac is .sym-wo without the icon
+   column; .sym-chip is .sym-bt at chip weight; .sym-num is a number inside a
+   tile. Same object, different sizes, as section 2 of APP-FORMAT.md requires.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* A section heading between tiles — MEALS, EXTRAS. */
+.sym-sec {
+  font-size: 10.5px; font-weight: 800; letter-spacing: 1.15px;
+  color: var(--brand-text-secondary); margin: 16px 0 9px;
+}
+
+/* The day's calories. */
+.sym-num { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 8px; }
+.sym-num b {
+  font-size: 34px; font-weight: 800; line-height: 1; color: var(--brand-text);
+  font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+}
+.sym-num i { font-style: normal; font-size: 12.5px; font-weight: 700; color: var(--brand-text-secondary); }
+.sym-num u {
+  text-decoration: none; margin-left: auto; font-size: 12px; font-weight: 800;
+  color: var(--brand-text-secondary); font-variant-numeric: tabular-nums;
+}
+.sym-bar { height: 8px; border-radius: 99px; background: var(--in-tile); overflow: hidden; margin-bottom: 11px; }
+.sym-bar i {
+  display: block; height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-accent));
+}
+.sym-bar.is-over i { background: linear-gradient(90deg, var(--brand-warn, #f59e0b), var(--brand-accent)); }
+
+/* Protein / carbs / fat. */
+.sym-macs { display: flex; gap: 8px; }
+.sym-mac {
+  position: relative; overflow: hidden; flex: 1;
+  border-radius: 13px; padding: 11px 10px 9px; background: var(--in-tile);
+}
+.sym-mac::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--tile-cap); }
+.sym-mac p { margin: 0; font-size: 9px; font-weight: 800; letter-spacing: .85px; color: var(--brand-text-secondary); }
+.sym-mac b {
+  display: block; font-size: 15px; font-weight: 800; color: var(--brand-text);
+  line-height: 1.15; font-variant-numeric: tabular-nums; margin-top: 1px;
+}
+.sym-mac s { text-decoration: none; font-size: 10.5px; font-weight: 600; color: var(--brand-text-secondary); }
+
+/* The range toggle: Today / 1W / 2W / 4W / 8W / Custom. */
+.sym-chips { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 11px; }
+.sym-chip {
+  font-family: inherit; font-size: 11px; font-weight: 800; padding: 6px 11px; border-radius: 99px;
+  border: 1px solid var(--tile-ctrl-bd); background: var(--tile-ctrl);
+  color: var(--brand-text-secondary); cursor: pointer;
+}
+.sym-chip[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--brand-primary) 55%, var(--brand-text));
+  color: var(--brand-surface); border-color: transparent;
+}
+
+/* Adherence and logging rate, side by side. */
+.sym-split { display: flex; gap: 8px; margin-top: 9px; }
+.sym-split > div {
+  position: relative; overflow: hidden; flex: 1; text-align: center;
+  border-radius: 13px; padding: 11px 8px 9px; background: var(--in-tile);
+}
+.sym-split > div::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--brand-border); }
+.sym-split b { display: block; font-size: 15px; font-weight: 800; color: var(--brand-text); font-variant-numeric: tabular-nums; }
+.sym-split p { margin: 1px 0 0; font-size: 9px; font-weight: 800; letter-spacing: .8px; color: var(--brand-text-secondary); }
+.sym-split s { text-decoration: none; font-size: 9px; color: var(--brand-text-secondary); }
+
+.sym-more {
+  width: 100%; margin-top: 9px; font-family: inherit; font-size: 10px; font-weight: 800;
+  letter-spacing: .8px; color: var(--brand-text-secondary);
+  background: none; border: 0; padding: 5px 0; cursor: pointer;
+}
+
+/* THE RING THAT LOGS A MEAL — the control a client touches most.
+   It moves from the head of a flat row to the action strip, which is what the
+   approved mock-up shows. It does NOT shrink to match the mock-up's drawing:
+   that was a sketch at 27px and this is a thumb target on a phone, so it keeps
+   a 44px box. Anything smaller is a regression from the 46px circle it
+   replaces, and the position was what he approved, not the pixel count. */
+.sym-ring {
+  width: 44px; height: 44px; border-radius: 50%; flex: 0 0 auto; cursor: pointer;
+  border: 2.5px solid var(--tile-ctrl-bd); background: transparent;
+  display: grid; place-items: center; font-size: 17px; line-height: 1; padding: 0;
+  transition: background .2s, border-color .2s;
+}
+.sym-tile.is-today .sym-ring { border-color: rgba(255, 255, 255, .6); }
+
+/* The food a meal is made of, one item per line — it has always listed every
+   item, and it is NOT .sym-wo-name. That class is clamped to two rows because
+   "no more than 2 rows of text per card" is about the workout NAME. */
+.sym-food { font-size: 12.5px; line-height: 1.4; color: var(--brand-text-secondary); }
+.sym-food em {
+  font-style: normal; font-size: 8.5px; font-weight: 800; letter-spacing: .6px;
+  padding: 1px 5px; border-radius: 4px; margin-left: 5px; vertical-align: middle;
+  background: color-mix(in srgb, var(--brand-accent) 22%, transparent); color: var(--brand-text);
+}
+.sym-kcal {
+  font-size: 12px; font-weight: 700; color: var(--brand-text-secondary);
+  margin-top: 5px; font-variant-numeric: tabular-nums;
+}
+.sym-kcal b { color: var(--brand-text); }
+.sym-grip { font-size: 15px; color: var(--brand-text-secondary); opacity: .7; cursor: grab; padding: 0 2px; }
+
+/* ── the same objects on the bright tile ──────────────────────────────────
+   THE INVERSION IS NOT OPTIONAL AND IT IS EASY TO FORGET. Everything inside a
+   tile derives from --in-tile / --brand-text, which are computed from the
+   NORMAL tile background. .sym-tile.is-today replaces the background and leaves
+   those tokens alone — which is exactly why the block above already inverts
+   .sym-wo, .sym-badge, .sym-bt and .sym-rest by hand. Every object added here
+   needs the same treatment, or the day summary, the brightest thing on the
+   screen, renders dark text on a dark fill. */
+.sym-tile.is-today .sym-num b { color: #fff; }
+.sym-tile.is-today .sym-num i,
+.sym-tile.is-today .sym-num u { color: rgba(255, 255, 255, .86); }
+.sym-tile.is-today .sym-bar { background: rgba(255, 255, 255, .18); }
+.sym-tile.is-today .sym-bar i,
+.sym-tile.is-today .sym-bar.is-over i { background: #fff; }
+.sym-tile.is-today .sym-mac,
+.sym-tile.is-today .sym-split > div { background: rgba(255, 255, 255, .16); }
+.sym-tile.is-today .sym-mac::before { background: rgba(255, 255, 255, .75); }
+.sym-tile.is-today .sym-split > div::before { background: rgba(255, 255, 255, .4); }
+.sym-tile.is-today .sym-mac b,
+.sym-tile.is-today .sym-split b { color: #fff; }
+.sym-tile.is-today .sym-mac p, .sym-tile.is-today .sym-mac s,
+.sym-tile.is-today .sym-split p, .sym-tile.is-today .sym-split s,
+.sym-tile.is-today .sym-more,
+.sym-tile.is-today .sym-food,
+.sym-tile.is-today .sym-grip { color: rgba(255, 255, 255, .86); }
+.sym-tile.is-today .sym-kcal,
+.sym-tile.is-today .sym-kcal b { color: #fff; }
+.sym-tile.is-today .sym-chip {
+  background: rgba(255, 255, 255, .18); border-color: rgba(255, 255, 255, .36);
+  color: rgba(255, 255, 255, .9);
+}
+.sym-tile.is-today .sym-chip[aria-pressed="true"] {
+  background: #fff; color: color-mix(in srgb, var(--brand-primary) 82%, #000); border-color: transparent;
+}
+.sym-tile.is-today .sym-food em { background: rgba(255, 255, 255, .24); color: #fff; }
+
 
 /* ═══ the mock-up's own chrome — none of this ships ═══════════════════════ */
 body.mk {
@@ -3299,7 +3450,7 @@ body.mk {
       </div>
       <button class="sym-more">MORE NUTRIENTS ⌄</button>
       <div class="sym-split">
-        <div><b>86%</b><p>ADHERENCE</p><s>logging × macros · this week</s></div>
+        <div><b>86%</b><p>ADHERENCE</p><s>hitting the numbers · this week so far</s></div>
         <div><b>71%</b><p>LOGGING RATE</p><s>5 of 7 days</s></div>
       </div>
     </div>

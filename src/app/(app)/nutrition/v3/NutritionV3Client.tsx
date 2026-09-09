@@ -1823,9 +1823,14 @@ export default function NutritionV3Client(props: Props) {
               <div>
                 <b>{avgResult && avgResult.adherence != null ? Math.round(avgResult.adherence) + "%" : "—"}</b>
                 <p>ADHERENCE</p>
-                {/* Adherence = logging consistency × macro accuracy ({coachFirstName},
-                    2026-07-31). It only reads "plan meals" when the client has
-                    no macro target and the old meal-status average had to run. */}
+                {/* ADHERENCE IS HITTING THE NUMBERS, AND ONLY THAT.
+                    Dustin, 9 Sep 2026: *"the adherence i want to be based on
+                    hitting numbers alone so cal and macros, not logging since
+                    we have the logging rate."* The two figures sit side by side
+                    here, so multiplying logging into adherence charged a missed
+                    day twice — once in each column. It only reads "plan meals"
+                    when the client has no macro target at all and the old
+                    meal-status average is the last thing left to show. */}
                 <s>
                   {avgResult?.adherenceBasis === "meal-status" ? "plan meals" : "hitting the numbers"}
                   {isToday ? " · this week so far" : ""}
