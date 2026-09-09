@@ -1515,17 +1515,19 @@ export default function NutritionV3Client(props: Props) {
   const over = tg ? totals.kcal > tg.calories : false;
   const pctK = tg && tg.calories > 0 ? Math.min(100, (totals.kcal / tg.calories) * 100) : 0;
 
-  function pill(lab: string, val: number, target: number | null, color: string) {
+  // ONE MACRO, AS THE TILE OBJECT AT ITS SMALLEST.
+  // The per-macro colour argument is gone on purpose: "colour means the
+  // position, never the type" (APP-FORMAT section 2), and a hard-coded #5ec9a3
+  // for carbs was a colour that belonged to no scheme at all. The cap carries
+  // the scheme; over-target is the one thing still allowed to change colour,
+  // because it is a state and not a category.
+  function pill(lab: string, val: number, target: number | null) {
     const isOver = target != null && val > target;
     return (
-      <div className="flex-1 rounded-xl px-2 py-1.5 text-center" style={{ background: "var(--brand-bg)" }}>
-        <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.8, color: "var(--brand-text-secondary)" }}>{lab}</div>
-        <div style={{ fontSize: 12, fontWeight: 800, color: isOver ? ORANGE : "var(--brand-text)", margin: "1px 0 3px" }}>
-          {r(val)}{target != null ? `/${r(target)} g` : " g"}
-        </div>
-        <div style={{ height: 3.5, background: "var(--brand-border)", borderRadius: 2, overflow: "hidden" }}>
-          <i style={{ display: "block", height: "100%", borderRadius: 2, width: `${target ? Math.min(100, (val / target) * 100) : val > 0 ? 100 : 0}%`, background: isOver ? ORANGE : color, transition: "width 0.4s" }} />
-        </div>
+      <div className="sym-mac" key={lab}>
+        <p>{lab}</p>
+        <b style={isOver ? { color: ORANGE } : undefined}>{r(val)}</b>
+        <s>{target != null ? `of ${r(target)} g` : "g"}</s>
       </div>
     );
   }
@@ -1574,9 +1576,9 @@ export default function NutritionV3Client(props: Props) {
       <button
         onClick={() => tapCircle(row)}
         aria-label={`log ${rowLabel(row, idx)} full`}
-        className="flex-shrink-0 flex items-center justify-center"
+        className="sym-ring"
         style={{
-          width: 46, height: 46, borderRadius: "50%", border: `2.5px solid ${border}`, background: bg,
+          border: `2.5px solid ${border}`, background: bg,
           transition: "all 0.2s", animation: popKey === row.key ? "v3pop 0.35s cubic-bezier(0.3,1.6,0.5,1)" : undefined,
           borderStyle: row.kind === "openslot" && !built ? "dashed" : "solid",
         }}
@@ -1623,7 +1625,13 @@ export default function NutritionV3Client(props: Props) {
   }
 
   return (
-    <div className="pb-8">
+    // THE PAGE OPTS IN. `.sym-page` is the wrapper that carries the tile
+    // system's tokens -- the sink, the tile depth, the cap, the ladder ink --
+    // and it is scoped so a screen adopts the format during its own walk and
+    // no other screen moves. Nutrition is the second screen to take it, after
+    // the Workout tab, and it lands on the trainer's Client View and on real
+    // clients at once because both mount THIS component.
+    <div className="sym-page pb-8">
       <Toaster position="bottom-center" toastOptions={{ style: { background: "var(--brand-surface)", color: "var(--brand-text)", border: "1px solid var(--brand-border)", fontSize: 13, fontWeight: 600 } }} />
       {celebrate && <Confetti onDone={() => setCelebrate(false)} />}
       <style>{`
@@ -1634,21 +1642,25 @@ export default function NutritionV3Client(props: Props) {
       {/* Recipes live next to nutrition, not in the tab bar — a seventh tab
           would shrink the six people use every day. */}
       <div className="px-4 pt-3">
-        <a href="/recipes" className="flex items-center gap-2 px-3 py-2 rounded-xl"
-          style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", textDecoration: "none" }}>
-          <span style={{ fontSize: 15 }}>🍳</span>
-          <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--brand-text)" }}>Recipes</span>
-          <span style={{ fontSize: 11, color: "var(--brand-text-secondary)" }}>build one, or cook from the shared library</span>
-          <span style={{ marginLeft: "auto", color: "var(--brand-text-secondary)" }}>›</span>
+        <a href="/recipes" className="sym-past" style={{ textDecoration: "none" }}>
+          <span>🍳</span>
+          <span className="sym-sp">Recipes
+            <span className="sym-food" style={{ display: "block", fontWeight: 500 }}>build one, or cook from the shared library</span>
+          </span>
+          <span className="sym-past-go">OPEN</span>
         </a>
       </div>
 
       {/* date nav */}
-      <div className="relative flex items-center justify-center gap-1 px-4 pt-3">
-        <button onClick={() => setSelectedDate(shiftDateStr(selectedDate, -1))} aria-label="previous day" className="w-11 h-10 flex items-center justify-center rounded-xl" style={{ color: "var(--brand-text-secondary)", fontSize: 20 }}>‹</button>
-        <div className="text-center" style={{ minWidth: 170 }}>
-          <p className="text-sm font-bold" style={{ color: "var(--brand-text)" }}>{selectedDate === today ? "Today" : fmtDateLong(selectedDate)}</p>
-          <p style={{ color: planStartsLater ? GOLD : "var(--brand-text-secondary)", fontSize: 11, fontWeight: planStartsLater ? 700 : 400 }}>
+      {/* THE TITLE ROW. The ⋯ was `position: absolute; right: 3` over a
+          centre-justified flex row, so on a long date it sat on top of the ›
+          arrow. It is a normal item on the row now and cannot collide. */}
+      <div className="sym-title px-4">
+        <button onClick={() => setSelectedDate(shiftDateStr(selectedDate, -1))} aria-label="previous day"
+          className="sym-bt ic" style={{ fontSize: 18, alignSelf: "center" }}>‹</button>
+        <div className="sym-sp text-center">
+          <h1>{selectedDate === today ? "Today" : fmtDateLong(selectedDate)}</h1>
+          <p style={planStartsLater ? { color: GOLD, fontWeight: 700 } : undefined}>
             {selectedDate === today
               ? fmtDateLong(selectedDate)
               : planStartsLater
@@ -1658,19 +1670,21 @@ export default function NutritionV3Client(props: Props) {
               : "past day"}
           </p>
         </div>
-        <button onClick={() => setSelectedDate(shiftDateStr(selectedDate, 1))} aria-label="next day" className="w-11 h-10 flex items-center justify-center rounded-xl" style={{ color: "var(--brand-text-secondary)", fontSize: 20 }}>›</button>
-        <button onClick={() => openSheet({ kind: "menu" })} aria-label="plan menu" className="w-11 h-10 flex items-center justify-center rounded-xl absolute right-3 top-3" style={{ color: "var(--brand-text)", fontSize: 20 }}>⋯</button>
+        <button onClick={() => setSelectedDate(shiftDateStr(selectedDate, 1))} aria-label="next day"
+          className="sym-bt ic" style={{ fontSize: 18, alignSelf: "center" }}>›</button>
+        <button onClick={() => openSheet({ kind: "menu" })} aria-label="plan menu"
+          className="sym-bt ic" style={{ fontSize: 18, alignSelf: "center" }}>⋯</button>
       </div>
 
       {/* incoming plan banner */}
       {incomingPlan && incomingPlan.effective_date && incomingPlan.effective_date > today && (
-        <button onClick={openVersions} className="mx-4 mt-2 w-[calc(100%-2rem)] flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left"
-          style={{ background: "rgba(198,158,60,0.12)", border: "1px solid rgba(198,158,60,0.45)" }}>
+        <button onClick={openVersions} className="sym-jump mx-4 w-[calc(100%-2rem)]"
+          style={{ background: "rgba(198,158,60,0.12)", borderColor: "rgba(198,158,60,0.45)" }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: GOLD, flexShrink: 0 }} />
-          <span className="text-xs" style={{ color: "var(--brand-text)" }}>
+          <span className="sym-jump-sp">
             <b style={{ color: GOLD }}>{planLabel(incomingPlan)}</b> starts {fmtDateLong(incomingPlan.effective_date)} — tap for the version timeline
           </span>
-          <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
+          <span className="sym-jump-go">OPEN</span>
         </button>
       )}
 
@@ -1694,21 +1708,28 @@ export default function NutritionV3Client(props: Props) {
           { key: "4w", label: "4W" }, { key: "8w", label: "8W" }, { key: "custom", label: "Custom" },
         ];
         return (
-          <div className="mx-4 mt-2 p-3.5" style={CARD}>
+          // THE DAY IS THIS SCREEN'S "TODAY", AND IT IS THE ONLY BRIGHT THING.
+          // Dustin, 9 Sep, approving the mock-up: *"do not lift meals, leave
+          // them in order we eat them in. bright fill on today block as in the
+          // mock up is correct."* So nothing is hoisted here -- M1 -> M6 stays
+          // the order you eat in -- and "you are here" is carried by this tile.
+          // Bright only when it really is now: a past day, a future day or a
+          // range average is not "now" and must not claim to be.
+          <div className={"sym-tile mx-4" + (isToday && selectedDate === today ? " is-today" : "")}>
             {/* range toggle */}
-            <div className="flex gap-1 mb-3 flex-wrap">
+            <div className="sym-chips">
               {rangeChips.map((rc) => (
-                <button key={rc.key} onClick={() => setSummaryRange(rc.key)} className="px-2.5 py-1.5 rounded-full text-xs font-bold"
-                  style={summaryRange === rc.key ? { background: "var(--brand-primary)", color: "#fff" } : { background: "var(--brand-bg)", color: "var(--brand-text-secondary)" }}>
+                <button key={rc.key} onClick={() => setSummaryRange(rc.key)} className="sym-chip"
+                  aria-pressed={summaryRange === rc.key}>
                   {rc.label}
                 </button>
               ))}
             </div>
             {summaryRange === "custom" && (
               <div className="flex gap-2 items-center mb-3 text-xs">
-                <input type="date" value={customStart} max={today} onChange={(e) => setCustomStart(e.target.value)} className="flex-1 rounded-lg px-2 py-1.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", colorScheme: "dark light" }} />
+                <input type="date" value={customStart} max={today} onChange={(e) => setCustomStart(e.target.value)} className="flex-1 rounded-lg px-2 py-1.5" style={{ background: "var(--in-tile)", border: "1px solid var(--tile-ctrl-bd)", color: "var(--brand-text)", colorScheme: "dark light" }} />
                 <span style={{ color: "var(--brand-text-secondary)" }}>to</span>
-                <input type="date" value={customEnd} max={today} onChange={(e) => setCustomEnd(e.target.value)} className="flex-1 rounded-lg px-2 py-1.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", colorScheme: "dark light" }} />
+                <input type="date" value={customEnd} max={today} onChange={(e) => setCustomEnd(e.target.value)} className="flex-1 rounded-lg px-2 py-1.5" style={{ background: "var(--in-tile)", border: "1px solid var(--tile-ctrl-bd)", color: "var(--brand-text)", colorScheme: "dark light" }} />
               </div>
             )}
 
@@ -1718,34 +1739,28 @@ export default function NutritionV3Client(props: Props) {
               <p className="text-center py-4 text-sm" style={{ color: "var(--brand-text-secondary)" }}>No logs in this range yet.</p>
             ) : (
               <>
-                <div className="flex items-baseline justify-between mb-2">
-                  <div style={{ fontSize: 21, fontWeight: 800, color: "var(--brand-text)" }}>
-                    {r(kcalVal).toLocaleString()}{" "}
-                    <small style={{ fontSize: 13, color: "var(--brand-text-secondary)", fontWeight: 600 }}>
-                      {tgt ? `/ ${tgt.kcal.toLocaleString()} cal` : (showAvg ? "avg cal / day" : "cal eaten")}
-                    </small>
-                  </div>
+                <div className="sym-num">
+                  <b>{r(kcalVal).toLocaleString()}</b>
+                  <i>{tgt ? `of ${tgt.kcal.toLocaleString()} cal` : (showAvg ? "avg cal / day" : "cal eaten")}</i>
                   {showAvg ? (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--brand-text-secondary)" }}>avg / day</span>
+                    <u>avg / day</u>
                   ) : tgt ? (
-                    <span style={{ fontSize: 12, fontWeight: 600, color: isOverK ? ORANGE : "var(--brand-text-secondary)" }}>
-                      {isOverK ? `${r(kcalVal - tgt.kcal).toLocaleString()} over` : `${r(tgt.kcal - kcalVal).toLocaleString()} left`}
-                    </span>
+                    <u>{isOverK ? `${r(kcalVal - tgt.kcal).toLocaleString()} over` : `${r(tgt.kcal - kcalVal).toLocaleString()} left`}</u>
                   ) : (
-                    <span style={{ fontSize: 11, color: "var(--brand-text-secondary)", border: "1px dashed var(--brand-border)", borderRadius: 8, padding: "3px 8px" }}>
+                    <u style={{ border: "1px dashed var(--tile-ctrl-bd)", borderRadius: 8, padding: "3px 8px", fontWeight: 600 }}>
                       no targets set
-                    </span>
+                    </u>
                   )}
                 </div>
                 {tgt && (
-                  <div style={{ height: 8, background: "var(--brand-bg)", borderRadius: 6, overflow: "hidden", marginBottom: 10 }}>
-                    <i style={{ display: "block", height: "100%", width: `${barPct}%`, borderRadius: 6, background: isOverK ? ORANGE : "var(--brand-primary)", transition: "width 0.4s cubic-bezier(0.4,0,0.2,1), background 0.3s" }} />
+                  <div className={"sym-bar" + (isOverK ? " is-over" : "")}>
+                    <i style={{ width: `${barPct}%`, transition: "width 0.4s cubic-bezier(0.4,0,0.2,1), background 0.3s" }} />
                   </div>
                 )}
-                <div className="flex gap-2">
-                  {pill("PROTEIN", pVal, tgt ? tgt.p : null, "var(--brand-primary)")}
-                  {pill("CARBS", cVal, tgt ? tgt.c : null, "#5ec9a3")}
-                  {pill("FAT", fVal, tgt ? tgt.f : null, BLUE)}
+                <div className="sym-macs">
+                  {pill("PROTEIN", pVal, tgt ? tgt.p : null)}
+                  {pill("CARBS", cVal, tgt ? tgt.c : null)}
+                  {pill("FAT", fVal, tgt ? tgt.f : null)}
                 </div>
                 {/* Nutrients beyond the macros. Collapsed by default so the card
                     still reads at a glance; the coverage line is not optional —
@@ -1756,14 +1771,13 @@ export default function NutritionV3Client(props: Props) {
                   <div className="mt-2">
                     <button
                       onClick={() => setShowNutrients((v) => !v)}
-                      className="w-full flex items-center justify-center gap-1"
-                      style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: "var(--brand-text-secondary)", background: "none", border: "none", cursor: "pointer", padding: "4px 0" }}
+                      className="sym-more flex items-center justify-center gap-1"
                     >
                       {showNutrients ? "HIDE NUTRIENTS" : "ALL NUTRIENTS"}
                       <i className={"ti ti-chevron-" + (showNutrients ? "up" : "down")} style={{ fontSize: 12 }} />
                     </button>
                     {showNutrients && (
-                      <div className="mt-1 pt-2" style={{ borderTop: "1px dashed var(--brand-border)" }}>
+                      <div className="mt-1 pt-2" style={{ borderTop: "1px dashed var(--tile-ctrl-bd)" }}>
                         {/* The full registry, grouped. Nutrients nothing knew
                             are hidden rather than shown as a column of dashes —
                             30 em-dashes is noise, and the footnote below already
@@ -1805,26 +1819,22 @@ export default function NutritionV3Client(props: Props) {
             )}
 
             {/* adherence + logging rate — always shown */}
-            <div className="flex items-center mt-3 pt-3" style={{ borderTop: "1px dashed var(--brand-border)" }}>
-              <div className="text-center flex-1">
-                <p className="font-extrabold" style={{ color: "var(--brand-text)", fontSize: 16, lineHeight: 1.1 }}>
-                  {avgResult && avgResult.adherence != null ? Math.round(avgResult.adherence) + "%" : "—"}
-                </p>
-                <p style={{ color: "var(--brand-text-secondary)", fontSize: 9, fontWeight: 700, letterSpacing: 0.8 }}>ADHERENCE</p>
+            <div className="sym-split">
+              <div>
+                <b>{avgResult && avgResult.adherence != null ? Math.round(avgResult.adherence) + "%" : "—"}</b>
+                <p>ADHERENCE</p>
                 {/* Adherence = logging consistency × macro accuracy ({coachFirstName},
                     2026-07-31). It only reads "plan meals" when the client has
                     no macro target and the old meal-status average had to run. */}
-                <p style={{ color: "var(--brand-text-secondary)", fontSize: 9 }}>
-                  {avgResult?.adherenceBasis === "meal-status" ? "plan meals" : "logging × macros"}
-                  {isToday ? " · this week" : ""}
-                </p>
+                <s>
+                  {avgResult?.adherenceBasis === "meal-status" ? "plan meals" : "hitting the numbers"}
+                  {isToday ? " · this week so far" : ""}
+                </s>
               </div>
-              <div className="text-center flex-1">
-                <p className="font-extrabold" style={{ color: "var(--brand-text)", fontSize: 16, lineHeight: 1.1 }}>
-                  {avgResult ? Math.round((avgResult.loggedDays / avgResult.totalDays) * 100) + "%" : "—"}
-                </p>
-                <p style={{ color: "var(--brand-text-secondary)", fontSize: 9, fontWeight: 700, letterSpacing: 0.8 }}>LOGGING RATE</p>
-                <p style={{ color: "var(--brand-text-secondary)", fontSize: 9 }}>{avgResult ? `${avgResult.loggedDays} of ${avgResult.totalDays} day${avgResult.totalDays === 1 ? "" : "s"}` : (isToday ? "this week" : "")}</p>
+              <div>
+                <b>{avgResult ? Math.round((avgResult.loggedDays / avgResult.totalDays) * 100) + "%" : "—"}</b>
+                <p>LOGGING RATE</p>
+                <s>{avgResult ? `${avgResult.loggedDays} of ${avgResult.totalDays} day${avgResult.totalDays === 1 ? "" : "s"}` : (isToday ? "this week" : "")}</s>
               </div>
             </div>
           </div>
@@ -1833,13 +1843,13 @@ export default function NutritionV3Client(props: Props) {
 
       {/* weekly read — last week vs this week, refreshed every Sunday */}
       {weekFood && !weekFoodDismissed && coachOn && !coachDismissed && (
-        <div className="mx-4 mt-2.5 p-3" style={{ ...CARD, borderLeft: "3px solid var(--brand-primary)", animation: "v3fadeup 0.35s ease" }}>
-          <div className="flex items-start gap-2.5">
-            <AiBadge size={26} mood="nutrition" />
-            <div className="flex-1">
-              <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.1, color: "var(--brand-primary)", marginBottom: 4 }}>YOUR WEEK</p>
-              <p className="text-xs leading-relaxed" style={{ color: "var(--brand-text-secondary)" }}>{weekFood}</p>
-            </div>
+        // NO LEFT BORDER. "No side borders anywhere -- a tile is capped, and
+        // the cap is the only edge that carries colour" (APP-FORMAT section 2).
+        // The 3px left rule these AI cards carried was the old way of saying
+        // "this one is different", and the cap says it now.
+        <div className="sym-tile mx-4" style={{ animation: "v3fadeup 0.35s ease" }}>
+          <div className="sym-tile-head">
+            <span className="sym-tile-lbl"><AiBadge size={22} mood="nutrition" />YOUR WEEK</span>
             <button
               onClick={() => {
                 setWeekFoodDismissed(true);
@@ -1850,48 +1860,64 @@ export default function NutritionV3Client(props: Props) {
                   sessionStorage.setItem("sym:v3:weekfood:" + clientId + ":" + dt.toISOString().slice(0, 10), "x");
                 } catch { /* noop */ }
               }}
-              aria-label="dismiss"
-              style={{ color: "var(--brand-text-secondary)", fontSize: 12, padding: "2px 6px" }}
+              aria-label="dismiss the weekly read"
+              className="sym-tile-meta"
+              style={{ background: "none", border: 0, cursor: "pointer", padding: "2px 6px" }}
             >✕</button>
           </div>
+          <div className="sym-body"><div className="sym-wo"><div className="sym-food">{weekFood}</div></div></div>
         </div>
       )}
 
       {/* coach card */}
       {coach && (
-        <div className="mx-4 mt-2.5 flex items-start gap-2.5 p-3" style={{ ...CARD, borderLeft: `3px solid ${coach.kind === "push" ? ORANGE : GREEN}`, animation: "v3fadeup 0.35s ease" }}>
-          <AiBadge size={26} mood={coach.kind === "push" ? "nutrition" : "happy"} />
-          <p className="flex-1 text-xs leading-relaxed" style={{ color: "var(--brand-text-secondary)" }}>{coach.html}</p>
-          <button onClick={() => setCoachDismissed(true)} aria-label="dismiss" style={{ color: "var(--brand-text-secondary)", fontSize: 12, padding: "2px 6px" }}>✕</button>
+        // WHOSE ASSISTANT, SAID IN THE LABEL. Ruling 4: it is the coach's
+        // assistant, named, and it never claims to BE them. The card carried no
+        // attribution at all -- an AiBadge and a paragraph -- so a client had no
+        // way to tell this from a message their coach wrote.
+        <div className="sym-tile mx-4" style={{ animation: "v3fadeup 0.35s ease" }}>
+          <div className="sym-tile-head">
+            <span className="sym-tile-lbl">
+              <AiBadge size={22} mood={coach.kind === "push" ? "nutrition" : "happy"} />
+              {coachFirstName.toUpperCase()}&rsquo;S ASSISTANT
+            </span>
+            <button onClick={() => setCoachDismissed(true)} aria-label="dismiss this note" className="sym-tile-meta"
+              style={{ background: "none", border: 0, cursor: "pointer", padding: "2px 6px" }}>✕</button>
+          </div>
+          <div className="sym-body"><div className="sym-wo"><div className="sym-food">{coach.html}</div></div></div>
         </div>
       )}
 
       {/* open-plan builder card */}
       {openMode && (
-        <div className="mx-4 mt-2.5 p-3" style={{ ...CARD, borderStyle: "dashed" }}>
-          <p style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.1, color: "var(--brand-primary)", marginBottom: 7 }}>✦ TURN THIS INTO MY PLAN</p>
-          <button onClick={() => openSheet({ kind: "saveplan" })} className="w-full flex items-center gap-3 rounded-2xl p-3 text-left" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
-            <span className="text-base">🛠</span>
-            <span className="text-xs font-semibold" style={{ color: "var(--brand-text)" }}>
-              Save my built day as the plan
-              <span className="block font-normal" style={{ color: "var(--brand-text-secondary)", fontSize: 10.5 }}>Targets computed from the slots below · one-tap logging after</span>
-            </span>
-            <span className="ml-auto" style={{ color: "var(--brand-text-secondary)" }}>›</span>
-          </button>
-          <div className="flex gap-1.5 mt-2 flex-wrap">
-            <button onClick={() => openSheet({ kind: "aiplan", mode: "targets" })} className="px-3 py-2 rounded-full text-xs font-semibold" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>
-              ✦ Build me a plan from targets
+        <div className="sym-tile mx-4">
+          <div className="sym-tile-head">
+            <span className="sym-tile-lbl"><i>✦</i>TURN THIS INTO MY PLAN</span>
+          </div>
+          <div className="sym-body">
+            <button onClick={() => openSheet({ kind: "saveplan" })} className="sym-wo w-full text-left" style={{ cursor: "pointer" }}>
+              <div className="sym-wo-row">
+                <span className="sym-wo-ic">🛠</span>
+                <span className="sym-wo-name">Save my built day as the plan</span>
+                <span style={{ color: "var(--brand-text-secondary)" }}>›</span>
+              </div>
+              <span className="sym-food">Targets computed from the slots below · one-tap logging after</span>
             </button>
-            <button onClick={() => openSheet({ kind: "aiplan", mode: "consult" })} className="px-3 py-2 rounded-full text-xs font-semibold" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>
-              ✦ Recommend my targets
+          </div>
+          <div className="sym-acts" style={{ marginTop: 9 }}>
+            <button onClick={() => openSheet({ kind: "aiplan", mode: "targets" })} className="sym-bt">
+              <i>✦</i> Build me a plan from targets
+            </button>
+            <button onClick={() => openSheet({ kind: "aiplan", mode: "consult" })} className="sym-bt">
+              <i>✦</i> Recommend my targets
             </button>
           </div>
         </div>
       )}
 
       {/* meal rows */}
-      <p className="mx-4 mt-4 mb-2" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: "var(--brand-text-secondary)" }}>
-        {openMode ? "TODAY — TAP A SLOT TO BUILD · ⋯ FOR MORE" : "MEALS — TAP CIRCLE TO LOG FULL · ⋯ FOR MORE · HOLD ⠿ TO MOVE"}
+      <p className="sym-sec mx-4">
+        {openMode ? "TODAY — TAP A SLOT TO BUILD · ⋯ FOR MORE" : "MEALS — TAP THE RING TO LOG FULL · ⋯ FOR MORE · HOLD ⠿ TO MOVE"}
       </p>
       <div ref={listRef} className="px-4" style={{ touchAction: "pan-y" }}>
         {insertLine(0)}
@@ -1942,78 +1968,169 @@ export default function NutritionV3Client(props: Props) {
               ? row.meta.items.map((it) => ({ label: it.n + (it.free ? "" : it.a ? ` — ${it.a}` : ""), free: it.free }))
               : [];
           const built = row.kind === "openslot" && (row.meta?.items?.length || 0) > 0;
+          // MEAL OPTIONS AS OBJECTS. A plan slot with more than one meal on it
+          // used to render two lettered buttons and nothing else, so choosing B
+          // meant tapping B to find out what B was. Each option now carries its
+          // own food list and its own cost, which is the same shape two workouts
+          // take inside one day tile.
+          const optionRows =
+            row.kind === "plan" && (row.options?.length || 0) > 1
+              ? row.options!.map((o, oi) => {
+                  const isChosen = row.chosen?.id === o.id;
+                  // Per-item overrides belong to the meal that was LOGGED. They
+                  // key on item id, so applying them to a different option would
+                  // silently miss (or worse, hit an id it shares).
+                  const om = planMealMacros(o, isChosen ? row.log?.item_overrides : undefined);
+                  return {
+                    id: o.id,
+                    letter: String.fromCharCode(65 + oi),
+                    name: o.name || `Option ${String.fromCharCode(65 + oi)}`,
+                    chosen: isChosen,
+                    items: isChosen
+                      ? itemList.map((it) => it.label)
+                      : [...(o.meal_items || [])]
+                          .sort((a, b) => a.position - b.position)
+                          .map((it) =>
+                            it.food +
+                            (it.is_unlimited
+                              ? ""
+                              : it.amount != null
+                              ? ` — ${it.amount}${it.unit ? " " + it.unit : ""}`
+                              : it.unit
+                              ? ` — ${it.unit}`
+                              : "")),
+                    kcal: om.kcal, protein: om.protein, carbs: om.carbs, fats: om.fats,
+                  };
+                })
+              : null;
           return (
             <div key={row.key}>
+              {/* A MEAL IS A TILE. The flat row it replaces put the ring, the
+                  name, every food line, the macro line, the ⠿ handle and the ⋯
+                  on ONE flex row, which is why the row grew tall and the handle
+                  ended up beside the text. Head / body / actions is the same
+                  object the Workout tab already uses, and it also ends a real
+                  bug: the options A / B were <button>s nested inside the row's
+                  own <button>, which is invalid HTML and swallowed taps. */}
               <div
                 data-rowkey={row.key}
-                className="flex items-center gap-3 p-3 mb-2"
+                className="sym-tile"
+                data-rung
                 style={{
-                  ...CARD,
+                  ["--rung" as string]: `${Math.min(i, 5) * 5}%`,
                   borderColor,
                   opacity: dragState?.key === row.key ? 0.35 : logged && adh === "Skipped" ? 0.55 : 1,
                   transition: "border-color 0.2s, opacity 0.2s",
-                }}
+                } as React.CSSProperties}
               >
-                {circleFor(row, i)}
-                <button className="flex-1 min-w-0 text-left" onClick={() => openSheet({ kind: "meal", rowKey: row.key })} style={{ background: "none" }}>
-                  <p className="text-sm font-bold flex items-center gap-1.5 flex-wrap" style={{ color: "var(--brand-text)" }}>
+                <button
+                  className="sym-tile-head w-full"
+                  onClick={() => openSheet({ kind: "meal", rowKey: row.key })}
+                  style={{ background: "none", border: 0, padding: 0, font: "inherit", textAlign: "left", cursor: "pointer" }}
+                >
+                  <span className="sym-tile-lbl" style={{ flexWrap: "wrap", rowGap: 4 }}>
                     {rowLabel(row, i)}
                     {rowName(row) && <span style={{ fontWeight: 600, color: "var(--brand-text-secondary)" }}>{rowName(row)}</span>}
-                    {rowTime(row) && <span style={{ fontSize: 10, fontWeight: 600, color: "var(--brand-text-secondary)", background: "var(--brand-bg)", padding: "2px 7px", borderRadius: 6 }}>{rowTime(row)}</span>}
+                    {rowTime(row) && <span style={{ fontSize: 10, fontWeight: 600, color: "var(--brand-text-secondary)", background: "var(--in-tile)", padding: "2px 7px", borderRadius: 6 }}>{rowTime(row)}</span>}
                     {row.kind === "custom" && <span style={{ fontSize: 9, fontWeight: 800, background: "rgba(66,165,245,0.14)", color: BLUE, padding: "2px 6px", borderRadius: 5 }}>CUSTOM</span>}
                     {statusTag(row)}
                     {logged && adh === "Off-plan" && row.kind !== "custom" && estBadge()}
                     {built && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6, background: "rgba(34,197,94,0.15)", color: GREEN }}>{row.meta!.items.length} item{row.meta!.items.length > 1 ? "s" : ""}</span>}
-                  </p>
-                  {logged && adh === "Off-plan" && row.kind !== "custom" && row.log?.off_plan_details ? (
-                    <p className="mt-0.5" style={{ fontSize: 12.5, color: "var(--brand-text-secondary)" }}>{row.log.off_plan_details}</p>
-                  ) : row.kind === "openslot" && !built ? null : itemList.length ? (
-                    <div className="mt-1" style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                      {itemList.map((it, k) => (
-                        <p key={k} style={{ fontSize: 12.5, lineHeight: 1.35, color: "var(--brand-text-secondary)", textDecoration: it.removed ? "line-through" : "none", opacity: it.removed ? 0.6 : 1 }}>
-                          {it.label}
-                          {it.removed && <span style={{ marginLeft: 5, fontSize: 8.5, fontWeight: 800, background: "rgba(148,163,184,0.2)", color: "var(--brand-text-secondary)", padding: "1px 5px", borderRadius: 4, verticalAlign: "middle", textDecoration: "none" }}>removed</span>}
-                          {it.free && <span style={{ marginLeft: 5, fontSize: 8.5, fontWeight: 800, background: "rgba(34,197,94,0.15)", color: GREEN, padding: "1px 5px", borderRadius: 4, verticalAlign: "middle" }}>FREE</span>}
-                          {it.added && <span style={{ marginLeft: 5, fontSize: 8.5, fontWeight: 800, background: "rgba(66,165,245,0.16)", color: BLUE, padding: "1px 5px", borderRadius: 4, verticalAlign: "middle" }}>ADDED</span>}
-                        </p>
-                      ))}
-                    </div>
-                  ) : null}
+                  </span>
                   {(row.kind !== "openslot" || built) && (
-                    <p className="text-xs mt-0.5 font-semibold" style={{ color: "var(--brand-text-secondary)" }}>
-                      <b style={{ color: "var(--brand-text)" }}>{r(logged && adh === "Off-plan" && row.kind !== "custom" ? (row.log?.est_kcal || 0) : mm.kcal)}</b> cal · {r(logged && adh === "Off-plan" && row.kind !== "custom" ? (row.log?.est_protein || 0) : mm.protein)}P / {r(logged && adh === "Off-plan" && row.kind !== "custom" ? (row.log?.est_carbs || 0) : mm.carbs)}C / {r(logged && adh === "Off-plan" && row.kind !== "custom" ? (row.log?.est_fats || 0) : mm.fats)}F
-                    </p>
-                  )}
-                  {row.kind === "openslot" && !built && (
-                    <p className="text-xs mt-0.5 font-bold" style={{ color: "var(--brand-primary)" }}>
-                      ＋ Build this meal <span style={{ color: "var(--brand-text-secondary)", fontWeight: 500, fontSize: 10 }}>food DB · 📷 photo · ⌨ typed</span>
-                    </p>
-                  )}
-                  {row.kind === "plan" && (row.options?.length || 0) > 1 && (
-                    <span className="flex gap-1.5 mt-1.5">
-                      {row.options!.map((o, oi) => {
-                        const on = row.chosen?.id === o.id;
-                        return (
-                          <button key={o.id}
-                            onClick={(e) => { e.stopPropagation(); setOptSel((prev) => ({ ...prev, [row.position]: o.id })); if (isLogged(row)) upsertLog(row.position, { meal_id: o.id }); }}
-                            style={{ fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 8, background: on ? "color-mix(in srgb, var(--brand-primary) 16%, transparent)" : "var(--brand-bg)", border: `1px solid ${on ? "var(--brand-primary)" : "var(--brand-border)"}`, color: on ? "var(--brand-text)" : "var(--brand-text-secondary)" }}>
-                            {String.fromCharCode(65 + oi)}
-                          </button>
-                        );
-                      })}
+                    <span className="sym-tile-meta">
+                      {r(logged && adh === "Off-plan" && row.kind !== "custom" ? (row.log?.est_kcal || 0) : mm.kcal)} cal
                     </span>
                   )}
                 </button>
-                <span
-                  onPointerDown={(e) => onHandleDown(e, row.key)}
-                  title="Hold to move"
-                  aria-label={`hold to move ${rowLabel(row, i)}`}
-                  className="flex items-center self-stretch flex-shrink-0 select-none"
-                  style={{ touchAction: "none", cursor: "grab", color: dragState?.key === row.key ? "var(--brand-primary)" : "var(--brand-text-secondary)", fontSize: 15, padding: "0 4px", opacity: 0.7 }}
-                >
-                  ⠿
-                </span>
-                <button onClick={() => openSheet({ kind: "meal", rowKey: row.key })} aria-label="more" className="flex-shrink-0 w-9 h-11 flex items-center justify-center rounded-xl" style={{ color: "var(--brand-text-secondary)", fontSize: 18 }}>⋯</button>
+
+                <div className="sym-body">
+                  {/* An off-plan meal shows what was eaten instead, not the plan. */}
+                  {logged && adh === "Off-plan" && row.kind !== "custom" && row.log?.off_plan_details ? (
+                    <div className="sym-wo">
+                      <div className="sym-food">{row.log.off_plan_details}</div>
+                      <div className="sym-kcal">
+                        <b>{r(row.log?.est_kcal || 0)}</b> cal · {r(row.log?.est_protein || 0)}P / {r(row.log?.est_carbs || 0)}C / {r(row.log?.est_fats || 0)}F
+                      </div>
+                    </div>
+                  ) : row.kind === "openslot" && !built ? (
+                    // An empty slot reads as empty — the rest-day shape, not a
+                    // normal card with a line of blue text inside it.
+                    <button
+                      className="sym-rest w-full"
+                      onClick={() => openSheet({ kind: "meal", rowKey: row.key })}
+                      style={{ border: 0, cursor: "pointer", font: "inherit" }}
+                    >
+                      <span style={{ color: "var(--brand-primary)", fontWeight: 800 }}>＋ Build this meal</span>
+                      <br />
+                      <span style={{ fontWeight: 600 }}>food database · 📷 photo · ⌨ typed</span>
+                    </button>
+                  ) : optionRows ? (
+                    // MEAL OPTIONS ARE OBJECTS, NOT TWO LETTERS. The same shape
+                    // as two workouts inside one day tile: each option shows the
+                    // food it is made of and what it costs, so choosing does not
+                    // mean tapping B to find out what B was.
+                    optionRows.map((o) => (
+                      <div key={o.id} className={"sym-wo" + (o.chosen ? "" : " is-done")}>
+                        <div className="sym-wo-row">
+                          <span className="sym-wo-ic">{o.letter}</span>
+                          <span className="sym-wo-name">{o.name}</span>
+                        </div>
+                        <div className="sym-food">{o.items.map((t, k) => <div key={k}>{t}</div>)}</div>
+                        <div className="sym-acts">
+                          <span className="sym-badge">{r(o.kcal)} cal · {r(o.protein)}P / {r(o.carbs)}C / {r(o.fats)}F</span>
+                          <span className="sym-sp" />
+                          {o.chosen ? (
+                            <span className="sym-badge">CHOSEN</span>
+                          ) : (
+                            <button
+                              className="sym-bt"
+                              onClick={() => { setOptSel((prev) => ({ ...prev, [row.position]: o.id })); if (isLogged(row)) upsertLog(row.position, { meal_id: o.id }); }}
+                            >Choose {o.letter}</button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : itemList.length ? (
+                    <div className="sym-wo">
+                      <div className="sym-food">
+                        {itemList.map((it, k) => (
+                          <div key={k} style={{ textDecoration: it.removed ? "line-through" : "none", opacity: it.removed ? 0.6 : 1 }}>
+                            {it.label}
+                            {it.removed && <em style={{ background: "rgba(148,163,184,0.2)", color: "var(--brand-text-secondary)", textDecoration: "none" }}>removed</em>}
+                            {it.free && <em style={{ background: "rgba(34,197,94,0.15)", color: GREEN }}>FREE</em>}
+                            {it.added && <em style={{ background: "rgba(66,165,245,0.16)", color: BLUE }}>ADDED</em>}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="sym-kcal">
+                        <b>{r(mm.kcal)}</b> cal · {r(mm.protein)}P / {r(mm.carbs)}C / {r(mm.fats)}F
+                      </div>
+                    </div>
+                  ) : (row.kind !== "openslot" || built) ? (
+                    <div className="sym-wo">
+                      <div className="sym-kcal">
+                        <b>{r(mm.kcal)}</b> cal · {r(mm.protein)}P / {r(mm.carbs)}C / {r(mm.fats)}F
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="sym-acts" style={{ marginTop: 9 }}>
+                  {circleFor(row, i)}
+                  <span className="sym-sp" />
+                  <button className="sym-bt" onClick={() => openSheet({ kind: "meal", rowKey: row.key })}>✎ Edit</button>
+                  <button className="sym-bt ic" onClick={() => openSheet({ kind: "meal", rowKey: row.key })} aria-label="more">⋯</button>
+                  <span
+                    onPointerDown={(e) => onHandleDown(e, row.key)}
+                    title="Hold to move"
+                    aria-label={`hold to move ${rowLabel(row, i)}`}
+                    className="sym-grip flex items-center self-stretch flex-shrink-0 select-none"
+                    style={{ touchAction: "none", color: dragState?.key === row.key ? "var(--brand-primary)" : undefined }}
+                  >
+                    ⠿
+                  </span>
+                </div>
               </div>
               {insertLine(i + 1)}
             </div>
@@ -2022,19 +2139,32 @@ export default function NutritionV3Client(props: Props) {
       </div>
 
       {/* extras */}
-      <p className="mx-4 mt-3 mb-2" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: "var(--brand-text-secondary)" }}>EXTRAS</p>
+      <p className="sym-sec mx-4">EXTRAS</p>
       <div className="px-4">
         {extras.map((e) => (
-          <div key={e.id} className="flex items-center gap-2.5 p-3 mb-2" style={{ ...CARD }}>
-            <span className="flex items-center justify-center flex-shrink-0" style={{ width: 34, height: 34, borderRadius: 10, background: "var(--brand-bg)", fontSize: 15 }}>＋</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold truncate flex items-center gap-1.5" style={{ color: "var(--brand-text)" }}>
-                {e.off_plan_details || "Extra"} {e.macros_pending ? <span style={{ fontSize: 9, fontWeight: 800, background: "#fef3c7", color: "#b45309", padding: "2px 6px", borderRadius: 5 }}>PENDING</span> : estBadge()}
-              </p>
-              <p className="text-xs font-semibold" style={{ color: "var(--brand-text-secondary)" }}>
-                {e.macros_pending ? "macros tonight" : <><b style={{ color: "var(--brand-text)" }}>{r(e.est_kcal || 0)}</b> cal · {r(e.est_protein || 0)}P / {r(e.est_carbs || 0)}C / {r(e.est_fats || 0)}F</>}
-              </p>
+          <div key={e.id} className="sym-tile" data-rung style={{ ["--rung" as string]: "8%" } as React.CSSProperties}>
+            {/* THE NAME IS NOT TRUNCATED ANY MORE. `truncate` on a one-line
+                flex child cut every extra longer than the card -- and the name
+                IS the record of what was eaten, the same column the composer
+                fills. Two rows, wrapped, never clipped. */}
+            <div className="sym-tile-head">
+              <span className="sym-tile-lbl" style={{ flexWrap: "wrap", rowGap: 4 }}>
+                <i>＋</i>{e.off_plan_details || "Extra"}
+                {e.macros_pending
+                  ? <span style={{ fontSize: 9, fontWeight: 800, background: "#fef3c7", color: "#b45309", padding: "2px 6px", borderRadius: 5 }}>PENDING</span>
+                  : estBadge()}
+              </span>
+              <span className="sym-tile-meta">{e.macros_pending ? "macros tonight" : `${r(e.est_kcal || 0)} cal`}</span>
             </div>
+            {!e.macros_pending && (
+              <div className="sym-body"><div className="sym-wo">
+                <div className="sym-kcal">
+                  <b>{r(e.est_kcal || 0)}</b> cal · {r(e.est_protein || 0)}P / {r(e.est_carbs || 0)}C / {r(e.est_fats || 0)}F
+                </div>
+              </div></div>
+            )}
+            <div className="sym-acts" style={{ marginTop: 9 }}>
+            <span className="sym-sp" />
             <button
               onClick={async () => {
                 const backup = { ...e };
@@ -2048,12 +2178,14 @@ export default function NutritionV3Client(props: Props) {
                   });
                 });
               }}
-              aria-label="remove extra" className="flex-shrink-0 w-9 h-9 flex items-center justify-center" style={{ color: "var(--brand-text-secondary)" }}>✕</button>
+              aria-label="remove extra" className="sym-bt ic">✕</button>
+            </div>
           </div>
         ))}
-        <button onClick={() => openSheet({ kind: "extrapick" })} className="w-full flex items-center gap-2.5 p-3 mb-2 text-left" style={{ ...CARD, borderStyle: "dashed", color: "var(--brand-text-secondary)" }}>
-          <span className="flex items-center justify-center" style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--brand-bg)", fontSize: 16, color: "var(--brand-text)" }}>＋</span>
-          <span className="text-sm">Quick-add an extra (snack, drink, off-plan bite…)</span>
+        <button onClick={() => openSheet({ kind: "extrapick" })} className="sym-past">
+          <span>＋</span>
+          <span className="sym-sp">Quick-add an extra (snack, drink, off-plan bite…)</span>
+          <span className="sym-past-go">OPEN</span>
         </button>
       </div>
 

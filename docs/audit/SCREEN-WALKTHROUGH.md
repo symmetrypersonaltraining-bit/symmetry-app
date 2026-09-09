@@ -2007,3 +2007,53 @@ is done against the screen he approved.
 
 One component, so it lands on **his Client View and the clients' app together**,
 the way `ClientTopBar` now does. There is no second copy to keep in step.
+
+### SHIPPED — the format is live on Nutrition (9 Sep)
+
+Dustin approved the mock-up with two rulings, and both are now enforced by
+`tests/unit/nutritionWearsTheFormat.test.ts` rather than trusted:
+
+> *"do not lift meals, leave them in order we eat them in. bright fill on today
+> block as in the mock up is correct."*
+
+| Element | Before | Now |
+|---|---|---|
+| Page | plain `pb-8` div on the app background | `.sym-page` — sink, tile depth, cap, ladder ink |
+| Date row | `‹ date ›` with the `⋯` absolutely positioned at `right: 3` over a centred flex row | `.sym-title`; the `⋯` is a normal item and can no longer sit on top of the `›` |
+| Recipes | a small bordered link | `.sym-past` strip, capped |
+| Incoming plan banner | gold rounded box | `.sym-jump`, its gold kept |
+| Day summary | flat card, hero 21px | `.sym-tile.is-today` — **the one bright thing on the screen**, and only when the day really is today |
+| Range chips | primary-filled pill | `.sym-chip` with `aria-pressed`, so it announces its state |
+| Macros | three `pill()` boxes, carbs hard-coded `#5ec9a3` | `.sym-mac` objects; **no per-macro hue** — colour means position, not type |
+| Adherence / logging | two centred columns under a dashed rule | `.sym-split`, two capped objects |
+| Weekly read + coach note | cards with a 3px coloured **left border** | `.sym-tile`; no side borders, the cap carries it |
+| Coach note attribution | an AI badge and a paragraph, nothing naming it | head reads **`<COACH>'S ASSISTANT`** — ruling 4, the name never a pronoun |
+| A meal | one flex row holding ring + name + every food line + macros + `⠿` + `⋯` | `.sym-tile`: head (name, badges, calories), body (food), action strip (ring, Edit, `⋯`, `⠿`) |
+| Meal options A / B | two lettered buttons — **nested inside the row's own `<button>`** | each option is a `.sym-wo` object with its food and its cost, and choosing is a real button |
+| An empty slot | a normal card with a line of blue text in it | the `.sym-rest` shape — it reads as empty |
+| Extras | one row, name `truncate`d | `.sym-tile`; the name wraps and is never clipped |
+| Log ring | 46px circle at the head of the row | `.sym-ring`, 44px, in the action strip |
+
+### Three real defects the conversion ended, not just moved
+
+1. **Nested buttons.** The A / B option buttons lived inside the row's own
+   `<button>`. That is invalid HTML, and browsers resolve it by dropping the
+   inner element out of the button — which is why a tap on A sometimes opened
+   the meal sheet instead of switching the option.
+2. **The `⋯` overlapped the `›`.** `position: absolute; right: 3` over a
+   `justify-center` row: on a long date the two controls collided.
+3. **`truncate` on an extra's name.** The name IS the record of what was eaten
+   — the same column the composer writes — and anything longer than the card was
+   cut with no way to read it.
+
+### What did NOT change
+
+No behaviour. Every control that was on the screen is still on it, doing the
+same thing: the ring still logs, `⋯` still opens the meal sheet, `⠿` still
+drags, the range chips still drive the same state, the nutrient disclosure still
+collapses. `"numbers are way off"`, Nutrition %, the logging sheets, food search
+and the photo path are all untouched and are the walk itself.
+
+**Both surfaces at once.** `/nutrition` and `/client-preview/nutrition` mount the
+same component, so this landed on his Client View and on real clients together —
+asserted, so it stays that way.
