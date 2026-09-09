@@ -291,3 +291,47 @@ test("the rename may not move a single gram", () => {
   assert.match(NAMES, /\(s\.d->>'grams'\)::numeric = s\.old_g/,
     "a row is renamed only when the new answer weighs exactly what the old one did");
 });
+
+// ── a measure opens on one ─────────────────────────────────────────────────
+//
+// Dustin's original sentence, still unmet five migrations later: "butter should
+// open to 1 tbsp and you can edit it if you had more than that." Butter opened
+// on SIX tablespoons — the package's 85 g stick, faithfully restated as a count
+// of tablespoons. 83,478 rows opened on more than one of a divisible unit.
+//
+// A measure or a size opens on ONE. A named piece keeps the label's count,
+// because "8 crackers" is how the box is eaten. And only ever downwards: the
+// first cut rounded a 0.75-cup serving UP to a full cup, which is the same
+// fault pointing the other way.
+
+const OPENS_ON_ONE = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260909a_a_measure_opens_on_one.sql"), "utf8");
+
+test("a measure or a size opens on one, a named piece does not", () => {
+  assert.match(OPENS_ON_ONE, /food_serving_opens_on_one/);
+  assert.match(OPENS_ON_ONE, /food_serving_is_divisible\(label\)/,
+    "tbsp, cup and oz open on one because they are divisible");
+  assert.match(OPENS_ON_ONE, /small\|medium\|large/, "so do the size words");
+  // "cracker" must NOT be in the opens-on-one predicate: 8 crackers is the
+  // serving on the box and 1 cracker is not a portion anyone means.
+  const predicate = OPENS_ON_ONE.slice(
+    OPENS_ON_ONE.indexOf("function food_serving_opens_on_one"),
+    OPENS_ON_ONE.indexOf("grant execute on function food_serving_opens_on_one"));
+  assert.doesNotMatch(predicate, /cracker|cookie|slice|nugget/);
+});
+
+test("it shrinks a multiple and never inflates a fraction", () => {
+  // Both call sites are guarded on cnt > 1. Without that, "0.75 cup" became
+  // "1 cup" and every such portion grew by a third.
+  const guards = OPENS_ON_ONE.match(/cnt is not null and cnt > 1 and food_serving_opens_on_one/g) ?? [];
+  assert.equal(guards.length, 2,
+    "the own-unit branch and the mapped-unit branch both need the downwards-only guard");
+});
+
+test("a vague word only counts when it is the whole label", () => {
+  // "1 serving, 1/2 cup" names half a cup. Treating it as vague threw the half
+  // cup away and doubled an ice cream from 68 g to 132 g.
+  assert.match(OPENS_ON_ONE,
+    /\^\(each\|unit\|units\|item\|items\|piece\|pieces\|serving\|servings\|portion\|portions\)\$/,
+    "the vague check must be anchored at BOTH ends");
+});

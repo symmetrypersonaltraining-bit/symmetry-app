@@ -5,7 +5,13 @@ session reads it first and updates it before finishing.** The `HANDOFF-*.md`
 files with dates in the name are history — do not read them for current state,
 and do not create another one.
 
-Last updated: **8 Sep 2026, evening CDT** · four food-database fixes on
+> 🔴 **PICK UP HERE (9 Sep):** the catalogue is 11 of 16 batches through a
+> recompute — branded ids starting `b` `c` `d` `e` `f` still open on multiples.
+> Five queries, listed at the bottom of
+> `supabase/migrations/20260909a_a_measure_opens_on_one.sql` and in
+> `docs/audit/AUDIT-RESUME.md`. Then the food work is caught up with the code.
+
+Last updated: **9 Sep 2026** · six food-database fixes on
 `claude/symmetry-audit-resume-ws695t` (`612874a` → `dc186b5`), gates green:
 0 errors in `src/`, 2,951 unit tests passing, build compiles.
 

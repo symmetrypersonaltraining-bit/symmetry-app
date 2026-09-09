@@ -612,6 +612,45 @@ by reading the diff before keeping it:
 - `dc186b5` — 26 rules labelled `each` when their keyword was the noun. 3,623
   rows renamed, **0 weights moved**.
 
+### 🔴 UNFINISHED, 9 SEP — FIVE QUERIES, DO THIS FIRST
+
+**The catalogue is 11 of 16 batches through a recompute.** The session was
+stopped mid-run. Branded rows whose id starts with **`b`, `c`, `d`, `e` or `f`**
+still open on multiples ("6 tbsp" of butter); everything else is done. The code
+is committed and the function is live — only the data pass is part-finished.
+
+Run the five remaining batches from the bottom of
+`supabase/migrations/20260909a_a_measure_opens_on_one.sql`, one at a time,
+changing the hex character on the last line. Each takes a few seconds; the whole
+catalogue in one statement exceeds the 60-second timeout, which is why it is
+batched. **Re-running a finished batch is harmless** — the update is a no-op
+when the answer has not changed. Then confirm:
+
+    select count(*) from food_catalog
+    where quarantined is not true and default_serving_desc is not null
+      and food_serving_count_in(default_serving_desc) > 1
+      and food_serving_is_divisible(food_serving_label_of(default_serving_desc));
+    -- was 83,478 before the pass; should end near zero
+
+### A MEASURE OPENS ON ONE — 9 Sep, `20260909a`
+
+His original sentence was still unmet five migrations later: *"butter should
+open to 1 tbsp and you can edit it if you had more than that."* **Butter opened
+on 6 tbsp.** Found by listing the 314 foods he actually programmes and reading
+what the catalogue gives each one — baby spinach opened on 3 cups, almonds on
+2.5 oz (~420 cal), hard boiled eggs on 2 large.
+
+The brain was restating the package's serving weight as a count of household
+units. True of the label, never what a person wants first. Now: a MEASURE or a
+SIZE opens on ONE; a NAMED PIECE keeps the label's count, because "8 crackers"
+is how the box is eaten. **Downwards only** — the first cut rounded a 0.75-cup
+serving UP to a cup, the same fault reversed. In a 40,000-row sample, 12,327
+portions shrank and 4 grew.
+
+Also fixed there: `20260908e` treated "1 serving, 1/2 cup" as a meaningless
+label and threw the half cup away, doubling an ice cream. A vague word only
+counts when it is the whole label.
+
 ### ⚠️ THE ROOT CAUSE, FOUND 8 SEP — READ THIS BEFORE TOUCHING FOOD AGAIN
 
 Dustin: *"these decisions are not mine to say... You can go online as AI and
