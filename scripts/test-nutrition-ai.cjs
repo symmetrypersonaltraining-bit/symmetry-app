@@ -253,7 +253,20 @@ test("verify result: corrected macros normalized, kcal derived when absent", () 
 });
 
 console.log("\nnutrition-json: /act validation (validateActReply)");
-test("valid swap_meal: items normalized, kcal derived, name defaulted from new_name", () => {
+// A MACRO THE MODEL VOLUNTEERS IS DROPPED, NOT DERIVED AND NOT KEPT.
+//
+// Dustin's 9 Sep ruling, shipped as a1edf49: the coach chat was one of two
+// paths that let the model state a nutrition figure, and whatever it said went
+// onto the plate AND into that client's My Meals library. validateActItems
+// went from validateParseResult (which carried kcal/p/c/f and derived a
+// missing kcal) to validateParsedNames — names and amounts only. The route
+// prices every item against food_catalog, reaching USDA when the catalogue is
+// short one.
+//
+// So these assert ABSENCE. The item shape is the gate: a number that cannot
+// land in the shape cannot reach the log. Both tests below asserted the old
+// derived-kcal contract until 9 Sep and were left behind by a1edf49.
+test("valid swap_meal: items are names only — volunteered macros dropped, name defaulted from new_name", () => {
   const r = nj.validateActReply({
     intent: "swap_meal",
     params: { position: 4, new_name: "Salmon + rice", items: [
@@ -267,8 +280,10 @@ test("valid swap_meal: items normalized, kcal derived, name defaulted from new_n
   assert.strictEqual(r.intent, "swap_meal");
   assert.strictEqual(r.params.meal.position, 4);
   assert.strictEqual(r.params.name, "Salmon + rice");
-  assert.strictEqual(r.params.items[0].kcal, Math.round(34 * 4 + 0 * 4 + 11 * 9)); // derived
-  assert.strictEqual(r.params.items[1].kcal, 205);
+  // deepStrictEqual, not a kcal check: it proves p/c/f are ABSENT rather than
+  // merely unread, and that a kcal the model stated outright is discarded too.
+  assert.deepStrictEqual(r.params.items[0], { name: "salmon", amount: 6, unit: "oz" });
+  assert.deepStrictEqual(r.params.items[1], { name: "jasmine rice", amount: 1, unit: "cup" });
   assert.ok(r.confirmation && r.reply);
 });
 test("valid move_meal by names only (positions null, refs kept for fuzzy resolution)", () => {
@@ -288,7 +303,7 @@ test("log_meal: adherence defaults to Full; 'half' normalizes to 1/2", () => {
   assert.strictEqual(nj.validateActReply({ ...base, params: { position: 2, adherence: "half" } }).params.adherence, "1/2");
   assert.strictEqual(nj.validateActReply({ ...base, params: { position: 2, adherence: "nonsense" } }).params.adherence, "Full");
 });
-test("add_snack: items required + normalized, name defaults to item join", () => {
+test("add_snack: items required + reduced to names only, name defaults to item join", () => {
   const r = nj.validateActReply({
     intent: "add_snack",
     params: { items: [{ name: "oreo", p: 0.5, c: 8.3, f: 2.3 }] },
@@ -297,7 +312,9 @@ test("add_snack: items required + normalized, name defaults to item join", () =>
   });
   assert.ok(r);
   assert.strictEqual(r.params.name, "oreo");
-  assert.strictEqual(r.params.items[0].kcal, Math.round(0.5 * 4 + 8.3 * 4 + 2.3 * 9));
+  // No amount and no unit were stated, so both are null — and the three macros
+  // the model volunteered are gone. This is the snack path into My Meals.
+  assert.deepStrictEqual(r.params.items[0], { name: "oreo", amount: null, unit: null });
 });
 test("intent none passes through with clarify flag; confirmation forced null", () => {
   const r = nj.validateActReply({ intent: "none", params: { clarify: true }, confirmation: "ignored", reply: "Which meal do you mean?" });
