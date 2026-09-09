@@ -18,16 +18,19 @@ and do not create another one.
 > because it was pushed to a branch and never merged, and that is what
 > section 3's push rule now exists to stop.
 >
-> 🔵 **PICK UP HERE: the Nutrition button-by-button walk.** The control
-> inventory is DONE — six batches at the end of
-> `docs/audit/SCREEN-WALKTHROUGH.md`. Do not re-derive it. Section 5 has the
-> open specs; `docs/audit/AUDIT-RESUME.md` owns the audit thread.
+> 🔵 **PICK UP HERE: the Nutrition walk is OPEN and waiting on him.** The three
+> opening questions have been put to him and are **unanswered** — he went out for
+> the night on 9 Sep before answering. **Re-ask those three, then go straight to
+> Batch 1.** Do not re-derive the control inventory; it is done, six batches at
+> the end of `docs/audit/SCREEN-WALKTHROUGH.md`. `docs/audit/AUDIT-RESUME.md`
+> owns the audit thread and has the exact resume point.
 >
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **9 Sep 2026** · `main` = `3c694ed` + the food merge. Gates green:
-0 errors in `src/`, **2,960 unit tests passing**, build compiles.
+Last updated: **9 Sep 2026, evening** · `main` = `547a544`. Gates green as of the
+PR #3 merge: 0 errors in `src/`, **2,960 unit tests passing**, build compiles.
+Nothing has been committed since but documentation.
 
 > **His other Claude session pushes to this repo while you work.** It is not a
 > mistake and it is not to be reverted — check `git log origin/main` before you
@@ -228,21 +231,17 @@ Pause only for a red gate or a merge conflict that genuinely needs his call.
 
 ## 4. WHAT JUST HAPPENED — 9 Sep (NUTRITION)
 
-> ### ⛔ NOTHING FROM 9 SEP IS ON `main` YET
+> ### ✅ ALL OF 9 SEP IS ON `main` — PR #3 MERGED
 >
-> **PR #3** — <https://github.com/symmetrypersonaltraining-bit/symmetry-app/pull/3>
-> — branch `claude/symmetry-audit-resume-ws695t`, 17 commits.
+> **PR #3** merged as `4d379cd`, 17 commits, branch
+> `claude/symmetry-audit-resume-ws695t`. Everything below is live on
+> `symmetry-app-omega.vercel.app`. **Do not ask him whether to merge it** — that
+> question is closed, and asking it again is asking him something he has already
+> answered.
 >
-> Vercel deploys from `main`. This is why Dustin said *"the visual rebuild of the
-> nutrition page never landed"* — it is all built, gated and pushed, and none of
-> it has been merged. **Merging deploys to the live app and 27 real clients**, so
-> it waits on his word. Ask him first thing.
->
-> The database migrations ARE already applied to the live project (they went
-> through the Supabase MCP), and their `.sql` files are in `supabase/migrations/`.
-> So the schema is ahead of `main` until the PR merges. Nothing on `main` reads
-> the new column or the new `source` value, so that is safe — but do not assume
-> `main` and the database agree.
+> `main` and the database now agree: the migrations had already been applied to
+> the live project through the Supabase MCP, and their `.sql` files rode in with
+> the merge.
 
 ### Shipped on the branch — the screen
 
@@ -543,15 +542,24 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 
 ## 5. OPEN — pick up here
 
-### 🔴 FIRST THING, EVERY TIME: is PR #3 merged?
+### 🔵 FIRST THING, EVERY TIME: `git fetch origin main`
 
-If not, ask him. Nothing from 9 Sep is visible in the app until it is.
+**PR #3 is merged and that question is closed.** What replaced it is the one
+that keeps biting: his other session pushes to this repo while you work, so find
+out where `main` actually is before you write a line. On the evening of 9 Sep it
+landed `547a544` mid-session, while this one was reading.
 
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
 
 He asked for this specifically: *"then lets do the walk through button by button
 and make sure everything is working the way it should... take your time here
 this one has to be perfect."*
+
+**STATE, 9 Sep evening: opened, nothing recorded yet.** The three opening
+questions were put to him and he went out for the night before answering —
+*"we will pick up here tomorrow im out for the night"*. So tomorrow: re-ask the
+three, then Batch 1's six controls. Nothing has been walked, nothing decided,
+no row filled in. `docs/audit/AUDIT-RESUME.md` carries the same resume point.
 
 **The control inventory is already done** — it is in
 `docs/audit/SCREEN-WALKTHROUGH.md` under "SCREEN 3 — NUTRITION · THE CONTROL
