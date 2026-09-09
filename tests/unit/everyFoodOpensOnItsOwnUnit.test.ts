@@ -335,3 +335,68 @@ test("a vague word only counts when it is the whole label", () => {
     /\^\(each\|unit\|units\|item\|items\|piece\|pieces\|serving\|servings\|portion\|portions\)\$/,
     "the vague check must be anchored at BOTH ends");
 });
+
+// ── A UNIT THAT CANNOT FIT IS NOT THE UNIT — 20260909b ──────────────────────
+//
+// Found on 9 Sep while finishing 20260909a's recompute, by reading the batch
+// diff before keeping it. A can of ginger ale opened on 1 tsp — 2 g, against a
+// real serving of 591 g. So did 9,128 other rows, understating by 31x on
+// average and 430x at worst.
+//
+// 20260909a put the opens-on-one return BEFORE the cap check instead of inside
+// it. The cap is the sanity check that says *this unit does not belong to this
+// food*: 591 g of ginger ale is 296 teaspoons, and a count blowing past the cap
+// is exactly how the brain knew the keyword "ginger" had matched a FLAVOUR
+// rather than the food. Before 20260909a such a row fell through to "1 serving"
+// at the label weight. After it, the shortcut answered first with one teaspoon.
+
+const CAP_FIRST = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260909b_a_unit_that_cannot_fit_is_not_the_unit.sql"), "utf8");
+
+/**
+ * Is every opens-on-one return nested INSIDE a cap guard?
+ *
+ * Walks the function body and, for each `food_serving_opens_on_one` call,
+ * looks back for the cap guard that must enclose it. An `end if;` in between
+ * means the guard closed before the call — which is the bug this catches.
+ */
+function opensOnOneIsCapped(sql: string): boolean {
+  const body = sql.slice(sql.indexOf("create or replace function food_default_serving"));
+  const sites = [...body.matchAll(/food_serving_opens_on_one\(\w/g)].map(m => m.index ?? -1);
+  if (sites.length !== 2) return false; // both call sites must be present
+  return sites.every(at => {
+    const before = body.slice(0, at);
+    const guard = before.lastIndexOf("cnt <= cap then");
+    if (guard === -1) return false;
+    return !before.slice(guard).includes("end if;");
+  });
+}
+
+test("the cap is checked before a food opens on one of its unit", () => {
+  assert.ok(opensOnOneIsCapped(CAP_FIRST),
+    "both opens-on-one returns must sit inside the cnt <= cap guard");
+});
+
+test("that check would have caught 20260909a — it is not a check that cannot fail", () => {
+  // The whole point. 20260909a is the version that shipped the fault, and the
+  // guard above must report it. If this ever passes, the check has stopped
+  // testing anything.
+  assert.equal(opensOnOneIsCapped(OPENS_ON_ONE), false,
+    "20260909a returned one-of-a-unit before the cap, and the check must see it");
+});
+
+test("a count past the cap falls through to the label weight, not to one unit", () => {
+  // Proven red then green against the shipped function in a local Postgres 16
+  // with its whole dependency chain: "Ginger Ale, Ginger" with a 591 g serving
+  // returned "1 tsp / 2 g" before and "1 serving / 591 g" after, while butter
+  // stayed on 1 tbsp, spinach on 1 cup, almonds on 1 oz and a cracker box on
+  // 8 crackers. None of those was ever near its cap — butter is 5.67 of 8,
+  // spinach 2.8 of 4, almonds 2.6 of 24 — which is why the cap can come first
+  // without undoing anything 20260909a exists to fix.
+  assert.match(CAP_FIRST, /label weight, no name/,
+    "the fall-through answer keeps the package's own serving weight");
+  assert.match(CAP_FIRST, /if cnt > 1 and food_serving_opens_on_one\(rule\.label\)/,
+    "the mapped-unit branch keeps the downwards-only guard, just nested deeper");
+  assert.match(CAP_FIRST, /if cnt > 1 and food_serving_opens_on_one\(own_label\)/,
+    "and so does the own-unit branch");
+});

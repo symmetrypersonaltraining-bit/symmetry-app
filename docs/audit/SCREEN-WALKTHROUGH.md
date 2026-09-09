@@ -1727,3 +1727,109 @@ products already carry their label serving and are not the problem.
 
 Migration `20260908f_a_small_banana_is_101_grams.sql`. Reversible:
 `bak_food_catalog_banana_20260908f`.
+
+---
+
+## Interlude — a unit that cannot fit is not the unit  ·  9 Sep 2026
+
+The 9 Sep session was stopped with the catalogue 11 of 16 batches through a
+recompute. Finishing it was meant to be four queries and a count. It was — and
+then reading the batch diff before keeping it turned up the fifth fault in this
+work, in the migration that had just shipped.
+
+**A can of ginger ale opened on 1 tsp — 2 g.**
+
+    Ginger Ale, Ginger                 1 tsp    2 g     really 591 g
+    Diet Soda, Ginger Ale              1 tsp    2 g     really 355 g
+    Macaroni & Cheese, Creamy Sauce    1 tbsp  16 g     really 340 g
+    Restaurant, chicken parmesan       1 tbsp   5 g     really 301 g
+    Cinnamon Rolls                     1 tsp    3 g     really  57 g
+
+### The fault
+
+`20260909a` added *"a measure opens on ONE"* — correctly, and it is what finally
+made butter open on a tablespoon. But it put that return **before** the cap
+check instead of inside it:
+
+    if cnt > 1 and food_serving_opens_on_one(label) then return 1 <label>;
+    if cnt >= 0.25 and cnt <= cap  then return cnt <label>;
+
+The cap is the sanity check that says *this unit does not belong to this food*.
+591 g of ginger ale is 296 teaspoons. Nothing is 296 teaspoons — and the count
+blowing past the cap is precisely how the brain knew the keyword `ginger` had
+matched a **flavour** rather than the food. Before `20260909a`, such a row fell
+through to "1 serving" at the label weight, which is right. After it, the
+opens-on-one shortcut answered first and returned one teaspoon, turning a missed
+keyword into a 296× understated portion.
+
+**9,128 rows catalogue-wide**, understating by 31× on average and 430× at worst.
+All of them branded — which is what a client hits when they scan a barcode.
+
+### What changed
+
+The cap comes first. Opening on one is a choice made **among counts that were
+already plausible**, not a way around the plausibility test.
+
+    if cnt >= 0.25 and cnt <= cap then
+      if cnt > 1 and food_serving_opens_on_one(label) then return 1 <label>;
+      return cnt <label>;
+    end if;
+
+Both call sites, because both had it: the row's own named serving, and the
+mapped unit.
+
+### What a user sees now
+
+Nothing he programmes moved. **Zero of his 249 trainer and client foods
+changed** — butter still opens on 1 tbsp / 14 g, baby spinach on 1 cup / 30 g,
+almonds on 1 oz, white rice on 1 cup / 158 g, chicken breast on 1 breast (6 oz),
+hard boiled eggs on 1 large. None of them was ever near its cap: butter is 5.67
+of 8, spinach 2.8 of 4, almonds 2.6 of 24. That is why the cap can come first
+without undoing anything `20260909a` exists to fix.
+
+What changed is 8,484 branded rows that had been collapsed to a teaspoon or a
+tablespoon, and every one of them **grew back** to the serving on the package.
+
+### How it was proven, because this is the method now
+
+Red first, then green, then measured before applying:
+
+1. The shipped `20260909a` function was loaded into a local Postgres 16 with its
+   whole dependency chain, and the cases above reproduced **exactly**.
+2. The fix turned them green while butter, spinach, almonds, chia and an 8-cracker
+   box stayed exactly as they were.
+3. Then measured on the live catalogue through a shadow function, before a single
+   row was written:
+
+   | | changed | grew | shrank |
+   |---|---|---|---|
+   | 20,344-row branded sample | 539 | 539 | 0 |
+   | all 24,415 non-branded rows | 11 | 11 | 0 |
+   | his own trainer/client foods | **0** | 0 | 0 |
+
+**Nothing shrinks.** That is the invariant that matters here: this fix can only
+ever give a serving back, never take one away — the mirror of `20260909a`'s own
+downwards-only rule, and the reason the two do not fight.
+
+### ⚠️ The confirmation query has to round the way the function rounds
+
+The first check reported 644 survivors. They were phantoms: it compared the
+**raw** ratio while the function tests the **pretty-rounded** count. A 33 g bag
+of popcorn is 4.125 cups, `food_serving_pretty_count` rounds that to 4, and 4 is
+exactly the cup cap. Those rows are correct and the naive check called them
+broken. Rounded the way the function does, the count is **zero**.
+
+The corrected query is at the bottom of the migration. Use that one.
+
+### Still open — unchanged by this
+
+The keyword coverage problem underneath is the same size it was: **68,778 rows
+still say "1 serving"** and 73,453 carry a vague word. This fix makes a missed
+keyword fail *safely* — back to the package's own serving weight instead of to a
+teaspoon — but it does not add a keyword. "Lemon Lime Soda" still reads `6 lemon`,
+and a granola bar with "peanut butter" in its name still borrows a tablespoon.
+Those want the measured keyword pass described in the 8 Sep interludes.
+
+Migration `20260909b_a_unit_that_cannot_fit_is_not_the_unit.sql`. Reversible:
+`bak_food_default_serving_20260909` holds all 322,232 searchable rows as they
+stood before the `20260909a` pass.
