@@ -86,9 +86,10 @@ covered by a CI gate; see `CLAUDE.md` rule 1.
    reads, what it decides, what it writes, when it runs, and what Dustin wants
    it to do — then reconcile the two. An AI component that is merely working is
    not the bar; it has to be doing the thing he actually wants.
-   **HOME IS OUTSTANDING.** Screen 1 was closed before this rule existed, so its
-   AI components have not been through it. Home is re-opened for an AI pass
-   before the Workout audit continues.
+   **HOME IS DONE** — its AI pass ran 5 Sep and its last item, the assistant
+   framing, shipped 9 Sep. The Workout TAB's own AI is negligible (one call to
+   `coachForViewer` for a name); the coach a client actually talks to is the
+   shared `CoachChatSheet`, and the rest lives in the LOGGER.
 1. **Inventory the controls from the CODE first**, never from memory. Grep the
    page and its components for `onClick`, `href`, `router.push`. Put them in a
    table in SCREEN-WALKTHROUGH.md before asking him anything.
@@ -121,24 +122,27 @@ are NOT bugs and must stop being re-reported.
 
 | # | screen | notes |
 |---|---|---|
-| 1 | **Client home** | ✅ closed. ✅ AI pass done 5 Sep — both its AI elements (the Coach, the Weekly Focus) rebuilt; inventory in `docs/audit/AI-COMPONENTS.md`. Two small items remain: the **View** button on today's tile, and the assistant framing (item H). Original close: Adherence now counts only days due; This Week moved under the streak; second "This week" card renamed Weekly Focus; Add Workout removed; AI Insights placeholder deleted; header is a banner; payments sit above This Week; milestone Share now carries the message. |
-| 2 | **Workout tab** | ◐ REBUILT 4 Sep, not yet walked. New tile format, Start/View split, move-a-logged-workout copies forward, Add workout on the title row. Everything on it now needs testing button by button — including the AI components, which have never been reviewed. |
+| 1 | **Client home** | ✅ **CLOSED 9 Sep.** AI pass done 5 Sep (the Coach, the Weekly Focus; inventory in `docs/audit/AI-COMPONENTS.md`). Both leftovers now built: the **View** button on today's tile (`27fcd0e` — it was worse than missing, the pill said Start and did View) and the **assistant framing**, item H / ruling 4 (`5cd796a`). |
+| 2 | **Workout tab** | ✅ **WALKED.** He tapped through it live on 4 Sep — the findings under "Fixed on first live test, 4 Sep" are his. Re-confirmed 9 Sep: *"I'm pretty sure we finished the workout screen already."* He was right; the old "not yet walked" line here was wrong. One item still open: the **"modified from original"** marker (6 of 73 forks carry the link). Its AI is all in the LOGGER, not the tab. |
 
 ### Next — in this order
 
-1. **F, G, H** — see the AI programme table below. E shipped 8 Sep (`eeb98b19`);
-   F is next: the length cap and ban-the-obvious enforcement, rule 7.
-2. **Home, the two leftovers.**
-   - today's workout tile needs the **View** button, to match the Workout tab's
-     Start / View split. Dustin, 4 Sep. Last place a workout opens only one way.
-   - the "Dustin's assistant" framing on the coach entry points (ruling 4) —
-     this is item H, and lands with it.
-3. **Workout, full walk.** The screen was rebuilt on 4 Sep and NOTHING on it has
-   been tapped since. Every button, every path: add, edit, move, replace,
-   remove, start, view, drag, past strip — manually and through Claude. Plus its
-   AI components against docs/audit/AI-CONTRACT.md.
-4. **The workout logger** — its own pass, see its section below.
-5. Screen 3 onward.
+1. **F and G** — the last two unbuilt items of the AI programme. H shipped
+   9 Sep (`5cd796a`), E on 8 Sep (`eeb98b19`).
+   - **F — the length cap, rule 7.** Default 2–4 sentences, and never the
+     obvious. Not yet enforced anywhere.
+   - **G — bounded client adjustment, rule 8.** A client can NUDGE what the AI
+     proposes rather than only accept or reject it, and the nudge is logged and
+     visible to Dustin.
+2. **The workout logger** — its own pass, see its section below. Off limits
+   without per-item permission, and it holds nearly all the client-facing AI
+   that is not the shared coach sheet.
+3. Screen 3 onward — nutrition first, where "the numbers are way off" is still
+   open and is both a screen item and an AI item.
+
+**Closed since this list was written:** Home (both leftovers built 9 Sep), and
+the Workout tab, which he had already walked on 4 Sep — the entry saying
+otherwise was wrong.
 
 ### The AI programme — from docs/audit/AI-CONTRACT.md
 
