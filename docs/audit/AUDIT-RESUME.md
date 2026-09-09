@@ -612,7 +612,18 @@ by reading the diff before keeping it:
 - `dc186b5` — 26 rules labelled `each` when their keyword was the noun. 3,623
   rows renamed, **0 weights moved**.
 
-### 🔴 UNFINISHED, 9 SEP — FIVE QUERIES, DO THIS FIRST
+### ✅ DONE, 9 SEP — and one lesson worth keeping
+
+All 16 batches ran. Rows opening on more than one household unit: **83,478 → 8.**
+
+**The lesson:** `20260908f` fixed the banana rows with a direct UPDATE, and the
+`20260909a` recompute wiped it hours later — "Banana (small)" went back to
+1 medium. A number written into rows is only as durable as the next pass over
+those rows. `food_default_serving()` is the one place that decides, so anything
+the answer depends on must be reachable FROM it. `20260909b` moves the portion
+reference inside the brain, where it now wins ahead of everything inferred.
+
+### ~~UNFINISHED, 9 SEP — FIVE QUERIES, DO THIS FIRST~~ (done)
 
 **The catalogue is 11 of 16 batches through a recompute.** The session was
 stopped mid-run. Branded rows whose id starts with **`b`, `c`, `d`, `e` or `f`**

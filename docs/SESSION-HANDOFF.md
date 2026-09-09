@@ -5,11 +5,12 @@ session reads it first and updates it before finishing.** The `HANDOFF-*.md`
 files with dates in the name are history — do not read them for current state,
 and do not create another one.
 
-> 🔴 **PICK UP HERE (9 Sep):** the catalogue is 11 of 16 batches through a
-> recompute — branded ids starting `b` `c` `d` `e` `f` still open on multiples.
-> Five queries, listed at the bottom of
-> `supabase/migrations/20260909a_a_measure_opens_on_one.sql` and in
-> `docs/audit/AUDIT-RESUME.md`. Then the food work is caught up with the code.
+> ✅ **The recompute is DONE (9 Sep).** All 16 batches ran: rows opening on more
+> than one household unit went **83,478 → 8**. Butter opens on 1 tbsp, almonds
+> on 1 oz, baby spinach on 1 cup, chicken breast on 1 breast (6 oz).
+>
+> Still open: the USDA `food_portion` import (needs `api.nal.usda.gov` allowed
+> plus a free key — see below), and **68,778 rows still saying "1 serving"**.
 
 Last updated: **9 Sep 2026** · six food-database fixes on
 `claude/symmetry-audit-resume-ws695t` (`612874a` → `dc186b5`), gates green:
