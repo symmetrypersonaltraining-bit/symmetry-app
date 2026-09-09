@@ -127,14 +127,30 @@ are NOT bugs and must stop being re-reported.
 
 ### Next — in this order
 
-1. **Screen 3 — NUTRITION.** ⚠️ **THE WALK IS THE NEXT SESSION'S JOB.** The
-   format is shipped, adherence is rebuilt, the food brain now goes online, and
-   **the control inventory is DONE** — six batches at the end of
+1. **Screen 3 — NUTRITION.** 🔵 **THE WALK IS OPEN. RESUME AT: his answers to
+   the three questions, then Batch 1.**
+
+   **Exactly where it stopped (9 Sep, evening).** The three opening questions
+   were put to him — what the screen is *for*, what he never looks at, what he
+   expects to be wrong — and he went out before answering: *"we will pick up
+   here tomorrow im out for the night"*. **Nothing has been tapped, nothing
+   recorded, not one row filled in.** So the next session re-asks those three,
+   waits for him, then puts Batch 1's six controls to him.
+
+   The format is shipped, adherence is rebuilt, the food brain now goes online,
+   and **the control inventory is DONE** — six batches at the end of
    `SCREEN-WALKTHROUGH.md` under "SCREEN 3 — NUTRITION · THE CONTROL INVENTORY".
    Do not re-derive it. Walk it with him one batch at a time.
-   Everything from 9 Sep is on **PR #3** and NOT on `main`, so ask whether to
-   merge before anything else. Open items and their specs are in
-   `docs/SESSION-HANDOFF.md` §5.
+
+   ⚠️ **PR #3 IS MERGED** (`4d379cd`) — all of the 9 Sep nutrition work is live.
+   The old instruction here to ask him whether to merge is closed; do not ask it
+   again. Open items and their specs are in `docs/SESSION-HANDOFF.md` §5.
+
+   **Do not re-ask these three either** — they are answered and the answers are
+   in the inventory's "Already answered" block: *"numbers are way off"* (traced —
+   his M6 really is 766 kcal and the plan is 249 cal / 22 g fat short of the
+   target), Nutrition % (ruled 9 Sep — hitting the numbers alone, week to date,
+   in-progress day excluded), and whether meals get lifted (they do not).
 
    *(Historical note: the format mock-up was built and approved first)* — `docs/mockups/nutrition-format.html`
    (regenerate with `python3 scripts/gen-nutrition-mockup.py`), published at
