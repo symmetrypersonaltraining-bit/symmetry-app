@@ -5,15 +5,21 @@ session reads it first and updates it before finishing.** The `HANDOFF-*.md`
 files with dates in the name are history — do not read them for current state,
 and do not create another one.
 
-> 🔴 **PICK UP HERE (9 Sep):** the catalogue is 11 of 16 batches through a
-> recompute — branded ids starting `b` `c` `d` `e` `f` still open on multiples.
-> Five queries, listed at the bottom of
-> `supabase/migrations/20260909a_a_measure_opens_on_one.sql` and in
-> `docs/audit/AUDIT-RESUME.md`. Then the food work is caught up with the code.
+> ✅ **Everything on 9 Sep is landed and on `main`.** The AI assistant fix
+> shipped as `3c694ed`, and the food recompute plus `20260909b` merged behind it.
+> `main` is green on all three gates: 0 errors in `src/`, 2,960 unit tests
+> passing, build compiles. Nothing is sitting on a branch.
+>
+> 🔵 **PICK UP HERE: the audit.** `docs/audit/AUDIT-RESUME.md` owns that thread
+> and has its own reading order. Next is the **Workout tab** — rebuilt 4 Sep and
+> never tapped button-by-button since, including its AI components, which have
+> never been reviewed against `docs/audit/AI-CONTRACT.md`.
+>
+> The biggest number left in the food work is keyword coverage: **68,383 rows
+> still say "1 serving"** (counted 9 Sep). Section 5 item 3.
 
-Last updated: **9 Sep 2026** · six food-database fixes on
-`claude/symmetry-audit-resume-ws695t` (`612874a` → `dc186b5`), gates green:
-0 errors in `src/`, 2,951 unit tests passing, build compiles.
+Last updated: **9 Sep 2026** · `main` = `3c694ed` + the food merge. Gates green:
+0 errors in `src/`, **2,960 unit tests passing**, build compiles.
 
 > **His other Claude session pushes to this repo while you work.** It is not a
 > mistake and it is not to be reverted — check `git log origin/main` before you
@@ -131,7 +137,7 @@ C:\Users\dusti\Claude\Projects\Trainer App\outbox\            (the mailbox)
 ```
 npx tsc --noEmit        # 0 errors in src/  (tests/e2e errors are pre-existing:
                         #  @playwright/test is not installed here — ignore them)
-npm run test:unit       # 0 failed. ~2,890 tests, about 3 minutes. If the npm
+npm run test:unit       # 0 failed. ~2,960 tests, about 3 minutes. If the npm
                         # script times out, run it directly:
                         #   node --import tsx --test tests/unit/*.test.ts
                         #   node scripts/test-nutrition-ai.cjs
@@ -244,6 +250,56 @@ work runs on now, and three of the four would have made the database worse.
 | **c** | His own programmed foods opened on **a cup weighing 240 g, which is water**. Spinach +700%, oats +196%, rice +52%. Plus "Canned tuna in water" matched the keyword `water` over `tuna`. 28 rows corrected. | `5397ceb` |
 | **d** | **"Chicken breast" logged 1 oz — 28 g.** The catalogue cannot answer this: median "1 breast" is 863 g because USDA means bone-in. `food_piece_sizes` holds the standard; small/med/large in the picker. 6 rows, all his. | `9acc316` |
 | **e** | 26 rules carried the label `each` while their keyword WAS the noun. 3,623 rows renamed, **0 weights moved**. | `dc186b5` |
+
+### The AI button was there and nothing opened — 9 Sep, `3c694ed`
+
+Dustin, on Todd Prine's page with the header **AI** button visible in the
+screenshot: *"trainer ai assistant is gone!!"* Both halves true at once.
+
+`HeaderAssist` (the BUTTON) re-read the client-mode cookie every 2 seconds.
+`AIAssistant` (the DRAWER) asked once at mount, folded the cookie into the same
+latched boolean, and ends in `if (!isTrainer) return null`. So leaving Client
+View brought the button back within two seconds over a drawer that stayed shut
+until a full reload.
+
+Both now read one watcher — `src/lib/auth/trainerMode.ts`, with its browser
+wiring split into `trainerModeBrowser.ts` so the logic is unit-testable without
+a DOM. It re-asks on every Supabase auth change, which also fixes the cold start
+where `auth.getUser()` resolved before the session restored.
+
+**This stays presentation.** `/api/agent` authorizes itself server-side and
+fail-closed against an ACTIVE trainers row and refuses client mode; its tools run
+on the service role, so it cannot lean on RLS and does not lean on the UI.
+`trainerGate.ts`: *"The UI decides which button to draw. It never decides who is
+allowed."* That is what makes a live client-side answer safe.
+
+⚠️ **Note for whoever touches this next:** the trainer half is still latched on
+purpose — `if (answer) trainer = true`, never back to false. That is deliberate,
+and `viewerIsTrainer` explains why: it FAILS OPEN to the build-time list so a
+database blip cannot demote the owner in his own app. Setting it false on error
+would make his own AI button flicker away on a transient failure. Do not
+"fix" it.
+
+### The fifth fault, and the pass that is now finished — 9 Sep
+
+`20260909a` finally made butter open on 1 tbsp. Its data pass was stopped 11 of
+16 batches through; the rest ran on 9 Sep. **24,522 rows changed in those four
+batches, 23,604 portions shrank and 0 grew**, and rows opening on a multiple of a
+divisible unit went from 83,478 to 8 — those 8 being the known "100 g" residue.
+
+Reading that batch diff before keeping it found the fault. **A can of ginger ale
+opened on 1 tsp — 2 g against a real 591 g serving**, and so did 9,128 other
+rows, understating by 31× on average and 430× at worst. `20260909a` had put the
+opens-on-one return BEFORE the cap check. The cap is what says *this unit does
+not belong to this food* — 591 g of ginger ale is 296 teaspoons, and the count
+blowing past the cap is exactly how the brain knew "ginger" had matched a
+flavour. `20260909b` puts the cap first at both call sites. 8,484 rows corrected;
+**539 of 539 sample changes grew, none shrank, and 0 of his own 249 foods moved.**
+
+⚠️ **A confirmation query on this function must round the way the function
+rounds.** Checking the raw ratio reports 644 phantom failures — a 33 g bag of
+popcorn is 4.125 cups, which rounds to 4, which is exactly the cup cap. The
+corrected query is at the bottom of `20260909b`.
 
 **Still the biggest number left in the food work: 68,778 rows say "1 serving"**
 and 73,453 carry a vague word. Every one is a missing keyword, not a missing
@@ -392,21 +448,34 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 
 ### Known gaps, nobody blocked
 
-3. **`src/lib/nutrition/foodUnitDefaults.ts` is stale.** 251 foods; `meal_items`
+3. **Keyword coverage is the biggest number left in the food work.** Counted
+   after the 9 Sep recompute: **68,383 rows say "1 serving"** and 68,490 carry a
+   vague label. (The 8 Sep figures of 68,778 and 73,453 predate the recompute —
+   `20260909b` moved ~8,484 rows INTO "1 serving" on purpose, trading an unnamed
+   unit at the right weight for a named one at the wrong weight.) Every one is a missing
+   keyword, not a missing mechanism — the machinery names a food the moment the
+   map has a word for it. `20260909b` made a *missed* keyword fail safely (back
+   to the package's own serving weight rather than to a teaspoon), but it adds no
+   keywords: "Lemon Lime Soda" still reads `6 lemon`, and a granola bar with
+   "peanut butter" in its name still borrows a tablespoon. Wants its own measured
+   pass — propose, read the diff, keep only what does not move a gram it should
+   not. Reasoning and the guards already built are in the four 8 Sep
+   `SCREEN-WALKTHROUGH.md` interludes and the 9 Sep one.
+4. **`src/lib/nutrition/foodUnitDefaults.ts` is stale.** 251 foods; `meal_items`
    now holds **310**. Fifty-nine foods he has programmed since it was generated
    have no unit at all and fall through to the catalogue. Regenerate with
    `scripts/food-unit-defaults.sql` — note the file now stores
    `{ unit, uses }` per key, not a bare string, because the count is what
    decides ties.
-4. **The Open Food Facts fallback** in `/api/nutrition-ai/barcode-lookup` is now
+5. **The Open Food Facts fallback** in `/api/nutrition-ai/barcode-lookup` is now
    the only path that can write an `off` row. The nightly gate hides whatever it
    writes, so a scanned miss is offered once and never becomes searchable.
    Decide whether to keep it.
-5. **`usda_conflict` is advisory only** — sorts a row down, never hides it.
+6. **`usda_conflict` is advisory only** — sorts a row down, never hides it.
    Sampling put false positives near 50% (shirataki noodles really are 5 cal).
-6. **The "modified from original" calendar marker.** `days.swapped_from_day_id`
+7. **The "modified from original" calendar marker.** `days.swapped_from_day_id`
    exists but only 6 of 73 forks carry it; the fork routes do not set it.
-7. Deferred by him until those screens are walked: the `/progress` tiles, and
+8. Deferred by him until those screens are walked: the `/progress` tiles, and
    the coach-chat snack path (`/api/nutrition-ai/act`).
 
 ### The audit thread
@@ -437,6 +506,26 @@ shipped as `234619c8`.)
 - **The disk is 1 GB.** An import filled it once. Guard bulk inserts with
   `where pg_database_size(current_database()) < 900000000`.
 - **Big table updates restart the database.** Batch at 45–50k rows.
+- **The ship bridge is OUTBOUND ONLY, and no cloud session can read his laptop.**
+  The bridge carries a bundle from the sandbox to his machine so his machine can
+  push. It is not a file share. If work exists only as a file on his laptop — a
+  patch in Downloads, anything under `claude/` — a cloud session cannot get at it,
+  and **turning the ship watcher on does not change that.** Claude Code has no
+  `device_*` tools at all, and can already push directly without the bridge. The
+  only ways in are: he pastes the content, or he runs the command himself. This
+  cost a round trip on 9 Sep over the AI assistant patch.
+- **A check on a rounded value must round the same way.** The confirmation
+  query for `food_default_serving` compared the raw ratio while the function
+  tests `food_serving_pretty_count` of it, and reported 644 failures that were
+  all correct rows — a 33 g bag of popcorn is 4.125 cups, rounds to 4, and 4 is
+  exactly the cup cap. Twenty minutes chasing rows that were already right.
+- **The local Postgres 16 will hold the whole food function chain.** Dump the
+  dependency functions with `pg_get_functiondef`, the two small rule tables as
+  inserts, and the shipped `food_default_serving` straight out of its migration
+  file with `awk '/^create or replace function food_default_serving/,/^\$\$;/'`.
+  That is what made the ginger-ale fault reproducible and provable red before a
+  line was changed. It needs `su postgres` and a data directory the postgres
+  user can traverse — `/var/lib/postgresql/...`, not the scratchpad.
 - **A source-reading test cannot tell code from comments.** Strip comments before
   asserting a string is absent, or the file's own explanation fails the test.
 
