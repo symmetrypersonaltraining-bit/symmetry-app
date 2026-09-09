@@ -1727,3 +1727,60 @@ products already carry their label serving and are not the problem.
 
 Migration `20260908f_a_small_banana_is_101_grams.sql`. Reversible:
 `bak_food_catalog_banana_20260908f`.
+
+---
+
+## Home, AI item H — his assistant, not him  ·  9 Sep 2026
+
+Ruling 4 of the AI contract, built. Dustin re-approved the wording on 9 Sep,
+word for word:
+
+> "Dustin's assistant — knows your programme, your logs and how he trains you.
+> Anything real goes to him."
+
+**What it was doing instead.** The coach sheet — one shared component mounted on
+every client screen — labelled every reply **`COACH`**, and two of its nine
+greetings opened with **"I'm your coach"**. In the first line a client read, the
+app claimed to *be* him.
+
+The reasoning recorded with the ruling is why this matters more than it looks:
+clients *discovering* they were talking to a bot is a top-three risk to trust,
+and an undisclosed assistant means that on the day it is discovered, **every
+warm message he actually wrote gets re-read as generated.**
+
+### What a client sees now
+
+A standing line at the top of the sheet, above the conversation:
+
+> ✦ **Dustin's assistant** — knows your programme, your logs and how Dustin
+> trains you. Anything real goes to Dustin.
+
+- The per-message label reads **`DUSTIN'S ASSISTANT`**, not `COACH`.
+- The two greetings that impersonated him no longer do. Their capability lines
+  are unchanged — "I can see your logs, targets and trends" is still true and
+  still the useful half.
+- **Said once, standing**, rather than repeated into every greeting. Rule 7 bans
+  walls of obvious text, and a disclosure that repeats on every message is the
+  thing people learn to skip.
+
+### ⚠️ The name, never a pronoun
+
+His wording says "how **he** trains you" because he was describing himself. Half
+the clients on this deployment are **Stephanie's** — `coachIdentity` exists
+precisely because one name cannot serve two trainers — and `CoachIdentity`
+carries no pronoun field to read. So the rendered copy uses the coach's NAME
+everywhere his wording used a pronoun. Stephanie's clients read "Stephanie's
+assistant — knows your programme, your logs and how Stephanie trains you."
+
+Same sentence, same warmth, correct for every coach, and it needs no field that
+does not exist. A test asserts no pronoun can creep back into that block.
+
+### Where it appears
+
+One component, `CoachChatSheet`, mounted globally by `GlobalCoach` — so Home,
+Nutrition, Progress, Messages, Settings and Help all get it from this one
+change. The **workout logger is deliberately untouched**: `GlobalCoach` returns
+null there, the logger mounts its own coach, and that screen is off limits
+without per-item permission. It gets this when the logger is walked.
+
+Four tests in `tests/unit/hisAssistantNotHim.test.ts`.
