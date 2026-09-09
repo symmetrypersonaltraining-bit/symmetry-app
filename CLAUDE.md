@@ -90,6 +90,19 @@ behaviour changes its row.
 - **No `any`, no `@ts-ignore`, no `@ts-expect-error`** to silence a type error.
   If the generated types are wrong about the database, relax the one field and
   write down why.
+- **A CONFIRMED CHANGE GETS PUSHED, AND MERGED, IN THE SAME BREATH.** Dustin,
+  9 Sep 2026: *"i want everything pushed upon confirmation every time not leave
+  it for me im using code specifically for that reason if i confirm a fix or
+  update you push it period moving forward."*
+
+  A whole day of nutrition work sat on a branch and he opened the app and found
+  nothing had changed — *"the visual rebuild of the nutrition page never
+  landed"* — because it was pushed but never merged, and Vercel deploys from
+  `main`. Pushing to a branch is not shipping.
+
+  So: he confirms it → gates → commit → push → **open the PR and merge it**.
+  Do not stop at the branch and do not hand him the merge. The only reason to
+  pause is a gate that is red or a conflict that needs his call.
 
 ## 4. HOW WORK IS DONE
 

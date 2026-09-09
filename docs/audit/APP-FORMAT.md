@@ -148,7 +148,24 @@ applies to this page and app wide like it does on home screen."*
 | Built and live | The tile system (`.sym-*`, ~50 rules in `globals.css`), scoped to `.sym-page` |
 | Adopted | Screen 2, Workout tab (4 Sep) |
 | Partly adopted | Screen 1, Home — Weekly Focus is the source object, rest of the screen predates it |
+| Mock-up out for approval | Screen 3, Nutrition (9 Sep) — `docs/mockups/nutrition-format.html`, built by `scripts/gen-nutrition-mockup.py` |
 | Not yet | Every other screen — they adopt as they are walked |
+
+### How a mock-up gets built now
+
+`scripts/gen-nutrition-mockup.py` is the pattern for every screen after this
+one: it **inlines the real `globals.css`** instead of copying colours out of it,
+so the mock-up shows the same `.sym-*` rules, the same thirty `[data-theme]`
+palettes and the same four `[data-deep]` levels the app ships, with `AutoDark`'s
+luminance test replayed in JS. It also renders the screen **as it is today**
+behind a toggle, so the comparison is like for like. A mock-up drawn from
+hand-picked hexes can look right and ship wrong; one that shares the stylesheet
+cannot.
+
+One trap it hit, worth not repeating: pulling the palettes out with a regex over
+the raw file **silently loses a theme** — a prose comment that names a selector
+swallows the block after it, and Midnight Aurora vanished from a run that
+cheerfully reported success. Strip the comments first, then assert on 30.
 
 ### Carried, agreed, NOT built
 

@@ -1,0 +1,386 @@
+<title>Nutrition Log Audit</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+:root{
+  --paper:#F6F7F9; --panel:#FFFFFF; --ink:#101720; --muted:#5B6B7F;
+  --edge:#DCE3EB; --hair:#E9EEF3;
+  --flag:#A8480B; --flag-soft:#FBF0E6;
+  --ok:#1C6248; --ok-soft:#E9F3EE;
+  --accent:#1F4C6B; --accent-soft:#E9F0F5;
+  --figure:#0B1119;
+  --sans:"Archivo",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0C1016; --panel:#141A22; --ink:#E6EDF5; --muted:#93A3B7;
+    --edge:#242E3A; --hair:#1D252F;
+    --flag:#F0A365; --flag-soft:#241A11;
+    --ok:#6FCBA4; --ok-soft:#0F1E19;
+    --accent:#7FB3D9; --accent-soft:#101C26;
+    --figure:#FFFFFF;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0C1016; --panel:#141A22; --ink:#E6EDF5; --muted:#93A3B7;
+  --edge:#242E3A; --hair:#1D252F;
+  --flag:#F0A365; --flag-soft:#241A11;
+  --ok:#6FCBA4; --ok-soft:#0F1E19;
+  --accent:#7FB3D9; --accent-soft:#101C26;
+  --figure:#FFFFFF;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--serif);margin:0;
+     -webkit-font-smoothing:antialiased;line-height:1.62}
+.wrap{max-width:900px;margin:0 auto;padding-block:34px 90px;padding-left:20px;padding-right:20px}
+
+/* masthead */
+.mast{border-bottom:2px solid var(--ink);padding-bottom:16px;margin-bottom:8px}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+        color:var(--muted);margin:0 0 10px}
+h1{font-family:var(--sans);font-weight:700;font-size:clamp(28px,6vw,40px);line-height:1.06;
+   letter-spacing:-.022em;margin:0 0 10px;text-wrap:balance}
+.stand{font-size:16px;color:var(--muted);margin:0;max-width:62ch}
+.stand b{color:var(--ink);font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:6px 22px;font-family:var(--mono);font-size:11px;
+      color:var(--muted);letter-spacing:.05em;padding:12px 0 0}
+
+/* the correction notice */
+.correct{background:var(--ok-soft);border:1px solid color-mix(in srgb,var(--ok) 34%,transparent);
+         border-radius:4px;padding:15px 17px;margin:26px 0 6px}
+.correct h2{font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:.06em;
+            text-transform:uppercase;color:var(--ok);margin:0 0 7px}
+.correct p{margin:0 0 8px;font-size:14.5px}
+.correct p:last-child{margin-bottom:0}
+
+/* findings — a dossier, not cards */
+.find{display:grid;grid-template-columns:112px 1fr;gap:0 26px;
+      border-top:1px solid var(--edge);padding:30px 0 4px}
+@media(max-width:640px){.find{grid-template-columns:1fr;gap:0}}
+.gutter{position:sticky;top:16px;align-self:start}
+@media(max-width:640px){.gutter{position:static;display:flex;align-items:baseline;gap:10px;margin-bottom:10px}}
+.num{font-family:var(--mono);font-size:30px;font-weight:600;color:var(--figure);line-height:1;
+     letter-spacing:-.04em}
+.sev{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+     display:inline-block;margin-top:8px;padding:3px 7px;border-radius:3px}
+@media(max-width:640px){.sev{margin-top:0}}
+.sev.a{background:var(--flag-soft);color:var(--flag)}
+.sev.b{background:var(--accent-soft);color:var(--accent)}
+.sev.c{background:var(--ok-soft);color:var(--ok)}
+.body h2{font-family:var(--sans);font-size:clamp(19px,3.4vw,23px);font-weight:600;letter-spacing:-.015em;
+         line-height:1.22;margin:0 0 12px;text-wrap:balance}
+.body p{margin:0 0 13px;font-size:15.5px}
+.body ul{margin:0 0 13px;padding-left:20px}
+.body li{margin:0 0 7px;font-size:15.5px}
+.body b{font-weight:600}
+.body em{font-style:italic;color:var(--muted)}
+code{font-family:var(--mono);font-size:.88em;background:var(--hair);padding:1px 5px;border-radius:3px}
+
+/* figures pulled out of the prose */
+.figs{display:flex;flex-wrap:wrap;gap:10px;margin:2px 0 16px}
+.fig{background:var(--panel);border:1px solid var(--edge);border-radius:4px;padding:10px 14px;min-width:118px}
+.fig b{display:block;font-family:var(--mono);font-size:22px;font-weight:600;color:var(--figure);
+       line-height:1.1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.fig span{display:block;font-family:var(--sans);font-size:10.5px;font-weight:500;letter-spacing:.06em;
+          text-transform:uppercase;color:var(--muted);margin-top:4px}
+
+/* tables */
+.tw{overflow-x:auto;margin:0 0 16px;border:1px solid var(--edge);border-radius:4px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--hair);vertical-align:top}
+th{font-family:var(--sans);font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+   color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.bad{color:var(--flag);font-weight:600}
+
+blockquote{margin:0 0 14px;padding:2px 0 2px 16px;border-left:2px solid var(--edge);
+           color:var(--muted);font-size:15px}
+
+/* decisions */
+.calls{border-top:2px solid var(--ink);margin-top:40px;padding-top:26px}
+.calls h2{font-family:var(--sans);font-size:clamp(21px,4vw,26px);font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
+.calls .stand{margin-bottom:20px}
+.call{display:grid;grid-template-columns:26px 1fr;gap:14px;padding:15px 0;border-bottom:1px solid var(--hair)}
+.call:last-child{border-bottom:0}
+.call > i{font-style:normal;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--muted);
+          padding-top:2px}
+.call h3{font-family:var(--sans);font-size:16px;font-weight:600;margin:0 0 5px;letter-spacing:-.01em}
+.call p{margin:0;font-size:14.5px;color:var(--muted)}
+.call p b{color:var(--ink);font-weight:600}
+.rec{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+     color:var(--ok);background:var(--ok-soft);padding:2px 6px;border-radius:3px;margin-left:7px;
+     white-space:nowrap;display:inline-block;vertical-align:2px}
+footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--edge);
+        font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em}
+footer a{color:var(--accent)}
+</style>
+
+<div class="wrap">
+  <div class="mast">
+    <p class="kicker">Symmetry · screen 3 audit · before the walk</p>
+    <h1>What the nutrition log is getting wrong</h1>
+    <p class="stand">Eight findings, read out of the code and then <b>checked against the live
+    database</b>, so every one carries a count instead of a suspicion. <b>You ruled on all six
+    calls at the bottom</b> — five are built, one is still a question back to you. Where I got a
+    number wrong I have said so in place rather than quietly fixing it.</p>
+    <div class="meta">
+      <span>9 SEP 2026 · UPDATED</span><span>471,633 CATALOGUE ROWS READ</span>
+      <span>1,745 LOGS · LAST 60 DAYS</span><span>BUILT ON PR #3 · NOT LIVE YET</span>
+    </div>
+  </div>
+
+  <div class="correct">
+    <h2>One false alarm, killed before it reached you</h2>
+    <p>My first pass said <em>“Claudine’s plan is 4,869 kcal against a 1,650 target — 195% over.”</em>
+    <b>That was my query, not her plan.</b> She has 15 meals across 7 positions (options A/B/C) and
+    I summed all of them instead of one per slot.</p>
+    <p>Run properly her plan is <b>1,467 kcal — 11% under</b>, which is ordinary drift. Written down
+    because a query that double-counts options looks exactly like a broken plan.</p>
+  </div>
+
+  <div class="find">
+    <div class="gutter"><div class="num">01</div><span class="sev a">Root cause</span></div>
+    <div class="body">
+      <h2>Three places a food’s macros come from, and two of them let the model invent the number</h2>
+      <div class="tw"><table>
+        <tr><th>Path</th><th>Where the numbers come from</th></tr>
+        <tr><td><b>Typed · describe it · voice</b></td>
+            <td>The model says <b>what</b> was eaten. Every number is read off a <code>food_catalog</code>
+            row. A food that matches nothing is excluded <em>and named</em>, so you can search it by hand.</td></tr>
+        <tr><td class="bad"><b>Photo</b></td>
+            <td>The model states <code>calories</code>, <code>protein_g</code>, <code>carbs_g</code>,
+            <code>fat_g</code> itself. No catalogue lookup anywhere in the route.</td></tr>
+        <tr><td class="bad"><b>The AI chat</b><br><em>“I ate a banana”, “swap M4 for wings”</em></td>
+            <td>Its prompt says, in these words: <em>“Estimate realistic macros per item (grams
+            protein/carbs/fat, kcal).”</em> No catalogue lookup.</td></tr>
+      </table></div>
+      <p>The typed path was rebuilt on 26 Aug for exactly this reason. Its own header records why:</p>
+      <blockquote>The parse prompt used to ask it to estimate macros using USDA / nutrition-label
+      knowledge, which is recall plus arithmetic, and it got both wrong in ways that looked right.</blockquote>
+      <p><b>That prompt is still live in the other two paths</b> — and the chat one is the path you
+      asked me to look at.</p>
+      <p><b>Worse: the chat path keeps the invented number.</b> A swap calls <code>saveMyMeal()</code>,
+      so a macro the model made up is written into that client’s My Meals library and re-used every
+      time they pick it again.</p>
+      <h2 style="font-size:17px;margin-top:22px">Why no arithmetic check can ever catch this</h2>
+      <p>All 154 client-saved foods are internally consistent — kcal agrees with 4/4/9 of their own
+      macros, every single one. The <code>banana</code> row reading <b>242 kcal · 2P · 27C · 14F</b>
+      is perfectly self-consistent. It just isn’t a banana. <b>A fabricated macro is consistent by
+      construction.</b> Only reading it off a row can catch it.</p>
+      <div class="figs">
+        <div class="fig"><b>154</b><span>client-saved foods</span></div>
+        <div class="fig"><b>149</b><span>with no serving weight</span></div>
+      </div>
+      <p>149 of the 154 have no <code>serving_grams</code>, so “1 serving” of a client-saved food has
+      no weight behind it and can never be scaled or converted.</p>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="gutter"><div class="num">02</div><span class="sev a">Trust</span></div>
+    <div class="body">
+      <h2>The “verified” badge means nothing</h2>
+      <div class="tw"><table>
+        <tr><th>Source</th><th class="n">Rows</th><th class="n">Marked verified</th></tr>
+        <tr><td>usda_branded</td><td class="n">442,891</td><td class="n bad">100%</td></tr>
+        <tr><td>usda_generic</td><td class="n">11,732</td><td class="n">100%</td></tr>
+        <tr><td>usda_core</td><td class="n">8,789</td><td class="n">100%</td></tr>
+        <tr><td>usda</td><td class="n">7,766</td><td class="n">100%</td></tr>
+        <tr><td>trainer</td><td class="n">155</td><td class="n">100%</td></tr>
+        <tr><td>restaurant · brand</td><td class="n">143</td><td class="n">100%</td></tr>
+        <tr><td>client</td><td class="n">154</td><td class="n">0%</td></tr>
+      </table></div>
+      <p>Everything that isn’t client-created is stamped verified. And <code>usda_branded</code> is the
+      <b>manufacturer-submitted label</b> half of FoodData Central — the crowd-sourced part. Two live
+      rows, both flagged verified:</p>
+      <ul>
+        <li><code>Banana</code> — <b>336 kcal, 0 g protein</b>, 78.6 C, 1.1 F per 100 g. A raw banana is 89.</li>
+        <li><code>Banana</code> — <b>312 kcal, 12.5 P</b>, 40.6 C, 6.3 F per 100 g.</li>
+      </ul>
+      <p>This is the same failure MyFitnessPal has. Their own help page says <em>“even verified entries
+      can sometimes have mistakes”</em>, and a published analysis found <b>~30% of their top 1,000
+      most-logged foods carried a &gt;20% error in at least one macro</b>. Cronometer went the other
+      way: no crowd row enters the main database at all, and every entry is labelled with its real
+      origin — USDA, NCCDB, CRDB — instead of a badge.</p>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="gutter"><div class="num">03</div><span class="sev b">Data</span></div>
+    <div class="body">
+      <h2>23,385 catalogue rows disagree with themselves</h2>
+      <div class="figs">
+        <div class="fig"><b>23,385</b><span>kcal ≠ own macros</span></div>
+        <div class="fig"><b>900</b><span>&gt;100 kcal, zero C and F</span></div>
+        <div class="fig"><b>11</b><span>physically impossible</span></div>
+      </div>
+      <p>Out of 471,633 rows carrying full macros, <b>5.0%</b> have a calorie figure that differs from
+      4/4/9 of their own protein, carbs and fat by more than 25 cal or 15%.</p>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="gutter"><div class="num">04</div><span class="sev a">Still broken</span></div>
+    <div class="body">
+      <h2>The banana you complained about is still wrong — in your own trainer rows</h2>
+      <div class="tw"><table>
+        <tr><th>Name</th><th>Serving says</th><th class="n">kcal</th><th>P / C / F</th></tr>
+        <tr><td>Bananas</td><td class="bad">1 large (8″–8-7/8″) — but the weight on file is 100 g</td><td class="n">128</td><td>1 / 31 / 0</td></tr>
+        <tr><td>Banana (small)</td><td class="bad">“1 medium”</td><td class="n">112</td><td>2 / 26 / 0</td></tr>
+        <tr><td>Banana (medium)</td><td>“1 each”</td><td class="n">112</td><td>1 / 27 / 0</td></tr>
+      </table></div>
+      <p>The name and the serving description contradict each other on two of the three, and
+      <b>small and medium are the same 112 kcal</b> — the exact thing you raised on 8 Sep.</p>
+      <p>The USDA portion work fixed the <em>function</em> that picks a serving. These three rows carry
+      their own hard-coded numbers and were never touched by it.</p>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="gutter"><div class="num">05</div><span class="sev a">Numbers way off</span></div>
+    <div class="body">
+      <h2>Your own plan cannot reach your own target</h2>
+      <div class="tw"><table>
+        <tr><th>Plan v7</th><th class="n">Plan</th><th class="n">Target</th><th class="n">Off by</th></tr>
+        <tr><td>Calories</td><td class="n">4,213</td><td class="n">4,462</td><td class="n bad">−5.6%</td></tr>
+        <tr><td>Protein</td><td class="n">254</td><td class="n">267</td><td class="n">−4.7%</td></tr>
+        <tr><td>Carbs</td><td class="n">381</td><td class="n">381</td><td class="n">0.0%</td></tr>
+        <tr><td>Fat</td><td class="n">186</td><td class="n">208</td><td class="n bad">−10.7%</td></tr>
+      </table></div>
+      <p>Eat the plan perfectly and the card reads 4,213 against 4,462, every day. And because fat
+      lands 10.7% off, <b>a flawless day scores under 100% adherence</b> — the full-credit band is ±10%.</p>
+      <p>You are not alone, and <b>fat is the macro that drifts everywhere</b>:</p>
+      <div class="tw"><table>
+        <tr><th>Client</th><th class="n">kcal</th><th class="n">protein</th><th class="n">fat</th></tr>
+        <tr><td>Madeleine Coker</td><td class="n">−19%</td><td class="n bad">−34%</td><td class="n bad">+53%</td></tr>
+        <tr><td>Gerard Gautreaux</td><td class="n">+17%</td><td class="n">−5%</td><td class="n bad">+52%</td></tr>
+        <tr><td>Sharon Gautreaux</td><td class="n">+6%</td><td class="n">+11%</td><td class="n bad">+55%</td></tr>
+        <tr><td>Brooke Orton</td><td class="n">−1%</td><td class="n">+24%</td><td class="n bad">−36%</td></tr>
+        <tr><td>Jerry Bourgeois</td><td class="n">+4%</td><td class="n">−6%</td><td class="n bad">+32%</td></tr>
+        <tr><td>Dustin</td><td class="n">−6%</td><td class="n">−5%</td><td class="n">−11%</td></tr>
+      </table></div>
+      <p>The AI plan builder already enforces 3% on calories and 5 g on each macro, and prints the
+      drift in orange when it misses. <b>Hand-built plans are never checked</b>, and nothing on the
+      trainer’s plan screen or the client’s card says the plan doesn’t add up to the target it is
+      being graded against.</p>
+      <p><b>Confirmed clean, so it isn’t the cause:</b> your M6 really is 766 kcal in the plan. The
+      number you questioned on 4 Sep was the app telling the truth.</p>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="gutter"><div class="num">06</div><span class="sev b">History</span></div>
+    <div class="body">
+      <h2>95 logged rows carry a calorie that disagrees with their own macros</h2>
+      <p>Up to <b>731 cal</b> apart, and they still sit inside every average and every adherence
+      figure. The pattern is photo-era rows in the legacy band with <b>fat recorded as zero</b>:</p>
+      <ul>
+        <li>“4 slices of sausage pizza” — 1,120 kcal, 52P / 98C / <b>0F</b> · the macros say 600</li>
+        <li>“Bowl of yogurt” — 520 kcal, 18P / 52C / <b>0F</b> · the macros say 280</li>
+        <li>“3/4 cup egg whites, green beans” — 95 kcal but <b>203 g protein</b></li>
+      </ul>
+      <p>Plus 9 off-plan rows saved with a description and zero calories.</p>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="gutter"><div class="num">07</div><span class="sev b">Dead promise</span></div>
+    <div class="body">
+      <h2>“Macros tonight” — nothing keeps that promise</h2>
+      <p>The off-plan sheet offers <em>“save it as pending — macros get filled in tonight”</em> and the
+      summary card prints <em>“totals update tonight”</em>. <b>There is no job.</b> Four crons run —
+      weekly-ai, weekly-ai refresh, birthdays, goals — and none of them touches a pending row.
+      Nothing anywhere resolves one.</p>
+      <p>Live impact today is <b>zero rows</b>, so it’s a dead promise rather than a live wrong number.
+      But the button is on the screen.</p>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="gutter"><div class="num">08</div><span class="sev c">Better than it looks</span></div>
+    <div class="body">
+      <h2>What happens when you tell the AI to do something</h2>
+      <p>Worth writing down plainly, because the control flow is sound:</p>
+      <ul>
+        <li><b>Eight actions:</b> swap a meal, add to a meal, move, copy, delete, add a snack, log,
+        un-log.</li>
+        <li><b>Nothing changes until you tap Confirm.</b> The reply comes back as a message plus a
+        confirmation card; the write only runs on the tap, and a failure says so and changes nothing.</li>
+        <li><b>It never guesses which meal you meant.</b> A reference it can’t resolve — missing, or
+        two plausible matches — downgrades the whole action to one clarifying question.</li>
+        <li><b>Every write goes to the day on screen</b>, and every label names that date when it
+        isn’t today.</li>
+      </ul>
+      <p>The gap isn’t here. It’s finding 01: what it asks you to confirm can contain a number nobody
+      sourced.</p>
+    </div>
+  </div>
+
+  <div class="calls">
+    <h2>Six calls, then we walk the buttons</h2>
+    <p class="stand">Each one is a decision, not a preference — say yes or say different and I’ll build it.</p>
+
+    <div class="call"><i>1</i><div>
+      <h3>Route photo and chat macros through the food database<span class="rec">recommended</span></h3>
+      <p><b>You added the important half:</b> <em>“if it’s not in the data base they need a way to
+      search in online through ai and get real numbers.”</em> So on a miss the app now goes to USDA
+      FoodData Central, pulls the real measured rows, and the model <b>chooses between them</b> —
+      it is never asked for a figure. What it picks is written into the catalogue with its USDA id,
+      so the next client to eat it gets it with no network at all. The catalogue teaches itself.</p>
+      <p>The chat is done. <b>The photo route is the last path still stating its own macros</b> and
+      is first up next session; the design is written out in the handoff.</p>
+    </div></div>
+
+    <div class="call"><i>2</i><div>
+      <h3>Stop saving unsourced foods into My Meals<span class="rec">recommended</span></h3>
+      <p>A food only enters the library once it resolves to a real row. Otherwise one invented number
+      becomes a permanent one.</p>
+    </div></div>
+
+    <div class="call"><i>3</i><div>
+      <h3>Make “verified” mean something</h3>
+      <p>Drop the badge from the 442,891 manufacturer-label rows and keep it for USDA core, USDA
+      generic and your own trainer rows. <b>Cronometer’s version is stronger</b>: show the origin
+      instead of a tick — “USDA” / “your library” / “from a label”. That takes a design pass, so it’s
+      yours to pick.</p>
+    </div></div>
+
+    <div class="call"><i>4</i><div>
+      <h3>Check a hand-built plan against the target<span class="rec">recommended</span></h3>
+      <p>The same 3% / 5 g check the AI builder already runs, printed on the trainer’s plan screen.
+      Six live plans would flag today, five of them on fat.</p>
+    </div></div>
+
+    <div class="call"><i>5</i><div>
+      <h3>“Macros tonight” — build the job, or take the button off</h3>
+      <p><b>You asked what this means, so nothing has been changed.</b> The off-plan sheet offers
+      “save it as pending — macros get filled in tonight”, and the summary card says “totals update
+      tonight”. <b>There is no job.</b> Four scheduled tasks run — the weekly AI twice, birthdays,
+      goals — and none of them touches a pending row. Anything saved that way would sit at zero
+      calories for ever and quietly under-count the day.</p>
+      <p>Right now <b>zero rows are pending</b>, so nothing is broken today. It is a promise on a
+      button that nothing keeps. Build the nightly pass, or take the option off the sheet — either
+      is honest, and the current state isn’t.</p>
+    </div></div>
+
+    <div class="call"><i>6</i><div>
+      <h3>The 95 bad history rows — fix, flag or leave</h3>
+      <p><b>15 of the 95 are done.</b> They shared one signature — fat recorded as zero while the
+      calories were far above what protein and carbs could pay for, which is the fat column arriving
+      empty from the photo path. The calories survived, so the fat was recoverable exactly:
+      4 slices of sausage pizza, 1,120 kcal, 52P 98C 0F → <b>57.8 g fat</b>. 266 g restored, backed
+      up first.</p>
+      <p>The other 80 are not arithmetic. <em>“banana — 105 kcal, 1P, 27C, 14F”</em> has no
+      non-negative solution for any single macro: the fat is simply wrong. Those need re-resolving
+      through the food brain, as a script, with the before and after read before anything is
+      written.</p>
+    </div></div>
+  </div>
+
+  <footer>
+    Read from the code and verified against the live database, 9 Sep 2026 · corrected the same day
+    where I had it wrong · everything built today sits on PR #3 and is NOT live until it is merged.
+  </footer>
+</div>

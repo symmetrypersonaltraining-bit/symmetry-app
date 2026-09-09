@@ -86,9 +86,10 @@ covered by a CI gate; see `CLAUDE.md` rule 1.
    reads, what it decides, what it writes, when it runs, and what Dustin wants
    it to do — then reconcile the two. An AI component that is merely working is
    not the bar; it has to be doing the thing he actually wants.
-   **HOME IS OUTSTANDING.** Screen 1 was closed before this rule existed, so its
-   AI components have not been through it. Home is re-opened for an AI pass
-   before the Workout audit continues.
+   **HOME IS DONE** — its AI pass ran 5 Sep and its last item, the assistant
+   framing, shipped 9 Sep. The Workout TAB's own AI is negligible (one call to
+   `coachForViewer` for a name); the coach a client actually talks to is the
+   shared `CoachChatSheet`, and the rest lives in the LOGGER.
 1. **Inventory the controls from the CODE first**, never from memory. Grep the
    page and its components for `onClick`, `href`, `router.push`. Put them in a
    table in SCREEN-WALKTHROUGH.md before asking him anything.
@@ -121,24 +122,66 @@ are NOT bugs and must stop being re-reported.
 
 | # | screen | notes |
 |---|---|---|
-| 1 | **Client home** | ✅ closed. ✅ AI pass done 5 Sep — both its AI elements (the Coach, the Weekly Focus) rebuilt; inventory in `docs/audit/AI-COMPONENTS.md`. Two small items remain: the **View** button on today's tile, and the assistant framing (item H). Original close: Adherence now counts only days due; This Week moved under the streak; second "This week" card renamed Weekly Focus; Add Workout removed; AI Insights placeholder deleted; header is a banner; payments sit above This Week; milestone Share now carries the message. |
-| 2 | **Workout tab** | ◐ REBUILT 4 Sep, not yet walked. New tile format, Start/View split, move-a-logged-workout copies forward, Add workout on the title row. Everything on it now needs testing button by button — including the AI components, which have never been reviewed. |
+| 1 | **Client home** | ✅ **CLOSED 9 Sep.** AI pass done 5 Sep (the Coach, the Weekly Focus; inventory in `docs/audit/AI-COMPONENTS.md`). Both leftovers now built: the **View** button on today's tile (`27fcd0e` — it was worse than missing, the pill said Start and did View) and the **assistant framing**, item H / ruling 4 (`5cd796a`). |
+| 2 | **Workout tab** | ✅ **WALKED.** He tapped through it live on 4 Sep — the findings under "Fixed on first live test, 4 Sep" are his. Re-confirmed 9 Sep: *"I'm pretty sure we finished the workout screen already."* He was right; the old "not yet walked" line here was wrong. One item still open: the **"modified from original"** marker (6 of 73 forks carry the link). Its AI is all in the LOGGER, not the tab. |
 
 ### Next — in this order
 
-1. **F, G, H** — see the AI programme table below. E shipped 8 Sep (`eeb98b19`);
-   F is next: the length cap and ban-the-obvious enforcement, rule 7.
-2. **Home, the two leftovers.**
-   - today's workout tile needs the **View** button, to match the Workout tab's
-     Start / View split. Dustin, 4 Sep. Last place a workout opens only one way.
-   - the "Dustin's assistant" framing on the coach entry points (ruling 4) —
-     this is item H, and lands with it.
-3. **Workout, full walk.** The screen was rebuilt on 4 Sep and NOTHING on it has
-   been tapped since. Every button, every path: add, edit, move, replace,
-   remove, start, view, drag, past strip — manually and through Claude. Plus its
-   AI components against docs/audit/AI-CONTRACT.md.
-4. **The workout logger** — its own pass, see its section below.
-5. Screen 3 onward.
+1. **Screen 3 — NUTRITION.** ⚠️ **THE WALK IS THE NEXT SESSION'S JOB.** The
+   format is shipped, adherence is rebuilt, the food brain now goes online, and
+   **the control inventory is DONE** — six batches at the end of
+   `SCREEN-WALKTHROUGH.md` under "SCREEN 3 — NUTRITION · THE CONTROL INVENTORY".
+   Do not re-derive it. Walk it with him one batch at a time.
+   Everything from 9 Sep is on **PR #3** and NOT on `main`, so ask whether to
+   merge before anything else. Open items and their specs are in
+   `docs/SESSION-HANDOFF.md` §5.
+
+   *(Historical note: the format mock-up was built and approved first)* — `docs/mockups/nutrition-format.html`
+   (regenerate with `python3 scripts/gen-nutrition-mockup.py`), published at
+   <https://claude.ai/code/artifact/c52d0283-f009-4946-8fbb-1ae34c719c6b>. It
+   inlines the app's real `globals.css`, so it cannot drift from what ships, and
+   it flips to the current screen for comparison. **One decision is open:**
+   whether the next meal due is filled bright *in place* (what the mock-up does)
+   or hoisted to the top the way today is on the Workout tab. Full write-up:
+   the Nutrition interlude at the end of `SCREEN-WALKTHROUGH.md`.
+   Then the control inventory and the three questions. His words already against
+   this screen:
+   - *"numbers are way off"* (4 Sep, from the Coach sheet: M6 read 766 kcal and
+     the day landed at 4,573 against a 4,462 target). **Both the day total and
+     the target need checking against the meal plan and the logged rows before
+     anything else on that screen is touched.**
+   - *"there are tons of screwed up details in the nutrition page we need to
+     deal with"* — his reason for deferring the coach-chat snack path here.
+   - **Nutrition %** — he is unhappy with how it calculates. Capture the rule at
+     this screen so both places change together.
+2. **The workout logger** — **pinned here by him.** Dustin, 9 Sep, mid-session:
+   *"side note, we need to put workout logger next on the list to audit."* It
+   comes straight after Nutrition and ahead of every remaining screen; do not
+   let screen 4 jump it. Its own pass, see its section below. OFF LIMITS
+   without per-item permission; agree which controls may be touched first.
+3. Screen 4 onward.
+
+### ⚠️ F AND G ARE NOT HIS, AND WERE PRESENTED AS IF THEY WERE
+
+Dustin, 9 Sep, on being asked to decide item F: *"i dont remember ever even
+talking about this so im not real sure where all that is even coming from."*
+
+He was right. **Not one of the ten rules in AI-CONTRACT.md quotes him** —
+checked, zero direct quotes in that section. Rule 7's evidence is industry
+complaints about OTHER apps; rule 8's is a *Management Science* paper from 2016.
+They are a previous session's proposals, written in his voice under a header
+that quotes him on the overall goal.
+
+**His actual decisions are the four RULINGS**, which are quoted. Ruling 4
+shipped 9 Sep as item H.
+
+So F is parked (he ruled: *"leave the length as is for now"*) and **G must be
+put to him as a proposal, not read back to him as his own instruction.** Before
+raising anything else from that file, check whether he said it.
+
+**Closed since this list was written:** Home (both leftovers built 9 Sep), the
+Workout tab (he had already walked it on 4 Sep), and the Client View / real
+client mismatch — one shared top bar, locked by a test.
 
 ### The AI programme — from docs/audit/AI-CONTRACT.md
 

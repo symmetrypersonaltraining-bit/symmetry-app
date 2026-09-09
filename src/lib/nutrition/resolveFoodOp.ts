@@ -22,6 +22,8 @@ import {
   PORTION_SYSTEM, validatePortion,
 } from "@/lib/nutrition/foodResolve";
 import { unitHeUses } from "@/lib/nutrition/foodUnitDefaults";
+import { readNutrients, scaleNutrients } from "@/lib/nutrition/nutrients";
+import { searchUsdaOnline, cacheUsdaFood, usdaOnlineAvailable } from "@/lib/nutrition/usdaOnline";
 
 /** Enough rows to contain the right one; short enough that the whole list gets read. */
 export const CANDIDATE_LIMIT = 10;
@@ -139,7 +141,62 @@ export async function resolveFood(
     }
   }
 
-  // ── THE CATALOGUE DOES NOT HAVE IT. ASK ANYWAY. ───────────────────────────
+  // ── THE CATALOGUE DOES NOT HAVE IT. GO AND GET IT. ────────────────────────
+  //
+  // Dustin, 9 Sep 2026: *"if it's not in the data base they need a way to
+  // search in online through ai and get real numbers. again this is the whole
+  // point of having a 'brain' in the app."*
+  //
+  // The brain is not the model reciting macros — that is the failure this
+  // module exists to end, and it is undetectable, because a recited number is
+  // self-consistent by construction. The brain is: go to USDA FoodData Central,
+  // pull the real measured rows for this food, and let the model do here what
+  // it does everywhere else in this file — CHOOSE between rows it can see.
+  //
+  // What comes back is written into food_catalog carrying its FDC id, so the
+  // second client to eat the same thing gets it out of the catalogue with no
+  // network at all. The database teaches itself, one miss at a time.
+  if (!row && usdaOnlineAvailable()) {
+    const online = await searchUsdaOnline(term, CANDIDATE_LIMIT);
+    if (online.length) {
+      // Shaped as candidate rows so the SAME pick prompt judges them, with the
+      // same rule: the numbers are IN the list and the model picks one or says
+      // none of these. Nothing here asks it for a figure.
+      const asRows: CatalogRow[] = online.map((f) => ({
+        id: `usda:${f.fdcId}`,
+        name: f.description,
+        brand: f.brand,
+        kcal: f.kcal,
+        protein: f.protein,
+        carbs: f.carbs,
+        fats: f.fats,
+        serving_desc: "100 g",
+        serving_grams: 100,
+        // Branded is the manufacturer-submitted half of FDC and is not
+        // measured. Saying so in the candidate list is what lets the model
+        // prefer the laboratory row when both are offered.
+        verified: f.dataType !== "Branded",
+        source: `USDA ${f.dataType}`,
+        serving_options:
+          f.servingGrams && f.servingGrams > 0
+            ? [{ desc: "100 g", grams: 100 }, { desc: f.servingLabel || "1 serving", grams: f.servingGrams }]
+            : [{ desc: "100 g", grams: 100 }],
+      }));
+      const chosen = await pick(asRows);
+      if (chosen) {
+        const hit = online[asRows.indexOf(chosen)];
+        // Only the CHOSEN row is written. Caching all ten would fill the
+        // catalogue with near-misses that the next search then has to reject.
+        const cached = hit ? await cacheUsdaFood(deps.db, hit) : null;
+        if (cached) {
+          row = cached as unknown as CatalogRow;
+          rows = [row];
+        }
+      }
+    }
+  }
+
+  // ── STILL NOTHING. ASK ANYWAY, AND MARK IT AS A GUESS. ────────────────────
   //
   // Dustin, 28 Aug: "That function needs to function as AI. It does not pull
   // foods just from my database... If I say I ate one Thomas cinnamon swirl
@@ -168,8 +225,10 @@ export async function resolveFood(
         return e === null ? null : { e };
       },
     });
-    // Still nothing. NOT ADDED — the model saying "I don't know this food" is
-    // an answer, and a better one than a number nobody can check.
+    // Still nothing — the catalogue missed it, the alternate names missed it,
+    // and USDA has no row for it either (or the network was down). NOT ADDED:
+    // the model saying "I don't know this food" is an answer, and a better one
+    // than a number nobody can check.
     if (!est.value) return null;
     const e = est.value.e;
 
@@ -320,4 +379,75 @@ export async function resolveFood(
   // model too — thirty-three of them per food, which is thirty-three more
   // chances to be confidently wrong.
   return { ...scaled, micros: (row as CatalogRow & { micros?: unknown }).micros ?? null };
+}
+
+/**
+ * A LIST OF NAMES IN, A LIST OF PRICED FOODS OUT — the one implementation.
+ *
+ * /nutrition-ai/parse had this loop inline. When the coach chat was made to
+ * stop inventing macros (9 Sep 2026) it needed exactly the same loop, and two
+ * copies of "how a described food becomes a number" is how two screens end up
+ * disagreeing about the same dinner — the reason resolveFood itself lives in
+ * this file rather than in a route.
+ *
+ * A name that resolves to nothing is RETURNED SEPARATELY and contributes
+ * nothing to any total. It is not zeroed, not guessed at, and not silently
+ * dropped: the caller shows it by name so the person can find it themselves.
+ * A fabricated food looks identical to a real one on the screen that follows,
+ * and that is the failure this whole module exists to design out.
+ */
+export async function priceNamedFoods(
+  deps: ResolveDeps,
+  named: { name: string; amount: number | null; unit: string | null }[],
+): Promise<{ items: PricedItem[]; unresolved: string[] }> {
+  const items: PricedItem[] = [];
+  const unresolved: string[] = [];
+  for (const n of named) {
+    let got: Awaited<ReturnType<typeof resolveFood>> = null;
+    try {
+      got = await resolveFood(deps, n.name, n.amount, n.unit);
+    } catch {
+      // A lookup that fell over is not licence to invent one.
+      got = null;
+    }
+    if (!got) { unresolved.push(n.name); continue; }
+    const scale = got.per_amount > 0 ? got.amount / got.per_amount : 1;
+    const r1 = (x: number) => Math.round(x * 10) / 10;
+    items.push({
+      // The ROW's name, so a wrong choice is visible and correctable. A wrong
+      // name you can see beats a wrong number you cannot.
+      name: got.name,
+      amount: got.amount,
+      unit: got.unit,
+      p: r1(got.p * scale),
+      c: r1(got.c * scale),
+      f: r1(got.f * scale),
+      kcal: Math.round(got.p * scale * 4 + got.c * scale * 4 + got.f * scale * 9),
+      // SCALED, like every other number on the row. The loop this replaced
+      // did `scaleNutrients(readNutrients(...), scale)`; returning the row's
+      // raw micros would quote 100 g of sodium for 30 g of cheese, and the
+      // whole nutrient panel is built on those totals.
+      micros: got.micros ? scaleNutrients(readNutrients(got.micros), scale) : null,
+      food_id: got.food_id,
+      verified: got.verified,
+      estimated: got.estimated === true,
+    });
+  }
+  return { items, unresolved };
+}
+
+export interface PricedItem {
+  name: string;
+  amount: number | null;
+  unit: string | null;
+  p: number;
+  c: number;
+  f: number;
+  kcal: number;
+  micros: unknown;
+  /** The food_catalog row every figure came from. Null only for an estimate. */
+  food_id: string | null;
+  verified: boolean;
+  /** True when no row existed anywhere and the last-resort estimate produced it. */
+  estimated: boolean;
 }

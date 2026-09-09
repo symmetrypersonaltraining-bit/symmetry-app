@@ -215,7 +215,19 @@ export default function ScheduleBoard({
    */
   const todayFirst = upcomingDays.includes(today);
   const orderedDays = useMemo(() => {
-    const seq = [...(showPast ? pastDays : []), ...upcomingDays.filter((d) => d !== today)];
+    // ⚠️ TODAY STAYS IN THE SEQUENCE — as a pointer, not a hole.
+    //
+    // Dustin, 9 Sep, with the past strip open: "wed is missing." It was not.
+    // Today is hoisted to the top, so filtering it out of the chronological run
+    // left the list reading Mon 7 → Tue 8 → Thu 10. A gap in a date sequence
+    // does not read as "moved to the top", it reads as LOST DATA — and he had
+    // just moved two sessions onto that date, so the first thing it looked like
+    // was the move having failed.
+    //
+    // The hoist is right and stays. What was wrong is that nothing marked the
+    // place it was hoisted from. `renderTodayPointer` fills the slot with a
+    // one-line tile that says where today went and scrolls back to it.
+    const seq = showPast ? [...pastDays, ...upcomingDays] : upcomingDays.filter((d) => d !== today);
     return seq.map((date, i) => ({ date, rung: i + 1 }));
   }, [showPast, pastDays, upcomingDays, today]);
 
@@ -502,6 +514,41 @@ export default function ScheduleBoard({
    * today · past strip · the rest, rather than strict chronology — see the
    * comment at the call site.
    */
+  /**
+   * Today's place in the chronological run, when today itself is up at the top.
+   *
+   * One line, not a tile: it must not compete with the real today tile, and it
+   * must not look like a second copy of the day. It says where today went and
+   * takes you back to it.
+   *
+   * It carries the session count for the same reason the gap was a problem —
+   * the number is the thing that says "your two moved sessions are on this
+   * date", right where the eye is looking for them.
+   */
+  function renderTodayPointer(k: string) {
+    const n = (byDate[k] || []).length;
+    return (
+      <button
+        key={k}
+        type="button"
+        className="sym-jump"
+        onClick={() => {
+          document.querySelector("[data-today-anchor]")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+        style={{ opacity: 0.9 }}
+      >
+        <span style={{ fontWeight: 800 }}>
+          ☀ Today · {longLabel(k)}
+        </span>
+        <span className="sym-jump-sp" />
+        <span className="sym-jump-go">
+          {n === 0 ? "at the top ↑" : `${n} session${n === 1 ? "" : "s"} · at the top ↑`}
+        </span>
+      </button>
+    );
+  }
+
   function renderDayTile(k: string, rungIdx: number) {
         const isToday = k === today;
         const isPast = k < today;
@@ -522,6 +569,7 @@ export default function ScheduleBoard({
           <div
             key={k}
             data-board-date={k}
+            {...(isToday ? { "data-today-anchor": "" } : {})}
             data-rung=""
             className={"sym-tile" + (isToday ? " is-today" : "")}
             style={{
@@ -670,7 +718,10 @@ export default function ScheduleBoard({
         </button>
       )}
       <div>
-        {orderedDays.map((d) => renderDayTile(d.date, d.rung))}
+        {orderedDays.map((d) =>
+          d.date === today && todayFirst
+            ? renderTodayPointer(d.date)
+            : renderDayTile(d.date, d.rung))}
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 10.5, color: "var(--brand-text-secondary)", marginTop: 3 }}>
         <span>Press &amp; hold a workout to drag it onto another day · or tap the calendar button</span>

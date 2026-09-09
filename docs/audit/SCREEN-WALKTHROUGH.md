@@ -1730,6 +1730,789 @@ Migration `20260908f_a_small_banana_is_101_grams.sql`. Reversible:
 
 ---
 
+## Home, AI item H — his assistant, not him  ·  9 Sep 2026
+
+Ruling 4 of the AI contract, built. Dustin re-approved the wording on 9 Sep,
+word for word:
+
+> "Dustin's assistant — knows your programme, your logs and how he trains you.
+> Anything real goes to him."
+
+**What it was doing instead.** The coach sheet — one shared component mounted on
+every client screen — labelled every reply **`COACH`**, and two of its nine
+greetings opened with **"I'm your coach"**. In the first line a client read, the
+app claimed to *be* him.
+
+The reasoning recorded with the ruling is why this matters more than it looks:
+clients *discovering* they were talking to a bot is a top-three risk to trust,
+and an undisclosed assistant means that on the day it is discovered, **every
+warm message he actually wrote gets re-read as generated.**
+
+### What a client sees now
+
+A standing line at the top of the sheet, above the conversation:
+
+> ✦ **Dustin's assistant** — knows your programme, your logs and how Dustin
+> trains you. Anything real goes to Dustin.
+
+- The per-message label reads **`DUSTIN'S ASSISTANT`**, not `COACH`.
+- The two greetings that impersonated him no longer do. Their capability lines
+  are unchanged — "I can see your logs, targets and trends" is still true and
+  still the useful half.
+- **Said once, standing**, rather than repeated into every greeting. Rule 7 bans
+  walls of obvious text, and a disclosure that repeats on every message is the
+  thing people learn to skip.
+
+### ⚠️ The name, never a pronoun
+
+His wording says "how **he** trains you" because he was describing himself. Half
+the clients on this deployment are **Stephanie's** — `coachIdentity` exists
+precisely because one name cannot serve two trainers — and `CoachIdentity`
+carries no pronoun field to read. So the rendered copy uses the coach's NAME
+everywhere his wording used a pronoun. Stephanie's clients read "Stephanie's
+assistant — knows your programme, your logs and how Stephanie trains you."
+
+Same sentence, same warmth, correct for every coach, and it needs no field that
+does not exist. A test asserts no pronoun can creep back into that block.
+
+### Where it appears
+
+One component, `CoachChatSheet`, mounted globally by `GlobalCoach` — so Home,
+Nutrition, Progress, Messages, Settings and Help all get it from this one
+change. The **workout logger is deliberately untouched**: `GlobalCoach` returns
+null there, the logger mounts its own coach, and that screen is off limits
+without per-item permission. It gets this when the logger is walked.
+
+Four tests in `tests/unit/hisAssistantNotHim.test.ts`.
+
+---
+
+## Home — today's workout opens two ways  ·  9 Sep 2026
+
+Dustin, 4 Sep and again 9 Sep: *"that today's workouts section... we need to add
+the view button. So we have the start and the view button just like on the
+workout page."* The resume had it as the last place a workout opened only one
+way.
+
+**It was worse than a missing button.** Both branches of the tile — the single
+branded card and each row of the multi-workout list — wrapped the *whole card*
+in a link to the **overview**, while the pill sitting on it read **"Start
+Workout"**. The one control was labelled Start and did View. A client who tapped
+Start landed on the overview and had to find another button to actually begin.
+
+Counted in the code before the change: the word "Start" appeared twice in that
+region and `?start=1` appeared **zero** times.
+
+### What a client sees now
+
+| | Start | View |
+|---|---|---|
+| Single card | white pill → `?start=1`, enters the session | outlined pill → the overview |
+| Each row of a multi day | primary pill → `?start=1` | tinted pill in the row's own colour → the overview |
+
+- **A completed session keeps View** and loses Start — it is how a client reads
+  back what they actually lifted.
+- The card wrapper is gone. Two destinations cannot live inside one anchor, and
+  a nested `<a>` is invalid HTML, so the card is a container and the two buttons
+  are the links.
+- Same split, same words and same order as the Workout tab, so the pair means
+  the same thing in both places.
+
+Five tests in `tests/unit/todayOpensTwoWays.test.ts`. The load-bearing one is an
+invariant rather than a snapshot: **every control that says "Start" must carry
+`?start=1`.** Against the pre-change file that reads 2 Starts and 0 flags, which
+is the bug stated as a number.
+
+---
+
+## Workout tab — today left a hole in the week  ·  9 Sep 2026
+
+Dustin, 9 Sep, having moved two sessions onto today and then opened the past
+strip: *"wed is missing."*
+
+**It was not missing.** The data was right the whole time — both sessions sat on
+Wednesday 9 Sep, carrying `moved_from_date` 7 Sep and 8 Sep exactly as he had
+moved them, and today's tile rendered them correctly at the top of both Home and
+the Workout tab.
+
+**The board was telling him otherwise.** Today is hoisted to the top — right,
+and it stays — but it was then *filtered out* of the chronological run below.
+With the past strip open that list read:
+
+    Monday, Sep 7   →   Tuesday, Sep 8   →   Thursday, Sep 10
+
+A gap in a date sequence does not read as "moved to the top". It reads as **lost
+data** — and he had just moved two sessions onto that exact date, so the first
+thing it looked like was the move having failed. He was right to report it and
+right about what he saw; only the diagnosis was different.
+
+### The fix — a pointer, not a hole
+
+Today keeps its slot in the sequence, filled with a single line rather than a
+tile:
+
+> ☀ **Today · Wednesday, Sep 9** — 2 sessions · at the top ↑
+
+Tapping it scrolls back to the real tile. It carries the **session count** for
+the same reason the gap was a problem: the number is what says *your two moved
+sessions are on this date*, right where the eye is looking for them.
+
+One line and not a tile on purpose — it must not compete with the real today
+tile, and it must not look like a second copy of the same day on one screen.
+
+### The lesson worth keeping
+
+The board's reading order is deliberately not chronological, and that is
+documented and correct. What was missing is that **a deliberate reordering has
+to leave a mark where it moved something from.** Silence in a numbered sequence
+is indistinguishable from a bug — and the client it looks like a bug to is the
+one who just made the change.
+
+Five tests in `tests/unit/todayLeavesNoHole.test.ts`; three of them fail against
+the pre-change file.
+
+---
+
+## One client app — Client View and a client's app are now the same  ·  9 Sep 2026
+
+Dustin, 9 Sep, on finding out they were not: *"we need to make my client app
+work exactly like any other clients so i can test the same exact app they are
+using... this is something we've discussed before and needs to be locked in
+permanently so we dont run into this again. i was not aware they were looking at
+a diff screen than i am and that is not good."*
+
+### What differed
+
+They were two different code paths in `src/app/(app)/layout.tsx` — a trainer got
+`TrainerLayoutWrapper`, a client got the branch below it — and the chrome had
+quietly diverged:
+
+| | Client View (his) | A real client |
+|---|---|---|
+| Top bar | Branded: logo, "Symmetry · My Training" | **A bare sticky strip** with the feedback button pushed right |
+| Bell + feedback | Yes | Yes |
+| Trainer View | Yes | No — correctly |
+| Bottom nav | Same six tabs, same order, same icons | Same |
+
+### ⚠️ Why this was worse than cosmetic
+
+**It had already cost real time.** The nutrition logger's "very sticky
+scrolling" was chased as an app bug. It existed ONLY in Client View, because
+that wrapper added a nested scroller real clients never had — the code comment
+in `TrainerLayoutWrapper` says so outright. A test surface that differs from the
+real one does not merely fail to catch bugs: **it invents them, and they then
+get fixed in the app that never had them.**
+
+### The fix, and the part that makes it permanent
+
+One component — `ClientTopBar` — mounted by both. Not two blocks of JSX that
+match today, because those drift and nobody notices until a client reports
+something the trainer cannot reproduce.
+
+The **only** difference is a `trailing` slot carrying the Trainer View toggle.
+Dustin, the same day: *"just remember they cannot have that trainer view
+toggle."* A real client has no trainer view to go to, so the button, the
+handler and the mode flag are all absent from their layout — asserted three
+ways, including against the raw file with comments included.
+
+**Bottom navs were already identical** and were left alone: same six tabs, same
+order, same icons, same labels. Only the hrefs differ — his carry `?as=client`
+so the SERVER renders the client branch on first paint, which fixes an
+intermittent trainer-UI leak. That difference is deliberate and must not be
+"fixed".
+
+**Routing was not touched.** Checked against the diff: no href, route, redirect
+or `router.push` changed in either file. He asked for that specifically —
+*"routing needs to be watched very carefully bc that's where things can change a
+bit."*
+
+### The standing rule, locked in
+
+**The trainer's Client View and a client's app are the same app.** Every fix
+lands on both, always. `tests/unit/oneClientApp.test.ts` fails if a second top
+bar is hand-rolled, if either mount stops using the shared one, if the tabs stop
+matching, or if a trainer-only control reaches a client.
+
+---
+
+## INTERLUDE — Nutrition in the tile format: the mock-up, before the walk
+
+Dustin, 9 Sep, opening screen 3: *"Let's start on nutrition. However, before you
+run the inventory, look back through our notes. We talked about transferring the
+layout as far as the visuals from the home page. We've already done it on the
+workout page. We need to transfer that over to the nutrition page now. Show me a
+mock up of what you're going to do before you do it. and remember that needs to
+be on my client view and on the clients. actual client view."*
+
+`APP-FORMAT.md` §5 already required this: *"Each screen gets a mock-up Dustin
+approves before it changes. Every time. He rejected three layouts before
+approving the current one."* Mock-ups show **all thirty schemes**.
+
+**Built:** `docs/mockups/nutrition-format.html`, generated by
+`scripts/gen-nutrition-mockup.py`, and published for phone viewing at
+<https://claude.ai/code/artifact/c52d0283-f009-4946-8fbb-1ae34c719c6b>.
+
+### The one thing that makes this mock-up worth trusting
+
+It **inlines the app's real `globals.css`** rather than copying colours out of
+it. The same `.sym-*` rules, the same thirty `[data-theme]` palettes, the same
+four `[data-deep]` levels, and `AutoDark`'s luminance test replayed in ten lines
+of JS. A mock-up drawn from hand-picked hexes can look right and ship wrong;
+this one cannot drift, because it *is* the stylesheet. It also flips to the
+screen **as it is today**, so the comparison is like for like.
+
+### What the format brings over
+
+| Rule | How it lands on Nutrition |
+|---|---|
+| The cap, no side borders | Every tile: day summary, assistant, each meal, extras |
+| Nesting is the same object smaller | A meal is a tile; the food inside is that tile smaller |
+| Today is filled bright and renders first | The **day summary** is this screen's "now" — bright fill, sweeping cap, already at the top |
+| Ladder shading, one colour six shades | M1 → M6. Six meals, six shades — it fits a day better than it fits a week |
+| Two rows of text max, name never cut | Kept for meal names; the food list is its own object (`.sym-food`), because a meal has always listed every item on its own line |
+| The three contrast rules | Buttons and chips stop vanishing on the tinted schemes — Carbon Neon and Blush Cloud are the two to check |
+
+### What it fixes on the way past — format only, no behaviour
+
+- A meal's **foods and its controls stop competing for one row**. Today the
+  ring, name, food list, macros, `⠿` handle and `⋯` all share a single flex row,
+  which is why the row grows tall and the drag handle ends up beside the text.
+- **Meal options A / B become real objects** instead of two lettered buttons —
+  the same shape as two workouts inside one day tile.
+- **An empty slot reads as empty** (the rest-day shape), not as a normal card
+  with a line of blue text in it.
+
+### ⚠️ The decision put to him, not assumed
+
+**The next meal due: bright in place, or hoisted to the top?**
+
+On the Workout tab today is lifted out of date order and drawn first. A day of
+meals is not that list: **M1 → M6 *is* the order you eat in**, and hoisting M3
+above M1 breaks the only thing that makes it readable — and it would move again
+as the day went on.
+
+So the mock-up **leaves the next meal in place** and marks it with a `NEXT` meta
+label, giving the bright fill to the day summary instead. That is the one place
+this screen deliberately does not copy the Workout tab, and it is his to rule
+on, not mine to assume.
+
+### Explicitly not in this change
+
+`"numbers are way off"` (the day total against the target), **Nutrition %** and
+how adherence calculates, and the logging sheets / food search / photo path.
+All behaviour, all part of the walk itself — the format lands first so the walk
+is done against the screen he approved.
+
+### Where it goes
+
+One component, so it lands on **his Client View and the clients' app together**,
+the way `ClientTopBar` now does. There is no second copy to keep in step.
+
+### SHIPPED — the format is live on Nutrition (9 Sep)
+
+Dustin approved the mock-up with two rulings, and both are now enforced by
+`tests/unit/nutritionWearsTheFormat.test.ts` rather than trusted:
+
+> *"do not lift meals, leave them in order we eat them in. bright fill on today
+> block as in the mock up is correct."*
+
+| Element | Before | Now |
+|---|---|---|
+| Page | plain `pb-8` div on the app background | `.sym-page` — sink, tile depth, cap, ladder ink |
+| Date row | `‹ date ›` with the `⋯` absolutely positioned at `right: 3` over a centred flex row | `.sym-title`; the `⋯` is a normal item and can no longer sit on top of the `›` |
+| Recipes | a small bordered link | `.sym-past` strip, capped |
+| Incoming plan banner | gold rounded box | `.sym-jump`, its gold kept |
+| Day summary | flat card, hero 21px | `.sym-tile.is-today` — **the one bright thing on the screen**, and only when the day really is today |
+| Range chips | primary-filled pill | `.sym-chip` with `aria-pressed`, so it announces its state |
+| Macros | three `pill()` boxes, carbs hard-coded `#5ec9a3` | `.sym-mac` objects; **no per-macro hue** — colour means position, not type |
+| Adherence / logging | two centred columns under a dashed rule | `.sym-split`, two capped objects |
+| Weekly read + coach note | cards with a 3px coloured **left border** | `.sym-tile`; no side borders, the cap carries it |
+| Coach note attribution | an AI badge and a paragraph, nothing naming it | head reads **`<COACH>'S ASSISTANT`** — ruling 4, the name never a pronoun |
+| A meal | one flex row holding ring + name + every food line + macros + `⠿` + `⋯` | `.sym-tile`: head (name, badges, calories), body (food), action strip (ring, Edit, `⋯`, `⠿`) |
+| Meal options A / B | two lettered buttons — **nested inside the row's own `<button>`** | each option is a `.sym-wo` object with its food and its cost, and choosing is a real button |
+| An empty slot | a normal card with a line of blue text in it | the `.sym-rest` shape — it reads as empty |
+| Extras | one row, name `truncate`d | `.sym-tile`; the name wraps and is never clipped |
+| Log ring | 46px circle at the head of the row | `.sym-ring`, 44px, in the action strip |
+
+### Three real defects the conversion ended, not just moved
+
+1. **Nested buttons.** The A / B option buttons lived inside the row's own
+   `<button>`. That is invalid HTML, and browsers resolve it by dropping the
+   inner element out of the button — which is why a tap on A sometimes opened
+   the meal sheet instead of switching the option.
+2. **The `⋯` overlapped the `›`.** `position: absolute; right: 3` over a
+   `justify-center` row: on a long date the two controls collided.
+3. **`truncate` on an extra's name.** The name IS the record of what was eaten
+   — the same column the composer writes — and anything longer than the card was
+   cut with no way to read it.
+
+### What did NOT change
+
+No behaviour. Every control that was on the screen is still on it, doing the
+same thing: the ring still logs, `⋯` still opens the meal sheet, `⠿` still
+drags, the range chips still drive the same state, the nutrient disclosure still
+collapses. `"numbers are way off"`, Nutrition %, the logging sheets, food search
+and the photo path are all untouched and are the walk itself.
+
+**Both surfaces at once.** `/nutrition` and `/client-preview/nutrition` mount the
+same component, so this landed on his Client View and on real clients together —
+asserted, so it stays that way.
+
+### SHIPPED — adherence is hitting the numbers (9 Sep)
+
+Dustin, 9 Sep: *"the adherence i want to be based on hitting numbers alone so
+cal and macros, not logging since we have the logging rate. the adherence needs
+to be based on hitting the numbers on daily average for that week up to that day
+within that week."*
+
+**This supersedes his 31 Jul ruling** (*"adherence should be based on
+consistently logging and hitting macros n calories"*), which made it
+`consistency × accuracy`. The reason the old one had to go is visible on the
+card itself: adherence and logging rate sit **side by side**, so folding logging
+into adherence charged a missed day twice, once in each column. A client who
+logged 5 of 7 days and hit target on all five read **71% adherence** — a number
+that says they missed their numbers when they missed none.
+
+| | Before | Now |
+|---|---|---|
+| Formula | `consistency × accuracy` | `accuracy` — the daily hit score, averaged |
+| What one day scores | mean of cal / P / C / F against that day's target, ±10% = full credit, zero at 50% off | **unchanged** |
+| The window on the card | Sunday → today | **unchanged** |
+| The day in progress | **counted in the average** | left out of the average, still counted as logged |
+| Card copy | "logging × macros" | "hitting the numbers · this week so far" |
+| No target on file | meal-status average, labelled "plan meals" | **unchanged** — nothing else can be computed |
+
+### Two defects found while doing it
+
+1. **The client and the coach were shown different numbers for the same week.**
+   `excludeDates` — the option that keeps a half-eaten day out of an average —
+   has existed since the module was written, and `weekly-context.ts` (what the
+   AI is briefed with) always passed it. `useNutritionAverages`, which draws the
+   number the **client** reads, never did. Now both do. It matters more under
+   the new formula: at 8am today's totals are near zero against a whole day's
+   target, which scores ~0% and drags the week down until dinner.
+2. **A caller with a target but no window silently got the wrong measure.** The
+   old gate required *both* `consistency` and `accuracy` before it would score,
+   so handing over a perfectly good target with no `windowDays` fell back to the
+   meal-status average — a different measurement wearing the same label.
+
+### One implementation, four readers
+
+`summariseLogRange` is the only place this is computed. The client card, the
+averages strip, the home tile and the AI's weekly context all read it, which is
+why the change is one function and the tests are on that function.
+
+The AI's briefing now states both figures and is told, in the prompt, never to
+merge them or describe one as the other.
+
+---
+
+## SCREEN 3 — NUTRITION · MY OWN AUDIT, BEFORE THE WALK (9 Sep)
+
+Dustin: *"go ahead and fully audit the nutrition log yourself first to find any
+obvious issues to report. then lets do the walk through button by button... take
+your time here this one has to be perfect."*
+
+**Readable version, with the six decisions:**
+<https://claude.ai/code/artifact/d76b5285-7578-4ca5-a428-dcf507448ad3>
+
+Everything below was read out of the code and then **checked against the live
+database**, so each item carries a count rather than a suspicion. Nothing here
+has been changed — these are for him to rule on before the walk.
+
+### ⚠️ ONE FALSE POSITIVE, CAUGHT AND KILLED BEFORE IT REACHED HIM
+
+The first pass reported *"Claudine's plan is 4,869 kcal against a 1,650
+target — 195% over."* **That was my bug, not hers.** Her plan offers 15 meals
+across 7 positions (options A/B/C), and my query summed every meal instead of
+one per position. Re-run properly her plan is 1,467 kcal — 11% under, which is
+an ordinary drift. Recorded here because the standing rule exists for exactly
+this: a query that double-counts options looks identical to a broken plan.
+
+---
+
+### 1 · THREE PLACES A FOOD'S MACROS COME FROM, AND TWO OF THEM LET THE MODEL INVENT THE NUMBER
+
+| Path | Where the numbers come from |
+|---|---|
+| Typed · "describe it loosely" · voice | `/api/nutrition-ai/parse` — the model says **what** was eaten, every number is read off a `food_catalog` row, and a food that matches nothing is **excluded and named** so it can be searched by hand |
+| **Photo** | `/api/analyze-meal-photo` — the model states `calories`, `protein_g`, `carbs_g`, `fat_g` itself. No catalogue lookup anywhere in the route |
+| **The AI chat — "I ate a banana", "swap M4 for wings"** | `/api/nutrition-ai/act`, whose prompt says, in these words: *"Estimate realistic macros per item (grams protein/carbs/fat, kcal)."* No catalogue lookup |
+
+The parse route's own header records why it was rebuilt: *"The parse prompt used
+to ask it to estimate macros using USDA / nutrition-label knowledge, which is
+recall plus arithmetic, and it got both wrong in ways that looked right."* **That
+prompt is still live in the other two paths**, and the chat one is the path he
+asked about.
+
+**And the chat path keeps the invented number.** `swapMealCustom` calls
+`saveMyMeal(name, items)`, so a macro the model made up is written into the
+client's My Meals library and re-used every time they pick it again.
+
+**Why no arithmetic check will ever catch this.** All 154 client-saved foods are
+internally consistent — kcal agrees with 4/4/9 of their own macros, every one.
+The `banana` row reading **242 kcal · 2P · 27C · 14F** is perfectly
+self-consistent. It is simply not a banana. A fabricated macro is consistent *by
+construction*; only sourcing it from a row can catch it.
+
+**149 of those 154 rows have no `serving_grams` at all**, so "1 serving" of a
+client-saved food has no weight behind it and can never be scaled or converted.
+
+### 2 · THE `verified` BADGE MEANS NOTHING
+
+| Source | Rows | Marked verified |
+|---|---:|---:|
+| `usda_branded` | 442,891 | **100%** |
+| `usda_generic` | 11,732 | 100% |
+| `usda_core` | 8,789 | 100% |
+| `usda` | 7,766 | 100% |
+| `trainer` | 155 | 100% |
+| `restaurant` / `brand` | 143 | 100% |
+| `client` | 154 | 0% |
+
+Everything that is not client-created is stamped verified — and `usda_branded`
+is the **manufacturer-submitted label** half of FoodData Central, which is the
+crowd-sourced part. Two live examples, both `verified: true`:
+
+- `Banana` — **336 kcal, 0 g protein, 78.6 C, 1.1 F per 100 g** (a raw banana is 89)
+- `Banana` — **312 kcal, 12.5 P, 40.6 C, 6.3 F per 100 g**
+
+This is the same failure MyFitnessPal has: their own help page says *"even
+verified entries can sometimes have mistakes"*, and a published analysis found
+**~30% of the top 1,000 most-logged foods carried a >20% error in at least one
+macro**. Cronometer's answer is the opposite — no crowd row enters the main
+database at all, and each entry is labelled with its actual origin (USDA, NCCDB,
+CRDB) instead of a badge.
+
+### 3 · 23,385 CATALOGUE ROWS DISAGREE WITH THEMSELVES
+
+Out of 471,633 rows carrying full macros, **23,385 (5.0%)** have a `kcal` that
+differs from 4/4/9 of their own protein/carbs/fat by more than 25 cal or 15%.
+**900** rows over 100 kcal declare zero carbs *and* zero fat. 11 are physically
+impossible per serving.
+
+### 4 · THE BANANA HE COMPLAINED ABOUT IS STILL WRONG — IN THE TRAINER ROWS
+
+Search "banana" today and the top three are his own:
+
+| Name | Serving says | kcal | P / C / F |
+|---|---|---:|---|
+| Bananas | 1 large (8"–8-7/8") — **but `serving_grams` = 100** | 128 | 1 / 31 / 0 |
+| Banana (small) | **"1 medium"** | 112 | 2 / 26 / 0 |
+| Banana (medium) | "1 each" | 112 | 1 / 27 / 0 |
+
+The name and the serving description contradict each other on two of the three,
+and **small and medium are the same 112 kcal** — the exact complaint from 8 Sep.
+The `food_portion_reference` work fixed `food_default_serving()`; these three
+rows carry their own hard-coded numbers and were never touched by it.
+
+### 5 · HIS OWN PLAN CANNOT REACH HIS OWN TARGET
+
+Plan v7, one meal per position:
+
+| | Plan | Target | Off by |
+|---|---:|---:|---:|
+| Calories | 4,213 | 4,462 | **−5.6%** |
+| Protein | 254 | 267 | −4.7% |
+| Carbs | 381 | 381 | 0.0% |
+| Fat | 186 | 208 | **−10.7%** |
+
+Eat the plan perfectly and the card reads 4,213 against 4,462, every day. And
+because fat lands 10.7% off, a **flawless day scores less than 100% adherence** —
+the full-credit band is ±10%.
+
+He is not alone, and **fat is the macro that drifts everywhere**:
+
+| Client | kcal | protein | fat |
+|---|---:|---:|---:|
+| Madeleine Coker | −19% | **−34%** | **+53%** |
+| Gerard Gautreaux | +17% | −5% | **+52%** |
+| Sharon Gautreaux | +6% | +11% | **+55%** |
+| Brooke Orton | −1% | +24% | **−36%** |
+| Jerry Bourgeois | +4% | −6% | **+32%** |
+| Dustin | −6% | −5% | −11% |
+
+The AI plan builder already enforces 3% on calories and 5 g on each macro and
+prints the drift in orange when it misses. **Hand-built plans are never
+checked**, and nothing on the trainer's plan screen or the client's card says
+the plan does not add up to the target it is graded against.
+
+*Confirmed clean, so it is not the cause:* his M6 really is 766 kcal in the
+plan, so the number he questioned on 4 Sep was the app telling the truth.
+
+### 6 · 95 LOG ROWS CARRY A CALORIE THAT DISAGREES WITH THEIR OWN MACROS
+
+Up to **731 cal** apart, and they are still inside every average and every
+adherence figure. The pattern is photo-era rows at the legacy 101/102 band with
+**`est_fats` = 0**:
+
+- "4 slices of sausage pizza" — 1,120 kcal, 52P / 98C / **0F** (macros say 600)
+- "Bowl of yogurt" — 520 kcal, 18P / 52C / **0F** (macros say 280)
+- "3/4 cup egg whites, green beans" — 95 kcal but **203 g protein**
+
+Also 9 off-plan rows saved with details and **zero calories**.
+
+### 7 · "MACROS TONIGHT" IS A PROMISE NOTHING KEEPS
+
+The off-plan sheet offers *"save it as pending — macros get filled in tonight"*
+and the summary card prints *"totals update tonight"*. **There is no job.**
+`vercel.json` runs four crons — weekly-ai, weekly-ai refresh, birthdays, goals —
+and none of them touches `macros_pending`. Nothing anywhere flips a pending row
+to resolved.
+
+Live impact today is **zero rows**, so this is a dead promise rather than a live
+wrong number — but the button is on the screen.
+
+### 8 · WHAT THE AI CAN ACTUALLY DO, AND WHAT IT ASKS FIRST
+
+Worth writing down plainly because it is better than it looks:
+
+- Eight actions: `swap_meal`, `add_to_meal`, `move_meal`, `copy_meal`,
+  `delete_meal`, `add_snack`, `log_meal`, `unlog_meal`.
+- **Nothing mutates until Confirm.** The reply renders as a bubble plus a
+  confirmation card; the write only runs on tap, and a failure says so and
+  changes nothing.
+- Any meal reference it cannot resolve — missing, or two plausible matches —
+  **downgrades the whole action to a clarifying question**. It never guesses
+  which meal you meant.
+- Every write goes to the **day on screen**, and every label names that date
+  when it is not today.
+
+The gap is not the control flow. It is item 1: what it confirms can contain a
+number nobody sourced.
+
+### THE SIX CALLS PUT TO HIM — none of these are decided
+
+Recorded so a later session does not read a recommendation back to him as his
+own instruction. **Nothing below is his yet.**
+
+1. **Route photo and chat macros through the food database** (recommended). Same
+   shape as typed: the model identifies *what*, the database supplies the
+   numbers, anything unmatched is shown by name. Photo keeps the model for
+   identification and restaurant detection.
+2. **Stop saving unsourced foods into My Meals** (recommended). A food enters the
+   library only once it resolves to a real row.
+3. **Make `verified` mean something.** Drop it from the 442,891 manufacturer-label
+   rows, keep it for USDA core/generic and trainer rows — or take Cronometer's
+   stronger line and show the *origin* instead of a tick. Design pass, so it is
+   his to pick.
+4. **Check a hand-built plan against the target** (recommended). The same 3% / 5 g
+   check the AI builder already runs, printed on the trainer's plan screen. Six
+   live plans would flag today, five of them on fat.
+5. **"Macros tonight" — build the nightly job, or take the button off.**
+6. **The 95 bad history rows — recompute, flag, or leave as history.**
+
+### Research consulted, so the recommendations are not invented
+
+- Cronometer curates every submission and labels entries by origin (USDA, NCCDB,
+  CRDB, Nutritionix) rather than by badge; crowd rows never enter the main
+  database.
+- MyFitnessPal's own help page says a verified entry can still be wrong and an
+  unverified one can be right. A published analysis found ~30% of their
+  top-1,000 most-logged foods carried a >20% error in at least one macro.
+- On off-plan logging, the consistent finding across app reviews is that
+  **friction, not accuracy, decides whether a meal gets logged at all** — which
+  is the argument for keeping the photo and chat paths fast and fixing where
+  their numbers come from, rather than making them slower.
+
+Sources: [Cronometer vs MyFitnessPal](https://feastgood.com/cronometer-vs-myfitnesspal/) ·
+[Verified vs community food data](https://nutriscan.app/blog/posts/verified-vs-community-food-entries-accuracy-2026-044a380ccd) ·
+[The fastest ways to log food](https://www.intakenutrition.io/blog/fastest-ways-to-log-food-less-friction)
+
+### SHIPPED — the chat stops inventing macros, and the brain goes online (9 Sep)
+
+Dustin's rulings on the audit, in his words:
+
+> **1** — *"thats fine but also ai needs to be involved here, if it's not in the
+> data base they need a way to search in online through ai and get real numbers.
+> again this is the whole point of having a 'brain' in the app."*
+> **2** — *"def stop saving foods that are not accurate."*
+
+| | Before | Now |
+|---|---|---|
+| The chat's prompt | *"Estimate realistic macros per item (grams protein/carbs/fat, kcal)"* | *"YOU NEVER STATE A NUTRITION FIGURE"* — names and amounts only, same rule the parse prompt has carried since 26 Aug |
+| Where a chat food's numbers come from | whatever the model said | `food_catalog`, then **USDA FoodData Central over the network** when the catalogue is short one |
+| A food nothing can price | priced anyway, from recall | named back: *"I couldn't find X, and I won't guess"* |
+| A partly-resolved meal | silently short | the confirmation says which food is missing, **before** the tap |
+| Saving to My Meals | always | **only when every item resolved to a real row** |
+| The pricing loop | inline in the parse route | one function, `priceNamedFoods`, called by both |
+
+**The brain's online step.** On a catalogue miss the app queries FoodData
+Central for the real measured rows and hands them to the *same* pick prompt
+every other path uses — the model chooses between rows it can see and is never
+asked for a figure. What it picks is written into `food_catalog` with its FDC
+id, so the next client to eat it reads it from the catalogue with no network at
+all. The catalogue teaches itself, one miss at a time. Foundation, SR Legacy and
+Survey are written verified; **Branded is not** — that is the
+manufacturer-submitted half, and the source of the 336 kcal "Banana".
+
+Verified live: *"thomas cinnamon swirl bagel"* returns THOMAS' own row at 279
+kcal **and its label serving, 1 BAGEL at 43 g** — a real countable portion,
+which is the thing the catalogue has been short of all along.
+
+### ⚠️ A feature that had never once worked
+
+`add_to_meal` — built 5 Sep for *"add the jam to that meal"* — is extracted by
+the model, validated, and resolved against the day correctly. Then
+`wireParams()` had **no case for it** and fell through to `default: {}`, so the
+confirmation card received empty params and tapping Confirm threw *"that meal
+isn't on today's list anymore"*, every single time. Found while rewiring the
+route. Fixed in the same commit.
+
+### ⚠️ CORRECTION TO FINDING 3 OF MY OWN AUDIT
+
+I reported **23,385 catalogue rows disagree with themselves** and **900 rows
+over 100 kcal with no carbs and no fat**. Those counts included rows that
+**`quarantined = true` already keeps out of every search** — 149,401 of them,
+a third of the table, and a mechanism I had not found when I wrote the finding.
+
+Against rows a search can actually return:
+
+| | Reported | Actually reachable |
+|---|---:|---:|
+| Rows whose kcal disagrees with their own macros | 23,385 | **831** |
+| Rows over 100 kcal with zero carbs and zero fat | 900 | **78** |
+| Rows flagged as contradicting USDA | — | 122 |
+
+**28× overstated.** The other findings stand as written and were re-checked:
+the three bad `Banana` rows are *not* quarantined and *are* reachable, and
+297,817 reachable `usda_branded` rows are still all stamped `verified`.
+
+### SHIPPED — a hand-built plan is checked against the target (9 Sep)
+
+Dustin's ruling on the audit finding: **"4: yes"**.
+
+His own plan reaches 4,213 kcal against a 4,462 target with **fat 10.7% short**,
+so eating it exactly as written still reads under — and because the
+full-credit band is ±10%, a flawless day cannot score 100% adherence.
+
+Six live plans would flag today and **five of them are wrong on fat**, which is
+the macro that drifts when a plan is built to calories and protein:
+
+| Client | kcal | protein | fat |
+|---|---:|---:|---:|
+| Madeleine Coker | −19% | −34% | **+53%** |
+| Gerard Gautreaux | +17% | −5% | **+52%** |
+| Sharon Gautreaux | +6% | +11% | **+55%** |
+| Brooke Orton | −1% | +24% | **−36%** |
+| Jerry Bourgeois | +4% | −6% | **+32%** |
+| Dustin | −6% | −5% | −11% |
+
+**Where it shows:** on the day tile, **trainer only**, **today only**. "Your plan
+doesn't add up" is a message for the person who can change it; to a client it is
+only unsettling, and a past day's plan is history.
+
+**The tolerances are the AI plan builder's own** — 3% on calories, 5 g on each
+macro — deliberately, not looser ones. A tolerance a second check invents for
+itself is how "within 3%" quietly becomes 24%. The builder has enforced this
+since it shipped and prints the drift in orange when it misses; a hand-built
+plan was never checked by anything.
+
+**It sums the CHOSEN meal per slot**, one per position, the way the day actually
+renders. Summing every meal double-counts any slot offering A/B — the exact
+mistake that made an ordinary plan look 195% over when this was first measured.
+
+---
+
+## SCREEN 3 — NUTRITION · THE CONTROL INVENTORY
+
+Built from the code on 9 Sep 2026, after the format landed. **This is audit step
+1 and it is done — the next session does not re-derive it.** Walk it in this
+order, one batch at a time, and fill the last column in with his words.
+
+Everything below is on `/nutrition` and `/client-preview/nutrition`, which mount
+the same component. A row marked **T** is trainer-only.
+
+### Batch 1 — the top of the screen
+
+| # | Control | What it should do | What it actually does |
+|---|---|---|---|
+| 1 | **Recipes** strip | opens `/recipes` | link, no state |
+| 2 | **‹** | back one day | `setSelectedDate(-1)`; every write follows the date on screen |
+| 3 | The date | shows Today, or the date + "past day" / "upcoming day" / "scheduled — plan vN" | display only |
+| 4 | **›** | forward one day | `setSelectedDate(+1)`; **future days are reachable** |
+| 5 | **⋯** | the plan menu sheet | `openSheet({kind:"menu"})` |
+| 6 | Incoming-plan banner | "plan vN starts <date> — tap for the version timeline" | `openVersions()`; only when a plan is dated ahead |
+
+### Batch 2 — the day tile (the bright one)
+
+| # | Control | What it should do | What it actually does |
+|---|---|---|---|
+| 7 | **Today / 1W / 2W / 4W / 8W / Custom** | switch the tile between today's live totals and a range average | `setSummaryRange`; "Today" maps to the **week-to-date** range for adherence and logging rate |
+| 8 | Custom **start** / **end** dates | set the range | both capped at today |
+| 9 | Calorie hero + "N left" / "N over" | today's eaten against target | `totals.kcal` vs `macro_targets` |
+| 10 | The bar | share of the calorie target | capped at 100%, turns warn-coloured over |
+| 11 | **PROTEIN / CARBS / FAT** | eaten of target | over-target turns orange; no per-macro hue by design |
+| 12 | **ALL NUTRIENTS ⌄** | expand the full nutrient registry | `setShowNutrients`; today only, not on a range |
+| 13 | The nutrient grid | every nutrient anything knew | unknown nutrients are **hidden**, not shown as dashes |
+| 14 | The coverage line | "from N of M logged meals" | says out loud when it is a floor, not a total |
+| 15 | **ADHERENCE** | hitting the numbers, this week so far | **changed 9 Sep** — accuracy alone, in-progress day excluded |
+| 16 | **LOGGING RATE** | days logged of days in the window | in-progress day still counts as logged |
+| 17 | ⚠ plan-vs-target strip **T** | says when the plan cannot reach the target | trainer only, today only, 3% / 5 g |
+
+### Batch 3 — the AI tiles
+
+| # | Control | What it should do | What it actually does |
+|---|---|---|---|
+| 18 | **YOUR WEEK** tile | last week vs this week | dismissed per week in `sessionStorage` |
+| 19 | its **✕** | dismiss | |
+| 20 | **`<COACH>`'S ASSISTANT** tile | the nudge for today | ruling 4 — named, never impersonating |
+| 21 | its **✕** | dismiss for the session | |
+| 22 | **Save my built day as the plan** | open-plan only | `saveplan` sheet |
+| 23 | **✦ Build me a plan from targets** | open-plan only | `aiplan` sheet, mode `targets` |
+| 24 | **✦ Recommend my targets** | open-plan only | `aiplan` sheet, mode `consult` |
+
+### Batch 4 — a meal
+
+| # | Control | What it should do | What it actually does |
+|---|---|---|---|
+| 25 | The **＋** on the line between meals | insert a meal at that point | `addmeal` sheet |
+| 26 | The tile **head** | open the meal sheet | whole head is the button |
+| 27 | The food list | every item, one per line | struck through when removed, badged FREE / ADDED |
+| 28 | **Choose A / Choose B** | switch which option is planned | **was nested buttons, fixed 9 Sep**; re-logs if already logged |
+| 29 | **＋ Build this meal** | an empty slot | the rest-day shape; food database · photo · typed |
+| 30 | The **ring** | log the meal full | 44px; colour carries Full / part / Skipped / Off-plan |
+| 31 | **✎ Edit** | the meal sheet | same target as the head |
+| 32 | **⋯** | the meal sheet | same target again — **worth asking him whether three doors to one sheet is right** |
+| 33 | **⠿** | hold to reorder | pointer-driven; `persistOrder` |
+
+### Batch 5 — extras
+
+| # | Control | What it should do | What it actually does |
+|---|---|---|---|
+| 34 | An extra's name | what was eaten | **no longer truncated** (fixed 9 Sep) |
+| 35 | PENDING / EST badge | says the number is not final | see the "macros tonight" question |
+| 36 | **✕** | remove, with undo | `deleteLogRow` + undo toast |
+| 37 | **Quick-add an extra** | the extra picker | `extrapick` sheet |
+
+### Batch 6 — the sheets, each its own pass
+
+Not yet inventoried control by control. There are **27 sheet kinds**:
+`menu`, `meal`, `addmeal`, `adjust`, `composer`, `copyto`, `copy`, `foodsearch`,
+`mymeals`, `offplan`, `replace`, `extrapick`, `extra`, `aiplan`, `saveplan`,
+`buildplan`, `versions`, `trends`, `forward`, `custom`, `openslot`, `slot`,
+`swap`, `plan`, `good`, `push`, `insert`.
+
+The ones that carry real risk and should be walked first: **`offplan`** (photo /
+typed / voice — the path whose macros are still the model's), **`foodsearch`**,
+**`composer`**, **`adjust`**, **`aiplan`**.
+
+### The three questions to put to him before the walk
+
+1. What is this screen **for**, in his words?
+2. What on it does he **never** use?
+3. What does he expect to be **wrong** before we start?
+
+### Already answered, do not ask again
+
+- **"numbers are way off"** — traced. His M6 really is 766 kcal; the plan itself
+  is 249 cal and 22 g of fat short of the target. See the plan-vs-target finding.
+- **Nutrition %** — ruled on 9 Sep: hitting the numbers alone, week to date,
+  in-progress day excluded. Shipped.
+- **Whether meals get lifted** — ruled: they do not.
+
+---
+
 ## Interlude — a unit that cannot fit is not the unit  ·  9 Sep 2026
 
 The 9 Sep session was stopped with the catalogue 11 of 16 batches through a

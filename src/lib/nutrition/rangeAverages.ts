@@ -50,11 +50,24 @@ export interface MacroTargetLike {
 //   consistency = days logged ÷ days in the window
 //   accuracy    = how close those days landed to target, across ALL FOUR of
 //                 calories, protein, carbs and fat
-//   adherence   = consistency × accuracy
+//   adherence   = accuracy
 //
-// Multiplied, not blended, at Dustin's call: a day nobody logged is a miss,
-// because it is one. Logging 5 of 7 days and nailing every one of them reads
-// 71%, not 100% — and it moves the moment either half moves.
+// ── ADHERENCE IS HITTING THE NUMBERS. IT IS NOT LOGGING. ────────────────────
+//
+// Dustin, 9 Sep 2026: *"the adherence i want to be based on hitting numbers
+// alone so cal and macros, not logging since we have the logging rate. the
+// adherence needs to be based on hitting the numbers on daily average for that
+// week up to that day within that week."*
+//
+// This supersedes his 31 Jul call, which was consistency × accuracy. That
+// version answered two questions with one number, and the card shows BOTH
+// halves side by side — so multiplying them in meant a missed day was counted
+// twice: once as a lower logging rate, and again as a lower adherence. Someone
+// logging 5 of 7 days and hitting target on all five read 71% adherence, which
+// says they missed their numbers when they did not miss one.
+//
+// The two numbers now answer one question each, which is the only reason to
+// print two numbers.
 //
 // Within 10% of a target is full credit (2000 kcal → 1800–2200 all score 1.0).
 // Past that the score falls off in a straight line and reaches zero at 50% off,
@@ -103,13 +116,17 @@ export interface RangeSummary {
   p: number;
   c: number;
   f: number;
-  /** consistency × accuracy, 0-100. Falls back to the meal-status average with no target. */
+  /** How well they hit the numbers, 0-100 — the daily accuracy averaged over the
+   *  window. Falls back to the meal-status average when there is no target. */
   adherence: number | null;
   /** Days logged ÷ days in the window, 0-100. null when the caller gave no window length. */
   consistency: number | null;
   /** How close the logged days landed to target, 0-100. null when there's no target. */
   accuracy: number | null;
-  /** Which calculation produced `adherence` — so copy can describe it honestly. */
+  /** Which calculation produced `adherence` — so copy can describe it honestly.
+   *  "logging+macros" is kept as the wire value because it is persisted in AI
+   *  context and read by three other modules; it now means "scored against the
+   *  targets" and the copy everywhere says "hitting the numbers". */
   adherenceBasis: "logging+macros" | "meal-status";
 }
 
@@ -248,7 +265,10 @@ export function summariseLogRange(
   // no target to be accurate against.
   const statusAdherence = adhDays ? adhSum / adhDays : null;
 
-  const scored = consistency != null && accuracy != null;
+  // Adherence needs a target to score against — nothing more. It used to also
+  // require `consistency`, which meant a caller that gave no windowDays got the
+  // meal-status average even when it had handed over a perfectly good target.
+  const scored = accuracy != null;
   return {
     loggedDays: realDays.length,
     avgDays: avgDates.length,
@@ -256,7 +276,7 @@ export function summariseLogRange(
     p: p / denom,
     c: c / denom,
     f: f / denom,
-    adherence: scored ? consistency * accuracy * 100 : statusAdherence,
+    adherence: scored ? accuracy * 100 : statusAdherence,
     consistency: consistency == null ? null : consistency * 100,
     accuracy: accuracy == null ? null : accuracy * 100,
     adherenceBasis: scored ? "logging+macros" : "meal-status",

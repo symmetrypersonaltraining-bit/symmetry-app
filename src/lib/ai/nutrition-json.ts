@@ -526,7 +526,17 @@ export interface ActReply {
     meal?: ActMealRef;      // swap / delete / log / unlog target
     from?: ActMealRef;      // move / copy source
     to?: ActMealRef | null; // move target · copy insertion point (null = end of day)
-    items?: ParsedItem[];   // swap_meal / add_to_meal / add_snack
+    // NAMES AND AMOUNTS ONLY — never numbers.
+    //
+    // Dustin, 9 Sep 2026, ruling on the audit: the chat is one of two paths
+    // that let the model state macros, and its prompt said so in those words:
+    // "Estimate realistic macros per item". Whatever it said was then written
+    // into the log AND into the client's My Meals library, to be re-used.
+    //
+    // The route prices these against food_catalog (falling through to USDA
+    // FoodData Central on a miss) before anything reaches the confirmation
+    // card, exactly as /nutrition-ai/parse has done since 26 Aug.
+    items?: ParsedName[];   // swap_meal / add_to_meal / add_snack
     name?: string | null;   // new meal / snack label
     adherence?: ActAdherence;
     clarify?: boolean;      // intent 'none': reply is a clarifying question, not a Q&A question
@@ -580,9 +590,15 @@ function actAdherence(v: unknown): ActAdherence {
   return "Full";
 }
 
-/** Items for swap_meal / add_to_meal / add_snack — same normalization as the parse endpoint. */
-function validateActItems(raw: unknown): ParsedItem[] | null {
-  const r = validateParseResult({ items: raw });
+/**
+ * Items for swap_meal / add_to_meal / add_snack.
+ *
+ * validateParsedNames, NOT validateParseResult: the same gate the parse
+ * endpoint uses, and it is a gate precisely because a kcal or a protein the
+ * model volunteers has nowhere to land in the shape it returns.
+ */
+function validateActItems(raw: unknown): ParsedName[] | null {
+  const r = validateParsedNames({ items: raw });
   return r ? r.items : null;
 }
 

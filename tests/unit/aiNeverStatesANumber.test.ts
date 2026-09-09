@@ -258,15 +258,36 @@ test("the food parser no longer asks a model for macros either", () => {
 });
 
 test("parse resolves every item against the catalogue", () => {
-  assert.match(code(PARSE), /resolveFood\(deps, named\.name, named\.amount, named\.unit\)/);
+  // The loop MOVED on 9 Sep 2026, it did not go away: the coach chat needed the
+  // identical thing, so it lives in resolveFoodOp.priceNamedFoods and both
+  // routes call it. Two copies of "how a described food becomes a number" is
+  // how two screens end up disagreeing about the same dinner.
+  assert.match(code(PARSE), /priceNamedFoods\(/,
+    "parse must price its items through the shared resolver");
+  assert.match(code(OP), /resolveFood\(deps, n\.name, n\.amount, n\.unit\)/);
   // The ROW's name goes back, not the words typed.
-  assert.match(code(PARSE), /name: got\.name/);
+  assert.match(code(OP), /name: got\.name/);
+});
+
+test("the coach chat prices its items the same way, through the same function", () => {
+  // Dustin, 9 Sep 2026, ruling on the audit: the chat was one of two paths that
+  // let the model state macros -- its prompt said "Estimate realistic macros per
+  // item" -- and whatever it said went into the log AND into My Meals.
+  const ACT = readFileSync(join(process.cwd(), "src/app/api/nutrition-ai/act/route.ts"), "utf8");
+  assert.match(code(ACT), /priceNamedFoods\(/);
+  assert.match(ACT, /YOU NEVER STATE A NUTRITION FIGURE/,
+    "the action prompt carries the same rule as the parse prompt");
+  assert.doesNotMatch(ACT, /Estimate realistic macros per item/,
+    "the instruction that made this path invent numbers must be gone");
+  // And what the confirmation card executes is the PRICED items, never the
+  // model's own list.
+  assert.match(code(ACT), /items: priced/);
 });
 
 test("an unfindable food is named, not silently dropped", () => {
   // Losing a food off a logged meal is the same class of error as inventing
   // one: the total is wrong and nothing on screen says why.
-  assert.match(code(PARSE), /unresolved\.push\(named\.name\)/);
+  assert.match(code(OP), /unresolved\.push\(n\.name\)/);
   assert.match(code(PARSE), /unresolved\.length \? \{ unresolved \}/);
   assert.match(code(PARSE_CLIENT), /unresolved/);
 });

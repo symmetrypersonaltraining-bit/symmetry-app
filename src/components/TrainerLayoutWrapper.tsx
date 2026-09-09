@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import TrainerSidebar from "./TrainerSidebar";
 import Logo from "./Logo";
 import HeaderAssist from "./HeaderAssist";
+import ClientTopBar from "./ClientTopBar";
 import SessionDock from "./SessionDock";
 import AppBottomNav, { type NavItem } from "./AppBottomNav";
 import RefreshHandle from "./RefreshHandle";
@@ -89,31 +90,21 @@ export default function TrainerLayoutWrapper({ children }: Props) {
     return (
       <div className="flex flex-col min-h-screen app-bg">
 
-        {/* Top bar — mirrors what a client would see on mobile.
-            Uses --chrome-grad, the same token as the trainer sidebar and
-            AppHeader, for two reasons. It was a FLAT var(--brand-primary),
-            which meant (a) it never moved when the depth level changed, and
-            the top bar is the biggest block of scheme colour on any screen —
-            "the deep blue on this one looks exactly the same on all settings"
-            — and (b) it carries white text on the raw primary, which is 2.5:1
-            on Blush Cloud and worse on Soft Pastel. --chrome-grad is floored
-            toward black precisely so white stays legible in all 30 schemes. */}
-        <div className="flex items-center gap-3 px-4 pb-3 sticky top-0 z-40 shadow-sm"
-          style={{ background: "var(--chrome-grad)", paddingTop: "calc(12px + env(safe-area-inset-top))" }}>
-          <Logo size={28} color="white" className="flex-shrink-0" />
-          <div className="flex-1">
-            <span className="text-white font-semibold text-sm">Symmetry</span>
-            <span className="text-white/50 text-xs ml-2">· My Training</span>
-          </div>
-          <HeaderAssist />
-        <button
-            onClick={handleToggleMode}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg"
-            style={{ background: "rgba(255,255,255,0.15)", color: "white" }}>
-            <i className="ti ti-layout-dashboard text-sm" />
-            Trainer View
-          </button>
-        </div>
+        {/* The SAME bar a real client gets -- one component, so the two can
+            never drift. The only difference is the Trainer View toggle, which
+            must not exist for a real client because there is no trainer view
+            for them to go to. */}
+        <ClientTopBar
+          trailing={
+            <button
+              onClick={handleToggleMode}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg"
+              style={{ background: "rgba(255,255,255,0.15)", color: "white" }}>
+              <i className="ti ti-layout-dashboard text-sm" />
+              Trainer View
+            </button>
+          }
+        />
 
         <RefreshHandle />
 

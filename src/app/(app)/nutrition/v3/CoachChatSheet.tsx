@@ -59,6 +59,23 @@ export interface CoachActionItem {
   c: number;
   f: number;
   /**
+   * THE ROW EVERY FIGURE ABOVE CAME FROM.
+   *
+   * Added 9 Sep 2026 with the ruling that ended the chat inventing macros. The
+   * route prices each named food against food_catalog (reaching USDA
+   * FoodData Central when the catalogue is short one) before anything gets to
+   * the confirmation card, so this is set on every item that resolved.
+   *
+   * Null means the last-resort estimate produced it and no row exists. That is
+   * allowed on a plate — it is marked "est" there — and NOT allowed into the
+   * My Meals library, where it would be re-used forever.
+   */
+  food_id?: string | null;
+  /** True when the row is measured (USDA core/lab, or the trainer's own). */
+  verified?: boolean;
+  /** True when nothing was found anywhere and this is the model's own guess. */
+  estimated?: boolean;
+  /**
    * Nutrients keyed by the registry (fiber, sugar, sodium, sat_fat, …).
    *
    * The parse route has asked the model for these since `da30c87`, and
@@ -153,7 +170,7 @@ const ACTION_CHIPS = ["Swap a meal", "Move a meal", "I ate something extra"];
 const OPENERS = (coachFirstName: string): Record<string, { greeting: string; chips: string[] }> => ({
   nutrition: {
     greeting:
-      "Hey — I'm your coach. I can see your logs, targets and trends. Ask me anything — or tell me what to change (\"swap M4 for salmon and rice\", \"I ate a cookie\") and I'll set it up for you to confirm.",
+      "Hey — I can see your logs, targets and trends. Ask me anything — or tell me what to change (\"swap M4 for salmon and rice\", \"I ate a cookie\") and I'll set it up for you to confirm.",
     chips: ["How's my adherence this week?", "Am I on track with protein today?", "What should I adjust?"],
   },
   workout: {
@@ -186,7 +203,7 @@ const OPENERS = (coachFirstName: string): Record<string, { greeting: string; chi
     chips: ["How do I log a workout?", "How do I log a meal?", "Where do I see my progress?"],
   },
   app: {
-    greeting: "I'm your coach — I can see your training, your eating and your trend. Ask me anything.",
+    greeting: "I can see your training, your eating and your trend. Ask me anything.",
     chips: ["How's my week going?", "What should I focus on?", "What should I change?"],
   },
 });
@@ -689,6 +706,41 @@ export default function CoachChatSheet({
         <Sheet title="✦ Coach" subtitle="Grounded in your logs, targets & trends" onClose={() => { setOpen(false); onClose?.(); }}>
           <style>{`@keyframes coachdot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }`}</style>
           <div style={{ display: "flex", flexDirection: "column", height: "62vh" }}>
+            {/* WHO THIS IS — ruling 4 of the AI contract, approved 9 Sep.
+                Dustin, 5 Sep: "Dustin's assistant — knows your programme, your
+                logs and how he trains you. Anything real goes to him."
+
+                Not "the coach" wearing his name, and not a cold AI badge on
+                everything. The reasoning recorded with the ruling: clients
+                DISCOVERING they were talking to a bot is a top-three risk to
+                trust, and an undisclosed assistant means that on the day it is
+                discovered, every warm message he actually wrote gets re-read as
+                generated.
+
+                Said ONCE, standing, rather than repeated into every greeting —
+                rule 7 bans walls of obvious text, and a disclosure that repeats
+                is the thing people learn to skip.
+
+                ⚠️ THE NAME, NOT A PRONOUN. His wording said "how HE trains you"
+                because he was describing himself. Half the clients on this
+                deployment are Stephanie's — coachIdentity exists precisely
+                because one name cannot serve two trainers — and there is no
+                pronoun on CoachIdentity to read. The name is correct for every
+                coach and needs no field that does not exist. */}
+            <div
+              style={{
+                display: "flex", alignItems: "center", gap: 6, padding: "0 2px 8px",
+                fontSize: 11, lineHeight: 1.45, color: "var(--brand-text-secondary)",
+              }}
+            >
+              <AiBadge size={16} mood="neutral" ring={false} title="" />
+              <span>
+                <strong style={{ fontWeight: 700 }}>{coachFirstName}&rsquo;s assistant</strong>
+                {" — knows your programme, your logs and how "}
+                {coachFirstName} trains you. Anything real goes to {coachFirstName}.
+              </span>
+            </div>
+
             {/* messages */}
             <div ref={listRef} style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: 8 }}>
               {msgs.map((msg, mi) => (
@@ -700,7 +752,11 @@ export default function CoachChatSheet({
                   {msg.role !== "client" && (mi === 0 || msgs[mi - 1].role === "client") && (
                     <div className="flex items-center gap-1.5 mb-1">
                       <AiBadge size={20} mood={surfaceMood(surface)} />
-                      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, color: "var(--brand-text-secondary)" }}>COACH</span>
+                      {/* "COACH" claimed to BE him. Ruling 4: his assistant,
+                          clearly and warmly. */}
+                      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, color: "var(--brand-text-secondary)" }}>
+                        {coachFirstName.toUpperCase()}&rsquo;S ASSISTANT
+                      </span>
                     </div>
                   )}
                   <div

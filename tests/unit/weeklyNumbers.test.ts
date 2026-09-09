@@ -144,9 +144,11 @@ test("averages are reported per logged day and compared to target with the direc
   assert.match(lines, /do NOT recompute the direction/);
 });
 
-test("scored adherence is described as consistency × accuracy, not a checkbox score", () => {
-  // Dustin, 2026-07-31: "adherence should be based on consistently logging and
-  // hitting macros n calories." The AI must never call this a meal-plan score.
+test("scored adherence is described as hitting the numbers, and logging is said separately", () => {
+  // Dustin, 2026-09-09: "the adherence i want to be based on hitting numbers
+  // alone so cal and macros, not logging since we have the logging rate."
+  // The AI must never call this a meal-plan score, and must never merge the two
+  // figures or describe one as the other.
   const lines = weekFactsLines(
     facts({
       loggedDays: 5, avgDays: 5, avg: { kcal: 2200, p: 190, c: 210, f: 65 },
@@ -157,11 +159,11 @@ test("scored adherence is described as consistency × accuracy, not a checkbox s
   ).join("\n");
 
   assert.match(lines, /Adherence: 65%/);
-  assert.match(lines, /logging consistency × macro accuracy/);
-  assert.match(lines, /consistency 71%/);
-  assert.match(lines, /accuracy 92%/);
+  assert.match(lines, /HITTING THE NUMBERS and nothing else/);
   assert.match(lines, /ALL FOUR of calories, protein, carbs and fat/);
-  assert.match(lines, /A day nobody logged counts as a miss/);
+  assert.match(lines, /NOT how often they logged/);
+  assert.match(lines, /Logging rate: 71%/);
+  assert.match(lines, /Never merge these two numbers/);
   assert.ok(!/meal-status average only/.test(lines), "a scored week must not be hedged as status-only");
   // loggedDays === avgDays here, so there is no in-progress day to caveat.
   assert.ok(!/in-progress day is left out/.test(lines), "no caveat when nothing was excluded");
@@ -177,7 +179,7 @@ test("the in-progress-day caveat only appears when a day was actually excluded",
     "THIS WEEK SO FAR",
     { calories: 2200, protein: 190, carbs: 210, fats: 65 },
   ).join("\n");
-  assert.match(lines, /the in-progress day is left out of both sides of consistency/);
+  assert.match(lines, /The in-progress day is left out of both figures/);
 });
 
 test("training and weight lines degrade honestly when data is thin", () => {
