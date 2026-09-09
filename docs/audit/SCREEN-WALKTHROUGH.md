@@ -1870,3 +1870,65 @@ one who just made the change.
 
 Five tests in `tests/unit/todayLeavesNoHole.test.ts`; three of them fail against
 the pre-change file.
+
+---
+
+## One client app — Client View and a client's app are now the same  ·  9 Sep 2026
+
+Dustin, 9 Sep, on finding out they were not: *"we need to make my client app
+work exactly like any other clients so i can test the same exact app they are
+using... this is something we've discussed before and needs to be locked in
+permanently so we dont run into this again. i was not aware they were looking at
+a diff screen than i am and that is not good."*
+
+### What differed
+
+They were two different code paths in `src/app/(app)/layout.tsx` — a trainer got
+`TrainerLayoutWrapper`, a client got the branch below it — and the chrome had
+quietly diverged:
+
+| | Client View (his) | A real client |
+|---|---|---|
+| Top bar | Branded: logo, "Symmetry · My Training" | **A bare sticky strip** with the feedback button pushed right |
+| Bell + feedback | Yes | Yes |
+| Trainer View | Yes | No — correctly |
+| Bottom nav | Same six tabs, same order, same icons | Same |
+
+### ⚠️ Why this was worse than cosmetic
+
+**It had already cost real time.** The nutrition logger's "very sticky
+scrolling" was chased as an app bug. It existed ONLY in Client View, because
+that wrapper added a nested scroller real clients never had — the code comment
+in `TrainerLayoutWrapper` says so outright. A test surface that differs from the
+real one does not merely fail to catch bugs: **it invents them, and they then
+get fixed in the app that never had them.**
+
+### The fix, and the part that makes it permanent
+
+One component — `ClientTopBar` — mounted by both. Not two blocks of JSX that
+match today, because those drift and nobody notices until a client reports
+something the trainer cannot reproduce.
+
+The **only** difference is a `trailing` slot carrying the Trainer View toggle.
+Dustin, the same day: *"just remember they cannot have that trainer view
+toggle."* A real client has no trainer view to go to, so the button, the
+handler and the mode flag are all absent from their layout — asserted three
+ways, including against the raw file with comments included.
+
+**Bottom navs were already identical** and were left alone: same six tabs, same
+order, same icons, same labels. Only the hrefs differ — his carry `?as=client`
+so the SERVER renders the client branch on first paint, which fixes an
+intermittent trainer-UI leak. That difference is deliberate and must not be
+"fixed".
+
+**Routing was not touched.** Checked against the diff: no href, route, redirect
+or `router.push` changed in either file. He asked for that specifically —
+*"routing needs to be watched very carefully bc that's where things can change a
+bit."*
+
+### The standing rule, locked in
+
+**The trainer's Client View and a client's app are the same app.** Every fix
+lands on both, always. `tests/unit/oneClientApp.test.ts` fails if a second top
+bar is hand-rolled, if either mount stops using the shared one, if the tabs stop
+matching, or if a trainer-only control reaches a client.

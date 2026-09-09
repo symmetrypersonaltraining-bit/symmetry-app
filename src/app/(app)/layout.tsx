@@ -4,7 +4,7 @@ import TrainerLayoutWrapper from "@/components/TrainerLayoutWrapper";
 import BottomNav from "@/components/BottomNav";
 import InstallPrompt from "@/components/InstallPrompt";
 import SessionDock from "@/components/SessionDock";
-import HeaderAssist from "@/components/HeaderAssist";
+import ClientTopBar from "@/components/ClientTopBar";
 import RealtimeScheduleSync from "@/components/RealtimeScheduleSync";
 import RefreshOnReturn from "@/components/RefreshOnReturn";
 import PushRegister from "@/components/PushRegister";
@@ -93,11 +93,16 @@ export default async function AppLayout({
       <PushRegister />
       <WebPushRegister />
       <MessageNotifier />
-      {/* Docked feedback strip: reserves its own row in the page flow, so the
-          button can NEVER cover content (fixed overlays float over scrolled content). */}
-      <div style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", justifyContent: "flex-end", padding: "8px 14px 6px", background: "var(--brand-bg)" }}>
-        <HeaderAssist solid />
-      </div>
+      {/* THE SAME TOP BAR THE TRAINER SEES IN CLIENT VIEW. Dustin, 9 Sep:
+          "i def want the branded bar w logo just like mine" -- and, more to the
+          point, "we need to make my client app work exactly like any other
+          clients so i can test the same exact app they are using."
+
+          This was a bare sticky strip with the feedback button pushed right,
+          while Client View had the branded bar. Same app, two different chromes,
+          and he only found out by asking. It reserves its own row in the page
+          flow exactly as the strip did, so it still cannot cover content. */}
+      <ClientTopBar />
       {/* Deliberate pull-to-refresh. See RefreshHandle for why the old
           swipe-anywhere version was replaced by a handle you have to grab. */}
       <RefreshHandle />
