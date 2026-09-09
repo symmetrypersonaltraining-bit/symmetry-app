@@ -5,14 +5,25 @@ session reads it first and updates it before finishing.** The `HANDOFF-*.md`
 files with dates in the name are history — do not read them for current state,
 and do not create another one.
 
-> ✅ **The recompute is finished (9 Sep).** All 16 batches ran; the catalogue is
-> caught up with the code. Finishing it turned up a fifth fault in that work —
-> a can of ginger ale opened on **1 tsp** — fixed and recomputed as `20260909b`.
-> There is no half-finished data pass anywhere in the food work now.
+> 🔴 **FIRST: two things are waiting on Dustin, and neither can be done without
+> him.**
 >
-> 🔵 **PICK UP HERE:** the biggest number left is keyword coverage — **68,383
-> rows still say "1 serving"** (counted 9 Sep, after the recompute). See section 5
-> and the 9 Sep walkthrough interlude.
+> 1. **The AI assistant fix has never landed.** Written in a Cowork session, alive
+>    only on his laptop, and unreachable from any cloud session. The bug is real
+>    and still on main. **The ship bridge does not solve it** — that is outbound,
+>    this is inbound. Section 5 item 1 has the verified diagnosis and the exact
+>    commands; read it before offering him anything.
+> 2. **`claude/food-database-completion-q8qb37` is pushed but not merged.** Four
+>    commits, gates green. No PR was opened because none was asked for. The
+>    database half is already live; the code and docs half is on that branch.
+>
+> ✅ **The food recompute is finished (9 Sep).** All 16 batches ran. Finishing it
+> turned up a fifth fault in that work — a can of ginger ale opened on **1 tsp** —
+> fixed and recomputed as `20260909b`. No half-finished data pass remains.
+>
+> 🔵 **The biggest number left** is keyword coverage: **68,383 rows still say
+> "1 serving"** (counted 9 Sep, after the recompute). Section 5 item 4, and the
+> 9 Sep walkthrough interlude.
 
 Last updated: **9 Sep 2026** · the food recompute finished and `20260909b`
 shipped on `claude/food-database-completion-q8qb37`, gates green: 0 errors in
@@ -404,13 +415,56 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 
 ### Owed to him, waiting on his word
 
-1. **Claudine's two Kerrygold meal-plan entries.** `Kerrygold Irish butter —
+1. 🔴 **THE AI ASSISTANT FIX IS WRITTEN AND HAS NEVER LANDED.** A Cowork session
+   wrote it on 9 Sep; it exists only on his laptop, as
+   `C:\Users\dusti\Downloads\0001-The-AI-button-was-there-and-nothing-opened.patch`
+   and as the write-up `claude/HANDOFF-AI-ASSISTANT-FIX-2026-09-09.md`. **Neither
+   is reachable from a cloud session** — `claude/` is project knowledge and is not
+   in the repo, and a Claude Code container has no `device_*` tools. Checked, not
+   assumed: it is on no remote branch and `src/lib/auth/trainerMode.ts` has never
+   existed in any history.
+
+   ⚠️ **The ship bridge does not solve this.** The bridge is OUTBOUND — sandbox →
+   his laptop → GitHub push. This is an INBOUND problem: the bytes of a file in
+   his Downloads folder. Turning the watcher on does not help, and Claude Code
+   can already push directly without it. Do not spend a round trip on this again.
+
+   **The bug is real and still on main**, verified 9 Sep against `813afe6`:
+
+   - `src/components/HeaderAssist.tsx:70` — `setInterval(checkClientMode, 2000)`.
+     The BUTTON re-reads the client-mode cookie every 2 seconds.
+   - `src/components/AIAssistant.tsx:83-94` — one `useEffect(…, [])` at mount that
+     **only ever calls `setIsTrainer(true)`**. Never re-read, never set back, no
+     subscription to auth state. Line 319 is `if (!isTrainer) return null`.
+
+   So leaving Client View brings the button back over a drawer that stays shut
+   until a full reload, and on a cold start where `auth.getUser()` resolves before
+   the session restores, the drawer is latched shut for the whole visit. The fix
+   puts both components on one watcher, `src/lib/auth/trainerMode.ts`, that keeps
+   asking.
+
+   **`git am` should apply cleanly** — neither component has been touched on main
+   since `d0c280a` (5 Sep), well before the patch was written. To land it, either
+   he pastes the patch into a session (`cat "/c/Users/dusti/Downloads/0001-The-AI-button-was-there-and-nothing-opened.patch"`
+   in Git Bash), or he runs it himself:
+
+       cd /c/Users/dusti/Claude/Projects/symmetry-app
+       git checkout main && git pull
+       git am "/c/Users/dusti/Downloads/0001-The-AI-button-was-there-and-nothing-opened.patch"
+       npx tsc --noEmit && node --import tsx --test tests/unit/*.test.ts && npx next build
+       git push origin main
+
+   **Do not rebuild it from this description.** That would be a third
+   implementation rather than the one he wrote and tested; he was offered that and
+   has not said yes.
+
+2. **Claudine's two Kerrygold meal-plan entries.** `Kerrygold Irish butter —
    6 g — 5 g fat` ×2 (ids `9f417d96…`, `afc88871…`). Five over six is 0.833 g
    fat/g → 83 per 100 instead of 81, which is why that row reads 750 cal/100 g
    instead of 717. **The trainer row is generated from those two lines, so
    fixing the row alone does nothing** — the generator rebuilds it weekly. His
    programming, so it has not been touched. Offered; awaiting yes.
-2. **An end-to-end browser test of the home screen** against the live app. The
+3. **An end-to-end browser test of the home screen** against the live app. The
    current guard proves the refresh mechanism is mounted, not that the screen is
    right on a real phone. Offered; not started.
 
@@ -474,6 +528,14 @@ shipped as `234619c8`.)
 - **The disk is 1 GB.** An import filled it once. Guard bulk inserts with
   `where pg_database_size(current_database()) < 900000000`.
 - **Big table updates restart the database.** Batch at 45–50k rows.
+- **The ship bridge is OUTBOUND ONLY, and no cloud session can read his laptop.**
+  The bridge carries a bundle from the sandbox to his machine so his machine can
+  push. It is not a file share. If work exists only as a file on his laptop — a
+  patch in Downloads, anything under `claude/` — a cloud session cannot get at it,
+  and **turning the ship watcher on does not change that.** Claude Code has no
+  `device_*` tools at all, and can already push directly without the bridge. The
+  only ways in are: he pastes the content, or he runs the command himself. This
+  cost a round trip on 9 Sep over the AI assistant patch.
 - **A check on a rounded value must round the same way.** The confirmation
   query for `food_default_serving` compared the raw ratio while the function
   tests `food_serving_pretty_count` of it, and reported 644 failures that were
