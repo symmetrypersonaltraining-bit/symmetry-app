@@ -208,7 +208,7 @@ function addedFromPick(item: {
 
 export default function NutritionV3Client(props: Props) {
   const { firstName: coachFirstName } = useCoach();
-  const { clientId, clientName, mealPlan, livePlans, incomingPlan, todayLogs, macroTarget, today } = props;
+  const { clientId, clientName, mealPlan, livePlans, incomingPlan, todayLogs, macroTarget, today, isTrainer } = props;
   const supabase = useMemo(() => createClient(), []);
 
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -1529,6 +1529,35 @@ export default function NutritionV3Client(props: Props) {
   // =========================================================================
   // Macro-bar target: day-group menu total for the viewed date, else macro_targets.
   const tg = dailyTarget;
+
+  // THE PLAN'S OWN DAY, AGAINST THE TARGET IT IS GRADED BY.
+  //
+  // Sums the CHOSEN meal at each plan position — one per slot, the way the day
+  // actually renders. Summing every meal would double-count any slot offering
+  // A / B, which is exactly the mistake that made a client's perfectly ordinary
+  // plan look 195% over when this was first measured.
+  //
+  // Tolerances are the AI plan builder's, deliberately: 3% on calories and 5 g
+  // on each macro. A tolerance a second check invents for itself is how "within
+  // 3%" quietly becomes 24%.
+  const planDrift = useMemo(() => {
+    if (!tg || !tg.calories) return null;
+    let k = 0, pr = 0, ca = 0, fa = 0, slots = 0;
+    for (const row of rows) {
+      if (row.kind !== "plan" || !row.chosen) continue;
+      const m = planMealMacros(row.chosen);
+      k += m.kcal; pr += m.protein; ca += m.carbs; fa += m.fats;
+      slots++;
+    }
+    if (!slots || k < 200) return null;
+    const off: { label: string; delta: number; unit: string }[] = [];
+    if (Math.abs(k - tg.calories) > tg.calories * 0.03) off.push({ label: "calories", delta: k - tg.calories, unit: "" });
+    if (Math.abs(pr - tg.protein) > 5) off.push({ label: "protein", delta: pr - tg.protein, unit: "g" });
+    if (Math.abs(ca - tg.carbs) > 5) off.push({ label: "carbs", delta: ca - tg.carbs, unit: "g" });
+    if (Math.abs(fa - tg.fats) > 5) off.push({ label: "fat", delta: fa - tg.fats, unit: "g" });
+    return off.length ? { plan: { kcal: k, p: pr, c: ca, f: fa }, off } : null;
+  }, [rows, tg]);
+
   const over = tg ? totals.kcal > tg.calories : false;
   const pctK = tg && tg.calories > 0 ? Math.min(100, (totals.kcal / tg.calories) * 100) : 0;
 
@@ -1859,6 +1888,37 @@ export default function NutritionV3Client(props: Props) {
                 <s>{avgResult ? `${avgResult.loggedDays} of ${avgResult.totalDays} day${avgResult.totalDays === 1 ? "" : "s"}` : (isToday ? "this week" : "")}</s>
               </div>
             </div>
+
+            {/* ── DOES THE PLAN EVEN REACH THE TARGET? ────────────────────
+                Dustin, 9 Sep 2026, ruling on the audit finding: "4: yes".
+
+                His own plan comes to 4,213 kcal against a 4,462 target with
+                fat 10.7% short, so eating it perfectly still reads under —
+                and because the full-credit band is ±10%, a flawless day
+                cannot score 100%. Six live plans would flag today and five of
+                them are wrong on FAT, which is the macro that drifts when a
+                plan is built to calories and protein.
+
+                The AI plan builder has enforced 3% on calories and 5 g on
+                each macro since it shipped, and prints the drift in orange
+                when it misses. A HAND-BUILT plan was never checked by
+                anything. Same test, same numbers, shown where the plan is.
+
+                TRAINER ONLY. "Your plan doesn't add up" is a message for the
+                person who can change it; to a client it is only unsettling.
+                And only on today, because a past day's plan is history. */}
+            {isTrainer && isToday && selectedDate === today && planDrift && (
+              <div className="sym-food" style={{ marginTop: 10, paddingTop: 9, borderTop: "1px dashed var(--tile-ctrl-bd)" }}>
+                <b style={{ color: ORANGE }}>⚠ This plan does not reach the target.</b>{" "}
+                Eaten exactly as written it comes to{" "}
+                <b>{r(planDrift.plan.kcal).toLocaleString()} cal · {r(planDrift.plan.p)}P / {r(planDrift.plan.c)}C / {r(planDrift.plan.f)}F</b>
+                {" — "}
+                {planDrift.off.map((o, i) => (
+                  <span key={o.label}>{i ? ", " : ""}{o.label} {o.delta > 0 ? "+" : ""}{r(o.delta)}{o.unit}</span>
+                ))}
+                . Adjust the amounts, or move the target.
+              </div>
+            )}
           </div>
         );
       })()}

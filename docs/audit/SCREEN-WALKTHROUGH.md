@@ -2377,3 +2377,37 @@ Against rows a search can actually return:
 **28× overstated.** The other findings stand as written and were re-checked:
 the three bad `Banana` rows are *not* quarantined and *are* reachable, and
 297,817 reachable `usda_branded` rows are still all stamped `verified`.
+
+### SHIPPED — a hand-built plan is checked against the target (9 Sep)
+
+Dustin's ruling on the audit finding: **"4: yes"**.
+
+His own plan reaches 4,213 kcal against a 4,462 target with **fat 10.7% short**,
+so eating it exactly as written still reads under — and because the
+full-credit band is ±10%, a flawless day cannot score 100% adherence.
+
+Six live plans would flag today and **five of them are wrong on fat**, which is
+the macro that drifts when a plan is built to calories and protein:
+
+| Client | kcal | protein | fat |
+|---|---:|---:|---:|
+| Madeleine Coker | −19% | −34% | **+53%** |
+| Gerard Gautreaux | +17% | −5% | **+52%** |
+| Sharon Gautreaux | +6% | +11% | **+55%** |
+| Brooke Orton | −1% | +24% | **−36%** |
+| Jerry Bourgeois | +4% | −6% | **+32%** |
+| Dustin | −6% | −5% | −11% |
+
+**Where it shows:** on the day tile, **trainer only**, **today only**. "Your plan
+doesn't add up" is a message for the person who can change it; to a client it is
+only unsettling, and a past day's plan is history.
+
+**The tolerances are the AI plan builder's own** — 3% on calories, 5 g on each
+macro — deliberately, not looser ones. A tolerance a second check invents for
+itself is how "within 3%" quietly becomes 24%. The builder has enforced this
+since it shipped and prints the drift in orange when it misses; a hand-built
+plan was never checked by anything.
+
+**It sums the CHOSEN meal per slot**, one per position, the way the day actually
+renders. Summing every meal double-counts any slot offering A/B — the exact
+mistake that made an ordinary plan look 195% over when this was first measured.
