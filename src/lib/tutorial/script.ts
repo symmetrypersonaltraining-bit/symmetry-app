@@ -566,6 +566,20 @@ export const TUTORIAL: TutorialChapter[] = [
         audioUrl: null,
       },
       {
+        id: "clients-access-ends",
+        title: "When an archived client loses the app",
+        body: [
+          "Archiving takes somebody off the roster. On its own it has never removed their app access, and for a long time it did not: somebody archived in August could still open the app in September.",
+          "There is now a rule for that. An archived client keeps full access until thirty days after their last paid invoice, and then loses it automatically overnight. No step for you to remember. They see a screen saying their access has ended and that nothing they logged has been deleted.",
+          "It ships switched OFF, and the owner turns it on once — the switch is app_flags.access_revoke_live. Until then archiving behaves exactly as it always has.",
+          "Two things it never does. It never touches an active client, whatever their billing looks like. And it never deletes anything: workouts, sets, meals and measurements all stay on file, so bringing somebody back is switching their access on again, not rebuilding their history.",
+          "To keep somebody past the thirty days, set an override date on them. An override can only ever extend access, never shorten it.",
+        ],
+        narration:
+          "Archiving takes somebody off your roster. On its own it never removed their app access. There is now a rule for that. An archived client keeps the app until thirty days after their last paid invoice, then loses it automatically overnight. They see a screen saying their access has ended and that nothing they logged has been deleted. It ships switched off, and the owner turns it on once. It never touches an active client, and it never deletes anything. Their whole history stays. To keep somebody longer, set an override date. An override can only extend access, never shorten it.",
+        audioUrl: null,
+      },
+      {
         id: "clients-tabs",
         title: "The client file",
         body: [
