@@ -34,11 +34,12 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **9 Sep 2026, evening** · `main` = `cf32c88`. Gates green as of the
+Last updated: **10 Sep 2026** · `main` = `381d758`. Gates green as of the
 PR #3 merge: 0 errors in `src/`, **2,960 unit tests passing**, build compiles.
-Since then: the access rule (`cf32c88`) — 3,031 unit tests pass, 0 fail, and
-two PRE-EXISTING failures in `scripts/test-nutrition-ai.cjs` that are red on
-clean `main` too. Section 5 has them.
+**The gate is fully green for the first time in a while**: 0 errors in `src/`,
+**3,037 unit tests pass 0 fail**, `test-nutrition-ai.cjs` **43 passed 0 failed**,
+build compiles. Shipped since: the access rule and its switch, the two red
+nutrition-AI tests closed by the bug-fix session, and the invisible meal ring.
 
 > **His other Claude session pushes to this repo while you work.** It is not a
 > mistake and it is not to be reverted — check `git log origin/main` before you
@@ -621,24 +622,50 @@ override.
 - **`billing_type = 'none'` on six real training clients** may be worth a look.
   Noticed, not touched.
 
-### 🟠 ASSIGNED OUT — two nutrition-AI tests are red on `main`
+### ✅ CLOSED — the two red nutrition-AI tests, and the gate is fully green
 
-`node scripts/test-nutrition-ai.cjs` reports **41 passed, 2 failed**:
-`valid swap_meal: items normalized, kcal derived, name defaulted from new_name`
-and `add_snack: items required + normalized, name defaults to item join`.
+`node scripts/test-nutrition-ai.cjs` now reports **43 passed, 0 failed**. Fixed
+by the bug-fix session as `49ccb63` (PR #8) on 9 Sep.
 
-**They were already failing on clean `main`** — verified by stashing and
-re-running, so they predate the access work and were not caused by it. They were
-left alone rather than folded into an unrelated commit. `npm run test:unit` runs
-this script after the node tests, so the gate is not fully green until they are
-fixed.
+**The tests were wrong, not the code — and the number they demanded is the exact
+thing his 9 Sep ruling took out.** `a1edf49` changed one line in
+`validateActItems` from `validateParseResult` (which carried the model's macros
+and derived a missing kcal from 4/4/9) to `validateParsedNames` (which builds
+`{name, amount, unit}` and drops the rest, because `/act` now prices every item
+through `priceNamedFoods`). It did not touch that script, so both tests kept
+asserting the old contract and went red the moment the contract changed.
 
-**Dustin sent this to the bug-fix session on 9 Sep** — `9/9 — Symmetry app bugs`,
-`session_01H2cGxKw7pwc5gUA88KpoP8`. It carries the caution that matters: this is
-`/api/nutrition-ai/act`, the one food path still taking macros from the model
-rather than a `food_catalog` row, and it is DEFERRED to the Nutrition screen by
-his "one page at a time" ruling — so fix the defect, do not widen the route.
-**Do not start on it in this session as well.**
+The 56 kcal one of them asserted for an oreo was a figure **the model made up**,
+on its way to the plate and into that client's My Meals library. The rewrite
+asserts the current contract with `deepStrictEqual` on the whole item, so it
+proves the macros are ABSENT rather than merely unread.
+
+Worth keeping because of the shape: a red test is not automatically a broken
+app, and here it was the ruling working. `/act` itself was left alone, still
+deferred to the Nutrition screen.
+
+### ✅ SHIPPED 10 Sep — the unchecked ring on a meal was invisible
+
+`381d758` (PR #11). Dustin, with a screenshot of M5 and M6: *"you cant see the
+unchecked circles on unlocked foods w the new layout on nutrition logger."*
+
+`circleFor` passed `var(--brand-border)` inline for an unlogged meal, overriding
+the `--tile-ctrl-bd` that `.sym-ring` already carried. **`--brand-border` is
+mixed against the PAGE and the ring sits inside a TILE** — in dark those are two
+near-identical darks, so the circle was a ghost. `globals.css` has warned about
+this for months: *"Everything a tile contains derives from the TILE, not from the
+raw token."*
+
+**This is the first thing to suspect for any "I can't see X" report on a tiled
+screen**, and every screen is being converted to tiles. An unlogged ring now
+paints nothing inline and lets the class win — which also made
+`.sym-tile.is-today .sym-ring` reachable, having been dead code overridden on
+every meal.
+
+`.sym-ring--todo` additionally gives it a real border and a faint inset, because
+every other state of that control is a filled circle and the one state a client
+must ACT on was the only one with no fill. Full write-up: the interlude "the ring
+you could not see" at the end of `docs/audit/SCREEN-WALKTHROUGH.md`.
 
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
 
