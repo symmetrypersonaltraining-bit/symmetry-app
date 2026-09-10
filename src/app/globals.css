@@ -3163,11 +3163,18 @@ option:hover {
 .sym-ring--todo {
   border-color: color-mix(in srgb, var(--brand-text) 38%, var(--tile-bg));
   background: color-mix(in srgb, var(--brand-text) 5%, var(--tile-bg));
+  /* The ghost tick inherits this. A shade stronger than the border because a
+     3px stroke reads lighter than a solid ring edge at the same value — they
+     are meant to look like one object, not two weights. It cannot be mistaken
+     for a logged meal: that is a WHITE tick on a solid green fill, and this is
+     an outline on an empty circle. */
+  color: color-mix(in srgb, var(--brand-text) 45%, var(--tile-bg));
 }
 .sym-ring--todo:active { background: color-mix(in srgb, var(--brand-text) 12%, var(--tile-bg)); }
 /* On the bright tile the white border above already carries it; the inset would
-   only muddy a fill that is already light. */
-.sym-tile.is-today .sym-ring--todo { background: transparent; }
+   only muddy a fill that is already light, and the ghost tick follows the
+   border rather than the tile it is no longer sitting on. */
+.sym-tile.is-today .sym-ring--todo { background: transparent; color: rgba(255, 255, 255, .6); }
 
 /* The food a meal is made of, one item per line — it has always listed every
    item, and it is NOT .sym-wo-name. That class is clamped to two rows because
