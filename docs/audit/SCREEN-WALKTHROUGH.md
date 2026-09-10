@@ -3106,3 +3106,65 @@ flags a `.limit()` above the cap, and this read had no `.limit()` at all.
 `tests/unit/theTrainerHomeCostsOneRoundTrip.test.ts` pins one `Promise.all`,
 one `await`, both reads paged, and no `refresh()` — and fails against the
 branch as it was.
+
+---
+
+## Interlude — three names that should not have been on his day (10 Sep)
+
+Dustin, 7:13am, screenshot of Today's Sessions: *"I need to know why Tyler, Troy
+and Christine are in my schedule. Troy n christine are archived. Tyler only
+trains w me at 5am Mondays."* Three rows with a "–" where the time should be.
+
+### The "–" is the tell
+
+Today's Sessions is built from the day's **appointments**, and then — since
+27 Aug — any workout flagged *with-you* (`supervised`) that has **no**
+appointment, so a supervised session missing from the calendar is not missed
+on the board. No appointment means no time, hence "–". All three were that path.
+
+### Three causes
+
+- **Christine** — archived 31 Aug. **Archiving sets `clients.archived_at` and
+  nothing else.** Her programme kept 35 future rows, nine flagged with-you, and
+  the trainer home read the *schedule*, never the *roster*. Bobbie Page and
+  Robert Miller were the same shape, one flag away from surfacing.
+- **Troy** — **not archived in the app at all.** `archived_at` empty, billing
+  "none", last workout and last appointment 29 Jul, never a paid invoice. His
+  pattern still said Wednesday and Thursday with-you. Archived by hand today, the
+  way the app does it; pattern days switched off.
+- **Tyler** — a stale flag. He trained Thursdays until 20 Aug (×10 on the
+  calendar); his pattern was corrected to Monday-only; but the rows generated on
+  17 and 24 Aug carried Thursday = with-you **through 10 December, plus all six
+  days of his peak week** — which is photoshoot prep, not sessions with him.
+  Nothing re-derives the flag after generation.
+
+### Why calendar sync never caught it
+
+`detect_schedule_changes` has two rules: an appointment with no with-you
+workout ("uncovered"), and a client with nothing booked at all ("retired"). It
+has **no rule for the inverse** — a with-you workout with no appointment on a
+client who still trains. Tyler kept his Mondays, so "retired" never fired, and
+his Thursdays were invisible to it by construction.
+
+### What changed
+
+1. **The trainer home reads the roster.** `activeIds` from the existing active
+   `clients` read gates all four schedule-derived loops — appointments, today's
+   workouts, the with-you fallback, the calendar layer. An archived client's rows
+   never reach the screen. `tests/unit/anArchivedClientLeavesTheTrainersDay.test.ts`
+   pins all four; **all fail against the page as it was.**
+2. **The rule, in his words: if it is not on the calendar, it is not with him.**
+   `derive_supervised_from_calendar()` (migration `20260910c`) clears the with-you
+   flag on any future, unlogged workout with no appointment that day — **downward
+   only**, and judged against the client's **own booked horizon**, the rule the
+   `supervised_workout_no_appointment` integrity check already used: a session
+   past the last appointment a client has actually made is next week's booking,
+   not a ghost. It runs first in the thrice-daily `calendar_derived_consistency`
+   job. First run: 42 rows cleared (Tyler 19, Christine 9, Troy 9, Lauren 4,
+   Laurie 1); Todd, Celeste and Krysta correctly untouched.
+
+| | before | now |
+|---|---|---|
+| archived client with a running programme | on Today's Sessions and the calendar until the programme ends | never shown |
+| with-you flag after the calendar changes | frozen at generation | re-derived three times a day, inside the booked horizon |
+| a session he simply hasn't put on the calendar yet | shown as with-you | shown until his booked horizon passes it, then cleared — the calendar is the truth |

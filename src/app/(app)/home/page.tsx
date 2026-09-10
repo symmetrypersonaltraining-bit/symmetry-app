@@ -173,6 +173,16 @@ export default async function HomePage(props: {
         .order("due_date"),
     ]);
 
+    // THE ROSTER IS THE FILTER. Dustin, 10 Sep, with three names on Today's
+    // Sessions that should not have been there: "Troy n christine are
+    // archived." Archiving sets clients.archived_at and nothing else -- a
+    // programme keeps its future rows, and every read below joined on the
+    // SCHEDULE, never on the roster, so an archived client's with-you workouts
+    // sat on his day for as long as their programme ran. `clients` above is
+    // already the active roster; nothing an archived client has scheduled
+    // reaches this screen.
+    const activeIds = new Set(((clients || []) as { id: string }[]).map((c) => c.id));
+
     type AE = {
       id: string; clientId: string; clientName: string; title: string;
       startTime: string; endTime: string; status: string; scheduledAt: string; endsAt: string | null;
@@ -180,6 +190,7 @@ export default async function HomePage(props: {
     const appointmentMap: Record<string, AE[]> = {};
     for (const a of apptRows || []) {
       const row = a as any;
+      if (!activeIds.has(row.clients?.id || row.client_id)) continue;
       const dateKey = new Date(row.scheduled_at).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
       const startTime = new Date(row.scheduled_at).toLocaleTimeString("en-US", {
         hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Chicago",
@@ -218,7 +229,7 @@ export default async function HomePage(props: {
     const clientDayMap: Record<string, ClientDay> = {};
     for (const w of todayWorkoutRows || []) {
       const row = w as any;
-      if (!row.client_id) continue;
+      if (!row.client_id || !activeIds.has(row.client_id)) continue;
       const label = (row.days?.label || "Training") as string;
       const score = dayRank(label, row.supervised === true, row.position);
       if (bestRank[row.client_id] === undefined || score < bestRank[row.client_id]) {
@@ -277,6 +288,7 @@ export default async function HomePage(props: {
     for (const w of todayWorkoutRows || []) {
       const row = w as any;
       if (row.supervised !== true || !row.client_id) continue;
+      if (!activeIds.has(row.client_id)) continue;
       if (shownClientIds.has(row.client_id)) continue;
       shownClientIds.add(row.client_id);
       const day = clientDayMap[row.client_id];
@@ -315,6 +327,7 @@ export default async function HomePage(props: {
     const workoutMap: Record<string, WE[]> = {};
     for (const w of workoutRows || []) {
       const row = w as any;
+      if (!activeIds.has(row.clients?.id || row.client_id)) continue;
       const dateKey = row.scheduled_date;
       if (!workoutMap[dateKey]) workoutMap[dateKey] = [];
       workoutMap[dateKey].push({
