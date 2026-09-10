@@ -34,8 +34,7 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **10 Sep 2026** · `main` = `381d758`. Gates green as of the
-PR #3 merge: 0 errors in `src/`, **2,960 unit tests passing**, build compiles.
+Last updated: **10 Sep 2026** · `main` = `67e0c8a`.
 **The gate is fully green for the first time in a while**: 0 errors in `src/`,
 **3,037 unit tests pass 0 fail**, `test-nutrition-ai.cjs` **43 passed 0 failed**,
 build compiles. Shipped since: the access rule and its switch, the two red
@@ -835,6 +834,23 @@ shipped as `234619c8`.)
 
 - **Postgres can reach the internet; the sandbox cannot.** `extensions.http(...)`
   is how USDA and HuggingFace data got in.
+- **A test that goes red after a ruling is not automatically a defect.** Check
+  whether the assertion predates the ruling BEFORE touching a line of source.
+  `git log -S '<the changed call>' -- <file>` on the line the test exercises
+  found the two red `/act` tests in minutes — the contract had moved and the
+  script had not. Fixing the code there would have undone the ruling.
+- **A shallow clone hides the history that answers this.** `git log` on a
+  `--depth 1` clone shows only the merge commit, so the real change looks like
+  it never happened. `git fetch --depth=200 origin main` first; prefer a bounded
+  deepen over `--unshallow`.
+- **This sandbox can push a branch and open a PR, but the MERGE API call is
+  refused** — blocked the same way through `python urllib` and through `curl`,
+  and afterwards even `git ls-remote` was refused. It is not a GitHub problem
+  and not a token problem. Do not keep retrying and do not go hunting for
+  another route: hand him the PR link and say it is ready. **He must be SIGNED
+  IN on the GitHub mobile page or no merge button is drawn** — that is what the
+  first round trip was spent on. A permission rule for the merge call would end
+  this; it has not been added yet.
 - **A local Postgres 16 is in the sandbox** at `/usr/lib/postgresql/16/bin`. It
   is the cheapest way to prove a migration runs, runs twice, and that a new
   integrity check actually fires on a planted fault. Use it every time.
