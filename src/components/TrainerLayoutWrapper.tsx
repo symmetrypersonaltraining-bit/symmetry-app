@@ -83,8 +83,7 @@ export default function TrainerLayoutWrapper({ children, initialClientMode = fal
     }
     // Land on /home. Entering client view carries ?as=client so the first
     // server render is deterministically the client dashboard (belt-and-
-    // suspenders with the cookie). router.refresh() invalidates the router
-    // cache so a page prefetched in the OTHER mode can't be served stale.
+    // suspenders with the cookie).
     // BOTH directions carry a marker now. A bare /home let a stale cookie —
     // or a payload prefetched while in the other mode — decide, which is how
     // "hit trainer toggle, get client view" happened.
@@ -95,8 +94,21 @@ export default function TrainerLayoutWrapper({ children, initialClientMode = fal
     // wearing the client shell. Replacing the history entry means the page you
     // toggled away from is not one gesture behind you. The middleware guard is
     // the real boundary; this stops the most likely way of testing it.
+    //
+    // NO router.refresh() ANY MORE. Dustin, 10 Sep: "the trainer view takes
+    // about 10 seconds to switch screen over its laggy". refresh() re-renders
+    // the layout AND the page for the URL being LEFT, and then replace()
+    // renders the destination — two full server renders per tap, and the
+    // trainer home was ten PostgREST hops each. It was there to stop a payload
+    // prefetched in the other mode being served stale, and three things have
+    // since made that impossible without it: both directions carry a marker,
+    // so the destination URL is never one that was prefetched; Next 15 does not
+    // reuse dynamic page payloads on navigation (staleTimes.dynamic is 0 and
+    // next.config sets nothing); and the nav links are prefetch={false}. The
+    // chrome itself no longer needs the layout re-rendered either — this
+    // handler sets it, and on a full load the layout hands over the cookie's
+    // answer (#18).
     router.replace(next ? "/home?as=client" : "/home?as=trainer");
-    router.refresh();
   }
 
   // ── CLIENT MODE ───────────────────────────────────────────────────────────

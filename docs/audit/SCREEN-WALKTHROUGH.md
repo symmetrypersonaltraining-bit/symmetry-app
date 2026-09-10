@@ -3049,3 +3049,60 @@ it as an input again.
 
 `tests/unit/theChromeAgreesWithThePage.test.ts` pins the rule and the wiring,
 and **its wiring assertions fail against the wrapper as it was**.
+
+---
+
+## Interlude — the trainer home costs one round trip (10 Sep)
+
+Dustin: *"the trainer view takes about 10 seconds to switch screen over its
+laggy fix that too"*.
+
+### Measured, not guessed
+
+The trainer branch of `/home` made **five serial reads** — clients,
+appointments, today's workouts, the calendar's workouts, reminders — and the
+calendar one pages through **5,697** scheduled workouts at 1,000 a time, so it is
+six round trips on its own. **Ten PostgREST hops, one after another, per
+render.** Then the toggle called `router.refresh()` as well as
+`router.replace()`: refresh renders the layout and page for the URL being
+*left*, and then replace renders the destination. **Two full renders, about
+twenty hops, per tap.** At phone-to-Vercel-to-Supabase latency that is ten
+seconds.
+
+One screen over, the client branch already says it: *"Promise.all so the five
+leave together and the page costs one round trip."*
+
+### What changed
+
+- **The five reads leave together.** One `Promise.all`; the page waits for the
+  slowest, not the sum. The paged calendar read still costs six hops internally
+  but now runs alongside the other four: ~10 serial hops → ~6.
+- **The toggle renders once.** `router.refresh()` is gone. It existed to stop a
+  payload prefetched in the other mode being served stale, and three things
+  since made that impossible without it: both directions carry a marker so the
+  destination URL is never one that was prefetched; Next 15 does not reuse
+  dynamic page payloads on navigation; the nav links are `prefetch={false}`.
+  And since the chrome fix (#18) the wrapper no longer needs the layout
+  re-rendered to know which mode it is in. ~20 hops per tap → ~6.
+
+### Found on the way — and this one is correctness
+
+The appointments read was **not paged**. 2,491 appointments sit in its window
+against a 1,000-row cap that reports no error; the 1,000 that arrived were the
+oldest, the last dated **1 December**, and the **1,491 after that never reached
+the calendar.** Today's Sessions happened to be right — today was rank 557 — and
+a month from now it would not have been. Same fault this file documents for
+workouts since 24 Aug, fixed the same way. The static audit could not see it: it
+flags a `.limit()` above the cap, and this read had no `.limit()` at all.
+
+### What he sees
+
+| | before | now |
+|---|---|---|
+| tap the view toggle | ~10 s, chrome flips first, page follows | one render; the page arrives with the chrome |
+| trainer calendar, months ahead | empty past 1 Dec | every appointment that exists |
+| Today's Sessions | correct today, by luck of the ordering | correct by construction |
+
+`tests/unit/theTrainerHomeCostsOneRoundTrip.test.ts` pins one `Promise.all`,
+one `await`, both reads paged, and no `refresh()` — and fails against the
+branch as it was.

@@ -49,12 +49,18 @@ export default async function HomePage(props: {
 
   // ── TRAINER VIEW ──────────────────────────────────────────────────────────
   if (isTrainer && !isInClientMode) {
-    const { data: clients } = await supabase
-      .from("clients")
-      .select("id, name")
-      .is("archived_at", null)
-      .order("name");
-
+    // ── EVERYTHING THE TRAINER HOME READS, IN ONE ROUND TRIP ─────────────────
+    //
+    // Dustin, 10 Sep: "the trainer view takes about 10 seconds to switch screen
+    // over its laggy". These five reads were awaited one after another -- and
+    // the calendar's workouts page through 5,697 rows at 1,000 a time, so that
+    // one alone is six hops -- ten serial PostgREST round trips per render. The
+    // client branch below already does what this now does: "Promise.all so the
+    // five leave together and the page costs one round trip." The page waits
+    // for the slowest read now, not for the sum of them.
+    //
+    // Every query keeps its own note. Each was shaped the way it is for a
+    // reason that cost real time, and moving a read must not lose the reason.
     const todayStrCT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
     // Calendar range: 3 months back, 12 months forward (Central time)
@@ -65,13 +71,107 @@ export default async function HomePage(props: {
     const startStr = rangeStart.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
     const endStr = rangeEnd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
-    // All appointments for the calendar (3mo back to 12mo forward)
-    const { data: apptRows } = await supabase
-      .from("appointments")
-      .select("id, client_id, scheduled_at, ends_at, status, title, clients(id, name)")
-      .gte("scheduled_at", startStr + "T00:00:00")
-      .lte("scheduled_at", endStr + "T23:59:59")
-      .order("scheduled_at");
+    // Programmed-workout calendar layer: this month back to three months forward.
+    const workoutRangeEnd = new Date();
+    workoutRangeEnd.setMonth(workoutRangeEnd.getMonth() + 3);
+
+    // Payment reminders: 90 days back (overdue lives in the past) to 30 forward.
+    // shiftDate/centralToday rather than another hand-rolled toLocaleDateString:
+    // the suite caps that idiom at 99 copies and this would have been the 100th.
+    const thirtyDays = new Date();
+    thirtyDays.setDate(thirtyDays.getDate() + 30);
+    const ninetyBackCT = shiftDate(todayStrCT, -90);
+
+    const [
+      { data: clients },
+      apptRows,
+      { data: todayWorkoutRows },
+      workoutRows,
+      { data: remindersRaw },
+    ] = await Promise.all([
+      supabase
+        .from("clients")
+        .select("id, name")
+        .is("archived_at", null)
+        .order("name"),
+
+      // All appointments for the calendar (3mo back to 12mo forward).
+      //
+      // PAGED, for the reason written below about scheduled_workouts and never
+      // applied here: PostgREST caps every response at 1,000 rows and says
+      // nothing. Counted 10 Sep: 2,491 appointments sit in this window. The
+      // 1,000 that arrived were the OLDEST, the last of them dated 1 December,
+      // and the 1,491 after that -- every appointment past 1 Dec -- never
+      // reached the calendar. Today was rank 557, so Today's Sessions happened
+      // to be right; a month from now it would not have been. The static audit
+      // cannot see this shape (no .limit(), so nothing for a scanner to flag)
+      // -- the pager's runtime ceiling is the guard.
+      fetchAllRowsSafe<any>(
+        () => supabase
+          .from("appointments")
+          .select("id, client_id, scheduled_at, ends_at, status, title, clients(id, name)")
+          .gte("scheduled_at", startStr + "T00:00:00")
+          .lte("scheduled_at", endStr + "T23:59:59")
+          .order("scheduled_at") as any,
+        { label: "trainer calendar appointments" },
+      ),
+
+      // Today's scheduled workouts -- provides day_id for Start button + completion status
+      supabase
+        .from("scheduled_workouts")
+        .select("id, client_id, status, day_id, supervised, position, days(id, label), clients(id, name)")
+        .is("deleted_at", null)
+        .eq("scheduled_date", todayStrCT),
+
+      // THE TRAINER CALENDAR HAS SHOWN NOTHING SINCE 29 JULY, and this read is why.
+      // 4,589 live scheduled workouts sit in the window; PostgREST caps every
+      // response at 1,000 and reports no error; the rows are ordered by date
+      // ascending, so the 1,000 that arrive are the OLDEST and the last one is
+      // dated 2026-07-29. Today and everything future -- 2,063 rows -- never
+      // reached the page. This is the same failure Dustin reported on 24 Aug in a
+      // different read, which is exactly why paging it once is not enough and the
+      // static audit now looks for the shape.
+      fetchAllRowsSafe<any>(
+        () => supabase
+        .from("scheduled_workouts")
+        .select("id, day_id, client_id, scheduled_date, status, days(id, label), clients(id, name)")
+        .is("deleted_at", null)
+        // Central, not UTC: derive the month floor from the Central date, not the UTC year/month.
+        .gte("scheduled_date", (() => {
+          const [y, m] = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }).split("-").map(Number);
+          const dt = new Date(Date.UTC(y, m - 2, 1));
+          return dt.toISOString().slice(0, 10);
+        })())
+        .lte("scheduled_date", workoutRangeEnd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
+        .order("scheduled_date") as any,
+        { label: "trainer calendar workouts" },
+      ),
+
+      // Payment reminders.
+      supabase
+        .from("payment_reminders")
+        .select("id, client_id, due_date, amount_due, billing_credits, notification_status, email_sent_at, clients(id, name)")
+        // ⚠️ THE "N OVERDUE" BADGE COULD NEVER FIRE, and this is why.
+        //
+        // The panel computes `overdue = reminders.filter(daysUntil(due) < 0)`.
+        // This query started at TODAY, so nothing before today was ever in the
+        // set it filtered. The badge counted a subset that had been excluded
+        // upstream -- structurally unreachable, not merely empty. Two panels on
+        // the same screen could therefore read "2 overdue" and "none".
+        //
+        // It was excluded twice over: the status filter allowed only pending and
+        // paused, and BOTH genuinely overdue invoices are 'sent' -- Christine
+        // Latham $320 due 22 Aug and Sharon Rambo $300 due 23 Aug. An invoice
+        // that has been sent and not paid is exactly what "overdue" means.
+        //
+        // So: look back 90 days as well as forward 30, and count sent-and-unpaid
+        // as pending does. 'paid' stays out, which is the only status that
+        // should be.
+        .gte("due_date", ninetyBackCT)
+        .lte("due_date", thirtyDays.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
+        .in("notification_status", ["pending", "paused", "sent"])
+        .order("due_date"),
+    ]);
 
     type AE = {
       id: string; clientId: string; clientName: string; title: string;
@@ -103,12 +203,7 @@ export default async function HomePage(props: {
       });
     }
 
-    // Today's scheduled workouts — provides day_id for Start button + completion status
-    const { data: todayWorkoutRows } = await supabase
-      .from("scheduled_workouts")
-      .select("id, client_id, status, day_id, supervised, position, days(id, label), clients(id, name)")
-      .is("deleted_at", null)
-      .eq("scheduled_date", todayStrCT);
+    // todayWorkoutRows was read above, in the Promise.all.
 
     // The trainer's "Today's Sessions" must launch the SUPERVISED day (what the client trains
     // WITH the trainer), never their solo mobility/cardio/walk homework. Rank each candidate:
@@ -214,31 +309,8 @@ export default async function HomePage(props: {
 
     // Workout map (programmed workouts — separate calendar layer, do NOT modify)
     type WE = { id: string; dayId: string | null; clientId: string; clientName: string; date: string; dayLabel: string; status: string };
-    const workoutRangeEnd = new Date();
-    workoutRangeEnd.setMonth(workoutRangeEnd.getMonth() + 3);
-    // THE TRAINER CALENDAR HAS SHOWN NOTHING SINCE 29 JULY, and this read is why.
-    // 4,589 live scheduled workouts sit in the window; PostgREST caps every
-    // response at 1,000 and reports no error; the rows are ordered by date
-    // ascending, so the 1,000 that arrive are the OLDEST and the last one is
-    // dated 2026-07-29. Today and everything future -- 2,063 rows -- never
-    // reached the page. This is the same failure Dustin reported on 24 Aug in a
-    // different read, which is exactly why paging it once is not enough and the
-    // static audit now looks for the shape.
-    const workoutRows = await fetchAllRowsSafe<any>(
-      () => supabase
-      .from("scheduled_workouts")
-      .select("id, day_id, client_id, scheduled_date, status, days(id, label), clients(id, name)")
-      .is("deleted_at", null)
-      // Central, not UTC: derive the month floor from the Central date, not the UTC year/month.
-      .gte("scheduled_date", (() => {
-        const [y, m] = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }).split("-").map(Number);
-        const dt = new Date(Date.UTC(y, m - 2, 1));
-        return dt.toISOString().slice(0, 10);
-      })())
-      .lte("scheduled_date", workoutRangeEnd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
-      .order("scheduled_date") as any,
-      { label: "trainer calendar workouts" },
-    );
+    // workoutRows was read above, in the Promise.all -- the "29 JULY" note
+    // about the 1,000-row cap travels with the read.
 
     const workoutMap: Record<string, WE[]> = {};
     for (const w of workoutRows || []) {
@@ -256,36 +328,8 @@ export default async function HomePage(props: {
       });
     }
 
-    // Payment reminders due in 30 days
-    const thirtyDays = new Date();
-    thirtyDays.setDate(thirtyDays.getDate() + 30);
-    // Overdue lives in the past, so the window has to reach into it.
-    // shiftDate/centralToday rather than another hand-rolled toLocaleDateString:
-    // the suite caps that idiom at 99 copies and this would have been the 100th.
-    const ninetyBackCT = shiftDate(todayStrCT, -90);
-    const { data: remindersRaw } = await supabase
-      .from("payment_reminders")
-      .select("id, client_id, due_date, amount_due, billing_credits, notification_status, email_sent_at, clients(id, name)")
-      // ⚠️ THE "N OVERDUE" BADGE COULD NEVER FIRE, and this is why.
-      //
-      // The panel computes `overdue = reminders.filter(daysUntil(due) < 0)`.
-      // This query started at TODAY, so nothing before today was ever in the
-      // set it filtered. The badge counted a subset that had been excluded
-      // upstream -- structurally unreachable, not merely empty. Two panels on
-      // the same screen could therefore read "2 overdue" and "none".
-      //
-      // It was excluded twice over: the status filter allowed only pending and
-      // paused, and BOTH genuinely overdue invoices are 'sent' -- Christine
-      // Latham $320 due 22 Aug and Sharon Rambo $300 due 23 Aug. An invoice
-      // that has been sent and not paid is exactly what "overdue" means.
-      //
-      // So: look back 90 days as well as forward 30, and count sent-and-unpaid
-      // as pending does. 'paid' stays out, which is the only status that
-      // should be.
-      .gte("due_date", ninetyBackCT)
-      .lte("due_date", thirtyDays.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }))
-      .in("notification_status", ["pending", "paused", "sent"])
-      .order("due_date");
+    // remindersRaw was read above, in the Promise.all -- the "N OVERDUE" note
+    // travels with the read.
 
     const reminders = (remindersRaw || []).map((r: any) => ({
       id: r.id,
