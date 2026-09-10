@@ -1,5 +1,12 @@
 # Backlog — the single work queue
 
+## 2026-09-10 — A paused client's next invoice arrives paused (DONE, DB rule)
+
+Stacie: invoice set to $480 (manual), toggle off. The roll-forward on mark-paid
+inserted the next cycle as pending regardless of the toggle;
+`20260910e` turns it paused for a switched-off client. Open question for him:
+the 3 Sep email quoted $640 — does she need a corrected message?
+
 ## 2026-09-10 — One client, one copy (DONE, DB rule); the 70 copies and the library phase OPEN, his call
 
 Scheduling 35 workouts for Mary Ellen on library days made 70 full copies of
