@@ -348,7 +348,7 @@
     "movement_assessment_id",
     "created_by_trainer_id"
   ],
-  "client_error_log": [
+  "app_error_log": [
     "id",
     "client_id",
     "user_id",
@@ -357,7 +357,13 @@
     "detail",
     "path",
     "user_agent",
-    "created_at"
+    "created_at",
+    "fingerprint",
+    "occurrences",
+    "last_seen_at",
+    "source",
+    "recent",
+    "resolved_at"
   ],
   "client_goals": [
     "id",

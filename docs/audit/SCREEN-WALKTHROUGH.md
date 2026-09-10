@@ -2902,3 +2902,89 @@ Two details worth keeping:
   to look like one object; a 3px stroke reads lighter than a solid ring edge at
   the same value. On the bright tile both follow the white border instead of the
   tile they are no longer sitting on.
+
+---
+
+## Interlude — the app records its own errors (10 Sep)
+
+Dustin: *"anytime something goes wrong or errors or there's a bug, you can look
+back at the actual log of when it happened and what happened and figure it out a
+little bit easier to make sure that we fix it permanently, and we don't keep
+running into the same problems."*
+
+### What was already there, and why it had never seen anything
+
+`client_error_log` (`20260826e`) was built the day Jennifer lost 27 minutes of
+sets, and it works. It watches three writes — `set_log`, `bulk_set_log`,
+`workout_complete`. **It had zero rows, and that was checked before anything was
+changed**: the mechanism is sound and the RLS policies were correct, so the
+honest reading is the good one — the workout write path genuinely has not missed.
+
+Everywhere else, an error went to `console.error`. There are **124** of those,
+and on a phone that means a hidden console and then nothing. So "it didn't work"
+had no record behind it unless it was one of those three writes. There was no
+error boundary and no global handler at all.
+
+### The hole that mattered most
+
+The insert policy was `client_id = my_client_id()`, and `my_client_id()`
+resolves the **logged-in** user's client row. When Dustin logs a client's
+session at `/workout?forClient=<id>` he has no client row — so the insert was
+refused by RLS, and `logClientError`'s own `catch` swallowed the refusal,
+correctly, because it must never throw.
+
+**A failed set during a session he logged himself could not be recorded.** The
+one case most likely to be noticed and reported was the one guaranteed to leave
+no trace. Writing through `/api/log-error` under the service role closes it, and
+**the workout logger was not touched to do it** — its call sites were always
+passing the right client id; only RLS disagreed.
+
+### One row per fault, not one per occurrence
+
+`20260826e` refused to widen its net for a stated reason: *"anything broader
+becomes a table nobody reads, which is where the integrity checker sat for ten
+days."* That fear is right, and the fingerprint is the answer to it. A screen a
+client opens forty times a day, failing every time, is **one row saying 40** —
+carrying `occurrences`, `last_seen_at`, and `recent`, the last ten actual hits
+with their own times, clients and paths.
+
+The fingerprint is `scope + normalised message + path`, where normalising strips
+uuids, timestamps, numbers and quoted strings. Get it too specific and every
+occurrence is its own row; too loose and two faults share one and the count is a
+lie. `tests/unit/oneBugIsOneRow.test.ts` pins both directions, and **two of its
+grouping assertions fail against a naive hash of the raw message** — which is
+what the obvious implementation would have been.
+
+### What a client sees now — this is the observable change
+
+| state | before | now |
+|---|---|---|
+| a screen crashes | blank white screen | a tile: *"Something went wrong… it has been reported automatically"*, with **Try again** and **Go home** |
+| the app fails to start | blank white screen | a plain dark page with **Try again** |
+
+**Try again** calls Next's `reset()` — it re-renders the route without a full
+reload, so a transient failure costs a tap rather than a cold start.
+
+Neither screen promises the data is safe, deliberately. The crash screen says
+*"if you were part-way through logging something, check it saved"*, because the
+app does not know, and reassurance over the top of a failure that may have eaten
+a set is the app lying to the one person able to notice. The global one **does**
+say nothing was lost, because it only fires before any screen has opened.
+
+### Rules this had to obey
+
+- **The reporter must never throw.** It runs on the error path, and a `window`
+  `error` listener that throws re-enters itself — one dead image becomes an
+  infinite loop on a client's phone. A test asserts no `throw` in either file;
+  it caught a genuinely unguarded handler while it was being written.
+- **It must survive the navigation that follows.** A crash is usually followed
+  by a reload, and an in-flight `fetch` dies with the page, so the worst faults
+  would be the least likely to be reported. `sendBeacon` first, `keepalive`
+  after.
+- **It must not flood.** An error inside a render fires every render. The same
+  fingerprint is sent at most once a minute per page; the server counts
+  occurrences regardless, so the number stays true while the traffic does not.
+- **The browser is never believed about who it is.** A client's id comes from
+  their session; a trainer may name a client, but that lookup runs under their
+  own session so RLS decides. A log writable into someone else's name is worse
+  than no log.

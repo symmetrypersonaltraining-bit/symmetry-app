@@ -4076,15 +4076,21 @@ export type Database = {
           },
         ]
       }
-      client_error_log: {
+      app_error_log: {
         Row: {
           client_id: string | null
           created_at: string
           detail: Json | null
+          fingerprint: string | null
           id: string
+          last_seen_at: string
           message: string | null
+          occurrences: number
           path: string | null
+          recent: Json
+          resolved_at: string | null
           scope: string
+          source: string
           user_agent: string | null
           user_id: string | null
         }
@@ -4092,10 +4098,16 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           detail?: Json | null
+          fingerprint?: string | null
           id?: string
+          last_seen_at?: string
           message?: string | null
+          occurrences?: number
           path?: string | null
+          recent?: Json
+          resolved_at?: string | null
           scope: string
+          source?: string
           user_agent?: string | null
           user_id?: string | null
         }
@@ -4103,58 +4115,64 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           detail?: Json | null
+          fingerprint?: string | null
           id?: string
+          last_seen_at?: string
           message?: string | null
+          occurrences?: number
           path?: string | null
+          recent?: Json
+          resolved_at?: string | null
           scope?: string
+          source?: string
           user_agent?: string | null
           user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "client_error_log_client_id_fkey"
+            foreignKeyName: "app_error_log_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "client_error_log_client_id_fkey"
+            foreignKeyName: "app_error_log_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_challenge_roster"
             referencedColumns: ["cid"]
           },
           {
-            foreignKeyName: "client_error_log_client_id_fkey"
+            foreignKeyName: "app_error_log_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_client_assessment"
             referencedColumns: ["client_id"]
           },
           {
-            foreignKeyName: "client_error_log_client_id_fkey"
+            foreignKeyName: "app_error_log_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_client_now"
             referencedColumns: ["client_id"]
           },
           {
-            foreignKeyName: "client_error_log_client_id_fkey"
+            foreignKeyName: "app_error_log_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_client_profile"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "client_error_log_client_id_fkey"
+            foreignKeyName: "app_error_log_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_client_training_history"
             referencedColumns: ["client_id"]
           },
           {
-            foreignKeyName: "client_error_log_client_id_fkey"
+            foreignKeyName: "app_error_log_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_nutrition_now"

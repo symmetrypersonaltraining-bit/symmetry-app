@@ -18,19 +18,36 @@
  * A guard that can only report to the one person who cannot act on it is half a
  * guard.
  *
- * ── WHAT THIS IS NOT ─────────────────────────────────────────────────────────
+ * ── WHAT CHANGED, 10 Sep 2026 ────────────────────────────────────────────────
  *
- * Not general error reporting, and deliberately so. It is for the small set of
- * writes whose failure costs training data — the ones where the difference
- * between "it failed" and "it silently did nothing" is somebody's session.
- * Anything broader turns into a table nobody reads, which is where the
- * integrity checker sat for ten days.
+ * This used to insert into client_error_log straight from the browser. Two
+ * things were wrong with that, and the second one silenced it in the case that
+ * mattered most:
  *
- * Never throws and never blocks. A logger that can be broken by its own error
- * reporting is worse than one that reports nothing.
+ *   THE TABLE NEVER FIRED. Not because nothing failed — the write path really
+ *   has not missed in 60 days — but it could only ever have caught three
+ *   writes. Every other failure in the app went to console.error, which on a
+ *   phone is a hidden console and then nothing.
+ *
+ *   IT COULD NOT RECORD A SESSION DUSTIN LOGGED. The insert policy was
+ *   `client_id = my_client_id()`, which resolves the LOGGED-IN user's client
+ *   row. Logging a client's session at /workout?forClient=<id> he has no client
+ *   row, so every insert was refused by RLS and swallowed by the catch below —
+ *   correctly, since this must never throw. The one case most likely to be
+ *   noticed and reported was the one guaranteed to leave no trace.
+ *
+ * Both are fixed by the same move: the write goes through /api/log-error, which
+ * runs under the service role and authorises the caller itself. THE CALL SITES
+ * IN THE WORKOUT LOGGER ARE UNCHANGED — they were always passing the right
+ * client id; only RLS disagreed.
+ *
+ * This wrapper is kept rather than folded into logAppError so those call sites
+ * stay untouched. The workout logger is off limits without per-item
+ * permission, and a rename that reaches into it to gain nothing is exactly the
+ * kind of drive-by that rule exists to stop.
  */
 
-import { createClient } from "@/lib/supabase/client";
+import { logAppError } from "@/lib/logAppError";
 
 export type ClientErrorScope = "set_log" | "bulk_set_log" | "workout_complete";
 
@@ -40,30 +57,16 @@ export async function logClientError(opts: {
   error: unknown;
   detail?: Record<string, unknown>;
 }): Promise<void> {
-  try {
-    if (!opts.clientId) return;   // RLS would refuse it, and it would say nothing
-    const e = opts.error as { message?: string; code?: string; details?: string; hint?: string } | null;
-    const sb = createClient();
-    const { data: auth } = await sb.auth.getUser();
-    await sb.from("client_error_log").insert({
-      client_id: opts.clientId,
-      user_id: auth?.user?.id ?? null,
-      scope: opts.scope,
-      message: (e?.message || String(opts.error) || "unknown").slice(0, 500),
-      // The postgrest fields are the whole point: `code` is what separates an
-      // RLS refusal from a constraint violation from a dropped request, and
-      // that distinction is exactly what could not be recovered after the fact.
-      detail: {
-        code: e?.code ?? null,
-        details: e?.details ?? null,
-        hint: e?.hint ?? null,
-        online: typeof navigator !== "undefined" ? navigator.onLine : null,
-        ...(opts.detail || {}),
-      },
-      path: typeof location !== "undefined" ? location.pathname : null,
-      user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 300) : null,
-    });
-  } catch {
-    /* reporting a failure must never become a second failure */
-  }
+  // NO EARLY RETURN ON A MISSING clientId ANY MORE.
+  //
+  // It used to bail out, because RLS would have refused the row and said
+  // nothing. The server route has no such constraint: an error with no client
+  // attached is still worth having, and a set that failed to save is worth
+  // having whether or not we can say whose it was.
+  logAppError({
+    clientId: opts.clientId ?? null,
+    scope: opts.scope,
+    error: opts.error,
+    detail: opts.detail,
+  });
 }

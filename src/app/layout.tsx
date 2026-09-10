@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import ErrorReporter from "@/components/ErrorReporter";
 import HapticTap from "@/components/HapticTap";
 import InteractionFX from "@/components/InteractionFX";
 import AutoDark from "@/components/AutoDark";
@@ -131,6 +132,10 @@ export default function RootLayout({
         </noscript>
       </head>
       <body>
+        {/* FIRST, deliberately. It only registers two window listeners, and
+          * registering them ahead of everything else means a component that
+          * throws while mounting below it is still caught and recorded. */}
+        <ErrorReporter />
         <HapticTap />
         <InteractionFX />
         <AutoDark />

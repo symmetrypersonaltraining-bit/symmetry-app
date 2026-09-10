@@ -122,6 +122,12 @@ test("the hold needs no change inside the logger", () => {
 
 const LOGGER = code(read("src/app/(app)/workout/[dayId]/WorkoutLogger.tsx"));
 const HELPER = code(read("src/lib/logClientError.ts"));
+// 10 Sep: the reporting itself moved to logAppError, shared by every surface.
+// logClientError is a thin wrapper kept so the workout logger's call sites did
+// not have to change — it is off limits without per-item permission.
+const REPORTER = code(read("src/lib/logAppError.ts"));
+/** SQL comments out, for the same reason `code` exists. */
+const sql = (s: string) => s.replace(/--[^\n]*/g, "");
 
 test("a refused set write is recorded, not only shown to the client", () => {
   assert.match(LOGGER, /scope: "set_log"/);
@@ -141,19 +147,39 @@ test("the guards still refuse the tick — the change adds, it does not soften",
 test("the postgrest code is kept, because that is the part that identifies the fault", () => {
   // `code` separates an RLS refusal from a constraint violation from a dropped
   // request. Not having it is why 26 Aug ended in inference rather than a cause.
-  assert.match(HELPER, /code: e\?\.code \?\? null/);
-  assert.match(HELPER, /online: typeof navigator !== "undefined" \? navigator\.onLine : null/);
+  assert.match(REPORTER, /code: e\.code \?\? null/);
+  assert.match(REPORTER, /online: typeof navigator !== "undefined" \? navigator\.onLine : null/);
 });
 
 test("reporting a failure can never become a second failure", () => {
-  assert.match(HELPER, /catch \{/);
-  assert.match(HELPER, /if \(!opts\.clientId\) return;/,
-    "with no client id the insert is refused by RLS and says nothing");
+  assert.match(REPORTER, /catch \{/);
+  assert.doesNotMatch(REPORTER, /\bthrow\b/, "the reporter runs on the error path and must never throw");
 });
 
-test("clients cannot read the error table, trainers can", () => {
-  const SQL = read("supabase/migrations/20260826e_client_error_log.sql");
-  assert.match(SQL, /for insert to authenticated\s*\n\s*with check \(client_id = public\.my_client_id\(\)\)/);
-  assert.match(SQL, /for select to authenticated\s*\n\s*using \(public\.trainer_can_see_client\(client_id\)\)/);
+test("a session Dustin logs himself is no longer unrecordable", () => {
+  // THE EARLY RETURN IS GONE ON PURPOSE. It used to read
+  //     if (!opts.clientId) return;
+  // because the browser insert was refused by RLS with no client row — and
+  // that refusal is exactly why a failed set during a session HE logged at
+  // /workout?forClient=<id> could never be recorded. The write now goes through
+  // /api/log-error under the service role, so a missing or foreign client id
+  // is a row with no client attached, not a row that never existed.
+  assert.doesNotMatch(HELPER, /if \(!opts\.clientId\) return;/,
+    "putting this back re-opens the hole: a trainer-logged session leaves no trace");
+  assert.match(HELPER, /logAppError\(/, "it must hand off to the shared reporter");
+});
+
+test("the browser has no insert grant; trainers read their clients' rows and the ones with no client", () => {
+  const SQL = sql(read("supabase/migrations/20260910b_the_app_records_its_own_errors.sql"));
+  // The insert policy is dropped, not rewritten: the service role writes, and a
+  // browser-side grant is a second path that would have to be kept correct.
+  assert.match(SQL, /drop policy if exists client_writes_own_errors/);
+  assert.doesNotMatch(SQL, /for insert/, "no browser insert path at all");
+  // Trainers read their own clients' rows...
+  assert.match(SQL, /for select to authenticated[\s\S]{0,60}trainer_can_see_client\(client_id\)/);
+  // ...and rows with NO client, which trainer_can_see_client(null) would hide:
+  // server faults, and errors from a signed-out screen.
+  assert.match(SQL, /client_id is null and exists/);
+  assert.match(SQL, /t\.active\b/, "trainers.active is a boolean — there is no status column");
   assert.doesNotMatch(SQL, /for select[\s\S]{0,80}my_client_id/, "the detail column carries ids");
 });
