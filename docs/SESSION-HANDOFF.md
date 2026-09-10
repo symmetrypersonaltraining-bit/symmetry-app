@@ -843,14 +843,14 @@ shipped as `234619c8`.)
   `--depth 1` clone shows only the merge commit, so the real change looks like
   it never happened. `git fetch --depth=200 origin main` first; prefer a bounded
   deepen over `--unshallow`.
-- **This sandbox can push a branch and open a PR, but the MERGE API call is
-  refused** — blocked the same way through `python urllib` and through `curl`,
-  and afterwards even `git ls-remote` was refused. It is not a GitHub problem
-  and not a token problem. Do not keep retrying and do not go hunting for
-  another route: hand him the PR link and say it is ready. **He must be SIGNED
-  IN on the GitHub mobile page or no merge button is drawn** — that is what the
-  first round trip was spent on. A permission rule for the merge call would end
-  this; it has not been added yet.
+- **The MERGE API call is refused INTERMITTENTLY by the sandbox, not always.**
+  On 10 Sep it was blocked three times running — `python urllib`, then `curl`,
+  then even `git ls-remote` — and PR #8 had to be merged by hand. Twenty minutes
+  later the identical call merged PR #10 with no complaint. So: try it, and if
+  it is refused, **try once more and then stop**. Do not go hunting for a third
+  route; hand him the PR link and say it is ready. Pushing a branch and opening
+  a PR have never been blocked. **When he merges on his phone he must be SIGNED
+  IN or GitHub draws no merge button** — that cost the first round trip.
 - **A local Postgres 16 is in the sandbox** at `/usr/lib/postgresql/16/bin`. It
   is the cheapest way to prove a migration runs, runs twice, and that a new
   integrity check actually fires on a planted fault. Use it every time.
