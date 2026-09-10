@@ -34,12 +34,19 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **10 Sep 2026** · `main` = `3e4be97`.
-**The gate is fully green**: 0 errors in `src/`, **3,053 unit tests pass 0 fail**,
+Last updated: **10 Sep 2026, evening** · `main` = `9f44da0`.
+**The gate is fully green**: 0 errors in `src/`, **3,067 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
-closed, the invisible meal ring and its ghost tick, and **the app's own error log**
-(`3e4be97`) — section 5 has the query to read it.
+closed, the invisible meal ring and its ghost tick, **the app's own error log**
+(`3e4be97` — section 5 has the query to read it), **Client View's chrome agreeing
+with its page** (`97aa2b4`, his missing tabs), and **the trainer home in one round
+trip** (`9f44da0`, the ten-second toggle — and the calendar past 1 December).
+
+> ⏳ **AWAITING HIS CONFIRMATION** on the last two. He asked *"build it n
+> confirm fixed"*; both are merged and deploying, and he has not yet said the
+> tabs are back or the toggle is quick. If he reports either still wrong, start
+> from the section 5 entry, not from scratch.
 
 > **His other Claude session pushes to this repo while you work.** It is not a
 > mistake and it is not to be reverted — check `git log origin/main` before you
@@ -718,6 +725,47 @@ The fingerprint (`lib/errorFingerprint.ts`) decides what "the same fault" means.
 If two rows look like one bug, or one row is clearly two, the normaliser is what
 to change — and `tests/unit/oneBugIsOneRow.test.ts` pins both directions.
 
+### ✅ SHIPPED 10 Sep — his tabs were gone, and the toggle took ten seconds (`97aa2b4`, `9f44da0`)
+
+Dustin, with a screenshot of his own Client View: *"my own client view nav
+tabs r gone! fix n check other clients"* — then *"the trainer view takes about
+10 seconds to switch screen over its laggy fix that too"*.
+
+**The tabs (PR #18).** The page was the client home; the chrome was the
+trainer's. Every server page and the middleware decide Client View from `?as=`
+and the `symmetry_client_mode` cookie; `TrainerLayoutWrapper` decided from
+**localStorage** and read neither. Android evicts localStorage under storage
+pressure, cookies are not subject to quota, so once localStorage was gone the
+two disagreed for 30 days. Now `lib/clientModeResolve.ts` is the pages' rule,
+pure; the server layout hands the wrapper its starting mode from the cookie;
+localStorage is written as a mirror and never read. **Other clients:**
+client-only accounts could never hit it (their branch mounts `<BottomNav />`
+unconditionally); the seven trainer-who-is-also-a-client accounts could, and
+now cannot. Nothing had crashed — `app_error_log` was empty, and that query
+was the first move.
+
+**The toggle (PR #19).** Measured: the trainer branch of `/home` made five
+serial reads, one paging **5,697** rows at 1,000 a time — ~10 hops per render —
+and the toggle called `router.refresh()` **and** `router.replace()`, two full
+renders, ~20 hops per tap. Now one `Promise.all` (the client branch already
+did this) and no `refresh()`: ~6 hops per tap. **Found on the way, and
+correctness:** the appointments read was not paged; **2,491** rows in its
+window, the 1,000th dated 1 December, **1,491 future appointments never
+reached the calendar**. Today's Sessions was right only because today was
+rank 557. Paged now, its own commit.
+
+**If the toggle is still slow after this,** the next lever is the calendar read
+itself: 5,697 scheduled workouts with two joins is a large payload for a HOME
+screen. Bounding it to the visible month means the calendar loads months on
+demand — a design change to `TrainerCalendarPanel`, not a query change. Not
+done; his call.
+
+**Follow-up worth a line:** `readsCannotTruncate.test.ts` cannot see a bounded
+window with no `.limit()` — exactly the shape that just bit. A scanner cannot
+know a row count; the pager's runtime ceiling is the only real guard, so every
+windowed calendar-style read should go through `fetchAllRowsSafe`. There may
+be more.
+
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
 
 He asked for this specifically: *"then lets do the walk through button by button
@@ -913,6 +961,21 @@ shipped as `234619c8`.)
   `app_error_log` still had `client_error_log_pkey` and `_client_id_fkey` until
   they were renamed by hand — which is what a violation message would have
   printed. `rename constraint` has no IF EXISTS; guard it in a DO block.
+- **One mode, one store.** Client View is decided by `?as=` then the
+  `symmetry_client_mode` cookie — `lib/clientModeResolve.ts` is the rule and
+  every page, the middleware and the wrapper now use it. localStorage
+  (`symmetry_view_mode`) is a write-only mirror for three feedback labels. Do
+  not add a third store, and do not read the mirror to decide anything: two
+  stores for one mode is how his tabs vanished.
+- **A bounded read with no `.limit()` can still exceed 1,000 rows, and nothing
+  flags it.** The static audit bans `.limit(n)` above the cap; a windowed
+  `.gte/.lte` read has no `.limit()` to see. Count the window against the live
+  table before trusting a calendar-style read, and page it. The appointments
+  read was 2,491 rows and silently ended the trainer calendar on 1 December.
+- **A toggle that "flips then waits" is two renders.** `router.replace()` plus
+  `router.refresh()` renders the page being left and then the destination. With
+  `?as=` markers on both directions and Next 15's dynamic staleTime of 0, the
+  refresh is pure cost — and on a ten-hop page it is the whole lag.
 - **A local Postgres 16 is in the sandbox** at `/usr/lib/postgresql/16/bin`. It
   is the cheapest way to prove a migration runs, runs twice, and that a new
   integrity check actually fires on a planted fault. Use it every time.
