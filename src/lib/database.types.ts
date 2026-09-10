@@ -8675,6 +8675,7 @@ export type Database = {
           category: string | null
           created_at: string | null
           description: string | null
+          forked_from_program_id: string | null
           id: string
           name: string
           owner_trainer_id: string | null
@@ -8687,6 +8688,7 @@ export type Database = {
           category?: string | null
           created_at?: string | null
           description?: string | null
+          forked_from_program_id?: string | null
           id?: string
           name: string
           owner_trainer_id?: string | null
@@ -8699,6 +8701,7 @@ export type Database = {
           category?: string | null
           created_at?: string | null
           description?: string | null
+          forked_from_program_id?: string | null
           id?: string
           name?: string
           owner_trainer_id?: string | null
@@ -8708,6 +8711,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "programs_forked_from_program_id_fkey"
+            columns: ["forked_from_program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "programs_owner_trainer_id_fkey"
             columns: ["owner_trainer_id"]

@@ -34,14 +34,23 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **10 Sep 2026, evening** · `main` = `9f44da0`.
-**The gate is fully green**: 0 errors in `src/`, **3,067 unit tests pass 0 fail**,
+Last updated: **10 Sep 2026, late morning Central** · `main` = `47e89dc` plus
+the one-client-one-copy PR merged after it.
+**The gate is fully green**: 0 errors in `src/`, **3,074 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
 closed, the invisible meal ring and its ghost tick, **the app's own error log**
 (`3e4be97` — section 5 has the query to read it), **Client View's chrome agreeing
-with its page** (`97aa2b4`, his missing tabs), and **the trainer home in one round
-trip** (`9f44da0`, the ten-second toggle — and the calendar past 1 December).
+with its page** (`97aa2b4`, his missing tabs), **the trainer home in one round
+trip** (`9f44da0`, the ten-second toggle — and the calendar past 1 December),
+**three ghosts off Today's Sessions** (`47e89dc`, the with-you marker follows
+the calendar), and **one client, one copy** (a scheduled library workout no
+longer clones the whole library programme once per row).
+
+> 🔴 **WAITING ON HIS WORD: 70 copies of "Solo Training — 3-Day — Mary"**
+> (10,150 days) are sitting in the database from this morning's programming run.
+> Nothing references them. Deleting a programme needs his yes — section 5, "one
+> client, one copy", has the counts and the backup plan.
 
 > ⏳ **AWAITING HIS CONFIRMATION** on the last two. He asked *"build it n
 > confirm fixed"*; both are merged and deploying, and he has not yet said the
@@ -820,7 +829,11 @@ future rows, no with-you markers) are now hidden by the roster gate.
 ⚠️ **Tyler is `online_only = true`, and that flag turns the calendar machinery
 OFF for him:** the follow-the-booking sync, the 'uncovered' proposal and the
 integrity check all skip online-only clients. He has 108 Mondays booked with
-Dustin. Put to him 10 Sep; **not changed** — his roster.
+Dustin. **His ruling, 10 Sep:** *"Leave Tyler's that way. Technically, he is
+online, but we do try to meet up every Monday. His workouts can stay in place.
+We will move them manually as needed. He's an exception."* So `online_only`
+stays true on purpose, his Monday workouts stay where they are, and they are
+moved by hand. **Do not raise it again.**
 
 ### ✅ DONE 10 Sep — the pulldown/row library consolidated; blank boxes on day one explained
 
@@ -902,6 +915,67 @@ weighted history on a row, prescribe that row, not a sibling name.*
 
 The "prefill the programmed weight when history is empty" idea is
 **superseded** by his ruling — he wants history, not the chip.
+
+### ✅ DONE 10 Sep — one client, one copy: Mary Ellen's 35 workouts made 70 programmes
+
+His screenshot from the Cowork "Client programming overhaul" session showed a
+fork loop in `day_is_exclusive_to` and asked *"does this need an actual fix or
+just a script from you to the project to explain?"* Both — and the loop it saw
+was the small part.
+
+**What happened (9:54 and again 9:57am Central).** That session scheduled 35
+workouts for Mary Ellen Joseph (new client, created 9:29) in one INSERT, on
+days sitting in the **library** programme "Solo Training — 3-Day"
+(`aaaa0002-…-0001`). Two BEFORE INSERT triggers on `scheduled_workouts` fire in
+**name order**, and the stamp (`trg_stamp_scheduled_workout_assignment`) ran
+before day isolation (`trg_sw_enforce_day_isolation`). The stamp found no
+assignment on the library programme, inserted one, and
+`pa_enforce_program_isolation` copied the **entire programme**. Then day
+isolation forked the one day into "Mary — Personal Workouts" and the copy was
+never used — or found again, because the next row looked for an assignment on
+the ORIGINAL programme id. One full copy per row: **70 programmes** named
+"Solo Training — 3-Day — Mary", 70 assignments, **10,150 days**, 32,935
+sections, 102,585 prescribed exercises. **0 workouts, 0 logs, 0 notes** on any
+of them. Her real 35 workouts are on four forked days in "Mary — Personal
+Workouts" — correct, untouched.
+
+**The fix — `20260910d_one_client_one_copy.sql`, applied live.**
+1. Day isolation renamed `trg_a_sw_enforce_day_isolation_first` so it fires
+   before the stamp. A library day becomes the client's before anything asks
+   which programme it is in; the stamp then finds the personal programme's
+   assignment and inserts nothing.
+2. `programs.forked_from_program_id` — a copy remembers its parent.
+   `pa_enforce_program_isolation` reuses the client's existing copy instead of
+   copying again; the stamp treats an assignment on a copy as one on the
+   parent and follows it to the matching day.
+
+Red proof, rolled back against production: 2 rows → **+2 programmes, +294
+days**. Green after: 2 rows → **+0**, both in her personal programme with its
+assignment. Assigning the same library programme to her twice now stops on
+`uq_pa_active_client_program` instead of silently copying. Test:
+`tests/unit/oneClientOneCopy.test.ts`. Pre-fix function bodies are in
+`bak_day_isolation_fns_20260910`.
+
+**Two things NOT done, both his call:**
+- **The 70 copies are still there.** Never delete a programme without asking.
+  When he says go: back up to `bak_mary_clones_20260910_*` (programs, phases,
+  days, sections, prescribed_exercises, program_assignments), then delete the
+  70 programmes by `forked_from_program_id = 'aaaa0002-…-0001'` and
+  `name = 'Solo Training — 3-Day — Mary'`. Mary keeps "Mary — Personal
+  Workouts" (1 programme, 4 days, 35 workouts).
+- **The library programme "Solo Training — 3-Day" is a dumping ground.** Its
+  one phase `bbbb0002-…-0001` holds **147 days**: the original 3 (20 Jun), then
+  everything built without a phase of its own since 15 Jul — Ankle & Posterior
+  Chain ×94, 8Wk Cut, MC-Sept cardio, Sharon's backup days ×20 (with her as
+  owner), Mary Ellen's 4 this morning at 9:55. Every copy carried all 147.
+  Where those days should live is his decision; the programming project must
+  stop writing there (the script he asked for was given 10 Sep, and is
+  repeated in section 6).
+
+The `day_is_exclusive_to` owner guard that session proposed
+(`or d.client_owner_id = p_client_id`) was **not** applied: it is not what
+multiplied, and treating a client-owned day that sits in a library programme as
+exclusive would schedule it in place, inside the library.
 
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
 
@@ -1069,6 +1143,29 @@ shipped as `234619c8`.)
 
 ## 6. THINGS THAT COST TIME — do not rediscover these
 
+- **Triggers on one table and one event fire in NAME order.** On
+  `scheduled_workouts`, `trg_stamp_…` fired before `trg_sw_…` and that order
+  copied a whole library programme once per scheduled row (10 Sep: 10,150
+  days in three minutes). If a trigger must run first, its name must sort
+  first — `trg_a_sw_enforce_day_isolation_first` is named for exactly that.
+  Read `pg_trigger` for the table before adding a trigger to
+  `scheduled_workouts`, `program_assignments` or `days`.
+- **Library phase `bbbb0002-0000-0000-0000-000000000001` ("Solo Training —
+  3-Day", P1) is where stray days end up.** 147 days from eight different
+  efforts since July. A programme copy with a day count that looks wrong
+  started there. Never build days into it; never copy it without looking.
+- **`programs.forked_from_program_id` is set by `pa_enforce_program_isolation`
+  only.** `duplicate_program_for_me` (a trainer's own copy) leaves it null on
+  purpose — a trainer's copy is not a client's isolation fork.
+- **The rules for the programming project (given to him 10 Sep):** build a
+  client's programme as their own programme (`personal_for_client_id` = the
+  client, or a programme with no other client assigned) with its own phase;
+  never insert days into a library phase; schedule from the client's days —
+  scheduling a library day is allowed but it gets forked into "<First> —
+  Personal Workouts", so do not expect the row to keep the library `day_id`;
+  never retry a batch insert by inserting again — check what landed first;
+  and `sw_enforce_day_isolation` / `stamp_scheduled_workout_assignment` are
+  the app's, not the project's — report, do not redefine.
 - **Postgres can reach the internet; the sandbox cannot.** `extensions.http(...)`
   is how USDA and HuggingFace data got in.
 - **A test that goes red after a ruling is not automatically a defect.** Check

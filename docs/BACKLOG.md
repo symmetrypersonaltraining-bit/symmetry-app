@@ -1,5 +1,27 @@
 # Backlog — the single work queue
 
+## 2026-09-10 — One client, one copy (DONE, DB rule); the 70 copies and the library phase OPEN, his call
+
+Scheduling 35 workouts for Mary Ellen on library days made 70 full copies of
+"Solo Training — 3-Day" (10,150 days) because the assignment stamp fired before
+day isolation and copied the programme once per row. `20260910d_one_client_one_copy.sql`:
+day isolation fires first (`trg_a_sw_enforce_day_isolation_first`),
+`programs.forked_from_program_id` lets the isolation trigger reuse a client's
+copy, the stamp treats a copy's assignment as the parent's. Red 2 rows → +2
+programmes; green → +0. Test `tests/unit/oneClientOneCopy.test.ts`.
+
+**Open, waiting on Dustin:**
+- Delete the 70 "Solo Training — 3-Day — Mary" copies (0 workouts/logs/notes on
+  them). Back up to `bak_mary_clones_20260910_*` first. Mary keeps "Mary —
+  Personal Workouts".
+- The library phase `bbbb0002-…-0001` holds 147 days from eight efforts since
+  15 Jul (Ankle & Posterior Chain ×94, Sharon's backups ×20, Mary Ellen's 4
+  today…). Decide where they live; the programming project must stop writing
+  there (rules given 10 Sep, repeated in the handoff §6).
+- Not applied: the `day_is_exclusive_to` owner guard the Cowork session
+  proposed. Not the multiplier; would schedule a client-owned day in place
+  inside a library programme.
+
 ## 2026-09-10 — Three ghosts on Today's Sessions (DONE, code + DB rule)
 
 Dustin: *"why Tyler, Troy and Christine are in my schedule ... get it fixed
