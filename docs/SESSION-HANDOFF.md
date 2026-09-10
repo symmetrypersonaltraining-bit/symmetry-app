@@ -766,6 +766,48 @@ know a row count; the pager's runtime ceiling is the only real guard, so every
 windowed calendar-style read should go through `fetchAllRowsSafe`. There may
 be more.
 
+### ✅ DONE 10 Sep — three ghosts on Today's Sessions, and the rule that ends them
+
+Dustin, 7:13am: *"why Tyler, Troy and Christine are in my schedule. Troy n
+christine are archived. Tyler only trains w me at 5am Mondays."* Then: *"that
+should have been picked up by cal sync, find out why it wasn't n fix it ... get
+it fixed this cant happen anymore."*
+
+**Three causes.** Today's Sessions adds any workout flagged with-you
+(`supervised`) even without an appointment (27 Aug). The flag is stamped by
+`generate_scheduled_workouts` from `client_training_patterns` and **never
+re-derived**. Christine: archived 31 Aug, but **archiving sets `archived_at` and
+nothing else** — her programme kept 35 future rows, 9 with-you, and the trainer
+home read the schedule, not the roster. Troy: **never archived in the app**
+(billing none, last appointment 29 Jul) — archived by hand today the way the app
+does it, pattern days switched off. Tyler: trained Thursdays until 20 Aug; his
+pattern was corrected to Monday-only; the rows generated 17/24 Aug kept
+Thursday = with-you through 10 Dec plus his whole peak week (photoshoot prep,
+not sessions).
+
+**Why cal sync missed it:** `detect_schedule_changes` sees an appointment with no
+workout ("uncovered") and a client with nothing booked ("retired"). **It has no
+rule for a with-you workout with no appointment on a client who still trains.**
+Tyler kept his Mondays, so nothing fired.
+
+**Fixed, both halves:**
+1. **Code** — the trainer home gates all four schedule-derived loops on the
+   active roster (`activeIds`). `tests/unit/anArchivedClientLeavesTheTrainersDay.test.ts`,
+   red on the old page.
+2. **Database** — `derive_supervised_from_calendar()` (migration `20260910c`,
+   applied live): clears with-you on any future unlogged workout with no
+   appointment that day, **downward only**, judged against the client's **own
+   booked horizon** (same rule as the `supervised_workout_no_appointment`
+   check) or any date if archived. Wired first into the thrice-daily
+   `calendar_derived_consistency` cron. First run cleared **42** rows — Tyler 19,
+   Christine 9, Troy 9, Lauren 4, Laurie 1 — Todd/Celeste/Krysta correctly left
+   alone. Backups `bak_ghost_sessions_20260910_*`.
+
+**His rule now, in force:** *if it is not on his calendar, it is not with him.*
+A real session he has not put on the calendar yet stays with-you only until
+his booked horizon passes it. Bobbie Page and Robert Miller (archived, 27 and 36
+future rows, no with-you flags) are now hidden by the roster gate.
+
 ### ✅ DONE 10 Sep — the pulldown/row library consolidated; blank boxes on day one explained
 
 Dustin, 10 Sep, logging Todd Prine's session, twice: *"Todd's weight is not
@@ -1066,6 +1108,19 @@ shipped as `234619c8`.)
   under a sibling row starts from zero, and thirteen pulldown rows make that
   easy. The fix is the builder reusing the client's rows, not the logger
   guessing which rows are alike.
+- **Archiving a client touches ONE column.** `clients.archived_at`, nothing
+  else. The programme keeps generating, appointments stay, patterns stay. Any
+  screen that reads the schedule must gate on the roster itself, or an archived
+  client's rows show for as long as their programme runs.
+- **`scheduled_workouts.supervised` is stamped at generation and was never
+  re-derived.** `generate_scheduled_workouts` copies it from
+  `client_training_patterns`, which nothing maintains after its one-time
+  derivation on 31 Jul. The calendar is the truth for with-you days;
+  `derive_supervised_from_calendar` (20260910c) is what keeps rows honest, and
+  it only clears — the 'uncovered' proposal is the upward direction.
+- **`detect_schedule_changes` cannot see a ghost.** It fires on an appointment
+  with no workout, and on a client with nothing booked. A with-you workout with
+  no appointment on a client who still trains is invisible to it by design.
 - **A toggle that "flips then waits" is two renders.** `router.replace()` plus
   `router.refresh()` renders the page being left and then the destination. With
   `?as=` markers on both directions and Next 15's dynamic staleTime of 0, the
