@@ -3143,6 +3143,32 @@ option:hover {
 }
 .sym-tile.is-today .sym-ring { border-color: rgba(255, 255, 255, .6); }
 
+/* AN UNLOGGED RING HAS TO LOOK LIKE SOMETHING YOU TAP.
+   Dustin, 10 Sep, with a screenshot of M5 and M6: "you cant see the unchecked
+   circles on unlocked foods w the new layout on nutrition logger."
+
+   He was right, and the cause was a token drawn against the wrong background —
+   the component passed --brand-border inline, which is mixed against the PAGE,
+   over a ring that sits inside a TILE. In dark those two are near-identical
+   darks. That is fixed in the component by not overriding the class at all.
+
+   This rule is the other half. Every OTHER state of this control is a filled
+   circle in a state colour — green logged, gold part, blue off-plan — so the
+   one state a client is meant to act on was also the only one with no fill at
+   all. It gets a real border and a faint inset, which is what makes an empty
+   checkbox read as an empty checkbox rather than as a hairline.
+
+   Both values are mixed against --tile-bg for the same reason the bug existed:
+   inside a tile, nothing may be mixed against the page. */
+.sym-ring--todo {
+  border-color: color-mix(in srgb, var(--brand-text) 38%, var(--tile-bg));
+  background: color-mix(in srgb, var(--brand-text) 5%, var(--tile-bg));
+}
+.sym-ring--todo:active { background: color-mix(in srgb, var(--brand-text) 12%, var(--tile-bg)); }
+/* On the bright tile the white border above already carries it; the inset would
+   only muddy a fill that is already light. */
+.sym-tile.is-today .sym-ring--todo { background: transparent; }
+
 /* The food a meal is made of, one item per line — it has always listed every
    item, and it is NOT .sym-wo-name. That class is clamped to two rows because
    "no more than 2 rows of text per card" is about the workout NAME. */

@@ -1605,13 +1605,30 @@ export default function NutritionV3Client(props: Props) {
     const logged = isLogged(row);
     const adh = logged ? l!.adherence : null;
     const built = row.kind === "openslot" && (row.meta?.items?.length || 0) > 0;
-    let bg = "transparent", border = "var(--brand-border)", inner: React.ReactNode = null;
+    // `null` means "not logged yet, leave the colours to .sym-ring". It used to
+    // be "var(--brand-border)" and that is the bug Dustin photographed: the
+    // circle on an unlogged meal was invisible on the new tile layout.
+    //
+    // --brand-border is computed against the PAGE. In dark it is
+    // color-mix(--brand-primary 34%, #2a3140) — a dark blue-grey — and the ring
+    // sits inside a TILE whose background is #141922 tinted with that same
+    // primary. Two near-identical darks, so a 2.5px ring drawn in one on the
+    // other is a ghost. .sym-ring already carried the right token
+    // (--tile-ctrl-bd, mixed against the tile); this inline style was
+    // overriding it. Setting no inline border lets the class win, which is also
+    // what makes the .sym-tile.is-today override reachable at all.
+    let bg: string | null = null, border: string | null = null, inner: React.ReactNode = null;
     if (row.kind === "openslot") {
       if (built) { bg = GREEN; border = GREEN; inner = <CheckSvg />; }
       else { inner = <span style={{ color: "var(--brand-text-secondary)", fontSize: 18 }}>＋</span>; }
     } else if (logged) {
       if (adh === "Full") { bg = GREEN; border = GREEN; inner = <CheckSvg />; }
-      else if (adh === "Skipped") { bg = "var(--brand-bg)"; inner = <span style={{ color: "var(--brand-text-secondary)", fontWeight: 800 }}>—</span>; }
+      // Skipped names its border explicitly. It only ever set a background and
+      // let the border default, which was fine while the default was a real
+      // colour — with the default now meaning "unlogged, leave it to the class"
+      // a skipped meal would have lost its fill and read as untouched.
+      // --tile-ctrl-bd, not --brand-border: it is inside a tile.
+      else if (adh === "Skipped") { bg = "var(--brand-bg)"; border = "var(--tile-ctrl-bd)"; inner = <span style={{ color: "var(--brand-text-secondary)", fontWeight: 800 }}>—</span>; }
       else if (adh === "Off-plan") {
         const pctMeta = row.meta && !row.meta.unlogged;
         bg = pctMeta ? GREEN : BLUE; border = bg; inner = <CheckSvg />;
@@ -1622,9 +1639,11 @@ export default function NutritionV3Client(props: Props) {
       <button
         onClick={() => tapCircle(row)}
         aria-label={`log ${rowLabel(row, idx)} full`}
-        className="sym-ring"
+        className={`sym-ring${border === null ? " sym-ring--todo" : ""}`}
         style={{
-          border: `2.5px solid ${border}`, background: bg,
+          // Only a ring with a REAL state colour paints itself. An unlogged one
+          // paints nothing inline, or it would override the class again.
+          ...(border === null ? null : { border: `2.5px solid ${border}`, background: bg ?? "transparent" }),
           transition: "all 0.2s", animation: popKey === row.key ? "v3pop 0.35s cubic-bezier(0.3,1.6,0.5,1)" : undefined,
           borderStyle: row.kind === "openslot" && !built ? "dashed" : "solid",
         }}

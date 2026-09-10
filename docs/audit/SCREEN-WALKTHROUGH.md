@@ -2471,7 +2471,7 @@ the same component. A row marked **T** is trainer-only.
 | 27 | The food list | every item, one per line | struck through when removed, badged FREE / ADDED |
 | 28 | **Choose A / Choose B** | switch which option is planned | **was nested buttons, fixed 9 Sep**; re-logs if already logged |
 | 29 | **＋ Build this meal** | an empty slot | the rest-day shape; food database · photo · typed |
-| 30 | The **ring** | log the meal full | 44px; colour carries Full / part / Skipped / Off-plan |
+| 30 | The **ring** | log the meal full | 44px; colour carries Full / part / Skipped / Off-plan. **UNLOGGED was invisible on the new layout — fixed 10 Sep**, see the interlude |
 | 31 | **✎ Edit** | the meal sheet | same target as the head |
 | 32 | **⋯** | the meal sheet | same target again — **worth asking him whether three doors to one sheet is right** |
 | 33 | **⠿** | hold to reorder | pointer-driven; `persistOrder` |
@@ -2818,3 +2818,59 @@ test accounts outright. Not built; his call.
 Migration `20260910a_access_is_not_the_same_as_archived.sql`. Rule:
 `src/lib/access/archivedAccess.ts`. Job: `/api/cron/revoke-access`, daily at
 06:30 Central, **live since 9 Sep**.
+
+
+## Interlude — the ring you could not see  ·  10 Sep 2026
+
+Dustin, with a screenshot of M5 Dinner and M6 Evening Snack: *"you cant see the
+unchecked circles on unlocked foods w the new layout on nutrition logger."*
+
+He was right, and it is the control a client touches most on this screen.
+
+### The cause was one token drawn against the wrong background
+
+`circleFor` passed `var(--brand-border)` inline for an unlogged meal, which
+overrode the `--tile-ctrl-bd` that `.sym-ring` already carried.
+
+The two are not interchangeable, and `globals.css` has said so for months:
+*"Everything a tile contains derives from the TILE, not from the raw token."*
+
+| | mixed against | in dark |
+|---|---|---|
+| `--brand-border` | the PAGE | `color-mix(--brand-primary 34%, #2a3140)` |
+| `--tile-ctrl-bd` | the TILE | `color-mix(--brand-text 22%, --tile-bg)` |
+
+The ring sits inside a tile whose background is `#141922` tinted with that same
+primary. So the border and the surface behind it were two near-identical darks,
+and a 2.5px circle drawn in one on the other is a ghost. Exactly what the
+screenshot shows.
+
+**The fix is to stop overriding the class.** An unlogged ring now paints nothing
+inline, which also makes the `.sym-tile.is-today .sym-ring` rule reachable — it
+had been dead code, silently overridden on every meal.
+
+### The other half: it never looked like a target
+
+Every OTHER state of this control is a filled circle in a state colour — green
+for logged, gold for part, blue for off-plan, a dash for skipped. So the one
+state a client is actually meant to **act on** was the only one with no fill at
+all, and a hairline outline is not a checkbox.
+
+`.sym-ring--todo` gives it a real border (38% of the text colour) and a faint
+inset (5%), both mixed against `--tile-bg` for the same reason the bug existed.
+It darkens on `:active`, and it drops the inset on the bright tile where the
+white border already carries it.
+
+### The trap inside the fix
+
+**Skipped** set a background and let the border default. That was fine while the
+default was a real colour; once the default means *"unlogged, leave it to the
+class"*, a skipped meal would have lost its fill and read as untouched. It names
+`--tile-ctrl-bd` explicitly now, and a test holds it.
+
+### Proven red first
+
+`tests/unit/theRingYouCanActuallySee.test.ts` — **five of its six tests fail
+against the unfixed code.** It also pins the 44px thumb target, because this
+class of bug invites a "make it smaller and darker" fix, and shrinking a thumb
+target on a phone is its own regression.
