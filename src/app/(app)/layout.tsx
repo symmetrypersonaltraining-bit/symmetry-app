@@ -22,6 +22,7 @@ import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { requireUser } from "@/lib/auth/serverUser";
 import { coachForViewer } from "@/lib/coachIdentity";
 import { CoachProvider } from "@/lib/useCoach";
+import { isClientMode } from "@/lib/client-mode";
 
 export default async function AppLayout({
   children,
@@ -66,6 +67,14 @@ export default async function AppLayout({
   if (isTrainer) noteTrainerEmail(email);
 
   if (isTrainer) {
+    // THE CHROME STARTS WHERE THE PAGE STARTS. Every page under this layout
+    // picks client-vs-trainer from the symmetry_client_mode cookie; the wrapper
+    // used to pick from localStorage and could disagree — a client page inside
+    // trainer chrome, with no bottom tabs. Dustin, 10 Sep: "my own client view
+    // nav tabs r gone!" Handing it the cookie's answer means the two cannot
+    // start apart. (A layout cannot see ?as=; the wrapper reconciles that on
+    // mount, the same way the pages honour it.)
+    const initialClientMode = await isClientMode();
     return (
       // One provider, wrapping everything that reads unread — the bell in
       // HeaderAssist, the banner, and the nav badge. Mounted here so there can
@@ -77,7 +86,7 @@ export default async function AppLayout({
         <PushRegister />
         <WebPushRegister />
         <MessageNotifier />
-          <TrainerLayoutWrapper>{children}</TrainerLayoutWrapper>
+          <TrainerLayoutWrapper initialClientMode={initialClientMode}>{children}</TrainerLayoutWrapper>
       </NotificationProvider>
       </CoachProvider>
     );
