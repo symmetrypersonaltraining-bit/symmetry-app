@@ -1,6 +1,20 @@
 # Backlog — the single work queue
 
-## 2026-09-10 — Day one of a new programme shows blank weight boxes  ← WAITING ON HIS PICK
+## 2026-09-10 — Pulldown/row library consolidated (DONE, data only); builder rule OPEN
+
+**Ruling:** *"we dont have a machine lat pull down or machine row so they both
+are cable n need to be consolidated n machines removed from library
+permanently."* Survivor Wide Grip Lat Pulldown (absorbed Machine / Lat Pulldown
+/ Cable Seated / Cable — 139 sets, 84 prescriptions); Hammer Strength pulldown
+→ Reverse Grip; Machine Row Underhand Grip renamed Cable Seated Underhand Grip
+Row; empty duplicate seated-row folded; seven rows `(retired)` + excluded, old
+names as aliases on the survivors. Backups `bak_*_exmerge_20260910`. Verified:
+0 clients still split; Smith Machine Row and Machine Assisted Pull Up stay.
+
+**Open:** the builder rule — *prescribe the row the client has history on, not
+a sibling name.* Aliases catch these four names, not the next one it invents.
+
+## 2026-09-10 — Day one of a new programme shows blank weight boxes (context, kept)
 
 Dustin, logging Todd: *"Todd's weight is not pulling up in history"* — twice,
 T-Bar row then Wide Grip Lat Pulldown. **Two different things.** The T-Bar is

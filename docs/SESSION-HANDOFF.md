@@ -766,7 +766,7 @@ know a row count; the pager's runtime ceiling is the only real guard, so every
 windowed calendar-style read should go through `fetchAllRowsSafe`. There may
 be more.
 
-### 🟠 WAITING ON HIS PICK — day one of a new programme shows blank weight boxes
+### ✅ DONE 10 Sep — the pulldown/row library consolidated; blank boxes on day one explained
 
 Dustin, 10 Sep, logging Todd Prine's session, twice: *"Todd's weight is not
 pulling up in history"* — T Bar Chest Supported Row, then Wide Grip Lat
@@ -809,14 +809,40 @@ Reverse Grip target is 120 — he loads grips differently, so merging every
 "lat pulldown" row would put the wrong most-recent weight in the box, which is
 worse than a blank one.
 
-**ONE QUESTION TO HIM, unanswered:** is Wide Grip Lat Pulldown the same
-movement as Machine Lat Pulldown for Todd? Yes → repoint today's prescription
-(`pe 0315f65b`'s sibling on the same day — the Wide Grip one) to the Machine
-row `3c659df2`; his 18 sets and the 150 appear at once, box and sheet. Then the
-root cause goes to the AI-programme thread as a builder rule: *when the client
-has weighted history on a row, prescribe that row, not a sibling name.* Reverse
-Grip ↔ Free Motion was NOT put to him as the same movement; a grip change is a
-different movement unless he says otherwise.
+**HIS RULING ON THE LIBRARY:** *"we dont have a machine lat pull down or
+machine row so they both are cable n need to be consolidated n machines
+removed from library permanently as an option."* Then, asked the three
+ambiguities: survivor = **Wide Grip Lat Pulldown**; Hammer Strength pulldown
+folds into Reverse Grip; **Smith Machine Row stays** (he has one).
+
+**DONE, data only, no code.** Backups `bak_exercises_exmerge_20260910`,
+`bak_set_logs_exmerge_20260910` (119 rows), `bak_prescribed_exercises_exmerge_20260910`
+(64), `bak_exercise_notes_exmerge_20260910` (2).
+- **Wide Grip Lat Pulldown** `ccdfa82a` absorbed Machine Lat Pulldown, Lat
+  Pulldown, Cable Seated Lat Pull Down, Cable Lat Pulldown → 139 set logs, 84
+  prescriptions, 2 notes. **The old names are its `aliases`** so the builder's
+  exact-name-then-alias lookup resolves any of them here.
+- **Reverse Grip Lat Pulldown** `a348d3a8` absorbed the Hammer Strength one.
+- **Machine Row Underhand Grip** `9715e272` renamed in place to **Cable Seated
+  Underhand Grip Row** (no cable underhand row existed; 24 sets, logged that
+  day, all intact), old name as alias.
+- **Cable Wide Grip Seated Row** absorbed its empty duplicate *Cable Seated
+  Wide Grip Row*.
+- Seven rows renamed `(retired) …` and `availability_status='excluded'` — the
+  picker and the AI pool filter that; the rename is because
+  `lib/exerciseLookup.ts` does NOT skip excluded rows and would still match
+  the exact name. **Never deleted.**
+- Verified: every retired row has 0 set logs / 0 prescriptions; the five
+  clients split across two pulldown lineages (Claudine, Hassan, Jennifer, Tim,
+  Todd) are now each under one row, **0 still split**; the only selectable
+  "Machine" pull/row rows are Machine Assisted Pull Up and Smith Machine Row.
+  Todd: 22 sets on the survivor, newest at 10 reps = his 130 from that night.
+
+**STILL OPEN — the root cause, for the AI-programme thread:** the builder
+resolves a movement by exact name then alias and never asks which rows the
+client already has history on. Aliases now catch the four names above; they do
+not catch the next sibling it invents. Rule to add: *when the client has
+weighted history on a row, prescribe that row, not a sibling name.*
 
 The "prefill the programmed weight when history is empty" idea is
 **superseded** by his ruling — he wants history, not the chip.
