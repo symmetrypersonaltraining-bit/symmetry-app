@@ -34,11 +34,12 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **10 Sep 2026** · `main` = `67e0c8a`.
-**The gate is fully green for the first time in a while**: 0 errors in `src/`,
-**3,037 unit tests pass 0 fail**, `test-nutrition-ai.cjs` **43 passed 0 failed**,
-build compiles. Shipped since: the access rule and its switch, the two red
-nutrition-AI tests closed by the bug-fix session, and the invisible meal ring.
+Last updated: **10 Sep 2026** · `main` = `3e4be97`.
+**The gate is fully green**: 0 errors in `src/`, **3,053 unit tests pass 0 fail**,
+`test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
+9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
+closed, the invisible meal ring and its ghost tick, and **the app's own error log**
+(`3e4be97`) — section 5 has the query to read it.
 
 > **His other Claude session pushes to this repo while you work.** It is not a
 > mistake and it is not to be reverted — check `git log origin/main` before you
@@ -666,6 +667,50 @@ every other state of that control is a filled circle and the one state a client
 must ACT on was the only one with no fill. Full write-up: the interlude "the ring
 you could not see" at the end of `docs/audit/SCREEN-WALKTHROUGH.md`.
 
+### ✅ SHIPPED 10 Sep — the app records its own errors (`3e4be97`, PR #15)
+
+Dustin: *"anytime something goes wrong or errors or there's a bug, you can look
+back at the actual log of when it happened and what happened … and we don't keep
+running into the same problems."* He chose **everything, grouped**, and **fix
+the trainer hole**. Both shipped; the workout logger was not touched to do it.
+
+**READ THIS FIRST WHEN HE REPORTS A BUG.** The table is `app_error_log`, one row
+per DISTINCT fault, and it is the thing to check before theorising — the same
+rule as "check the data before you explain". You need the Supabase MCP; Claude
+Code has no service key in its environment.
+
+    -- what is broken now, worst-most-recent first
+    select scope, source, occurrences, last_seen_at, path, message, client_id
+    from app_error_log where resolved_at is null
+    order by last_seen_at desc limit 20;
+
+    -- the last ten actual hits of one row: time, client, path, detail
+    select jsonb_pretty(recent) from app_error_log where id = '<id>';
+
+    -- when it is fixed. A LATER OCCURRENCE CLEARS THIS AGAIN on its own, so a
+    -- bug that comes back cannot hide behind a tick.
+    update app_error_log set resolved_at = now() where id = '<id>';
+
+What lands there: every uncaught throw and unhandled rejection (`ErrorReporter`
+in the root layout), every crashed screen (`(app)/error.tsx`, `global-error.tsx`),
+the three original workout writes (`logClientError`, now routed through
+`/api/log-error`), and anything a server route reports via `logServerError`
+(`lib/errorLog.ts`). **No server route calls `logServerError` yet** — it exists
+for the next failure that needs it; add it in the catch block, fire-and-forget.
+
+`detail.code` is the postgrest code — an RLS refusal, a constraint, a dropped
+request are all different codes, and that distinction is the one 26 Aug could
+not recover. `scope` says which net caught it: `render`, `unhandled`,
+`rejection`, `server`, or one of the workout three.
+
+**Zero rows is the good answer, not a broken one** — it was checked. Do not
+"fix" an empty table. A client's crash tile says *"reported automatically"*, so
+if he sends a screenshot of that tile, the row is already there.
+
+The fingerprint (`lib/errorFingerprint.ts`) decides what "the same fault" means.
+If two rows look like one bug, or one row is clearly two, the normaliser is what
+to change — and `tests/unit/oneBugIsOneRow.test.ts` pins both directions.
+
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
 
 He asked for this specifically: *"then lets do the walk through button by button
@@ -851,6 +896,16 @@ shipped as `234619c8`.)
   route; hand him the PR link and say it is ready. Pushing a branch and opening
   a PR have never been blocked. **When he merges on his phone he must be SIGNED
   IN or GitHub draws no merge button** — that cost the first round trip.
+- **Do not merge on "some check passed" — wait for the NAMED checks.** GitHub's
+  check-runs list fills in over a minute or so, and the Vercel one lands first.
+  A poll that stops when "every check present is complete" declared PR #15
+  ready with 1 of 3 reported; `mergeable_state: unstable` was the tell. Require
+  `syntax-check` and `tutorial-current` to be present AND completed. `clean` is
+  the state to merge on.
+- **Renaming a table leaves its constraints named after the old table.**
+  `app_error_log` still had `client_error_log_pkey` and `_client_id_fkey` until
+  they were renamed by hand — which is what a violation message would have
+  printed. `rename constraint` has no IF EXISTS; guard it in a DO block.
 - **A local Postgres 16 is in the sandbox** at `/usr/lib/postgresql/16/bin`. It
   is the cheapest way to prove a migration runs, runs twice, and that a new
   integrity check actually fires on a planted fault. Use it every time.

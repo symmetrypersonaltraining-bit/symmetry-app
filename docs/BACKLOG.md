@@ -1,5 +1,38 @@
 # Backlog — the single work queue
 
+## 2026-09-10 — The app records its own errors (SHIPPED, 3e4be97)
+
+Dustin: *"anytime something goes wrong or errors or there's a bug, you can look
+back at the actual log of when it happened and what happened … and we don't keep
+running into the same problems."* Chose **everything, grouped** and **fix the
+trainer hole**.
+
+`client_error_log` (26 Aug) watched three workout writes and had never fired —
+and that was checked: the mechanism was sound, the write path really had not
+missed. Everywhere else an error went to one of **124** `console.error` calls,
+which on a phone is nothing. No error boundary, no global handler.
+
+**The hole:** the insert policy resolved the *logged-in* user's client row, so
+when Dustin logged a client's session at `/workout?forClient=…` the insert was
+refused by RLS and swallowed. The case most likely to be reported was the one
+guaranteed to leave no trace. Writes now go through `/api/log-error` under the
+service role; the workout logger was not touched.
+
+**One row per fault.** 26 Aug refused to go broader — *"a table nobody reads"* —
+and it was right. `lib/errorFingerprint.ts` groups by scope + normalised message
++ path; a row carries `occurrences`, `last_seen_at`, and the last ten actual
+hits. Renamed to `app_error_log`. A crashed screen now shows a tile with **Try
+again** / **Go home** instead of white. Triage query in `SESSION-HANDOFF.md` §5.
+
+Caught on the way by the repo's own guards: both writes in `lib/errorLog.ts`
+were unchecked (would have answered `ok: true` to a refusal), an unguarded
+`window` error listener (a throw there is an infinite loop), and a migration
+that assumed `trainers.status` where the column is `trainers.active`.
+
+**Still open from this:** no server route calls `logServerError` yet. It is
+built and tested; wire it into a route's catch block the next time one is
+touched for another reason.
+
 ## 2026-09-08 — The coach can look a movement up (SHIPPED, eeb98b19)
 
 Item E of the AI programme — the last of the four big ones from 5 Sep, and the
