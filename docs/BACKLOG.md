@@ -17,14 +17,13 @@ day isolation fires first (`trg_a_sw_enforce_day_isolation_first`),
 copy, the stamp treats a copy's assignment as the parent's. Red 2 rows → +2
 programmes; green → +0. Test `tests/unit/oneClientOneCopy.test.ts`.
 
-**Open, waiting on Dustin:**
-- Delete the 70 "Solo Training — 3-Day — Mary" copies (0 workouts/logs/notes on
-  them). Back up to `bak_mary_clones_20260910_*` first. Mary keeps "Mary —
-  Personal Workouts".
-- The library phase `bbbb0002-…-0001` holds 147 days from eight efforts since
-  15 Jul (Ankle & Posterior Chain ×94, Sharon's backups ×20, Mary Ellen's 4
-  today…). Decide where they live; the programming project must stop writing
-  there (rules given 10 Sep, repeated in the handoff §6).
+**Follow-ups, both done on his word (10 Sep):**
+- The 70 copies deleted, backed up to `bak_mary_clones_20260910_*`; Mary's 35
+  workouts re-pointed to her Personal Workouts assignment.
+- The 147-day library phase: programme renamed "Madeleine — Solo Training
+  3-Day" (only she was ever assigned), her 10 days stay; 8 days moved to the
+  personal programmes of Sharon/Gerard/Stacie/Tina; 129 parked in the draft
+  programme "Unfiled — Jul/Aug 2026". Backup `bak_library_phase_20260910_*`.
 - Not applied: the `day_is_exclusive_to` owner guard the Cowork session
   proposed. Not the multiplier; would schedule a client-owned day in place
   inside a library programme.

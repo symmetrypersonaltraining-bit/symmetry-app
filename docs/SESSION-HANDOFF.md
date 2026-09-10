@@ -34,8 +34,8 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **10 Sep 2026, late morning Central** · `main` = `47e89dc` plus
-the one-client-one-copy PR merged after it.
+Last updated: **10 Sep 2026, midday Central** · `main` = `e32870c` plus the
+docs commit recording today's data changes.
 **The gate is fully green**: 0 errors in `src/`, **3,074 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
@@ -47,10 +47,10 @@ trip** (`9f44da0`, the ten-second toggle — and the calendar past 1 December),
 the calendar), and **one client, one copy** (a scheduled library workout no
 longer clones the whole library programme once per row).
 
-> 🔴 **WAITING ON HIS WORD: 70 copies of "Solo Training — 3-Day — Mary"**
-> (10,150 days) are sitting in the database from this morning's programming run.
-> Nothing references them. Deleting a programme needs his yes — section 5, "one
-> client, one copy", has the counts and the backup plan.
+> ✅ **The 70 copies are gone and the library phase is sorted (10 Sep, his
+> yes on both).** Section 5, "one client, one copy", has what moved where and
+> the backup tables. One question is open for him there: Stacie's 3 Sep email
+> quoted $640 and her invoice is now $480.
 
 > ⏳ **AWAITING HIS CONFIRMATION** on the last two. He asked *"build it n
 > confirm fixed"*; both are merged and deploying, and he has not yet said the
@@ -956,21 +956,29 @@ assignment. Assigning the same library programme to her twice now stops on
 `tests/unit/oneClientOneCopy.test.ts`. Pre-fix function bodies are in
 `bak_day_isolation_fns_20260910`.
 
-**Two things NOT done, both his call:**
-- **The 70 copies are still there.** Never delete a programme without asking.
-  When he says go: back up to `bak_mary_clones_20260910_*` (programs, phases,
-  days, sections, prescribed_exercises, program_assignments), then delete the
-  70 programmes by `forked_from_program_id = 'aaaa0002-…-0001'` and
-  `name = 'Solo Training — 3-Day — Mary'`. Mary keeps "Mary — Personal
-  Workouts" (1 programme, 4 days, 35 workouts).
-- **The library programme "Solo Training — 3-Day" is a dumping ground.** Its
-  one phase `bbbb0002-…-0001` holds **147 days**: the original 3 (20 Jun), then
-  everything built without a phase of its own since 15 Jul — Ankle & Posterior
-  Chain ×94, 8Wk Cut, MC-Sept cardio, Sharon's backup days ×20 (with her as
-  owner), Mary Ellen's 4 this morning at 9:55. Every copy carried all 147.
-  Where those days should live is his decision; the programming project must
-  stop writing there (the script he asked for was given 10 Sep, and is
-  repeated in section 6).
+**Both follow-ups DONE, on his word (10 Sep, late morning):**
+- **The 70 copies are deleted.** *"1 yes delete."* Backed up first to
+  `bak_mary_clones_20260910_{programs,phases,days,sections,prescribed,assignments,sw}`:
+  70 programmes, 70 phases, 10,150 days, 32,935 sections, 102,585 prescribed
+  exercises, 70 assignments. The only live reference was her own 35 workouts'
+  `assignment_id`, which pointed at one of the copies; re-pointed to the
+  "Mary — Personal Workouts" assignment inside the same transaction. She has
+  one assignment and 35 workouts, `days` is back to 1,208 rows.
+- **The 147-day library phase is sorted.** The programme "Solo Training —
+  3-Day" (`aaaa0002-…-0001`) had exactly one client assigned, Madeleine, since
+  20 June, and she was the only person who trained off it. So, backed up to
+  `bak_library_phase_20260910_{days,program}`:
+  1. renamed **"Madeleine — Solo Training 3-Day"**, her 10 used days stay
+     (Day A/B/C, Cardio, MC-Sept Lift A/B/C, two MC-Sept cardio, evening
+     mobility); her 123 scheduled rows untouched;
+  2. **8 days moved into the personal programme of the client who scheduled
+     them** (Sharon 2, Gerard 2, Stacie 3, Tina 1) via `ensure_personal_phase`;
+     history follows because logs are keyed by day;
+  3. **129 days parked** in a new `draft` programme **"Unfiled — Jul/Aug 2026"**
+     (one phase "Unfiled"): the 122 nobody ever scheduled or logged, Mary
+     Ellen's 4 originals (her forks in Personal Workouts carry the workouts),
+     and the 3 June template days. Nothing deleted; he files or prunes at
+     leisure.
 
 The `day_is_exclusive_to` owner guard that session proposed
 (`or d.client_owner_id = p_client_id`) was **not** applied: it is not what
@@ -1174,10 +1182,12 @@ shipped as `234619c8`.)
   first — `trg_a_sw_enforce_day_isolation_first` is named for exactly that.
   Read `pg_trigger` for the table before adding a trigger to
   `scheduled_workouts`, `program_assignments` or `days`.
-- **Library phase `bbbb0002-0000-0000-0000-000000000001` ("Solo Training —
-  3-Day", P1) is where stray days end up.** 147 days from eight different
-  efforts since July. A programme copy with a day count that looks wrong
-  started there. Never build days into it; never copy it without looking.
+- **Library phase `bbbb0002-0000-0000-0000-000000000001` is where stray days
+  used to end up.** It is Madeleine's programme ("Madeleine — Solo Training
+  3-Day", 10 days, sorted 10 Sep); 129 strays are parked in "Unfiled —
+  Jul/Aug 2026" (draft). If its day count climbs again, something is still
+  writing there — the programming project was told not to. Never build days
+  into it; never copy it without looking.
 - **`programs.forked_from_program_id` is set by `pa_enforce_program_isolation`
   only.** `duplicate_program_for_me` (a trainer's own copy) leaves it null on
   purpose — a trainer's copy is not a client's isolation fork.
