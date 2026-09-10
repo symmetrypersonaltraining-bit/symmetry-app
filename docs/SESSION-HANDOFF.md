@@ -766,6 +766,61 @@ know a row count; the pager's runtime ceiling is the only real guard, so every
 windowed calendar-style read should go through `fetchAllRowsSafe`. There may
 be more.
 
+### 🟠 WAITING ON HIS PICK — day one of a new programme shows blank weight boxes
+
+Dustin, 10 Sep, logging Todd Prine's session, twice: *"Todd's weight is not
+pulling up in history"* — T Bar Chest Supported Row, then Wide Grip Lat
+Pulldown, both with the programmed weight sitting in the chip and the box blank.
+
+**Checked before explaining, and it is two different things.**
+
+- **T-Bar: genuinely no history.** Todd has never logged it, and no row-type
+  movement he has logged is it. The blank box is the rule — *weights from
+  history* — with no history. Not a bug.
+- **Lat pulldown: the same movement under a different library row.** Todd has
+  **18 weighted sets of Machine Lat Pulldown at 150 lb** and 4 of Free Motion
+  at 120. Today's programme — **built today, 10 Sep** — prescribes *Wide Grip*
+  Lat Pulldown at a 150 lb target, *Reverse Grip* at 120, T-Bar at 90. Whatever
+  built it read his history correctly and then picked **different rows** for
+  the same movements. History is keyed by row, so every one reads "No history
+  yet". The library has **thirteen** pulldown rows for this to happen across.
+
+⚠️ **A wrong column nearly sent this the other way.** `set_logs` has both
+`weight` (dead) and `weight_lbs` (real). Counting on `weight` said Todd had
+zero weighted sets ever; on `weight_lbs` he has 497. Section 6.
+
+**HIS RULING, 10 Sep (voice, verbatim):** *"most recent weight at that number
+of reps should autofill. all history should be there at all reps. all history
+and reps full history should be in history button."*
+
+**All three already hold in the logger — for the row the history is on.** The
+box takes the newest weight at the target rep count (`histByPe`), falls back to
+the last session (`prevByPe`), and the history sheet shows every session at
+every rep count with no cap. Read and confirmed. **The whole gap is row
+identity**, and nothing in the library links the rows: the thirteen pulldown
+rows carry no `aliases` (2 of 858 rows library-wide do), no `forked_from_id`
+(0 of 858), and the builder resolves a movement by exact name then alias — it
+never asks which rows the client already has history on. So it named "Wide
+Grip Lat Pulldown", got that row, and began a new lineage for a movement Todd
+has done 18 times.
+
+**Do NOT build "history by base name."** Todd's Wide Grip target is 150 and his
+Reverse Grip target is 120 — he loads grips differently, so merging every
+"lat pulldown" row would put the wrong most-recent weight in the box, which is
+worse than a blank one.
+
+**ONE QUESTION TO HIM, unanswered:** is Wide Grip Lat Pulldown the same
+movement as Machine Lat Pulldown for Todd? Yes → repoint today's prescription
+(`pe 0315f65b`'s sibling on the same day — the Wide Grip one) to the Machine
+row `3c659df2`; his 18 sets and the 150 appear at once, box and sheet. Then the
+root cause goes to the AI-programme thread as a builder rule: *when the client
+has weighted history on a row, prescribe that row, not a sibling name.* Reverse
+Grip ↔ Free Motion was NOT put to him as the same movement; a grip change is a
+different movement unless he says otherwise.
+
+The "prefill the programmed weight when history is empty" idea is
+**superseded** by his ruling — he wants history, not the chip.
+
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
 
 He asked for this specifically: *"then lets do the walk through button by button
@@ -972,6 +1027,19 @@ shipped as `234619c8`.)
   `.gte/.lte` read has no `.limit()` to see. Count the window against the live
   table before trusting a calendar-style read, and page it. The appointments
   read was 2,491 rows and silently ended the trainer calendar on 1 December.
+- **`set_logs.weight` is dead; `weight_lbs` is the column.** Both exist. The
+  logger reads and writes `weight_lbs`; `weight` is a legacy column that is
+  NULL on rows that plainly have a weight. A count on `weight` said Todd Prine
+  had never logged a weight; on `weight_lbs` he had 497. Check the column list
+  before counting anything on this table. **`v_exercise_history` reads the dead
+  column** and nothing in `src/` reads the view — do not reach for it.
+- **The library has no "same movement" relation.** `exercises.aliases` is
+  other NAMES that resolve to a row (used by the builder and the picker), not a
+  history family; `forked_from_id` is unused; `prescribed_exercises.alternate_of`
+  is unused. History is keyed by `exercise_id`, full stop. A movement prescribed
+  under a sibling row starts from zero, and thirteen pulldown rows make that
+  easy. The fix is the builder reusing the client's rows, not the logger
+  guessing which rows are alike.
 - **A toggle that "flips then waits" is two renders.** `router.replace()` plus
   `router.refresh()` renders the page being left and then the destination. With
   `?as=` markers on both directions and Next 15's dynamic staleTime of 0, the

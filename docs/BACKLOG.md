@@ -1,5 +1,32 @@
 # Backlog — the single work queue
 
+## 2026-09-10 — Day one of a new programme shows blank weight boxes  ← WAITING ON HIS PICK
+
+Dustin, logging Todd: *"Todd's weight is not pulling up in history"* — twice,
+T-Bar row then Wide Grip Lat Pulldown. **Two different things.** The T-Bar is
+genuinely new to him: no history, blank box is the rule. The pulldown is the
+same movement under a different library row: Todd has 18 weighted sets of
+*Machine* Lat Pulldown at 150; today's programme — built today — prescribes
+*Wide Grip* at a 150 target. History is keyed by row. Thirteen pulldown rows in
+the library.
+
+**His ruling:** *"most recent weight at that number of reps should autofill.
+all history should be there at all reps. all history and reps full history
+should be in history button."* All three already hold in the logger for the
+row the history is on; the gap is purely row identity, and the library has no
+same-movement relation (no aliases on these rows, no forks, `alternate_of`
+unused). The builder resolves by exact name and never asks what rows the
+client has history on.
+
+**Waiting on one answer:** is Wide Grip Lat Pulldown the same movement as
+Machine Lat Pulldown for Todd? Yes → repoint today's prescription to the
+Machine row (his programming; asked, not done), then the builder rule for the
+AI-programme thread: *prescribe the row the client has history on, not a
+sibling name.* Reverse Grip ↔ Free Motion not assumed the same.
+
+Not to be built: history by base name. He loads grips differently (150 vs 120
+on the same day), so a merged family puts the wrong weight in the box.
+
 ## 2026-09-10 — His tabs were gone, and the toggle took ten seconds (SHIPPED, 97aa2b4 → 9f44da0)
 
 Dustin: *"my own client view nav tabs r gone! fix n check other clients"* and
