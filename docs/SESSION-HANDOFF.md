@@ -49,8 +49,8 @@ longer clones the whole library programme once per row).
 
 > ✅ **The 70 copies are gone and the library phase is sorted (10 Sep, his
 > yes on both).** Section 5, "one client, one copy", has what moved where and
-> the backup tables. One question is open for him there: Stacie's 3 Sep email
-> quoted $640 and her invoice is now $480.
+> the backup tables. Stacie's $480 reminder is a fresh unsent row waiting for
+> him on Payments (section 5).
 
 > ⏳ **AWAITING HIS CONFIRMATION** on the last two. He asked *"build it n
 > confirm fixed"*; both are merged and deploying, and he has not yet said the
@@ -990,10 +990,14 @@ exclusive would schedule it in place, inside the library.
 Dustin: *"update Stacie current invoice to $480 then pause her after that
 billing cycle. ill resume hers when she's back."*
 
-- **Her open invoice (due 9 Sep) is $480**, `manual_amount = true`, note on the
-  row. It was $640 and **the 3 Sep email told her $640** — he has not been asked
-  whether she needs a corrected message. Backups:
-  `bak_stacie_billing_20260910_reminders`, `_client`.
+- **Her open invoice (due 9 Sep) is a fresh `pending` row for $480**,
+  `manual_amount = true`, unsent, ready for him to send from Payments. The
+  original $640 row (emailed 3 Sep) was deleted on his word — *"delete the
+  current one and set up a new one that I can send with the updated amount"*.
+  The new row was inserted after the pause rule below went live, so it was
+  stamped `paused` and set back to `pending` by hand: it is meant to go out.
+  Backups: `bak_stacie_billing_20260910_reminders` (original $640 state),
+  `_reminders_v2` (the $480 state before the delete), `_client`.
 - **Her "Payment reminders" toggle is OFF.** That stops the daily generator
   (`generate_due_payment_reminders` honours it).
 - **The gap that would have undone the pause:** marking the $480 paid inserts
