@@ -1,4 +1,4 @@
--- IF IT IS NOT ON THE CALENDAR, IT IS NOT WITH THE TRAINER.
+-- THE WITH-YOU MARKER FOLLOWS THE CALENDAR. THE WORKOUT STAYS WHERE IT IS.
 --
 -- Dustin, 10 Sep 2026, 7:13am, with three names on Today's Sessions that
 -- should not have been there:
@@ -8,19 +8,25 @@
 --   "Tyler trains on Mondays now. that should have been picked up by cal sync,
 --    find out why it wasn't n fix it ... get it fixed this cant happen anymore."
 --
--- THREE CAUSES, ONE SHAPE. Today's Sessions shows every workout flagged
--- supervised for the day even without an appointment (27 Aug -- supervised
--- sessions were being missed). The flag is stamped by generate_scheduled_workouts
--- from client_training_patterns at generation time and NEVER re-derived. So:
+-- And, on first reading the word "clears": "i dont want the workout cleared
+-- just bc its not in my gcal." It is not. This touches ONE column,
+-- scheduled_workouts.supervised, true -> false. The workout keeps its date, its
+-- day and its status; the client still sees it and logs it. The only thing
+-- that changes is whether it counts as a session with the trainer -- which is
+-- what puts it on HIS Today's Sessions without an appointment.
+--
+-- THREE CAUSES, ONE SHAPE. Today's Sessions shows every workout marked with-you
+-- for the day even without an appointment (27 Aug -- with-you sessions were
+-- being missed). The marker is stamped by generate_scheduled_workouts from
+-- client_training_patterns at generation time and was NEVER re-derived. So:
 --
 --   Christine -- archived 31 Aug. Archiving sets clients.archived_at and nothing
---   else; her programme kept 35 future rows, 9 flagged with-you.
+--   else; her programme kept 35 future rows, 9 marked with-you.
 --   Troy      -- never archived in the app at all (done by hand today). Pattern
 --   said Wed/Thu with-you; last appointment 29 Jul.
 --   Tyler     -- trained Thursdays until 20 Aug. His pattern was corrected to
 --   Monday-only; the rows generated 17/24 Aug kept Thursday = with-you through
---   10 December, plus all six days of a peak week that is a photoshoot prep,
---   not sessions with him.
+--   10 December, plus all six days of a peak week that is photoshoot prep.
 --
 -- WHY CALENDAR SYNC NEVER CAUGHT IT. detect_schedule_changes has two rules: an
 -- appointment with no with-you workout ('uncovered'), and a client with nothing
@@ -28,9 +34,9 @@
 -- workout with no appointment on a client who still trains. Tyler kept his
 -- Mondays, so 'retired' never fired.
 --
--- THE RULE. derive_supervised_from_calendar clears the flag on a future,
+-- THE RULE. derive_supervised_from_calendar takes the marker OFF a future,
 -- unlogged, scheduled workout that has no scheduled appointment that day. It is
--- DOWNWARD ONLY -- it never sets the flag -- and it is judged against the
+-- DOWNWARD ONLY -- it never sets the marker -- and it is judged against the
 -- client's OWN BOOKED HORIZON, the same rule the
 -- supervised_workout_no_appointment integrity check already uses: a session
 -- later than the last appointment the client has actually made is a booking
@@ -38,12 +44,17 @@
 -- programmed through October; he is untouched. Archived clients are judged on
 -- every date.
 --
--- It runs inside the existing calendar_derived_consistency cron (06:05, 09:05,
--- 18:05 Central), ahead of sync_supervised_workouts_to_appointments.
+-- NOT ITS BUSINESS: a workout tied to a LIVE appointment. When he moves a
+-- booking in Google Calendar (imported every 15 minutes),
+-- sync_supervised_workouts_to_appointments moves that workout to match -- and
+-- it only moves MARKED workouts. So this runs AFTER the sync in the cron, and
+-- skips anything linked to a scheduled appointment on any date. If the sync
+-- cannot move one (the target day is taken), the row keeps its marker and the
+-- appointment_no_supervised_workout check reports it.
 --
--- FIRST RUN, 10 Sep: 42 rows cleared across five clients (Tyler 19, Christine
+-- FIRST RUN, 10 Sep: 42 rows unmarked across five clients (Tyler 19, Christine
 -- 9, Troy 9, Lauren 4, Laurie 1); Todd, Celeste and Krysta correctly left
--- alone. Backed up to bak_ghost_sessions_20260910_cleared.
+-- alone. Every changed row is in bak_ghost_sessions_20260910_cleared.
 
 create or replace function public.derive_supervised_from_calendar(p_dry_run boolean default true)
 returns table (client_name text, sched_date date, day_label text, action text)
@@ -67,6 +78,8 @@ begin
       and sw.status = 'scheduled'
       and sw.workout_log_id is null
       and sw.scheduled_date >= v_today
+      -- tied to a live booking: the sync's to move, not ours to unmark
+      and not exists (select 1 from appointments la where la.id = sw.appointment_id and la.status = 'scheduled')
       and not exists (
         select 1 from appointments a
         where a.client_id = sw.client_id and a.status = 'scheduled'
@@ -79,20 +92,21 @@ begin
     returning sw.id
   )
   select g.c_name, g.s_date, g.d_label,
-         case when p_dry_run then 'would clear' else 'cleared' end
+         case when p_dry_run then 'would unmark' else 'unmarked' end
   from ghost g order by g.c_name, g.s_date;
 end $$;
 
 comment on function public.derive_supervised_from_calendar(boolean) is
-  'Clears supervised on future scheduled workouts that have no appointment that day, judged against the client''s own booked horizon (or any date if archived). Downward only. Runs in cron job calendar_derived_consistency. Dustin, 10 Sep 2026: "if it is not on the calendar it is not with me."';
+  'Takes the with-you marker (supervised) OFF future scheduled workouts that have no appointment that day and are not tied to a live appointment, judged against the client''s own booked horizon (any date if archived). The workout itself is untouched. Downward only. Runs AFTER sync_supervised_workouts_to_appointments in cron job calendar_derived_consistency. Dustin, 10 Sep 2026.';
 
--- Wire it into the job that already keeps the schedule consistent with the
--- calendar, first in line so the sync and the billing recalc read cleaned rows.
+-- Into the job that already keeps the schedule consistent with the calendar --
+-- AFTER the sync, so a workout whose booking moved is moved first, and never
+-- unmarked out from under it.
 select cron.alter_job(
   (select jobid from cron.job where jobname = 'calendar_derived_consistency'),
   command := $job$
-    select public.derive_supervised_from_calendar(false);
     select public.sync_supervised_workouts_to_appointments(false);
+    select public.derive_supervised_from_calendar(false);
     select public.recalc_pending_payment_reminders();
   $job$
 );
