@@ -2728,28 +2728,60 @@ called the model, and still posted a preview into Dustin's own inbox — eleven
 consecutive nights after he set the flag false, and by his count he had turned it
 off about ten times. Three tests fail if that shape is ever reintroduced here.
 
-### Five people, not one
+### The list, and what he ruled on every name
 
-He flagged Bobbie Page. Read off the live database on 9 Sep, the first run would
-have taken **five**:
+He flagged Bobbie Page. The other seven were read off the live database and put
+to him one by one on 9 Sep. **He ruled on all eight, and the switch went ON the
+same night** — `app_flags.access_revoke_live = true`, job daily at 06:30 Central.
 
-| | archived | last paid | access ends | first run |
+| | archived | last paid | access ends | outcome |
 |---|---|---|---|---|
-| Tina Haley | 13 Aug | 12 Jul | **11 Aug** | cut off |
-| Christine Latham | 31 Aug | 22 Jul | **21 Aug** | cut off |
-| Brooke Reynolds | 31 Jul | never | **30 Aug** | cut off, no login to ban |
-| Robert Miller | 1 Sep | 1 Aug | **31 Aug** | cut off — *before he was archived* |
-| Bobbie Page | 31 Aug | 1 Aug | 31 Aug → **1 Oct** | his override |
-| Jada Cook | 13 Aug | never | 12 Sep | keeps it |
-| Tania Millan | 13 Aug | never | 12 Sep | keeps it |
-| Test Client | 13 Aug | never | 12 Sep | keeps it |
+| Tina Haley | 13 Aug | 12 Jul | **11 Aug** | cut off, first run |
+| Christine Latham | 31 Aug | 22 Jul | **21 Aug** | cut off, first run |
+| Brooke Reynolds | 31 Jul | never | **30 Aug** | cut off, first run — no login to ban |
+| Robert Miller | 1 Sep | 1 Aug | **31 Aug** | cut off, first run |
+| Jada Cook | 13 Aug | never | 12 Sep | auto cut-off on 12 Sep |
+| Tania Millan | 13 Aug | never | 12 Sep | auto cut-off on 12 Sep |
+| Bobbie Page | 31 Aug | 1 Aug | 31 Aug → **1 Oct** | kept, his override |
+| Test Client | 13 Aug | never | → **2099** | kept, indefinite override |
 
-**Robert Miller is the case worth his ruling.** He was archived on 1 Sep, his
-last paid invoice was due 1 Aug, so the rule ends his access on 31 Aug — *the day
-before he was archived at all*. Read literally, as it is built, a client archived
-more than thirty days after their last payment gets **no grace period whatsoever**;
-archiving them cuts them off that night. That may be exactly right. It is not
-something to decide on his behalf, so it is built literally and flagged.
+His words, in order: *"Tina, Christine and Brooke can be archived, not robert!"*
+— *"robert is archived i forgot he quit!!"* — *"Jada n Tania can be archived,
+leave test client"*.
+
+### ROBERT MILLER, AND THE FLOOR THAT WAS NOT ADDED
+
+His is the case where the rule looks harsh. Archived 1 Sep, last paid invoice due
+1 Aug, so the rule ends his access on **31 Aug — the day before he was archived
+at all.** Read literally, anyone archived more than thirty days after their last
+payment gets **no grace period whatsoever**: archiving them cuts them off that
+night.
+
+The tempting fix was a floor — a guaranteed few days from the archiving date. It
+was built literally and put to him instead. **He ruled: no floor.** He quit, and
+being cut off on the first run is correct.
+
+Worth recording that it nearly went the other way. He first said Robert should
+not be archived at all (*"Robert still trains but I only do programming but he's
+still paying"*), his row was unarchived, and then he corrected himself and it was
+restored from `bak_robert_miller_unarchive_20260909`. **Neither the rule nor the
+row needed changing in the end.** Check the row, and ask him, before softening
+this rule the next time it looks harsh.
+
+### `payment_reminders` is a thinner ledger than this rule assumes
+
+Robert pays **$300 a month flat** and has exactly **one** `payment_reminders`
+row, for **$150**, with `payment_reminders_enabled = false`. He is not unusual:
+**16 of the 33 active clients have reminders off**, every one of them
+`billing_type = 'none'` with zero paid rows — four family accounts, five
+self-coached, one demo, and six real training clients (Celeste Lennon, Greg
+Lennon, Jerry Bourgeois, Krysta Ruiz-Schnitzler, Laurie Kane, Troy Schnitzler).
+
+So "their last paid invoice" is **not** a reliable record of when somebody last
+paid. Where there is no paid row the rule falls back to `archived_at + 30`, which
+is the safer answer and is doing more of the work here than the headline rule
+suggests. It was right for every name he ruled on. **It is a standing risk for
+anyone archived in future** — and it is the reason the override exists.
 
 ### Brooke Reynolds is a one-day timezone bug that the tests caught
 
@@ -2773,11 +2805,16 @@ unban their auth user.
 ### Not built, and deliberately
 
 **The trainer-facing override control.** `access_override_until` exists and
-works, and Bobbie's is set. What does not exist is a button for it on the client
+works, and two overrides are set — Bobbie's and Test Client's. What does not exist is a button for it on the client
 profile — because `/clients/[clientId]` has not been walked yet, and audit rule 6
 is *never edit a screen that has not been walked*. It lands when that screen
 comes up. Until then the override is set directly.
 
+**`Test Client` has `is_test_account = false`**, which looks wrong for a row
+named that. It is held back by a 2099 override, which is a workaround rather than
+an answer — the tidier fix is flagging it a test account and having the job skip
+test accounts outright. Not built; his call.
+
 Migration `20260910a_access_is_not_the_same_as_archived.sql`. Rule:
 `src/lib/access/archivedAccess.ts`. Job: `/api/cron/revoke-access`, daily at
-06:30 Central.
+06:30 Central, **live since 9 Sep**.
