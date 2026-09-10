@@ -664,8 +664,15 @@ every meal.
 
 `.sym-ring--todo` additionally gives it a real border and a faint inset, because
 every other state of that control is a filled circle and the one state a client
-must ACT on was the only one with no fill. Full write-up: the interlude "the ring
-you could not see" at the end of `docs/audit/SCREEN-WALKTHROUGH.md`.
+must ACT on was the only one with no fill.
+
+**Then he asked for an icon in it** (*"we need some type of icon in there,
+ideas?"* → *"Just run 1 ghost check plz"*) — shipped `6fb55d5` (PR #14). An
+unlogged ring now carries a dimmed tick, `currentColor` from `.sym-ring--todo`.
+Not a ＋: that already means "build this meal" on the open-slot ring and "insert
+a meal" on the line between tiles. `CheckSvg` takes a colour now, default `#fff`.
+Full write-up: the interlude "the ring you could not see" at the end of
+`docs/audit/SCREEN-WALKTHROUGH.md`.
 
 ### ✅ SHIPPED 10 Sep — the app records its own errors (`3e4be97`, PR #15)
 
