@@ -2471,7 +2471,7 @@ the same component. A row marked **T** is trainer-only.
 | 27 | The food list | every item, one per line | struck through when removed, badged FREE / ADDED |
 | 28 | **Choose A / Choose B** | switch which option is planned | **was nested buttons, fixed 9 Sep**; re-logs if already logged |
 | 29 | **＋ Build this meal** | an empty slot | the rest-day shape; food database · photo · typed |
-| 30 | The **ring** | log the meal full | 44px; colour carries Full / part / Skipped / Off-plan. **UNLOGGED was invisible on the new layout — fixed 10 Sep**, see the interlude |
+| 30 | The **ring** | log the meal full | 44px; colour carries Full / part / Skipped / Off-plan. **Unlogged now shows a ghost tick** — was invisible on the new layout, fixed 10 Sep, see the interlude |
 | 31 | **✎ Edit** | the meal sheet | same target as the head |
 | 32 | **⋯** | the meal sheet | same target again — **worth asking him whether three doors to one sheet is right** |
 | 33 | **⠿** | hold to reorder | pointer-driven; `persistOrder` |
@@ -2874,3 +2874,31 @@ class"*, a skipped meal would have lost its fill and read as untouched. It names
 against the unfixed code.** It also pins the 44px thumb target, because this
 class of bug invites a "make it smaller and darker" fix, and shrinking a thumb
 target on a phone is its own regression.
+
+### And then an icon inside it  ·  10 Sep 2026
+
+Dustin, once the ring was visible: *"we need some type of icon in there,
+ideas?"* — then *"Just run 1 ghost check plz"*.
+
+**An unlogged ring now carries a dimmed version of the tick it turns into.**
+Tapping it fills the circle green and makes that same tick white, so the ghost is
+a preview of the outcome rather than a new symbol to learn.
+
+**Why not the obvious ＋.** It is already two things on this screen: the
+open-slot ring means *build this meal*, and the line between tiles means *insert
+a meal here*. A third meaning would have made all three vaguer. The tick also
+cannot be confused with the — that marks a meal skipped.
+
+It cannot read as "already logged" either: a logged meal is a **white** tick on a
+**solid green fill**, and this is an outline on an empty circle.
+
+Two details worth keeping:
+
+- `CheckSvg` hardcoded `stroke="#fff"`. Correct on a green, blue or gold fill and
+  wrong the moment the same path is a ghost on an empty ring in a light scheme.
+  It takes a colour now, defaulting to `#fff` so every existing call site is
+  untouched, and the ghost passes `currentColor`.
+- The tick is **45%** of the text colour where the border is 38%. They are meant
+  to look like one object; a 3px stroke reads lighter than a solid ring edge at
+  the same value. On the bright tile both follow the white border instead of the
+  tile they are no longer sitting on.

@@ -1634,6 +1634,20 @@ export default function NutritionV3Client(props: Props) {
         bg = pctMeta ? GREEN : BLUE; border = bg; inner = <CheckSvg />;
       }
       else { bg = GOLD; border = GOLD; inner = <span style={{ color: "#111", fontWeight: 800, fontSize: 13 }}>{adh === "3/4" ? "¾" : adh === "1/2" ? "½" : adh === "1/4" ? "¼" : "½"}</span>; }
+    } else {
+      // A PLANNED MEAL NOBODY HAS LOGGED YET — a ghost of the tick it becomes.
+      //
+      // Dustin, 10 Sep: "we need some type of icon in there". The ＋ was the
+      // obvious candidate and it is already taken TWICE on this screen — the
+      // open-slot ring means "build this meal" and the line between tiles means
+      // "insert a meal here" — so a third meaning would have made all three
+      // vaguer.
+      //
+      // A dimmed version of the very tick this ring turns into says what
+      // tapping does without inventing any vocabulary, and it cannot be
+      // confused with the ＋ that builds or the — that skips. currentColor,
+      // inherited from .sym-ring--todo, so it holds on all thirty schemes.
+      inner = <CheckSvg color="currentColor" />;
     }
     return (
       <button
@@ -4076,10 +4090,21 @@ function SavePlanSheet({
 // Off-plan flow (photo / typed / describe) — shared by meal rows & extras.
 // ---------------------------------------------------------------------------
 
-function CheckSvg() {
+/**
+ * The tick inside a logged ring — and, dimmed, inside an unlogged one.
+ *
+ * The stroke was hardcoded #fff, which is right on a green, blue or gold fill
+ * and wrong everywhere else. It takes a colour now so the SAME path can be the
+ * ghost on an empty ring: `currentColor` there, inherited from
+ * `.sym-ring--todo`, so it lands correctly on all thirty schemes instead of
+ * being white on a pale tile.
+ *
+ * Default stays #fff, so every existing call site is unchanged.
+ */
+function CheckSvg({ color = "#fff" }: { color?: string } = {}) {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22">
-      <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path d="M5 12.5l4.5 4.5L19 7.5" stroke={color} strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

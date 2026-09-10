@@ -89,6 +89,37 @@ test("the unlogged ring is more visible than the generic tile control", () => {
   assert.ok(pct >= 30, `the unlogged border is ${pct}% of the text colour; 22% is what was already too faint`);
 });
 
+test("an unlogged ring carries a ghost of the tick it becomes", () => {
+  // Dustin, 10 Sep: "we need some type of icon in there". A dimmed version of
+  // the very tick this ring turns into says what tapping does without inventing
+  // vocabulary.
+  const body = circleForBody();
+  assert.match(body, /inner = <CheckSvg color="currentColor" \/>/,
+    "the unlogged branch must draw the ghost tick");
+  // currentColor, not a literal: the tick has to land on all thirty schemes,
+  // and .sym-ring--todo is what supplies the value.
+  const rule = CSS.slice(CSS.indexOf(".sym-ring--todo {"), CSS.indexOf(".sym-ring--todo:active"));
+  assert.match(rule, /color:\s*color-mix\([\s\S]*?--tile-bg/,
+    ".sym-ring--todo must set the colour the ghost tick inherits");
+});
+
+test("the ghost tick is NOT the + that builds or inserts", () => {
+  // The + is already two things on this screen: the open-slot ring builds a
+  // meal, and the line between tiles inserts one. A third meaning would have
+  // made all three vaguer, which is why the tick was chosen.
+  const body = circleForBody();
+  const openslot = body.slice(body.indexOf('row.kind === "openslot"'), body.indexOf("} else if (logged)"));
+  assert.match(openslot, /＋/, "the open slot keeps its + and does not gain a tick");
+});
+
+test("CheckSvg takes a colour so it is not white on a pale tile", () => {
+  // It hardcoded stroke="#fff", which is right on a green, blue or gold fill
+  // and wrong as a ghost on an empty ring in a light scheme.
+  const svg = NUT.slice(NUT.indexOf("function CheckSvg("), NUT.indexOf("function OffPlanFlow("));
+  assert.match(svg, /color = "#fff"/, "the default stays #fff so filled rings are unchanged");
+  assert.match(svg, /stroke=\{color\}/, "and the stroke has to be the parameter, not a literal");
+});
+
 test("the ring keeps its 44px thumb target", () => {
   // Guarded because this bug invites "make it smaller and darker" fixes. It is
   // a thumb target on a phone and shrinking it is a regression on its own.
