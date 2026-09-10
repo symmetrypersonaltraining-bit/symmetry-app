@@ -84,7 +84,12 @@ test("the ring stays a thumb target", () => {
   // It moves into the action strip, which is what the mock-up shows. It must
   // NOT shrink to the mock-up's 27px sketch: it replaces a 46px circle and it
   // is the control a client touches more than any other.
-  assert.match(CODE, /className="sym-ring"/, "the log ring uses the shared class");
+  // Matches the template-literal form too. It became
+  // className={`sym-ring${...  " sym-ring--todo"}`} on 10 Sep, when an unlogged
+  // ring stopped painting its border inline — see theRingYouCanActuallySee.
+  // What this line is protecting is that the ring keeps the SHARED class and
+  // its tile-mixed tokens, and that is still exactly what it asserts.
+  assert.match(CODE, /className=(?:"sym-ring"|\{`sym-ring)/, "the log ring uses the shared class");
   const rule = CSS.match(/\.sym-ring \{[^}]*\}/)?.[0] ?? "";
   const px = Number(rule.match(/width:\s*(\d+)px/)?.[1] ?? 0);
   assert.ok(px >= 44, `the log ring is ${px}px — under the 44px touch floor`);
