@@ -977,6 +977,30 @@ The `day_is_exclusive_to` owner guard that session proposed
 multiplied, and treating a client-owned day that sits in a library programme as
 exclusive would schedule it in place, inside the library.
 
+### ✅ DONE 10 Sep — Stacie: invoice to $480, then paused after this cycle
+
+Dustin: *"update Stacie current invoice to $480 then pause her after that
+billing cycle. ill resume hers when she's back."*
+
+- **Her open invoice (due 9 Sep) is $480**, `manual_amount = true`, note on the
+  row. It was $640 and **the 3 Sep email told her $640** — he has not been asked
+  whether she needs a corrected message. Backups:
+  `bak_stacie_billing_20260910_reminders`, `_client`.
+- **Her "Payment reminders" toggle is OFF.** That stops the daily generator
+  (`generate_due_payment_reminders` honours it).
+- **The gap that would have undone the pause:** marking the $480 paid inserts
+  the next cycle as `pending` from two places (`markClientPaid`,
+  `ReminderEditor`) and neither reads the toggle — so a 9 Oct invoice would
+  have sat on Payments as Pending, $0. Red proof, rolled back: `pending`.
+  `20260910e_a_paused_clients_next_invoice_arrives_paused.sql` (applied live):
+  a reminder inserted as pending for a client whose toggle is off lands as
+  `paused`. Green: Stacie → `paused`, a toggle-on control client → `pending`.
+  Test `tests/unit/aPausedClientsNextInvoiceArrivesPaused.test.ts`.
+- **To resume her:** switch the toggle on in her profile, then press Resume on
+  the paused row on Payments (a paused row does not block a new pending one —
+  `uq_one_open_reminder_per_client` counts only pending/sent — so if the
+  generator makes a fresh one first, delete the paused one).
+
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
 
 He asked for this specifically: *"then lets do the walk through button by button
