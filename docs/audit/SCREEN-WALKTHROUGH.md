@@ -3154,17 +3154,25 @@ his Thursdays were invisible to it by construction.
    never reach the screen. `tests/unit/anArchivedClientLeavesTheTrainersDay.test.ts`
    pins all four; **all fail against the page as it was.**
 2. **The rule, in his words: if it is not on the calendar, it is not with him.**
-   `derive_supervised_from_calendar()` (migration `20260910c`) clears the with-you
-   flag on any future, unlogged workout with no appointment that day — **downward
-   only**, and judged against the client's **own booked horizon**, the rule the
-   `supervised_workout_no_appointment` integrity check already used: a session
+   `derive_supervised_from_calendar()` (migration `20260910c`) takes the
+   **with-you marker** off any future, unlogged workout with no appointment that
+   day. **The workout itself is untouched** — same date, same day, still on the
+   client's schedule, still theirs to log; only whether it counts as a session
+   with him changes. He read "clears" as deleting — *"i dont want the workout
+   cleared just bc its not in my gcal"* — so: it is a marker, not the workout.
+   **Downward only**, judged against the client's **own booked horizon** (the
+   rule the `supervised_workout_no_appointment` check already used: a session
    past the last appointment a client has actually made is next week's booking,
-   not a ghost. It runs first in the thrice-daily `calendar_derived_consistency`
-   job. First run: 42 rows cleared (Tyler 19, Christine 9, Troy 9, Lauren 4,
-   Laurie 1); Todd, Celeste and Krysta correctly untouched.
+   not a ghost), and it **skips any workout tied to a live booking** — when he
+   moves a session in Google Calendar, the existing follow-the-booking sync
+   moves that workout to match, and it runs first. First run: 42 rows unmarked
+   (Tyler 19, Christine 9, Troy 9, Lauren 4, Laurie 1); Todd, Celeste and Krysta
+   correctly untouched.
 
 | | before | now |
 |---|---|---|
 | archived client with a running programme | on Today's Sessions and the calendar until the programme ends | never shown |
-| with-you flag after the calendar changes | frozen at generation | re-derived three times a day, inside the booked horizon |
-| a session he simply hasn't put on the calendar yet | shown as with-you | shown until his booked horizon passes it, then cleared — the calendar is the truth |
+| with-you marker after the calendar changes | frozen at generation | re-derived three times a day, after the sync, inside the booked horizon |
+| he moves a booking in Google Calendar | the marked workout follows it (unchanged) | the marked workout follows it, and is never unmarked out from under the move |
+| a session he simply hasn't put on the calendar yet | shown as with-you | shown until his booked horizon passes it, then unmarked — the workout stays, the calendar is the truth |
+| a client flagged online-only | the calendar machinery skips them (unchanged) | unchanged — Tyler carries that flag and 108 Mondays; put to him |

@@ -11,10 +11,13 @@ through December after his Thursdays ended 20 Aug. Cal sync could not see it:
 appointment on a client who still trains.
 
 Fixed: trainer home gates every schedule read on the active roster; new
-`derive_supervised_from_calendar()` clears with-you on future workouts with no
-appointment, inside the client's own booked horizon, thrice daily. First run 42
-rows (Tyler 19, Christine 9, Troy 9, Lauren 4, Laurie 1). His rule: **if it's
-not on the calendar, it's not with him.** Backups `bak_ghost_sessions_20260910_*`.
+`derive_supervised_from_calendar()` takes the **with-you marker** off future
+workouts with no appointment that day — **the workout itself is untouched** —
+inside the client's own booked horizon, after the follow-the-booking sync,
+thrice daily. First run 42 rows (Tyler 19, Christine 9, Troy 9, Lauren 4,
+Laurie 1). His rule: **if it's not on the calendar, it's not with him.** Backups
+`bak_ghost_sessions_20260910_*`. Open: Tyler is flagged `online_only`, which
+switches the calendar machinery off for him — his call.
 
 Also from the movement audit (report: `same-lift-two-rows` artifact): 9 live
 history gaps and 12 duplicate pairs, two decisions pending — survivors for

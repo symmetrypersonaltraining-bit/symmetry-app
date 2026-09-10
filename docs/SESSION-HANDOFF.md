@@ -795,18 +795,32 @@ Tyler kept his Mondays, so nothing fired.
    active roster (`activeIds`). `tests/unit/anArchivedClientLeavesTheTrainersDay.test.ts`,
    red on the old page.
 2. **Database** — `derive_supervised_from_calendar()` (migration `20260910c`,
-   applied live): clears with-you on any future unlogged workout with no
-   appointment that day, **downward only**, judged against the client's **own
-   booked horizon** (same rule as the `supervised_workout_no_appointment`
-   check) or any date if archived. Wired first into the thrice-daily
-   `calendar_derived_consistency` cron. First run cleared **42** rows — Tyler 19,
-   Christine 9, Troy 9, Lauren 4, Laurie 1 — Todd/Celeste/Krysta correctly left
-   alone. Backups `bak_ghost_sessions_20260910_*`.
+   applied live): takes the **with-you marker** (`supervised`) off any future
+   unlogged workout with no appointment that day. **THE WORKOUT ITSELF IS
+   UNTOUCHED** — same date, same day, same status, the client still sees and
+   logs it; only whether it counts as a session with him changes. He read the
+   word "clears" as deleting and said so: *"i dont want the workout cleared just
+   bc its not in my gcal."* Do not use that word for this. **Downward only**,
+   judged against the client's **own booked horizon** (same rule as the
+   `supervised_workout_no_appointment` check) or any date if archived, and it
+   **skips any workout tied to a live appointment** — those belong to
+   `sync_supervised_workouts_to_appointments`, which moves a marked workout to
+   follow its booking when he moves it in Google Calendar (imported every 15
+   min). The cron runs the **sync first, then this**; the first draft ran them
+   the other way round and would have unmarked a workout the sync was about to
+   move. First run unmarked **42** rows — Tyler 19, Christine 9, Troy 9, Lauren
+   4, Laurie 1 — Todd/Celeste/Krysta correctly left alone. Backups
+   `bak_ghost_sessions_20260910_*`.
 
 **His rule now, in force:** *if it is not on his calendar, it is not with him.*
-A real session he has not put on the calendar yet stays with-you only until
+A real session he has not put on the calendar yet stays marked with-you until
 his booked horizon passes it. Bobbie Page and Robert Miller (archived, 27 and 36
-future rows, no with-you flags) are now hidden by the roster gate.
+future rows, no with-you markers) are now hidden by the roster gate.
+
+⚠️ **Tyler is `online_only = true`, and that flag turns the calendar machinery
+OFF for him:** the follow-the-booking sync, the 'uncovered' proposal and the
+integrity check all skip online-only clients. He has 108 Mondays booked with
+Dustin. Put to him 10 Sep; **not changed** — his roster.
 
 ### ✅ DONE 10 Sep — the pulldown/row library consolidated; blank boxes on day one explained
 
@@ -1116,8 +1130,11 @@ shipped as `234619c8`.)
   re-derived.** `generate_scheduled_workouts` copies it from
   `client_training_patterns`, which nothing maintains after its one-time
   derivation on 31 Jul. The calendar is the truth for with-you days;
-  `derive_supervised_from_calendar` (20260910c) is what keeps rows honest, and
-  it only clears — the 'uncovered' proposal is the upward direction.
+  `derive_supervised_from_calendar` (20260910c) is what keeps the marker honest,
+  and it only takes the marker off — never the workout, never upward; the
+  'uncovered' proposal is the upward direction. It runs AFTER the sync and skips
+  anything tied to a live booking, or it would unmark a workout the sync was
+  about to move. "Clears" is the wrong word for this in front of him.
 - **`detect_schedule_changes` cannot see a ghost.** It fires on an appointment
   with no workout, and on a client with nothing booked. A with-you workout with
   no appointment on a client who still trains is invisible to it by design.
