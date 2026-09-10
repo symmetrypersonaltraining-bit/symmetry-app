@@ -1,5 +1,33 @@
 # Backlog — the single work queue
 
+## 2026-09-10 — His tabs were gone, and the toggle took ten seconds (SHIPPED, 97aa2b4 → 9f44da0)
+
+Dustin: *"my own client view nav tabs r gone! fix n check other clients"* and
+*"the trainer view takes about 10 seconds to switch screen over its laggy fix
+that too"*. **Awaiting his confirmation on both.**
+
+**Tabs (#18).** Client page inside trainer chrome. Every page and the middleware
+decide Client View from `?as=` and the cookie; the wrapper decided from
+localStorage and read neither. Android evicts localStorage, cookies survive,
+the two disagree for 30 days. `lib/clientModeResolve.ts` is now the one rule;
+the server layout hands the wrapper its starting mode. Client-only accounts
+could never hit it; the seven trainer-who-is-also-a-client accounts could.
+Nothing crashed — `app_error_log` was empty, first query asked.
+
+**Toggle (#19).** Measured: five serial reads, one paging 5,697 rows — ~10 hops
+per render — and `router.refresh()` + `replace()` rendering twice: ~20 hops per
+tap. One `Promise.all`, no `refresh()`: ~6. Found on the way: the appointments
+read was not paged, 2,491 rows, **the trainer calendar silently ended on
+1 December** (1,491 future rows past the cap). Paged, own commit.
+
+**Open from this:**
+- If the toggle is still slow: bound the calendar read to the visible month —
+  a `TrainerCalendarPanel` design change (months on demand), not a query tweak.
+  His call.
+- `readsCannotTruncate.test.ts` cannot see a windowed read with no `.limit()`.
+  Every calendar-style `.gte/.lte` read should go through `fetchAllRowsSafe`;
+  there may be more. Worth a sweep.
+
 ## 2026-09-10 — The app records its own errors (SHIPPED, 3e4be97)
 
 Dustin: *"anytime something goes wrong or errors or there's a bug, you can look
