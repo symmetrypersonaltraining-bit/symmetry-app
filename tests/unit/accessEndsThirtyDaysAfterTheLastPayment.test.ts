@@ -120,8 +120,16 @@ test("a date the rule cannot read never costs anyone their access", () => {
 test("Robert Miller's access ended BEFORE he was archived", () => {
   // Archived 1 Sep, last paid invoice due 1 Aug, so the rule's date is 31 Aug —
   // the day before he was archived at all. Taken literally, as it is here, he
-  // gets no grace period whatsoever. That is what the spec says, and it is
-  // flagged for Dustin rather than quietly softened with a floor.
+  // gets no grace period whatsoever. It was built literally and put to Dustin
+  // rather than quietly softened with a floor.
+  //
+  // RULED, 9 Sep: no floor. He quit, and being cut off on the first run is
+  // correct. The route there is worth keeping, because it nearly went the other
+  // way: he first said "Robert still trains, he's still paying" and the row was
+  // unarchived, then "robert is archived i forgot he quit!!" and it was put
+  // back from bak_robert_miller_unarchive_20260909. Neither the rule nor the
+  // row needed changing. Check with him before adding a floor to this rule the
+  // next time it looks harsh.
   const robert = { archivedAt: "2026-09-01T11:40:00+00:00", lastPaidDueDate: "2026-08-01", overrideUntil: null };
   const d = accessDecision(robert, "2026-09-09");
   assert.equal(d.endsOn, "2026-08-31");

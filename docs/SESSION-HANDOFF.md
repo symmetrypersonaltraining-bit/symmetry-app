@@ -557,48 +557,71 @@ that keeps biting: his other session pushes to this repo while you work, so find
 out where `main` actually is before you write a line. On the evening of 9 Sep it
 landed `547a544` mid-session, while this one was reading.
 
-### 🔴 WAITING ON HIM — the access rule is BUILT and SWITCHED OFF
+### ✅ THE ACCESS RULE IS LIVE — switched ON 9 Sep, all eight ruled
 
-Shipped 9 Sep as `cf32c88` (PR #6). An archived client loses the app 30 days
-after their last paid invoice. **`app_flags.access_revoke_live` is FALSE**, so
-nothing has happened to anybody and nothing will until he says so.
+Shipped as `cf32c88`. An archived client loses the app 30 days after their last
+paid invoice. **`app_flags.access_revoke_live` was set TRUE on 9 Sep at his
+word**, so the job runs daily at 06:30 Central and this is no longer dormant.
 
-Three things need his word, in this order:
+He ruled on every archived client individually. Do not re-ask:
 
-1. **The first run takes FIVE people, and he flagged one.** Tina Haley (ends
-   11 Aug), Christine Latham (21 Aug), Brooke Reynolds (30 Aug) and Robert
-   Miller (31 Aug) are all past their date alongside Bobbie Page — whose
-   override to **1 Oct is already set**, per his instruction. Show him the list
-   before flipping the switch:
+| | archived | last paid | outcome |
+|---|---|---|---|
+| Tina Haley | 13 Aug | 12 Jul | cut off, first run |
+| Christine Latham | 31 Aug | 22 Jul | cut off, first run |
+| Brooke Reynolds | 31 Jul | never | cut off, first run — no login to ban |
+| Robert Miller | 1 Sep | 1 Aug | cut off, first run |
+| Jada Cook | 13 Aug | never | auto cut-off **12 Sep** |
+| Tania Millan | 13 Aug | never | auto cut-off **12 Sep** |
+| Bobbie Page | 31 Aug | 1 Aug | KEPT — override to **1 Oct** |
+| Test Client | 13 Aug | never | KEPT — override to 2099-12-31 |
 
-       update app_flags set enabled = true where key = 'access_revoke_live';
+His words: *"Tina, Christine and Brooke can be archived, not robert!"*, then
+*"robert is archived i forgot he quit!!"*, then *"Jada n Tania can be archived,
+leave test client"*.
 
-   A dry run answers "who would go" without writing anything or banning anyone:
-   `GET /api/cron/revoke-access?dry=1`.
+**ROBERT MILLER — the round trip worth not repeating.** He was first reported as
+wrongly archived (*"Robert still trains but I only do programming but he's still
+paying"*), so his `archived_at` was cleared; he then corrected himself and it was
+restored from `bak_robert_miller_unarchive_20260909`. His row is back exactly as
+it was. The lesson underneath: his case is the one where the rule looks harsh —
+access ending the day *before* the archiving, no grace at all — and the tempting
+fix was to soften the rule with a floor. **He ruled: no floor.** Check the row
+and ask him before changing this rule the next time it looks harsh.
 
-2. **Robert Miller wants a ruling.** Archived 1 Sep, last paid invoice due
-   1 Aug, so the rule ends his access on **31 Aug — the day before he was
-   archived**. Read literally, as built, anyone archived more than thirty days
-   after their last payment gets **no grace period at all**: archiving them cuts
-   them off that night. That may be exactly what he wants. It was built
-   literally rather than softened with a floor, because inventing a grace period
-   he did not ask for is not a decision to make on his behalf.
+#### ⚠️ `payment_reminders` is a thinner ledger than this rule assumes
 
-3. **The trainer-facing override control is NOT built**, deliberately.
-   `access_override_until` works and Bobbie's is set, but the button belongs on
-   `/clients/[clientId]`, which has not been walked, and audit rule 6 is never
-   edit a screen that has not been walked. Until then an override is set
-   directly:
+Robert pays $300/month flat and has exactly ONE invoice row, for $150, with
+reminders off. **16 of the 33 active clients have `payment_reminders_enabled =
+false`**, all of them `billing_type = 'none'` with zero paid rows: four family
+accounts, five self-coached, one demo, and six real training clients — Celeste
+Lennon, Greg Lennon, Jerry Bourgeois, Krysta Ruiz-Schnitzler, Laurie Kane and
+Troy Schnitzler.
 
-       update clients set access_override_until = date '2026-11-01' where id = '<id>';
+So "their last paid invoice" is **not** a reliable record of when somebody last
+paid. Where no paid row exists the rule falls back to `archived_at + 30`, which
+is the safer answer and is doing more of the work here than the headline rule
+suggests. It was right for everyone he ruled on. **It is a standing risk for
+anyone archived in future** — check the row before trusting the date, and use the
+override.
 
-The rule is `src/lib/access/archivedAccess.ts` — one implementation, called by
-both the job and the middleware. The full write-up, including the one-day
-timezone bug the tests found in Brooke Reynolds' row, is the interlude
-"access is not the same thing as archived" at the end of
-`docs/audit/SCREEN-WALKTHROUGH.md`.
+#### Still open on this
 
-### 🟠 FOUND, NOT FIXED — two nutrition-AI tests are red on `main`
+- **The trainer-facing override control is NOT built**, deliberately. The column
+  works and two overrides are set, but the button belongs on
+  `/clients/[clientId]`, which has not been walked, and audit rule 6 is never
+  edit a screen that has not been walked. Until then:
+
+      update clients set access_override_until = date '2026-11-01' where id = '<id>';
+
+- **`Test Client` has `is_test_account = false`**, which looks wrong for a row
+  named that. It is currently held back by a 2099 override, which is a workaround
+  rather than an answer. The tidier fix is flagging it a test account and having
+  the job skip test accounts outright. Not built; his call.
+- **`billing_type = 'none'` on six real training clients** may be worth a look.
+  Noticed, not touched.
+
+### 🟠 ASSIGNED OUT — two nutrition-AI tests are red on `main`
 
 `node scripts/test-nutrition-ai.cjs` reports **41 passed, 2 failed**:
 `valid swap_meal: items normalized, kcal derived, name defaulted from new_name`
@@ -608,7 +631,14 @@ and `add_snack: items required + normalized, name defaults to item join`.
 re-running, so they predate the access work and were not caused by it. They were
 left alone rather than folded into an unrelated commit. `npm run test:unit` runs
 this script after the node tests, so the gate is not fully green until they are
-fixed. Nobody has looked at why yet.
+fixed.
+
+**Dustin sent this to the bug-fix session on 9 Sep** — `9/9 — Symmetry app bugs`,
+`session_01H2cGxKw7pwc5gUA88KpoP8`. It carries the caution that matters: this is
+`/api/nutrition-ai/act`, the one food path still taking macros from the model
+rather than a `food_catalog` row, and it is DEFERRED to the Nutrition screen by
+his "one page at a time" ruling — so fix the defect, do not widen the route.
+**Do not start on it in this session as well.**
 
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
 
