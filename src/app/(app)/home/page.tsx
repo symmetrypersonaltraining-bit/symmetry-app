@@ -65,13 +65,26 @@ export default async function HomePage(props: {
     const startStr = rangeStart.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
     const endStr = rangeEnd.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
-    // All appointments for the calendar (3mo back to 12mo forward)
-    const { data: apptRows } = await supabase
-      .from("appointments")
-      .select("id, client_id, scheduled_at, ends_at, status, title, clients(id, name)")
-      .gte("scheduled_at", startStr + "T00:00:00")
-      .lte("scheduled_at", endStr + "T23:59:59")
-      .order("scheduled_at");
+    // All appointments for the calendar (3mo back to 12mo forward).
+    //
+    // PAGED, for the reason written 150 lines down about scheduled_workouts and
+    // never applied here: PostgREST caps every response at 1,000 rows and says
+    // nothing. Counted 10 Sep: 2,491 appointments sit in this window. The
+    // 1,000 that arrived were the OLDEST, the last of them dated 1 December,
+    // and the 1,491 after that -- every appointment past 1 Dec -- never reached
+    // the calendar. Today was rank 557, so Today's Sessions happened to be
+    // right; a month from now it would not have been. The static audit cannot
+    // see this shape (no .limit(), so nothing for a scanner to flag) -- the
+    // pager's runtime ceiling is the guard.
+    const apptRows = await fetchAllRowsSafe<any>(
+      () => supabase
+        .from("appointments")
+        .select("id, client_id, scheduled_at, ends_at, status, title, clients(id, name)")
+        .gte("scheduled_at", startStr + "T00:00:00")
+        .lte("scheduled_at", endStr + "T23:59:59")
+        .order("scheduled_at") as any,
+      { label: "trainer calendar appointments" },
+    );
 
     type AE = {
       id: string; clientId: string; clientName: string; title: string;
