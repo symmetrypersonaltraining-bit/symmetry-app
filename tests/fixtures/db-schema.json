@@ -1099,7 +1099,8 @@
     "created_at",
     "updated_at",
     "personal_for_client_id",
-    "owner_trainer_id"
+    "owner_trainer_id",
+    "forked_from_program_id"
   ],
   "progress_photos": [
     "id",
