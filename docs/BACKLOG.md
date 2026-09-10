@@ -4,8 +4,8 @@
 
 Stacie: invoice set to $480 (manual), toggle off. The roll-forward on mark-paid
 inserted the next cycle as pending regardless of the toggle;
-`20260910e` turns it paused for a switched-off client. Open question for him:
-the 3 Sep email quoted $640 — does she need a corrected message?
+`20260910e` turns it paused for a switched-off client. The $640 row she was emailed on 3 Sep
+was deleted on his word and replaced by a fresh unsent $480 row for him to send.
 
 ## 2026-09-10 — One client, one copy (DONE, DB rule); the 70 copies and the library phase OPEN, his call
 
