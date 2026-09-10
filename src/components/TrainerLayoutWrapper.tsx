@@ -10,10 +10,14 @@ import SessionDock from "./SessionDock";
 import AppBottomNav, { type NavItem } from "./AppBottomNav";
 import RefreshHandle from "./RefreshHandle";
 import GlobalCoach from "./GlobalCoach";
+import { resolveClientMode, readClientModeInputs } from "@/lib/clientModeResolve";
 
 
 interface Props {
   children: React.ReactNode;
+  /** The cookie's answer, read by the server layout, so the first paint of the
+   *  chrome agrees with the page it wraps. See lib/clientModeResolve.ts. */
+  initialClientMode?: boolean;
 }
 
 // Client-mode bottom nav tabs — SAME tabs/order/icons as the real client
@@ -33,22 +37,32 @@ const CLIENT_NAV: NavItem[] = [
 
 const CLIENT_MODE_COOKIE_MAXAGE = 60 * 60 * 24 * 30; // 30 days
 
-export default function TrainerLayoutWrapper({ children }: Props) {
-  const [clientMode, setClientMode] = useState(false);
+export default function TrainerLayoutWrapper({ children, initialClientMode = false }: Props) {
+  // Starts on the SERVER's answer, not on false-then-maybe-true. The old
+  // useState(false) plus a localStorage effect meant the trainer chrome always
+  // painted first and was then swapped; worse, it meant the chrome and the page
+  // could settle on different answers for good.
+  const [clientMode, setClientMode] = useState(initialClientMode);
   const router = useRouter();
 
   useEffect(() => {
-    const stored = localStorage.getItem("symmetry_view_mode");
-    if (stored === "client") {
-      setClientMode(true);
-      // RE-ASSERT the cookie on mount. Client mode was persisted in
-      // localStorage but the cookie could have expired — when that happens the
-      // layout still shows client mode while SERVER pages (/messages, /home…)
-      // read no cookie and render the TRAINER branch (e.g. the full client
-      // inbox leaks into Client View). Keeping the cookie fresh (30 days) makes
-      // every server page reliably see client mode.
-      try { document.cookie = "symmetry_client_mode=1; path=/; max-age=" + CLIENT_MODE_COOKIE_MAXAGE; } catch { /* noop */ }
-    }
+    // RECONCILE ON MOUNT, FROM THE SAME INPUTS THE PAGES USE.
+    //
+    // This used to read localStorage and, if it said "client", switch the
+    // chrome and re-assert the cookie. That fixed one direction of a two-way
+    // split: localStorage → cookie. The other direction was never handled, so
+    // when Android evicted localStorage and the cookie survived, every page
+    // rendered the client app and this rendered the trainer's around it.
+    // Dustin, 10 Sep: "my own client view nav tabs r gone!"
+    //
+    // Now the decision is resolveClientMode over ?as= and the cookie — the rule
+    // every server page already applies — and localStorage is written as a
+    // MIRROR, never read as an input. The ?as= half matters on a hard reload
+    // mid-toggle: the layout can only see the cookie, and ?as=trainer must
+    // beat a cookie that has not cleared yet, exactly as it does on the pages.
+    const next = resolveClientMode(readClientModeInputs());
+    setClientMode(next);
+    try { localStorage.setItem("symmetry_view_mode", next ? "client" : "trainer"); } catch { /* noop */ }
   }, []);
 
   // Keep the cookie fresh while client mode is active (covers long sessions /

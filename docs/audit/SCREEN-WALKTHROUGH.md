@@ -2988,3 +2988,64 @@ say nothing was lost, because it only fires before any screen has opened.
   their session; a trainer may name a client, but that lookup runs under their
   own session so RLS decides. A log writable into someone else's name is worse
   than no log.
+
+---
+
+## Interlude — the chrome agrees with the page (10 Sep)
+
+Dustin, with a screenshot of his own Client View: *"my own client view nav tabs
+r gone! fix n check other clients"*.
+
+### What the screenshot actually showed
+
+The **page** was the client home — greeting, streak, This Week, Today's
+Workouts. The **chrome** was the trainer's: hamburger top-left, the trainer's
+bell and AI button, and no bottom tabs at all. Client mode's bar carries a
+"Trainer View" pill; this one did not. Two halves of one screen had decided
+differently which app they were in.
+
+Nothing had crashed. `app_error_log` was empty, which is what it is for — it
+ruled out a whole class in one query.
+
+### Why
+
+Every server page (`/home`, `/workout`, `/nutrition`, `/settings`, `/messages`)
+and the middleware decide Client View from `?as=` and the
+`symmetry_client_mode` cookie, in that order. `TrainerLayoutWrapper` — the one
+component that draws the top bar and the bottom tabs — decided from
+**localStorage** and read neither.
+
+Its own comment recorded fixing one direction of that split: it re-asserted
+the cookie *from* localStorage. The other direction was never handled. Android
+evicts localStorage under storage pressure; cookies are not subject to quota.
+Once localStorage was gone, the cookie lived another 30 days, every page
+rendered the client app, and the wrapper dressed it as the trainer's — until he
+toggled twice.
+
+### Check other clients
+
+Client-only accounts **cannot** hit this: their branch of the layout mounts
+`<BottomNav />` unconditionally, and `AppBottomNav` is `fixed bottom-0 z-50`
+with no responsive hiding. The seven accounts that are both a trainer and a
+client — Dustin, Steph, Alan, Brooke, Ian, Justin, Oliver — all go through the
+wrapper and all could. After this, none can.
+
+### The fix — one rule, both sides of the wire
+
+`lib/clientModeResolve.ts` is the pages' rule, pure: `?as=trainer` → trainer,
+`?as=client` → client, cookie `1` → client, else trainer. The server layout
+reads the cookie with the existing `isClientMode()` and hands the wrapper its
+**starting** mode, so the first paint of the chrome agrees with the page by
+construction. On mount the wrapper reconciles from `?as=` and the cookie —
+the same inputs — and **writes** localStorage as a mirror, because three
+feedback paths read it for a "client-app"/"trainer-app" label. It never reads
+it as an input again.
+
+| state | before | now |
+|---|---|---|
+| cookie says client, localStorage evicted | client page, trainer chrome, **no tabs** | client page, client chrome, tabs |
+| localStorage says client, cookie expired | client chrome over **trainer** pages (the 7 Sep leak) | trainer chrome over trainer pages — consistent; tap the toggle to re-enter |
+| any first paint | trainer chrome, then maybe a swap | the right chrome first time |
+
+`tests/unit/theChromeAgreesWithThePage.test.ts` pins the rule and the wiring,
+and **its wiring assertions fail against the wrapper as it was**.
