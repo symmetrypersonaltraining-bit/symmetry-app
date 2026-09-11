@@ -30,6 +30,44 @@
 
 import Logo from "./Logo";
 import HeaderAssist from "./HeaderAssist";
+import { usePathname } from "next/navigation";
+import { backDecision, showsBack } from "@/lib/nav/backFromHere";
+
+/**
+ * ── THE BACK CONTROL ───────────────────────────────────────────────────────
+ *
+ * Dustin, 11 Sep 2026: *"no matter which screen you're in, you always have a
+ * way to go back one page."* Drawn only off the bottom-nav roots, and it does
+ * precisely what the phone's own Back does — see backFromHere.ts for the rule
+ * and the one thing it must never do. It reads history and writes nothing to
+ * it.
+ *
+ * The desktop PWA is installed `standalone`, so it has no browser chrome and,
+ * until this, no way off /recipes except the Nutrition tab. Phones already had
+ * their hardware key; this gives everyone the same one button.
+ */
+function BackControl() {
+  const pathname = usePathname() || "/";
+  if (!showsBack(pathname)) return null;
+  return (
+    <button
+      type="button"
+      aria-label="back"
+      onClick={() => {
+        // Decide from the same two inputs BackButtonGuard uses, then act. No
+        // pushState here, ever — see the v2/v3 note in backFromHere.ts.
+        const d = backDecision(window.history.length, pathname, window.location.search);
+        if (d.action === "back") window.history.back();
+        else window.location.href = d.href;
+      }}
+      // 44px thumb target, same floor as every other control on a phone.
+      className="flex items-center justify-center flex-shrink-0 -ml-2"
+      style={{ width: 44, height: 44, color: "white", background: "transparent", border: 0 }}
+    >
+      <i className="ti ti-chevron-left" style={{ fontSize: 24 }} />
+    </button>
+  );
+}
 
 export default function ClientTopBar({ trailing }: { trailing?: React.ReactNode }) {
   return (
@@ -44,6 +82,7 @@ export default function ClientTopBar({ trailing }: { trailing?: React.ReactNode 
       // in all thirty schemes.
       style={{ background: "var(--chrome-grad)", paddingTop: "calc(12px + env(safe-area-inset-top))" }}
     >
+      <BackControl />
       <Logo size={28} color="white" className="flex-shrink-0" />
       <div className="flex-1">
         <span className="text-white font-semibold text-sm">Symmetry</span>
