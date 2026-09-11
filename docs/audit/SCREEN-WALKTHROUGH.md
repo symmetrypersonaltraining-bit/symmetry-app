@@ -2542,6 +2542,35 @@ label on the tile has to say it (**"avg per logged day"** vs **"avg per day"**),
 | 36 | **✕** | remove, with undo | `deleteLogRow` + undo toast |
 | 37 | **Quick-add an extra** | the extra picker | `extrapick` sheet |
 
+### Batch 1b — THE PLAN MENU SHEET · its own audit, at his request
+
+*"That's where I think we're going to run into that layered menu… one of the
+places I suspect we're going to need some pretty major adjustments or even
+rebuild."* Inventoried from `MenuSheetView` (`NutritionV3Client.tsx:3086–3109`).
+Opened by **#5 (⋯)**. Title "Plan menu", subtitle = client name + "plan vN (live)"
+or "open plan". No trainer-only rows.
+
+| # | Row | What it should do | What it actually does | Verdict |
+|---|---|---|---|---|
+| M0 | The sheet's **✕** / backdrop | close the menu | `closeAllSheets()` — closes **every** open sheet, not just this one | |
+| M1 | 🛒 **Grocery & Prep** | shopping list + prep sheet, Grocery / Meal Prep PDFs | closes the menu, opens the grocery overlay. **Only shown when a plan is live** | |
+| M2 | ✦ **Build my own plan with AI** | design a plan from scratch | `buildplan` sheet. Subtitle changes when a plan is live: "Switch to your own plan — your current one is saved to history" | |
+| M3 | 📈 **Trends** | averages + the progress charts | `trends` sheet | |
+| M4 | 🗂 **Plan versions** | current live + staged incoming; flips at midnight CT | `backSheet()` then `openVersions()` — the same timeline #6's banner opens | |
+| M5 | 📅 **Week ahead** | forward view, 1w / 4w / 8w / custom | `forward` sheet. **Only shown when a plan is live** | |
+| M6 | ⭐ **My Meals** | saved custom meals, reuse in any slot | `mymeals` sheet, inserting at the end of the day | |
+| M7 | ✦ **Coach: ON / OFF** | toggle insight cards, celebrations & nudges | flips `coachOn`, persisted, clears the dismissed state, toasts | |
+
+**Every one of M1–M6 opens something with its own controls.** Each is walked as
+its own sub-batch after the seven rows above: the grocery overlay, `buildplan`,
+`trends`, `versions`, `forward`, `mymeals`. Those sub-inventories are built from
+the code when we reach them, not before.
+
+**Two things to watch as he taps:** M0 closes *everything* (so backing out of a
+sub-sheet may drop him to the page rather than to the menu — that is his "go back
+one page, not all the way" case, and it is a sheet, not a route); and M1/M5 vanish
+entirely on an open plan, which a client with no plan will never know existed.
+
 ### Batch 6 — the sheets, each its own pass
 
 Not yet inventoried control by control. There are **27 sheet kinds**:
