@@ -34,8 +34,8 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **11 Sep 2026, late night Central** · `main` = the investor
-docs commit after `fe3a80f`.
+Last updated: **11 Sep 2026, late night Central** · `main` = `3452718`, the
+logger's failed-tick fix (section 5), on top of the investor docs commits.
 
 > 💼 **11 Sep, late: the business plan and the accounting sheet are in his
 > Drive.** Both in the folder "Symmetry Investor Package"
@@ -60,7 +60,7 @@ docs commit after `fe3a80f`.
 > Quotes for the proposal's section 8 are still the open item on the investor
 > side. Section 6 has the two Drive gotchas that cost this session two hours.
 
-**The gate is fully green**: 0 errors in `src/`, **3,074 unit tests pass 0 fail**,
+**The gate is fully green**: 0 errors in `src/`, **3,080 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
 closed, the invisible meal ring and its ghost tick, **the app's own error log**
@@ -1041,6 +1041,36 @@ billing cycle. ill resume hers when she's back."*
   the paused row on Payments (a paused row does not block a new pending one —
   `uq_one_open_reminder_per_client` counts only pending/sent — so if the
   generator makes a fresh one first, delete the paused one).
+
+### ✅ SHIPPED 11 Sep — a failed tick clears when the next one saves (`3452718`, PR #36)
+
+Dustin, mid-session on Bulk — Legs, exercise 11 of 17: *"new row violates
+row-level security policy for table workout_logs … when this happens error
+doesnt clear once it works."* His log (`6a265a44…`) had existed since 10:43
+Central with 24 sets on it. One tick went out **without his login attached**:
+the log lookup came back empty (RLS hides the row from an anonymous request),
+the logger inserted, the insert was refused (`42501`). The next tick carried
+the session and saved. **The policies are right; the request was anonymous for
+a moment.** Why the browser client dropped the session for one request is not
+known — the insert path recorded nothing, which is item 2 below.
+
+Three items in `WorkoutLogger.tsx`, each with his per-item permission ("all 3"):
+
+1. **A set that saves clears the banner.** The red banner is `completeError`,
+   and only Complete cleared it, so a later successful tick left the failure on
+   screen for the rest of the workout.
+2. **A refused `workout_logs` insert is recorded** in `app_error_log` under
+   scope `workout_log` (new scope in `logAppError.ts` / `logClientError.ts`),
+   with the code and `retried_after_session`. set_logs has done this since
+   26 Aug; the insert never did. **Next time it happens, read that row first.**
+3. **A `42501` refusal asks the browser client for its session and retries the
+   insert once.** Not the lookup: a second insert against an existing open log
+   is caught by `workout_logs_one_open_per_day` and the 23505 branch reads the
+   winner back.
+
+Test `tests/unit/aFailedTickClearsWhenTheNextOneSaves.test.ts`, red on all
+three before the change. Unit count is now **3,080**. Walkthrough carries the
+rows. **Not yet confirmed by him in the app.**
 
 ### ✅ DONE 11 Sep — the investor proposal for Lauren Standefer ($274,000)
 
