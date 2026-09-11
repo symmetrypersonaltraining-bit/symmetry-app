@@ -2805,7 +2805,18 @@ option:hover {
     var(--brand-primary) 100%);
   --tile-cap-h: 3px;
 
-  background: color-mix(in srgb, #070A10 var(--sink), var(--brand-bg));
+  /* THE PAGE CAN ALSO CARRY THE SCHEME, NOT ONLY LESS LIGHT.
+     Sinking toward near-black darkens every scheme by the same amount and
+     desaturates all of them on the way — Citrus goes from a pale green to a
+     grey. --page-tint mixes the scheme's OWN primary back in afterwards, so a
+     deeper page still reads as that scheme's page rather than as grey.
+
+     0% by default, which is exactly the behaviour above it, so this commit
+     changes no pixel anywhere. It exists so the mock-up sheet and the app
+     move the same three numbers. */
+  --page-tint: 0%;
+  background: color-mix(in srgb, var(--brand-primary) var(--page-tint),
+    color-mix(in srgb, #070A10 var(--sink), var(--brand-bg)));
   min-height: 100vh;
 }
 
@@ -3529,10 +3540,14 @@ body.mk {
     <button data-m="dark" aria-pressed="false">Dark</button>
   </div>
   <div class="mk-seg"><span>PAGE vs TILE</span>
-    <button data-s="after" aria-pressed="true">Fixed</button>
-    <button data-s="before" aria-pressed="false">Before the fix</button>
+    <button data-s="was" aria-pressed="false">Was</button>
+    <button data-s="now" aria-pressed="true">Live now</button>
+    <button data-s="more" aria-pressed="false">More</button>
+    <button data-s="strong" aria-pressed="false">Strong</button>
+    <button data-s="most" aria-pressed="false">Strongest</button>
   </div>
   <span class="mk-read" id="mk-read"></span>
+  <span class="mk-read" id="mk-sepnote"></span>
 </div>
 
   <div class="mk-schemes"><button class="mk-sw" data-t="pastel" aria-pressed="false"><i style="background:linear-gradient(120deg,#7c9cf5 0 45%,#5ec9a3 45% 100%)"></i><span>Soft Pastel</span></button><button class="mk-sw" data-t="navy" aria-pressed="false"><i style="background:linear-gradient(120deg,#0F4C81 0 45%,#0EA5E9 45% 100%)"></i><span>Navy Blue</span></button><button class="mk-sw" data-t="charcoal" aria-pressed="false"><i style="background:linear-gradient(120deg,#2D2D2D 0 45%,#555555 45% 100%)"></i><span>Charcoal</span></button><button class="mk-sw" data-t="forest" aria-pressed="false"><i style="background:linear-gradient(120deg,#1B5E20 0 45%,#43A047 45% 100%)"></i><span>Forest Green</span></button><button class="mk-sw" data-t="gunmetal" aria-pressed="false"><i style="background:linear-gradient(120deg,#37474F 0 45%,#607D8B 45% 100%)"></i><span>Gunmetal</span></button><button class="mk-sw" data-t="purple" aria-pressed="false"><i style="background:linear-gradient(120deg,#4A148C 0 45%,#7B1FA2 45% 100%)"></i><span>Deep Purple</span></button><button class="mk-sw" data-t="orange" aria-pressed="false"><i style="background:linear-gradient(120deg,#BF360C 0 45%,#E64A19 45% 100%)"></i><span>Burnt Orange</span></button><button class="mk-sw" data-t="rose" aria-pressed="false"><i style="background:linear-gradient(120deg,#880E4F 0 45%,#E91E63 45% 100%)"></i><span>Rose</span></button><button class="mk-sw" data-t="blush" aria-pressed="false"><i style="background:linear-gradient(120deg,#C2185B 0 45%,#FF4D8D 45% 100%)"></i><span>Blush</span></button><button class="mk-sw" data-t="lagoon" aria-pressed="false"><i style="background:linear-gradient(120deg,#0E7C86 0 45%,#FF7A59 45% 100%)"></i><span>Lagoon</span></button><button class="mk-sw" data-t="orchid" aria-pressed="false"><i style="background:linear-gradient(120deg,#8E2DAF 0 45%,#00B295 45% 100%)"></i><span>Orchid</span></button><button class="mk-sw" data-t="berry" aria-pressed="false"><i style="background:linear-gradient(120deg,#B0306A 0 45%,#5A4FCF 45% 100%)"></i><span>Berry</span></button><button class="mk-sw" data-t="slatepop" aria-pressed="false"><i style="background:linear-gradient(120deg,#2E4374 0 45%,#FF6B6B 45% 100%)"></i><span>Slate Pop</span></button><button class="mk-sw" data-t="plumdusk" aria-pressed="false"><i style="background:linear-gradient(120deg,#5E3A87 0 45%,#E0568A 45% 100%)"></i><span>Plum Dusk</span></button><button class="mk-sw" data-t="carbonneon" aria-pressed="false"><i style="background:linear-gradient(120deg,#00C2A8 0 45%,#FF5DA2 45% 100%)"></i><span>Carbon Neon</span><u>DARK</u></button><button class="mk-sw" data-t="midnight" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#79C0FF 45% 100%)"></i><span>Midnight</span><u>DARK</u></button><button class="mk-sw" data-t="sunsetcoral" aria-pressed="false"><i style="background:linear-gradient(120deg,#ff6b6b 0 45%,#ff9f5a 45% 100%)"></i><span>Sunset Coral</span></button><button class="mk-sw" data-t="aurora" aria-pressed="false"><i style="background:linear-gradient(120deg,#3aa8c1 0 45%,#8b6ff0 45% 100%)"></i><span>Aurora</span></button><button class="mk-sw" data-t="citrus" aria-pressed="false"><i style="background:linear-gradient(120deg,#5bbf3a 0 45%,#ff8f3f 45% 100%)"></i><span>Citrus Punch</span></button><button class="mk-sw" data-t="berrynoir" aria-pressed="false"><i style="background:linear-gradient(120deg,#b5379a 0 45%,#5b52e0 45% 100%)"></i><span>Berry Noir</span></button><button class="mk-sw" data-t="oceandusk" aria-pressed="false"><i style="background:linear-gradient(120deg,#1f7a8c 0 45%,#ff7a59 45% 100%)"></i><span>Ocean Dusk</span></button><button class="mk-sw" data-t="midnightaurora" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#22D3EE 45% 72%,#A78BFA 72% 100%)"></i><span>Midnight Aurora</span><u>DARK</u></button><button class="mk-sw" data-t="midnightember" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#FB7185 45% 72%,#FBBF24 72% 100%)"></i><span>Midnight Ember</span><u>DARK</u></button><button class="mk-sw" data-t="midnightcitrus" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#38BDF8 45% 72%,#A3E635 72% 100%)"></i><span>Midnight Citrus</span><u>DARK</u></button><button class="mk-sw" data-t="midnightorchid" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#7C3AED 45% 72%,#E879F9 72% 100%)"></i><span>Midnight Orchid</span><u>DARK</u></button><button class="mk-sw" data-t="violetdawn" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#6D28D9 45% 72%,#C4B5FD 72% 100%)"></i><span>Violet Dawn</span></button><button class="mk-sw" data-t="sunsetdrift" aria-pressed="false"><i style="background:linear-gradient(120deg,#BE185D 0 45%,#F97316 45% 72%,#FBBF24 72% 100%)"></i><span>Sunset Drift</span></button><button class="mk-sw" data-t="deepreef" aria-pressed="false"><i style="background:linear-gradient(120deg,#0E7490 0 45%,#14B8A6 45% 72%,#A855F7 72% 100%)"></i><span>Deep Reef</span><u>DARK</u></button><button class="mk-sw" data-t="blushcloud" aria-pressed="false"><i style="background:linear-gradient(120deg,#E1789F 0 45%,#F9A8D4 45% 72%,#FBCFE8 72% 100%)"></i><span>Blush Cloud</span></button><button class="mk-sw" data-t="hotpink" aria-pressed="false"><i style="background:linear-gradient(120deg,#FF1F8F 0 45%,#FF6FB5 45% 72%,#7C3AED 72% 100%)"></i><span>Hot Pink</span></button></div>
@@ -3855,7 +3870,7 @@ body.mk {
     [].forEach.call(document.querySelectorAll('.mk-sw'), function (b) {
       b.setAttribute('aria-pressed', String(b.dataset.t === theme));
     });
-    measure();
+    applySep();
   }
 
   function setTheme(t) {
@@ -3926,24 +3941,77 @@ body.mk {
     apply();
   });
 
-  /* "Before the fix" puts the two numbers that changed back where they were —
-     a 6% sink and no tile lift — on the page element only. It is the same
-     stylesheet underneath, so what it shows is genuinely what he was looking
-     at when he said the tiles merge into the background. */
-  seg('[data-s]', 's', function (v) {
+  /* HOW FAR THE PAGE SITS BEHIND THE TILE — the thing being decided.
+     Dustin, 11 Sep, on the live build: *"whenever you switch it to light mode,
+     a lot of the color schemes, the actual tiles are too close to the same
+     exact color to the background. So it's the background that we need to
+     adjust… I need a little bit more contrast so the tiles pop out a little
+     bit more."*
+
+     Five stops, each one three numbers: how far the page sinks toward black,
+     how much of the scheme's own primary is mixed back in afterwards so it
+     does not turn grey, and how much primary tints the tile. Sinking alone
+     desaturates — Citrus goes pale-green to grey — which is what --page-tint
+     is for.
+
+     The ranges each stop produces across the twenty-three light schemes:
+       was       1.130 – 1.209   the merge he reported in the first place
+       live now  1.292 – 1.416   shipped 11 Sep
+       more      1.496 – 1.749
+       strong    1.657 – 1.973
+       strongest 1.836 – 2.230
+
+     LIGHT SCHEMES ONLY. A dark page is a different problem — its page is
+     already near black, so sinking moves nothing and the TILE lifts instead —
+     and he said the dark side reads right. On a dark scheme these stops stand
+     down and the dark block's own numbers apply. */
+  var SEP = {
+    was:    ['6%',  '0%', '4%'],
+    now:    ['12%', '0%', '4%'],
+    more:   ['16%', '4%', '0%'],
+    strong: ['20%', '6%', '0%'],
+    most:   ['24%', '8%', '0%']
+  };
+  var sep = 'now';
+
+  function applySep() {
+    var v = SEP[sep] || SEP.now;
+    var showingDark = root.getAttribute('data-appearance') === 'dark' ||
+      (DARK.indexOf(theme) >= 0 && root.getAttribute('data-appearance') !== 'light');
     [].forEach.call(document.querySelectorAll('.sym-page'), function (el) {
-      if (v === 'before') { el.style.setProperty('--sink', '6%'); el.style.setProperty('--tile-lift', '0%'); }
-      else { el.style.removeProperty('--sink'); el.style.removeProperty('--tile-lift'); }
+      if (showingDark) {
+        el.style.removeProperty('--sink');
+        el.style.removeProperty('--page-tint');
+        el.style.removeProperty('--tile-deep');
+      } else {
+        el.style.setProperty('--sink', v[0]);
+        el.style.setProperty('--page-tint', v[1]);
+        el.style.setProperty('--tile-deep', v[2]);
+      }
     });
+    var note = document.getElementById('mk-sepnote');
+    if (note) note.textContent = showingDark ? 'dark — the tile lifts instead' : '';
     measure();
+  }
+
+  seg('[data-s]', 's', function (v) {
+    sep = v;
+    try { localStorage.setItem('mk-sep', v); } catch (e) {}
+    applySep();
   });
 
-  var t0 = 'navy', d0 = '20', m0 = 'auto';
+  var t0 = 'navy', d0 = '20', m0 = 'auto', s0 = 'now';
   try {
     t0 = localStorage.getItem('mk-theme') || t0;
     d0 = localStorage.getItem('mk-deep') || d0;
     m0 = localStorage.getItem('mk-mode') || m0;
+    s0 = localStorage.getItem('mk-sep') || s0;
   } catch (e) {}
+  if (!SEP[s0]) s0 = 'now';
+  sep = s0;
+  [].forEach.call(document.querySelectorAll('[data-s]'), function (b) {
+    b.setAttribute('aria-pressed', String(b.dataset.s === s0));
+  });
   if (!PAL[t0]) t0 = 'navy';
   mode = m0;
   root.setAttribute('data-deep', d0);

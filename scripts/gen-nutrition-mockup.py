@@ -611,10 +611,14 @@ CONTROLS = """
     <button data-m="dark" aria-pressed="false">Dark</button>
   </div>
   <div class="mk-seg"><span>PAGE vs TILE</span>
-    <button data-s="after" aria-pressed="true">Fixed</button>
-    <button data-s="before" aria-pressed="false">Before the fix</button>
+    <button data-s="was" aria-pressed="false">Was</button>
+    <button data-s="now" aria-pressed="true">Live now</button>
+    <button data-s="more" aria-pressed="false">More</button>
+    <button data-s="strong" aria-pressed="false">Strong</button>
+    <button data-s="most" aria-pressed="false">Strongest</button>
   </div>
   <span class="mk-read" id="mk-read"></span>
+  <span class="mk-read" id="mk-sepnote"></span>
 </div>
 """
 
@@ -656,7 +660,7 @@ JS = """
     [].forEach.call(document.querySelectorAll('.mk-sw'), function (b) {
       b.setAttribute('aria-pressed', String(b.dataset.t === theme));
     });
-    measure();
+    applySep();
   }
 
   function setTheme(t) {
@@ -727,24 +731,77 @@ JS = """
     apply();
   });
 
-  /* "Before the fix" puts the two numbers that changed back where they were —
-     a 6%% sink and no tile lift — on the page element only. It is the same
-     stylesheet underneath, so what it shows is genuinely what he was looking
-     at when he said the tiles merge into the background. */
-  seg('[data-s]', 's', function (v) {
+  /* HOW FAR THE PAGE SITS BEHIND THE TILE — the thing being decided.
+     Dustin, 11 Sep, on the live build: *"whenever you switch it to light mode,
+     a lot of the color schemes, the actual tiles are too close to the same
+     exact color to the background. So it's the background that we need to
+     adjust… I need a little bit more contrast so the tiles pop out a little
+     bit more."*
+
+     Five stops, each one three numbers: how far the page sinks toward black,
+     how much of the scheme's own primary is mixed back in afterwards so it
+     does not turn grey, and how much primary tints the tile. Sinking alone
+     desaturates — Citrus goes pale-green to grey — which is what --page-tint
+     is for.
+
+     The ranges each stop produces across the twenty-three light schemes:
+       was       1.130 – 1.209   the merge he reported in the first place
+       live now  1.292 – 1.416   shipped 11 Sep
+       more      1.496 – 1.749
+       strong    1.657 – 1.973
+       strongest 1.836 – 2.230
+
+     LIGHT SCHEMES ONLY. A dark page is a different problem — its page is
+     already near black, so sinking moves nothing and the TILE lifts instead —
+     and he said the dark side reads right. On a dark scheme these stops stand
+     down and the dark block's own numbers apply. */
+  var SEP = {
+    was:    ['6%%',  '0%%', '4%%'],
+    now:    ['12%%', '0%%', '4%%'],
+    more:   ['16%%', '4%%', '0%%'],
+    strong: ['20%%', '6%%', '0%%'],
+    most:   ['24%%', '8%%', '0%%']
+  };
+  var sep = 'now';
+
+  function applySep() {
+    var v = SEP[sep] || SEP.now;
+    var showingDark = root.getAttribute('data-appearance') === 'dark' ||
+      (DARK.indexOf(theme) >= 0 && root.getAttribute('data-appearance') !== 'light');
     [].forEach.call(document.querySelectorAll('.sym-page'), function (el) {
-      if (v === 'before') { el.style.setProperty('--sink', '6%%'); el.style.setProperty('--tile-lift', '0%%'); }
-      else { el.style.removeProperty('--sink'); el.style.removeProperty('--tile-lift'); }
+      if (showingDark) {
+        el.style.removeProperty('--sink');
+        el.style.removeProperty('--page-tint');
+        el.style.removeProperty('--tile-deep');
+      } else {
+        el.style.setProperty('--sink', v[0]);
+        el.style.setProperty('--page-tint', v[1]);
+        el.style.setProperty('--tile-deep', v[2]);
+      }
     });
+    var note = document.getElementById('mk-sepnote');
+    if (note) note.textContent = showingDark ? 'dark — the tile lifts instead' : '';
     measure();
+  }
+
+  seg('[data-s]', 's', function (v) {
+    sep = v;
+    try { localStorage.setItem('mk-sep', v); } catch (e) {}
+    applySep();
   });
 
-  var t0 = 'navy', d0 = '20', m0 = 'auto';
+  var t0 = 'navy', d0 = '20', m0 = 'auto', s0 = 'now';
   try {
     t0 = localStorage.getItem('mk-theme') || t0;
     d0 = localStorage.getItem('mk-deep') || d0;
     m0 = localStorage.getItem('mk-mode') || m0;
+    s0 = localStorage.getItem('mk-sep') || s0;
   } catch (e) {}
+  if (!SEP[s0]) s0 = 'now';
+  sep = s0;
+  [].forEach.call(document.querySelectorAll('[data-s]'), function (b) {
+    b.setAttribute('aria-pressed', String(b.dataset.s === s0));
+  });
   if (!PAL[t0]) t0 = 'navy';
   mode = m0;
   root.setAttribute('data-deep', d0);
