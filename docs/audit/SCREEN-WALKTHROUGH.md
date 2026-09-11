@@ -3572,3 +3572,57 @@ the profile in particular had no editable field at all before, and now has two.
 Everything else on those screens is untouched and still waits for its walk.
 
 The trainer tutorial's assessment step says the first step asks height and sex.
+
+## Interlude — an AI draft is a proposal, not a verdict  ·  11 Sep 2026
+
+Dustin, on the consult's draft screen: *"Once it spits out a recommended plan
+and numbers, we need to put in a way to manually change these numbers and edit
+this entire plan before you accept it to make an ongoing plan. Even though this
+is run by AI, the client needs the ability to override those numbers and edit
+this plan before they actually accept it."* Then, minutes later: *"Same issue
+from the build from my targets and build it from the foods I eat."*
+
+**The screen had been telling people to do this since it was built.** The drift
+warning says *"Adjust the amounts before you save it"* — and there was nothing
+to adjust them with. One Accept button, take it or run it again.
+
+### What is editable now
+
+One editor, because all three modes render through the same `AiPlanSheet`. A
+test asserts there is exactly one draft block, so it cannot be forked per mode
+and quietly lose editing on two of them.
+
+| | |
+|---|---|
+| **Targets** | all four, his to override outright. Typing a macro refills calories 4/4/9; calories stay hand-settable — the same rule as the entry form |
+| **Meal** | name, time, or remove the whole meal |
+| **Item** | food name, amount, or remove it |
+| **Totals & the target check** | recomputed as you type, from the items |
+
+### Changing an amount scales the macros — from the ORIGINAL
+
+Nothing in this editor lets anyone type a macro by hand. The whole complaint
+behind this screen is invented numbers, so the honest handle is the portion, and
+the grams follow it.
+
+Each item is scaled from the item **as the model wrote it**, not from its
+current value. Type 170 → 1 → 17 → 170 — which is what clearing a field and
+retyping looks like — and you get back exactly the numbers you started with.
+Compounding from the current value would not. Each item carries a stable `_k`
+so removing one cannot shift which baseline another scales from, which an index
+would.
+
+### The target check is the server's
+
+`planTargetDrift` is imported rather than reimplemented: 3% on calories, 5 g per
+macro, the same numbers the prompt demands. A tolerance invented in the UI is
+how "within 3%" becomes 24%.
+
+### Found while testing this — the builder was truncating
+
+Ten consecutive plan builds logged `No valid JSON after 2 attempts`, each
+alongside an `ok`. The replies were 6,776-8,686 output tokens against
+`maxTokens: 8000`: the JSON was being cut off mid-structure, both attempts
+failed, and what reached the screen came from the **salvage** path
+(`validatePlanAcceptingDrift`). That is also why his drafts kept missing their
+targets. **Not fixed here** — it is its own change, and it is the next one.
