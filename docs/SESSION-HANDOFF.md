@@ -34,9 +34,10 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **11 Sep 2026, late night Central** · `main` = `ef2af5d`, the
-restaurant-plate fix, after `3452718`, the logger's failed-tick fix (both in
-section 5), on top of the investor docs commits.
+Last updated: **11 Sep 2026, late night Central** · `main` = `9c9283e`, the
+plan-drift fix, after `ef2af5d` (restaurant plate) and `3452718` (logger's
+failed tick), all in section 5, alongside the audit session's Nutrition
+Batch 1 commits (#40–#42).
 
 > 💼 **11 Sep, late: the business plan and the accounting sheet are in his
 > Drive.** Both in the folder "Symmetry Investor Package"
@@ -61,7 +62,7 @@ section 5), on top of the investor docs commits.
 > Quotes for the proposal's section 8 are still the open item on the investor
 > side. Section 6 has the two Drive gotchas that cost this session two hours.
 
-**The gate is fully green**: 0 errors in `src/`, **3,085 unit tests pass 0 fail**,
+**The gate is fully green**: 0 errors in `src/`, **3,088 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
 closed, the invisible meal ring and its ghost tick, **the app's own error log**
@@ -1042,6 +1043,21 @@ billing cycle. ill resume hers when she's back."*
   the paused row on Payments (a paused row does not block a new pending one —
   `uq_one_open_reminder_per_client` counts only pending/sent — so if the
   generator makes a fresh one first, delete the paused one).
+
+### ✅ SHIPPED 11 Sep — "as written" means the plan, not the day (`9c9283e`, PR #43)
+
+Dustin, on his own Nutrition tab while the other session audits it: *"a little
+warning thing saying this plan does not reach the target. Eating exactly as
+written comes to 3,553 calories. My actual calorie set is 4,462."* His live
+plan (BULK v2, `fe8f56af…`) sums to **4,462.5 kcal** from `meal_items` — it
+reaches the target. The missing 909 was **Lunch, swapped for restaurant
+fajitas that day**: `planDrift` in `NutritionV3Client.tsx` walked the day's
+`rows` and skipped every slot that was not `kind: "plan"`, so a swapped,
+custom or removed slot fell out of an "as written" total. It now totals
+`planMeals`, one meal per position, and depends on `[planMeals, tg]`.
+**The audit session should not re-find this**; the walkthrough interlude of
+the same name has the row. Test
+`tests/unit/asWrittenMeansThePlanNotTheDay.test.ts`. Unit count **3,088**.
 
 ### ✅ SHIPPED 11 Sep — a restaurant plate is not a retail serving (`ef2af5d`, PR #38)
 
