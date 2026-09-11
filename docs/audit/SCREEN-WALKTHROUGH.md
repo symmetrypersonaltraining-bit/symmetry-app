@@ -3499,9 +3499,33 @@ control that calls back or falls back, and never fabricates.
 roots so no walked screen changes, and it is one test. It does not touch either
 logger.
 
-**Held for his confirmation.** His words: *"don't necessarily put that in
-there."* Nothing is built until he says so, and when he does it lands as its own
-commit after the Nutrition walk, not inside it.
+### Confirmed and built — 11 Sep
+
+> *"Go ahead with the back button. Just be careful on this one. The actual back
+> button on mobile phones still needs to work as it does right now, the same
+> exact way as clicking the in-app back button. That's a big piece that I added
+> to this because people are used to using the back button on their phone. Those
+> two buttons should work the exact same way. When you hit either button, it
+> needs to go back one page — the previous screen you were looking at."*
+
+So it is built as **one rule, two buttons.** `src/lib/nav/backFromHere.ts` holds
+the decision — `history.length > 1` → back one entry, otherwise Home — which is
+*exactly* the two branches `BackButtonGuard` already runs for the Android
+hardware key. A test pins the guard's lines unchanged, so the two cannot drift.
+
+- **Where it draws:** `ClientTopBar`, the one client top bar, before the logo —
+  on every page that is **not** a bottom-nav root. `/recipes` gets it; Home,
+  Workout, Nutrition, Progress, Messages and Settings do not. Client View's
+  `/client-preview/…` roots count as roots, so both mounts of the bar agree.
+- **The fallback keeps Client View.** From a deep link with no history, Home is
+  `/home?as=client` when he is in Client View — leaving it by accident is the
+  boundary the 7 Sep middleware guard exists to hold.
+- **It never writes history.** No `pushState`, no sentinel entry. A test forbids
+  it, because that is precisely the v2/v3 `BackButtonGuard` bug.
+- **44px target**, the same floor as every other control on a phone.
+
+The phone's hardware Back is untouched. It was already correct; it now has a
+twin on screen that does the same thing.
 
 ## Interlude — "as written" means the plan, not the day (11 Sep)
 
