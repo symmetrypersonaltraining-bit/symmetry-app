@@ -3829,3 +3829,33 @@ are real app screens he really did visit, just in a previous launch. Left alone
 for now rather than guessed at; if it still reads wrong once the sign-in bounce
 is live, the fix is to stamp each entry with an in-session depth so both back
 buttons stop at the launch entry and go Home instead.
+
+### The contrast fix, checked in both appearances  ·  11 Sep 2026
+
+The first pass measured every scheme **as designed** and stopped there. That
+covered half the matrix. With a Light/Dark toggle in the app, each of the
+thirty schemes can now be shown the other way round, and a 3% dark tile lift
+did not hold for the flipped ones: **Charcoal 1.244, Deep Purple 1.249, Rose
+1.277** — near-black primaries, so every surface derived from them collapses
+back toward the page.
+
+**5%** is the value where the worst case in the whole matrix — thirty schemes
+times both appearances, sixty combinations — is **1.292**, the same number the
+worst light scheme sits at. One relationship everywhere, whichever way round.
+
+| | worst | best |
+|---|---|---|
+| as designed | 1.292 (Citrus) | 1.709 (Carbon Neon) |
+| flipped by the toggle | 1.320 (Charcoal) | 1.950 (Citrus dark) |
+
+`tests/unit/tilesStandOffThePage.test.ts` reads the real stylesheet, resolves
+the same `color-mix` chain the browser does, and fails if any of the sixty
+drops under 1.28. It was run against the numbers that shipped before this
+(a 6% sink, no lift) and fails there, which is the only reason to trust it.
+
+**The mock-up sheet** — `docs/mockups/nutrition-format.html` — gained three
+things for approving this: a **Light / Dark / Auto** segment that replays
+AutoDark's real rule, a **"Before the fix"** toggle that puts the 6% sink back
+so the merge is visible side by side, and a live page-vs-tile contrast readout
+measured off the rendered pixels rather than the tokens, so it cannot flatter
+the fix.

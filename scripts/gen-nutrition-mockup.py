@@ -151,6 +151,11 @@ body.mk {
 .mk-decide { border-color: #7A6320; background: #1E1A0F; }
 .mk-decide h2 { color: #F0C64E; }
 .mk-decide h2::before { content: "◆ "; }
+.mk-read { font-size: 11.5px; font-weight: 700; color: #93A4BC; padding-left: 2px;
+  font-variant-numeric: tabular-nums; }
+.mk-read b { color: #fff; }
+.mk-read i { font-style: normal; color: #F0C64E; }
+.mk-read s { text-decoration: none; color: #7E92AE; font-weight: 600; }
 .mk-tag { display: inline-block; font-size: 9.5px; font-weight: 800; letter-spacing: .9px; padding: 3px 7px;
   border-radius: 5px; background: #223046; color: #9FC0EA; margin-left: 6px; vertical-align: middle; }
 
@@ -599,6 +604,18 @@ CONTROLS = """
     <button data-d="50" aria-pressed="false">50</button>
   </div>
 </div>
+<div class="mk-ctl">
+  <div class="mk-seg"><span>LIGHT / DARK</span>
+    <button data-m="auto" aria-pressed="true">Auto</button>
+    <button data-m="light" aria-pressed="false">Light</button>
+    <button data-m="dark" aria-pressed="false">Dark</button>
+  </div>
+  <div class="mk-seg"><span>PAGE vs TILE</span>
+    <button data-s="after" aria-pressed="true">Fixed</button>
+    <button data-s="before" aria-pressed="false">Before the fix</button>
+  </div>
+  <span class="mk-read" id="mk-read"></span>
+</div>
 """
 
 JS = """
@@ -618,18 +635,67 @@ JS = """
     return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
   }
 
-  function setTheme(t) {
-    root.setAttribute('data-theme', t);
-    // AutoDark, replayed: it stamps data-appearance on genuinely light-token
-    // schemes that are being shown dark. Without it the tile system picks the
-    // wrong --sink and the whole ladder collapses on the dark schemes.
-    var isDark = DARK.indexOf(t) >= 0 || lum((PAL[t] || {})['--brand-bg']) < 0.18;
-    if (isDark) root.setAttribute('data-appearance', 'dark');
+  var theme = 'navy', mode = 'auto';
+
+  /* AutoDark, replayed exactly — including the half added 11 Sep 2026.
+     Two overrides, each guarded by the same measurement, each applied only to
+     a scheme that needs it:
+       dark  — wanted dark, scheme is light  -> darken it
+       light — wanted light, scheme is dark  -> lighten it
+     Asking for what a scheme already is sets NOTHING, because the generic
+     block would otherwise overwrite that scheme's own palette. */
+  function apply() {
+    root.setAttribute('data-theme', theme);
+    var schemeIsDark = DARK.indexOf(theme) >= 0 || lum((PAL[theme] || {})['--brand-bg']) < 0.18;
+    var wantDark = mode === 'dark' ? true
+                 : mode === 'light' ? false
+                 : (schemeIsDark || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches));
+    if (wantDark && !schemeIsDark) root.setAttribute('data-appearance', 'dark');
+    else if (!wantDark && schemeIsDark) root.setAttribute('data-appearance', 'light');
     else root.removeAttribute('data-appearance');
     [].forEach.call(document.querySelectorAll('.mk-sw'), function (b) {
-      b.setAttribute('aria-pressed', String(b.dataset.t === t));
+      b.setAttribute('aria-pressed', String(b.dataset.t === theme));
     });
+    measure();
+  }
+
+  function setTheme(t) {
+    theme = t;
+    apply();
     try { localStorage.setItem('mk-theme', t); } catch (e) {}
+  }
+
+  /* THE NUMBER HE ASKED THE QUESTION ABOUT.
+     "the background is the same color as the tiles on a lot of the color
+     schemes." Sixteen of the thirty were under 1.18; this prints the live
+     ratio for whichever scheme is on screen, measured off the rendered
+     pixels rather than off the tokens, so it cannot flatter the fix. */
+  function rgb(str) {
+    var m = String(str || '').match(/[\d.]+/g);
+    if (!m || m.length < 3) return [255, 255, 255];
+    return m.slice(0, 3).map(Number);
+  }
+  function relLum(c) {
+    var v = c.map(function (x) {
+      x = x / 255;
+      return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+  }
+  function measure() {
+    var page = document.querySelector('#mk-new .sym-page') || document.querySelector('.sym-page');
+    var tile = document.querySelector('#mk-new .sym-tile') || document.querySelector('.sym-tile');
+    var out = document.getElementById('mk-read');
+    if (!page || !tile || !out) return;
+    // getComputedStyle resolves color-mix for us, which is the whole point of
+    // measuring here instead of recomputing the mixes in JS.
+    var a = relLum(rgb(getComputedStyle(page).backgroundColor));
+    var b = relLum(rgb(getComputedStyle(tile).backgroundColor));
+    var hi = Math.max(a, b), lo = Math.min(a, b);
+    var ratio = (hi + 0.05) / (lo + 0.05);
+    var good = ratio >= 1.28;
+    out.innerHTML = 'page vs tile <b>' + ratio.toFixed(3) + '</b>' +
+      (good ? ' <s>— clears 1.28</s>' : ' <i>— under 1.28, they merge</i>');
   }
 
   function seg(sel, attr, apply) {
@@ -653,16 +719,42 @@ JS = """
   seg('[data-v]', 'v', function (v) {
     document.getElementById('mk-new').hidden = v !== 'new';
     document.getElementById('mk-old').hidden = v !== 'old';
+    measure();
+  });
+  seg('[data-m]', 'm', function (v) {
+    mode = v;
+    try { localStorage.setItem('mk-mode', v); } catch (e) {}
+    apply();
   });
 
-  var t0 = 'navy', d0 = '20';
-  try { t0 = localStorage.getItem('mk-theme') || t0; d0 = localStorage.getItem('mk-deep') || d0; } catch (e) {}
+  /* "Before the fix" puts the two numbers that changed back where they were —
+     a 6%% sink and no tile lift — on the page element only. It is the same
+     stylesheet underneath, so what it shows is genuinely what he was looking
+     at when he said the tiles merge into the background. */
+  seg('[data-s]', 's', function (v) {
+    [].forEach.call(document.querySelectorAll('.sym-page'), function (el) {
+      if (v === 'before') { el.style.setProperty('--sink', '6%%'); el.style.setProperty('--tile-lift', '0%%'); }
+      else { el.style.removeProperty('--sink'); el.style.removeProperty('--tile-lift'); }
+    });
+    measure();
+  });
+
+  var t0 = 'navy', d0 = '20', m0 = 'auto';
+  try {
+    t0 = localStorage.getItem('mk-theme') || t0;
+    d0 = localStorage.getItem('mk-deep') || d0;
+    m0 = localStorage.getItem('mk-mode') || m0;
+  } catch (e) {}
   if (!PAL[t0]) t0 = 'navy';
-  setTheme(t0);
+  mode = m0;
   root.setAttribute('data-deep', d0);
   [].forEach.call(document.querySelectorAll('[data-d]'), function (b) {
     b.setAttribute('aria-pressed', String(b.dataset.d === d0));
   });
+  [].forEach.call(document.querySelectorAll('[data-m]'), function (b) {
+    b.setAttribute('aria-pressed', String(b.dataset.m === m0));
+  });
+  setTheme(t0);
   body.classList.add('mk');
 })();
 """ % (json.dumps(NATIVE_DARK), json.dumps({k: {"--brand-bg": PAL[k].get("--brand-bg", "#fff")} for k, _ in THEMES}))
