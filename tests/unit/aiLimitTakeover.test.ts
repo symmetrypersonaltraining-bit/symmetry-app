@@ -30,7 +30,10 @@ test("the conversational caps are raised, and the risky ones are not", () => {
   // NOT raised, each for its own reason — a blanket sweep would have taken
   // these with it, and one of them writes rows.
   assert.equal(DEFAULT_LIMITS.food_photo, 20, "the most expensive client call there is");
-  assert.equal(DEFAULT_LIMITS.plan_build, 1, "rebuilding a meal plan twice a day is not a use case");
+  // Was 1 ("rebuilding a meal plan twice a day is not a use case"). Dustin,
+  // 11 Sep 2026: "let's do three times per day permanently." A client who
+  // rejects two drafts and wants a third is a use case after all.
+  assert.equal(DEFAULT_LIMITS.plan_build, 3, "three a day — his ruling, 11 Sep 2026");
   assert.equal(DEFAULT_LIMITS.workout_build, 8, "this one WRITES; a loop does damage, not spend");
 });
 

@@ -5,6 +5,15 @@ session reads it first and updates it before finishing.** The `HANDOFF-*.md`
 files with dates in the name are history — do not read them for current state,
 and do not create another one.
 
+> ⏳ **UNTIL 14 SEP: the meal-plan builder is 10/day so he can test it.** The
+> permanent limit is 3/day (`meter-core.ts`, his ruling 11 Sep). The 10 is a
+> dated override that expires by itself on the 15th; what does NOT expire is the
+> code and Test Client's `ai_daily_plan_build_limit = 10` column. **From 15 Sep
+> `planBuildLimitIsThree.test.ts` is red on main until both are cleaned up** —
+> delete `PLAN_BUILD_TEST_WINDOW`, set the column back to NULL, delete that
+> test. Routine `trig_01EcEWnV4eU36KP2xKczDpes` wakes a session at 8am Central
+> on the 14th to do it. Do not "fix" the red test any other way.
+>
 > ✅ **The food recompute is DONE (9 Sep).** All 16 batches ran: rows opening on
 > more than one household unit went **83,478 → 8**. Butter opens on 1 tbsp,
 > almonds on 1 oz, baby spinach on 1 cup, chicken breast on 1 breast (6 oz). The

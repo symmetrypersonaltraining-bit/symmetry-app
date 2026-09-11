@@ -108,7 +108,8 @@ export const AI_FEATURES = {
   // is the exact fault this registry exists to prevent.
   meal_edit:       { label: "Adjust a meal by voice",  surface: "client",    limitColumn: "ai_daily_parse_limit",      defaultLimit: 60 },
   food_photo:      { label: "Meal photo",              surface: "client",    limitColumn: "ai_daily_photo_limit",      defaultLimit: 20 },
-  plan_build:      { label: "Meal plan builder",       surface: "client",    limitColumn: "ai_daily_plan_build_limit", defaultLimit: 1  },
+  // 3, not 1. Dustin, 11 Sep 2026: "let's do three times per day permanently."
+  plan_build:      { label: "Meal plan builder",       surface: "client",    limitColumn: "ai_daily_plan_build_limit", defaultLimit: 3  },
   // Audited 2026-08-13: the route works and is metered, but NOTHING calls it —
   // no button, no cron, no other route. Marked dormant rather than deleted
   // because the food catalog still wants an auditor; wire it and drop the flag.
@@ -254,14 +255,39 @@ export class AiPaused extends Error {
  * and unattended jobs, which have no client to charge. Those are bounded by the
  * global kill switch alone.
  */
+/**
+ * ⏳ TEMPORARY — THE PLAN-BUILDER TEST WINDOW. DELETE AFTER 14 SEP 2026.
+ *
+ * Dustin, 11 Sep 2026: *"temporarily, we need to bump it to, like, ten times a
+ * day so that I can test this out from every angle. I wanna test out every
+ * single button in here. So bump it up to ten times per day right now, but put
+ * a reminder somewhere that we cannot miss in maybe three days to bring it
+ * back down to three times per day per client."*
+ *
+ * So: ten a day for every client through 14 Sep, then the permanent three,
+ * with no human action needed for the number to come back down — the date does
+ * it. What DOES need a human is deleting this block afterwards, and the
+ * reminder that cannot be missed is planBuildLimitIsThree.test.ts: from 15 Sep
+ * it fails while this constant still exists. A Routine also wakes a session
+ * that morning to do exactly that.
+ */
+export const PLAN_BUILD_TEST_WINDOW = { limit: 10, until: "2026-09-14" } as const;
+
+/** The default for a feature on a given Central date — see the window above. */
+export function defaultLimitFor(feature: AiFeature, today: string = chicagoToday()): number | null {
+  if (feature === "plan_build" && today <= PLAN_BUILD_TEST_WINDOW.until) return PLAN_BUILD_TEST_WINDOW.limit;
+  return DEFAULT_LIMITS[feature];
+}
+
 export function resolveDailyLimit(
   settings: Record<string, unknown> | null | undefined,
-  feature: AiFeature
+  feature: AiFeature,
+  today: string = chicagoToday()
 ): number | null {
   const col = LIMIT_COLUMNS[feature];
   const raw = settings && col ? settings[col] : undefined;
   const n = typeof raw === "number" ? raw : raw == null ? NaN : Number(raw);
-  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_LIMITS[feature];
+  return Number.isFinite(n) && n >= 0 ? n : defaultLimitFor(feature, today);
 }
 
 /**
