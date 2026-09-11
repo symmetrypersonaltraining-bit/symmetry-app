@@ -69,7 +69,7 @@ Batch 1 commits (#40–#42).
 >   Drive converts to a native Doc. He said he will keep editing it in Drive, so
 >   the script is the seed, not the master.
 > - **Symmetry App Books (bookkeeping, P&L, loan, taxes)** (Google Sheet,
->   `1fpOomihXy42Q585tf_7zLejXxOXAp4qhBcqATRZEpes`) — eleven tabs: Settings,
+>   `16fobos7hI8dgPuxr1Kq_YUxFI1C5W21JN33n_JNxQ6g`) — eleven tabs: Settings,
 >   Categories, Ledger, ProfitLoss, BalanceSheet, Loan, Owners, SalesTax,
 >   Form1099, TaxSummary, Plan. He types on the Ledger only; everything else is
 >   formulas over it. Source: `docs/investor/build-books-xml.py` → uploaded as
@@ -1793,8 +1793,14 @@ rejected file:
 - **`ss:Index` is ignored** on `Row`, `Cell` and `Column`. Gaps must be written
   as explicit empty `<Row/>` and `<Cell/>` elements or everything shifts left.
 - **A `DataValidation` range past row 1000 fails the whole conversion** with
-  "Unable to convert uploaded content" and no hint which sheet. The dropdowns
-  stop at row 1000.
+  "Unable to convert uploaded content" and no hint which sheet — so Google does
+  parse the element. It then **throws every validation rule away**: a probe
+  workbook with an inline list and a cross-sheet range list came back with no
+  `dataValidation` anywhere in the exported xlsx (proved by byte accounting on
+  the export; the sheet holding the two rules has a post-`</sheetData>` trailer
+  exactly the same size as the sheet with none). Dropdowns therefore cannot be
+  shipped in the file. The Settings tab tells Dustin to build the two he needs
+  in Data ▸ Data validation, which takes thirty seconds and sticks.
 
 Also: **sheet names must be one word.** A quoted cross-tab reference such as
 `'Start Here'!R5C2` is dropped silently and the formula reads 0, which is why
