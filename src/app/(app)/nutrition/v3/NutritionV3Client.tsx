@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
+import { centralToday } from "@/lib/central-time";
 import Confetti from "@/components/Confetti";
 import MicButton from "@/components/MicButton";
 import { startDictation } from "@/lib/dictation";
@@ -31,6 +32,7 @@ import Sheet from "./Sheet";
 import { planTargetDrift } from "@/lib/ai/nutrition-json";
 import TargetEditor from "@/components/nutrition/TargetEditor";
 import { fromGrams, type MacroTargets } from "@/lib/nutrition/macroSplit";
+import { MISSING_LABEL, type MissingInput } from "@/lib/nutrition/expenditure";
 import FoodSearchSheet from "./FoodSearchSheet";
 import ComposerSheet from "./ComposerSheet";
 import CoachChatSheet, { CoachActionItem, CoachActions } from "./CoachChatSheet";
@@ -4058,6 +4060,20 @@ function AiPlanSheet({
   // The item as the model wrote it, by key. Every amount edit scales from HERE,
   // never from the current value, so repeated typing cannot drift the macros.
   const [baseItems, setBaseItems] = useState<Record<string, DraftItem>>({});
+  /**
+   * WHAT THE COACH IS MISSING BEFORE IT CAN WORK OUT A DAILY BURN.
+   *
+   * Dustin, 11 Sep: *"If those numbers are not already in my profile, it needs
+   * to ask for them and put them in my profile for future use, and then it
+   * needs to get an accurate number to build the plan off of that."*
+   *
+   * The route answers 422 with the list rather than guessing — a defaulted sex
+   * alone moves the answer 166 kcal and nothing on screen would say so. These
+   * are asked for once, saved to the profile, and never asked again.
+   */
+  const [needs, setNeeds] = useState<MissingInput[] | null>(null);
+  const [gap, setGap] = useState({ sex: "", dob: "", ft: "", inch: "", weight: "" });
+  const [savingGap, setSavingGap] = useState(false);
   const [edited, setEdited] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -4111,12 +4127,55 @@ function AiPlanSheet({
   const label = mode === "targets" ? "AI draft" : mode === "foods" ? "my foods" : "coach consult";
   const inputStyle: React.CSSProperties = { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 12, padding: "10px 12px", fontSize: 13, width: "100%", outline: "none", textAlign: "center" };
 
+  // What to re-run once the gaps are filled, so he does not re-answer the chips.
+  const [lastRun, setLastRun] = useState<Record<string, unknown> | null>(null);
+
+  /** Save the answers onto the profile, then pick the plan build back up. */
+  async function saveGapsAndRetry() {
+    setSavingGap(true);
+    try {
+      const patch: Record<string, unknown> = {};
+      if (gap.sex === "male" || gap.sex === "female") patch.sex = gap.sex;
+      if (gap.dob) patch.date_of_birth = gap.dob;
+      const ft = Number(gap.ft), inch = Number(gap.inch);
+      if (Number.isFinite(ft) && ft > 0) patch.height_in = Math.round(ft * 12 + (Number.isFinite(inch) ? inch : 0));
+      const w = Number(gap.weight);
+      if (Number.isFinite(w) && w > 0) patch.current_weight = w;
+      const db = createClient();
+      if (Object.keys(patch).length) {
+        const { error } = await db.from("clients").update(patch).eq("id", clientId);
+        if (error) { setErr("Couldn't save that to your profile — try again."); return; }
+      }
+      // A weight they just told us is today's weigh-in. The expenditure reads
+      // the newest metric first, so without this row an older weigh-in would
+      // keep winning over what they typed thirty seconds ago.
+      if (Number.isFinite(w) && w > 0) {
+        const { error: mErr } = await db.from("metrics").insert({
+          client_id: clientId,
+          metric_date: centralToday(),
+          weight: w,
+        });
+        // Not fatal — the profile already has the weight, so the plan can be
+        // built. Losing the weigh-in silently is what is not acceptable.
+        if (mErr) console.error("weigh-in from the plan consult was not saved:", mErr.message);
+      }
+      setNeeds(null);
+      if (lastRun) await run(lastRun);
+    } finally { setSavingGap(false); }
+  }
+
   async function run(body: Record<string, unknown>) {
     setBusy(true);
     setErr(null);
     try {
       const res = await fetch("/api/nutrition-ai/plan-build", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, clientId }) });
       const json = await res.json().catch(() => null);
+      // Not an error — a question. Ask it, save the answers, come back.
+      if (res.status === 422 && Array.isArray(json?.needsProfile)) {
+        setNeeds(json.needsProfile as MissingInput[]);
+        setLastRun(() => body);
+        return;
+      }
       // Route contract: { draft: true, plan: {...} } (tolerate a bare plan too).
       const plan = json && typeof json.plan === "object" && json.plan ? json.plan : json;
       if (!res.ok || !json || json.error || !plan || !Array.isArray(plan.meals)) {
@@ -4222,6 +4281,54 @@ function AiPlanSheet({
           <span className="text-sm" style={{ color: "var(--brand-text-secondary)" }}>
             ✦ {mode === "consult" ? "Crunching your trend + drafting 5 meals…" : mode === "foods" ? "Building 5 meals out of your foods…" : "Drafting 5 meals against your targets…"}
           </span>
+        </div>
+      )}
+
+      {needs && needs.length > 0 && (
+        <div className="rounded-xl p-3 mb-2" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-primary)" }}>
+          <p className="text-sm font-bold mb-1" style={{ color: "var(--brand-text)" }}>A couple of things first</p>
+          <p className="text-xs mb-3" style={{ color: "var(--brand-text-secondary)" }}>
+            To work out what you actually burn in a day the coach needs your {needs.map((n) => MISSING_LABEL[n]).join(", ")}. It saves to your profile, so this is the only time you will be asked.
+          </p>
+          {needs.includes("sex") && (
+            <div className="mb-2">
+              <span className="block text-xs font-semibold mb-1" style={{ color: "var(--brand-text-secondary)" }}>Sex</span>
+              <div className="flex gap-2">
+                {(["male", "female"] as const).map((v) => (
+                  <button key={v} type="button" onClick={() => setGap((g) => ({ ...g, sex: v }))} aria-pressed={gap.sex === v}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold capitalize"
+                    style={gap.sex === v
+                      ? { background: "var(--brand-primary)", color: "white", border: "1px solid var(--brand-primary)" }
+                      : { background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>{v}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          {needs.includes("age") && (
+            <label className="block mb-2">
+              <span className="block text-xs font-semibold mb-1" style={{ color: "var(--brand-text-secondary)" }}>Date of birth</span>
+              <input type="date" max={centralToday()} value={gap.dob} onChange={(e) => setGap((g) => ({ ...g, dob: e.target.value }))} style={{ ...inputStyle, textAlign: "left" }} />
+            </label>
+          )}
+          {needs.includes("height") && (
+            <div className="mb-2">
+              <span className="block text-xs font-semibold mb-1" style={{ color: "var(--brand-text-secondary)" }}>Height</span>
+              <div className="flex gap-2">
+                <input inputMode="numeric" placeholder="ft" aria-label="height feet" value={gap.ft} onChange={(e) => setGap((g) => ({ ...g, ft: e.target.value.replace(/[^0-9]/g, "") }))} style={inputStyle} />
+                <input inputMode="numeric" placeholder="in" aria-label="height inches" value={gap.inch} onChange={(e) => setGap((g) => ({ ...g, inch: e.target.value.replace(/[^0-9]/g, "") }))} style={inputStyle} />
+              </div>
+            </div>
+          )}
+          {needs.includes("weight") && (
+            <label className="block mb-2">
+              <span className="block text-xs font-semibold mb-1" style={{ color: "var(--brand-text-secondary)" }}>Current weight (lbs)</span>
+              <input inputMode="decimal" aria-label="current weight" value={gap.weight} onChange={(e) => setGap((g) => ({ ...g, weight: e.target.value.replace(/[^0-9.]/g, "") }))} style={inputStyle} />
+            </label>
+          )}
+          <button type="button" onClick={saveGapsAndRetry} disabled={savingGap}
+            className="w-full py-3 rounded-2xl text-sm font-bold text-white mt-1" style={{ background: "var(--brand-primary)" }}>
+            {savingGap ? "Saving…" : "Save and build my plan →"}
+          </button>
         </div>
       )}
 
