@@ -1542,10 +1542,23 @@ export default function NutritionV3Client(props: Props) {
   // 3%" quietly becomes 24%.
   const planDrift = useMemo(() => {
     if (!tg || !tg.calories) return null;
+    // THE PLAN AS WRITTEN, NOT THE DAY AS EATEN.
+    //
+    // Dustin, 11 Sep: "Eating exactly as written comes to 3,553 calories. My
+    // actual calorie set is 4,462 … I've been eating on this plan exactly what
+    // it says." His plan sums to 4,462. The 909 it could not find was Lunch,
+    // which he had swapped for restaurant fajitas that day: this walked the
+    // day's rows and skipped every slot that was not kind "plan", so a swap
+    // dropped a whole meal out of a sentence that begins "as written".
+    //
+    // planMeals is what was written. One meal per position — a rotating slot
+    // offers several and the first is the default the day opens on.
     let k = 0, pr = 0, ca = 0, fa = 0, slots = 0;
-    for (const row of rows) {
-      if (row.kind !== "plan" || !row.chosen) continue;
-      const m = planMealMacros(row.chosen);
+    const seen = new Set<number>();
+    for (const meal of planMeals) {
+      if (seen.has(meal.position)) continue;
+      seen.add(meal.position);
+      const m = planMealMacros(meal);
       k += m.kcal; pr += m.protein; ca += m.carbs; fa += m.fats;
       slots++;
     }
@@ -1556,7 +1569,7 @@ export default function NutritionV3Client(props: Props) {
     if (Math.abs(ca - tg.carbs) > 5) off.push({ label: "carbs", delta: ca - tg.carbs, unit: "g" });
     if (Math.abs(fa - tg.fats) > 5) off.push({ label: "fat", delta: fa - tg.fats, unit: "g" });
     return off.length ? { plan: { kcal: k, p: pr, c: ca, f: fa }, off } : null;
-  }, [rows, tg]);
+  }, [planMeals, tg]);
 
   const over = tg ? totals.kcal > tg.calories : false;
   const pctK = tg && tg.calories > 0 ? Math.min(100, (totals.kcal / tg.calories) * 100) : 0;

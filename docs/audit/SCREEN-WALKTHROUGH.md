@@ -3386,3 +3386,19 @@ logger.
 **Held for his confirmation.** His words: *"don't necessarily put that in
 there."* Nothing is built until he says so, and when he does it lands as its own
 commit after the Nutrition walk, not inside it.
+
+## Interlude — "as written" means the plan, not the day (11 Sep)
+
+Dustin, on his own Nutrition tab, mid-audit: *"a little warning thing saying
+this plan does not reach the target. Eating exactly as written comes to 3,553
+calories. My actual calorie set is 4,462 … I've been eating on this plan
+exactly what it says."* His live plan (BULK v2, resumes Aug 31) sums to
+**4,462.5 kcal** from `meal_items`. The 909 kcal the warning could not find
+was **Lunch, which he had swapped for restaurant fajitas that day**.
+
+| Control | Before | Now |
+|---|---|---|
+| Today block · "⚠ This plan does not reach the target" (trainer, today only) | totalled the **day's rows** and skipped any slot that was not a plain plan meal, so a swapped, custom or removed slot dropped a whole meal out of an "as written" total | totals **`planMeals` as written**, one meal per position (a rotating slot counts its first option); recomputes when the plan or the target changes, never when a log does |
+
+Test: `tests/unit/asWrittenMeansThePlanNotTheDay.test.ts`, red on all three
+before the change.
