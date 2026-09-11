@@ -1443,6 +1443,67 @@ export default function NutritionV3Client(props: Props) {
   // ---- versions -----------------------------------------------------------
   const [restoring, setRestoring] = useState<string | null>(null);
 
+  // ── SEE A PLAN BEFORE YOU RESTORE IT ────────────────────────────────────
+  //
+  // Dustin, 11 Sep 2026, walking Plan versions: *"It doesn't really tell you
+  // a whole lot just in that one tab. We should have a way to tap on that and
+  // open up a little more details on exactly what that plan looks like without
+  // actually clicking make this my plan again. That way if they want to reuse
+  // a previous plan they can look through the actual plans first instead of
+  // just a very brief small summary."*
+  //
+  // Tapping a version's head expands it in place: its meals in order, every
+  // item with its amount, a kcal per meal and a day total. Nothing is adopted.
+  // The restore button below it is unchanged and still the only thing that
+  // changes the live plan. Loaded once per version and kept, so re-opening is
+  // free; RLS lets a client read the meals and items of their own archived
+  // plans (client_read_meals / client_read_meal_items).
+  type VersionMeal = {
+    id: string; name: string | null; timing: string | null; position: number;
+    items: { food: string; amount: number | null; unit: string | null; protein: number; carbs: number; fats: number; kcal: number }[];
+  };
+  const [openVersion, setOpenVersion] = useState<string | null>(null);
+  const [versionMeals, setVersionMeals] = useState<Record<string, { loading: boolean; meals: VersionMeal[] }>>({});
+  async function toggleVersion(planId: string) {
+    if (openVersion === planId) { setOpenVersion(null); return; }
+    setOpenVersion(planId);
+    if (versionMeals[planId]) return;
+    setVersionMeals((m) => ({ ...m, [planId]: { loading: true, meals: [] } }));
+    const { data: meals } = await supabase
+      .from("meals")
+      .select("id, name, timing, position")
+      .eq("meal_plan_id", planId)
+      .order("position", { ascending: true });
+    const mealRows = ((meals as { id: string; name: string | null; timing: string | null; position: number | null }[]) || []);
+    const ids = mealRows.map((m) => m.id);
+    const { data: items } = ids.length
+      ? await supabase
+          .from("meal_items")
+          .select("meal_id, food, amount, unit, protein, carbs, fats, kcal, position")
+          .in("meal_id", ids)
+          .order("position", { ascending: true })
+      : { data: [] as unknown[] };
+    const byMeal: Record<string, VersionMeal["items"]> = {};
+    for (const it of ((items as Record<string, unknown>[]) || [])) {
+      const mid = String(it.meal_id);
+      const p = Number(it.protein) || 0, c = Number(it.carbs) || 0, f = Number(it.fats) || 0;
+      // The stored kcal when the row has one; 4/4/9 from its own macros when
+      // it does not. Never a figure from anywhere the row cannot vouch for.
+      const kcal = it.kcal != null ? Number(it.kcal) || 0 : kcalOf(p, c, f);
+      (byMeal[mid] ||= []).push({
+        food: String(it.food || ""), amount: it.amount == null ? null : Number(it.amount), unit: (it.unit as string | null) ?? null,
+        protein: p, carbs: c, fats: f, kcal,
+      });
+    }
+    setVersionMeals((m) => ({
+      ...m,
+      [planId]: {
+        loading: false,
+        meals: mealRows.map((r) => ({ id: r.id, name: r.name, timing: r.timing, position: Number(r.position) || 0, items: byMeal[r.id] || [] })),
+      },
+    }));
+  }
+
   async function openVersions() {
     openSheet({ kind: "versions" });
     const { data } = await supabase
@@ -3155,18 +3216,62 @@ export default function NutritionV3Client(props: Props) {
           const isLive = v.status === "live" && !pending;
           return (
             <div key={v.id} className="rounded-2xl p-3 mb-2" style={{ background: "var(--brand-bg)", border: `1px solid ${isLive ? "rgba(34,197,94,0.5)" : "var(--brand-border)"}` }}>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-bold min-w-0" style={{ color: "var(--brand-text)" }}>
-                  {planLabel(v)}
-                  {v.created_by_client && <span style={{ marginLeft: 6, fontSize: 8.5, fontWeight: 800, background: "rgba(66,165,245,0.16)", color: BLUE, padding: "2px 6px", borderRadius: 5, verticalAlign: "middle" }}>BUILT BY YOU</span>}
+              {/* The head is the toggle. It opens the plan's meals below; it
+                  never restores. See toggleVersion for his words. */}
+              <button
+                type="button"
+                onClick={() => toggleVersion(v.id)}
+                aria-expanded={openVersion === v.id}
+                className="w-full text-left"
+                style={{ background: "transparent", border: 0, padding: 0, color: "inherit" }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold min-w-0" style={{ color: "var(--brand-text)" }}>
+                    {planLabel(v)}
+                    {v.created_by_client && <span style={{ marginLeft: 6, fontSize: 8.5, fontWeight: 800, background: "rgba(66,165,245,0.16)", color: BLUE, padding: "2px 6px", borderRadius: 5, verticalAlign: "middle" }}>BUILT BY YOU</span>}
+                  </p>
+                  <span className="flex items-center gap-1.5" style={{ flexShrink: 0 }}>
+                    <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 6, background: isLive ? "rgba(34,197,94,0.18)" : pending ? "rgba(198,158,60,0.18)" : "var(--brand-surface)", color: isLive ? GREEN : pending ? GOLD : "var(--brand-text-secondary)" }}>
+                      {isLive ? "LIVE" : pending ? `PENDING · EFF ${v.effective_date}` : "ARCHIVED"}
+                    </span>
+                    <i className={"ti ti-chevron-" + (openVersion === v.id ? "up" : "down")} style={{ fontSize: 14, color: "var(--brand-text-secondary)" }} />
+                  </span>
+                </div>
+                <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>
+                  Effective {v.effective_date || "—"}{v.change_reason ? ` · ${v.change_reason}` : ""}
+                  {openVersion !== v.id ? " · tap to see the meals" : ""}
                 </p>
-                <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 6, flexShrink: 0, background: isLive ? "rgba(34,197,94,0.18)" : pending ? "rgba(198,158,60,0.18)" : "var(--brand-surface)", color: isLive ? GREEN : pending ? GOLD : "var(--brand-text-secondary)" }}>
-                  {isLive ? "LIVE" : pending ? `PENDING · EFF ${v.effective_date}` : "ARCHIVED"}
-                </span>
-              </div>
-              <p className="text-xs mt-1" style={{ color: "var(--brand-text-secondary)" }}>
-                Effective {v.effective_date || "—"}{v.change_reason ? ` · ${v.change_reason}` : ""}
-              </p>
+              </button>
+              {openVersion === v.id && (() => {
+                const d = versionMeals[v.id];
+                if (!d || d.loading) return <p className="text-xs mt-2" style={{ color: "var(--brand-text-secondary)" }}>Loading the meals…</p>;
+                if (d.meals.length === 0) return <p className="text-xs mt-2" style={{ color: "var(--brand-text-secondary)" }}>This version has no meals on file.</p>;
+                const dayKcal = d.meals.reduce((a, m) => a + m.items.reduce((b, i) => b + i.kcal, 0), 0);
+                const dayP = d.meals.reduce((a, m) => a + m.items.reduce((b, i) => b + i.protein, 0), 0);
+                const dayC = d.meals.reduce((a, m) => a + m.items.reduce((b, i) => b + i.carbs, 0), 0);
+                const dayF = d.meals.reduce((a, m) => a + m.items.reduce((b, i) => b + i.fats, 0), 0);
+                return (
+                  <div className="mt-2 pt-2" style={{ borderTop: "1px dashed var(--tile-ctrl-bd)" }}>
+                    {d.meals.map((m, i) => {
+                      const mk = m.items.reduce((b, it) => b + it.kcal, 0);
+                      return (
+                        <div key={m.id} className="mb-2">
+                          <p className="text-xs font-bold" style={{ color: "var(--brand-text)" }}>
+                            M{i + 1} {m.name || ""}{m.timing ? <span style={{ fontWeight: 500, color: "var(--brand-text-secondary)" }}> · {m.timing}</span> : null}
+                            <span style={{ float: "right", fontWeight: 700, color: "var(--brand-text-secondary)" }}>{Math.round(mk)} cal</span>
+                          </p>
+                          {m.items.map((it, j) => (
+                            <p key={j} className="sym-food">
+                              {it.food}{it.amount != null ? ` — ${it.amount}${it.unit ? ` ${it.unit}` : ""}` : ""}
+                            </p>
+                          ))}
+                        </div>
+                      );
+                    })}
+                    <p className="sym-kcal"><b>{Math.round(dayKcal)}</b> cal · {Math.round(dayP)}P / {Math.round(dayC)}C / {Math.round(dayF)}F per day</p>
+                  </div>
+                );
+              })()}
               {/* THE BUTTON THAT MAKES THE PROMISE TRUE.
                   This sheet has said "restorable anytime" since it was built and
                   there was no way to do it. Claudine found that gap the hard way
