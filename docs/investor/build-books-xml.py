@@ -167,8 +167,7 @@ r = 4
 st.banner(r, "START HERE \u2014 READ THIS ONCE, IT TAKES FIVE MINUTES", 3); r += 1
 for t in [
     "You do not need to know any accounting to use this. There is one rule: every time money moves in or out of the business, you add ONE line to the Ledger tab. That is the whole job. Profit and loss, the balance sheet, the loan, the sales tax, the tax return numbers \u2014 all of it is worked out from those lines. You never type on those tabs.",
-    "The tabs are the row of names along the bottom of the screen. Click Ledger. Row 1 is a gold banner, row 2 is the column headings, and row 3 already has an example line in it so you can see what a finished line looks like. When you are ready, type straight over row 3 with your first real transaction \u2014 it is only there as a sample, and until you replace it the reports will show a $300 filing fee that never happened.",
-    "The cream cells with a box round them are the only things you ever change on this tab. There are nine of them, just below. Everything else on this tab is instructions.",
+    "The tabs are the row of names along the bottom of the screen. Click Ledger. Row 1 is a gold banner, row 2 is the column headings, and row 3 already has an example line in it so you can see what a finished line looks like. When you are ready, type straight over row 3 with your first real transaction \u2014 it is only there as a sample, and until you replace it the reports will show a $300 filing fee that never happened. Back on this tab, the cream cells with a box round them are the only things you ever change; there are nine of them, just below, and everything else here is instructions.",
 ]:
     st.text(r, 1, t, "wrap", merge=2); r += 1
 r += 1
@@ -180,6 +179,7 @@ for label, body in [
     ("A Texas sales tax permit", "Register at comptroller.texas.gov before your first sale to a Texas customer. It is free. You are not allowed to charge sales tax without it, and you are required to collect it once you have Texas customers."),
     ("A W-9 from every contractor", "Before you pay a contractor their first dollar, get a signed Form W-9 back from them (free download from irs.gov). It gives you their legal name and tax ID, which you will need in January to send their 1099. Chasing it a year later is painful and some people simply stop answering."),
     ("A receipts folder", "One folder in Drive per year. Every time you enter a line, drop the receipt in it and paste the link into the Receipt column."),
+    ("Switch the two dropdowns on", "Google throws data-validation rules away when it converts an uploaded file, so the Ledger arrives without them and you build them once. Go to the Ledger tab and open the menu: Data \u25b8 Data validation \u25b8 Add rule. Set \u201cApply to range\u201d to D3:D1000, set Criteria to \u201cDropdown (from a range)\u201d, type Categories!A4:A61 in the box under it, and click Done. Then Add rule again: range G3:G1000, Criteria \u201cDropdown\u201d, and add the four options Bank, Stripe, Card and Cash. That is it \u2014 thirty seconds, it sticks, and from then on the category is a click instead of typing."),
 ]:
     r = two(r, label, body)
 r += 1
@@ -215,10 +215,10 @@ for label, body in [
     ("A \u2014 Date", "The day the money actually moved, not the date on the invoice. Type it like 9/11/2026."),
     ("B \u2014 Payee / who", "Who you paid, or who paid you. Spell a contractor's name exactly the same way every single time \u2014 the 1099 tab adds up by this name, and \u201cJohn Smith\u201d and \u201cJohn Smith LLC\u201d are two different people to a spreadsheet."),
     ("C \u2014 What for", "A plain sentence in your own words: \u201cSeptember hosting\u201d, \u201cLLC filing fee\u201d. This is what you will be reading in a year's time when you cannot remember."),
-    ("D \u2014 Category", "Pick it from the dropdown. Click the cell and a small arrow appears at its right-hand edge; click the arrow and choose from the list. The list comes from the Categories tab. This is the one column that has to be right \u2014 every report in the workbook is built on it. If you cannot see an arrow, read IF SOMETHING LOOKS WRONG at the bottom of this tab."),
+    ("D \u2014 Category", "The one column that has to be right: every report in the workbook is built on it. Once you have switched the dropdown on (see BEFORE THE FIRST LINE above), click the cell and a small arrow appears at its right-hand edge; click the arrow and pick from the list. Until then, and any time you would rather type, the name just has to match the Categories tab exactly \u2014 column N says NOT A CATEGORY when it does not."),
     ("E \u2014 Money in", "Money that came INTO the business. Fill in E or F, never both on the same line."),
     ("F \u2014 Money out", "Money that LEFT the business. Type it as a plain positive number: 300, not -300. The sheet knows it is money going out because of the column it is in."),
-    ("G \u2014 Account", "Which pot it moved through: Bank, Stripe, Card or Cash. Also a dropdown. This is what lets the Balance Sheet be checked against each statement."),
+    ("G \u2014 Account", "Which pot the money moved through: Bank, Stripe, Card or Cash, spelled exactly like that. The second dropdown covers this column. It is what lets the Balance Sheet be checked against each statement."),
     ("H \u2014 Receipt link / ref", "The Drive link to the receipt, or the subject line of the email receipt. Takes five seconds now and saves an afternoon later."),
     ("I \u2014 Notes", "Anything else worth remembering. Optional, except for meals."),
     ("J to Q \u2014 leave alone", "Grey italic, and worked out for you: the month, the net amount, the category number, the type, the tax line it lands on and whether it counts toward a 1099. Do not type in them. If one of them looks wrong the answer is always in columns A to I."),
@@ -277,7 +277,7 @@ r += 1
 
 st.banner(r, "IF SOMETHING LOOKS WRONG", 3); r += 1
 for label, body in [
-    ("No dropdown in the Category column", "Click the cell first \u2014 the little arrow only appears on the cell you have selected, and only from row 3 down. If there is still no arrow, you can build it yourself in about twenty seconds: click cell D3, then in the menu go Data \u25b8 Data validation \u25b8 Add rule, set Criteria to \u201cDropdown (from a range)\u201d, type Categories!A4:A61 in the box, tick \u201cShow warning\u201d, then Done. Drag the little blue square at the bottom-right of D3 down the column to copy it to the rows below. Or skip it entirely and type the category by hand \u2014 it just has to be spelled exactly as it is on the Categories tab. The built-in dropdowns only cover rows 3 to 1000; past that, copy a filled cell down."),
+    ("There is no dropdown in the Category column", "There will not be one until you build it. Google discards data-validation rules when it converts an uploaded file, so the Ledger arrives with plain cells. Building them takes thirty seconds and is the last item under BEFORE THE FIRST LINE above: Data \u25b8 Data validation \u25b8 Add rule, range D3:D1000, Criteria \u201cDropdown (from a range)\u201d, Categories!A4:A61. Nothing breaks in the meantime \u2014 a typed category works exactly as well, as long as it matches the Categories tab. If you set the rule on D3:D1000 and later use more than a thousand lines, edit the rule and change the 1000."),
     ("Column N says NOT A CATEGORY", "Whatever is in column D on that line is not spelled the same as anything on the Categories tab. Pick it from the dropdown again, or fix the spelling."),
     ("The balance check is not $0.00", "Nearly always one of two things: a Transfer between accounts that only got one of its two lines, or a line with an amount typed into both Money in and Money out."),
     ("A whole month shows nothing", "Check the Year in Settings at the top of this tab. The report tabs only ever show that one year."),
