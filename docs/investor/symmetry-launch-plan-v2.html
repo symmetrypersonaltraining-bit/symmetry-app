@@ -1,0 +1,200 @@
+<title>Symmetry Launch Plan, Revised</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ink:#14202e; --ink-2:#4a5566; --ink-3:#7b8494;
+  --paper:#f7f6f2; --paper-2:#ffffff; --line:#d9d6cd;
+  --navy:#0C2A47; --navy-soft:#e7ecf2; --gold:#C69E3C; --gold-soft:#f6efdd;
+  --good:#2f6f4e; --warn:#a15c1a; --bad:#9a2f2f;
+  --display:"Archivo",system-ui,sans-serif; --body:"Source Serif 4",Georgia,serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --ink:#ecebe6; --ink-2:#b7bcc6; --ink-3:#8790a0;
+  --paper:#12171f; --paper-2:#1a2129; --line:#2c3541;
+  --navy:#c9d6e6; --navy-soft:#1f2a38; --gold:#d8b45c; --gold-soft:#2a2516;
+  --good:#7fc39d; --warn:#e0a05a; --bad:#e08484;
+}}
+:root[data-theme="dark"]{
+  --ink:#ecebe6; --ink-2:#b7bcc6; --ink-3:#8790a0;
+  --paper:#12171f; --paper-2:#1a2129; --line:#2c3541;
+  --navy:#c9d6e6; --navy-soft:#1f2a38; --gold:#d8b45c; --gold-soft:#2a2516;
+  --good:#7fc39d; --warn:#e0a05a; --bad:#e08484;
+}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55;padding-inline:clamp(16px,4vw,40px);padding-block:32px 80px}
+main{max-width:880px;margin:0 auto}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,44px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:clamp(22px,3.2vw,28px);font-weight:600;margin-top:56px;padding-top:18px;border-top:2px solid var(--navy)}
+h3{font-size:18px;font-weight:600;margin-top:28px;color:var(--navy)}
+p{margin:12px 0;max-width:68ch}
+.eyebrow{font-family:var(--display);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:600}
+.lede{font-size:20px;color:var(--ink-2);max-width:62ch;margin-top:14px}
+.meta{font-family:var(--mono);font-size:13px;color:var(--ink-3);margin-top:18px}
+.verdict{background:var(--navy-soft);border-left:4px solid var(--gold);padding:18px 22px;margin:28px 0;border-radius:0 6px 6px 0}
+.verdict p{margin:8px 0}
+.verdict strong{font-family:var(--display)}
+table{border-collapse:collapse;width:100%;font-size:15px;margin:16px 0}
+.tablewrap{overflow-x:auto;margin:16px 0}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-family:var(--display);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);font-weight:600;background:var(--paper-2)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:14px;white-space:nowrap}
+tr.total td{font-weight:600;border-top:2px solid var(--ink);background:var(--paper-2)}
+.tag{display:inline-block;font-family:var(--display);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:3px;font-weight:600}
+.tag.good{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}
+.tag.warn{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn)}
+.tag.bad{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
+ul,ol{padding-left:22px;max-width:70ch}li{margin:6px 0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:18px 0}
+.card{background:var(--paper-2);border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+.card .k{font-family:var(--mono);font-size:26px;font-weight:500;color:var(--navy);font-variant-numeric:tabular-nums}
+.card .l{font-family:var(--display);font-size:12.5px;color:var(--ink-2);margin-top:4px;line-height:1.3}
+.src{font-size:13.5px;color:var(--ink-3);font-family:var(--mono);margin-top:4px}
+.note{font-size:15px;color:var(--ink-2);border-left:3px solid var(--line);padding-left:14px;margin:14px 0}
+.changed{border-left:3px solid var(--gold);padding-left:14px}
+small{color:var(--ink-3)}
+@media (max-width:480px){body{font-size:16px}table{font-size:13.5px}td.n,th.n{font-size:12.5px}}
+</style>
+<main>
+<div class="eyebrow">Symmetry Personal Training · Working draft for Dustin · 11 September 2026 · v6, the $274,000 version</div>
+<h1>Symmetry Launch Plan, Revised</h1>
+<p class="lede">The 3 July proposal to Lauren, rebuilt on what the app is today, what trainers pay, how launches in this category actually grow, and what a build and launch cost. Sized to your decisions: one developer at $10,000 a month from January 2027 (three days a week after launch), a fractional marketing lead from January, web launch March 2027, a solid launch budget, trainer pricing capped at $199, individuals at $49, a 7% loan with payments starting at monthly break-even, and Lauren as a 10% owner.</p>
+<p class="meta">Sources: live Symmetry database and codebase (11 Sep), three research reports with 200+ cited pages. Ranges marked ≈ come from 2026 secondary sources; see "What to verify".</p>
+
+<div class="verdict">
+<p><strong>The ask.</strong> <strong>≈ $274,000</strong>: marketing lead and developer from January, two months of build, six months of launch, setup and 12% contingency, drawn in two tranches. The developer is <strong>$65,000</strong> of it, the part you would borrow separately under Option B if Lauren prefers not to fund it.</p>
+<p><strong>What it buys, base case.</strong> About 120 paying trainers and 65 individuals by the end of the sixth launch month ($17,000 a month), 217 trainers and $30,000 a month at month 12, and monthly break-even around month 14, spring 2028, when Lauren's loan payments start at $5,894 a month. The raise, with its contingency, carries the base case through its cash trough with about $35,000 to spare. Optimistic breaks even at month 7. Conservative never breaks even and is the signal to change course at the August 2027 review.</p>
+<p><strong>Who runs the marketing.</strong> An agency is the one structure that does not fit a $20,000 budget at this stage: it eats a third to a half of the money in fees and still needs you for positioning and content. Section 4 compares the three ways to run it; the plan uses a fractional marketing lead plus a media buyer and a content freelancer, started in January so the launch has a working funnel on day one.</p>
+</div>
+
+<h2>1. What exists today</h2>
+<p>The July proposal said "25+ clients, a full feature set". That undersold it. Measured on 11 September:</p>
+<div class="cards">
+<div class="card"><div class="k">27</div><div class="l">active clients, 36 all-time; 20 logged a workout in the last 7 days</div></div>
+<div class="card"><div class="k">1,330</div><div class="l">workouts logged since 17 June, 13,975 sets, 2,367 meal logs</div></div>
+<div class="card"><div class="k">$19,472</div><div class="l">collected through the app's own invoicing, 41 invoices; $8,992 in July, $8,050 in August</div></div>
+<div class="card"><div class="k">$0.55</div><div class="l">measured AI cost per client per month (1,593 AI calls, 36 users, $14.80 total in 30 days)</div></div>
+<div class="card"><div class="k">50 / 71</div><div class="l">user-facing screens / API routes, 24 of them AI-backed</div></div>
+<div class="card"><div class="k">320</div><div class="l">unit-test files, plus browser tests, CI that blocks spec drift, error log, health endpoint</div></div>
+</div>
+<p><strong>Built and in daily use:</strong> trainer console (roster, client files, programme builder and calendar, exercise/video/workout libraries, invoicing with emailed reminders, schedule-change queue, movement screen via phone camera, AI and data health pages) and client app (workout logger, nutrition with photo and text AI logging, meal-plan generation, progress, messages and group chat, recipes, body-fat calculator, onboarding). Google Calendar two-way sync. Email. Web push.</p>
+<p><strong>Not built, and it is what the developer is for:</strong></p>
+<ul>
+<li><span class="tag bad">Missing</span> Multi-trainer tenancy. One trainer is hard-wired; adding another is a manual database insert with no data separation. This is the largest piece of work and is "not started" per the repo's own backlog.</li>
+<li><span class="tag bad">Missing</span> Subscriptions and payments. No Stripe, no plans, no seats. The app tracks invoices; money moves outside it.</li>
+<li><span class="tag warn">Partial</span> App Store packaging. A Capacitor shell and a build pipeline exist; no native iOS project is in the repo and nothing has shipped to TestFlight. The app already installs to a phone home screen as a web app, so the March launch is a web launch and does not wait for the stores.</li>
+<li><span class="tag warn">Partial</span> Onboarding. The 59-step trainer tutorial ships switched off; there is no client tutorial; 2 of 39 screens have been walked button-by-button.</li>
+<li><span class="tag warn">Partial</span> SMS reminders are in the privacy policy but not in the code.</li>
+</ul>
+<p class="note">Worth saying out loud to Lauren: this 123,000-line codebase was built in under three months by one trainer working with AI coding tools, with no developer payroll. It is the strongest argument in the plan, and it is why one developer plus you is the right team.</p>
+
+<h2>2. Pricing</h2>
+<div class="changed">
+<p><strong>Decided:</strong> trainers pay $79 a month for up to 5 clients, plus $15 for every further 5 clients, capped at $199. Individuals training on their own pay $49 a month. Both count as app revenue.</p>
+</div>
+<div class="tablewrap"><table>
+<tr><th>Clients</th><th class="n">Symmetry</th><th>Competitor at the same size</th></tr>
+<tr><td>5</td><td class="n">$79</td><td>CoachRx $29, TrueCoach $29.98, PT Distinction $19.90 (3 clients)</td></tr>
+<tr><td>10</td><td class="n">$94</td><td>Hevy Coach $25, Everfit $29</td></tr>
+<tr><td>20</td><td class="n">$124</td><td>TrueCoach $69.98, PT Distinction $59.90 (25)</td></tr>
+<tr><td>30</td><td class="n">$154</td><td>Trainerize ≈ $115 + add-ons</td></tr>
+<tr><td>45 and up</td><td class="n">$199 cap</td><td>PT Distinction $89.90, Kahunas $69 to $99, CoachRx $79, TrueCoach $164.98, Trainerize ≈ $190 with add-ons</td></tr>
+<tr class="total"><td>Weighted average across a typical client mix</td><td class="n">≈ $115</td><td>Near your $120 target; the model below uses $115</td></tr>
+</table></div>
+<p>Below 20 clients Symmetry is priced above every competitor, sometimes by 3x, and at the cap it sits with TrueCoach and Trainerize-with-add-ons. That holds only if the assessment-to-programme engine is live and visible on day one, because it is the one thing nobody else sells. The cap removes the price cliff that trainers complain about most. Charge 0% on client payments; that is the norm and the exceptions are resented.</p>
+
+<h2>3. What the market says</h2>
+<p><strong>Where competitors are weak:</strong> only PT Distinction has any movement assessment, and none of the ten turns an assessment into a corrective programme. Trainers' top complaints are hidden add-ons, payment fees, price cliffs at 20 or 50 clients, client-app crashes that lose a workout mid-session, and support decay at the two acquired leaders (Trainerize, TrueCoach).</p>
+<p><strong>Market size, honestly:</strong> BLS counts 322,930 employed trainers and instructors in the US (May 2025); independents push the total to roughly 450,000 to 600,000. Published "market size" reports range from $0.8B to $13.8B and are not usable. A bottom-up estimate of US trainer-software revenue is roughly $80M to $260M a year. The incumbents took 10+ years and full teams to reach $5M to $25M; none raised more than about $4.5M.</p>
+<p><strong>How founder-led launches in this category actually went:</strong> with no marketing budget, the base case is under $1,000 a month at month 12 (about 70% of indie software never passes that line). The closest analogue to you, a gym co-owner selling a programming tool to peers, plateaued at $7,000 to $8,000 a month. TrueCoach's founders reached about $100,000 a month in five years by putting savings into paid ads. Acquisition spend is what separates those outcomes, which is why the launch budget matters more than the build budget.</p>
+
+<h2>4. The plan and the budget</h2>
+<div class="changed">
+<p><strong>Team:</strong> one senior full-stack developer at $10,000 a month, starting January 2027, dropping to three days a week ($7,000) from April once the web launch is out, plus you as product owner working with AI tooling as you do now. You take no income from the app until the profit gate is met.</p>
+<p><strong>Timeline:</strong> January 2027 the marketing lead and the developer start (positioning, site, waitlist, tracking; multi-trainer build). January and February 2027 build (multi-trainer, Stripe subscriptions, trainer sign-up and onboarding). <strong>Web launch March 2027</strong> with a solid marketing push for six months, March to August. App Store and Google Play packaging April to August alongside. <strong>Reassess in August 2027</strong>, five months after launch.</p>
+</div>
+<h3>Monthly expenses</h3>
+<div class="tablewrap"><table>
+<tr><th>Line</th><th class="n">Pre-launch, Jan to Feb</th><th class="n">Launch, Mar to Aug</th><th class="n">After</th><th>Basis</th></tr>
+<tr><td>Senior full-stack developer: full time to the March launch, three days a week after</td><td class="n">$10,000</td><td class="n">$10,000 in March, then $7,000</td><td class="n">$7,000</td><td>Your figure; nearshore senior range is $12,000 to $15,000, so confirm the person and rate</td></tr>
+<tr><td>Marketing, Option C: fractional marketing lead $6k, media buyer $2.5k, content freelancer $2k, ads and channels $9.5k (paid search, Meta/Instagram, trainer podcasts and a newsletter, one Perform Better booth fund; a 3-month fitness PR push around launch paid from the ad line)</td><td class="n">$12,000: lead and content, light ads, waitlist</td><td class="n">$20,000</td><td class="n">$20,000</td><td>Cost report "solid" tier $15k to $25k</td></tr>
+<tr><td>Infrastructure: Supabase, Vercel, Claude API, email, SMS, monitoring, domain, Workspace</td><td class="n">$500</td><td class="n">$2,000</td><td class="n">$3,000</td><td>$800 to $2,450 a month at 100 trainers; AI measured at $0.55 per client</td></tr>
+<tr><td>Legal, accounting, insurance, payroll service</td><td class="n">$1,500</td><td class="n">$1,500</td><td class="n">$1,500</td><td>GL + cyber $2k to $5k a year; CPA $3k to $12k a year</td></tr>
+<tr><td>Tools</td><td class="n">$300</td><td class="n">$300</td><td class="n">$300</td><td></td></tr>
+<tr class="total"><td>Monthly total</td><td class="n">≈ $24,300</td><td class="n">≈ $33,800 in March, then ≈ $30,800</td><td class="n">≈ $31,800</td><td></td></tr>
+</table></div>
+<h3>The raise</h3>
+<div class="tablewrap"><table>
+<tr><th>Block</th><th class="n">Amount</th></tr>
+<tr><td>One-time setup: Texas LLC and agent, operating agreement with Lauren's 10% membership interest, terms and privacy with lawyer review, trademark, Apple and Google developer accounts, D-U-N-S, SMS registration, insurance binder</td><td class="n">$8,000</td></tr>
+<tr><td>Pre-launch, January to February (marketing lead, content and waitlist $24,000; developer $20,000; infra, legal, tools $4,600)</td><td class="n">$48,600</td></tr>
+<tr><td>Launch, March to August (developer $45,000; marketing $120,000; infra $12,000; legal $9,000; tools $1,800)</td><td class="n">$187,800</td></tr>
+<tr><td>Contingency, 12%</td><td class="n">$29,300</td></tr>
+<tr class="total"><td>Total raise, drawn as about $60,000 in January and the rest at the March launch</td><td class="n">≈ $274,000</td></tr>
+<tr><td>Of which the developer, January to August (Option B: borrowed separately if Lauren does not fund it)</td><td class="n">$65,000</td></tr>
+</table></div>
+<h3>Who runs the marketing: agency, freelancers, or a fractional lead</h3>
+<p>You asked whether to hire a company to do the launch and marketing. Priced from 2026 agency rate pages and surveys (fetched via search; confirm on a sales call). Ad spend is always billed on top of fees.</p>
+<div class="tablewrap"><table>
+<tr><th>Structure, at $20,000 a month all-in</th><th class="n">Fees</th><th class="n">Left for ads</th><th>What you get</th><th>Where it breaks</th></tr>
+<tr><td><strong>A. One full-service agency</strong> (Directive Startup $6,500 month-to-month; Bay Leaf Digital, Texas, $5,000 to $6,000, 3 to 6 month minimum; larger shops $10,000 to $30,000 want 6 to 12 month contracts and $5M+ revenue clients)</td><td class="n">$6,500 to $10,000</td><td class="n">$10,000 to $13,500</td><td>Strategy, paid media, landing pages, some content, reporting, one throat to choke</td><td>Generic SaaS playbook; PR never included; you still supply positioning and every piece of trainer-facing content; founders report negative return from mid-tier agencies (SaaStr, Indie Hackers)</td></tr>
+<tr><td><strong>B. Freelancer bench, you as marketing lead</strong> (media buyer $2,000 to $3,000 flat, editor, copywriter, part-time marketer)</td><td class="n">$7,000 to $10,000</td><td class="n">$10,000 to $13,000</td><td>Cheapest hands; you control the message</td><td>Highest demand on your time, and you already have a full roster</td></tr>
+<tr><td><strong>C. Fractional marketing lead + freelance media buyer + content freelancer</strong> (fractional CMO $5,000 to $8,000 for 1 to 2 days a week; media buyer $2,500; content $2,000)</td><td class="n">$9,000 to $11,500</td><td class="n">$8,500 to $11,000</td><td>A senior owner of the plan who has launched SaaS before, without a 12-month lock; flat media fee beats a percentage below $20,000 spend</td><td>Execution still needs the freelancers; less raw ad money than A</td></tr>
+</table></div>
+<p><strong>Decided: C</strong>, started in January 2027 so positioning, site, tracking and a waitlist exist before the March launch, with a three-month fitness-industry PR push around launch (boutique fitness PR runs $3,000 to $7,500 a month) paid for by trimming ads in those months. If you would rather have one company, the only two that fit the budget and the stage are Directive and Bay Leaf; insist on owning the ad accounts, a 90-day exit, and trial and paid-conversion targets in the contract. The unit-economics reason is simple: at $79 to $199 a month per trainer, the cost to win one has to stay under about $800 to $1,200, and any structure that spends more than half the budget on fees is fighting the math. No agency category exists for marketing to trainers on behalf of fitness software; the reachable vertical channels are trainer podcasts, the Fitt Insider newsletter, and Perform Better and IDEA events.</p>
+<p>Store and payment rules that shape this: sell subscriptions on the web through Stripe (≈ 4.1% + 30¢ with Billing and Tax); a US app may link out to web checkout with 0% Apple commission today, with a 5% small-business rate proposed and pending. Apple's Small Business Program is 15% and Google Play is 15% on subscriptions if you sell in-app instead. HIPAA does not apply; the FTC Health Breach Notification Rule and Texas privacy law do.</p>
+
+<h2>5. What the launch brings in</h2>
+<p>A cohort model: each month, marketing spend divided by the cost to win one paying trainer gives new trainers; a monthly churn rate removes some; the first two months run at 60% and 85% because the funnel, site and waitlist are built before launch (Option C). Individuals are modelled at 5, 15 or 30 new a month with 10% monthly churn, scaled to marketing spend. Trainers at the $115 average, individuals at $49. Marketing stays at $20,000 a month after launch; the model was also run with marketing cut to $10,000 after month 6, and every scenario got worse, because acquisition is the growth engine. Keep the spend unless the funnel is not working.</p>
+<div class="tablewrap"><table>
+<tr><th>Months after March 2027 launch</th><th class="n">Conservative<br><small>$1,500 per trainer, 7% churn</small></th><th class="n">Base<br><small>$800 per trainer, 5.5% churn</small></th><th class="n">Optimistic<br><small>$500 per trainer, 4% churn</small></th></tr>
+<tr><td>6 (Aug 2027, the review)</td><td class="n">62 trainers + 22 individuals · $8,200/mo</td><td class="n">120 + 65 · $17,000/mo</td><td class="n">199 + 131 · $29,300/mo</td></tr>
+<tr><td>12 (Feb 2028)</td><td class="n">107 + 35 · $14,100</td><td class="n">217 + 105 · $30,000</td><td class="n">373 + 210 · $53,200</td></tr>
+<tr><td>18 (Aug 2028)</td><td class="n">137 + 42 · $17,800</td><td class="n">285 + 126 · $39,000</td><td class="n">509 + 252 · $70,900</td></tr>
+<tr><td>24 (Feb 2029)</td><td class="n">156 + 46 · $20,100</td><td class="n">334 + 137 · $45,100</td><td class="n">616 + 275 · $84,300</td></tr>
+<tr><td>36 (Feb 2030)</td><td class="n">176 + 49 · $22,600</td><td class="n">393 + 146 · $52,400</td><td class="n">765 + 293 · $102,300</td></tr>
+<tr class="total"><td>Monthly break-even (revenue ≥ $31,800)</td><td class="n"><span class="tag bad">never</span></td><td class="n">month 14, spring 2028</td><td class="n">month 7, late 2027</td></tr>
+<tr class="total"><td>Deepest cash need after launch</td><td class="n">keeps growing</td><td class="n">≈ $178,000</td><td class="n">≈ $92,000</td></tr>
+<tr class="total"><td>Loan payments start (at break-even)</td><td class="n"><span class="tag bad">never</span></td><td class="n">month 14, spring 2028</td><td class="n">month 7, late 2027</td></tr>
+<tr class="total"><td>Cash-positive with the loan payment included</td><td class="n"><span class="tag bad">never</span></td><td class="n">month 18, autumn 2028</td><td class="n">month 8, late 2027</td></tr>
+</table></div>
+<p><strong>The August 2027 review, in advance.</strong> The raise's launch block plus contingency is about $217,000, which covers the base case's deepest cash need of about $178,000 (including the first months of loan payments) without Option B, with about $35,000 to spare. Optimistic needs about $116,000 and is comfortably inside. Conservative is the one that cannot be fixed with money: revenue never reaches expenses, so the review decision on that path is to cut the marketing spend to what the founder-led funnel supports and rethink the channel, not to borrow. The signal to read in August is cost per paying trainer: under $900 and holding, keep going; over $1,200, stop paid spend.</p>
+<p><strong>Why these numbers and not bigger ones.</strong> The base case needs roughly 190 trial sign-ups a month at 10 to 15% conversion from a $20,000 budget. No company in this category has published growth like that from a standing start; TrueCoach and Trainerize took years. The model assumes paid channels work from month 3, which is the single biggest risk in the plan and the reason the review exists.</p>
+
+<h2>6. Terms and what they mean in dollars</h2>
+<div class="changed">
+<p><strong>Your terms:</strong> a $274,000 loan to the app LLC at <strong>7% a year</strong>, drawn in two tranches (about $60,000 in January, the balance at the March launch) so interest accrues only on money in use, with <strong>payments starting the month the app first covers its own running costs</strong> and then amortising over five years. Lauren becomes a <strong>10% owner</strong> of the LLC, written into the operating agreement, with 10% of profit distributions for as long as she holds it and the right to sell her interest back to you later. Profit is drawn by either of you only once the business account holds four months of expenses in retained earnings. The LLC is the only borrower; your training income is separate and untouched. Option B: if Lauren does not want to fund the developer, the $80,000 developer line is borrowed elsewhere.</p>
+</div>
+<div class="tablewrap"><table>
+<tr><th>Path</th><th class="n">Payments start</th><th class="n">Balance then, incl. accrued 7%</th><th class="n">Monthly payment, 5 years</th><th class="n">Total interest Lauren receives</th><th class="n">Trainers needed to cover the payment</th></tr>
+<tr><td>Optimistic</td><td class="n">month 8 after launch, late 2027</td><td class="n">$286,500</td><td class="n">$5,673</td><td class="n">$66,700</td><td class="n">≈ 49</td></tr>
+<tr><td>Base</td><td class="n">month 14, spring 2028</td><td class="n">$297,700</td><td class="n">$5,894</td><td class="n">$79,900</td><td class="n">≈ 51</td></tr>
+<tr><td>Conservative</td><td class="n">not reached in 4 years</td><td class="n">accrues</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+</table></div>
+<p class="src">Numbers are for the full $274,000; under Option B they scale to $209,000 (base payment ≈ $4,500). The conservative path is the reason the August 2027 review exists: on that path the loan is not serviceable from the app and the decision is a marketing cut and channel change, made early.</p>
+<p><strong>What Lauren gets, plainly.</strong> Interest of $66,700 to $79,900 on $274,000 over five years of payments, first payment late 2027 to mid 2028. Her 10% ownership is the upside: once the four-month reserve is met, profit distributions run at roughly $1,000 to $1,500 a month to her on the base path in year three and grow with the business, several times that on the optimistic path, and she holds 10% of whatever the company is worth if it is ever sold.</p>
+<h2>7. What changes in the proposal document</h2>
+<ul>
+<li>Section 1 rewritten to the measured figures above, including collected-through-app revenue and the AI unit cost.</li>
+<li>Section 2 replaced by the budget in Section 4: build plus six-month solid launch, itemised, with the developer line separable for Option B.</li>
+<li>Section 3 replaced: $274,000 loan at 7%, payments from break-even, plus 10% ownership with profit share and buy-back right, with Option B stated.</li>
+<li>Section 4 payback table replaced with the cohort model, the August 2027 review and the loan table above. Web launch March 2027, stores April to August.</li>
+<li>Section 6 competitors updated to 2026 prices; the pricing ladder and $199 cap stated; 0% payment fee.</li>
+<li>Section 7 risks rewritten around the three honest ones: the paid funnel working at scale, founder time, and multi-tenant engineering.</li>
+<li>Section 2 also states who runs the marketing (fractional lead plus media buyer, or one of two agencies that fit).</li>
+<li>A separate key-terms sheet for the lawyer once you confirm the terms.</li>
+</ul>
+
+<h2>8. Figures to confirm in the next few weeks</h2>
+<p>Checked on 11 September: the four competitor prices now match two independent listings each (PT Distinction $19.90 / $59.90 / $89.90; Kahunas $35 / $69 / $99; CoachRx $29 / $79 / $149 with a 2% fee per its own help centre; TrueCoach $29.98 / $69.98 / $164.98). Health-and-fitness search ads run $5.00 to $6.17 a click in 2026 benchmarks. Still to confirm, each with a quote or a screenshot; the model updates in minutes:</p>
+<ul>
+<li><strong>The developer:</strong> rate, hours, January start, and prior Next.js, Postgres or Supabase, and Stripe subscription work, in writing.</li>
+<li><strong>The marketing lead:</strong> two quotes for a fractional SaaS marketing lead at one to two days a week, and one flat-fee media buyer.</li>
+<li><strong>Insurance:</strong> one quote for general liability plus cyber for a small software LLC (budgeted $2,000 to $5,000 a year).</li>
+<li><strong>Lawyer:</strong> a fixed fee for the LLC operating agreement with Lauren's 10% interest, the loan note, and terms and privacy review (budgeted $3,000 to $5,500 in setup).</li>
+<li><strong>Hosting:</strong> current Supabase Pro and Vercel Pro list prices on the vendor pages.</li>
+<li><strong>TrueCoach's payment fee:</strong> one listing says Stripe payments are included free; the plan no longer assumes a 5% fee.</li>
+<li><strong>Your own average price:</strong> the $115 trainer average assumes a typical client mix; after the first 30 sign-ups replace it with the real number.</li>
+<li><strong>Apple's link-out fee:</strong> 0% today for US web checkout; a 5% small-business rate is proposed and pending in court.</li>
+</ul>
+<p><small>All revenue figures are projections built from published benchmarks, not guarantees. Cost ranges are from cited 2026 sources and should be confirmed with quotes before any agreement is signed. This is a planning document, not legal or financial advice.</small></p>
+</main>
