@@ -1313,51 +1313,130 @@ Accept; back from Recipes on his phone; the Light/Dark toggle. Also confirmed
 earlier the same day: recommend-my-targets, the consult asking for a deleted
 height, plan versions, and Trends being gone.
 
-### STILL OPEN ON THE NUTRITION SCREEN — TOMORROW'S LIST
+### TOMORROW'S LIST — 12 SEP, IN HIS ORDER
 
-In his order.
+He asked for this explicitly, at the end of a long night: *"I want a full list
+ready to go for tomorrow of what I have left to confirm so we don't lose our
+place in the audit."* Nothing on it needs re-deriving or re-asking.
 
-1. **The maxTokens truncation.** `plan-build` sets `maxTokens: 8000` and the
-   replies run **6,776-8,686** tokens. The JSON truncates mid-structure, both
-   attempts fail `No valid JSON`, and what reaches the screen comes from the
-   **salvage** path — which is why drafts kept landing +157 kcal / +62 g
-   protein off target. *"Fix the maxTokens truncation first thing tomorrow."*
-   **FIRST.**
-2. **AI-parse a food when adding to a draft.** The add-food sheet offers the
-   library only. *"There needs to be an option to AI parse, look up a food and
-   have AI go online and find the actual numbers for it just like everywhere
-   else. Make sure that's for the drafts for all options of creating a plan
-   with AI, not just this one."* `/api/nutrition-ai/parse` already exists.
-3. **Per-meal ⋯ and Edit** (inventory #31/#32). Explicitly deferred to
-   tomorrow; needs a saved plan on Test Client first.
-4. **Every mic in the app: click on, click off.** *"I don't want any mics
-   cutting off while somebody pauses."* Four files use SpeechRecognition;
-   `dictation.ts` sets `continuous = false`. One shared hook, app-wide.
-5. **Draft editor round 2:** swap a food for another IN PLACE, rebuild one meal
-   with AI to a per-meal target, reorder meals, and a before/after delta. Plus
-   *"the AI should automatically adjust the drafted meals to match those
-   calories"* when targets change — a re-fit action, not a silent rewrite.
-6. **The AI still cannot see the `recipes` table.** `libraryForAi.ts` serves a
-   hardcoded list; anything added on `/recipes` is invisible to every builder
-   and to the assistant. Contradicts his Batch 1 ruling; step-0 item.
-7. **The plan builder still invents macros** for any item it makes up — the
-   class his 9 Sep ruling removed from chat, still live here.
-8. **A library-vs-custom switch** for the builders — his design ask, not built.
-9. **The rest of the Nutrition walk.** Batches 2-6 of the control inventory are
-   unwalked. *"Anything else that's left to confirm on the audit needs to go on
-   tomorrow's list."*
-10. **The messages notification split** — PRs and finished workouts out of the
-    group chat and into a notifications bar/bell inside Messages only; messages
-    from him or other clients keep the existing push. **Mock-up only**, not
-    built. Not started.
-11. **Test Client's `ai_daily_plan_build_limit` back to 3/day.** Currently 200.
-    The 14 Sep Routine `trig_01EcEWnV4eU36KP2xKczDpes` carries this.
+**0. THE AI PRINCIPLE — go over this FIRST, before any building.**
 
-**The stale-PWA-history half of the back button** is not on the list because it
-is not harmful: *"from pretty much anywhere else, it goes back to the progress
-tab"* is Chrome replaying real screens from an earlier launch. If it ever reads
-wrong, stamp each entry with an in-session depth using `replaceState` ONLY —
-never push, see the v2/v3 sentinel note in `src/lib/nav/backFromHere.ts`.
+He sent a brief from another session (his Jarvis project) and asked for an
+assessment, not changes: *"add to that list to get your feedback on everything
+that I put from that other session about the AI. Don't change anything yet.
+Just add to the list for us to go over that first thing tomorrow so I can get
+all of your feedback and see if that's worth doing or not."*
+
+The principle: **understanding happens in the model, execution happens in code,
+nothing in between guesses.** No regexes recognising intent, no hand-written
+name matchers, no silently truncated lists, no keyword routing deciding what
+context a request needs. The model gets what a good assistant would have, emits
+a structured action, and code validates and executes it.
+
+The assessment was given in chat on 11 Sep and is summarised here so it is not
+lost. **Headline: the app largely already works this way** — `resolveMealRef`
+resolves-or-asks and never guesses, and `act/route.ts` prices every food from
+the catalogue rather than from the model. The wins are the gaps, and two are
+live right now:
+
+| | finding | where |
+|---|---|---|
+| **a** | **The trainer agent can only see 60 of 113 programmes**, cut alphabetically, with no total returned so the model cannot know the list is partial. 53 invisible. This is his "contact list capped at 400" bug, in this app, today. | `src/lib/ai/agent-tools.ts:501` |
+| **b** | **The agent cannot see any archived client.** Eight are archived, including Robert Miller (still trains, still pays) and Test Client (the one being audited with). Returns nothing, explains nothing. | `agent-tools.ts:336` |
+| **c** | **The movement matcher is substring-only on the name, and aliases are effectively empty** — 858 exercises, 6 with aliases. No hyphen/space normalising, so "pull up" misses "Pull-Up" and "RDL" misses "Romanian Deadlift". A miss tells the client *"that one isn't in your programme"* — confidently wrong about a movement they have. | `src/lib/ai/movementContext.ts:86` |
+| **d** | The AI still cannot see the `recipes` table — 38 rows invisible to every builder. | `src/lib/nutrition/libraryForAi.ts` |
+| **e** | `.order("metric_date", ascending: true).limit(400)` takes the OLDEST 400 weigh-ins. Harmless today (max 28 per client) but it drops the recent half first when it bites. | `src/lib/ai/goalContext.ts:49` |
+| **f** | `exercises .limit(1000)` with 858 rows — 86% of the way to a silent cliff. | `movementContext.ts:126` |
+
+**What must NOT move to the model:** `symptomTriage.ts`. Its own header has the
+argument — *"A safety list a model is asked to remember is a list it will
+eventually forget one item from, silently, on a turn nobody is watching"* — and
+it carries a compiled-in `RED_FLOOR` because the database-only version failed
+silently to "none" on "my hand went numb". Also staying in code: auth scope, the
+meter and cap, Central-time date arithmetic, 4/4/9 macro maths, and food pricing
+from `food_catalog`.
+
+**Also flagged:** injuries and chronic conditions ALREADY go to the model
+(`assessmentContext.ts:99`, `coach-context.ts:346`). Arguably necessary for
+coaching, but it is a line to decide on deliberately rather than inherit. And
+the NASM-terminology ban is enforced in three separate prompts — any
+consolidation has to carry it or it is gone from surfaces that had it.
+
+**Proposed staging (nothing started):** (1) uncap and count `list_programs`,
+`find_clients`, `exercises`, returning `{rows, total, truncated}` and including
+archived clients with a flag — ~2h; (2) fix the movement matcher — ~2h; (3) wire
+`recipes` in — ~2h; (4) one shared action envelope behind a flag — ~1 day;
+(5) golden-transcript tests per action — ~1 day.
+
+---
+
+**1. The maxTokens truncation.** `plan-build` sets `maxTokens: 8000` and the
+replies run **6,776-8,686** tokens. The JSON truncates mid-structure, both
+attempts fail `No valid JSON`, and what reaches the screen comes from the
+**salvage** path — which is why drafts kept landing +157 kcal / +62 g protein
+off target. *"Fix the maxTokens truncation first thing tomorrow."*
+
+**2. AI-parse a food when adding to a draft.** The add-food sheet offers the
+library only. *"There needs to be an option to AI parse, look up a food and have
+AI go online and find the actual numbers for it just like everywhere else. Make
+sure that's for the drafts for all options of creating a plan with AI, not just
+this one."* `/api/nutrition-ai/parse` already exists.
+
+**3. Per-meal ⋯ and Edit** (control inventory #31/#32). Deferred by him on
+11 Sep; needs a saved plan on Test Client first.
+
+**4. Every mic in the app: click on, click off.** *"I don't want any mics
+cutting off while somebody pauses."* Four files use SpeechRecognition;
+`dictation.ts` sets `continuous = false`. One shared hook, app-wide.
+
+**5. Draft editor round 2:** swap a food for another IN PLACE, rebuild one meal
+with AI to a per-meal target, reorder meals, and a before/after delta. Plus
+*"the AI should automatically adjust the drafted meals to match those
+calories"* when targets change — a re-fit action, not a silent rewrite.
+
+**6. The plan builder still invents macros** for any item it makes up — the
+class his 9 Sep ruling removed from chat, still live here.
+
+**7. A library-vs-custom switch** for the builders — his design ask, not built.
+
+**8. The rest of the Nutrition walk.** Batches 2-6 of the control inventory are
+unwalked. *"Anything else that's left to confirm on the audit needs to go on
+tomorrow's list."*
+
+**9. The messages notification split** — PRs and finished workouts out of the
+group chat and into a notifications bar/bell inside Messages only; messages from
+him or other clients keep the existing push. **Mock-up only**, not built, not
+started.
+
+**10. Test Client's `ai_daily_plan_build_limit` back to 3/day.** Currently 200.
+The 14 Sep Routine `trig_01EcEWnV4eU36KP2xKczDpes` carries this.
+
+### CONFIRMED BY HIM — DO NOT RE-ASK
+
+On the live app, 11 Sep evening: the draft numbers following add / clear an
+amount / ✕ / remove-meal / revert; the percentage split going red and blocking
+Accept; back from Recipes on his phone; the Light/Dark toggle. Earlier the same
+day: recommend-my-targets, the consult asking for a deleted height, plan
+versions, Trends being gone, and the plan menu batch.
+
+Two design rulings, both settled and both recorded in the mock-up sheet:
+
+- **The meals stay in place.** *"Leave the meals in place. Do not hoist them at
+  the top."* The next meal due is marked without being moved — bright fill on
+  the day summary, a NEXT label in its meta line. This is the one place
+  Nutrition deliberately does not copy the Workout tab.
+- **The strongest background, approved and live.** *"Mockup is approved. Use
+  strongest for the background."* `--sink: 24%`, `--page-tint: 8%`,
+  `--tile-deep: 0%` → 1.836-2.230 across the light schemes, applied to
+  Nutrition AND Workout in one change because both wrap their whole tree in
+  `.sym-page`.
+
+**The stale-PWA-history half of the back button is deliberately NOT on the
+list.** *"From pretty much anywhere else, it goes back to the progress tab"* is
+Chrome replaying real screens from an earlier launch, and it is not harmful. If
+it ever starts reading wrong, stamp each entry with an in-session depth using
+`replaceState` ONLY — never push, see the v2/v3 sentinel note in
+`src/lib/nav/backFromHere.ts`.
 
 
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
