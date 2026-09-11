@@ -2772,13 +2772,27 @@ option:hover {
      tile from --brand-surface, two INDEPENDENT tokens, so the gap between them
      was whatever each palette happened to have. Nobody chose 1.13; it fell out.
 
-     6% → 12% puts every light scheme between 1.285 and 1.415, a spread of
-     0.010 — the same relationship everywhere, each keeping its own hue, which
-     is what he asked for ("I'd like them all to be the same on each color
-     scheme"). It is a deeper shade of the scheme's own background, not a
-     neutral grey and not white. */
-  --sink: 12%;
-  --tile-deep: 4%;
+     6% → 12% put every light scheme between 1.285 and 1.415. He looked at
+     that on the live app and it was still not enough:
+
+     Dustin, 11 Sep, round two: *"whenever you switch it to light mode, a lot
+     of the color schemes, the actual tiles are too close to the same exact
+     color to the background. So it's the background that we need to adjust…
+     I need a little bit more contrast so the tiles pop out a little bit more
+     and separate from each other."*
+
+     He was shown five stops on the mock-up sheet and picked the strongest:
+     a 24% sink, 8% of the scheme's own primary mixed back in, and a tile left
+     as its own surface. 1.836 – 2.230 across the twenty-three light schemes,
+     against 1.130 – 1.209 before any of this.
+
+     THE TINT IS WHY IT IS NOT GREY. Sinking alone desaturates on the way
+     down — at 24% and no tint, Citrus goes from a pale green to #B4B7BC,
+     which is a grey. Mixing the primary back in afterwards holds the hue, so
+     Citrus lands on #B8C2B2 and Hot Pink on #DBBACB: deeper shades of their
+     own schemes, which is what he asked for both times. */
+  --sink: 24%;
+  --tile-deep: 0%;
   /* Dark schemes cannot solve it this way: their pages are already within a few
      points of black, so sinking further moves nothing. There the TILE lifts
      instead — see the dark block below. */
@@ -2814,7 +2828,7 @@ option:hover {
      0% by default, which is exactly the behaviour above it, so this commit
      changes no pixel anywhere. It exists so the mock-up sheet and the app
      move the same three numbers. */
-  --page-tint: 0%;
+  --page-tint: 8%;
   background: color-mix(in srgb, var(--brand-primary) var(--page-tint),
     color-mix(in srgb, #070A10 var(--sink), var(--brand-bg)));
   min-height: 100vh;
@@ -3540,11 +3554,11 @@ body.mk {
     <button data-m="dark" aria-pressed="false">Dark</button>
   </div>
   <div class="mk-seg"><span>BACKGROUND</span>
-    <button data-s="was" aria-pressed="false">Was</button>
-    <button data-s="now" aria-pressed="true">Live now</button>
+    <button data-s="was" aria-pressed="false">Original</button>
+    <button data-s="first" aria-pressed="false">First fix</button>
     <button data-s="more" aria-pressed="false">More</button>
     <button data-s="strong" aria-pressed="false">Strong</button>
-    <button data-s="most" aria-pressed="false">Strongest</button>
+    <button data-s="now" aria-pressed="true">Live now</button>
   </div>
   <span class="mk-read" id="mk-read"></span>
   <span class="mk-read" id="mk-sepnote"></span>
@@ -3954,11 +3968,14 @@ body.mk {
      is for.
 
      The ranges each stop produces across the twenty-three light schemes:
-       was       1.130 – 1.209   the merge he reported in the first place
-       live now  1.292 – 1.416   shipped 11 Sep
+       original  1.130 – 1.209   the merge he reported in the first place
+       first fix 1.292 – 1.416   shipped earlier on 11 Sep, still not enough
        more      1.496 – 1.749
        strong    1.657 – 1.973
-       strongest 1.836 – 2.230
+       live now  1.836 – 2.230   APPROVED and shipped — "use strongest"
+
+     The other four stay so the decision can be walked back or nudged without
+     rebuilding the sheet.
 
      LIGHT SCHEMES ONLY. A dark page is a different problem — its page is
      already near black, so sinking moves nothing and the TILE lifts instead —
@@ -3966,10 +3983,10 @@ body.mk {
      down and the dark block's own numbers apply. */
   var SEP = {
     was:    ['6%',  '0%', '4%'],
-    now:    ['12%', '0%', '4%'],
+    first:  ['12%', '0%', '4%'],
     more:   ['16%', '4%', '0%'],
     strong: ['20%', '6%', '0%'],
-    most:   ['24%', '8%', '0%']
+    now:    ['24%', '8%', '0%']
   };
   var sep = 'now';
 

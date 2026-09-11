@@ -2765,13 +2765,27 @@ option:hover {
      tile from --brand-surface, two INDEPENDENT tokens, so the gap between them
      was whatever each palette happened to have. Nobody chose 1.13; it fell out.
 
-     6% → 12% puts every light scheme between 1.285 and 1.415, a spread of
-     0.010 — the same relationship everywhere, each keeping its own hue, which
-     is what he asked for ("I'd like them all to be the same on each color
-     scheme"). It is a deeper shade of the scheme's own background, not a
-     neutral grey and not white. */
-  --sink: 12%;
-  --tile-deep: 4%;
+     6% → 12% put every light scheme between 1.285 and 1.415. He looked at
+     that on the live app and it was still not enough:
+
+     Dustin, 11 Sep, round two: *"whenever you switch it to light mode, a lot
+     of the color schemes, the actual tiles are too close to the same exact
+     color to the background. So it's the background that we need to adjust…
+     I need a little bit more contrast so the tiles pop out a little bit more
+     and separate from each other."*
+
+     He was shown five stops on the mock-up sheet and picked the strongest:
+     a 24% sink, 8% of the scheme's own primary mixed back in, and a tile left
+     as its own surface. 1.836 – 2.230 across the twenty-three light schemes,
+     against 1.130 – 1.209 before any of this.
+
+     THE TINT IS WHY IT IS NOT GREY. Sinking alone desaturates on the way
+     down — at 24% and no tint, Citrus goes from a pale green to #B4B7BC,
+     which is a grey. Mixing the primary back in afterwards holds the hue, so
+     Citrus lands on #B8C2B2 and Hot Pink on #DBBACB: deeper shades of their
+     own schemes, which is what he asked for both times. */
+  --sink: 24%;
+  --tile-deep: 0%;
   /* Dark schemes cannot solve it this way: their pages are already within a few
      points of black, so sinking further moves nothing. There the TILE lifts
      instead — see the dark block below. */
@@ -2807,7 +2821,7 @@ option:hover {
      0% by default, which is exactly the behaviour above it, so this commit
      changes no pixel anywhere. It exists so the mock-up sheet and the app
      move the same three numbers. */
-  --page-tint: 0%;
+  --page-tint: 8%;
   background: color-mix(in srgb, var(--brand-primary) var(--page-tint),
     color-mix(in srgb, #070A10 var(--sink), var(--brand-bg)));
   min-height: 100vh;

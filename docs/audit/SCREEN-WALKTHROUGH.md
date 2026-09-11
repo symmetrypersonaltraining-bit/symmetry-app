@@ -3859,3 +3859,49 @@ AutoDark's real rule, a **"Before the fix"** toggle that puts the 6% sink back
 so the merge is visible side by side, and a live page-vs-tile contrast readout
 measured off the rendered pixels rather than the tokens, so it cannot flatter
 the fix.
+
+### Approved and live: the strongest background  ·  11 Sep 2026
+
+He looked at the first fix on the live app and it was not enough:
+
+> *"Whenever you switch it to light mode, a lot of the color schemes, the
+> actual tiles are too close to the same exact color to the background. So
+> it's the background that we need to adjust… I need a little bit more
+> contrast so the tiles pop out a little bit more and separate from each
+> other. Remember this gets applied once I approve it to the nutrition page
+> and the workout page."*
+
+Five stops went onto the mock-up sheet rather than a guess at what "a little
+bit more" meant. His answer: **`"use strongest for the background"`**.
+
+| stop | light schemes |
+|---|---|
+| original | 1.130 – 1.209 |
+| first fix (earlier the same day) | 1.292 – 1.416 |
+| more | 1.496 – 1.749 |
+| strong | 1.657 – 1.973 |
+| **live now — approved** | **1.836 – 2.230** |
+
+`--sink: 24%`, `--page-tint: 8%`, `--tile-deep: 0%`. The tile is now simply its
+own surface; all the separation comes from the page.
+
+**Why there is a tint at all.** Sinking toward near-black darkens every scheme
+by the same amount and desaturates it on the way down. At 24% with no tint,
+Citrus lands on `#B4B7BC` — a grey, and the scheme is gone. Mixing 8% of the
+scheme's own primary back in afterwards holds the hue: Citrus `#B8C2B2`, Hot
+Pink `#DBBACB`, Orange `#C3B0A1`, Lagoon `#A9BABC`, Forest `#ACB6AE`. Deeper
+shades of their own schemes, which is what he asked for both times.
+
+**Both pages at once, and nothing else.** `.sym-page` is the wrapper and only
+three files carry it: the Nutrition v3 client, the Workout tab, and the app
+error screen. Both target screens wrap their whole tree in it, so every tile,
+sheet and control inside them moves together — there was no per-component work
+to do. `WorkoutDaySheet` is the one thing that portals to `document.body`
+instead; it uses none of the tile tokens, so it is unaffected.
+
+The dark side is untouched. A dark page is already within a few points of
+black, so sinking moves nothing — there the tile lifts instead, and he said the
+dark side reads right.
+
+The mock-up sheet keeps all five stops so the decision can be walked back or
+nudged without rebuilding it.
