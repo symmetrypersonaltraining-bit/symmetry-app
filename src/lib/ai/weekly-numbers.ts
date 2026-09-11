@@ -69,11 +69,19 @@ export interface MacroSet {
   f: number;
 }
 
-/** Everything measured about one week. Averages are PER LOGGED DAY. */
+/**
+ * Everything measured about one week. Averages are PER FINISHED DAY IN THE
+ * WINDOW — an unlogged day counts as zero. Dustin, 11 Sep 2026, quoted in
+ * rangeAverages.ts; this reversed the old per-logged-day rule on purpose.
+ */
 export interface WeekFacts {
   window: WeekWindow;
   /** Days in the window with at least one food log. */
   loggedDays: number;
+  /** Finished days with nothing logged — each one is a ZERO inside `avg`. */
+  unloggedDays: number;
+  /** Those dates, so the model names them instead of guessing. */
+  unloggedDates: string[];
   /**
    * Days actually behind `avg`. Lower than loggedDays when the in-progress day
    * is left out — half a day of food would drag the average down and the model
@@ -114,6 +122,8 @@ export interface MacroTarget {
 export const EMPTY_WEEK = (window: WeekWindow): WeekFacts => ({
   window,
   loggedDays: 0,
+  unloggedDays: 0,
+  unloggedDates: [],
   avgDays: 0,
   avg: null,
   adherence: null,
@@ -180,16 +190,30 @@ export function weekFactsLines(f: WeekFacts, label: string, target: MacroTarget 
   if (!f.avg || !f.loggedDays) {
     out.push(`- Nutrition: nothing logged (${loggingLine(f)}).`);
   } else {
-    // When today is left out of the averages, say so in the same breath as the
-    // numbers — otherwise "logged 6 of 6 days" next to a 5-day average reads
-    // like an arithmetic error to anyone checking it.
-    const basis =
-      f.avgDays && f.avgDays !== f.loggedDays
-        ? ` averages across the ${f.avgDays} completed logged day${f.avgDays === 1 ? "" : "s"} (today is still in progress and is deliberately excluded)`
-        : " averages per logged day";
+    // THE AVERAGE IS OVER EVERY FINISHED DAY, AND THE MODEL IS TOLD SO.
+    //
+    // Dustin, 11 Sep 2026: *"Let's say there's two days that had nothing logged
+    // and it drops their average way down. The AI for Dustin's assistant and
+    // for Your Week needs to be able to reference that and say there was
+    // nothing logged on these two days — you need to get better at logging if
+    // you actually ate those days and just didn't log. The AI needs to be aware
+    // of that as a possibility always."*
+    //
+    // So the basis names the divisor, and the zero days are listed by date with
+    // an instruction that cannot be read two ways. Without this line the model
+    // sees a low average next to a target and coaches a deficit that may not
+    // exist.
+    const finished = f.avgDays + f.unloggedDays;
+    const excl = f.avgDays !== f.loggedDays ? " (today is still in progress and is deliberately excluded)" : "";
     out.push(
-      `- Nutrition: ${loggingLine(f)};${basis} ${r0(f.avg.kcal)} kcal, ${r0(f.avg.p)}g protein, ${r0(f.avg.c)}g carbs, ${r0(f.avg.f)}g fat.`,
+      `- Nutrition: ${loggingLine(f)}; averages over ALL ${finished} finished day${finished === 1 ? "" : "s"} in this window${excl}: ${r0(f.avg.kcal)} kcal, ${r0(f.avg.p)}g protein, ${r0(f.avg.c)}g carbs, ${r0(f.avg.f)}g fat.`,
     );
+    if (f.unloggedDays > 0) {
+      const days = f.unloggedDates.length ? ` (${f.unloggedDates.join(", ")})` : "";
+      out.push(
+        `  ${f.unloggedDays} of those day${f.unloggedDays === 1 ? "" : "s"} had NOTHING logged${days} and COUNT AS ZERO in the average above. If they ate on those days, the true average is HIGHER than shown. Say this plainly, name the days, and tell them to log every day — do NOT coach a deficit or a "you're under-eating" off an average that is low because of missing logs.`,
+      );
+    }
     if (target) {
       const d = (a: number, t: number) => `${signed(r0(a - t))} (${dirWord(r0(a - t), "ABOVE", "BELOW", "on")} target)`;
       out.push(

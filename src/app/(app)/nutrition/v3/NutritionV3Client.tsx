@@ -1910,6 +1910,20 @@ export default function NutritionV3Client(props: Props) {
               </>
             )}
 
+            {/* WHAT THE AVERAGE IS OVER — said on the tile, not assumed.
+                It divides by every finished day in the window, and a day with
+                nothing logged is a zero (Dustin, 11 Sep, quoted in
+                rangeAverages.ts). A number that can be dragged down by a
+                missed log has to say so where it is read. */}
+            {showAvg && avgOk && avgResult && (
+              <p className="mt-2 text-center" style={{ fontSize: 10, color: "var(--brand-text-secondary)", lineHeight: 1.35 }}>
+                {`avg per day over all ${avgResult.totalDays} days`}
+                {avgResult.unloggedDays > 0
+                  ? ` · ${avgResult.unloggedDays} unlogged day${avgResult.unloggedDays === 1 ? "" : "s"} counted as 0`
+                  : ""}
+              </p>
+            )}
+
             {/* adherence + logging rate — always shown */}
             <div className="sym-split">
               <div>

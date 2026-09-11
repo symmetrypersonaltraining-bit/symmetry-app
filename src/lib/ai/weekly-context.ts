@@ -9,6 +9,7 @@
 import { Db } from "@/lib/ai/scope";
 import { LogRow, PlanMeal } from "@/lib/nutrition/dailyTotals";
 import { summariseLogRange } from "@/lib/nutrition/rangeAverages";
+import { shiftDate } from "@/lib/central-time";
 import {
   EMPTY_WEEK,
   MacroTarget,
@@ -103,10 +104,15 @@ function factsFor(
     });
 
   const wLogs = inWin(logs, "log_date");
+  // The dates themselves, not just the count, so an unlogged day is a named
+  // zero the model can point at rather than an invisible drag on the average.
+  const windowDates: string[] = [];
+  for (let d = window.start; d <= window.end; d = shiftDate(d, 1)) windowDates.push(d);
   const sum = summariseLogRange(wLogs, pseudoMeals, {
     excludeDates: inProgressDate ? [inProgressDate] : [],
     target,
     windowDays: window.days,
+    windowDates,
   });
   const sw = inWin(workouts, "scheduled_date");
   const wi = inWin(weighIns, "metric_date")
@@ -117,6 +123,8 @@ function factsFor(
     ...EMPTY_WEEK(window),
     loggedDays: sum.loggedDays,
     avgDays: sum.avgDays,
+    unloggedDays: sum.unloggedDays,
+    unloggedDates: sum.unloggedDates,
     avg: sum.loggedDays ? { kcal: sum.kcal, p: sum.p, c: sum.c, f: sum.f } : null,
     adherence: sum.adherence,
     consistency: sum.consistency,

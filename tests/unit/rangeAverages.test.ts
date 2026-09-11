@@ -49,10 +49,34 @@ test("an empty range reports nothing rather than a zero average", () => {
   assert.equal(s.adherence, null, "no plan logs must be null, not 0% adherence");
 });
 
-test("averages divide by LOGGED days, not calendar days", () => {
-  // Two logged days inside a seven-day window. The average must be the average
-  // of those two — counting the five silent days as 0 kcal would report a
-  // starving client who simply didn't open the app.
+const WEEK = ["2026-07-20", "2026-07-21", "2026-07-22", "2026-07-23", "2026-07-24", "2026-07-25", "2026-07-26"];
+
+test("averages divide by the DAYS IN THE WINDOW — an unlogged day is a zero", () => {
+  // This test used to assert the opposite: "counting the five silent days as
+  // 0 kcal would report a starving client who simply didn't open the app."
+  // Dustin reversed that on 11 Sep 2026, on purpose: "I want it to go by all
+  // fourteen days. That way there's a lot more incentive to never skip logging.
+  // We need to know the average even if they forgot to log. That's their
+  // problem." The starving-client risk is handled by TELLING the AI which days
+  // are zeros (see anUnloggedDayIsAZero.test.ts), not by hiding them.
+  const logs = [
+    planLog("2026-07-20", 1, "m1", "Full"),
+    planLog("2026-07-20", 2, "m2", "Full"),
+    planLog("2026-07-24", 1, "m1", "Full"),
+    planLog("2026-07-24", 2, "m2", "Full"),
+  ];
+  const s = summariseLogRange(logs, PLAN, { windowDates: WEEK });
+  assert.equal(s.loggedDays, 2);
+  assert.equal(s.windowDays, 7);
+  assert.equal(Math.round(s.kcal), Math.round((2 * (M1_KCAL + M2_KCAL)) / 7), "two full days spread over seven");
+  assert.equal(Math.round(s.p * 10) / 10, Math.round((2 * 90 / 7) * 10) / 10);
+  assert.equal(s.unloggedDays, 5);
+  assert.deepEqual(s.unloggedDates, ["2026-07-21", "2026-07-22", "2026-07-23", "2026-07-25", "2026-07-26"]);
+  // Adherence is about the days they DID log and is untouched by this ruling.
+  assert.equal(Math.round(s.adherence!), 100);
+});
+
+test("with no window at all, per logged day is the only possible answer", () => {
   const logs = [
     planLog("2026-07-20", 1, "m1", "Full"),
     planLog("2026-07-20", 2, "m2", "Full"),
@@ -60,10 +84,9 @@ test("averages divide by LOGGED days, not calendar days", () => {
     planLog("2026-07-24", 2, "m2", "Full"),
   ];
   const s = summariseLogRange(logs, PLAN);
-  assert.equal(s.loggedDays, 2);
+  assert.equal(s.windowDays, null);
   assert.equal(Math.round(s.kcal), M1_KCAL + M2_KCAL);
-  assert.equal(Math.round(s.p), 90);
-  assert.equal(Math.round(s.adherence!), 100);
+  assert.equal(s.unloggedDays, 0);
 });
 
 test("partial adherence prorates both the macros and the percentage", () => {

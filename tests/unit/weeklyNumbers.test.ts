@@ -248,17 +248,25 @@ test("when today is left out of the averages the basis is spelled out beside the
     "THIS WEEK SO FAR", null,
   ).join("\n");
   assert.match(lines, /logged food on 6 of 6 days/);
-  assert.match(lines, /averages across the 5 completed logged days/);
+  // The basis sentence changed on 11 Sep 2026 — the average is now over every
+  // finished day in the window (Dustin: "all of the fourteen days added
+  // together divided by fourteen"). What this test protects is unchanged: a
+  // 6-of-6 logging line beside a 5-day average has to say why, in the same
+  // breath.
+  assert.match(lines, /averages over ALL 5 finished days in this window/);
   assert.match(lines, /today is still in progress and is deliberately excluded/);
   assert.match(lines, /2713 kcal, 295g protein/);
 });
 
-test("with nothing excluded the wording stays the plain per-logged-day one", () => {
+test("with nothing excluded the wording states the window and nothing more", () => {
   const lines = weekFactsLines(
     facts({ loggedDays: 6, avgDays: 6, avg: { kcal: 2293, p: 264, c: 32, f: 124 } }),
     "LAST WEEK", null,
   ).join("\n");
-  assert.match(lines, /averages per logged day/);
+  // "averages per logged day" is gone on purpose — an unlogged day is a zero
+  // now, so that sentence would be a lie. The basis is the window.
+  assert.match(lines, /averages over ALL 6 finished days in this window:/);
+  assert.doesNotMatch(lines, /averages per logged day/);
   assert.ok(!/deliberately excluded/.test(lines), "nothing was excluded, so don't say it was");
 });
 
